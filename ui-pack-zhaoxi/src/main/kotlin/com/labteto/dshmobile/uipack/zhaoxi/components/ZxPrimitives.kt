@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.border
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
@@ -216,6 +218,9 @@ fun ZxSwitch(
     val c = ZhaoxiTheme.colors
     val spec = ZhaoxiMotion.spec<androidx.compose.ui.graphics.Color>(ZhaoxiDuration.FAST)
     val track by animateColorAsState(if (checked) c.accent else c.bg2, spec, label = "zxSwTrack")
+    val thumbX by animateDpAsState(
+        if (checked) 18.dp else 0.dp,
+        ZhaoxiMotion.spec(ZhaoxiDuration.FAST), label = "zxSwThumb")
     Box(
         modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
@@ -224,8 +229,8 @@ fun ZxSwitch(
     ) {
         Box(Modifier.size(width = 44.dp, height = 26.dp)
             .clip(RoundedCornerShape(13.dp)).background(track).padding(3.dp),
-            contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart) {
-            Box(Modifier.size(20.dp).clip(CircleShape).background(c.card))
+            contentAlignment = Alignment.CenterStart) {
+            Box(Modifier.offset(x = thumbX).size(20.dp).clip(CircleShape).background(c.card))
         }
     }
 }
