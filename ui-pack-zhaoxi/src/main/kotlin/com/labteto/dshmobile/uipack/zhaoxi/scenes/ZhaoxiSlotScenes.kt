@@ -64,14 +64,20 @@ fun ZhaoxiTimelineScene(
 ) {
     val snap by chat.snapshots.collectAsState(initial = chat.snapshot())
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var branchFailure by remember(snap.identity) { mutableStateOf<UiCommandReceipt?>(null) }
     androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
+        CommandFeedback(branchFailure)
         if (snap.messages.isEmpty() && snap.phase != UiExecutionPhase.RUNNING)
             ZxEmpty("还没有消息", "从下方输入框开始")
         ConversationMessages(snap.identity, snap.messages, reading, history,
             Modifier.weight(1f), onMessage = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(it.text)) },
-            onBranch = { m, index -> snap.identity?.let {
-                chat.submit(ChatUiCommand.SelectVariant(it, m.id, index))
-            } }, preview = snap.livePreview,
+            onBranch = { m, index ->
+                val identity = snap.identity
+                val response = if (identity == null)
+                    UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                else chat.submit(ChatUiCommand.SelectVariant(identity, m.id, index))
+                branchFailure = response.takeUnless { it.admitted() }
+            }, preview = snap.livePreview,
             running = snap.phase == UiExecutionPhase.RUNNING,
             documents = documents, knownScenes = knownScenes, media = media)
     }
@@ -86,6 +92,7 @@ fun ZhaoxiMessageActionsScene(
     onRegenerate: () -> UiCommandReceipt = { UiCommandReceipt.NotAdmitted },
 ) {
     var regenerateReceipt by remember(message.id) { mutableStateOf<UiCommandReceipt?>(null) }
+    var copied by remember(message.id) { mutableStateOf(false) }
     ZxPage("消息操作", onBack = { scope.onBack() }) {
         CommandFeedback(regenerateReceipt)
         Spacer(Modifier.height(8.dp))
@@ -101,9 +108,11 @@ fun ZhaoxiMessageActionsScene(
         }
         ZxNavRow("阅读文本") { scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("conversation.reader")) }
         val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
-        ZxNavRow("复制文本", sub = "") {
+        ZxNavRow("复制文本") {
             clipboard.setText(androidx.compose.ui.text.AnnotatedString(message.text))
+            copied = true
         }
+        if (copied) ZxFooterNote("已复制")
 
     }
 }
