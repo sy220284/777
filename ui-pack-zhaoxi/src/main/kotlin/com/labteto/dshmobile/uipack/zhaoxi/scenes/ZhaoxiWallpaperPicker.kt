@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +26,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.uipack.zhaoxi.components.zxPressSurface
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip
 import com.labteto.dshmobile.uipack.zhaoxi.theme.zhaoxiWallpaperPresets
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -47,10 +51,15 @@ import java.util.zip.ZipInputStream
 
 /** The ten previews are actual packaged artwork, decoded as small bitmaps off the UI thread. */
 @Composable
-internal fun ZhaoxiWallpaperPicker(selectedPreset: String, onSelect: (String) -> Unit) {
+internal fun ZhaoxiWallpaperPicker(
+    selectedPreset: String,
+    saving: Boolean,
+    onSelect: (String) -> Unit,
+) {
     val context = LocalContext.current
-    val previews by produceState<Map<String, ImageBitmap>>(emptyMap(), context) {
-        value = withContext(Dispatchers.IO) {
+    var previewRevision by remember { mutableIntStateOf(0) }
+    val previewResult by produceState<Result<Map<String, ImageBitmap>>?>(null, context, previewRevision) {
+        value = runCatching { withContext(Dispatchers.IO) {
             buildMap {
                 context.assets.open("e818_wallpapers.zip").use { source ->
                     ZipInputStream(source).use { zip ->
@@ -76,8 +85,10 @@ internal fun ZhaoxiWallpaperPicker(selectedPreset: String, onSelect: (String) ->
                     }
                 }
             }
-        }
+        } }
     }
+    val previews = previewResult?.getOrNull().orEmpty()
+    val previewError = previewResult?.isFailure == true
     val c = ZhaoxiTheme.colors
     val entries = listOf("auto" to "跟随主题") + zhaoxiWallpaperPresets.map { it.key to it.label }
     LazyRow(
@@ -94,8 +105,8 @@ internal fun ZhaoxiWallpaperPicker(selectedPreset: String, onSelect: (String) ->
                     .clip(RoundedCornerShape(14.dp))
                     .border(BorderStroke(if (active) 2.dp else 1.dp, if (active) c.accent else c.line),
                         RoundedCornerShape(14.dp))
-                    .clickable(interactionSource = interaction, indication = LocalIndication.current,
-                        role = Role.RadioButton) { onSelect(key) }
+                    .clickable(enabled = !saving, interactionSource = interaction,
+                        indication = LocalIndication.current, role = Role.RadioButton) { onSelect(key) }
                     .semantics { selected = active }
                     .padding(5.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -114,15 +125,25 @@ internal fun ZhaoxiWallpaperPicker(selectedPreset: String, onSelect: (String) ->
                         modifier = Modifier.fillMaxWidth().height(122.dp),
                     )
                     else if (key == "auto") Text("自动", color = c.ink, fontSize = 17.sp)
-                    else Text("加载中", color = c.ink2, fontSize = 11.sp)
+                    else Text(
+                        when {
+                            previewResult == null -> "加载中"
+                            previewError -> "预览失败"
+                            else -> "暂无预览"
+                        }, color = c.ink2, fontSize = 11.sp,
+                    )
                     if (active) Text("✓",
                         modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
                             .clip(CircleShape).background(c.card).padding(horizontal = 5.dp, vertical = 1.dp),
                         color = c.accentInk, fontSize = 12.sp)
                 }
                 Text(name, color = if (active) c.accentInk else c.ink2,
-                    fontSize = 11.sp, maxLines = 1)
+                    fontSize = 12.sp, maxLines = 2, lineHeight = 15.sp,
+                    modifier = Modifier.heightIn(min = 32.dp))
             }
         }
+    }
+    if (previewError) {
+        ZxChip("壁纸预览读取失败，重新加载", false) { previewRevision++ }
     }
 }
