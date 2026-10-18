@@ -510,13 +510,23 @@ class ZhaoxiApplicationScenePack(
             "settings.memory_settings" -> settings?.let { ZhaoxiMemorySettingsScene(it, scope) }
             "settings.account" -> settings?.let { ZhaoxiAccountScene(it, scope) }
             "settings.minimax_quota" -> settings?.let { ZhaoxiQuotaScene(it, scope) }
-            "settings.usage" -> usageOwner?.let { ZhaoxiUsageOverviewScene(it, scope, settings = settings) }
-            "settings.model_usage" -> usageOwner?.let { ZhaoxiUsageOverviewScene(it, scope, modelOnly = true, settings = settings) }
+            "settings.usage" -> usageOwner?.let {
+                ZhaoxiUsageOverviewScene(it, scope, settings = settings, onOpenLog = { model ->
+                    targets.usageModelFilter = model
+                    scope.onNavigate(UiSceneId("settings.usage_log"))
+                })
+            }
+            "settings.model_usage" -> usageOwner?.let {
+                ZhaoxiUsageOverviewScene(it, scope, modelOnly = true, settings = settings, onOpenLog = { model ->
+                    targets.usageModelFilter = model
+                    scope.onNavigate(UiSceneId("settings.usage_log"))
+                })
+            }
             "settings.usage_log" -> usageOwner?.let { usage ->
-                ZhaoxiUsageLogScene(usage, scope) { requestId ->
+                ZhaoxiUsageLogScene(usage, scope, openRequest = { requestId ->
                     targets.usageRequestId = requestId
                     scope.onNavigate(UiSceneId("settings.usage_detail"))
-                }
+                }, initialModel = targets.usageModelFilter)
             }
             "settings.usage_detail" -> usageOwner?.let { ZhaoxiUsageDetailScene(it, targets.usageRequestId, scope) }
             "settings.model_performance" -> sec?.modelPerformance?.let { ZhaoxiPerformanceScene(it, scope) }
