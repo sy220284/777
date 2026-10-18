@@ -3357,7 +3357,7 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/ZhaoxiApplicationScenePack.kt",
-      "sha256": "ddf189bd2e111f4b"
+      "sha256": "851b8da93cd8af6b"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/ZhaoxiDraftCommands.kt",
@@ -3429,7 +3429,7 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConversationScenes.kt",
-      "sha256": "68b9a70cd4b91ab2"
+      "sha256": "f3efebbaddb3eef0"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiPersonaScenes.kt",
@@ -3469,12 +3469,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "579b70f0bad1",
+  "source_snapshot": "6a1401a2a4bf",
   "observed_delta": {
-    "baseline": "3a72e81ff00d",
+    "baseline": "579b70f0bad1",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
+      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/ZhaoxiApplicationScenePack.kt",
       "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConversationScenes.kt"
     ],
     "moved_unchanged_files": [],

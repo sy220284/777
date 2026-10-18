@@ -65,7 +65,7 @@ import com.labteto.dshmobile.uihost.UiSceneRenderScope
 
 /** conversation.chat — 聊天会话主场景。 */
 @Composable
-fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, authorName: String, scope: UiSceneRenderScope, onMessage: (UiSessionIdentity, String) -> Unit, menu: @Composable () -> Unit) {
+fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, authorName: String, scope: UiSceneRenderScope, onMessage: (UiSessionIdentity, UiMessageSnapshot) -> Unit, menu: @Composable () -> Unit) {
     val snap by chat.snapshots.collectAsState(initial = chat.snapshot())
     val storedDrafts by drafts.drafts.collectAsState()
     val sessionId = snap.identity?.sessionId.orEmpty()
@@ -83,7 +83,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
                 Spacer(Modifier.height(6.dp))
             }
             ConversationMessages(snap.identity, snap.messages, reading, history, Modifier.weight(1f),
-                onMessage = { m -> snap.identity?.let { onMessage(it, m.id) } },
+                onMessage = { m -> snap.identity?.let { onMessage(it, m) } },
                 onBranch = { m, index -> snap.identity?.let { receipt = chat.submit(ChatUiCommand.SelectVariant(it, m.id, index)) } })
             if (snap.phase == UiExecutionPhase.RUNNING) ZxTypingIndicator()
             if (snap.queuedInputCount > 0)
@@ -106,7 +106,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
 
 /** conversation.work — 工作会话主场景（审批卡/提问卡槽位 + 计划入口）。 */
 @Composable
-fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPort, reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, scope: UiSceneRenderScope, onMessage: (UiSessionIdentity, String) -> Unit, menu: @Composable () -> Unit) {
+fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPort, reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, scope: UiSceneRenderScope, onMessage: (UiSessionIdentity, UiMessageSnapshot) -> Unit, menu: @Composable () -> Unit) {
     val snap by work.snapshots.collectAsState(initial = work.snapshot())
     val storedDrafts by drafts.drafts.collectAsState()
     val sessionId = snap.identity?.sessionId.orEmpty()
@@ -121,7 +121,7 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
         if (snap.status == UiSceneStatus.LOADING) com.labteto.dshmobile.uipack.zhaoxi.components.ZxProgressBar(null)
         Column(Modifier.weight(1f)) {
             ConversationMessages(snap.identity, snap.messages, reading, history, Modifier.weight(1f),
-                onMessage = { m -> snap.identity?.let { onMessage(it, m.id) } })
+                onMessage = { m -> snap.identity?.let { onMessage(it, m) } })
             snap.approval?.let { ap ->
                 Spacer(Modifier.height(6.dp))
                 ZxApprovalCard(ap, expired = snap.phase == UiExecutionPhase.IDLE && ap.pendingId.isBlank()) { approved ->

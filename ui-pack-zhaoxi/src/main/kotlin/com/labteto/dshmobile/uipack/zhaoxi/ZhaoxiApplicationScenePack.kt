@@ -91,6 +91,8 @@ class ZhaoxiApplicationScenePack(
         return ZhaoxiDocumentContext(identity, workMode, messageId)
     }
 
+    private var messagePreview by mutableStateOf<Pair<UiSessionIdentity, UiMessageSnapshot>?>(null)
+
     // Ephemeral selection only: the FilesUiPort remains the data and authorization owner.
 
 
@@ -283,11 +285,11 @@ class ZhaoxiApplicationScenePack(
             // ---- 会话域 ----
             "conversation.chat" -> conv?.let {
                 ZhaoxiChatScene(it.chat, it.drafts, it.reading, it.history, authorName = "助手", scope,
-                    onMessage = { identity, id -> targets.message = identity to id; scope.onNavigate(UiSceneId("conversation.message_actions")) },
+                    onMessage = { identity, message -> targets.message = identity to message.id; messagePreview = identity to message; scope.onNavigate(UiSceneId("conversation.message_actions")) },
                     menu = { ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) }) })
             }
             "conversation.work" -> conv?.let { ZhaoxiWorkScene(it.work, it.drafts, it.reading, it.history, scope,
-                onMessage = { identity, id -> targets.message = identity to id; scope.onNavigate(UiSceneId("conversation.message_actions")) },
+                onMessage = { identity, message -> targets.message = identity to message.id; messagePreview = identity to message; scope.onNavigate(UiSceneId("conversation.message_actions")) },
                 menu = { ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) }) }) }
             "conversation.header" -> conv?.let {
                 ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) })
@@ -317,7 +319,12 @@ class ZhaoxiApplicationScenePack(
                 val workMode = conv?.workMode() == true
                 val activeIdentity = if (workMode) conv?.work?.snapshot()?.identity else conv?.chat?.snapshot()?.identity
                 val messages = if (workMode) conv?.work?.snapshot()?.messages else conv?.chat?.snapshot()?.messages
-                val msg = targets.message?.takeIf { it.first == activeIdentity }?.second?.let { id -> messages?.firstOrNull { it.id == id } }
+                val selectedId = targets.message?.takeIf { it.first == activeIdentity }?.second
+                val msg = selectedId?.let { id ->
+                    messages?.firstOrNull { it.id == id } ?: messagePreview?.takeIf {
+                        it.first == activeIdentity && it.second.id == id
+                    }?.second
+                }
                 if (msg == null) ZxEmpty("没有消息", "会话为空") else when (scene.value) {
                     "conversation.edit" -> ZhaoxiEditScene(msg, conv!!.chat, scope, if (workMode) conv.work else null)
                     "chat.branches" -> ZhaoxiBranchesScene(msg, conv!!.chat, scope)
