@@ -39,7 +39,9 @@ fun ZhaoxiUsageOverviewScene(
 ) {
     val revision by usage.revision.collectAsState()
     val source = remember(revision, usage) { usage.snapshot() }
-    val configured = settings?.state?.collectAsState(initial = settings.initialState)?.value?.modelProfiles.orEmpty()
+    val configured = settings?.let { owner ->
+        owner.state.collectAsState(initial = owner.initialState).value.modelProfiles
+    }.orEmpty()
     val modelNames = zxUsageModelNames(configured.map { it.model }, source.byModel.keys)
     val modelLabels = configured.associate { it.model to (it.displayName ?: it.model) }
     var selectedModel by rememberSaveable { mutableStateOf<String?>(null) }
