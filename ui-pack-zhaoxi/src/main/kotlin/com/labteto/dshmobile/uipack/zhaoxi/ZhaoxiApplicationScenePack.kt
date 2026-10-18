@@ -491,10 +491,11 @@ class ZhaoxiApplicationScenePack(
                 sec?.files ?: conv?.files, targets.workspacePath, scope)
 
             // ---- 设置 ----
-            "settings.root", "route.settings" -> ZhaoxiSettingsHomeScene(scope)
+            "settings.root", "route.settings" -> ZhaoxiSettingsHomeScene(
+                scope, updateStatus, checkForUpdate, settings ?: sec?.settings)
             "settings.appearance" -> ZhaoxiAppearanceScene(preferences, scope)
             "settings.notifications" -> ZhaoxiNotificationsScene(preferences, scope)
-            "settings.permissions" -> ZhaoxiPermissionsScene(preferences, scope, settings ?: sec?.settings)
+            "settings.permissions" -> ZhaoxiPermissionsScene(preferences, scope)
             "settings.models" -> settings?.let { ZhaoxiModelsScene(it, scope) }
             "settings.session" -> settings?.let { ZhaoxiRuntimeSettingsScene(it, scope, sessionOnly = true) }
             "settings.advanced" -> settings?.let { ZhaoxiRuntimeSettingsScene(it, scope) }
