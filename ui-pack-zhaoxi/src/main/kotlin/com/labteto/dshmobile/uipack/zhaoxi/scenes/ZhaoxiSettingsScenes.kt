@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.ui.platform.LocalContext
+import android.text.format.DateFormat
+import android.app.TimePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
@@ -202,6 +205,16 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
             ))) "已保存" else "未能保存通知设置"
         }
     }
+    val deviceContext = LocalContext.current
+    fun chooseQuietTime(start: Boolean) {
+        val current = zxTimeOfDayMinutes(if (start) startTime else endTime) ?: if (start) 22 * 60 else 7 * 60
+        TimePickerDialog(deviceContext, { _, hour, minute ->
+            val formatted = "%02d:%02d".format(hour, minute)
+            if (start) startTime = formatted else endTime = formatted
+            triedQuietSave = false
+            status = null
+        }, current / 60, current % 60, DateFormat.is24HourFormat(deviceContext)).show()
+    }
     var triedQuietSave by remember { mutableStateOf(false) }
     val quietError = if (triedQuietSave) zxQuietHoursError(startTime, endTime) else null
     ZxPage("通知", onBack = { scope.onBack() }) {
@@ -222,6 +235,12 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
                 com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
                     endTime, { endTime = it }, Modifier.weight(1f), placeholder = "结束 HH:mm",
                     error = quietError != null, errorMessage = quietError)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ZxButton("选择开始时间", { chooseQuietTime(true) },
+                    Modifier.weight(1f), variant = com.labteto.dshmobile.uipack.zhaoxi.components.ZxButtonVariant.Outline)
+                ZxButton("选择结束时间", { chooseQuietTime(false) },
+                    Modifier.weight(1f), variant = com.labteto.dshmobile.uipack.zhaoxi.components.ZxButtonVariant.Outline)
             }
             quietError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
             ZxButton("保存免打扰时间", {
