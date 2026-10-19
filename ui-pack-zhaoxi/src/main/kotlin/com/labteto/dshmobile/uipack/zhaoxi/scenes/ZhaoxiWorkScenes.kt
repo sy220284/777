@@ -255,6 +255,8 @@ fun ZhaoxiWorkTeamScene(team: WorkTeamUiPort, scope: UiSceneRenderScope) {
     var busy by remember { mutableStateOf(false) }
     var confirmMember by remember { mutableStateOf<Pair<String, String>?>(null) }
     var confirmTeam by remember { mutableStateOf(false) }
+    var focusTask by remember(snap.identity?.sessionId) { mutableStateOf<String?>(null) }
+    var pendingReassign by remember(snap.identity?.sessionId) { mutableStateOf<Triple<String, Int, String?>?>(null) }
     val current = snap.members.firstOrNull { it.id == selectedMember?.first && it.jobId == selectedMember?.second }
     fun send(command: WorkTeamUiCommand, successfulAction: String) {
         if (busy) return
@@ -294,6 +296,36 @@ fun ZhaoxiWorkTeamScene(team: WorkTeamUiPort, scope: UiSceneRenderScope) {
                         selectedMember = if (selected) null else member.id to member.jobId
                     }
                 })
+        }
+        if (snap.tasks.isNotEmpty()) {
+            ZxSection("任务分工与依赖 · ${snap.tasks.size}")
+            snap.tasks.forEach { task ->
+                val expanded = focusTask == task.id
+                ZxRow(task.subject,
+                    "${task.status} · ${task.ownerName ?: "待分配"}" +
+                        if (task.blockedBy.isNotEmpty()) " · 依赖：${task.blockedBy.joinToString("、")}" else "",
+                    onClick = { focusTask = if (expanded) null else task.id },
+                    trailing = {
+                        ZxChip(if (expanded) "收起分派" else "查看分派", expanded) {
+                            focusTask = if (expanded) null else task.id
+                        }
+                    })
+                if (expanded) {
+                    ZxFooterNote("任务 revision ${task.revision}；提交后由 Work Owner 校验任务状态、依赖和当前负责人。")
+                    snap.members.forEach { member ->
+                        ZxButton("交给 ${member.name}", {
+                            pendingReassign = Triple(task.id, task.revision, member.id)
+                        }, enabled = snap.identity != null && !busy && task.status in
+                            setOf("pending", "in_progress"),
+                            variant = ZxButtonVariant.Outline)
+                    }
+                    ZxButton("收回为待分配", {
+                        pendingReassign = Triple(task.id, task.revision, null)
+                    }, enabled = snap.identity != null && !busy &&
+                        task.status in setOf("pending", "in_progress"),
+                        variant = ZxButtonVariant.Outline)
+                }
+            }
         }
         if (current != null) {
             ZxSection("成员详情 · ${current.name}")
@@ -360,6 +392,20 @@ fun ZhaoxiWorkTeamScene(team: WorkTeamUiPort, scope: UiSceneRenderScope) {
                     send(WorkTeamUiCommand.StopMember(id, target.first, target.second), "停止成员")
                 else feedback = "成员任务已变化，取消过时的停止指令"
             }, { confirmMember = null })
+    }
+    pendingReassign?.let { request ->
+        ZxDialog("确认调整负责人？",
+            "将重新分派工作任务；如任务版本、依赖或目标成员状态已改变，Owner 会拒绝过时操作。",
+            "确认重新分派", {
+                pendingReassign = null
+                val id = snap.identity
+                val task = snap.tasks.firstOrNull { it.id == request.first &&
+                    it.revision == request.second }
+                if (id != null && task != null) {
+                    send(WorkTeamUiCommand.ReassignTask(
+                        id, request.first, request.second, request.third), "任务分派")
+                } else feedback = "任务已变化，请重新读取再选择负责人"
+            }, { pendingReassign = null })
     }
     if (confirmTeam) ZxDialog("停止整个 Agent 团队？",
         "将尝试中断当前会话的所有成员。仅发送指令不代表全部成员已经停止。",
