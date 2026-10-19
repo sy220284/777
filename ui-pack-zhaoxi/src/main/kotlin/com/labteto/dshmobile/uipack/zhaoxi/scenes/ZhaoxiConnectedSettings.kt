@@ -512,7 +512,23 @@ fun ZhaoxiStorageScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     var storage by remember { mutableStateOf<com.labteto.dshmobile.local.session.LocalSessionStorageStatus?>(null) }
     var busy by remember { mutableStateOf(false) }
     var confirmCompact by remember { mutableStateOf(false) }
+    var confirmRestore by remember { mutableStateOf(false) }
     LaunchedEffect(settings) { storage = settings.sessionStorageStatus() }
+    val importBackup = rememberUiDocumentImporter(64 * 1024 * 1024) { result ->
+        when (result) {
+            UiDocumentPickReceipt.Reading -> { busy = true; status = "正在读取并验证备份…" }
+            is UiDocumentPickReceipt.Picked -> jobs.launch {
+                try {
+                    val staged = settings.stageRestoreSessionStorage(result.document.bytes)
+                    status = "已安全暂存 ${staged} 个缺失会话。原有会话保持不变；完全退出并重新启动应用后加载。"
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (failure: Exception) { status = failure.message ?: "备份校验失败，没有覆盖原有会话" }
+                finally { busy = false }
+            }
+            UiDocumentPickReceipt.Cancelled -> { busy = false; status = "已取消备份恢复" }
+            is UiDocumentPickReceipt.Failed -> { busy = false; status = result.message ?: "无法读取所选备份" }
+        }
+    }
     val export = rememberUiStreamDocumentSaver<Unit>("application/zip", { "777-sessions.zip" }, { _, output ->
         settings.exportSessionStorage(output); UiDocumentWriteReceipt.Saved
     }, { _, r -> status = if (r == UiDocumentWriteReceipt.Saved) "备份已保存" else "备份失败" }, { status = it.message })
@@ -527,6 +543,15 @@ fun ZhaoxiStorageScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         ZxSection("维护与备份")
         ZxFooterNote("压缩会整理本地会话文件。建议先导出备份，维护期间不要退出应用。")
         ZxButton("导出会话备份", { export(Unit) }, enabled = !busy)
+        ZxButton("恢复缺失的会话", { confirmRestore = true }, enabled = !busy,
+            variant = ZxButtonVariant.Outline)
+        if (confirmRestore) ZxDialog(
+            "从备份恢复会话？",
+            "仅导入本机缺失的历史会话，绝不覆盖或合并已有会话。ZIP 不能超过 64 MiB；恢复内容会先安全校验并隔离暂存，下次完全重启应用后才生效。请仅选择信任来源的备份。",
+            "选择备份 ZIP", {
+                confirmRestore = false
+                importBackup()
+            }, { confirmRestore = false })
         ZxButton("压缩会话存储", { confirmCompact = true }, enabled = !busy,
             variant = ZxButtonVariant.Outline)
         if (confirmCompact) ZxDialog(
