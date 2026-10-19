@@ -336,9 +336,19 @@ internal fun nativeV6DocumentReceiptMessage(receipt: UiDocumentReceipt): String 
     is UiDocumentReceipt.InvalidFields -> "请检查输入：${receipt.fieldIds.joinToString()}"
     is UiDocumentReceipt.Fallback -> "无法显示文档：${receipt.reason}"
     is UiDocumentReceipt.Rejected -> "操作未执行：${receipt.reason}"
-    is UiDocumentReceipt.OwnerReceipt -> when (receipt.receipt) {
-        UiCommandReceipt.Accepted, UiCommandReceipt.Queued -> "操作已受理"
-        else -> "操作结果：${receipt.receipt}"
+    is UiDocumentReceipt.OwnerReceipt -> when (val outcome = receipt.receipt) {
+        UiCommandReceipt.Accepted -> "表单已提交，等待会话处理"
+        UiCommandReceipt.Queued -> "表单已加入工作队列，稍后处理"
+        is UiCommandReceipt.Rejected -> when (outcome.reason) {
+            UiCommandRejection.STALE_IDENTITY, UiCommandRejection.SESSION_TRANSITION ->
+                "表单所属会话已失效或正在切换，请重新打开当前会话"
+            UiCommandRejection.QUEUE_FULL -> "当前工作队列已满，提交未成功，请稍后重试"
+            UiCommandRejection.UNCONFIGURED -> "模型尚未配置，提交未成功"
+            else -> "表单提交未成功：${outcome.reason}"
+        }
+        is UiCommandReceipt.Failed -> "表单提交失败：${outcome.message}"
+        UiCommandReceipt.NotAdmitted -> "当前会话拒绝了这次表单提交"
+        else -> "操作未确认：$outcome"
     }
     is UiDocumentReceipt.Failed -> "操作失败：${receipt.message.orEmpty()}"
 }
