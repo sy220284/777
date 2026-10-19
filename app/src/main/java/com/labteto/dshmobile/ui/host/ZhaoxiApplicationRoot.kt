@@ -179,6 +179,7 @@ internal fun createZhaoxiApplicationPack(
             workTeam = owner.workTeamUiPort,
             replySuggestions = owner.replySuggestionsUiPort,
             files = owner.filesUiPort,
+            reasoning = owner.reasoningUiPort,
             workMode = owner::isWorkMode,
             workModeUpdates = owner.workModeUpdates,
         ),
