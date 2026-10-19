@@ -321,7 +321,7 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.onNodeWithText("设置").performClick()
         compose.onNodeWithText("模型", useUnmergedTree = true).performScrollTo().performClick()
         compose.onNodeWithText("＋ 添加 API 模型").performScrollTo().performClick()
-        compose.onNodeWithText("选择预设模型").performScrollTo().performClick()
+        compose.onNodeWithText("查看全部预设", substring = true).performScrollTo().performClick()
         compose.onNodeWithContentDescription("搜索预设模型").performTextInput("deepseek-flash")
         compose.onNodeWithTag("zx-model-preset-deepseek-flash").performScrollTo().performClick()
         compose.onNodeWithText("获取可选模型").performScrollTo().assertExists()
