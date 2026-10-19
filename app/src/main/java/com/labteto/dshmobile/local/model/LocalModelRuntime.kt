@@ -78,7 +78,11 @@ class LocalModelRuntime @Inject constructor(
                 if (before.modelSelection.activeProfileId == id) return@withLock
                 try {
                     val result = configuration.select(id, before.modelSelection.profiles)
-                    if (request == latestModelSelection.get()) result?.let(::commit)
+                    // Selection is already durably committed by the configuration owner.
+                    // Project it even when a newer click is queued: the mutex orders the next
+                    // selection, and suppressing this projection can leave disk and UI divergent
+                    // when that next selection is rejected.
+                    result?.let(::commit)
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
