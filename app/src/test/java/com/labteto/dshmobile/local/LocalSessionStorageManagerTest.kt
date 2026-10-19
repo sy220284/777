@@ -137,7 +137,7 @@ class LocalSessionStorageManagerTest {
     fun stagedZipRestoreOnlyBecomesVisibleOnNextBoot() {
         val source = temporary.newFolder("restore-source")
         File(source, "a.json").writeText("{\"v\":1}")
-        File(source, "a.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\\n")
+        File(source, "a.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
         val output = ByteArrayOutputStream()
         manager(source).exportAll(output)
 
@@ -146,7 +146,7 @@ class LocalSessionStorageManagerTest {
         assertEquals(1, incoming.stageRestore(output.toByteArray()))
         assertFalse(File(target, "a.events.jsonl").exists())
         assertEquals(2, manager(target).applyPendingRestore())
-        assertEquals("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\\n", File(target, "a.events.jsonl").readText())
+        assertEquals("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n", File(target, "a.events.jsonl").readText())
         assertEquals("{\"v\":1}", File(target, "a.json").readText())
         assertEquals(0, manager(target).applyPendingRestore())
     }
@@ -154,8 +154,8 @@ class LocalSessionStorageManagerTest {
     @Test
     fun restoreSkipsExistingSessionWithoutOverwritingItsEvents() {
         val source = temporary.newFolder("restore-multi-source")
-        File(source, "a.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\\n")
-        File(source, "b.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\\n")
+        File(source, "a.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
+        File(source, "b.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
         val output = ByteArrayOutputStream()
         manager(source).exportAll(output)
 
@@ -165,13 +165,13 @@ class LocalSessionStorageManagerTest {
         assertEquals(1, store.stageRestore(output.toByteArray()))
         assertEquals(1, store.applyPendingRestore())
         assertEquals("live-events", File(target, "a.events.jsonl").readText())
-        assertEquals("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\\n", File(target, "b.events.jsonl").readText())
+        assertEquals("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n", File(target, "b.events.jsonl").readText())
     }
 
     @Test
     fun recoveryCanResumeAfterOneFileWasAlreadyCopied() {
         val source = temporary.newFolder("restore-resume-source")
-        File(source, "c.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\\n")
+        File(source, "c.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
         File(source, "c.json").writeText("{\"id\":\"c\"}")
         val output = ByteArrayOutputStream()
         manager(source).exportAll(output)
@@ -179,7 +179,7 @@ class LocalSessionStorageManagerTest {
         val store = manager(target)
         assertEquals(1, store.stageRestore(output.toByteArray()))
         // Simulate a crash after the first completed copy and before deleting the staging area.
-        File(target, "c.events.jsonl").writeText("event")
+        File(target, "c.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
         assertEquals(2, store.applyPendingRestore())
         assertEquals("{\"id\":\"c\"}", File(target, "c.json").readText())
     }
