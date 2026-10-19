@@ -23,14 +23,14 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 class LocalSessionUiPortComposition @Inject internal constructor(
     private val state: LocalRuntimeStateStore,
     private val lifecycle: LocalSessionLifecyclePort,
-    private val pendingSessions: LocalPendingSessionRegistry,
+    private val pendingSessions: LocalPendingSessionRegistry? = null,
 ) : SessionUiPort {
     override val snapshots = state.state.map { snapshot() }.distinctUntilChanged()
     override fun snapshot(): UiSessionsSnapshot = synchronized(state.foregroundRunHandle.lock) {
         val current = state.state.value
         UiSessionsSnapshot(state.uiBindingIdentity(current), current.usageMode, current.loading,
             current.sessions.toList(), current.error,
-            pendingSessions.entries().map { (id, mode) -> UiPendingSession(id, mode) })
+            pendingSessions?.entries().orEmpty().map { (id, mode) -> UiPendingSession(id, mode) })
     }
     override fun submit(command: SessionUiCommand): UiCommandReceipt = try {
         synchronized(state.foregroundRunHandle.lock) {
