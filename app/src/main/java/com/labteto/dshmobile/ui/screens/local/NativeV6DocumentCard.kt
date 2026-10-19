@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import com.labteto.dshmobile.ui.shenyan.SyDialog
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -92,6 +94,7 @@ private fun NativeV6DocumentCard(
     }
     var confirmation by remember(doc.documentId, doc.revision) { mutableStateOf<String?>(null) }
     var deleting by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
+    var confirmDelete by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
     fun perform(actionId: String, confirmed: Boolean) {
         val values = fields.toMap()
         scope.launch {
@@ -121,13 +124,12 @@ private fun NativeV6DocumentCard(
                     }
                 }
             }
-            TextButton(onClick = {
-                deleting = true
-                scope.launch {
-                    try { onFeedback(nativeV6DocumentReceiptMessage(withContext(Dispatchers.IO) { controller.delete(snapshot) })) }
-                    finally { deleting = false }
-                }
-            }, enabled = !deleting && snapshot.recoveryNotice == null) { Text("删除文档") }
+            if (snapshot.recoveryNotice == null && !doc.documentId.startsWith("work-live:")) {
+                SyButton(
+                    "删除文档", onClick = { confirmDelete = true },
+                    enabled = !deleting, variant = SyButtonVariant.Ghost,
+                )
+            }
         }
     }
     confirmation?.let { actionId ->
@@ -142,6 +144,26 @@ private fun NativeV6DocumentCard(
     }
 }
     }
+    if (confirmDelete) {
+        SyDialog(title = "删除交互文档？", onDismiss = { confirmDelete = false }) {
+            Text("仅删除这份文档，不会删除来源会话消息。")
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                SyButton("取消", onClick = { confirmDelete = false },
+                    variant = SyButtonVariant.Ghost)
+                SyButton("确认删除", onClick = {
+                    confirmDelete = false
+                    deleting = true
+                    scope.launch {
+                        try {
+                            val receipt = withContext(Dispatchers.IO) { controller.delete(snapshot) }
+                            onFeedback(nativeV6DocumentReceiptMessage(receipt))
+                        } finally { deleting = false }
+                    }
+                }, variant = SyButtonVariant.Danger)
+            }
+        }
+    }
+
 }
 
 @Composable
