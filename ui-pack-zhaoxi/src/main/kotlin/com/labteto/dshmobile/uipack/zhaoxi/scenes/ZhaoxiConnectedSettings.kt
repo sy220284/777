@@ -55,6 +55,9 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         if (showModelForm) modelScroll.animateScrollTo(0)
     }
     var showPresets by rememberSaveable { mutableStateOf(false) }
+    var showCatalogPicker by rememberSaveable { mutableStateOf(false) }
+    var manualModelMode by rememberSaveable { mutableStateOf(false) }
+    var showModelTools by rememberSaveable { mutableStateOf(false) }
     var presetQuery by rememberSaveable { mutableStateOf("") }
     var showAdvancedConnection by rememberSaveable { mutableStateOf(false) }
     var expandedModelId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -108,6 +111,8 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     }
     fun closeModelForm() {
         showModelForm = false
+        showPresets = false
+        showCatalogPicker = false
         profileId = null
         credentialSourceProfileId = null
         apiKey = ""
@@ -123,7 +128,8 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             closeModelForm()
         }
     }
-    BackHandler(enabled = showModelForm && formDirty) { dismissModelForm(true) }
+    BackHandler(enabled = showModelForm && formDirty &&
+        !showPresets && !showCatalogPicker && !confirmDiscardModel) { dismissModelForm(true) }
     fun startNewModel() {
         profileId = null
         credentialSourceProfileId = null
@@ -136,6 +142,9 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         resetCatalog()
         showModelForm = true
         showPresets = false
+        showCatalogPicker = false
+        manualModelMode = false
+        showModelTools = false
         presetQuery = ""
         showAdvancedConnection = false
     }
@@ -151,6 +160,8 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         status = null
         showAdvancedConnection = false
         showPresets = false
+        showCatalogPicker = false
+        manualModelMode = false
     }
     fun submitModelForm() {
                         if (!validWindow && supportsWindowOverride) {
@@ -209,71 +220,30 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         if (showModelForm) {
             ZxSettingsGroup {
                 ZxSection(if (profileId == null && credentialSourceProfileId == null) "添加模型" else "编辑模型")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    settings.apiModelPresets.distinctBy { it.provider }.take(3).forEach { option ->
-                        ZxChip("${option.provider} · ${option.model}", model == option.model &&
-                            baseUrl.trimEnd('/') == option.baseUrl.trimEnd('/')) {
-                            selectPreset(option)
+                ZxSection("模型")
+                ZxRow(if (model.isBlank()) "选择模型预设" else model,
+                    if (preset == null && model.isNotBlank()) "自定义模型 · 点击更换" else
+                        "点击弹窗选择服务商和模型",
+                    modifier = Modifier.testTag("zx-model-picker-open"),
+                    onClick = { showPresets = true })
+                if (manualModelMode) {
+                    ZxField(model, { value ->
+                        if (value != model) {
+                            if (profileId != null) credentialSourceProfileId = profileId
+                            profileId = null
+                            model = value.take(160)
+                            resetCatalog()
                         }
-                    }
+                    }, Modifier.fillMaxWidth(), placeholder = "填写服务商返回的模型标识",
+                        fieldLabel = "自定义模型标识")
                 }
-                ZxButton(if (showPresets) "收起全部预设" else "查看全部预设 · ${settings.apiModelPresets.size} 项", {
-                    showPresets = !showPresets
-                    if (!showPresets) presetQuery = ""
-                }, Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline, enabled = !busy)
-                if (showPresets) {
-                    ZxField(presetQuery, { presetQuery = it.take(100) }, Modifier.fillMaxWidth(),
-                        placeholder = "搜索服务商或模型", fieldLabel = "搜索预设模型")
-                    val matches = settings.apiModelPresets.filter {
-                        it.model.contains(presetQuery.trim(), ignoreCase = true) ||
-                            it.provider.contains(presetQuery.trim(), ignoreCase = true)
-                    }
-                    if (matches.isEmpty()) ZxFooterNote("未找到匹配预设，可直接手动填写模型。")
-                    matches.take(12).groupBy { it.provider }.forEach { (provider, models) ->
-                        ZxSection(provider)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            models.forEach { option ->
-                                ZxChip(option.model, model == option.model &&
-                                    baseUrl.trimEnd('/') == option.baseUrl.trimEnd('/'),
-                                    modifier = Modifier.testTag("zx-model-preset-${option.model}")) {
-                                    selectPreset(option)
-                                }
-                            }
-                        }
-                    }
-                    if (matches.size > 12) ZxFooterNote("预设较多，输入名称可快速定位其他模型。")
-                    ZxButton("手动配置其他模型", {
-                        profileId = null
-                        credentialSourceProfileId = null
-                        model = ""
-                        baseUrl = ""
-                        protocol = LocalModelProtocol.CHAT_COMPLETIONS
-                        contextWindowTokens = ""
-                        apiKey = ""
-                        resetCatalog()
-                        showAdvancedConnection = true
-                        showPresets = false
-                    }, Modifier.fillMaxWidth(), variant = ZxButtonVariant.Ghost, enabled = !busy)
+                if (preset != null && !showAdvancedConnection) {
+                    ZxFooterNote("已套用 ${preset.provider} 的地址及协议，保存前可展开修改。")
                 }
-                ZxSection("模型标识")
-                ZxField(model, { value ->
-                    if (value != model) {
-                        if (profileId != null) credentialSourceProfileId = profileId
-                        profileId = null
-                        model = value.take(160)
-                        resetCatalog()
-                    }
-                }, Modifier.fillMaxWidth(), placeholder = "模型标识（支持手动输入）", fieldLabel = "模型名称")
-                if (preset != null && profileId == null && !showAdvancedConnection) {
-                    ZxFooterNote("已应用 ${preset.provider} 预设地址和协议；需要代理或自定义接口时可展开修改。")
-                }
-                if (preset != null) ZxButton(
-                    if (showAdvancedConnection) "收起连接参数" else "调整接口与高级参数",
+                ZxButton(if (showAdvancedConnection) "收起高级连接参数" else "高级连接参数 · 按需展开",
                     { showAdvancedConnection = !showAdvancedConnection },
                     Modifier.fillMaxWidth(), variant = ZxButtonVariant.Ghost, enabled = !busy)
-                if (preset == null || showAdvancedConnection || profileId != null) {
+                if (showAdvancedConnection) {
                 ZxSection("接口地址")
                 ZxField(baseUrl, { value ->
                     if (value != baseUrl) {
@@ -313,15 +283,18 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     if (!validWindow) ZxBanner("上下文窗口数值不支持，请检查后保存", ZxTone.Err)
                 }
                 }
-                ZxSection("访问凭据")
+                ZxSection("API Key")
                 ZxField(apiKey, { apiKey = it.take(8000); resetCatalog() },
                     Modifier.fillMaxWidth(), placeholder = "API Key（编辑时留空保留原凭据）",
                     visualTransformation = PasswordVisualTransformation())
                 ZxFooterNote(if (profileId != null || credentialSourceProfileId != null)
                     "留空可沿用同一接口地址的已保存密钥；修改接口地址时必须重新提供凭据。"
                 else "API Key 仅交由模型配置接口保存，不在此页面回显。")
-                ZxSection("验证连接")
-                ZxFooterNote("目录查询不代表有调用权限；请用“测试连接”验证。")
+                ZxButton(if (showModelTools) "收起连接验证" else "验证连接与获取模型",
+                    { showModelTools = !showModelTools }, Modifier.fillMaxWidth(),
+                    variant = ZxButtonVariant.Ghost)
+                if (showModelTools) {
+                ZxFooterNote("获取目录只说明名称可查询，测试连接才校验调用能力。")
                 ZxButton("获取可选模型", {
                     if (!busy) {
                         val oldAddress = baseUrl.trim()
@@ -345,6 +318,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                                     discoveredModels = names
                                     status = if (names.isEmpty()) "目录为空，可手动填写模型" else
                                         "已读取 ${names.size} 个模型，选择后仍需保存"
+                                    if (names.isNotEmpty()) showCatalogPicker = true
                                 }
                             } catch (cancelled: CancellationException) { throw cancelled }
                             catch (failure: Exception) {
@@ -358,24 +332,9 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     variant = ZxButtonVariant.Outline, loading = busy)
                 catalogFailure?.let { ZxFooterNote("目录读取失败：$it；不会清除手动填写内容。") }
                 discoveredModels?.let { names ->
-                    if (names.isEmpty()) ZxFooterNote("目录没有返回模型，可以手动填写模型标识。")
-                    else {
-                        ZxFooterNote("已发现 ${names.size} 个目录模型，点选只填入标识，不会自动保存或切换。")
-                        if (names.size > 8) ZxField(catalogFilter, { catalogFilter = it.take(128) },
-                            Modifier.fillMaxWidth(), placeholder = "筛选目录模型", fieldLabel = "筛选模型")
-                        val matched = names.filter { it.contains(catalogFilter.trim(), ignoreCase = true) }
-                        matched.take(12).forEach { available ->
-                            ZxRow(available, if (model == available) "已填入编辑框" else "点选后仍需保存",
-                                onClick = {
-                                    if (profileId != null) credentialSourceProfileId = profileId
-                                    profileId = null
-                                    model = available
-                                    status = "已选择 $available，请测试连接并保存"
-                                }, showChevron = model != available)
-                        }
-                        if (matched.size > 12) ZxFooterNote("显示前 12 项，请用上方搜索框定位其他模型。")
-                        if (matched.isEmpty()) ZxFooterNote("没有匹配的模型；仍可手动输入标识。")
-                    }
+                    if (names.isEmpty()) ZxFooterNote("目录未返回模型标识，仍可直接填写自定义模型。")
+                    else ZxButton("查看已发现模型 · ${names.size}", { showCatalogPicker = true },
+                        Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline)
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -388,6 +347,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                         (apiKey.isNotBlank() || profileId != null || credentialSourceProfileId != null),
                         variant = ZxButtonVariant.Outline)
 
+                }
                 }
                 ZxButton("取消编辑", { dismissModelForm(false) },
                     Modifier.fillMaxWidth(), variant = ZxButtonVariant.Ghost, enabled = !busy)
@@ -426,7 +386,12 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                         apiKey = ""
                         showModelForm = true
                         showPresets = false
-                        showAdvancedConnection = true
+                        showCatalogPicker = false
+                        manualModelMode = settings.apiModelPresets.none {
+                            it.model == p.model && it.baseUrl.trimEnd('/') == p.baseUrl.trimEnd('/')
+                        }
+                        showModelTools = false
+                        showAdvancedConnection = false
                         status = null
                         resetCatalog()
                     }
@@ -477,6 +442,90 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             scope.onNavigate(UiSceneId("settings.model_performance"))
         }
         ZxNavRow("官方价格") { scope.onNavigate(UiSceneId("settings.pricing")) }
+        }
+    }
+    if (showPresets) {
+        val maxHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp * .82f
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { showPresets = false; presetQuery = "" },
+            sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = ZhaoxiTheme.colors.card,
+            contentColor = ZhaoxiTheme.colors.ink,
+        ) {
+            Column(Modifier.fillMaxWidth().heightIn(max = maxHeight)
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
+                Text("选择模型", fontSize = 20.sp, color = ZhaoxiTheme.colors.ink)
+                ZxFooterNote("选择预设只会填入表单，不会自动保存或切换当前模型。")
+                ZxField(presetQuery, { presetQuery = it.take(100) }, Modifier.fillMaxWidth(),
+                    placeholder = "搜索服务商或模型", fieldLabel = "搜索预设模型")
+                val matches = settings.apiModelPresets.filter {
+                    it.provider.contains(presetQuery.trim(), ignoreCase = true) ||
+                        it.model.contains(presetQuery.trim(), ignoreCase = true)
+                }
+                if (matches.isEmpty()) ZxFooterNote("没有匹配预设，可使用自定义模型。")
+                matches.groupBy { it.provider }.forEach { (provider, models) ->
+                    ZxSection(provider)
+                    models.forEach { option ->
+                        val current = model == option.model &&
+                            baseUrl.trimEnd('/') == option.baseUrl.trimEnd('/')
+                        ZxRow(option.model,
+                            if (current) "已选择" else option.provider,
+                            modifier = Modifier.testTag("zx-model-preset-${option.model}"),
+                            onClick = { selectPreset(option) })
+                    }
+                }
+                ZxButton("手动配置其他模型", {
+                    profileId = null
+                    credentialSourceProfileId = null
+                    model = ""
+                    baseUrl = ""
+                    protocol = LocalModelProtocol.CHAT_COMPLETIONS
+                    contextWindowTokens = ""
+                    apiKey = ""
+                    resetCatalog()
+                    showAdvancedConnection = true
+                    manualModelMode = true
+                    showPresets = false
+                }, Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline, enabled = !busy)
+                ZxButton("取消选择", { showPresets = false },
+                    Modifier.fillMaxWidth(), variant = ZxButtonVariant.Ghost)
+            }
+        }
+    }
+    if (showCatalogPicker && discoveredModels != null) {
+        val models = discoveredModels.orEmpty()
+        val maxHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp * .82f
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { showCatalogPicker = false },
+            sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = ZhaoxiTheme.colors.card,
+            contentColor = ZhaoxiTheme.colors.ink,
+        ) {
+            Column(Modifier.fillMaxWidth().heightIn(max = maxHeight)
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
+                Text("接口可用模型 · ${models.size}", fontSize = 20.sp,
+                    color = ZhaoxiTheme.colors.ink)
+                ZxFooterNote("来自当前接口的模型目录；点选只填入标识，仍需测试连接和保存。")
+                ZxField(catalogFilter, { catalogFilter = it.take(128) }, Modifier.fillMaxWidth(),
+                    placeholder = "筛选已发现模型", fieldLabel = "筛选模型")
+                val visible = models.filter { it.contains(catalogFilter.trim(), ignoreCase = true) }
+                visible.forEach { available ->
+                    ZxRow(available, if (model == available) "已填入" else "点击填入模型标识",
+                        onClick = {
+                            if (profileId != null) credentialSourceProfileId = profileId
+                            profileId = null
+                            model = available
+                            manualModelMode = true
+                            showCatalogPicker = false
+                            status = "已选择 $available，请测试连接并保存"
+                        })
+                }
+                if (visible.isEmpty()) ZxFooterNote("没有匹配目录模型，可修改搜索条件。")
+                ZxButton("关闭", { showCatalogPicker = false },
+                    Modifier.fillMaxWidth(), variant = ZxButtonVariant.Ghost)
+            }
         }
     }
     if (confirmDiscardModel) ZxDialog(
