@@ -168,7 +168,6 @@ internal fun createZhaoxiApplicationPack(
             documents = owner.documents,
             forms = owner.forms,
             media = owner.mediaUiPort,
-            evidence = owner.workEvidenceUiPort,
             gallery = owner.personaGalleryUiPort,
             selection = owner.personaSelectionUiPort,
             groups = owner.chatGroupUiPort,
