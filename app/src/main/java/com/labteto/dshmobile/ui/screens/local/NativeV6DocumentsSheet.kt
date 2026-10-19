@@ -361,15 +361,9 @@ private fun NativeV6DocumentNode(
             label = { Text(node.label) }, modifier = Modifier.fillMaxWidth(),
             maxLines = if (node.multiline) 5 else 1, enabled = enabled,
         )
-        is UiDocumentNode.Select -> {
-            Text(node.label, color = colors.textSecondary)
-            node.options.forEach { option ->
-                SyButton((if (fields[node.id] == option) "✓ " else "") + option,
-                    onClick = { onFieldChange(node.id, option) },
-                    size = SyButtonSize.Small, enabled = enabled,
-                    variant = SyButtonVariant.Ghost)
-            }
-        }
+        is UiDocumentNode.Select -> NativeV6CompactSelect(
+            node = node, fields = fields, enabled = enabled, onFieldChange = onFieldChange,
+        )
         is UiDocumentNode.Switch -> Row {
             Text(node.label, modifier = Modifier.weight(1f), color = colors.textSecondary)
             Switch(checked = (fields[node.id] ?: node.initial.toString()) == "true",
