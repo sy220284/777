@@ -38,6 +38,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** A user/tool row must not become the source of a generated assistant document. */
+internal fun nativeV6SourceAssistantMessageId(
+    messages: List<com.labteto.dshmobile.local.session.LocalHarnessMessage>,
+): String? = messages.lastOrNull { it.role == "assistant" }?.id
+
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
     private val runtime: LocalUiRuntime,
@@ -108,7 +113,7 @@ class LocalHarnessViewModel @Inject constructor(
     ) { scene -> _documentRoute.value = scene.value }
     internal val nativeDocuments = NativeV6Documents(interactiveDocuments, conversationPorts, nativeDocumentDrafts, documentForms, documentMedia)
     internal fun documentIdentity() = conversationPorts.identitySnapshot()
-    internal fun activeDocumentMessageId(): String? = state.value.messages.lastOrNull { it.role == "assistant" }?.id
+    internal fun activeDocumentMessageId(): String? = nativeV6SourceAssistantMessageId(state.value.messages)
     internal fun consumeDocumentRoute(route: String) {
         if (_documentRoute.value == route) _documentRoute.value = null
     }
