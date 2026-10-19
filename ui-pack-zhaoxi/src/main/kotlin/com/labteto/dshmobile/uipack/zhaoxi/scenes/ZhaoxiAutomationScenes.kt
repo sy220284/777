@@ -863,9 +863,6 @@ fun ZhaoxiToolsScene(
             "tools.github" -> {
                 ZxSection("连接状态")
                 ZxValueRow("GitHub", value = if (githubConfigured) "已连接" else "尚未连接")
-                ZxSection("可用能力")
-                catalogue.filter { it.family.contains("github", ignoreCase = true) }
-                    .forEach { cap -> ZxRow(zxCapabilityActionLabel(cap.name), zxCapabilityPermissionLabel(cap.access, cap.approval)) }
                 if (githubConfigured) ZhaoxiGitHubBrowser(tools)
                 else ZxFooterNote("先连接 GitHub，再查看真实仓库目录。")
                 if (!githubConfigured) {
@@ -898,9 +895,12 @@ fun ZhaoxiToolsScene(
                 val grouped = catalogue.groupBy { it.family }
                 if (grouped.isEmpty()) ZxEmpty("暂无能力", "已注册的能力会在这里出现")
                 grouped.forEach { (group, items) ->
-                    ZxSection(zxToolFamilyLabel(group))
-                    items.forEach { cap ->
-                        ZxRow(zxCapabilityActionLabel(cap.name), zxCapabilityPermissionLabel(cap.access, cap.approval))
+                    ZxRow(zxToolFamilyLabel(group), "", onClick = {
+                        expandedFamily = if (expandedFamily == group) null else group
+                    })
+                    if (expandedFamily == group) items.forEach { cap ->
+                        ZxRow(zxCapabilityActionLabel(cap.name), zxCapabilityPermissionLabel(cap.access, cap.approval),
+                            showChevron = false)
                     }
                 }
             }
