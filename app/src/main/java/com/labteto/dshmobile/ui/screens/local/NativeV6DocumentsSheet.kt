@@ -100,7 +100,7 @@ internal fun NativeV6DocumentsSheet(
                     is UiDocumentReceipt.Rejected -> "操作被拒绝：${receipt.reason}"
                     is UiDocumentReceipt.InvalidFields -> "请检查输入：${receipt.fieldIds.joinToString()}"
                     is UiDocumentReceipt.Fallback -> receipt.text
-                    is UiDocumentReceipt.OwnerReceipt -> "已收到业务执行回执：${receipt.receipt}"
+                    is UiDocumentReceipt.OwnerReceipt -> nativeV6DocumentReceiptMessage(receipt)
                     UiDocumentReceipt.NavigationRequested -> "已请求打开原生页面"
                     UiDocumentReceipt.AdditionalRequestConsentRequired -> "需要确认额外模型请求"
                 }
