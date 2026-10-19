@@ -23,6 +23,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
@@ -195,7 +196,14 @@ fun ZxField(
                 if (error) c.err else if (focused) c.accentInk else c.line, shape)
             .padding(horizontal = 14.dp, vertical = 11.dp),
     ) {
-        BasicTextField(
+        // Keep field names visible when focus or content makes placeholders disappear.
+        Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(3.dp)) {
+            if (focused || value.isNotEmpty()) {
+                (fieldLabel ?: placeholder).takeIf(String::isNotBlank)?.let { label ->
+                    Text(label, color = c.ink2, fontSize = 11.sp, maxLines = 2)
+                }
+            }
+            BasicTextField(
             value = value,
             onValueChange = onValueChange,
             textStyle = textStyle.copy(color = c.ink),
@@ -215,6 +223,7 @@ fun ZxField(
                     fontSize = textStyle.fontSize)
                 inner()
             }
+        }
         }
     }
 }

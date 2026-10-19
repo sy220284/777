@@ -913,12 +913,12 @@ fun ZhaoxiWorkspaceScene(
                 ZxFooterNote("所选文件经系统文件选择器保存为 ZIP 后，才能分享给其他应用；最多 100 项。")
             }
             if (files == null) ZxEmpty("工作区不可用", "暂时无法读取文件")
-            else if (workspace.isEmpty()) ZxEmpty("工作区是空的", "执行过程中产生的文件会出现在这里")
+            else if (workspace.isEmpty()) ZxEmpty("还没有工作文件", "执行任务后产生的文档、图片与代码会出现在这里。你也可以查看当前会话的产物。", actionLabel = "查看会话产物", onAction = { selectedDomain = 1 })
             else if (visible.isEmpty()) ZxEmpty("没有匹配的文件", "可调整搜索条件，或选择包含内部文件")
             visible.forEach { file ->
                 val selected = file.path in selectedPaths
                 ZxRow(file.path.substringAfterLast('/'),
-                    "${zxHumanFileSize(file.bytes.toLong())} · ${file.path}",
+                    "${zxWorkspaceKindLabel(file.path)} · ${zxHumanFileSize(file.bytes.toLong())}",
                     onClick = {
                         if (selectionMode) selectedPaths = if (selected) selectedPaths - file.path
                             else selectedPaths + file.path
@@ -947,17 +947,30 @@ fun ZhaoxiWorkspaceScene(
             if (visibleArtifacts.isNotEmpty()) ZxSection("产物")
             visibleArtifacts.forEach { file ->
                 ZxRow(file.path.substringAfterLast('/'),
-                    "${zxHumanFileSize(file.bytes.toLong())} · ${file.path}",
+                    "${zxWorkspaceKindLabel(file.path)} · ${zxHumanFileSize(file.bytes.toLong())}",
                     onClick = { onPreview(file.path) })
             }
             if (visibleInvolved.isNotEmpty()) ZxSection("关联文件")
             visibleInvolved.forEach { file ->
                 ZxRow(file.path.substringAfterLast('/'),
-                    "${zxHumanFileSize(file.bytes.toLong())} · ${file.path}",
+                    "${zxWorkspaceKindLabel(file.path)} · ${zxHumanFileSize(file.bytes.toLong())}",
                     onClick = { onPreview(file.path) })
             }
         }
     }
+}
+
+/** Display the deliverable type in file lists; exact paths remain in file preview. */
+internal fun zxWorkspaceKindLabel(path: String): String = when (path.substringAfterLast('.', "").lowercase()) {
+    "png", "jpg", "jpeg", "webp", "gif" -> "图片"
+    "mp4", "mov", "webm" -> "视频"
+    "mp3", "wav", "m4a", "ogg" -> "音频"
+    "pdf" -> "PDF 文档"
+    "md", "txt", "doc", "docx", "rtf" -> "文档"
+    "csv", "xls", "xlsx" -> "表格"
+    "zip", "tar", "gz" -> "压缩文件"
+    "kt", "java", "js", "ts", "py", "json", "html", "css", "xml" -> "代码或数据"
+    else -> "文件"
 }
 
 /** workspace.preview — 使用 Owner 提供的实际预览与截断标记，不再截断调试字符串。 */

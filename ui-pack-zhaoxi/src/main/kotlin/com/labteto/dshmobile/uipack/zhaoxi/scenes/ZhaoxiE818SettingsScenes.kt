@@ -385,16 +385,36 @@ fun ZhaoxiApprovalModeScene(settings: SettingsUiPort, scope: UiSceneRenderScope)
 fun ZhaoxiApprovalModeSelector(settings: SettingsUiPort) {
     val mode by settings.approvalMode.collectAsState()
     var status by remember { mutableStateOf<String?>(null) }
+    var confirmAuto by remember { mutableStateOf(false) }
     ZxSection("操作审批模式")
+    ZxFooterNote("手动审批会逐次询问；自动审批会改变后续工具操作的全局授权方式。")
     LocalApprovalMode.entries.forEach { candidate ->
         ZxChip(when (candidate) {
             LocalApprovalMode.DEFAULT -> "默认"
             LocalApprovalMode.MANUAL -> "手动审批"
             LocalApprovalMode.AUTO -> "自动审批"
         }, mode == candidate) {
-            status = settings.submit(SettingsUiCommand.ApprovalMode(candidate)).zxUserMessage("更新审批模式")
+            if (candidate == LocalApprovalMode.AUTO && mode != LocalApprovalMode.AUTO) {
+                confirmAuto = true
+            } else {
+                status = settings.submit(SettingsUiCommand.ApprovalMode(candidate)).zxUserMessage("更新审批模式")
+            }
         }
     }
-    ZxFooterNote("审批模式不会修改系统权限")
+    if (mode == LocalApprovalMode.AUTO) {
+        ZxBanner("全局自动审批已开启。后续工具操作可能不再逐次询问，请仅在可信环境中使用。", ZxTone.Warn)
+    } else {
+        ZxFooterNote("审批模式不改变 Android 系统权限，随时可切回手动审批。")
+    }
     status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
+    if (confirmAuto) ZxDialog(
+        "启用全局自动审批？",
+        "此设置影响之后进入审批链的工具操作，包括可能涉及文件修改、Shell 和设备高权限操作。开启后不再逐次向你确认。可在本页随时改回手动审批；Android 系统权限不会改变。",
+        "确认启用",
+        {
+            confirmAuto = false
+            status = settings.submit(SettingsUiCommand.ApprovalMode(LocalApprovalMode.AUTO)).zxUserMessage("更新审批模式")
+        },
+        { confirmAuto = false },
+    )
 }

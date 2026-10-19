@@ -27,6 +27,7 @@ fun ZxEmpty(
     modifier: Modifier = Modifier,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    iconName: String = "sparkle",
 ) {
     val c = ZhaoxiTheme.colors
     Column(
@@ -36,7 +37,7 @@ fun ZxEmpty(
     ) {
         Box(Modifier.size(52.dp).background(c.bg2, CircleShape),
             contentAlignment = Alignment.Center) {
-            ZxIcon("sparkle", Modifier.size(22.dp))
+            ZxIcon(iconName, Modifier.size(22.dp))
         }
         Spacer(Modifier.height(4.dp))
         Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,

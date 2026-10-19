@@ -127,7 +127,17 @@ fun ZhaoxiAutomationTasksScene(
         }
     }
     ZxPage("自动化", onBack = { scope.onBack() }) {
+        if (snap.tasks.isEmpty()) {
+            ZxSection("按你的计划自动执行")
+            ZxEmpty(
+                "还没有自动化任务",
+                "创建一次提醒或周期任务，之后可以在这里查看执行时间、结果和失败原因。",
+                actionLabel = "新建自动化",
+                onAction = onCreate,
+            )
+        } else {
         Spacer(Modifier.height(8.dp))
+        ZxButton("新建自动化", onCreate, Modifier.fillMaxWidth())
         ZxField(taskQuery, { taskQuery = it }, Modifier.fillMaxWidth(),
             placeholder = "搜索任务内容、人物或执行周期")
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -232,8 +242,7 @@ fun ZhaoxiAutomationTasksScene(
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
-        ZxButton("新建自动化", onCreate, Modifier.fillMaxWidth())
+        }
         deleteTaskId?.let { id ->
             com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog(
                 "删除自动化任务？", "删除后不再调度此任务，已产生的会话和结果会保留。", "删除任务",
