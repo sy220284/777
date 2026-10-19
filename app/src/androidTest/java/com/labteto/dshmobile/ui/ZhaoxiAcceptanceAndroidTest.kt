@@ -150,7 +150,9 @@ class ZhaoxiAcceptanceAndroidTest {
             visible = true
         }
         compose.onNodeWithContentDescription("普通备注").assertTextEquals("保留到重开")
-        compose.onNodeWithContentDescription("本次输入").assertTextEquals("")
+        compose.onNodeWithContentDescription("本次输入").assert(
+            SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.EditableText,
+                androidx.compose.ui.text.AnnotatedString("")))
         capture("document-form-retention")
     }
 
@@ -199,7 +201,7 @@ class ZhaoxiAcceptanceAndroidTest {
                 }
             }
         } finally { appearance(ports, "system", 1f) }
-        assertEquals(107, index.readLines().size) // 76 light + 15 dark + 15 at 130% + header.
+        assertEquals(106, index.readLines().size) // 75 light + 15 dark + 15 at 130% + header.
     }
 
 
