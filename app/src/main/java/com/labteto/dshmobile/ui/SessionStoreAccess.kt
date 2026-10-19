@@ -23,4 +23,3 @@ internal fun rememberSidebarAvatarStore(): SidebarAvatarStore {
         EntryPointAccessors.fromApplication(context, SidebarAvatarEntryPoint::class.java).sidebarAvatarStore()
     }
 }
-

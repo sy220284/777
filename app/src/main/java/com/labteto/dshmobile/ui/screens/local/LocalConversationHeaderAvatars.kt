@@ -102,4 +102,3 @@ internal fun LocalPersonaHeaderAvatar(
         }
     }
 }
-

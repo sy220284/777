@@ -489,4 +489,3 @@ internal fun calculateSidebarAvatarCrop(
 private const val BUNDLED_AVATAR_FOCUS_Y = 0.38f
 private const val CENTERED_AVATAR_FOCUS_Y = 0.5f
 private const val AVATAR_DECODE_EDGE = 256f
-

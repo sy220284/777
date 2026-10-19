@@ -29,5 +29,3 @@ include(":reference-validation")
 include(":harness-runtime-android")
 include(":harness-interop")
 include(":harness-device-android")
-
-
