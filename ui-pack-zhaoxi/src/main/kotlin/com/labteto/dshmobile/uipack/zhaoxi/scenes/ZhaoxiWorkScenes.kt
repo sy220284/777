@@ -401,15 +401,51 @@ fun ZhaoxiWorkCapabilitiesScene(items: List<Triple<String, String, Int>>, scope:
     }
 }
 
-/** work.steering_choice — 运行中纠偏说明页。 */
+/** work.steering_choice — only send through the live Work Owner; no fake steer claim. */
 @Composable
-fun ZhaoxiSteeringScene(scope: UiSceneRenderScope) {
-    ZxPage("运行中纠偏", onBack = { scope.onBack() }) {
+fun ZhaoxiSteeringScene(
+    work: com.labteto.dshmobile.uicontract.WorkConversationUiPort,
+    drafts: com.labteto.dshmobile.uicontract.ConversationDraftUiPort,
+    scope: UiSceneRenderScope,
+) {
+    val snap by work.snapshots.collectAsState(initial = work.snapshot())
+    val draftsBySession by drafts.drafts.collectAsState()
+    val sessionId = snap.identity?.sessionId.orEmpty()
+    val draft = draftsBySession[sessionId].orEmpty()
+    var receipt by remember(sessionId) {
+        mutableStateOf<com.labteto.dshmobile.uicontract.UiCommandReceipt?>(null)
+    }
+    ZxPage("调整工作指令", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner("运行中直接发送即插队纠偏（steer）", com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Info)
-        ZxRow("发送即纠偏", "不等当前步骤结束 · 指令进入当前执行上下文")
-        ZxRow("排队语义", "队列满时拒收并提示 · 草稿保留")
-
+        ZxSection(if (snap.phase == com.labteto.dshmobile.uicontract.UiExecutionPhase.RUNNING)
+            "任务正在执行" else "当前工作状态")
+        ZxFooterNote("指令交给正在绑定的 Work 会话处理；实际插队或排队由执行引擎决定。拒收时保留原输入。")
+        snap.error?.let {
+            com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
+                it, com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
+        }
+        ZxField(draft, { value ->
+            if (sessionId.isNotBlank()) drafts.updateDraft(sessionId, value)
+        }, Modifier.fillMaxWidth().heightIn(min = 100.dp),
+            placeholder = "描述要调整的步骤、限制或新的要求",
+            fieldLabel = "工作调整指令")
+        CommandFeedback(receipt)
+        ZxButton("提交给当前 Work 会话", {
+            val identity = snap.identity
+            if (identity != null && draft.isNotBlank()) {
+                val submitted = work.submit(
+                    com.labteto.dshmobile.uicontract.WorkConversationUiCommand.SendText(
+                        identity, draft.trim()))
+                receipt = submitted
+                if (submitted is com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted ||
+                    submitted is com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued) {
+                    drafts.updateDraft(sessionId, "")
+                }
+            }
+        }, enabled = snap.identity != null && draft.isNotBlank() && snap.send.enabled)
+        if (snap.identity == null) ZxFooterNote("请先打开一个 Work 会话")
+        if (snap.queuedInputCount > 0)
+            ZxFooterNote("执行引擎已报告排队指令 ${snap.queuedInputCount} 条")
     }
 }
 
