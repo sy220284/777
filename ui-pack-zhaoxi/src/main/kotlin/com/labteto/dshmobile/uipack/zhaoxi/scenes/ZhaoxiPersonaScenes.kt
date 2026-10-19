@@ -417,21 +417,46 @@ fun ZxGroupAnnouncementScene(groups: ChatGroupUiPort, scope: UiSceneRenderScope)
     }
 }
 
-/** chat.reply_suggestions — 回复建议层。 */
+/** 已有 Chat Owner 按需生成回复建议；列表只填草稿，不直接发送。 */
 @Composable
 fun ZxReplySuggestionsScene(
     suggestions: com.labteto.dshmobile.uicontract.ReplySuggestionsUiPort,
-    onPick: (String) -> Unit,
+    onPick: (com.labteto.dshmobile.uicontract.UiSessionIdentity, String) -> Unit,
     scope: UiSceneRenderScope,
 ) {
     val snap by suggestions.snapshots.collectAsState(
         initial = com.labteto.dshmobile.uicontract.UiReplySuggestionsSnapshot(null, emptyList()))
+    val jobs = androidx.compose.runtime.rememberCoroutineScope()
+    var busy by remember(snap.identity) { mutableStateOf(false) }
+    var feedback by remember(snap.identity) { mutableStateOf<String?>(null) }
     ZxPage("回复建议", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        if (snap.values.isEmpty()) ZxEmpty("暂时没有建议", "对话进行一轮后再来")
-        snap.values.forEach { s ->
-            ZxRow(s.text, s.label + if (s.bold) " · 加粗" else "", onClick = { onPick(s.text) })
+        ZxButton(if (snap.values.isEmpty()) "生成回复建议" else "重新生成建议", {
+            val target = snap.identity ?: return@ZxButton
+            jobs.launch {
+                busy = true
+                try {
+                    feedback = when (val receipt = suggestions.generate(target)) {
+                        com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted -> "建议已生成，可选择填入输入框"
+                        com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued -> "生成请求已排队"
+                        is com.labteto.dshmobile.uicontract.UiCommandReceipt.Failed -> receipt.message
+                        is com.labteto.dshmobile.uicontract.UiCommandReceipt.Rejected -> "会话状态已变化，请返回聊天后再试"
+                        else -> "暂无可生成的建议，请先完成一轮对话"
+                    }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (failure: Exception) { feedback = failure.message ?: "生成失败，请稍后重试" }
+                finally { busy = false }
+            }
+        }, Modifier.fillMaxWidth(), enabled = snap.identity != null && !busy, loading = busy)
+        feedback?.let { ZxFooterNote(it) }
+        if (snap.identity == null) ZxEmpty("请先进入聊天", "在单人聊天中完成一轮对话后可生成建议")
+        else if (snap.values.isEmpty() && !busy) ZxEmpty("还没有回复建议", "点击上方按钮生成")
+        snap.identity?.let { target ->
+            snap.values.forEach { suggestion ->
+                ZxRow(suggestion.text, suggestion.label + if (suggestion.bold) " · 加粗" else "",
+                    onClick = { onPick(target, suggestion.text) })
+            }
         }
-        ZxFooterNote("点选填入草稿 · 不直接发送")
+        ZxFooterNote("点选后填入当前会话草稿，不会自动发送")
     }
 }
