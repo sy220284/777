@@ -388,7 +388,7 @@ private fun NativeV6DocumentNode(
             Text(calculateUiDocumentValue(node, fields) ?: "请输入有效数字",
                 style = MaterialTheme.typography.titleMedium)
         }
-        is UiDocumentNode.Button -> SyButton(node.label, onClick = { onAction(node.actionId) },
+        is UiDocumentNode.Button -> SyButton(nativeV6ActionLabel(node.label, item.document.actions.firstOrNull { it.id == node.actionId }), onClick = { onAction(node.actionId) },
             enabled = enabled && item.actions[node.actionId]?.available == true,
             variant = SyButtonVariant.Outline, modifier = Modifier.fillMaxWidth())
         is UiDocumentNode.Column -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
