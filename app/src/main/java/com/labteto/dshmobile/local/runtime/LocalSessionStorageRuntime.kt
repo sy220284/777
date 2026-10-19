@@ -52,6 +52,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
             },
     )
 
+    private val orderedCodecs = domainCodecs.sortedBy(LocalSessionDomainCodec::id)
     private val repository: LocalSessionRepository
     private val storageManager = LocalSessionStorageManager(sessionsRoot, json)
     internal val coordinator: LocalSessionCoordinator
@@ -64,7 +65,6 @@ class LocalSessionStorageRuntime @Inject internal constructor(
             runtimeStateStore.projection.publishError(
                 "会话备份恢复未全部完成：${failure.message ?: "请检查本地存储"}")
         }
-        val orderedDomainCodecs = domainCodecs.sortedBy(LocalSessionDomainCodec::id)
         repository = LocalSessionRepository(
             root = sessionsRoot,
             json = json,
@@ -73,7 +73,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
             onError = { error ->
                 runtimeStateStore.projection.publishError(error.message ?: "会话写入失败")
             },
-            domainCodecs = orderedDomainCodecs,
+            domainCodecs = orderedCodecs,
         )
         coordinator = LocalSessionCoordinator(
             repository = repository,
@@ -101,6 +101,10 @@ class LocalSessionStorageRuntime @Inject internal constructor(
 
     internal fun enqueueCurrentSnapshot(expectedSessionId: String): Boolean {
         val snapshot = currentSnapshot(expectedSessionId) ?: return false
+        // A new editor needs a stable runtime identity for its encrypted draft, but not a
+        // durable Session catalog entry. Existing historical sessions are never discarded here.
+        if (com.labteto.dshmobile.local.session.isUnstartedSessionSnapshot(snapshot, orderedCodecs) &&
+            coordinator.read(expectedSessionId) == null) return true
         coordinator.enqueue(snapshot)
         return true
     }
