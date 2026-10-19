@@ -476,21 +476,12 @@ object LocalModelPresets {
             ?: return null
         if (LocalMiniMaxPolicy.isOfficial(normalizedBaseUrl)) {
             val native = entries.firstOrNull { it.provider == "MiniMax" && it.model.equals(normalizedModel, true) }
-            if (native != null) return native.copy(
-                baseUrl = normalizedBaseUrl,
-                modelsEndpoint = "${normalizedBaseUrl.trimEnd('/')}/models",
-            )
+            if (native != null) return native.copy(baseUrl = normalizedBaseUrl)
             if (normalizedModel.equals("MiniMax-M3.1-Flash-Preview", true)) {
-                return entries.first { it.model == "MiniMax-M3" }.copy(
-                    model = normalizedModel, baseUrl = normalizedBaseUrl,
-                    modelsEndpoint = "${normalizedBaseUrl.trimEnd('/')}/models",
-                )
+                return entries.first { it.model == "MiniMax-M3" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
             }
             if (normalizedModel.lowercase() in setOf("minimax-m2", "minimax-m2.1", "minimax-m2.1-highspeed", "minimax-m2.5", "minimax-m2.5-highspeed")) {
-                return entries.first { it.model == "MiniMax-M2.7" }.copy(
-                    model = normalizedModel, baseUrl = normalizedBaseUrl,
-                    modelsEndpoint = "${normalizedBaseUrl.trimEnd('/')}/models",
-                )
+                return entries.first { it.model == "MiniMax-M2.7" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
             }
         }
         if (LocalKimiPolicy.isOfficial(normalizedBaseUrl)) {
