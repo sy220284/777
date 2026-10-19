@@ -89,7 +89,7 @@ class DeepSeekClient @Inject constructor(
             if (!LocalKimiPolicy.isOfficial(baseUrl)) temperature?.let { put("temperature", it) }
             val miniMax = LocalMiniMaxPolicy.isOfficial(baseUrl)
             if (miniMax) {
-                put("reasoning_split", true)
+                if (LocalMiniMaxPolicy.needsLegacyReasoningSplit(model)) put("reasoning_split", true)
                 LocalMiniMaxPolicy.writeThinking(this, model, reasoningEffort, anthropic = false)
             }
             if (LocalKimiPolicy.isOfficial(baseUrl)) {
@@ -206,7 +206,7 @@ class DeepSeekClient @Inject constructor(
             put("stream_options", buildJsonObject { put("include_usage", true) })
             val miniMax = LocalMiniMaxPolicy.isOfficial(baseUrl)
             if (miniMax) {
-                put("reasoning_split", true)
+                if (LocalMiniMaxPolicy.needsLegacyReasoningSplit(model)) put("reasoning_split", true)
                 LocalMiniMaxPolicy.writeThinking(this, model, reasoningEffort, anthropic = false)
             }
             if (LocalKimiPolicy.isOfficial(baseUrl)) {

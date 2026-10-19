@@ -21,6 +21,8 @@ class LocalMiniMaxCompatibilityTest {
             for (path in listOf("/v1", "/anthropic/v1")) {
                 val base = "https://$host$path"
                 assertEquals(1_000_000, LocalModelPresets.find("MiniMax-M3", base)?.contextWindowTokens)
+                assertEquals(1_000_000, LocalModelPresets.find("MiniMax-M3.1-Flash", base)?.contextWindowTokens)
+                assertEquals(true, LocalModelPresets.documentedImageInputSupport("MiniMax-M3.1-Flash", base))
                 assertEquals(204_800, LocalModelPresets.find("MiniMax-M2.5", base)?.contextWindowTokens)
                 assertEquals(false, LocalModelPresets.documentedImageInputSupport("MiniMax-M2.7", base))
                 assertEquals(10_000_000L, LocalModelPresets.maxNativeImageBytesFor("MiniMax-M3", base))
@@ -46,6 +48,10 @@ class LocalMiniMaxCompatibilityTest {
         val preview = LocalReasoningRequestPolicy.resolve(profile.copy(model = "MiniMax-M3.1-Flash-Preview"))!!
         assertEquals("low", preview.disabledEffort)
         assertEquals("max", preview.maxEffort)
+        val stable = LocalReasoningRequestPolicy.resolve(profile.copy(model = "MiniMax-M3.1-Flash"))!!
+        assertEquals("low", stable.disabledEffort)
+        assertEquals("high", stable.enabledEffort)
+        assertEquals("max", stable.maxEffort)
     }
 
     @Test fun anthropicWritesNativeThinkingAndEffortOnlyForSupportedModel() {
@@ -56,7 +62,42 @@ class LocalMiniMaxCompatibilityTest {
         assertFalse(payload("MiniMax-M3", "high").containsKey("output_config"))
         assertFalse(payload("MiniMax-M2.7", "none").containsKey("thinking"))
         assertEquals("max", payload("MiniMax-M3.1-Flash-Preview", "max")["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+        assertEquals("adaptive", payload("MiniMax-M3.1-Flash-Preview", "max")["thinking"]!!.jsonObject["type"]!!.jsonPrimitive.content)
         assertThrows(IllegalArgumentException::class.java) { payload("MiniMax-M3.1-Flash-Preview", "none") }
+        val latest = payload("MiniMax-M3.1-Flash", "high")
+        assertEquals("high", latest["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+        assertFalse(latest.containsKey("thinking"))
+        assertThrows(IllegalArgumentException::class.java) { payload("MiniMax-M3.1-Flash", "none") }
+        val nativeOpenAi = buildJsonObject {
+            LocalMiniMaxPolicy.writeThinking(this, "MiniMax-M3.1-Flash", "low", anthropic = false)
+        }
+        assertEquals("low", nativeOpenAi["reasoning_effort"]!!.jsonPrimitive.content)
+        assertFalse(nativeOpenAi.containsKey("thinking"))
+    }
+
+    @Test fun stableM31OpenAiRequestUsesDocumentedNativeEffortWithoutLegacySwitch() = runBlocking {
+        var captured: JsonObject? = null
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            captured = json.parseToJsonElement(
+                Buffer().also { chain.request().body!!.writeTo(it) }.readUtf8(),
+            ).jsonObject
+            val result = """{"choices":[{"message":{"role":"assistant","content":"完成"},"finish_reason":"stop"}]}"""
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200)
+                .message("OK").body(result.toResponseBody("application/json".toMediaType())).build()
+        }.build()
+        val reply = DeepSeekClient(http, json).complete(
+            apiKey = "test",
+            model = "MiniMax-M3.1-Flash",
+            baseUrl = "https://api.minimaxi.com/v1",
+            messages = emptyList(),
+            tools = JsonArray(emptyList()),
+            reasoningEffort = "low",
+        )
+        assertEquals("MiniMax-M3.1-Flash", captured!!["model"]!!.jsonPrimitive.content)
+        assertEquals("low", captured!!["reasoning_effort"]!!.jsonPrimitive.content)
+        assertFalse(captured!!.containsKey("thinking"))
+        assertFalse(captured!!.containsKey("reasoning_split"))
+        assertEquals("完成", reply.content)
     }
 
     @Test fun streamingThinkingDetailsSurviveToolHistoryOnlyOnSameRoute() = runBlocking {
@@ -148,24 +189,26 @@ class LocalMiniMaxCompatibilityTest {
         assertEquals(null, differentRoute["reasoning_content"])
     }
     @Test fun miniMaxChinaCompletion401RetainsBearerAndExplainsAuthentication() = runBlocking {
-        var authorization: String? = null
-        val http = OkHttpClient.Builder().addInterceptor { chain ->
-            authorization = chain.request().header("Authorization")
-            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(401)
-                .message("Unauthorized").body("""{"error":{"message":"login fail: Please carry the API secret key (1004)"}}""".toResponseBody()).build()
-        }.build()
-        val error = assertThrows(com.labteto.dshmobile.local.LocalModelException::class.java) {
-            runBlocking {
-                DeepSeekClient(http, json).completeStreaming(
-                    apiKey = "sample-only-key", model = "MiniMax-M3", messages = emptyList(),
-                    tools = JsonArray(emptyList()), baseUrl = "https://api.minimaxi.com/v1",
-                )
+        for (model in listOf("MiniMax-M3", "MiniMax-M3.1-Flash")) {
+            var authorization: String? = null
+            val http = OkHttpClient.Builder().addInterceptor { chain ->
+                authorization = chain.request().header("Authorization")
+                Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(401)
+                    .message("Unauthorized").body("""{"error":{"message":"login fail: Please carry the API secret key (1004)"}}""".toResponseBody()).build()
+            }.build()
+            val error = assertThrows(com.labteto.dshmobile.local.LocalModelException::class.java) {
+                runBlocking {
+                    DeepSeekClient(http, json).completeStreaming(
+                        apiKey = "sample-only-key", model = model, messages = emptyList(),
+                        tools = JsonArray(emptyList()), baseUrl = "https://api.minimaxi.com/v1",
+                    )
+                }
             }
+            assertEquals("Bearer sample-only-key", authorization)
+            assertEquals(401, error.status)
+            assertTrue(error.message!!.contains("鉴权失败"))
+            assertFalse(error.message!!.contains("sample-only-key"))
         }
-        assertEquals("Bearer sample-only-key", authorization)
-        assertEquals(401, error.status)
-        assertTrue(error.message!!.contains("鉴权失败"))
-        assertFalse(error.message!!.contains("sample-only-key"))
     }
 
 }
