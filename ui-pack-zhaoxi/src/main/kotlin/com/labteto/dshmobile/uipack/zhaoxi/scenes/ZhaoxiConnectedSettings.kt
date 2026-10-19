@@ -185,7 +185,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                 ZxSection("访问凭据")
                 ZxField(apiKey, { apiKey = it.take(8000); resetCatalog() },
                     Modifier.fillMaxWidth(), placeholder = "API Key（编辑时留空保留原凭据）",
-                    visualTransformation = PasswordVisualTransformation(), fieldLabel = "API Key")
+                    visualTransformation = PasswordVisualTransformation())
                 ZxFooterNote(if (profileId != null || credentialSourceProfileId != null)
                     "留空可沿用同一接口地址的已保存密钥；修改接口地址时必须重新提供凭据。"
                 else "API Key 仅交由模型配置接口保存，不在此页面回显。")
@@ -273,7 +273,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                                         profileId = null
                                         credentialSourceProfileId = null
                                         showModelForm = false
-                                        "模型已保存；当前使用模型以列表标记为准"
+                                        "模型已保存"
                                     }
                                     SettingsUiReceipt.Submitted -> "保存请求已提交"
                                     SettingsUiReceipt.Rejected -> "无法保存模型"
