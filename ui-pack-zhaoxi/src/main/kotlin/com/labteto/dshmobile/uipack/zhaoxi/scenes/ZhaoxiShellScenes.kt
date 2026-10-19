@@ -253,28 +253,6 @@ fun ZhaoxiHomeScene(
                                 }
                             }
                         }
-                        items(visibleSessions, key = { it.id }) { session ->
-                            val displayedTitle = renamedTitles[session.id] ?: session.title
-                            ZxHomeDrawerEntry(
-                                "diary", (if (bulkMode) {
-                                    if (session.id in bulkIds) "☑ " else "☐ "
-                                } else "") + displayedTitle.take(40),
-                                selected = if (bulkMode) session.id in bulkIds
-                                    else snap.identity?.sessionId == session.id,
-                                detail = listOfNotNull(
-                                    "已置顶".takeIf { session.id in pinnedIds },
-                                    session.summaryPreview?.take(48)?.takeIf { it.isNotBlank() },
-                                ).joinToString(" · "),
-                                onClick = {
-                                    if (bulkMode) bulkIds = if (session.id in bulkIds) bulkIds - session.id
-                                        else bulkIds + session.id
-                                    else openSession(session.id)
-                                },
-                                onLongClick = if (bulkMode) null else if (conversationShell == null) null else {
-                                    { selectedSessionAction = session.id }
-                                },
-                            )
-                        }
                         if (blankSessions.isNotEmpty()) {
                             item {
                                 ZxHomeDrawerEntry(
@@ -308,6 +286,28 @@ fun ZhaoxiHomeScene(
                                     )
                                 }
                             }
+                        }
+                        items(visibleSessions, key = { it.id }) { session ->
+                            val displayedTitle = renamedTitles[session.id] ?: session.title
+                            ZxHomeDrawerEntry(
+                                "diary", (if (bulkMode) {
+                                    if (session.id in bulkIds) "☑ " else "☐ "
+                                } else "") + displayedTitle.take(40),
+                                selected = if (bulkMode) session.id in bulkIds
+                                    else snap.identity?.sessionId == session.id,
+                                detail = listOfNotNull(
+                                    "已置顶".takeIf { session.id in pinnedIds },
+                                    session.summaryPreview?.take(48)?.takeIf { it.isNotBlank() },
+                                ).joinToString(" · "),
+                                onClick = {
+                                    if (bulkMode) bulkIds = if (session.id in bulkIds) bulkIds - session.id
+                                        else bulkIds + session.id
+                                    else openSession(session.id)
+                                },
+                                onLongClick = if (bulkMode) null else if (conversationShell == null) null else {
+                                    { selectedSessionAction = session.id }
+                                },
+                            )
                         }
                     }
                     ZxHomeDrawerEntry("settings", "设置", onClick = { navigate("route.settings") })
