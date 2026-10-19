@@ -115,9 +115,6 @@ class ZhaoxiApplicationScenePack(
         conversations.forms != null) setOf(UiSceneId("conversation.ui_document"),
         UiSceneId("conversation.ui_document_generate")) else emptySet()
 
-    private val evidenceScene = if (conversations?.evidence != null)
-        setOf(UiSceneId("work.requirement_evidence")) else emptySet()
-
     private val personaScene = if (conversations?.gallery != null &&
         conversations.selection != null) setOf(UiSceneId("chat.persona_picker")) else emptySet()
 
@@ -203,7 +200,7 @@ class ZhaoxiApplicationScenePack(
     /** 全部端口注入时恰好 75 场景；未注入的域整体不声明。 */
     private val declaredScenes: Set<UiSceneId> =
         pages + sessionSettings + conversationScenes + documentScenes +
-            evidenceScene + personaScene + groupScenes + archiveScenes +
+            personaScene + groupScenes + archiveScenes +
             planScene + teamScene + settingsSuite + updateScene +
             messageActionScenes + suggestionsScenes + steeringScene +
             secondaryTools + secondaryWorkspace + secondaryMedia +
@@ -229,7 +226,6 @@ class ZhaoxiApplicationScenePack(
                 if (conversations.documents != null && conversations.forms != null)
                     addAll(setOf("ui_document.generate", "ui_document.generate_local",
                         "ui_document.prepare_input"))
-                if (conversations.evidence != null) add("work.evidence_reference")
                 if (conversations.gallery != null) {
                     add("chat.gallery_archive")
                     if (conversations.selection != null) add("chat.persona_selection")
@@ -378,12 +374,9 @@ class ZhaoxiApplicationScenePack(
             "work.approval" -> conv?.let { ZhaoxiApprovalScene(it.work, scope) }
             "work.question" -> conv?.let { ZhaoxiQuestionScene(it.work, scope) }
             "work.plan_review" -> conv?.workReads?.let {
-                ZhaoxiPlanReviewScene(it, conv.work, sessionId, scope, canOpenEvidence = conv.evidence != null)
+                ZhaoxiPlanReviewScene(it, conv.work, sessionId, scope)
             } ?: ZxEmpty("工作计划不可用", "当前会话尚未接入计划读取能力",
                 actionLabel = "返回", onAction = { scope.onBack() })
-            "work.requirement_evidence" -> if (conv?.evidence != null && identity != null)
-                ZhaoxiRequirementEvidenceScene(conv.evidence, identity, scope)
-            else ZxEmpty("证据不可用", "缺少会话身份")
             "work.team" -> conv?.workTeam?.let { ZhaoxiWorkTeamScene(it, scope) }
                 ?: ZxEmpty("团队信息不可用", "当前会话没有团队运行信息",
                     actionLabel = "返回", onAction = { scope.onBack() })
