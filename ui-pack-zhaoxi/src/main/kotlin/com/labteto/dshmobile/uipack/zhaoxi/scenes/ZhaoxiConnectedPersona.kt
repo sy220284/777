@@ -70,6 +70,10 @@ private fun personaFieldTitle(key: String): String = when (key) {
     else -> key
 }
 
+/** 世界书数值边界与真实导出/使用策略一致。 */
+internal fun zxLorePriorityInput(value: String): Int? = value.toIntOrNull()?.takeIf { it in 0..100 }
+internal fun zxLoreSpoilerInput(value: String): Int? = value.toIntOrNull()?.takeIf { it in 0..3 }
+
 /** The E8.18 primary editor consists of 3 identity fields plus 10 canonical fact fields. */
 internal fun zxPersonaMainEditorKeys(): List<String> =
     listOf("name", "coreIdentity", "franchise") + UI_PERSONA_FACT_FIELDS
@@ -330,14 +334,14 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
                                 if (it.id == lore.id) it.copy(stage = value) else it
                             })
                         }
-                        ZhaoxiPersonaField("优先级", lore.priority.toString()) { value ->
-                            val parsed = value.toIntOrNull()
+                        ZhaoxiPersonaField("优先级（0–100）", lore.priority.toString()) { value ->
+                            val parsed = zxLorePriorityInput(value)
                             if (parsed != null) draft = draft.copy(lore = draft.lore.map {
                                 if (it.id == lore.id) it.copy(priority = parsed) else it
                             })
                         }
-                        ZhaoxiPersonaField("剧透等级", lore.spoilerLevel.toString()) { value ->
-                            val parsed = value.toIntOrNull()
+                        ZhaoxiPersonaField("剧透等级（0–3）", lore.spoilerLevel.toString()) { value ->
+                            val parsed = zxLoreSpoilerInput(value)
                             if (parsed != null) draft = draft.copy(lore = draft.lore.map {
                                 if (it.id == lore.id) it.copy(spoilerLevel = parsed) else it
                             })
