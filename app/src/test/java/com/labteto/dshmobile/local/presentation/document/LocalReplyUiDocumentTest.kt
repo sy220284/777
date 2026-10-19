@@ -38,6 +38,13 @@ class LocalReplyUiDocumentTest {
         assertFalse(LocalReplyUiDocumentProtocol.workFormMayBePublished(raw, modelToolCallCount = 2))
         assertTrue(LocalReplyUiDocumentProtocol.workFormMayBePublished(raw, modelToolCallCount = 0))
         assertFalse(LocalReplyUiDocumentProtocol.workFormMayBePublished(null, modelToolCallCount = 0))
+        // Ordinary read-only result cards must still render during ongoing Work tools.
+        val nonForm = """{"schemaVersion":1,"documentId":"reply","revision":0,"title":"状态",
+            "nodes":[{"id":"status","type":"text","text":"本轮已有进展"}],
+            "actions":[],"fallbackText":"进展"}""".trimIndent()
+        assertEquals(WorkReplyFormHandling.NONE,
+            LocalReplyUiDocumentProtocol.workReplyFormHandling(nonForm, hasToolCalls = true))
+        assertTrue(LocalReplyUiDocumentProtocol.workFormMayBePublished(nonForm, modelToolCallCount = 1))
     }
 
     @Test fun protocolDistinguishesConfirmAndSendFromPreparingUnsentDraft() {
