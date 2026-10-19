@@ -42,12 +42,16 @@ internal fun SettingsUiReceipt.zxUserMessage(action: String = "操作"): String 
 fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.state.collectAsState(initial = settings.initialState)
     val jobs = rememberCoroutineScope()
+    val modelScroll = androidx.compose.foundation.rememberScrollState()
     // Plan-backed routes are managed by Account Owner, never edited as API-key profiles.
     val apiProfiles = snap.modelProfiles.filter { it.authKind == LocalModelAuthKind.API_KEY }
     val planProfiles = snap.modelProfiles.count { it.authKind == LocalModelAuthKind.CHATGPT_PLAN }
     var profileId by rememberSaveable { mutableStateOf<String?>(null) }
     var credentialSourceProfileId by rememberSaveable { mutableStateOf<String?>(null) }
     var showModelForm by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(showModelForm) {
+        if (showModelForm) modelScroll.animateScrollTo(0)
+    }
     var showPresets by rememberSaveable { mutableStateOf(false) }
     var presetQuery by rememberSaveable { mutableStateOf("") }
     var showAdvancedConnection by rememberSaveable { mutableStateOf(false) }
@@ -104,7 +108,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         showAdvancedConnection = false
     }
     val activeProfile = snap.modelProfiles.firstOrNull { snap.modelSelection.isActive(it) }
-    ZxPage("模型与账户", onBack = { scope.onBack() }) {
+    ZxPage("模型与账户", onBack = { scope.onBack() }, scrollState = modelScroll) {
         snap.error?.let { ZxBanner(it, ZxTone.Err) }
         status?.let { ZxBanner(it, ZxTone.Warn) }
         ZxSection("当前使用")
