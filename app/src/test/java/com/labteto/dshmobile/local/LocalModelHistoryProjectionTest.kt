@@ -302,21 +302,22 @@ class LocalModelHistoryProjectionTest {
     @Test
     fun oldApprovalTailReplayRecoversToolReceiptAcrossEarlySystemUpdate() {
         val events = listOf(
-            event(0L, "assistant/message", assistantCall("approve")),
-            event(1L, "system/prompt", buildJsonObject {
+            event(0L, "system/prompt", buildJsonObject { put("content", "原始系统规则") }),
+            event(1L, "assistant/message", assistantCall("approve")),
+            event(2L, "system/prompt", buildJsonObject {
                 put("content", "执行模式")
                 put("update_mode", "append_only")
             }),
-            event(2L, "tool/result", buildJsonObject {
+            event(3L, "tool/result", buildJsonObject {
                 put("id", "approve")
                 put("content", "计划已获批准，已进入执行模式")
             }),
         )
         val restored = restoreLocalModelHistory(events, emptyList(), codec)
-        assertEquals(listOf("assistant", "tool", "system"), restored.messages.map {
+        assertEquals(listOf("system", "assistant", "tool", "system"), restored.messages.map {
             it["role"].toString().trim('"')
         })
-        assertEquals("approve", restored.messages[1]["tool_call_id"].toString().trim('"'))
+        assertEquals("approve", restored.messages[2]["tool_call_id"].toString().trim('"'))
         assertTrue(restored.checkpointRecommended)
     }
 
