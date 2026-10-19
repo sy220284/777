@@ -59,6 +59,11 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     internal val agentRunCoordinator = LocalAgentRunCoordinator(eventLogFor = eventLogs::get)
 
     init {
+        // Apply staged imports before any repository or event reader opens the session directory.
+        runCatching { storageManager.applyPendingRestore() }.onFailure { failure ->
+            runtimeStateStore.projection.publishError(
+                "会话备份恢复未全部完成：${failure.message ?: "请检查本地存储"}")
+        }
         val orderedDomainCodecs = domainCodecs.sortedBy(LocalSessionDomainCodec::id)
         repository = LocalSessionRepository(
             root = sessionsRoot,
@@ -105,6 +110,9 @@ class LocalSessionStorageRuntime @Inject internal constructor(
 
     internal suspend fun compactStorage(): LocalSessionStorageStatus =
         withContext(Dispatchers.IO) { storageManager.compactAll() }
+
+    internal suspend fun stageRestoreStorage(archive: ByteArray): Int =
+        withContext(Dispatchers.IO) { storageManager.stageRestore(archive) }
 
     internal suspend fun exportStorage(output: OutputStream): Long =
         withContext(Dispatchers.IO) { storageManager.exportAll(output) }
