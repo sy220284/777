@@ -18,6 +18,14 @@ internal object LocalReplyUiDocumentProtocol {
     internal const val marker = "```ui_document\n"
     internal val acceptedMarkers = listOf(marker, "```ui_document\r\n")
     val budget = UiDocumentBudget(512, 16, 262_144)
+    /**
+     * A Work agent keeps sampling after a step that contains tool calls. A generated form must
+     * not become actionable mid-step, before the user has had a chance to complete it.
+     * The tool-free final step closes that Work turn and allows the next user-submitted turn.
+     */
+    internal fun workFormMayBePublished(definition: String?, modelToolCallCount: Int): Boolean =
+        !definition.isNullOrBlank() && modelToolCallCount == 0
+
     val instruction = """
         Reply normally in readable language. When a structured card materially improves a
         reply (such as a comparison, choice, editable form or chart), include it automatically,
@@ -49,6 +57,11 @@ internal object LocalReplyUiDocumentProtocol {
         Sliders use 1-100 discrete intervals and a nonnegative numeric range.
         Supported actions: send_user_input or submit_user_input with id,type,text,fieldIds.
         The former prepares a composer draft; the latter requires explicit user confirmation.
+        Use submit_user_input for confirmation or submission buttons, so the confirmed form is
+        sent as a real user turn. Do not call send_user_input a confirmation or submission;
+        label it "放入输入框（需手动发送）" because it only prepares an unsent draft.
+        In Work, emit an interactive form only as the FINAL reply with no tool calls; the
+        agent must wait for the user's actual submission before continuing the task.
         Actions may only reference existing input field IDs. Provide fallbackText describing
         the card if it cannot be displayed, and keep the normal answer useful without the card.
         Cards cannot execute tools, change permissions, spend money or assert verified progress.
