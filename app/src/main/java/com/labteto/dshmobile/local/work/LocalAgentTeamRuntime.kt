@@ -400,6 +400,7 @@ internal class LocalAgentTeamRuntime(
                 },
                 ready = isReady(task, state.tasks),
                 writeConflict = writeScopeWarnings(task, state.tasks).isNotEmpty(),
+                revision = task.revision,
             )
         }
         return LocalAgentTeamUiState(
