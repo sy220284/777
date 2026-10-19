@@ -143,7 +143,12 @@ fun ZxSheet(
                 .background(c.line),
         )
         Spacer(Modifier.height(10.dp))
-        Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, Modifier.weight(1f), fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold, color = c.ink)
+            ZxButton("关闭", onDismiss, variant = ZxButtonVariant.Ghost)
+        }
         Spacer(Modifier.height(8.dp))
         content()
     }

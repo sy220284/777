@@ -145,23 +145,22 @@ fun ZxNavRow(label: String, sub: String = "", value: String = "", onClick: () ->
 
 /** Explicit settings icon mapping; avoids substring-based collisions and mixed alignment. */
 internal fun zxSettingsNavigationIcon(label: String): String? = when (label) {
-
-            "外观" -> "palette"
-            "聊天风格" -> "quote"
-            "个人规则" -> "user"
-            "记忆" -> "diary"
-            "模型" -> "sparkle"
-            "模型性能" -> "quota"
-            "ChatGPT 账户" -> "user"
-            "套餐额度" -> "usage"
-            "操作审批模式" -> "check"
-            "权限与设备" -> "settings"
-            "通知" -> "alert"
-            "用量统计" -> "usage"
-            "会话存储" -> "files"
-            "高级设置" -> "tools"
-            "诊断与网络" -> "info"
-            "检查更新" -> "refresh"
+    "外观" -> "palette"
+    "聊天风格" -> "quote"
+    "个人规则" -> "user"
+    "记忆" -> "diary"
+    "模型" -> "sparkle"
+    "模型性能" -> "quota"
+    "ChatGPT 账户" -> "user"
+    "套餐额度" -> "usage"
+    "操作审批模式" -> "check"
+    "权限与设备" -> "settings"
+    "通知" -> "alert"
+    "用量统计" -> "usage"
+    "会话存储" -> "files"
+    "高级设置" -> "tools"
+    "诊断与网络" -> "info"
+    "检查更新" -> "refresh"
     else -> null
 }
 

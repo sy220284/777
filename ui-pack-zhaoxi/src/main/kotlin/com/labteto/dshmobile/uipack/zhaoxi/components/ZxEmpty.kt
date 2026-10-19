@@ -34,6 +34,7 @@ fun ZxEmpty(
 ) {
     val c = ZhaoxiTheme.colors
     val hasAction = !actionLabel.isNullOrBlank() && onAction != null
+    val resolvedIcon = if (iconName == "sparkle") zxEmptyStateIcon(title) else iconName
     val shape = RoundedCornerShape(18.dp)
     Column(
         modifier
@@ -46,7 +47,7 @@ fun ZxEmpty(
     ) {
         Box(Modifier.size(44.dp).background(c.bg2, CircleShape),
             contentAlignment = Alignment.Center) {
-            ZxIcon(iconName, Modifier.size(22.dp))
+            ZxIcon(resolvedIcon, Modifier.size(22.dp))
         }
         Spacer(Modifier.height(4.dp))
         Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
@@ -58,4 +59,19 @@ fun ZxEmpty(
             ZxButton(actionLabel, onAction, variant = ZxButtonVariant.Outline)
         }
     }
+}
+
+/** Match empty-state imagery to the screen intent without fabricating data or extra actions. */
+internal fun zxEmptyStateIcon(title: String): String = when {
+    title.contains("人物") || title.contains("角色") -> "people"
+    title.contains("会话") || title.contains("聊天") -> "diary"
+    title.contains("文档") -> "file"
+    title.contains("文件") || title.contains("工作区") -> "files"
+    title.contains("任务") || title.contains("计划") || title.contains("自动化") -> "tasks"
+    title.contains("搜索") || title.contains("匹配") -> "search"
+    title.contains("插件") || title.contains("工具") || title.contains("能力") -> "tools"
+    title.contains("视频") -> "video"
+    title.contains("音频") || title.contains("语音") -> "voice"
+    title.contains("图片") || title.contains("画像") -> "photo"
+    else -> "sparkle"
 }
