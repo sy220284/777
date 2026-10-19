@@ -694,7 +694,7 @@ fun ZhaoxiSearchScene(
     }
 }
 
-/** shell.onboarding — 引导。 */
+/** shell.onboarding — real optional model setup, never blocks Home. */
 @Composable
 fun ZhaoxiOnboardingScene(scope: UiSceneRenderScope) {
     var step by remember { mutableStateOf(0) }
@@ -702,36 +702,49 @@ fun ZhaoxiOnboardingScene(scope: UiSceneRenderScope) {
         ZxOnboardingStep("01", "朝夕之间", "一个更安静的 Agent 界面"),
         ZxOnboardingStep("02", "人物图集", "创造、迁移、与人物相处"),
         ZxOnboardingStep("03", "工作模式", "计划、执行进度、团队协作"),
-        ZxOnboardingStep("04", "准备好了", "从一次对话开始"),
+        ZxOnboardingStep("04", "开始使用", "可以立即聊天，也可以先连接 AI 模型"),
     )
     ZxPage("欢迎使用", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(24.dp))
         ZxOnboardingFlow(
             steps = steps, current = step,
             onNext = { step = (step + 1).coerceAtMost(steps.lastIndex) },
-            onSkip = { scope.onBack() },
-            onFinish = { scope.onBack() },
+            onSkip = { scope.onNavigate(UiSceneId("route.persona_gallery")) },
+            onFinish = { scope.onNavigate(UiSceneId("route.home")) },
         )
+        if (step == steps.lastIndex) {
+            Spacer(Modifier.height(12.dp))
+            ZxSection("AI 模型 · 可选步骤")
+            ZxFooterNote("模型连接情况以设置中保存的配置为准。可以跳过，之后从设置继续。")
+            ZxButton("连接或检查 AI 模型", {
+                scope.onNavigate(UiSceneId("settings.models"))
+            }, Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline)
+        }
     }
 }
 
-/** shell.empty — 空态演示。 */
+/** A safe reusable empty destination. No pretend data or inert demo actions. */
 @Composable
 fun ZhaoxiEmptyDemoScene(scope: UiSceneRenderScope) {
-    ZxPage("空态演示", onBack = { scope.onBack() }) {
+    ZxPage("暂无内容", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(24.dp))
-        ZxEmpty("暂无内容", "请返回上一页")
+        ZxEmpty("当前没有可显示的内容", "你可以返回原页面，或回到会话继续使用。")
+        ZxButton("回到会话", { scope.onNavigate(UiSceneId("route.home")) },
+            Modifier.fillMaxWidth())
     }
 }
 
-/** shell.error — 错误态演示。 */
+/** No fabricated error or no-op retry when Host provides no resumable error token. */
 @Composable
 fun ZhaoxiErrorDemoScene(scope: UiSceneRenderScope) {
-    ZxPage("错误态演示", onBack = { scope.onBack() }) {
+    ZxPage("页面遇到问题", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        ZxBanner("渲染失败 · 示例错误", ZxTone.Err, action = "重试" to {})
+        ZxBanner("当前无法继续打开此页面。若问题反复出现，可查看诊断信息。", ZxTone.Err)
         Spacer(Modifier.height(8.dp))
-        ZxEmpty("内容不可用", "重试或返回上一页")
+        ZxButton("返回上一页", { scope.onBack() }, Modifier.fillMaxWidth())
+        ZxButton("查看本地诊断", {
+            scope.onNavigate(UiSceneId("settings.diagnostics"))
+        }, Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline)
     }
 }
 
