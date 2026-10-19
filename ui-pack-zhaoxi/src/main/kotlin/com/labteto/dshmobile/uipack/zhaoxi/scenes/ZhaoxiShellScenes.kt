@@ -382,7 +382,7 @@ fun ZhaoxiHomeScene(
                     ZxHomeDrawerEntry(
                         icon = "diary",
                         title = (renamedTitles[session.id] ?: session.title).take(40),
-                        detail = session.summaryPreview.orEmpty().take(56),
+                        detail = "",
                         selected = snap.identity?.sessionId == session.id,
                         testTag = "zhaoxi.home.reopen_session.${session.id}",
                         onClick = { openSession(session.id) },
