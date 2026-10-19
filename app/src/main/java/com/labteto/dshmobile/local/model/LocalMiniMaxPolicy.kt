@@ -17,6 +17,10 @@ internal object LocalMiniMaxPolicy {
             setOf("api.minimaxi.com", "api.minimax.cn", "api.minimax.io")
     }.getOrDefault(false)
 
+    /** M3.1 already separates reasoning_content natively; older models use the legacy flag. */
+    fun needsLegacyReasoningSplit(model: String): Boolean =
+        !model.equals("MiniMax-M3.1-Flash", ignoreCase = true)
+
     fun requireSuccessfulResponse(root: JsonObject) {
         val status = root["base_resp"] as? JsonObject ?: return
         val code = status["status_code"]?.jsonPrimitive?.intOrNull ?: return
