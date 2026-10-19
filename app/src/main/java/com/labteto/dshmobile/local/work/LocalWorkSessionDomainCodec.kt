@@ -51,6 +51,10 @@ internal fun LocalHarnessSession.withWorkSessionDomain(work: LocalWorkState): Lo
 internal object LocalWorkSessionDomainCodec : LocalSessionDomainCodec {
     override val id: String = "work"
 
+    override fun hasSessionWork(session: LocalHarnessSession): Boolean =
+        session.todos.isNotEmpty() || session.goal != null ||
+            session.plan.isNotEmpty() || session.planMode
+
     override fun normalizeLoaded(session: LocalHarnessSession): LocalHarnessSession {
         val decoded = session.decodeWorkSessionDomain()
         return session.withWorkSessionDomain(
