@@ -405,8 +405,15 @@ class ZhaoxiApplicationScenePack(
                 }
             // 人物子页的图集 id 合法来源 = CurrentPersonaUiPort.read() 的 target.personaId；
             // 端口未注入或无当前人物时显式空态，不伪造目标。
+            "route.diary" -> (sec?.gallery ?: conv?.gallery)?.let { gallery ->
+                ZhaoxiDiaryHubScene(gallery, scope, onOpenDiary = { galleryId ->
+                    targets.galleryId = galleryId
+                    scope.onNavigate(UiSceneId("chat.diary"))
+                })
+            } ?: ZxEmpty("人物目录暂不可用", "请从人物图集重新进入",
+                actionLabel = "返回", onAction = { scope.onBack() })
             "chat.gallery_profile", "chat.persona_editor", "chat.world_book",
-            "chat.gallery_portrait", "chat.gallery_delete", "chat.diary", "route.diary" -> {
+            "chat.gallery_portrait", "chat.gallery_delete", "chat.diary" -> {
                 val personaTarget = (sec?.currentPersona?.read() as?
                     com.labteto.dshmobile.uicontract.UiCurrentPersonaReceipt.Loaded)
                     ?.snapshot?.target
