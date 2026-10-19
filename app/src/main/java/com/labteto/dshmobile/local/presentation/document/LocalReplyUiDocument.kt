@@ -19,9 +19,10 @@ internal object LocalReplyUiDocumentProtocol {
     internal val acceptedMarkers = listOf(marker, "```ui_document\r\n")
     val budget = UiDocumentBudget(512, 16, 262_144)
     val instruction = """
-        Reply normally in readable language. If the user specifically requests an interactive
-        document, editable form, choice, comparison, or chart, include a structured card in
-        the SAME reply, after the useful plain-text answer. No additional model request is needed.
+        Reply normally in readable language. When a structured card materially improves a
+        reply (such as a comparison, choice, editable form or chart), include it automatically,
+        even if the user did not explicitly ask for a card. Attach it to the SAME reply, after
+        the useful plain-text answer; no additional model request is needed.
         For ordinary conversation do not emit a card. Append at most one final block, starting
         exactly with a line containing ```ui_document and ending with a line containing ```.
         The block body must be a single JSON object (not Markdown, comments or executable code).
