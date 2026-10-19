@@ -27,8 +27,6 @@ class LocalWorkFormContinuationPolicyTest {
             put("source_message_id", "user-1")
         })
         assertTrue(hasOutstandingWorkReplyForm(log))
-        assertTrue(hasOutstandingWorkReplyForm(log))
-        assertTrue(hasOutstandingWorkReplyForm(log))
         // Automatic continuation and a tool result do not constitute a user submission.
         log.append("tool/result", buildJsonObject { put("id", "tool-1") })
         log.append(com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE,
@@ -66,6 +64,9 @@ class LocalWorkFormContinuationPolicyTest {
             put("goal_revision", goal.revision)
         })
         assertTrue(shouldDiscardWorkGoalContinuation(input, emptyList(), work, log))
+        assertTrue(shouldDiscardWorkGoalContinuation(input, emptyList(),
+            LocalWorkState(goal = goal.copy(id = "g-replaced", revision = 2L)), log))
+        assertTrue(shouldDiscardWorkGoalContinuation(input, emptyList(), LocalWorkState(), log))
         assertFalse(isCurrentWorkGoalContinuation(retry, work, log))
         log.append("user/message", buildJsonObject { put("content", "用户填写完成") })
         assertFalse(shouldDiscardWorkGoalContinuation(input, emptyList(), work, log))
