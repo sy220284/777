@@ -395,7 +395,7 @@ internal fun PluginInventoryBrowser(
                                             .testTag("plugin-inventory-title-${item.id}"),
                                         color = colors.text,
                                         style = DsType.std14Strong.withReadingWeight(),
-                                        maxLines = 1,
+                                        maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                     Text(
