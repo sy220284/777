@@ -424,12 +424,12 @@ class ZhaoxiAcceptanceAndroidTest {
                 CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale * 2f)) {
                     ZhaoxiTheme(hue = ZhaoxiHue.STONE, dark = false, reducedMotion = true) {
                         Column(
-                            Modifier.fillMaxSize().testTag("zx-acceptance-longtable")
+                            Modifier.fillMaxSize().background(ZhaoxiTheme.colors.bg).testTag("zx-acceptance-longtable")
                                 .verticalScroll(rememberScrollState()).padding(16.dp),
                         ) {
                             ZxRichReply(table)
                             Spacer(Modifier.height(24.dp))
-                            androidx.compose.material3.Text("滚动终点锚点")
+                            androidx.compose.material3.Text("滚动终点锚点", color = ZhaoxiTheme.colors.ink)
                         }
                     }
                 }

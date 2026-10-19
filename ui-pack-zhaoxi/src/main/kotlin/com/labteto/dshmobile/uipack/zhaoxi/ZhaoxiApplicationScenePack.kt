@@ -601,11 +601,15 @@ class ZhaoxiApplicationScenePack(
                     workMode = state.stack.lastOrNull()?.value == "conversation.work",
                 )
                 // Only the incoming content is live; do not retain an outgoing command tree.
-                val progress = remember { Animatable(0f) }
+                val instant = reduced || appearance.motionScale == 0f
+                val progress = remember { Animatable(if (instant) 1f else 0f) }
                 val motion = ZhaoxiMotion.spec<Float>(ZhaoxiDuration.NORMAL)
-                LaunchedEffect(state.stack.lastOrNull()) {
-                    progress.snapTo(0f)
-                    progress.animateTo(1f, motion)
+                LaunchedEffect(state.stack.lastOrNull(), instant) {
+                    if (instant) progress.snapTo(1f)
+                    else {
+                        progress.snapTo(0f)
+                        progress.animateTo(1f, motion)
+                    }
                 }
                 // Modal drawer paints under status/navigation bars; ordinary scenes inset their controls.
                 // Never inset the drawer surface itself, or a black strip appears above it.
