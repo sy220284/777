@@ -162,6 +162,14 @@ fun ZxCapBar(caps: List<ZxCap>, onOpen: (String) -> Unit, modifier: Modifier = M
     }
 }
 
+/** Manual @skill invocation needs an actual task after its first-line marker. */
+internal fun zxComposerCanSendDraft(draft: String): Boolean {
+    if (draft.isBlank()) return false
+    val matched = Regex("^@skill:[a-z][a-z0-9-]{1,47}(?:\\r?\\n|$)").find(draft)
+        ?: return true
+    return draft.substring(matched.range.last + 1).isNotBlank()
+}
+
 /** 输入区：拒绝时保留草稿 + toast（回执矩阵见 朝夕-R4接入设计 §4）。 */
 @Composable
 fun ZxComposer(
@@ -200,8 +208,10 @@ fun ZxComposer(
         } else if (send.reason == UiCommandRejection.UNCONFIGURED && onConnectModel != null) {
             ZxButton("去连接", onClick = onConnectModel, variant = ZxButtonVariant.Outline)
         } else {
-            ZxIconButton(onClick = onSend, contentDescription = "发送消息",
-                enabled = send.available && draft.isNotBlank()) {
+            ZxIconButton(onClick = onSend,
+                contentDescription = if (draft.startsWith("@skill:") && !zxComposerCanSendDraft(draft))
+                    "先填写技能要处理的任务" else "发送消息",
+                enabled = send.available && zxComposerCanSendDraft(draft)) {
                 ZxIcon("send")
             }
         }
