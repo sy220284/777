@@ -20,7 +20,8 @@ class NativeV6DocumentPlacementTest {
         val docs = listOf(snapshot("user-1", "work-live:user-1"),
             snapshot("user-1", "reply-ui:user-1"), snapshot("assistant-2", "reply-ui:assistant-2"))
         val user = nativeV6DocumentsForMessage("user-1", "user", true, docs)
-        assertEquals(listOf("work-live:user-1"), user.map { it.document.documentId })
+        assertEquals(listOf("work-live:user-1", "reply-ui:user-1"),
+            user.map { it.document.documentId })
         assertEquals(listOf("reply-ui:assistant-2"),
             nativeV6DocumentsForMessage("assistant-2", "assistant", true, docs)
                 .map { it.document.documentId })
