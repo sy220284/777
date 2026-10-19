@@ -156,7 +156,7 @@ internal fun isCurrentWorkGoalContinuation(
     // A user-facing form blocks *every* autonomous continuation, including retry and
     // recovery ones. Only a subsequent real user send can release its durable fence.
     if (continuation != null && eventLog != null &&
-        work.goal?.let { hasOutstandingWorkReplyForm(eventLog, it) } == true) return false
+        hasOutstandingWorkReplyForm(eventLog)) return false
     if (continuation?.failureCode != WORK_GOAL_PROGRESS_CONTINUATION) return true
     val goal = work.goal ?: return false
     return !work.planMode && goal.status == "active" &&
@@ -213,7 +213,7 @@ internal fun queueWorkGoalProgressFollowUp(
 ): Boolean {
     val work = binding.state.value.work
     val goal = work.goal
-    if (goal != null && hasOutstandingWorkReplyForm(binding.eventLog, goal)) return false
+    if (hasOutstandingWorkReplyForm(binding.eventLog)) return false
     // Resolve the same evidence contract used by Goal completion; never trust model prose.
     val assessment = assessLocalWorkGoal(
         work,
