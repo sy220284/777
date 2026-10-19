@@ -84,9 +84,9 @@ fun ZhaoxiSettingsHomeScene(
         }
         ZxSection("模型与账户")
         ZxSettingsGroup {
-        ZxNavRow("模型", sub = "当前模型 · API Key · 协议") { scope.onNavigate(UiSceneId("settings.models")) }
+        ZxNavRow("模型", sub = "预设选择 · 在线检测 · 配置管理") { scope.onNavigate(UiSceneId("settings.models")) }
         ZxNavRow("模型性能", sub = "推理强度 · 温度") { scope.onNavigate(UiSceneId("settings.model_performance")) }
-        ZxNavRow("ChatGPT 账户", sub = "授权与登录状态") { scope.onNavigate(UiSceneId("settings.account")) }
+        ZxNavRow("ChatGPT 账户", sub = "多账户 · 套餐授权 · 模型选择") { scope.onNavigate(UiSceneId("settings.account")) }
         ZxNavRow("套餐额度", sub = "MiniMax 模型额度") { scope.onNavigate(UiSceneId("settings.minimax_quota")) }
 
         }
