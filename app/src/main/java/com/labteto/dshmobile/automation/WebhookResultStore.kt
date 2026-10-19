@@ -63,12 +63,21 @@ class WebhookResultStore @Inject constructor(
     @Synchronized
     fun get(id: String): WebhookRunResult? =
         preferences.getString(id, null)?.let { raw ->
-            runCatching { json.decodeFromString(WebhookRunResult.serializer(), raw) }
-                .onFailure { error ->
-                    AppLog.warn("WebhookResults", "failure=true operation=read_webhook_result " +
-                        "request_id=${id.take(80)} cause_type=${error.javaClass.simpleName}")
-                }.getOrNull()
+            try {
+                json.decodeFromString(WebhookRunResult.serializer(), raw)
+            } catch (error: Exception) {
+                AppLog.warn("WebhookResults", "failure=true operation=read_webhook_result " +
+                    "request_id=${id.take(80)} cause_type=${error.javaClass.simpleName}")
+                unknownReceipt(id)
+            }
         }
+
+    private fun unknownReceipt(id: String): WebhookRunResult = WebhookRunResult(
+        requestId = id,
+        status = WebhookRunStatus.INTERRUPTED,
+        updatedAt = System.currentTimeMillis(),
+        error = "Webhook 历史回执损坏，执行副作用是否发生未知；请先核实再决定是否重试",
+    )
 
     @Synchronized
     fun put(result: WebhookRunResult) {
@@ -103,9 +112,19 @@ class WebhookResultStore @Inject constructor(
     @Synchronized
     fun settleInterruptedFromPreviousProcess(): Int {
         val interrupted = preferences.all.mapNotNull { (id, raw) ->
-            val previous = (raw as? String)?.let { encoded ->
-                runCatching { json.decodeFromString(WebhookRunResult.serializer(), encoded) }.getOrNull()
-            } ?: return@mapNotNull null
+            val previous = try {
+                (raw as? String)?.let {
+                    json.decodeFromString(WebhookRunResult.serializer(), it)
+                }
+            } catch (error: Exception) {
+                AppLog.warn("WebhookResults", "failure=true operation=restore_webhook_result " +
+                    "request_id=${id.take(80)} cause_type=${error.javaClass.simpleName}")
+                null
+            }
+            if (previous == null) {
+                // A corrupted receipt is not evidence that the external action never ran.
+                return@mapNotNull id to unknownReceipt(id)
+            }
             if (previous.status != WebhookRunStatus.QUEUED &&
                 previous.status != WebhookRunStatus.RUNNING) return@mapNotNull null
             id to previous.copy(
