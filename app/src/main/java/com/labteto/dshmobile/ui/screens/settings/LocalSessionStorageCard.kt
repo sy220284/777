@@ -27,6 +27,7 @@ internal fun LocalSessionStorageCard(
     busy: Boolean,
     onCompact: () -> Unit,
     onExport: () -> Unit,
+    onRestore: () -> Unit,
     onCleanup: () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
@@ -115,6 +116,13 @@ internal fun LocalSessionStorageCard(
                 modifier = Modifier.weight(1f),
             )
         }
+        SyButton(
+            text = "导入会话备份（重启后生效）",
+            onClick = onRestore,
+            enabled = !busy,
+            variant = SyButtonVariant.Outline,
+            modifier = Modifier.fillMaxWidth(),
+        )
         SyButton(
             text = stringResource(R.string.settings_local_session_storage_cleanup),
             onClick = onCleanup,

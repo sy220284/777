@@ -277,6 +277,25 @@ fun SettingsScreen(
         }
     }
 
+    val sessionStorageImporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            localSessionStorageBusy = true
+            try {
+                val sessions = viewModel.importLocalSessionStorage(uri)
+                toast.second("已验证并安排恢复 $sessions 个会话，重启应用后生效")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                AppLog.failure("Settings", "stage_session_archive_restore", error)
+                toast.second(error.message ?: "会话备份导入失败")
+            } finally {
+                localSessionStorageBusy = false
+            }
+        }
+    }
+
     fun navigateBack() {
         if (page == SettingsDestination.USAGE_DETAIL && usageDetailBackSelection != null) {
             usageDetailSelection = usageDetailBackSelection
@@ -963,6 +982,7 @@ fun SettingsScreen(
                                 }
                             },
                             onExport = { sessionStorageExporter.launch("777-local-sessions.zip") },
+                            onRestore = { sessionStorageImporter.launch(arrayOf("application/zip", "application/octet-stream")) },
                             onCleanup = onClose,
                         )
                     }
