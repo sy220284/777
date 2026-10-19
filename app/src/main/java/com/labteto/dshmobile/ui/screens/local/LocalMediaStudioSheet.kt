@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.local.model.belongsTo
+
 import com.shenyan.designsystem.foundation.SyMetric
 
 import android.content.ClipData

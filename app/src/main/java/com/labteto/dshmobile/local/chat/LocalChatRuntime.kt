@@ -36,6 +36,7 @@ class LocalChatRuntime @Inject internal constructor(
     private val persistence: LocalChatPersistence,
     private val sessionRuntime: LocalSessionRuntime,
     private val personaCorrections: LocalChatPersonaCorrectionCoordinator,
+    private val behaviorTuning: LocalCharacterBehaviorTuningCoordinator,
     private val chatState: LocalChatStatePort,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
@@ -44,6 +45,13 @@ class LocalChatRuntime @Inject internal constructor(
     private val replySuggestions: LocalReplySuggestionCoordinator,
     private val gallery: ChatPersonaGalleryStore,
 ) : PersonaSelectionUiPort, PersonaStoryUiPort, PersonaGalleryDeletionUiPort, PersonaGallerySaveUiPort {
+    internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = behaviorTuning.configure(profile)
+    internal fun bindChatGallery(galleryId: String, galleryStoryId: String?) = personaCoordinator.bindGallery(galleryId, galleryStoryId)
+    internal fun updateBoundStoryStage(galleryId: String, storyId: String, stage: String) = personaCoordinator.updateBoundStoryStage(galleryId, storyId, stage)
+    internal fun clearChatGalleryBinding(expectedGalleryId: String, expectedStoryId: String? = null, keepCharacter: Boolean = false) = personaCoordinator.clearGalleryBinding(expectedGalleryId, expectedStoryId, keepCharacter)
+    internal fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) = personaCoordinator.select(profile, galleryId)
+    internal suspend fun setGroupChatAnnouncement(text: String): Result<Unit> = commitGroupAnnouncementFromUi(text)
+
     override suspend fun save(command: SavePersonaGalleryCommand): UiPersonaGallerySaveReceipt =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val before = synchronized(runtimeStateStore.foregroundRunHandle.lock) {

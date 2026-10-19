@@ -45,6 +45,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val sessionUi: LocalSessionUiFacade,
     private val toolsUi: LocalToolsUiFacade,
     private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
+    private val teamUi: com.labteto.dshmobile.uicontract.WorkTeamUiPort,
     private val approvalPreferences: LocalApprovalPreferences,
     private val networkSearchSettings: LocalNetworkSearchSettings,
     @ApplicationContext private val appContext: Context,
@@ -283,26 +284,52 @@ class LocalHarnessViewModel @Inject constructor(
     fun linkRequirementEvidenceForUi(
         sessionId: String, target: com.labteto.dshmobile.local.presentation.LocalRequirementUiTarget,
         artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
-    ) = runtime.work.linkRequirementEvidenceForUi(sessionId, target, artifact)
+    ): Boolean {
+        if (runtime.state.value.work.goal?.id != target.goalId) return false
+        val prepared = runtime.work.prepareRequirementEvidenceForUi(sessionId, target.index, target.content, artifact) ?: return false
+        return runtime.work.commitRequirementEvidenceForUi(prepared)
+    }
     fun eventSequenceForUi(sessionId: String) = runtime.work.eventSequenceForUi(sessionId)
-    internal fun teamMemberOutput(jobId: String): String = runtime.work.backgroundJobOutputForUi(jobId)
+    /** Resolve the current binding before every team action; never reuse a stale job identity. */
+    internal fun teamMemberOutput(jobId: String): String {
+        val snapshot = teamUi.snapshot()
+        val identity = snapshot.identity ?: return ""
+        val member = snapshot.members.firstOrNull { it.jobId == jobId } ?: return ""
+        return teamUi.readOutput(identity, member.id, member.jobId).message
+    }
 
-    internal suspend fun sendTeamMemberMessage(
-        memberId: String,
-        message: String,
-    ): LocalWorkUiActionResult {
-        val result = runtime.work.sendTeamMemberMessageForUi(memberId, message)
-        return LocalWorkUiActionResult(result.accepted, result.message)
+    private fun teamActionResult(result: com.labteto.dshmobile.uicontract.UiWorkTeamResult): LocalWorkUiActionResult {
+        val accepted = result.receipt is com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted ||
+            result.receipt is com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued
+        return LocalWorkUiActionResult(accepted, result.message)
+    }
+
+    internal suspend fun sendTeamMemberMessage(memberId: String, message: String): LocalWorkUiActionResult {
+        val snapshot = teamUi.snapshot()
+        val identity = snapshot.identity ?: return LocalWorkUiActionResult(false, "会话已变化")
+        val member = snapshot.members.firstOrNull { it.id == memberId }
+            ?: return LocalWorkUiActionResult(false, "团队成员已变化")
+        return teamActionResult(teamUi.submit(
+            com.labteto.dshmobile.uicontract.WorkTeamUiCommand.SendMessage(identity, memberId, member.jobId, message)
+        ))
     }
 
     internal suspend fun stopTeamMember(memberId: String): LocalWorkUiActionResult {
-        val result = runtime.work.stopTeamMemberForUi(memberId)
-        return LocalWorkUiActionResult(result.accepted, result.message)
+        val snapshot = teamUi.snapshot()
+        val identity = snapshot.identity ?: return LocalWorkUiActionResult(false, "会话已变化")
+        val member = snapshot.members.firstOrNull { it.id == memberId }
+            ?: return LocalWorkUiActionResult(false, "团队成员已变化")
+        return teamActionResult(teamUi.submit(
+            com.labteto.dshmobile.uicontract.WorkTeamUiCommand.StopMember(identity, memberId, member.jobId)
+        ))
     }
 
     internal suspend fun stopTeam(): LocalWorkUiActionResult {
-        val result = runtime.work.stopTeamForUi()
-        return LocalWorkUiActionResult(result.accepted, result.message)
+        val snapshot = teamUi.snapshot()
+        val identity = snapshot.identity ?: return LocalWorkUiActionResult(false, "会话已变化")
+        return teamActionResult(teamUi.submit(
+            com.labteto.dshmobile.uicontract.WorkTeamUiCommand.StopTeam(identity, snapshot.members.map { it.jobId }.toSet())
+        ))
     }
     fun approve(callId: String) = runtime.work.answerApproval(callId, true)
     fun deny(callId: String) = runtime.work.answerApproval(callId, false)
