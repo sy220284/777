@@ -137,6 +137,8 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
         ZxNavRow("历史结果", sub = "${page.results.size} 项") {
             scope.onNavigate(UiSceneId("media.result"))
         }
+        ZxSection("创建作品")
+        ZxFooterNote("先选择生成模型，填写描述后提交任务；进度与作品会显示在媒体结果中。")
         ZxSection("生成模型")
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -148,11 +150,11 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
         if (offer?.kind != LocalMediaKind.TRANSCRIBE) {
             ZxSection("生成描述")
             ZxField(prompt, { prompt = it }, Modifier.fillMaxWidth().heightIn(min = 96.dp),
-                placeholder = "描述想生成的内容…")
+                placeholder = "描述想生成的内容…", fieldLabel = "生成描述")
         }
         if (offer?.kind == LocalMediaKind.IMAGE) {
             ZxSection("画面比例")
-            ZxField(ratio, { ratio = it }, Modifier.fillMaxWidth(), placeholder = "例如 1:1")
+            ZxField(ratio, { ratio = it }, Modifier.fillMaxWidth(), placeholder = "例如 1:1", fieldLabel = "画面比例")
             if (!validImageRatio) ZxBanner("比例格式应为正整数:正整数，例如 1:1、16:9", ZxTone.Err)
         }
         if (offer?.kind == LocalMediaKind.SPEECH) {
@@ -164,6 +166,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
             }
             voices.forEach { item -> ZxChip(item.name, voice == item.id) { voice = item.id } }
         }
+        ZxFooterNote("生成请求可能产生模型费用；提交代表请求受理，不代表作品已完成。")
         ZxButton(if (offer?.kind == LocalMediaKind.TRANSCRIBE) "选择音频转写" else "开始生成", {
             val target = offer
             if (target != null) {
