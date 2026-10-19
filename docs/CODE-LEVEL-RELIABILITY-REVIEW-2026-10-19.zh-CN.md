@@ -23,7 +23,7 @@
 | R05 | 记忆记录已写入后，可选整理失败仍作为保存失败返回 | `MemoryManager` 在记录已提交后把整理故障隔离为可观察维护异常，返回真实已保存结果 | 原记忆持久化测试需以新 SHA CI 验证 |
 | R06 | 模型配置及本机 Runtime 初始化将协程取消误作普通异常；模型切换可能已写盘却因新一次点击抑制界面状态更新 | `LocalModelRuntime`、`LocalRuntimeKernel` 保持取消语义，成功提交的选择按串行顺序投影，后续操作再覆盖 | 模型/启动及连续快速切换回归需以新 SHA CI 验证 |
 | R07 | 安装交接标记先删旧文件再替换，崩溃可致新版本 APK 误被清理 | `UpdateCache` 使用完整写入与原子替换；异常标记按有限保留期处理、启动不误删也不崩溃 | `UpdateCacheTest`（重复交接、坏标记、保留期限、主动更新） |
-| R08 | Webhook 历史回执损坏被当作从不存在，隐瞒副作用未知事实 | `WebhookResultStore` 将无法解析的回执显式投影并持久结算为 `INTERRUPTED`，不自动重放 | `WebhookResultStoreInstrumentedTest`（损坏与冷恢复） |
+| R08 | Webhook 回执损坏、未来状态、存储键身份错配可能被解释为不存在、失败或其他请求的结果；执行成功后完成回执异常可能被错误结算为失败；运行中取消无法证明无副作用 | `WebhookResultStore` 校验身份与未知状态；`WebhookExecution` 分离业务执行和回执异常、区分未开始取消和有副作用风险的中断；`HarnessWebhookService` 记录持久化故障并可靠释放队列名额 | `WebhookResultStoreInstrumentedTest`（损坏、未知状态、身份错配、冷恢复）；`WebhookExecutionTest`（完成回执失败、运行中取消与正常结果） |
 | R09 | README 声称 V6 已移除且 APK 无 UI，与合并后的真实应用不符 | 更新 README | 文档与当前 V6 源码对账 |
 
 ## 3. 本轮未认定为缺陷的防护
