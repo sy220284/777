@@ -1169,6 +1169,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             WorkContentBlock(
                                 node = transcriptItem.node,
                                 running = state.running && !transcriptItem.node.failed &&
+                                    transcriptItem.node.count == 0 &&
                                     transcriptItem.key == transcriptItems.lastOrNull()?.key,
                             )
                         }
