@@ -35,6 +35,19 @@ class NativeV6DocumentPresentationTest {
         assertEquals("确认并发送表单", nativeV6ActionLabel("确认并发送表单", direct))
     }
 
+    @Test fun submittedFormReportsTheRealOwnerAdmissionOrRejection() {
+        val accepted = com.labteto.dshmobile.uicontract.UiDocumentReceipt.OwnerReceipt(
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted)
+        val queued = com.labteto.dshmobile.uicontract.UiDocumentReceipt.OwnerReceipt(
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued)
+        val rejected = com.labteto.dshmobile.uicontract.UiDocumentReceipt.OwnerReceipt(
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Rejected(
+                com.labteto.dshmobile.uicontract.UiCommandRejection.STALE_IDENTITY))
+        assertEquals("表单已提交，等待会话处理", nativeV6DocumentReceiptMessage(accepted))
+        assertEquals("表单已加入工作队列，稍后处理", nativeV6DocumentReceiptMessage(queued))
+        org.junit.Assert.assertTrue(nativeV6DocumentReceiptMessage(rejected).contains("已失效"))
+    }
+
     @Test fun singleSelectRendersCurrentChoiceWithoutPretendingToBeMultipleChoice() {
         val select = UiDocumentNode.Select("city", "目的地", listOf("成都", "上海"), "成都")
         assertEquals("成都", nativeV6SelectLabel(select, emptyMap()))
