@@ -29,7 +29,9 @@ internal object LocalReplyUiDocumentProtocol {
      * The tool-free final step closes that Work turn and allows the next user-submitted turn.
      */
     internal fun workFormMayBePublished(definition: String?, modelToolCallCount: Int): Boolean =
-        !definition.isNullOrBlank() && modelToolCallCount == 0
+        !definition.isNullOrBlank() &&
+            (modelToolCallCount == 0 ||
+                workReplyFormHandling(definition, hasToolCalls = true) == WorkReplyFormHandling.NONE)
 
     val instruction = """
         Reply normally in readable language. When a structured card materially improves a
