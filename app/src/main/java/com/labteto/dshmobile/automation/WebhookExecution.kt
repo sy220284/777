@@ -11,7 +11,9 @@ internal suspend fun executeWebhookRun(
     val output = try {
         run()
     } catch (cancelled: CancellationException) {
-        update(WebhookRunStatus.CANCELLED, null, "Webhook 服务已停止")
+        // RUNNING means the action could have reached external systems already.
+        // Unlike an unstarted queued request, cancellation cannot prove no side effect.
+        update(WebhookRunStatus.INTERRUPTED, null, "Webhook 执行中断，外部副作用可能已发生，请先核实")
         throw cancelled
     } catch (error: Exception) {
         update(WebhookRunStatus.FAILED, null, error.message ?: error::class.java.simpleName)

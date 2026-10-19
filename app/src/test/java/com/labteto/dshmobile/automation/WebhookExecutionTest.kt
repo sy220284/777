@@ -46,7 +46,7 @@ class WebhookExecutionTest {
         runCurrent()
         job.cancelAndJoin()
         assertTrue(job.isCancelled)
-        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.CANCELLED), states)
+        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.INTERRUPTED), states)
     }
     @Test fun cancellationBeforeWorkCompletesSettlesWithoutRetry() = runTest {
         val states = mutableListOf<WebhookRunStatus>()
@@ -57,7 +57,7 @@ class WebhookExecutionTest {
         }
         runCurrent()
         job.cancelAndJoin()
-        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.CANCELLED), states)
+        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.INTERRUPTED), states)
     }
     @Test fun successfulRunStoresResult() = runTest {
         val states = mutableListOf<WebhookRunStatus>()
