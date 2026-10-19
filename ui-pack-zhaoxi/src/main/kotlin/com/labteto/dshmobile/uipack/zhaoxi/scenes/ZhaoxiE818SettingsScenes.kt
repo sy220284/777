@@ -155,10 +155,21 @@ fun ZhaoxiUsageLogScene(
         if (timeWindowDays == 0) null else
             System.currentTimeMillis() - timeWindowDays * 86_400_000L
     }
+    var pageFailure by remember(selectedModel, timeWindowDays, currentCursor) {
+        mutableStateOf<String?>(null)
+    }
+    var retryPage by remember { mutableIntStateOf(0) }
     val page by produceState<UiUsageHistoryPage?>(
-        initialValue = null, usage, revision, selectedModel, since, currentCursor) {
-        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            usage.historyPage(selectedModel, since, currentCursor, 25)
+        initialValue = null, usage, revision, selectedModel, since, currentCursor, retryPage) {
+        value = null
+        pageFailure = null
+        try {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                usage.historyPage(selectedModel, since, currentCursor, 25)
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            pageFailure = failure.message ?: "用量历史读取失败，请重试"
         }
     }
     ZxPage("用量日志", onBack = { scope.onBack() }) {
@@ -182,8 +193,17 @@ fun ZhaoxiUsageLogScene(
         val records = page?.records.orEmpty()
         ZxSection("请求记录 · 共 ${page?.totalMatching ?: 0} 条")
         ZxFooterNote("从本地 SQLite 已保留的请求记录逐页读取。超过数据库留存期限的明细无法恢复，累计统计不受影响。")
-        if (page == null) ZxFooterNote("正在读取历史用量…")
-        else if (records.isEmpty()) ZxEmpty("所选条件没有请求记录", "可以调整模型或时间范围")
+        pageFailure?.let { error ->
+            ZxFooterNote(error)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ZxButton("重新读取", { retryPage++ }, variant = ZxButtonVariant.Outline)
+                if (pageCursors.size > 1) ZxButton("回到第一页", {
+                    pageCursors = listOf(null)
+                }, variant = ZxButtonVariant.Outline)
+            }
+        }
+        if (page == null && pageFailure == null) ZxFooterNote("正在读取历史用量…")
+        else if (page != null && records.isEmpty()) ZxEmpty("所选条件没有请求记录", "可以调整模型或时间范围")
         records.forEach { record ->
             ZxRow(record.model,
                 "${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(record.timestamp))} · ${record.context.action.name} · ${record.totalTokens} Token · ¥${"%.4f".format(record.estimatedCostCny)}" +
