@@ -124,7 +124,6 @@ fun ZhaoxiHomeScene(
         ?: kotlinx.coroutines.flow.flowOf(UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null)))
         .collectAsState(initial = UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null))
     var commandReceipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
-    var drawerQuery by rememberSaveable { mutableStateOf("") }
     var showDraftSessions by rememberSaveable { mutableStateOf(false) }
     var selectedSessionAction by remember { mutableStateOf<String?>(null) }
     var renameSessionId by remember { mutableStateOf<String?>(null) }
@@ -145,12 +144,7 @@ fun ZhaoxiHomeScene(
     val workMode = snap.usageMode == LocalUsageMode.WORK
     fun sceneAvailable(id: String) = UiSceneId(id) in availableScenes
     val modeSessions = snap.sessions.filter { it.usageMode == snap.usageMode }
-    val matchedSessions = if (drawerQuery.isBlank()) modeSessions else modeSessions.filter { session ->
-        renamedTitles.getOrDefault(session.id, session.title)
-            .contains(drawerQuery.trim(), ignoreCase = true) ||
-            session.summaryPreview.orEmpty().contains(drawerQuery.trim(), ignoreCase = true)
-    }
-    val visibleSessions = zxHomeRecentSessions(matchedSessions, pinnedIds)
+    val visibleSessions = zxHomeRecentSessions(modeSessions, pinnedIds)
     val unsentText by (draftPort?.drafts ?: kotlinx.coroutines.flow.flowOf(emptyMap<String, String>()))
         .collectAsState(initial = emptyMap())
     val unsentFiles by (draftPort?.attachments
@@ -158,13 +152,11 @@ fun ZhaoxiHomeScene(
         .collectAsState(initial = emptyMap())
     fun hasDraft(id: String): Boolean =
         !unsentText[id].isNullOrBlank() || unsentFiles[id].orEmpty().isNotEmpty()
-    val blankSessions = matchedSessions.filter { it.blank && hasDraft(it.id) }
+    val blankSessions = modeSessions.filter { it.blank && hasDraft(it.id) }
     val transientDrafts = snap.pendingSessions.filter { pending ->
         pending.usageMode == snap.usageMode &&
             modeSessions.none { it.id == pending.sessionId } &&
-            hasDraft(pending.sessionId) &&
-            (drawerQuery.isBlank() || unsentText[pending.sessionId].orEmpty()
-                .contains(drawerQuery.trim(), ignoreCase = true))
+            hasDraft(pending.sessionId)
     }
     val draftExpanded = showDraftSessions
     val shownSessionIds = (visibleSessions + if (draftExpanded) blankSessions else emptyList())
@@ -211,12 +203,6 @@ fun ZhaoxiHomeScene(
                         ) { ZxIcon("search") }
                     }
                     Spacer(Modifier.height(4.dp))
-                    ZxField(
-                        value = drawerQuery,
-                        onValueChange = { drawerQuery = it; bulkIds = emptySet() },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = if (workMode) "筛选工作会话" else "筛选聊天会话",
-                    )
                     CommandFeedback(commandReceipt)
                     managementFeedback?.let { ZxFooterNote(it) }
                     Spacer(Modifier.height(8.dp))
@@ -266,17 +252,9 @@ fun ZhaoxiHomeScene(
                         if (visibleSessions.isEmpty() && blankSessions.isEmpty() && transientDrafts.isEmpty()) {
                             item {
                                 Text(
-                                    if (drawerQuery.isBlank()) (if (workMode) "暂无工作历史，可返回首页新建" else "暂无聊天历史，可返回首页新建")
-                                    else "没有匹配的会话",
+                                    if (workMode) "暂无工作历史，可返回首页新建" else "暂无聊天历史，可返回首页新建",
                                     fontSize = 12.sp, color = c.ink2, modifier = Modifier.padding(12.dp),
                                 )
-                            }
-                            if (drawerQuery.isNotBlank()) {
-                                item {
-                                    ZxButton("清除筛选", { drawerQuery = "" },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        variant = ZxButtonVariant.Outline)
-                                }
                             }
                         }
                         if (blankSessions.isNotEmpty() || transientDrafts.isNotEmpty()) {
