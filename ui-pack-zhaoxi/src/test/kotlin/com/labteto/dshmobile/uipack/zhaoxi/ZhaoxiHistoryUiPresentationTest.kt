@@ -65,7 +65,7 @@ class ZhaoxiHistoryUiPresentationTest {
         assertEquals("MCP", zxToolFamilyLabel("MCP"))
     }
     @Test fun toolPermissionAndLifecycleLabelsAreHumanReadable() {
-        assertEquals("查看应用和设备信息", zxCapabilityActionLabel("android_app_info"))
+        assertEquals("应用信息", zxCapabilityActionLabel("android_app_info"))
         assertEquals("读取 GitHub 信息", zxCapabilityActionLabel("github_api_get"))
         assertEquals("启动应用", zxCapabilityActionLabel("android_app_launch"))
         assertEquals("屏幕点击", zxCapabilityActionLabel("android_tap"))
