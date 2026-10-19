@@ -115,16 +115,21 @@ private fun NativeV6DocumentCard(
     var confirmation by remember(doc.documentId, doc.revision) { mutableStateOf<String?>(null) }
     var deleting by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
     var submitting by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
+    var submitted by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
     var confirmDelete by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
     var progressDetailsExpanded by remember(doc.documentId) { mutableStateOf(false) }
     fun perform(actionId: String, confirmed: Boolean) {
-        if (submitting) return
+        if (submitting || submitted) return
         submitting = true
         val values = fields
         scope.launch {
             try {
                 val receipt = withContext(Dispatchers.IO) {
                     controller.submit(snapshot, actionId, values, confirmed)
+                }
+                if (nativeV6SubmittedToOwner(receipt) &&
+                    doc.actions.any { it.id == actionId && it is UiDocumentAction.SendUserInput && it.submit }) {
+                    submitted = true
                 }
                 onFeedback(nativeV6DocumentReceiptMessage(receipt))
                 if (receipt == UiDocumentReceipt.DraftPrepared) onPreparedDraft()
@@ -149,12 +154,14 @@ private fun NativeV6DocumentCard(
                 nativeV6InlineVisibleNodes(doc, progressDetailsExpanded).forEach { node ->
                     NativeV6DocumentNode(
                         node, snapshot.bindings, fields,
-                        onFieldChange = { id, value -> if (!readOnly && !submitting) controller.forms.update(formKey, id, value) },
-                        readOnly = readOnly || submitting, media = controller.media, sessionId = doc.source.sessionId,
+                        onFieldChange = { id, value -> if (!readOnly && !submitting && !submitted) controller.forms.update(formKey, id, value) },
+                        readOnly = readOnly || submitting || submitted, media = controller.media, sessionId = doc.source.sessionId,
                         actions = doc.actions,
                     ) { actionId ->
                         val action = doc.actions.firstOrNull { it.id == actionId }
-                        if (snapshot.actions[actionId]?.available != true) {
+                        if (submitted) {
+                            onFeedback("该表单已提交，等待会话处理")
+                        } else if (snapshot.actions[actionId]?.available != true) {
                             onFeedback("当前会话中的操作不可用：${snapshot.actions[actionId]?.reason ?: UiCommandRejection.STALE_IDENTITY}")
                         } else if (action is UiDocumentAction.AnswerApproval ||
                             action is UiDocumentAction.SendUserInput && action.submit) {
@@ -186,7 +193,7 @@ private fun NativeV6DocumentCard(
         TextButton(onClick = {
                 confirmation = null
                 perform(actionId, true)
-            }, enabled = !submitting) { Text(if (submitting) "正在提交…" else "确认") }
+            }, enabled = !submitting && !submitted) { Text(if (submitting) "正在提交…" else "确认") }
     }
 }
     }
