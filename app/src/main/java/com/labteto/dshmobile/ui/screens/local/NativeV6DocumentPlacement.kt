@@ -11,5 +11,6 @@ internal fun nativeV6DocumentsForMessage(
 ): List<UiDocumentSnapshot> = snapshots.filter { item ->
     item.document.source.messageId == messageId &&
         (role == "assistant" || workMode && role == "user" &&
-            item.document.documentId == "work-live:${messageId}")
+            item.document.source.workMode &&
+            item.document.documentId in setOf("work-live:${messageId}", "reply-ui:${messageId}"))
 }
