@@ -5,6 +5,12 @@ import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxUsageModelNames
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxPinnedSessionsFirst
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxHumanFileSize
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxToolFamilyLabel
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxPluginStateLabel
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxCapabilityActionLabel
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxCapabilityPermissionLabel
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkspaceKindLabel
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxUsageActionLabel
+import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkspaceFileVisible
 import org.junit.Assert.*
 import org.junit.Test
@@ -44,5 +50,19 @@ class ZhaoxiHistoryUiPresentationTest {
         assertEquals("设备操作", zxToolFamilyLabel("Android"))
         assertEquals("代码分析", zxToolFamilyLabel("LSP"))
         assertEquals("MCP", zxToolFamilyLabel("MCP"))
+    }
+    @Test fun toolPermissionAndLifecycleLabelsAreHumanReadable() {
+        assertEquals("查看应用和设备信息", zxCapabilityActionLabel("android_app_info"))
+        assertEquals("读取 GitHub 信息", zxCapabilityActionLabel("github_api_get"))
+        assertEquals("只读查询 · 无需额外确认", zxCapabilityPermissionLabel("READ_ONLY", "NEVER"))
+        assertEquals("可能修改内容 · 操作前须确认", zxCapabilityPermissionLabel("MUTATION", "ALWAYS"))
+        assertEquals("已启用", zxPluginStateLabel("ACTIVE"))
+        assertEquals("需要修复", zxPluginStateLabel("FAILED"))
+    }
+    @Test fun workspaceAndUsagePresentationDoesNotExposeRawInternalIdentifiers() {
+        assertEquals("PDF 文档", zxWorkspaceKindLabel("exports/report.pdf"))
+        assertEquals("图片", zxWorkspaceKindLabel("output/photo.png"))
+        assertEquals("工作任务", zxUsageActionLabel(TokenUsageAction.WORK_MAIN))
+        assertEquals("图像理解", zxUsageActionLabel(TokenUsageAction.VISION))
     }
 }
