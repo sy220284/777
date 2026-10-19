@@ -14,6 +14,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -277,6 +278,24 @@ private fun NativeV6DocumentNode(
         is UiDocumentNode.Switch -> Row {
             Checkbox(checked = fields[node.id].toBoolean(), onCheckedChange = { onFieldChange(node.id, it.toString()) }, enabled = !readOnly)
             Text(node.label, modifier = Modifier.padding(top = 12.dp))
+        }
+        is UiDocumentNode.Slider -> Column {
+            val value = fields[node.id]?.toDoubleOrNull()?.coerceIn(node.minimum, node.maximum) ?: node.initial
+            Text("${node.label}：${value.toBigDecimal().stripTrailingZeros().toPlainString()}")
+            Slider(value = value.toFloat(),
+                onValueChange = { update ->
+                    val steps = kotlin.math.round((update.toDouble() - node.minimum) / node.step)
+                    val snapped = (node.minimum + steps * node.step).coerceIn(node.minimum, node.maximum)
+                    onFieldChange(node.id, snapped.toString())
+                },
+                valueRange = node.minimum.toFloat()..node.maximum.toFloat(),
+                steps = ((node.maximum - node.minimum) / node.step).toInt() - 1,
+                enabled = !readOnly)
+        }
+        is UiDocumentNode.Calculated -> Column {
+            Text(node.label, style = MaterialTheme.typography.labelMedium)
+            Text(calculateUiDocumentValue(node, fields) ?: "请输入有效数字",
+                style = MaterialTheme.typography.titleMedium)
         }
         is UiDocumentNode.Button -> TextButton(onClick = { onAction(node.actionId) }, enabled = !readOnly) { Text(node.label) }
         is UiDocumentNode.Disclosure -> {

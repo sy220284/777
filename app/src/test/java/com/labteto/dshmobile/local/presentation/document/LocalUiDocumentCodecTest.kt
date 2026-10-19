@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.presentation.document
 
 import com.labteto.dshmobile.uicontract.UiDocumentBudget
 import com.labteto.dshmobile.uicontract.UiDocumentSource
+import com.labteto.dshmobile.uicontract.initialFields
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -83,4 +84,22 @@ class LocalUiDocumentCodecTest {
         assertTrue(result.isFailure)
         assertEquals("document_size", result.exceptionOrNull()?.message)
     }
+    @Test fun nativeCalculationRoundTripAndLiveInputUpdates() {
+        val input = raw("""{"id":"bill","type":"field","label":"账单","initial":"320","required":true},
+          {"id":"people","type":"slider","label":"人数","minimum":1,"maximum":10,"step":1,"initial":4},
+          {"id":"share","type":"calculated","label":"人均","leftId":"bill","rightId":"people",
+           "operation":"DIVIDE","prefix":"¥","suffix":"","decimals":2}""")
+        val doc = decode(input).getOrThrow()
+        assertEquals(doc, decode(LocalUiDocumentCodec.encode(doc).toString()).getOrThrow())
+        val calculated = doc.nodes.last() as com.labteto.dshmobile.uicontract.UiDocumentNode.Calculated
+        val inputs = doc.initialFields()
+        assertEquals("¥80.00", com.labteto.dshmobile.uicontract.calculateUiDocumentValue(calculated, inputs))
+        assertEquals("¥64.00", com.labteto.dshmobile.uicontract.calculateUiDocumentValue(calculated, inputs + ("people" to "5.0")))
+        assertTrue(com.labteto.dshmobile.uicontract.calculateUiDocumentValue(calculated, inputs + ("people" to "0")) == null)
+        assertTrue(decode(input.replace("rightId\":\"people", "rightId\":\"missing")).isFailure)
+        assertTrue(decode(input.replace("\"step\":1", "\"step\":0")).isFailure)
+        assertTrue(decode(input.replace("\"maximum\":10", "\"maximum\":10000")).isFailure)
+        assertTrue(decode(input.replace("\"operation\":\"DIVIDE", "\"operation\":\"EVAL")).isFailure)
+    }
+
 }

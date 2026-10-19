@@ -35,7 +35,18 @@ internal object LocalReplyUiDocumentProtocol {
         Supported nodes: text(text), table(headers,rows), bar_chart(title,unit,points),
         line_chart(title,unit,points), field(label,initial,required), textarea(label,initial,required),
         select(label,options,initial), switch(label,initial), button(label,actionId),
+        slider(label,minimum,maximum,step,initial),
+        calculated(label,leftId,rightId,operation,prefix,suffix,decimals),
         column(children), row(children), disclosure(title,children). Each point is {label,value}.
+        For instant on-device calculations, combine numeric fields, bounded sliders and
+        calculated outputs. Operations are ADD, SUBTRACT, MULTIPLY and DIVIDE, referencing
+        two existing numeric field or slider IDs. Never include executable code or HTML.
+        Example for 320 shared among 4 people:
+        [{"id":"amount","type":"field","label":"总金额","initial":"320","required":true},
+        {"id":"people","type":"slider","label":"人数","minimum":1,"maximum":10,"step":1,"initial":4},
+        {"id":"share","type":"calculated","label":"每人应付","leftId":"amount",
+        "rightId":"people","operation":"DIVIDE","prefix":"¥","suffix":"","decimals":2}]
+        Sliders use 1-100 discrete intervals and a nonnegative numeric range.
         Supported actions: send_user_input or submit_user_input with id,type,text,fieldIds.
         The former prepares a composer draft; the latter requires explicit user confirmation.
         Actions may only reference existing input field IDs. Provide fallbackText describing

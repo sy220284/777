@@ -12,6 +12,7 @@ import com.labteto.dshmobile.ui.shenyan.SyDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -369,6 +370,25 @@ private fun NativeV6DocumentNode(
             Text(node.label, modifier = Modifier.weight(1f), color = colors.textSecondary)
             Switch(checked = (fields[node.id] ?: node.initial.toString()) == "true",
                 onCheckedChange = { onFieldChange(node.id, it.toString()) }, enabled = enabled)
+        }
+        is UiDocumentNode.Slider -> Column {
+            val value = fields[node.id]?.toDoubleOrNull()?.coerceIn(node.minimum, node.maximum) ?: node.initial
+            Text("${node.label}：${value.toBigDecimal().stripTrailingZeros().toPlainString()}",
+                color = colors.textSecondary)
+            Slider(value = value.toFloat(),
+                onValueChange = { update ->
+                    val steps = kotlin.math.round((update.toDouble() - node.minimum) / node.step)
+                    onFieldChange(node.id, (node.minimum + steps * node.step)
+                        .coerceIn(node.minimum, node.maximum).toString())
+                },
+                valueRange = node.minimum.toFloat()..node.maximum.toFloat(),
+                steps = ((node.maximum - node.minimum) / node.step).toInt() - 1,
+                enabled = enabled)
+        }
+        is UiDocumentNode.Calculated -> Column {
+            Text(node.label, color = colors.textSecondary)
+            Text(calculateUiDocumentValue(node, fields) ?: "请输入有效数字",
+                style = MaterialTheme.typography.titleMedium)
         }
         is UiDocumentNode.Button -> SyButton(node.label, onClick = { onAction(node.actionId) },
             enabled = enabled && item.actions[node.actionId]?.available == true,

@@ -43,6 +43,7 @@ fun UiDocument.initialFields(): Map<String, String> = buildMap {
             is UiDocumentNode.Field -> put(node.id, node.initial)
             is UiDocumentNode.Select -> put(node.id, node.initial)
             is UiDocumentNode.Switch -> put(node.id, node.initial.toString())
+            is UiDocumentNode.Slider -> put(node.id, node.initial.toString())
             is UiDocumentNode.Column -> node.children.forEach(::visit)
             is UiDocumentNode.Row -> node.children.forEach(::visit)
             is UiDocumentNode.Disclosure -> node.children.forEach(::visit)
@@ -82,6 +83,12 @@ fun UiDocument.invalidInputFields(action: UiDocumentAction.SendUserInput, values
                 (node.required && value.isBlank())
             is UiDocumentNode.Select -> value !in node.options
             is UiDocumentNode.Switch -> value != "true" && value != "false"
+            is UiDocumentNode.Slider -> {
+                val number = value?.toDoubleOrNull()
+                number == null || !number.isFinite() || number !in node.minimum..node.maximum ||
+                    kotlin.math.abs((number - node.minimum) / node.step -
+                        kotlin.math.round((number - node.minimum) / node.step)) > 1.0e-5
+            }
             else -> true
         }
     }
@@ -94,3 +101,17 @@ fun UiDocument.preparedInput(action: UiDocumentAction.SendUserInput, values: Map
         val fields = initialFields() + values
         action.fieldIds.forEach { id -> append('\n'); append(id); append(": "); append(fields[id].orEmpty()) }
     }
+
+/** Pure on-device calculation over current form values; no model call or tool permission. */
+fun calculateUiDocumentValue(node: UiDocumentNode.Calculated, values: Map<String, String>): String? {
+    val left = values[node.leftId]?.toDoubleOrNull()?.takeIf { it.isFinite() } ?: return null
+    val right = values[node.rightId]?.toDoubleOrNull()?.takeIf { it.isFinite() } ?: return null
+    val result = when (node.operation) {
+        UiArithmeticOperation.ADD -> left + right
+        UiArithmeticOperation.SUBTRACT -> left - right
+        UiArithmeticOperation.MULTIPLY -> left * right
+        UiArithmeticOperation.DIVIDE -> if (right == 0.0) return null else left / right
+    }
+    if (!result.isFinite() || node.decimals !in 0..4) return null
+    return node.prefix + String.format(java.util.Locale.ROOT, "%.${node.decimals}f", result) + node.suffix
+}
