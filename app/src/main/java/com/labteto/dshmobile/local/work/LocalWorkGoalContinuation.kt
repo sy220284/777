@@ -151,6 +151,7 @@ internal fun localWorkGoalFingerprint(goal: LocalGoal): String {
 internal fun isCurrentWorkGoalContinuation(
     continuation: com.labteto.dshmobile.harness.agent.AgentContinuationRef?,
     work: LocalWorkState,
+    eventLog: LocalSessionEventLog? = null,
 ): Boolean {
     if (continuation?.failureCode != WORK_GOAL_PROGRESS_CONTINUATION) return true
     val goal = work.goal ?: return false
