@@ -17,6 +17,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +43,7 @@ internal fun NativeV6DocumentMessage(
     messageId: String,
     documents: List<UiDocumentSnapshot>,
     controller: NativeV6Documents,
+    readOnly: Boolean = false,
     onPreparedDraft: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -50,17 +53,17 @@ internal fun NativeV6DocumentMessage(
     var feedback by remember(messageId) { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         documents.forEach { snapshot ->
-            NativeV6DocumentCard(snapshot, controller, onFeedback = { feedback = it },
+            NativeV6DocumentCard(snapshot, controller, readOnly = readOnly, onFeedback = { feedback = it },
                 onPreparedDraft = onPreparedDraft)
         }
-        if (documents.isEmpty()) {
+        if (documents.isEmpty() && !readOnly) {
             TextButton(onClick = { creating = true }, enabled = !generating) {
                 Text(if (generating) "正在生成交互文档…" else "生成交互文档")
             }
         }
         feedback?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
     }
-    if (creating) {
+    if (creating && !readOnly) {
         SyDialog(title = "生成交互文档", onDismiss = { creating = false }) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("将额外请求一次模型；确认后才会执行。")
@@ -87,19 +90,26 @@ internal fun NativeV6DocumentMessage(
 private fun NativeV6DocumentCard(
     snapshot: UiDocumentSnapshot,
     controller: NativeV6Documents,
+    readOnly: Boolean,
     onFeedback: (String) -> Unit,
     onPreparedDraft: () -> Unit,
 ) {
     val doc = snapshot.document
     val scope = rememberCoroutineScope()
-    val fields = remember(doc.documentId, doc.revision) {
-        mutableStateMapOf<String, String>().apply { putAll(doc.initialFields()) }
+    val formKey = remember(doc.source.sessionId, doc.documentId, doc.revision) {
+        UiDocumentFormKey(doc.source.sessionId, doc.documentId, doc.revision)
+    }
+    val savedFields by controller.forms.values.collectAsStateWithLifecycle()
+    val fields = doc.initialFields() + savedFields[formKey].orEmpty()
+    DisposableEffect(formKey, readOnly) {
+        if (!readOnly) controller.forms.bindRetention(formKey, doc.fieldRetention())
+        onDispose { if (!readOnly) controller.forms.releaseRetention(formKey) }
     }
     var confirmation by remember(doc.documentId, doc.revision) { mutableStateOf<String?>(null) }
     var deleting by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
     var confirmDelete by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
     fun perform(actionId: String, confirmed: Boolean) {
-        val values = fields.toMap()
+        val values = fields
         scope.launch {
             val receipt = withContext(Dispatchers.IO) { controller.submit(snapshot, actionId, values, confirmed) }
             onFeedback(nativeV6DocumentReceiptMessage(receipt))
@@ -114,8 +124,13 @@ private fun NativeV6DocumentCard(
                 Text(doc.fallbackText, style = MaterialTheme.typography.bodyMedium)
                 Text("该文档仅提供历史内容，不能执行操作。")
             } else {
+                if (readOnly) Text("历史文档只读，操作已禁用。")
                 doc.nodes.forEach { node ->
-                    NativeV6DocumentNode(node, snapshot.bindings, fields) { actionId ->
+                    NativeV6DocumentNode(
+                        node, snapshot.bindings, fields,
+                        onFieldChange = { id, value -> if (!readOnly) controller.forms.update(formKey, id, value) },
+                        readOnly = readOnly, media = controller.media, sessionId = doc.source.sessionId,
+                    ) { actionId ->
                         val action = doc.actions.firstOrNull { it.id == actionId }
                         if (snapshot.actions[actionId]?.available != true) {
                             onFeedback("当前会话中的操作不可用")
@@ -128,7 +143,7 @@ private fun NativeV6DocumentCard(
                     }
                 }
             }
-            if (snapshot.recoveryNotice == null && !doc.documentId.startsWith("work-live:")) {
+            if (!readOnly && snapshot.recoveryNotice == null && !doc.documentId.startsWith("work-live:")) {
                 SyButton(
                     "删除文档", onClick = { confirmDelete = true },
                     enabled = !deleting, variant = SyButtonVariant.Ghost,
@@ -160,6 +175,7 @@ private fun NativeV6DocumentCard(
                     scope.launch {
                         try {
                             val receipt = withContext(Dispatchers.IO) { controller.delete(snapshot) }
+                            if (receipt == UiDocumentReceipt.Deleted) controller.forms.forgetDocument(formKey)
                             onFeedback(nativeV6DocumentReceiptMessage(receipt))
                         } finally { deleting = false }
                     }
@@ -174,12 +190,16 @@ private fun NativeV6DocumentCard(
 private fun NativeV6DocumentNode(
     node: UiDocumentNode,
     bindings: Map<UiDocumentBinding, UiDocumentBoundValue>,
-    fields: MutableMap<String, String>,
+    fields: Map<String, String>,
+    onFieldChange: (String, String) -> Unit,
+    readOnly: Boolean,
+    media: MediaUiPort,
+    sessionId: String,
     onAction: (String) -> Unit,
 ) {
     when (node) {
         is UiDocumentNode.Text -> Text(node.text, style = MaterialTheme.typography.bodyMedium)
-        is UiDocumentNode.Media -> Text("${node.label}（${node.kind.name.lowercase()} 素材）")
+        is UiDocumentNode.Media -> NativeV6DocumentMedia(node, sessionId, media)
         is UiDocumentNode.Table -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 node.headers.forEach { Text(it, modifier = Modifier.weight(1f),
@@ -235,37 +255,37 @@ private fun NativeV6DocumentNode(
             Text("${node.label}：$label")
         }
         is UiDocumentNode.Column -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            node.children.forEach { NativeV6DocumentNode(it, bindings, fields, onAction) }
+            node.children.forEach { NativeV6DocumentNode(it, bindings, fields, onFieldChange, readOnly, media, sessionId, onAction) }
         }
         is UiDocumentNode.Row -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             node.children.forEach { child ->
-                Column(Modifier.weight(1f)) { NativeV6DocumentNode(child, bindings, fields, onAction) }
+                Column(Modifier.weight(1f)) { NativeV6DocumentNode(child, bindings, fields, onFieldChange, readOnly, media, sessionId, onAction) }
             }
         }
         is UiDocumentNode.Field -> OutlinedTextField(
-            value = fields[node.id].orEmpty(), onValueChange = { fields[node.id] = it },
-            label = { Text(node.label) }, singleLine = !node.multiline,
+            value = fields[node.id].orEmpty(), onValueChange = { onFieldChange(node.id, it) },
+            label = { Text(node.label) }, singleLine = !node.multiline, enabled = !readOnly,
             modifier = Modifier.fillMaxWidth())
         is UiDocumentNode.Select -> Column {
             Text(node.label, style = MaterialTheme.typography.labelMedium)
             node.options.forEach { option ->
                 Row { Checkbox(checked = fields[node.id] == option,
-                    onCheckedChange = { if (it) fields[node.id] = option })
+                    onCheckedChange = { if (it) onFieldChange(node.id, option) }, enabled = !readOnly)
                     Text(option, modifier = Modifier.padding(top = 12.dp)) }
             }
         }
         is UiDocumentNode.Switch -> Row {
-            Checkbox(checked = fields[node.id].toBoolean(), onCheckedChange = { fields[node.id] = it.toString() })
+            Checkbox(checked = fields[node.id].toBoolean(), onCheckedChange = { onFieldChange(node.id, it.toString()) }, enabled = !readOnly)
             Text(node.label, modifier = Modifier.padding(top = 12.dp))
         }
-        is UiDocumentNode.Button -> TextButton(onClick = { onAction(node.actionId) }) { Text(node.label) }
+        is UiDocumentNode.Button -> TextButton(onClick = { onAction(node.actionId) }, enabled = !readOnly) { Text(node.label) }
         is UiDocumentNode.Disclosure -> {
             var expanded by remember(node.id) { mutableStateOf(false) }
             Column {
                 TextButton(onClick = { expanded = !expanded }) {
                     Text(if (expanded) "收起 · ${node.title}" else "展开 · ${node.title}")
                 }
-                if (expanded) node.children.forEach { NativeV6DocumentNode(it, bindings, fields, onAction) }
+                if (expanded) node.children.forEach { NativeV6DocumentNode(it, bindings, fields, onFieldChange, readOnly, media, sessionId, onAction) }
             }
         }
     }
