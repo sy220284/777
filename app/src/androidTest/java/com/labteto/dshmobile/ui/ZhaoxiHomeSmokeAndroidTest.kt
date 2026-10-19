@@ -4,6 +4,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
@@ -25,7 +26,6 @@ class ZhaoxiHomeSmokeAndroidTest {
     @Test fun homeShowsInteractiveSessionAndMainRoutes() {
         compose.onNodeWithContentDescription("打开侧栏").assertExists()
         compose.onNodeWithTag("zhaoxi.home.create_chat").assertExists()
-        compose.onNodeWithText("人物").assertExists()
         compose.onNodeWithContentDescription("打开侧栏").performClick()
         val drawer = compose.onNodeWithTag("zhaoxi.drawer.surface", useUnmergedTree = true)
             .assertTopPositionInRootIsEqualTo(0.dp)
@@ -34,7 +34,7 @@ class ZhaoxiHomeSmokeAndroidTest {
         org.junit.Assert.assertEquals("侧栏背景必须延伸至导航栏底部",
             viewportBottom.value, drawerBottom.value, 1f)
         compose.onNodeWithContentDescription("全局搜索").assertExists()
-        compose.onNodeWithContentDescription("新建会话").assertExists()
+        compose.onNodeWithText("工作区文件").assertExists()
         compose.onNodeWithText("人物图集").assertExists()
         // #758: search is a real global page, and the drawer no longer needs a redundant close icon.
         compose.onNodeWithContentDescription("全局搜索").performClick()
@@ -66,9 +66,16 @@ class ZhaoxiHomeSmokeAndroidTest {
         compose.onNodeWithTag("zhaoxi.composer.input", useUnmergedTree = true)
             .assertTextEquals("待发送的草稿")
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-        // Reopen the exact same session through the home recent-session entry.
-        // Clicking the generic “聊天” tab only selects a mode; it does not open a session.
-        val reopenTag = "zhaoxi.home.reopen_session.$createdSessionId"
+        // Unsent drafts are hidden from ordinary history, but can still be reopened in
+        // the drawer's collapsed unfinished-session group. No stored draft is deleted.
+        val recentTag = "zhaoxi.home.reopen_session.$createdSessionId"
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithTag("zhaoxi.home.create_chat").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag(recentTag).assertDoesNotExist()
+        compose.onNodeWithContentDescription("打开侧栏").performClick()
+        compose.onNodeWithTag("zhaoxi.drawer.blank_toggle").performClick()
+        val reopenTag = "zhaoxi.drawer.reopen_blank.$createdSessionId"
         compose.waitUntil(30_000) {
             compose.onAllNodesWithTag(reopenTag).fetchSemanticsNodes().isNotEmpty()
         }
