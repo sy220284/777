@@ -94,7 +94,7 @@ class LocalModelGateway @Inject constructor(
             withCancellableHttpResponse(http.newCall(request)) { response ->
                 check(response.isSuccessful) {
                     if (response.code == 401 && LocalMiniMaxPolicy.isOfficial(profile.baseUrl)) {
-                        LocalMiniMaxPolicy.authenticationFailureHint(profile.baseUrl)
+                        LocalMiniMaxPolicy.authenticationFailureHint()
                     } else "服务商模型目录查询失败（HTTP ${response.code}）"
                 }
                 val body = response.body ?: error("服务商模型目录没有响应体")
