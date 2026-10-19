@@ -223,7 +223,6 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
             if (conv.workReads != null && conv.workPolicy != null)
                 add("work.plan_review" to "计划审查")
             if (conv.workTeam != null) add("work.team" to "团队运行")
-            if (conv.evidence != null) add("work.requirement_evidence" to "需求与证据")
             if (secondary?.tools != null) add("work.capabilities" to "能力清单")
         }
     }
