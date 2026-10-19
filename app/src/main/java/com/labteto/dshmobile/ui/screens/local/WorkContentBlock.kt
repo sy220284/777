@@ -54,13 +54,16 @@ internal fun userFacingWorkToolActionRes(toolName: String?): Int? {
 /** A readable chronological step, with optional explanation instead of a hidden disclosure. */
 @Composable
 internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
-    val action = if (node.failed) {
-        stringResource(R.string.local_reasoning_work_failed)
-    } else if (node.summary == null && node.count > 1 &&
-        (node.operationKinds.size > 1 ||
-            node.kind == com.labteto.dshmobile.ui.AgentOperationKind.Generic)) {
-        "工具操作"
-    } else stringResource(agentOperationLabelRes(node.kind))
+    val action = when {
+        node.failed -> stringResource(R.string.local_reasoning_work_failed)
+        node.summary == null && node.operationKinds.size > 1 -> "工具操作"
+        node.summary == null && node.toolName != null &&
+            userFacingWorkToolActionRes(node.toolName) != null ->
+            stringResource(userFacingWorkToolActionRes(node.toolName)!!)
+        node.summary == null &&
+            node.kind == com.labteto.dshmobile.ui.AgentOperationKind.Generic -> "工具操作"
+        else -> stringResource(agentOperationLabelRes(node.kind))
+    }
     val provider = userFacingWorkToolProvider(node.toolName)
     val summary = node.summary ?: if (provider != null) "$provider · $action" else action
     val label = if (provider != null && node.summary != null &&
