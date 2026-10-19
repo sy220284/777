@@ -153,7 +153,8 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
 @Composable
 fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPort, reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, scope: UiSceneRenderScope, onMessage: (UiSessionIdentity, UiMessageSnapshot) -> Unit, menu: @Composable () -> Unit,
     documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
-    media: MediaUiPort? = null, attachments: AttachmentUiPort? = null) {
+    media: MediaUiPort? = null, attachments: AttachmentUiPort? = null,
+    reasoning: ConversationReasoningUiPort? = null, settings: SettingsUiPort? = null) {
     val snap by work.snapshots.collectAsState(initial = work.snapshot())
     val storedDrafts by drafts.drafts.collectAsState()
     val sessionId = snap.identity?.sessionId.orEmpty()
