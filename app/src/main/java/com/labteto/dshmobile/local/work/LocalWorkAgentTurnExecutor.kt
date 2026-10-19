@@ -735,7 +735,7 @@ internal class LocalWorkAgentTurnExecutor(
                             settlePendingTools("failed")
                             val detail = event.reason.take(2_000)
                             val continuationEligible =
-                                shouldAutoContinueWorkFailure(
+                                !waitingForReplyFormSubmission && shouldAutoContinueWorkFailure(
                                     error = lastModelError,
                                     automaticContinuationCount = binding.automaticContinuationCount,
                                     pendingInputs = binding.runHandle.pendingInputs.size(),
@@ -820,7 +820,7 @@ internal class LocalWorkAgentTurnExecutor(
             } catch (error: Exception) {
                 foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
                 val modelError = error as? LocalModelException
-                val queued = if (modelError != null) {
+                val queued = if (modelError != null && !waitingForReplyFormSubmission) {
                     queueAutomaticWorkContinuation(binding, runContext.runId, modelError, uiSourceMessageId)
                 } else {
                     false
