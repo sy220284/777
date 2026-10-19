@@ -59,6 +59,7 @@ import kotlinx.coroutines.launch
 fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile.uicontract.WorkConversationUiPort,
     sessionId: String, scope: UiSceneRenderScope) {
     val snapshot by work.snapshots.collectAsState(initial = work.snapshot())
+    var expandedTool by remember(sessionId) { mutableStateOf<String?>(null) }
     val plan = snapshot.let { workReads.planForUi(sessionId) }
     var historyRefresh by remember(sessionId) { mutableStateOf(0) }
     val sequence = workReads.eventSequenceForUi(sessionId)
@@ -199,7 +200,28 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
                     }
                     ZxRow(item.name, label +
                         (item.errorCode?.let { " · 错误 ${it}" } ?: "") +
-                        (item.resultPreview?.let { " · ${it.take(90)}" } ?: ""))
+                        (item.resultPreview?.let { " · ${it.take(90)}" } ?: ""),
+                        onClick = {
+                            expandedTool = if (expandedTool == item.callId) null else item.callId
+                        })
+                    if (expandedTool == item.callId) {
+                        ZxFooterNote("工具调用 · ${item.callId}")
+                        item.argumentsPreview?.let { ZxFooterNote("参数摘要：$it") }
+                        item.resultPreview?.let { ZxFooterNote("结果摘要：$it") }
+                        val end = item.finishedSequence
+                        if (end != null) {
+                            val evidence = remember(sessionId, item.callId, end, historyRefresh) {
+                                workReads.toolEvidenceForUi(sessionId, item.callId, end)
+                            }
+                            if (evidence == null) ZxFooterNote("原始记录已变化或无法读取，不能以摘要替代")
+                            else {
+                                ZxSection("运行证据（只读）")
+                                androidx.compose.foundation.text.selection.SelectionContainer {
+                                    Text(evidence, color = ZhaoxiTheme.colors.ink2, fontSize = 12.sp)
+                                }
+                            }
+                        } else ZxFooterNote("调用尚未产生最终执行证据")
+                    }
                 }
             }
         }
