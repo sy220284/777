@@ -95,4 +95,21 @@ class LocalApiModelCatalogTest {
         ), requested)
     }
 
+    @Test fun miniMaxCatalog401KeepsBearerHeaderAndExplainsRegionWithoutEchoingKey() = runBlocking {
+        val observed = mutableListOf<String>()
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            observed += chain.request().url.toString() + "|" + chain.request().header("Authorization")
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(401)
+                .message("Unauthorized").body("""{"error":{"message":"login fail: Please carry the API secret key (1004)"}}""".toResponseBody()).build()
+        }.build()
+        val error = assertThrows(IllegalStateException::class.java) {
+            runBlocking {
+                LocalApiModelCatalog(http).query("sample-only-key", "https://api.minimax.io/v1", LocalModelProtocol.CHAT_COMPLETIONS)
+            }
+        }
+        assertEquals(listOf("https://api.minimax.io/v1/models|Bearer sample-only-key"), observed)
+        assertTrue(error.message!!.contains("国际区"))
+        assertFalse(error.message!!.contains("sample-only-key"))
+    }
+
 }
