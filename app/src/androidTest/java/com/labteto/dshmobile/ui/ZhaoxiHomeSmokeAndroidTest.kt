@@ -22,7 +22,25 @@ import org.junit.Test
 class ZhaoxiHomeSmokeAndroidTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    private fun ensureChatMode() {
+        val owner = androidx.lifecycle.ViewModelProvider(compose.activity)[
+            com.labteto.dshmobile.ui.host.LocalApplicationFeaturePortsOwner::class.java
+        ]
+        compose.waitUntil(30_000) { !owner.sessions.snapshot().loading && owner.sessions.snapshot().identity != null }
+        if (owner.sessions.snapshot().usageMode != com.labteto.dshmobile.local.LocalUsageMode.CHAT) {
+            compose.onNodeWithText("聊天", useUnmergedTree = true).performClick()
+            compose.waitUntil(30_000) {
+                !owner.sessions.snapshot().loading &&
+                    owner.sessions.snapshot().usageMode == com.labteto.dshmobile.local.LocalUsageMode.CHAT
+            }
+        }
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithTag("zhaoxi.home.create_chat").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     @Test fun homeShowsInteractiveSessionAndMainRoutes() {
+        ensureChatMode()
         compose.onNodeWithContentDescription("打开侧栏").assertExists()
         compose.onNodeWithTag("zhaoxi.home.create_chat").assertExists()
         compose.onNodeWithContentDescription("打开侧栏").performClick()
@@ -33,8 +51,8 @@ class ZhaoxiHomeSmokeAndroidTest {
         org.junit.Assert.assertEquals("侧栏背景必须延伸至导航栏底部",
             viewportBottom.value, drawerBottom.value, 1f)
         compose.onNodeWithContentDescription("全局搜索").assertExists()
-        compose.onNodeWithText("工作区文件").assertExists()
-        compose.onNodeWithText("人物图集").assertExists()
+        compose.onNodeWithText("工作区文件", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("人物图集", useUnmergedTree = true).assertExists()
         // #758: search is a real global page, and the drawer no longer needs a redundant close icon.
         compose.onNodeWithContentDescription("全局搜索").performClick()
         compose.onNodeWithText("搜索").assertExists()
@@ -42,13 +60,14 @@ class ZhaoxiHomeSmokeAndroidTest {
         compose.waitUntil(10_000) {
             compose.onAllNodesWithText("人物图集").fetchSemanticsNodes().isEmpty()
         }
-        compose.onNodeWithText("设置").performClick()
+        compose.onNodeWithText("设置", useUnmergedTree = true).performClick()
         compose.onNodeWithText("模型与账户").assertExists()
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithTag("zhaoxi.home.create_chat").assertExists()
     }
     @Test fun newConversationDraftSurvivesActivityRecreationAndReturn() {
         val owner = androidx.lifecycle.ViewModelProvider(compose.activity)[com.labteto.dshmobile.ui.host.LocalApplicationFeaturePortsOwner::class.java]
+        ensureChatMode()
         compose.waitUntil(30_000) { owner.sessions.snapshot().identity != null && !owner.sessions.snapshot().loading }
         compose.onNodeWithTag("zhaoxi.home.create_chat").performClick()
         // Select the actual composer. The offscreen session drawer has its own
