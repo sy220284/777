@@ -10,6 +10,7 @@ import java.util.Base64
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -190,7 +191,11 @@ class ChatGptAuthCoordinator @Inject constructor(
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )
 
-            val callback = listener.await()
+            val callback = try {
+                listener.await()
+            } catch (_: TimeoutCancellationException) {
+                error("等待浏览器授权超时，请重新发起连接")
+            }
             require(callback.state == stateValue) { "ChatGPT OAuth state 校验失败" }
             if (callback.error != null) {
                 val detail = callback.errorDescription?.takeIf(String::isNotBlank)
