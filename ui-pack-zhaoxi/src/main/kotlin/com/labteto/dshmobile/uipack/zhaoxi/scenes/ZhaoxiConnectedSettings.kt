@@ -162,6 +162,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         showAdvancedConnection = false
         showPresets = false
         showCatalogPicker = false
+        presetQuery = ""
         manualModelMode = false
     }
     fun submitModelForm() {
@@ -228,7 +229,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     if (preset == null && model.isNotBlank()) "自定义模型 · 点击更换" else
                         "点击弹窗选择服务商和模型",
                     modifier = Modifier.testTag("zx-model-picker-open"),
-                    onClick = { showPresets = true })
+                    onClick = { if (!busy) { presetQuery = ""; showPresets = true } })
                 if (manualModelMode) {
                     ZxField(model, { value ->
                         if (value != model) {
@@ -477,7 +478,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                         ZxRow(option.model,
                             if (current) "已选择" else option.provider,
                             modifier = Modifier.testTag("zx-model-preset-${option.model}"),
-                            onClick = { selectPreset(option) })
+                            onClick = { if (!busy) selectPreset(option) })
                     }
                 }
                 ZxButton("手动配置其他模型", {
@@ -491,6 +492,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     resetCatalog()
                     showAdvancedConnection = true
                     manualModelMode = true
+                    presetQuery = ""
                     showPresets = false
                 }, Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline, enabled = !busy)
                 ZxButton("取消选择", { showPresets = false },
