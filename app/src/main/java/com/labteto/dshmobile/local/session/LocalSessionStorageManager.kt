@@ -283,7 +283,7 @@ internal class LocalSessionStorageManager(
         val COMPRESSED_SEGMENT = Regex("^.+\\.events\\.jsonl\\.part-[0-9]+\\.gz$")
         const val COMPACTION_YIELD_MILLIS = 25L
         const val COPY_BUFFER_BYTES = 32 * 1024
-        private val SAFE_RESTORE_NAME = Regex("^[A-Za-z0-9_-]{1,128}\\\\.(?:json|events\\\\.jsonl(?:\\\\.part-[0-9]+(?:\\\\.gz)?)?)$")
+        private val SAFE_RESTORE_NAME = Regex("^[A-Za-z0-9_-]{1,128}\\.(?:json|events\\.jsonl(?:\\.part-[0-9]+(?:\\.gz)?)?)$")
         private const val MAX_RESTORE_ZIP_BYTES = 64 * 1024 * 1024
         private const val MAX_RESTORE_ENTRY_BYTES = 64L * 1024 * 1024
         private const val MAX_RESTORE_UNPACKED_BYTES = 256L * 1024 * 1024
