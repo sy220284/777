@@ -354,7 +354,7 @@ fun ZhaoxiAutomationEditorScene(
     fun leaveEditor() {
         if (hasChanges) confirmDiscard = true else scope.onBack()
     }
-    BackHandler(enabled = hasChanges) { leaveEditor() }
+    BackHandler(enabled = hasChanges && !confirmDiscard) { leaveEditor() }
     fun minuteOfDay(value: String): Int? {
         val pieces = value.trim().split(":")
         if (pieces.size != 2) return null
