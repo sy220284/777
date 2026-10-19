@@ -148,7 +148,7 @@ fun ZhaoxiHomeScene(
     }
     val visibleSessions = zxHomeRecentSessions(matchedSessions, pinnedIds)
     val blankSessions = matchedSessions.filter { it.blank }
-    val blankExpanded = showBlankSessions || drawerQuery.isNotBlank()
+    val blankExpanded = showBlankSessions
     val shownSessionIds = (visibleSessions + if (blankExpanded) blankSessions else emptyList())
         .map { it.id }.toSet()
     fun create(mode: LocalUsageMode) {
