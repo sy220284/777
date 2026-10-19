@@ -4,6 +4,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
@@ -59,6 +60,7 @@ class ZhaoxiHomeSmokeAndroidTest {
         org.junit.Assert.assertEquals("侧栏背景必须延伸至导航栏底部",
             viewportBottom.value, drawerBottom.value, 1f)
         compose.onNodeWithContentDescription("全局搜索").assertExists()
+        compose.onNodeWithText("筛选聊天会话", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithText("工作区文件", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("人物图集", useUnmergedTree = true).assertExists()
         // #758: search is a real global page, and the drawer no longer needs a redundant close icon.
@@ -78,8 +80,7 @@ class ZhaoxiHomeSmokeAndroidTest {
         ensureChatMode()
         compose.waitUntil(30_000) { owner.sessions.snapshot().identity != null && !owner.sessions.snapshot().loading }
         compose.onNodeWithTag("zhaoxi.home.create_chat").performClick()
-        // Select the actual composer. The offscreen session drawer has its own
-        // editable search field and must never be mistaken for the conversation draft.
+        // Select the current composer; the sidebar no longer includes a duplicate search field.
         compose.waitUntil(30_000) {
             compose.onAllNodesWithTag("zhaoxi.composer.input", useUnmergedTree = true)
                 .fetchSemanticsNodes().isNotEmpty()
