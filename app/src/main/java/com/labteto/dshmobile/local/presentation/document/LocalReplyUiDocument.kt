@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local.presentation.document
 import com.labteto.dshmobile.local.session.LocalUiDocumentSessionStore
 import com.labteto.dshmobile.uicontract.UiDocumentAction
 import com.labteto.dshmobile.uicontract.UiDocumentNode
-import com.labteto.dshmobile.uicontract.UiDocument
 import com.labteto.dshmobile.uicontract.UiDocumentBudget
 import com.labteto.dshmobile.uicontract.UiDocumentSource
 import com.labteto.dshmobile.uicontract.UiDocumentProvenance
