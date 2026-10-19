@@ -53,14 +53,17 @@ fun ZxPage(
     onBack: (() -> Unit)? = null,
     menu: Boolean = false,
     topRight: @Composable () -> Unit = {},
+    footer: @Composable () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(modifier.fillMaxSize().imePadding()) {
         // Keep the scene surface transparent so E8.17 ambient light remains visible.
         ZxTopBar(title, onNav = { onBack?.invoke() }, canBack = !menu, showNav = onBack != null) { topRight() }
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 24.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())
+            .padding(start = 18.dp, end = 18.dp, bottom = 24.dp)) {
             content()
         }
+        footer()
     }
 }
 
