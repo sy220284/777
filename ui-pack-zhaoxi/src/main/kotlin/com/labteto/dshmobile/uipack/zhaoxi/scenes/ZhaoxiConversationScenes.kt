@@ -402,8 +402,8 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
     var older by remember(sessionId) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
     var cursor by remember(sessionId) { mutableStateOf<UiTranscriptCursor?>(null) }
     var loaded by remember(sessionId) { mutableStateOf(false) }
-    var loading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var loading by remember(sessionId) { mutableStateOf(false) }
+    var error by remember(sessionId) { mutableStateOf<String?>(null) }
     val jobs = androidx.compose.runtime.rememberCoroutineScope()
     val all = remember(older, messages) { (older + messages).distinctBy { it.id } }
     // A 100ms model preview changes only the live text, not historic message grouping.
@@ -443,7 +443,8 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
     // A cumulative model snapshot must not repeat already committed intermediate messages.
     val activeReply = timeline.lastOrNull { it is ZxTimelineEntry.Reply } as? ZxTimelineEntry.Reply
     val streamText = uncommittedReplyPreview(preview?.text, activeReply?.stages.orEmpty())
-    val state = rememberLazyListState()
+    // A reader position belongs to its session; keep it out of a newly opened chat/Work timeline.
+    val state = remember(sessionId) { androidx.compose.foundation.lazy.LazyListState() }
     var restored by remember(sessionId) { mutableStateOf(false) }
     var followTail by remember(sessionId) { mutableStateOf(true) }
     val readerDragging by state.interactionSource.collectIsDraggedAsState()
