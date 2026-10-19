@@ -106,9 +106,19 @@ internal object UpdateCache {
         if (handoff == null) {
             // No marker means unowned staging data. An existing but unreadable/corrupt marker
             // cannot prove the APK was never handed to the system installer.
-            val marker = File(root, HANDOFF_MARKER).toPath()
+            val markerFile = File(root, HANDOFF_MARKER)
+            val marker = markerFile.toPath()
             if (!Files.notExists(marker, LinkOption.NOFOLLOW_LINKS)) {
-                AppLog.warn("UpdateCache", "安装交接标记损坏或不可读取，暂时保留安装 APK")
+                AppLog.warn("UpdateCache", "安装交接标记损坏或不可读取，按有界交接窗口保留 APK")
+                val modifiedAt = markerFile.lastModified()
+                if (modifiedAt > 0L && nowMillis >= modifiedAt) {
+                    val elapsed = nowMillis - modifiedAt
+                    if (elapsed >= INSTALLER_HANDOFF_GRACE_MS) {
+                        root.deleteRecursively()
+                        return null
+                    }
+                    return INSTALLER_HANDOFF_GRACE_MS - elapsed
+                }
                 return INSTALLER_HANDOFF_GRACE_MS
             }
             root.deleteRecursively()

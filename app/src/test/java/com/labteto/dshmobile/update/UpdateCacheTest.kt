@@ -112,12 +112,19 @@ class UpdateCacheTest {
         val cacheDir = temporary.newFolder("cache-malformed")
         val root = prepare(cacheDir)
         val apk = File(root, "app-release.apk").apply { writeBytes(ByteArray(8)) }
-        File(root, ".installer-handoff").writeText("bad-marker")
+        val marker = File(root, ".installer-handoff").apply {
+            writeText("bad-marker")
+            assertTrue(setLastModified(1_000_000L))
+        }
         assertEquals(
-            UpdateCache.INSTALLER_HANDOFF_GRACE_MS,
+            UpdateCache.INSTALLER_HANDOFF_GRACE_MS - 50_000L,
             UpdateCache.cleanupStale(cacheDir, 100L, 1_050_000L),
         )
         assertTrue(apk.isFile)
+        assertNull(UpdateCache.cleanupStale(
+            cacheDir, 100L, 1_000_000L + UpdateCache.INSTALLER_HANDOFF_GRACE_MS,
+        ))
+        assertFalse(root.exists())
     }
 
     @Test
