@@ -171,6 +171,10 @@ internal fun zxComposerCanSendDraft(draft: String): Boolean {
     return draft.substring(matched.range.last + 1).isNotBlank()
 }
 
+/** A photo or file alone is a valid message; incomplete @skill directives still require a task. */
+internal fun zxComposerCanSendContent(draft: String, hasAttachments: Boolean): Boolean =
+    zxComposerCanSendDraft(draft) || (draft.isBlank() && hasAttachments)
+
 /** 输入区：拒绝时保留草稿 + toast（回执矩阵见 朝夕-R4接入设计 §4）。 */
 @Composable
 fun ZxComposer(
@@ -185,6 +189,7 @@ fun ZxComposer(
     onConnectModel: (() -> Unit)? = null,
     onAddClick: (() -> Unit)? = null,
     onFocusedChange: (Boolean) -> Unit = {},
+    hasAttachments: Boolean = false,
 ) {
     val c = ZhaoxiTheme.colors
     Row(
@@ -219,7 +224,7 @@ fun ZxComposer(
             ZxIconButton(onClick = onSend,
                 contentDescription = if (draft.startsWith("@skill:") && !zxComposerCanSendDraft(draft))
                     "先填写技能要处理的任务" else "发送消息",
-                enabled = send.available && zxComposerCanSendDraft(draft)) {
+                enabled = send.available && zxComposerCanSendContent(draft, hasAttachments)) {
                 ZxIcon("send")
             }
         }
