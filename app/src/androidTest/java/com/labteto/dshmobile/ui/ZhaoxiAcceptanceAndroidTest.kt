@@ -323,7 +323,7 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.onNodeWithText("＋ 添加 API 模型").performScrollTo().performClick()
         compose.onNodeWithText("选择预设模型").performScrollTo().performClick()
         compose.onNodeWithContentDescription("搜索预设模型").performTextInput("deepseek-flash")
-        compose.onNodeWithText("deepseek-flash", useUnmergedTree = true).performScrollTo().performClick()
+        compose.onNodeWithTag("zx-model-preset-deepseek-flash").performScrollTo().performClick()
         compose.onNodeWithText("获取可选模型").performScrollTo().assertExists()
         // 预设不会锁死自定义模型：改名后仍可编辑端点并保存。
         compose.onNodeWithContentDescription("模型名称").performTextReplacement("acceptance-local-model")
