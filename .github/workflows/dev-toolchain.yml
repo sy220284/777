@@ -290,6 +290,8 @@ jobs:
           rm -rf "$PULSE_DEB_DIR" "$PULSE_ROOT"
           mkdir -p "$PULSE_DEB_DIR" "$PULSE_ROOT"
 
+          # Runner 的预装 APT 索引可能仍指向已经下架的补丁包；下载依赖前刷新仓库索引。
+          sudo apt-get update
           mapfile -t PULSE_PACKAGES < <(
             apt-cache depends --recurse \
               --no-recommends --no-suggests --no-conflicts --no-breaks \
