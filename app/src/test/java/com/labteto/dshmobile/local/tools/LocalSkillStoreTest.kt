@@ -117,6 +117,31 @@ class LocalSkillStoreTest {
     }
 
     @Test
+    fun inaccessiblePresetCannotBeReplacedDuringStartupRefresh() = inWorkspace { store, _, root ->
+        store.seedOnce()
+        val original = root.resolve(".dsh/skills/code-review/SKILL.md")
+        val before = original.readText()
+        original.delete()
+        original.mkdir()
+        assertThrows(IllegalArgumentException::class.java) { store.seedOnce() }
+        assertTrue(original.isDirectory)
+        original.delete()
+        original.writeText(before)
+        assertEquals(before, original.readText())
+    }
+
+    @Test
+    fun damagedLargePresetRetainsExactBackupBeforeRepair() = inWorkspace { store, _, root ->
+        store.seedOnce()
+        val original = root.resolve(".dsh/skills/writing-polish/SKILL.md")
+        val damaged = "broken\n".repeat(19_000)
+        original.writeText(damaged)
+        store.seedOnce()
+        assertEquals(damaged, root.resolve(".dsh/skills/writing-polish/SKILL.pre-repair.md").readText())
+        assertTrue(store.readDocument("writing-polish").contains("用途："))
+    }
+
+    @Test
     fun customizedOfficialPresetsStayEditedWhileRemovedOnesStayRemoved() = inWorkspace { store, workspace, _ ->
         store.seedOnce()
         store.updateDocument("code-review", store.readDocument("code-review") + "\n用户自定义后续规则\n")

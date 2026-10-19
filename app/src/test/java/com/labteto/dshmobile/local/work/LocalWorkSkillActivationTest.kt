@@ -47,6 +47,22 @@ class LocalWorkSkillActivationTest {
     }
 
     @Test
+    fun unreadablePinnedSkillStopsModelContextPreparation() {
+        val root = Files.createTempDirectory("skill-pin-unreadable").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            val path = root.resolve(".dsh/skills/code-review/SKILL.md")
+            path.parentFile.mkdirs()
+            path.mkdir()
+            val pinned = listOf(LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "code-review"))
+            val error = assertThrows(IllegalArgumentException::class.java) {
+                resolveLocalWorkSkillGuidance(workspace, "继续", pinned)
+            }
+            assertTrue(error.message!!.contains("code-review"))
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
     fun chosenSkillIsLoadedBeforeModelRequestAndIsNotGuesswork() {
         val root = Files.createTempDirectory("selected-skill").toFile()
         try {
