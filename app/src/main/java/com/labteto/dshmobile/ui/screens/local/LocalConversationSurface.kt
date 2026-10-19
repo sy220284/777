@@ -129,6 +129,7 @@ import kotlinx.coroutines.withContext
 
 /** Optional introduction is wrapped so Compose never tracks a nullable enum via ordinal(). */
 internal data class LocalModeIntro(val usageMode: LocalUsageMode)
+internal data class LocalTranscriptJumpTarget(val sessionId: String, val messageId: String)
 
 /** Parameter boundary for the 61-argument Compose shell. Keeps the original public
  * callsite intact while cutting the renderer's DEX register pressure on API 36/37.
@@ -144,6 +145,8 @@ internal class LocalConversationSurfaceArgs(
     val streamingState: StateFlow<LocalHarnessStreamingState>,
     val gallery: List<PersonaGalleryEntry>,
     val transcriptHistory: LocalTranscriptHistoryState,
+    val transcriptJumpTarget: LocalTranscriptJumpTarget?,
+    val onTranscriptJumpConsumed: (LocalTranscriptJumpTarget) -> Unit,
     val modeIntro: LocalModeIntro?,
     val onConfigure: () -> Unit,
     val onSelectModel: (String) -> Unit,
@@ -208,6 +211,8 @@ internal fun LocalConversationSurface(
     streamingState: StateFlow<LocalHarnessStreamingState>,
     gallery: List<PersonaGalleryEntry>,
     transcriptHistory: LocalTranscriptHistoryState,
+    transcriptJumpTarget: LocalTranscriptJumpTarget? = null,
+    onTranscriptJumpConsumed: (LocalTranscriptJumpTarget) -> Unit = {},
     modeIntro: LocalModeIntro?,
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
@@ -270,6 +275,8 @@ internal fun LocalConversationSurface(
         streamingState = streamingState,
         gallery = gallery,
         transcriptHistory = transcriptHistory,
+        transcriptJumpTarget = transcriptJumpTarget,
+        onTranscriptJumpConsumed = onTranscriptJumpConsumed,
         modeIntro = modeIntro,
         onConfigure = onConfigure,
         onSelectModel = onSelectModel,
@@ -339,6 +346,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val streamingState = args.streamingState
     val gallery = args.gallery
     val transcriptHistory = args.transcriptHistory
+    val transcriptJumpTarget = args.transcriptJumpTarget
+    val onTranscriptJumpConsumed = args.onTranscriptJumpConsumed
     val modeIntro = args.modeIntro
     val onConfigure = args.onConfigure
     val onSelectModel = args.onSelectModel
@@ -538,6 +547,33 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         ?.takeIf { transcriptHistory.sessionId == state.sessionId }
     val showTranscriptPagingRow = transcriptHistoryError != null ||
         (hasOlderTranscript && loadingOlderTranscript)
+    // A diary source may be in cold historical pages. Advance one durable page at a time
+    // until the message is present, then scroll to the exact LazyColumn row.
+    val locatingDiarySource = transcriptJumpTarget?.sessionId == state.sessionId &&
+        !transcriptJumpTarget.messageId.isBlank()
+    LaunchedEffect(transcriptJumpTarget, state.sessionId, transcriptItems, hasOlderTranscript,
+        loadingOlderTranscript, transcriptHistoryError) {
+        val target = transcriptJumpTarget?.takeIf { it.sessionId == state.sessionId }
+            ?: return@LaunchedEffect
+        val messageIndex = transcriptItems.indexOfFirst { item ->
+            item is LocalTranscriptItem.Message && item.message.id == target.messageId
+        }
+        when {
+            messageIndex >= 0 -> {
+                val leading = listOf(mediaPage.unavailable, mediaPage.hasMore,
+                    showTranscriptPagingRow, false, false, false).count { it }
+                // Empty-state rows and the plan review card cannot coexist with found messages.
+                listState.scrollToItem(leading + messageIndex)
+                onTranscriptJumpConsumed(target)
+            }
+            loadingOlderTranscript -> Unit
+            hasOlderTranscript && transcriptHistoryError == null -> {
+                val result = onLoadOlderTranscript(state.sessionId)
+                if (result.isFailure || result.getOrNull() == 0) onTranscriptJumpConsumed(target)
+            }
+            else -> onTranscriptJumpConsumed(target)
+        }
+    }
     val showEmptyWorkbench = transcriptItems.isEmpty() &&
         (state.usageMode == LocalUsageMode.WORK ||
             (!state.groupChat.enabled && state.chatPersona.isUnboundChatPersona()))
@@ -738,7 +774,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 val wasNearTail = previousChatTailIndex < 0 ||
                     lastVisible >= previousChatTailIndex - 2
                 previousChatTailIndex = transcriptLastListIndex
-                if (wasNearTail) listState.animateScrollToItem(transcriptLastListIndex)
+                if (wasNearTail && !locatingDiarySource) listState.animateScrollToItem(transcriptLastListIndex)
             }
         }
     }
