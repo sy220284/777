@@ -1727,6 +1727,7 @@
     <string name="tasks_chat_optimize">优化任务</string>
     <string name="tasks_chat_optimization_seed">请优化以下定时任务的清晰度、可执行性与结果质量，保留原来的日期、触发条件、频率、角色身份和真实上下文，不编造经历；如确实需要改动时间，先明确依据。原任务：%1$s。原时间安排：%2$s。</string>
     <string name="skills_catalog_search">搜索技能</string>
+    <string name="skills_catalog_overview">已安装 %1$d · 可添加 %2$d</string>
     <string name="skills_create">添加自定义技能</string>
     <string name="skills_import_file">上传技能文件</string>
     <string name="skills_create_in_chat">对话创建技能</string>
