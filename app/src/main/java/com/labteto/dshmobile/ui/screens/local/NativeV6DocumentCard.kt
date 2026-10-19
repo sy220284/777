@@ -1,12 +1,15 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -109,6 +112,7 @@ private fun NativeV6DocumentCard(
     var confirmation by remember(doc.documentId, doc.revision) { mutableStateOf<String?>(null) }
     var deleting by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
     var confirmDelete by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
+    var progressDetailsExpanded by remember(doc.documentId) { mutableStateOf(false) }
     fun perform(actionId: String, confirmed: Boolean) {
         val values = fields
         scope.launch {
@@ -126,7 +130,7 @@ private fun NativeV6DocumentCard(
                 Text("该文档仅提供历史内容，不能执行操作。")
             } else {
                 if (readOnly) Text("历史文档只读，操作已禁用。")
-                doc.nodes.forEach { node ->
+                nativeV6InlineVisibleNodes(doc, progressDetailsExpanded).forEach { node ->
                     NativeV6DocumentNode(
                         node, snapshot.bindings, fields,
                         onFieldChange = { id, value -> if (!readOnly) controller.forms.update(formKey, id, value) },
@@ -141,6 +145,11 @@ private fun NativeV6DocumentCard(
                         } else {
                             perform(actionId, false)
                         }
+                    }
+                }
+                if (doc.documentId.startsWith("work-live:") && doc.nodes.size > 1) {
+                    TextButton(onClick = { progressDetailsExpanded = !progressDetailsExpanded }) {
+                        Text(if (progressDetailsExpanded) "收起执行明细" else "查看工具记录与阶段输出")
                     }
                 }
             }
@@ -201,15 +210,22 @@ private fun NativeV6DocumentNode(
     when (node) {
         is UiDocumentNode.Text -> Text(node.text, style = MaterialTheme.typography.bodyMedium)
         is UiDocumentNode.Media -> NativeV6DocumentMedia(node, sessionId, media)
-        is UiDocumentNode.Table -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        is UiDocumentNode.Table -> Column(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            // Each column needs a real minimum width inside horizontal scrolling. Weighted
+            // children otherwise squeeze technical receipt tables into illegible mobile cells.
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                node.headers.forEach { Text(it, modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelMedium) }
+                node.headers.forEach { header ->
+                    Text(header, modifier = Modifier.width(144.dp),
+                        style = MaterialTheme.typography.labelMedium)
+                }
             }
             node.rows.forEach { cells ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     node.headers.indices.forEach { i ->
-                        Text(cells.getOrElse(i) { "" }, modifier = Modifier.weight(1f),
+                        Text(cells.getOrElse(i) { "" }, modifier = Modifier.width(144.dp),
                             style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -267,14 +283,9 @@ private fun NativeV6DocumentNode(
             value = fields[node.id].orEmpty(), onValueChange = { onFieldChange(node.id, it) },
             label = { Text(node.label) }, singleLine = !node.multiline, enabled = !readOnly,
             modifier = Modifier.fillMaxWidth())
-        is UiDocumentNode.Select -> Column {
-            Text(node.label, style = MaterialTheme.typography.labelMedium)
-            node.options.forEach { option ->
-                Row { Checkbox(checked = fields[node.id] == option,
-                    onCheckedChange = { if (it) onFieldChange(node.id, option) }, enabled = !readOnly)
-                    Text(option, modifier = Modifier.padding(top = 12.dp)) }
-            }
-        }
+        is UiDocumentNode.Select -> NativeV6CompactSelect(
+            node = node, fields = fields, enabled = !readOnly, onFieldChange = onFieldChange,
+        )
         is UiDocumentNode.Switch -> Row {
             Checkbox(checked = fields[node.id].toBoolean(), onCheckedChange = { onFieldChange(node.id, it.toString()) }, enabled = !readOnly)
             Text(node.label, modifier = Modifier.padding(top = 12.dp))
