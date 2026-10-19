@@ -84,8 +84,8 @@
     {
       "id": "ui.zhaoxi.e817",
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 朝夕 E8.17 独立界面接入（PR #740，未合并）",
-      "source": "app/src/main/java/com/labteto/dshmobile/MainActivity.kt",
-      "entry": "MainActivity",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/host/ZhaoxiApplicationRoot.kt",
+      "entry": "ZhaoxiApplicationRoot",
       "owner": "SHELL",
       "test": "app/src/androidTest/java/com/labteto/dshmobile/ui/ZhaoxiHomeSmokeAndroidTest.kt#homeShowsInteractiveSessionAndMainRoutes"
     }

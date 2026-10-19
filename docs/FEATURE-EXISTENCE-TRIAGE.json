@@ -319,32 +319,13 @@
       "conclusion": "生产端口接入 V6/Next 的文本与附件发送、编辑、重生成、停止、Chat 分支及 Work 审批/提问；业务准入仍由原 Owner 执行。完整 Feature 端口及真实双包旅程尚未完成。"
     },
     {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / UI 场景覆盖清单与兼容性检查（迁移中）",
-      "kind": "ui_contract_migration_slice",
-      "independent": false,
-      "availability": "code_and_tests_present_execution_unverified",
-      "source": [
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalog.kt",
-          "symbol": "LocalUiSceneCatalog"
-        }
-      ],
-      "test": [
-        {
-          "path": "app/src/test/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalogTest.kt",
-          "method": "verificationPackCannotBeSelectedAsACompleteApplicationPack"
-        }
-      ],
-      "conclusion": "已建立源码场景索引及版本/覆盖兼容检查；缺场景的验证包不能宣称整包兼容。真实完整应用 UI Pack 切换与全量场景迁移尚未实现。"
-    },
-    {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
       "kind": "ui_contract_migration_slice",
       "independent": false,
       "availability": "code_and_tests_present_execution_unverified",
       "source": [
         {
-          "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilder.kt",
+          "path": "app/src/main/java/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilder.kt",
           "symbol": "LocalUiDocumentBuilder"
         },
         {
@@ -354,11 +335,11 @@
       ],
       "test": [
         {
-          "path": "ui-contract/src/test/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilderTest.kt",
-          "method": "freeTextCannotAcquireActionsOrBecomeACompletionFact"
+          "path": "app/src/test/java/com/labteto/dshmobile/local/presentation/document/LocalUiDocumentCodecTest.kt",
+          "method": "sourceIdentityComesFromTheOwnerAndModelCannotReplaceIt"
         }
       ],
-      "conclusion": "本地类型输入可制作状态、原文清单和回复表单，复用生产 Codec/Session 定义 Owner；新增模型调用为零的实现路径不依赖模型网关。工具 Schema 与结构化结果自动适配、媒体/证据节点及真实设备验收仍待实现。"
+      "conclusion": "本地交互模板构造器已迁入 App 并由 V6 原生交互文档控制器接入；现有测试验证文档 Owner 的来源身份，模型不具备覆盖权。完整设备交互与每类模板内容仍需进一步验收。"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 原回复内交互卡片（迁移中）",
