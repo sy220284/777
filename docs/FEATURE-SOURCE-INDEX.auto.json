@@ -3301,7 +3301,7 @@
     },
     {
       "path": "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiAttachmentPicker.kt",
-      "sha256": "3fad95fc4d957174"
+      "sha256": "92fea08c0984a762"
     },
     {
       "path": "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiDocumentTransfer.kt",
@@ -3357,7 +3357,7 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/ZhaoxiApplicationScenePack.kt",
-      "sha256": "fe4b362d8f605073"
+      "sha256": "8b8b72b26a92a5ba"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/ZhaoxiDraftCommands.kt",
@@ -3393,7 +3393,7 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxFeedback.kt",
-      "sha256": "cabc48f13c36e5a2"
+      "sha256": "b0e8a90f299fa2cf"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxIcon.kt",
@@ -3413,7 +3413,7 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiAutomationScenes.kt",
-      "sha256": "6882039284181946"
+      "sha256": "48b30ad7b9115807"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiCommandFeedback.kt",
@@ -3429,7 +3429,7 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedSettings.kt",
-      "sha256": "b24b0bf8f37da541"
+      "sha256": "4f22a157714b0011"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConversationLibraryActions.kt",
@@ -3441,15 +3441,15 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConversationScenes.kt",
-      "sha256": "d57c059d7df84f64"
+      "sha256": "16811feae932f62f"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiDocumentDisplayEditor.kt",
-      "sha256": "90b6f03a3efcddca"
+      "sha256": "6bbbb94734806da7"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiE818SettingsScenes.kt",
-      "sha256": "eb44eeedce013373"
+      "sha256": "ec95ac1ca220d50a"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiFormValidation.kt",
@@ -3465,15 +3465,15 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSceneCommon.kt",
-      "sha256": "2b3d879c8d4ac00e"
+      "sha256": "6e9afcd91f0b914c"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSettingsScenes.kt",
-      "sha256": "61b2d1496690c1fc"
+      "sha256": "7aca051ff395cfd0"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiShellScenes.kt",
-      "sha256": "8cca59f0aaca4bf9"
+      "sha256": "d0399968474e1d15"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSkillManager.kt",
@@ -3481,11 +3481,11 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSlotScenes.kt",
-      "sha256": "2b523385d63931b4"
+      "sha256": "931dc3e1336bc122"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiUiDocumentScenes.kt",
-      "sha256": "9a423a57513e1ee0"
+      "sha256": "e74a0f859dc4bb0d"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiWallpaperPicker.kt",
@@ -3509,13 +3509,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "62ea23a7ff2f",
+  "source_snapshot": "0202ba83b7ff",
   "observed_delta": {
-    "baseline": "d04df561e3a4",
+    "baseline": "8aeb7023d0da",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiDocumentDisplayEditor.kt"
+      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiAutomationScenes.kt",
+      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConversationScenes.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

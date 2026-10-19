@@ -313,18 +313,18 @@ class ZhaoxiApplicationScenePack(
                     menu = { ZhaoxiConversationMenu(conversations, secondary, scope,
                         hasSettings = settings != null) },
                     documents = conv.documents, knownScenes = manifest.scenes, media = conv.media,
-                    attachments = conv.attachments, reasoning = conv.reasoning, settings = settings, corrections = conv.corrections)
+                    attachments = conv.attachments, reasoning = conv.reasoning, settings = settings, corrections = conv.corrections, forms = conv.forms)
             }
             "conversation.work" -> conv?.let { ZhaoxiWorkScene(it.work, it.drafts, it.reading, it.history, scope,
                 onMessage = { identity, message -> targets.message = identity to message.id; messagePreview = identity to message; scope.onNavigate(UiSceneId("conversation.message_actions")) },
                 menu = { ZhaoxiConversationMenu(conversations, secondary, scope) },
                     documents = conv.documents, knownScenes = manifest.scenes, media = conv.media,
-                    attachments = conv.attachments, reasoning = conv.reasoning, settings = settings) }
+                    attachments = conv.attachments, reasoning = conv.reasoning, settings = settings, forms = conv.forms) }
             "conversation.header" -> conv?.let {
                 ZhaoxiConversationMenu(conversations, secondary, scope)
             }
             "conversation.timeline" -> conv?.let {
-                ZhaoxiTimelineScene(it.chat, it.reading, it.history, it.documents, manifest.scenes, it.media)
+                ZhaoxiTimelineScene(it.chat, it.reading, it.history, it.documents, manifest.scenes, it.media, it.forms)
             }
             "conversation.composer" -> conv?.let {
                 val s = it.chat.snapshot()
@@ -379,7 +379,7 @@ class ZhaoxiApplicationScenePack(
                 }, { modelOwner.submit(SettingsUiCommand.SelectModel(it)) },
                     { scope.onNavigate(UiSceneId("settings.models")) }, scope)
             }
-            "conversation.ui_document" -> conv?.documents?.let { ZhaoxiUiDocumentScene(it, scope, ::currentDocumentContext, manifest.scenes, { conversations?.work?.snapshot()?.approval?.pendingId }, conv?.media) }
+            "conversation.ui_document" -> conv?.documents?.let { ZhaoxiUiDocumentScene(it, scope, ::currentDocumentContext, manifest.scenes, { conversations?.work?.snapshot()?.approval?.pendingId }, conv?.media, conv?.forms) }
             "conversation.ui_document_generate" -> conv?.documents?.let { ZhaoxiUiDocumentGenerateScene(it, scope, ::currentDocumentContext) }
             "work.approval" -> conv?.let { ZhaoxiApprovalScene(it.work, scope, it.workPolicy) }
             "work.question" -> conv?.let { ZhaoxiQuestionScene(it.work, scope) }

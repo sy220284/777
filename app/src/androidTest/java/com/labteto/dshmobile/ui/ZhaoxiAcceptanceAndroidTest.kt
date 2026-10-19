@@ -79,6 +79,47 @@ class ZhaoxiAcceptanceAndroidTest {
         screenshot.recycle()
     }
 
+    @Test fun documentFieldsUseHostDraftsAndReleaseMemoryOnlyValuesWhenClosed() {
+        ready()
+        var saved: List<String> = emptyList()
+        val forms = LocalUiDocumentFormState(emptyList()) { saved = it }
+        val document = UiDocument(1, "form-lifecycle",
+            UiDocumentSource("form-session", "form-message", 1L, null, null), 1L,
+            "表单保存与关闭", listOf(
+                UiDocumentNode.Field("notes", "普通备注", "", false, true),
+                UiDocumentNode.Field("transient_notes", "本次输入", "", false, true, UiFieldRetention.MEMORY_ONLY),
+            ), emptyList(), "表单")
+        val key = UiDocumentFormKey("form-session", "form-lifecycle", 1L)
+        var visible by mutableStateOf(true)
+        compose.activityRule.scenario.onActivity { activity -> activity.setContent {
+            ZhaoxiTheme {
+                if (visible) com.labteto.dshmobile.uipack.zhaoxi.scenes.ZxDocumentCard(
+                    document, knownScenes = emptySet(), pendingApprovalId = null,
+                    onAction = { _, _, _ -> UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED) },
+                    forms = forms,
+                )
+            }
+        } }
+        compose.onNodeWithContentDescription("普通备注").performTextInput("保留到重开")
+        compose.onNodeWithContentDescription("本次输入").performTextInput("仅本次可见")
+        compose.runOnIdle {
+            assertEquals("保留到重开", forms.values.value[key]?.get("notes"))
+            assertEquals("仅本次可见", forms.values.value[key]?.get("transient_notes"))
+            assertTrue(saved.contains("保留到重开"))
+            assertFalse(saved.contains("仅本次可见"))
+            visible = false
+        }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertEquals("保留到重开", forms.values.value[key]?.get("notes"))
+            assertFalse(forms.values.value[key].orEmpty().containsKey("transient_notes"))
+            visible = true
+        }
+        compose.onNodeWithContentDescription("普通备注").assertTextEquals("保留到重开")
+        compose.onNodeWithContentDescription("本次输入").assertTextEquals("")
+        capture("document-form-retention")
+    }
+
     @Test fun all75RenderersAndThreeAppearanceMatrixUseProductionOwners() {
         val ports = ready()
         val saved = runBlocking { ports.personaAuthoringUiPort.create(UiPersonaDraft(name = "本地验收人物", coreIdentity = "验收夹具")) }

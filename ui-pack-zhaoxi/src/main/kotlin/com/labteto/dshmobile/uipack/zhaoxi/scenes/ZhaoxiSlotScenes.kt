@@ -1,11 +1,13 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Text
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
@@ -62,6 +64,7 @@ fun ZhaoxiTimelineScene(
     documents: UiDocumentUiPort? = null,
     knownScenes: Set<UiSceneId> = emptySet(),
     media: MediaUiPort? = null,
+    forms: com.labteto.dshmobile.uicontract.UiDocumentFormUiPort? = null,
 ) {
     val snap by chat.snapshots.collectAsState(initial = chat.snapshot())
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
@@ -80,7 +83,7 @@ fun ZhaoxiTimelineScene(
                 branchFailure = response.takeUnless { it.admitted() }
             }, preview = snap.livePreview,
             running = snap.phase == UiExecutionPhase.RUNNING,
-            documents = documents, knownScenes = knownScenes, media = media)
+            documents = documents, knownScenes = knownScenes, media = media, forms = forms)
     }
 }
 
@@ -338,7 +341,7 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
             feedback = null
             revision++
         }, Modifier.fillMaxWidth())
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ZxChip("有效", filter == "有效") {
                 filter = "有效"; editing = false; stale = false; feedback = null
             }

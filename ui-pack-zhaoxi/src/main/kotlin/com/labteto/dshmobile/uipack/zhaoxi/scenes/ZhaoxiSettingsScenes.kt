@@ -76,24 +76,31 @@ fun ZhaoxiSettingsHomeScene(
     ZxPage("设置", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("对话与体验")
+        ZxSettingsGroup {
         ZxNavRow("外观", sub = "明暗主题 · 强调色 · 环境光") { scope.onNavigate(UiSceneId("settings.appearance")) }
         ZxNavRow("聊天风格", sub = "过滤词 · 命中记录") { scope.onNavigate(UiSceneId("settings.chat")) }
         ZxNavRow("个人规则") { scope.onNavigate(UiSceneId("settings.session")) }
         ZxNavRow("记忆", sub = "记忆概览 · 管理") { scope.onNavigate(UiSceneId("settings.memory")) }
+        }
         ZxSection("模型与账户")
+        ZxSettingsGroup {
         ZxNavRow("模型", sub = "当前模型 · API Key · 协议") { scope.onNavigate(UiSceneId("settings.models")) }
         ZxNavRow("模型性能", sub = "推理强度 · 温度") { scope.onNavigate(UiSceneId("settings.model_performance")) }
         ZxNavRow("ChatGPT 账户", sub = "授权与登录状态") { scope.onNavigate(UiSceneId("settings.account")) }
         ZxNavRow("套餐额度", sub = "MiniMax 模型额度") { scope.onNavigate(UiSceneId("settings.minimax_quota")) }
 
+        }
         ZxSection("Agent 与安全")
+        ZxSettingsGroup {
         settingsOwner?.let {
             ZxNavRow("操作审批模式") { scope.onNavigate(UiSceneId("settings.approval_mode")) }
         }
         ZxNavRow("权限与设备", sub = "通知与媒体权限状态") { scope.onNavigate(UiSceneId("settings.permissions")) }
         ZxNavRow("通知", sub = "提醒类型 · 免打扰") { scope.onNavigate(UiSceneId("settings.notifications")) }
 
+        }
         ZxSection("数据与系统")
+        ZxSettingsGroup {
         ZxNavRow("用量统计", sub = "模型消耗 · 请求记录") { scope.onNavigate(UiSceneId("settings.usage")) }
         ZxNavRow("会话存储", sub = "占用空间 · 压缩 · 导出") { scope.onNavigate(UiSceneId("settings.session_storage")) }
         ZxNavRow("高级设置", sub = "运行限制") { scope.onNavigate(UiSceneId("settings.advanced")) }
@@ -105,6 +112,7 @@ fun ZhaoxiSettingsHomeScene(
             currentUpdateStatus?.takeIf(String::isNotBlank)?.let { ZxFooterNote(it) }
         } else {
             ZxFooterNote("当前构建未提供应用内更新检查")
+        }
         }
     }
 }

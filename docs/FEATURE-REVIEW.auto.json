@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "62ea23a7ff2f",
+  "snapshot": "0202ba83b7ff",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1491,
   "production_sources_scanned": 871,
@@ -9308,11 +9308,12 @@
   "followup_production_or_compatibility": 10,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "d04df561e3a4",
+    "baseline": "8aeb7023d0da",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiDocumentDisplayEditor.kt"
+      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiAutomationScenes.kt",
+      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConversationScenes.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

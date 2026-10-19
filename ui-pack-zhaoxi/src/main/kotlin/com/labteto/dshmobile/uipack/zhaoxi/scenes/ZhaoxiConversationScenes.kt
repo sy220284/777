@@ -98,7 +98,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
     documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
     media: MediaUiPort? = null, attachments: AttachmentUiPort? = null,
     reasoning: ConversationReasoningUiPort? = null, settings: SettingsUiPort? = null,
-    corrections: PersonaCorrectionUiPort? = null) {
+    corrections: PersonaCorrectionUiPort? = null, forms: UiDocumentFormUiPort? = null) {
     val snap by chat.snapshots.collectAsState(initial = chat.snapshot())
     val storedDrafts by drafts.drafts.collectAsState()
     val sessionId = snap.identity?.sessionId.orEmpty()
@@ -125,7 +125,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
                 onMessage = { m -> snap.identity?.let { onMessage(it, m) } },
                 onBranch = { m, index -> snap.identity?.let { receipt = chat.submit(ChatUiCommand.SelectVariant(it, m.id, index)) } },
                 preview = snap.livePreview, running = snap.phase == UiExecutionPhase.RUNNING,
-                documents = documents, knownScenes = knownScenes, media = media,
+                documents = documents, knownScenes = knownScenes, media = media, forms = forms,
                 showEmpty = snap.status != UiSceneStatus.LOADING && snap.error == null,
                 missingSession = snap.identity == null)
             if (snap.queuedInputCount > 0)
@@ -158,7 +158,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
 fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPort, reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, scope: UiSceneRenderScope, onMessage: (UiSessionIdentity, UiMessageSnapshot) -> Unit, menu: @Composable () -> Unit,
     documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
     media: MediaUiPort? = null, attachments: AttachmentUiPort? = null,
-    reasoning: ConversationReasoningUiPort? = null, settings: SettingsUiPort? = null) {
+    reasoning: ConversationReasoningUiPort? = null, settings: SettingsUiPort? = null, forms: UiDocumentFormUiPort? = null) {
     val snap by work.snapshots.collectAsState(initial = work.snapshot())
     val storedDrafts by drafts.drafts.collectAsState()
     val sessionId = snap.identity?.sessionId.orEmpty()
@@ -167,6 +167,7 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
     var receipt by remember(sessionId) { mutableStateOf<UiCommandReceipt?>(null) }
     var questionAnswer by remember { mutableStateOf("") }
     var showAddMenu by remember(sessionId) { mutableStateOf(false) }
+    var useTeam by androidx.compose.runtime.saveable.rememberSaveable(sessionId) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().fillMaxSize().imePadding()) {
         ZxConversationRoutes(scope, menu)
         CommandFeedback(receipt)
@@ -177,7 +178,7 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
                 onMessage = { m -> snap.identity?.let { onMessage(it, m) } },
                 preview = snap.livePreview, running = snap.phase == UiExecutionPhase.RUNNING,
                 documents = documents, knownScenes = knownScenes, pendingApprovalId = snap.approval?.pendingId,
-                media = media, workMode = true,
+                media = media, forms = forms, workMode = true,
                 showEmpty = snap.status != UiSceneStatus.LOADING && snap.error == null,
                 missingSession = snap.identity == null)
             snap.approval?.let { ap ->
@@ -205,6 +206,13 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
             if (snap.queuedInputCount > 0)
                 ZxBanner("⇄ 已排队 ${snap.queuedInputCount} 条 · 队列满时将拒收", ZxTone.Warn)
         }
+        if (UiSceneId("work.team") in knownScenes) {
+            androidx.compose.foundation.layout.FlowRow(Modifier.padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ZxChip("下次发送使用团队协作", useTeam) { useTeam = !useTeam }
+                ZxChip("查看团队", false) { scope.onNavigate(UiSceneId("work.team")) }
+            }
+        }
         ZhaoxiReasoningStrip(sessionId, true, true,
             reasoning, settings, scope, knownScenes)
         ZhaoxiComposerAddMenu(showAddMenu, snap.identity, { work.snapshot().identity },
@@ -217,7 +225,11 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
             onSend = {
                 val id = snap.identity
                 receipt = if (id == null) UiCommandReceipt.Rejected(UiCommandRejection.UNCONFIGURED)
-                else sendZhaoxiDraft(drafts, id) { text, files -> work.submit(WorkConversationUiCommand.SendMessage(id, text, files)) }
+                else sendZhaoxiDraft(drafts, id) { text, files ->
+                    work.submit(if (useTeam) WorkConversationUiCommand.SendWithTeam(id, text, files)
+                        else WorkConversationUiCommand.SendMessage(id, text, files))
+                }
+                if (receipt?.admitted() == true) useTeam = false
             },
             placeholder = "描述任务目标",
             onAddClick = { showAddMenu = !showAddMenu },
@@ -428,7 +440,7 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
     onMessage: (UiMessageSnapshot) -> Unit, onBranch: (UiMessageSnapshot, Int) -> Unit = { _, _ -> },
     preview: UiStreamingReplyPreview? = null, running: Boolean = false,
     documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
-    pendingApprovalId: String? = null, media: MediaUiPort? = null,
+    pendingApprovalId: String? = null, media: MediaUiPort? = null, forms: UiDocumentFormUiPort? = null,
     showEmpty: Boolean = true, workMode: Boolean = false,
     missingSession: Boolean = false) {
     val sessionId = identity?.sessionId.orEmpty()
@@ -613,7 +625,7 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                                         ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
                                             onAction = { actionId, fields, confirmed ->
                                                 submitDocumentAction(card, actionId, fields, confirmed)
-                                            }, media = media)
+                                            }, media = media, forms = forms)
                                     }
                                 }
                         }
@@ -631,14 +643,14 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                         entry.anchorId?.let { anchor -> workByTurn[anchor] }?.let { card ->
                             ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
                                 onAction = { actionId, fields, confirmed -> submitDocumentAction(card, actionId, fields, confirmed) },
-                                media = media)
+                                media = media, forms = forms)
                         }
                         entry.anchorId?.let { allCardsBySource[it] }.orEmpty()
                             .filterNot { it.document.isInlineWorkTaskCard() }
                             .forEach { card ->
                                 ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
                                     onAction = { actionId, fields, confirmed -> submitDocumentAction(card, actionId, fields, confirmed) },
-                                    media = media)
+                                    media = media, forms = forms)
                             }
                     }
                 }

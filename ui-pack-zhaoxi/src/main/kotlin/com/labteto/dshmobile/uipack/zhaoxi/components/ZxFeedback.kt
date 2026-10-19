@@ -227,12 +227,12 @@ fun ZxBanner(
 @Composable
 fun ZxSection(text: String, modifier: Modifier = Modifier) {
     Text(text, modifier.padding(start = 4.dp, top = 14.dp, bottom = 6.dp),
-        fontSize = 11.sp, color = ZhaoxiTheme.colors.ink3, fontWeight = FontWeight.SemiBold)
+        fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2, fontWeight = FontWeight.SemiBold)
 }
 
 /** 页面注脚。 */
 @Composable
 fun ZxFooterNote(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier.fillMaxWidth().padding(vertical = 14.dp),
-        textAlign = TextAlign.Center, fontSize = 10.sp, color = ZhaoxiTheme.colors.ink3)
+    Text(text, modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 10.dp),
+        textAlign = TextAlign.Start, fontSize = 12.sp, lineHeight = 18.sp, color = ZhaoxiTheme.colors.ink2)
 }

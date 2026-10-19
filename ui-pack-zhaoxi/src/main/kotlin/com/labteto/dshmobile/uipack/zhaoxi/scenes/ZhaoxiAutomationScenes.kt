@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
+import com.labteto.dshmobile.automation.AutomationUiDefaults
 import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
@@ -315,6 +316,21 @@ fun ZhaoxiAutomationEditorScene(
         mutableStateOf(editing?.windowEndMinuteOfDay?.let { "%02d:%02d".format(it / 60, it % 60) } ?: "18:00")
     }
     var notify by remember(editingTaskId, editing?.id) { mutableStateOf(editing?.notify ?: true) }
+    var quietEnabled by remember(editingTaskId, editing?.id) { mutableStateOf(editing?.quietHoursEnabled ?: false) }
+    var quietStart by remember(editingTaskId, editing?.id) {
+        mutableStateOf("%02d:%02d".format(editing?.quietStartHour ?: AutomationUiDefaults.DEFAULT_QUIET_START_HOUR,
+            editing?.quietStartMinute ?: AutomationUiDefaults.DEFAULT_QUIET_START_MINUTE))
+    }
+    var quietEnd by remember(editingTaskId, editing?.id) {
+        mutableStateOf("%02d:%02d".format(editing?.quietEndHour ?: AutomationUiDefaults.DEFAULT_QUIET_END_HOUR,
+            editing?.quietEndMinute ?: AutomationUiDefaults.DEFAULT_QUIET_END_MINUTE))
+    }
+    var minGap by remember(editingTaskId, editing?.id) {
+        mutableStateOf((editing?.proactiveMinGapMinutes ?: AutomationUiDefaults.DEFAULT_PROACTIVE_MIN_GAP_MINUTES).toString())
+    }
+    var maxUnanswered by remember(editingTaskId, editing?.id) {
+        mutableStateOf((editing?.proactiveMaxUnanswered ?: AutomationUiDefaults.DEFAULT_PROACTIVE_MAX_UNANSWERED).toString())
+    }
     var natural by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
@@ -389,7 +405,7 @@ fun ZhaoxiAutomationEditorScene(
                 }
                 if (selected == AutomationScheduleType.WINDOW) {
                     ZxSection("活动时段")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         ZxField(windowStart, { windowStart = it }, Modifier.weight(1f),
                             placeholder = "开始 HH:mm")
                         ZxField(windowEnd, { windowEnd = it }, Modifier.weight(1f),
@@ -397,8 +413,23 @@ fun ZhaoxiAutomationEditorScene(
                     }
                 }
             }
-            ZxSection("通知")
-            ZxSwitchRow("运行通知", "", notify) { notify = it }
+            if (!natural) {
+                ZxSection("通知与互动")
+                ZxSettingsGroup {
+                    ZxSwitchRow("运行通知", "完成与需要处理时提醒", notify) { notify = it }
+                    if (chatMode) {
+                        ZxSwitchRow("免打扰时段", "可设置跨夜时段", quietEnabled) { quietEnabled = it }
+                        if (quietEnabled) {
+                            ZxField(quietStart, { quietStart = it }, Modifier.fillMaxWidth(), fieldLabel = "免打扰开始", placeholder = "23:00")
+                            ZxField(quietEnd, { quietEnd = it }, Modifier.fillMaxWidth(), fieldLabel = "免打扰结束", placeholder = "07:00")
+                        }
+                        ZxField(minGap, { minGap = it }, Modifier.fillMaxWidth(), fieldLabel = "最短互动间隔（至少60分钟）",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                        ZxField(maxUnanswered, { maxUnanswered = it }, Modifier.fillMaxWidth(), fieldLabel = "连续未回复上限（1–5次）",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    }
+                }
+            } else ZxFooterNote("智能规划会确定任务内容和时间；创建后可在表单中调整通知与互动规则。")
             feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
             Spacer(Modifier.height(12.dp))
             ZxButton(if (editingTaskId == null) "创建任务" else "保存修改", {
@@ -441,6 +472,9 @@ fun ZhaoxiAutomationEditorScene(
                         "请选择有效且晚于当前时间的日期" else null
                     val minGap = if (chatMode) 60L else 15L
                     feedback = when {
+                        chatMode && quietEnabled && zxQuietHoursError(quietStart, quietEnd) != null -> zxQuietHoursError(quietStart, quietEnd)
+                        chatMode && (minGap.toLongOrNull() == null || (minGap.toLongOrNull() ?: 0) < 60L) -> "互动间隔至少为60分钟"
+                        chatMode && maxUnanswered.toIntOrNull() !in 1..5 -> "连续未回复上限应为1–5次"
                         timed && firstRunError != null -> firstRunError
                         selected == AutomationScheduleType.INTERVAL && (duration == null || duration < minGap) ->
                             "间隔不得小于 ${minGap} 分钟"
@@ -460,6 +494,13 @@ fun ZhaoxiAutomationEditorScene(
                             silenceMinutes = if (selected == AutomationScheduleType.SILENCE) silenceDuration else null,
                             windowStartMinuteOfDay = if (selected == AutomationScheduleType.WINDOW) start else null,
                             windowEndMinuteOfDay = if (selected == AutomationScheduleType.WINDOW) end else null,
+                            quietHoursEnabled = if (chatMode) quietEnabled else editing?.quietHoursEnabled ?: false,
+                            quietStartHour = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietStart)) / 60 else editing?.quietStartHour ?: AutomationUiDefaults.DEFAULT_QUIET_START_HOUR,
+                            quietStartMinute = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietStart)) % 60 else editing?.quietStartMinute ?: AutomationUiDefaults.DEFAULT_QUIET_START_MINUTE,
+                            quietEndHour = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietEnd)) / 60 else editing?.quietEndHour ?: AutomationUiDefaults.DEFAULT_QUIET_END_HOUR,
+                            quietEndMinute = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietEnd)) % 60 else editing?.quietEndMinute ?: AutomationUiDefaults.DEFAULT_QUIET_END_MINUTE,
+                            proactiveMinGapMinutes = if (chatMode) requireNotNull(minGap.toLongOrNull()) else editing?.proactiveMinGapMinutes ?: AutomationUiDefaults.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
+                            proactiveMaxUnanswered = if (chatMode) requireNotNull(maxUnanswered.toIntOrNull()) else editing?.proactiveMaxUnanswered ?: AutomationUiDefaults.DEFAULT_PROACTIVE_MAX_UNANSWERED,
                             notify = notify,
                         )
                         busy = true
@@ -628,7 +669,7 @@ fun ZhaoxiToolsScene(
         when (destination) {
             "tools.mcp" -> {
                 ZxSection("添加连接")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ZxChip("HTTP 服务", transport == "http") { transport = "http" }
                     ZxChip("本机 stdio", transport == "stdio") { transport = "stdio" }
                     ZxChip("刷新", false) { refresh++ }
@@ -674,7 +715,7 @@ fun ZhaoxiToolsScene(
                         }
                         ZxFooterNote("这里只显示工具与授权要求；任何执行仍需真实工作任务和工具审批。")
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         ZxChip("检查连接", false) { if (!busy) co.launch {
                             busy = true
                             try { feedback = zxMcpHealthText(tools.checkServerHealth(server.id)); refresh++ }
@@ -866,7 +907,7 @@ private fun ZhaoxiGitHubBrowser(tools: com.labteto.dshmobile.uicontract.ToolsUiP
     ZxSection("真实仓库浏览 · 只读")
     ZxFooterNote("仓库列表来自当前已授权的 GitHub 账户；创建 PR、提交修改和其他写操作仍经原有 Work/GitHub 工具审批。")
     error?.let { ZxFooterNote(it) }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ZxButton("刷新仓库", { error = null; revision++ },
             variant = ZxButtonVariant.Outline)
         if (selected != null) {
@@ -889,7 +930,7 @@ private fun ZhaoxiGitHubBrowser(tools: com.labteto.dshmobile.uicontract.ToolsUiP
         val repo = selected!!
         ZxSection(repo.fullName)
         ZxFooterNote("当前目录：/" + directory)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ZxButton("复制仓库地址", {
                 clipboard.setText(AnnotatedString("https://github.com/${repo.fullName}"))
             }, variant = ZxButtonVariant.Outline)

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -204,7 +205,7 @@ fun ZhaoxiHomeScene(
                         bulkMode = false
                     })
                     Spacer(Modifier.height(14.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         ZxChip(if (bulkMode) "完成多选" else "管理多选", bulkMode) {
                             bulkMode = !bulkMode
                             bulkIds = emptySet()
@@ -345,12 +346,12 @@ fun ZhaoxiHomeScene(
                 )
             }
             Spacer(Modifier.height(24.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ZxHomeShortcut("people", "人物") { navigate("route.persona_gallery") }
                 ZxHomeShortcut("files", "文件") { navigate("route.workspace") }
             }
             Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ZxHomeShortcut("tools", "工具") { navigate("route.tools") }
                 ZxHomeShortcut("settings", "设置") { navigate("route.settings") }
             }
@@ -430,7 +431,7 @@ fun ZhaoxiHomeScene(
                 Text("重命名会话", color = c.ink, fontWeight = FontWeight.SemiBold)
                 ZxField(renameTitle, { renameTitle = it }, Modifier.fillMaxWidth(),
                     placeholder = "会话标题（最多 80 字）")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ZxButton("取消", { renameSessionId = null }, Modifier.weight(1f),
                         ZxButtonVariant.Outline)
                     ZxButton("保存", {
@@ -867,14 +868,14 @@ fun ZhaoxiWorkspaceScene(
     }
     ZxPage("工作区", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ZxChip("工作区", selectedDomain == 0) { selectedDomain = 0; clearSelection() }
             ZxChip("会话产物", selectedDomain == 1) { selectedDomain = 1; clearSelection() }
         }
         fileFeedback?.let { ZxFooterNote(it) }
         ZxField(fileQuery, { fileQuery = it; selectedPaths = emptySet() }, Modifier.fillMaxWidth(),
             placeholder = "搜索文件名或路径")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (selectedDomain == 0) {
                 ZxChip("常用文件", !showInternalFiles) { showInternalFiles = false; selectedPaths = emptySet() }
                 ZxChip("含内部文件", showInternalFiles) { showInternalFiles = true; selectedPaths = emptySet() }
@@ -891,14 +892,14 @@ fun ZhaoxiWorkspaceScene(
             if (selectionMode && files != null && visible.isNotEmpty()) {
                 val visiblePaths = visible.map { it.path }.toSet()
                 val selectedVisible = selectedPaths.intersect(visiblePaths)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ZxChip("全选本页", selectedVisible.size == visible.size) {
                         selectedPaths = if (selectedVisible.size == visible.size)
                             selectedPaths - visiblePaths else selectedPaths + visiblePaths
                     }
                     ZxChip("已选 ${selectedVisible.size} 项", false) {}
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ZxButton("打包保存", {
                         batchExporter(UiWorkspaceBatchExportRequest(selectedVisible.toList().sorted(),
                             UiWorkspaceExportAction.SAVE))
@@ -985,7 +986,7 @@ fun ZhaoxiWorkspacePreviewScene(files: FilesUiPort?, path: String, scope: UiScen
                 ZxValueRow("文件名", value = item.file.path.substringAfterLast('/'))
                 ZxValueRow("大小", value = zxHumanFileSize(item.file.bytes.toLong()))
                 exportFeedback?.let { ZxFooterNote(it) }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ZxButton("保存", {
                         exporter(UiWorkspaceExportRequest(path, item.file.path.substringAfterLast('/'),
                             UiWorkspaceExportAction.SAVE))

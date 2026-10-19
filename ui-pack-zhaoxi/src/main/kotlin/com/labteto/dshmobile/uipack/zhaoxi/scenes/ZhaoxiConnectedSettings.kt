@@ -42,6 +42,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.state.collectAsState(initial = settings.initialState)
     val jobs = rememberCoroutineScope()
     var profileId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showModelForm by rememberSaveable { mutableStateOf(false) }
     var expandedModelId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingRemoveModel by remember { mutableStateOf<String?>(null) }
     var model by rememberSaveable { mutableStateOf("") }
@@ -55,8 +56,8 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     var catalogFailure by remember { mutableStateOf<String?>(null) }
     fun execute(action: suspend () -> String) {
         if (busy) return
+        busy = true
         jobs.launch {
-            busy = true
             try { status = action() }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { status = failure.message ?: "操作失败" }
@@ -66,41 +67,13 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     ZxPage("模型", onBack = { scope.onBack() }) {
         snap.error?.let { ZxBanner(it, ZxTone.Err) }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        ZxSection("已配置模型 · ${snap.modelProfiles.size}")
-        if (snap.modelProfiles.isEmpty()) ZxEmpty("还没有模型", "填写下方表单添加可用模型")
-        snap.modelProfiles.sortedByDescending { snap.modelSelection.isActive(it) }.forEach { p ->
-            val active = snap.modelSelection.isActive(p)
-            ZxRow(p.displayName ?: p.model,
-                if (active) "当前使用 · ${p.model}" else p.model,
-                onClick = { expandedModelId = if (expandedModelId == p.id) null else p.id })
-            if (expandedModelId == p.id) {
-                ZxValueRow("接口", value = p.baseUrl)
-                ZxValueRow("协议", value = p.protocol.name)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (!active) ZxChip("使用此模型", false) {
-                        status = settings.submit(SettingsUiCommand.SelectModel(p.id)).zxUserMessage("切换模型")
-                    }
-                    ZxChip("编辑", false) {
-                        profileId = p.id; model = p.model; baseUrl = p.baseUrl
-                        protocol = p.protocol; apiKey = ""
-                    }
-                    ZxChip("移除", false) { pendingRemoveModel = p.id }
-                }
-            }
-        }
-        pendingRemoveModel?.let { id ->
-            ZxDialog("移除模型？", "此操作会删除本地模型配置。", "移除", {
-                pendingRemoveModel = null
-                status = when (val receipt = settings.submit(SettingsUiCommand.RemoveModel(id))) {
-                    SettingsUiReceipt.Applied -> "模型已移除"
-                    SettingsUiReceipt.Submitted -> "移除已提交"
-                    SettingsUiReceipt.Rejected -> "当前无法移除"
-                    is SettingsUiReceipt.Failed -> receipt.message ?: "移除失败"
-                }
-                if (profileId == id) profileId = null
-                if (expandedModelId == id) expandedModelId = null
-            }, { pendingRemoveModel = null })
-        }
+        ZxButton("添加模型", {
+            profileId = null; model = ""; apiKey = ""; status = null
+            discoveredModels = null; catalogFailure = null; catalogFilter = ""
+            showModelForm = true
+        }, Modifier.fillMaxWidth(), enabled = !busy)
+        if (showModelForm || snap.modelProfiles.isEmpty()) {
+            ZxSettingsGroup {
         ZxSection(if (profileId == null) "添加模型" else "编辑模型")
         ZxSection("模型名称")
         ZxField(model, { model = it }, Modifier.fillMaxWidth(), placeholder = "模型名称（支持手动输入）",
@@ -113,11 +86,13 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             visualTransformation = PasswordVisualTransformation())
         ZxFooterNote(if (profileId == null) "凭据仅用于连接该模型" else
             "不填写密钥时保留原凭据；不会在界面中回显已有密钥")
-        LocalModelProtocol.entries.forEach { p -> ZxChip(p.name, p == protocol) {
-            protocol = p
-            discoveredModels = null
-            catalogFailure = null
-        } }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LocalModelProtocol.entries.forEach { p -> ZxChip(p.name, p == protocol) {
+                protocol = p
+                discoveredModels = null
+                catalogFailure = null
+            } }
+        }
         ZxSection("从提供商读取可用模型")
         ZxButton("读取 /models 目录", {
             if (!busy) {
@@ -172,15 +147,49 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         ZxButton("测试连接", { execute { settings.testModel(apiKey, model, baseUrl, protocol, profileId) } }, enabled = !busy && model.isNotBlank())
         ZxButton("保存模型", { execute {
             when (val result = settings.save(SettingsUiCommand.SaveModel(apiKey, model, baseUrl, protocol, profileId))) {
-                SettingsUiReceipt.Applied -> { apiKey = ""; profileId = null; "模型已保存" }
+                SettingsUiReceipt.Applied -> { apiKey = ""; profileId = null; showModelForm = false; "模型已保存" }
                 SettingsUiReceipt.Submitted -> "保存已提交"
                 SettingsUiReceipt.Rejected -> "无法保存模型"
                 is SettingsUiReceipt.Failed -> result.message ?: "保存失败"
             }
         } }, enabled = !busy && model.isNotBlank())
-        ZxChip("新建配置", false) {
-            profileId = null; model = ""; apiKey = ""; status = null
-            discoveredModels = null; catalogFailure = null; catalogFilter = ""
+        ZxButton("收起表单", { showModelForm = false }, variant = ZxButtonVariant.Outline, enabled = !busy)
+            }
+        }
+        ZxSection("已配置模型 · ${snap.modelProfiles.size}")
+        if (snap.modelProfiles.isEmpty()) ZxEmpty("还没有模型", "在上方添加第一个可用模型")
+        snap.modelProfiles.sortedByDescending { snap.modelSelection.isActive(it) }.forEach { p ->
+            val active = snap.modelSelection.isActive(p)
+            ZxRow(p.displayName ?: p.model,
+                if (active) "当前使用 · ${p.model}" else p.model,
+                onClick = { expandedModelId = if (expandedModelId == p.id) null else p.id })
+            if (expandedModelId == p.id) {
+                ZxValueRow("接口", value = p.baseUrl)
+                ZxValueRow("协议", value = p.protocol.name)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!active) ZxChip("使用此模型", false) {
+                        status = settings.submit(SettingsUiCommand.SelectModel(p.id)).zxUserMessage("切换模型")
+                    }
+                    ZxChip("编辑", false) {
+                        profileId = p.id; model = p.model; baseUrl = p.baseUrl
+                        protocol = p.protocol; apiKey = ""; showModelForm = true
+                    }
+                    ZxChip("移除", false) { pendingRemoveModel = p.id }
+                }
+            }
+        }
+        pendingRemoveModel?.let { id ->
+            ZxDialog("移除模型？", "此操作会删除本地模型配置。", "移除", {
+                pendingRemoveModel = null
+                status = when (val receipt = settings.submit(SettingsUiCommand.RemoveModel(id))) {
+                    SettingsUiReceipt.Applied -> "模型已移除"
+                    SettingsUiReceipt.Submitted -> "移除已提交"
+                    SettingsUiReceipt.Rejected -> "当前无法移除"
+                    is SettingsUiReceipt.Failed -> receipt.message ?: "移除失败"
+                }
+                if (profileId == id) profileId = null
+                if (expandedModelId == id) expandedModelId = null
+            }, { pendingRemoveModel = null })
         }
         ZxNavRow("查看模型用量", sub = "按模型对照 Token 与估算费用") {
             scope.onNavigate(UiSceneId("settings.model_usage"))
@@ -239,7 +248,7 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         (status ?: snap.error)?.let { ZxBanner(it, ZxTone.Warn) }
         if (busy) ZxFooterNote("正在请求账户 Owner，完成前不会重复提交")
         ZxSection("账户操作")
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ZxButton("添加账户", { execute {
                 settings.connectChatGpt()
                 "授权流程已发起，请在系统浏览器完成操作"
@@ -284,7 +293,7 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                         "套餐授权已请求，请在浏览器明确确认；完成后刷新账户状态"
                     } }, Modifier.fillMaxWidth(), enabled = !busy)
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ZxButton("使用此账户", { execute {
                         settings.selectChatGptAccount(account.id)
                         "已提交账户切换，请以当前账户标记为准"
@@ -294,7 +303,7 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                         "重新授权流程已发起"
                     } }, Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ZxButton("测试连接", { execute { settings.testChatGptAccount(account.id) } },
                         Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
                     ZxButton("断开连接", { disconnectConfirm = account.id },
@@ -656,7 +665,7 @@ fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope,
     }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("可见范围")
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             available.forEach { target ->
                 ZxChip(when (target) {
                     MemoryScope.GLOBAL -> "全局"
@@ -706,7 +715,7 @@ fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope,
                         else applyReceipt(memory.submit(
                             MemoryUiCommand.Update(record, record.content, checked)))
                     }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         ZxButton("保存修改", {
                             if (text.isBlank()) status = "请填写正文；删除请使用遗忘"
                             else applyReceipt(memory.submit(

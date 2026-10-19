@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -195,7 +196,7 @@ fun ZhaoxiUsageLogScene(
         ZxFooterNote("从本地 SQLite 已保留的请求记录逐页读取。超过数据库留存期限的明细无法恢复，累计统计不受影响。")
         pageFailure?.let { error ->
             ZxFooterNote(error)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ZxButton("重新读取", { retryPage++ }, variant = ZxButtonVariant.Outline)
                 if (pageCursors.size > 1) ZxButton("回到第一页", {
                     pageCursors = listOf(null)
@@ -210,7 +211,7 @@ fun ZhaoxiUsageLogScene(
                     if (record.reported) "" else " · 用量未完整上报",
                 onClick = { openRequest(record.requestId) })
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (pageCursors.size > 1) ZxButton("上一页", {
                 pageCursors = pageCursors.dropLast(1)
             }, variant = ZxButtonVariant.Outline)

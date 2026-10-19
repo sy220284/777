@@ -57,6 +57,7 @@ fun ZhaoxiUiDocumentScene(
     knownScenes: Set<UiSceneId>,
     pendingApprovalId: () -> String?,
     media: MediaUiPort? = null,
+    forms: UiDocumentFormUiPort? = null,
 ) {
     val snap by port.snapshots.collectAsState(initial = port.snapshot())
     var selecting by remember(snap.sessionId) { mutableStateOf(false) }
@@ -97,6 +98,7 @@ fun ZhaoxiUiDocumentScene(
                         val result = if (commands.size == 1) port.delete(commands.single()) else port.deleteBatch(commands)
                         batchFeedback = result.zxDocumentFeedback()
                         if (result == UiDocumentReceipt.Deleted) {
+                            commands.forEach { forms?.forgetDocument(UiDocumentFormKey(it.source.sessionId, it.documentId, it.revision)) }
                             selectedDocuments = emptyMap()
                             selecting = false
                         }
@@ -122,6 +124,7 @@ fun ZhaoxiUiDocumentScene(
                 knownScenes = knownScenes,
                 pendingApprovalId = pendingApprovalId(),
                 media = media,
+                forms = forms,
                 onAction = { actionId, fields, confirmed ->
                     // Commands are admitted again by the original Feature Owner.
                     val live = context()
@@ -138,7 +141,7 @@ fun ZhaoxiUiDocumentScene(
                 },
             )
             if (!readOnlyProgress && !selecting)
-                ZhaoxiDocumentDisplayEditor(port, document, context)
+                ZhaoxiDocumentDisplayEditor(port, document, context, forms)
             Spacer(Modifier.height(10.dp))
         }
     }
@@ -187,24 +190,6 @@ fun ZhaoxiUiDocumentGenerateScene(
     }
 }
 
-/** Form text lives in transient Compose presentation state, not a parallel business state store. */
-private fun documentDefaults(nodes: List<UiDocumentNode>): Map<String, String> {
-    val fields = mutableMapOf<String, String>()
-    fun visit(node: UiDocumentNode) {
-        when (node) {
-            is UiDocumentNode.Field -> fields[node.id] = node.initial
-            is UiDocumentNode.Select -> fields[node.id] = node.initial
-            is UiDocumentNode.Switch -> fields[node.id] = node.initial.toString()
-            is UiDocumentNode.Column -> node.children.forEach(::visit)
-            is UiDocumentNode.Row -> node.children.forEach(::visit)
-            is UiDocumentNode.Disclosure -> node.children.forEach(::visit)
-            else -> Unit
-        }
-    }
-    nodes.forEach(::visit)
-    return fields
-}
-
 @Composable
 fun ZxDocumentCard(
     document: UiDocument,
@@ -213,6 +198,7 @@ fun ZxDocumentCard(
     pendingApprovalId: String?,
     onAction: (String, Map<String, String>, Boolean) -> UiDocumentReceipt,
     media: MediaUiPort? = null,
+    forms: UiDocumentFormUiPort? = null,
 ) {
     var actionFeedback by remember(document.documentId, document.source) { mutableStateOf<String?>(null) }
     var pendingSend by remember(document.documentId, document.revision, document.source) {
@@ -223,14 +209,38 @@ fun ZxDocumentCard(
         if (!confirmed && action is UiDocumentAction.SendUserInput && action.submit) pendingSend = actionId to fields
         else actionFeedback = onAction(actionId, fields, confirmed).zxDocumentFeedback()
     }
-    val defaults = remember(document) { documentDefaults(document.nodes) }
-    // A new revision must never erase the user's unfinished form entry.
-    val fields = remember(document.source.sessionId, document.source.messageId, document.documentId) {
-        mutableStateMapOf<String, String>().apply { putAll(defaults) }
-    }
-    LaunchedEffect(document.revision) { defaults.forEach { (id, initial) -> if (id !in fields) fields[id] = initial } }
     val validation = remember(document, knownScenes, pendingApprovalId) {
         document.validate(UiDocumentBudget(512, 16, 262_144), knownScenes, pendingApprovalId)
+    }
+    if (!validation.valid) {
+        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+            Text(document.title.ifBlank { "文档" }, color = ZhaoxiTheme.colors.ink)
+            ZxBanner("文档无法完整显示，以下为原始文本", ZxTone.Warn)
+            Text(document.fallbackText.take(400), color = ZhaoxiTheme.colors.ink2)
+        }
+        return
+    }
+    val defaults = remember(document) { document.initialFields() }
+    val formKey = remember(document.source, document.documentId, document.revision) {
+        UiDocumentFormKey(document.source.sessionId, document.documentId, document.revision)
+    }
+    val retention = remember(document) { document.fieldRetention() }
+    var bindingReady by remember(forms, formKey, retention) { mutableStateOf(false) }
+    androidx.compose.runtime.DisposableEffect(forms, formKey, retention) {
+        forms?.bindRetention(formKey, retention)
+        bindingReady = true
+        onDispose { forms?.releaseRetention(formKey) }
+    }
+    val stored by (forms?.values ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap<UiDocumentFormKey, Map<String, String>>()) }).collectAsState()
+    val local = remember(formKey) { mutableStateMapOf<String, String>() }
+    val fields = defaults + if (forms == null) local else if (bindingReady) stored[formKey].orEmpty() else emptyMap()
+    fun changeField(id: String, value: String) {
+        if (forms == null) local[id] = value
+        else {
+            forms.update(formKey, id, value)
+            if (forms.values.value[formKey]?.get(id) != value)
+                actionFeedback = "本次输入未保存，内容超过表单支持范围；请缩短后重试"
+        }
     }
     val isWorkProgress = document.documentId == "work-live:${document.source.messageId}" &&
         document.source.workMode
@@ -244,10 +254,6 @@ fun ZxDocumentCard(
             }, { pendingSend = null })
         }
         actionFeedback?.let { ZxFooterNote(it) }
-        if (!validation.valid) {
-            ZxBanner("文档超出安全显示限制 · 已降级", ZxTone.Warn)
-            Text(document.fallbackText.take(400), fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
-        } else {
             if (isWorkProgress) {
                 val status = document.nodes.filterIsInstance<UiDocumentNode.Text>()
                     .firstOrNull { it.id == "work_turn_status" }?.text
@@ -269,16 +275,15 @@ fun ZxDocumentCard(
                         document.nodes.filterNot {
                             it.id == "work_turn_status" || it.id == "work_scope"
                         }.forEach { node ->
-                            ZxDocumentNodeView(node, bindings, fields,
+                            ZxDocumentNodeView(node, bindings, fields, ::changeField,
                                 { actionId -> dispatch(actionId, fields.toMap()) },
                                 media, document.source.sessionId)
                         }
                     }
                 }
             } else document.nodes.forEach { node ->
-                ZxDocumentNodeView(node, bindings, fields, { actionId -> dispatch(actionId, fields.toMap()) }, media, document.source.sessionId)
+                ZxDocumentNodeView(node, bindings, fields, ::changeField, { actionId -> dispatch(actionId, fields.toMap()) }, media, document.source.sessionId)
             }
-        }
     }
 }
 
@@ -286,7 +291,8 @@ fun ZxDocumentCard(
 private fun ZxDocumentNodeView(
     node: UiDocumentNode,
     bindings: Map<UiDocumentBinding, UiDocumentBoundValue>,
-    fields: MutableMap<String, String>,
+    fields: Map<String, String>,
+    onFieldChange: (String, String) -> Unit,
     onAction: (String) -> Unit,
     media: MediaUiPort?,
     sessionId: String,
@@ -302,16 +308,16 @@ private fun ZxDocumentNodeView(
             }
             ZxRow(node.label, value)
         }
-        is UiDocumentNode.Field -> ZxField(fields[node.id].orEmpty(), { fields[node.id] = it },
+        is UiDocumentNode.Field -> ZxField(fields[node.id].orEmpty(), { onFieldChange(node.id, it) },
             Modifier.fillMaxWidth(), placeholder = node.label)
         is UiDocumentNode.Switch -> ZxRow(node.label, "") {
-            ZxSwitch(fields[node.id].toBoolean(), { fields[node.id] = it.toString() })
+            ZxSwitch(fields[node.id].toBoolean(), { onFieldChange(node.id, it.toString()) })
         }
         is UiDocumentNode.Select -> Column {
             ZxRow(node.label, fields[node.id].orEmpty())
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 node.options.forEach { option ->
-                    ZxChip(option, fields[node.id] == option, onClick = { fields[node.id] = option })
+                    ZxChip(option, fields[node.id] == option, onClick = { onFieldChange(node.id, option) })
                 }
             }
         }
@@ -322,7 +328,7 @@ private fun ZxDocumentNodeView(
                 ZxRow(node.title, if (expanded) "收起" else "展开",
                     onClick = { expanded = !expanded })
                 if (expanded) node.children.forEach {
-                    ZxDocumentNodeView(it, bindings, fields, onAction, media, sessionId)
+                    ZxDocumentNodeView(it, bindings, fields, onFieldChange, onAction, media, sessionId)
                 }
             }
         }
@@ -385,10 +391,10 @@ private fun ZxDocumentNodeView(
             }
         }
         is UiDocumentNode.Column -> Column {
-            node.children.forEach { ZxDocumentNodeView(it, bindings, fields, onAction, media, sessionId) }
+            node.children.forEach { ZxDocumentNodeView(it, bindings, fields, onFieldChange, onAction, media, sessionId) }
         }
         is UiDocumentNode.Row -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            node.children.forEach { ZxDocumentNodeView(it, bindings, fields, onAction, media, sessionId) }
+            node.children.forEach { ZxDocumentNodeView(it, bindings, fields, onFieldChange, onAction, media, sessionId) }
         }
     }
 }

@@ -62,6 +62,7 @@ internal fun zxDocumentDisplayValues(nodes: List<UiDocumentNode>): List<ZxDocume
 @Composable
 internal fun ZhaoxiDocumentDisplayEditor(
     port: UiDocumentUiPort, document: UiDocument, context: () -> ZhaoxiDocumentContext?,
+    forms: UiDocumentFormUiPort? = null,
 ) {
     var editing by remember(document.documentId, document.source) { mutableStateOf<UiDocument?>(null) }
     var identity by remember(document.documentId, document.source) { mutableStateOf<UiSessionIdentity?>(null) }
@@ -77,6 +78,8 @@ internal fun ZhaoxiDocumentDisplayEditor(
             try {
                 val result = action()
                 feedback = result.zxDocumentFeedback()
+                if (result == UiDocumentReceipt.Deleted)
+                    forms?.forgetDocument(UiDocumentFormKey(document.source.sessionId, document.documentId, document.revision))
                 if (result is UiDocumentReceipt.Published || result == UiDocumentReceipt.Deleted) editing = null
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { feedback = failure.message ?: "保存失败，编辑内容仍保留" }
