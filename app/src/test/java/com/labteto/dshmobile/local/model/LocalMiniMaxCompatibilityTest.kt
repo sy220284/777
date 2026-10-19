@@ -147,4 +147,25 @@ class LocalMiniMaxCompatibilityTest {
         assertEquals("检查完成", differentRoute["content"]!!.jsonPrimitive.content)
         assertEquals(null, differentRoute["reasoning_content"])
     }
+    @Test fun miniMaxCompletion401UsesRegionalHintAndStillSendsTheProvidedBearerKey() = runBlocking {
+        var authorization: String? = null
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            authorization = chain.request().header("Authorization")
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(401)
+                .message("Unauthorized").body("""{"error":{"message":"login fail: Please carry the API secret key (1004)"}}""".toResponseBody()).build()
+        }.build()
+        val error = assertThrows(com.labteto.dshmobile.local.LocalModelException::class.java) {
+            runBlocking {
+                DeepSeekClient(http, json).completeStreaming(
+                    apiKey = "sample-only-key", model = "MiniMax-M3", messages = emptyList(),
+                    tools = JsonArray(emptyList()), baseUrl = "https://api.minimaxi.com/v1",
+                )
+            }
+        }
+        assertEquals("Bearer sample-only-key", authorization)
+        assertEquals(401, error.status)
+        assertTrue(error.message!!.contains("中国区"))
+        assertFalse(error.message!!.contains("sample-only-key"))
+    }
+
 }
