@@ -67,8 +67,15 @@ class ZhaoxiHistoryUiPresentationTest {
     @Test fun toolPermissionAndLifecycleLabelsAreHumanReadable() {
         assertEquals("查看应用和设备信息", zxCapabilityActionLabel("android_app_info"))
         assertEquals("读取 GitHub 信息", zxCapabilityActionLabel("github_api_get"))
-        assertEquals("只读查询 · 无需额外确认", zxCapabilityPermissionLabel("READ_ONLY", "NEVER"))
-        assertEquals("可能修改内容 · 操作前须确认", zxCapabilityPermissionLabel("MUTATION", "ALWAYS"))
+        assertEquals("启动应用", zxCapabilityActionLabel("android_app_launch"))
+        assertEquals("屏幕点击", zxCapabilityActionLabel("android_tap"))
+        assertEquals("滑动屏幕", zxCapabilityActionLabel("android_swipe"))
+        assertEquals("屏幕截图", zxCapabilityActionLabel("android_screenshot"))
+        assertEquals("android_unknown_future_action", zxCapabilityActionLabel("android_unknown_future_action"))
+        assertEquals("读取 · 无需额外确认", zxCapabilityPermissionLabel("READ_ONLY", "NEVER"))
+        assertEquals("读取 · 需操作确认", zxCapabilityPermissionLabel("READ_ONLY", "MUTATION"))
+        assertEquals("设备操作 · 需操作确认", zxCapabilityPermissionLabel("DEVICE", "MUTATION"))
+        assertEquals("可修改 · 需操作确认", zxCapabilityPermissionLabel("MUTATION", "ALWAYS"))
         assertEquals("已启用", zxPluginStateLabel("ACTIVE"))
         assertEquals("需要修复", zxPluginStateLabel("FAILED"))
     }
