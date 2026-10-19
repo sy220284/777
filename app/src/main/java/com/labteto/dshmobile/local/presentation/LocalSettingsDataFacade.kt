@@ -37,7 +37,7 @@ class LocalSettingsDataFacade @Inject internal constructor(
     internal val deepSeekPricing: StateFlow<DeepSeekPricingState> = pricing.state
     internal val usageRevision: StateFlow<Long> = usage.analyticsRevision
     internal fun usageSnapshot(): TokenUsageAnalyticsSnapshot = usage.analyticsSnapshot()
-    internal fun usageGroupDetail(kind: TokenUsageGroupKind, key: String, modelFilter: String?): TokenUsageGroupDetail? = usage.analyticsGroupDetail(kind, key, modelFilter)
+    internal fun usageGroupDetail(kind: TokenUsageGroupKind, key: String, modelFilter: String?): TokenUsageGroupDetail? = usage.analyticsGroupDetail(kind, key, modelFilter = modelFilter)
     internal fun usageRecord(requestId: String): TokenUsageRecord? = usage.analyticsRecord(requestId)
     override val snapshots: Flow<UiProviderPricingSnapshot> = pricing.state.map {
         it.asUiProviderPricing()
