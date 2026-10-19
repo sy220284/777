@@ -60,8 +60,19 @@ class OpenAiResponsesClientTest {
                     }), tools = JsonArray(emptyList()), temperature = null,
                     reasoningEffort = effort, planSharing = plan,
                 )
-                if (effort == null) assertFalse(payload.containsKey("reasoning"))
-                else assertEquals(effort, payload["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+                if (plan) {
+                    assertEquals("all_turns", payload["reasoning"]!!.jsonObject["context"]!!.jsonPrimitive.content)
+                    assertEquals("false", payload["parallel_tool_calls"]!!.jsonPrimitive.content)
+                    if (effort == null) assertFalse("effort" in payload["reasoning"]!!.jsonObject)
+                    else assertEquals(effort, payload["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+                } else {
+                    if (effort == null) assertFalse(payload.containsKey("reasoning"))
+                    else {
+                        assertEquals(effort, payload["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+                        assertFalse("context" in payload["reasoning"]!!.jsonObject)
+                    }
+                    assertFalse(payload.containsKey("parallel_tool_calls"))
+                }
                 assertFalse(payload.containsKey("reasoning_effort"))
                 assertEquals("false", payload["store"]!!.jsonPrimitive.content)
                 assertEquals("true", payload["stream"]!!.jsonPrimitive.content)
@@ -89,6 +100,8 @@ class OpenAiResponsesClientTest {
                 planSharing = profile.authKind == LocalModelAuthKind.CHATGPT_PLAN,
             )
             assertEquals("max", payload["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+            assertEquals("all_turns", payload["reasoning"]!!.jsonObject["context"]!!.jsonPrimitive.content)
+            assertEquals("false", payload["parallel_tool_calls"]!!.jsonPrimitive.content)
             assertEquals("false", payload["store"]!!.jsonPrimitive.content)
             assertEquals("true", payload["stream"]!!.jsonPrimitive.content)
             assertFalse(payload.containsKey("temperature"))
@@ -138,6 +151,8 @@ class OpenAiResponsesClientTest {
             val wire = Json.parseToJsonElement(postedBody).jsonObject
             assertEquals("gpt-6-sol", wire["model"]!!.jsonPrimitive.content)
             assertEquals("max", wire["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+            assertEquals("all_turns", wire["reasoning"]!!.jsonObject["context"]!!.jsonPrimitive.content)
+            assertEquals("false", wire["parallel_tool_calls"]!!.jsonPrimitive.content)
             assertEquals("false", wire["store"]!!.jsonPrimitive.content)
             assertEquals("true", wire["stream"]!!.jsonPrimitive.content)
             assertFalse(wire.containsKey("temperature"))
@@ -489,6 +504,9 @@ class OpenAiResponsesClientTest {
         assertFalse("Responses Lite instructions must be developer input", "instructions" in payload)
         assertEquals(false, payload["store"]?.jsonPrimitive?.content?.toBoolean())
         assertEquals(true, payload["stream"]?.jsonPrimitive?.content?.toBoolean())
+        assertEquals("all_turns", payload["reasoning"]!!.jsonObject["context"]!!.jsonPrimitive.content)
+        assertFalse("effort" in payload["reasoning"]!!.jsonObject)
+        assertEquals("false", payload["parallel_tool_calls"]!!.jsonPrimitive.content)
         assertFalse("temperature" in payload)
         val unsupported = listOf(
             "background",
