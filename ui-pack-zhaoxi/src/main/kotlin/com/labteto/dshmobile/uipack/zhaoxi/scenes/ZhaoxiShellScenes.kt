@@ -710,7 +710,7 @@ fun ZhaoxiSearchScene(
             if (fileResults.isNotEmpty()) {
                 ZxSection("工作区文件")
                 fileResults.forEach { item ->
-                    ZxRow(item.path.substringAfterLast('/'), item.path,
+                    ZxRow(item.path.substringAfterLast('/'), zxWorkspaceKindLabel(item.path),
                         onClick = { onFileOpen(item.path) })
                 }
             }
@@ -903,7 +903,16 @@ fun ZhaoxiWorkspaceScene(
             }
             if (files == null) ZxEmpty("工作区不可用", "暂时无法读取文件")
             else if (workspace.isEmpty()) ZxEmpty("还没有工作文件", "执行任务后产生的文档、图片与代码会出现在这里。你也可以查看当前会话的产物。", actionLabel = "查看会话产物", onAction = { selectedDomain = 1 }, iconName = "files")
-            else if (visible.isEmpty()) ZxEmpty("没有匹配的文件", "可调整搜索条件，或选择包含内部文件")
+            else if (visible.isEmpty()) {
+                val hasQuery = fileQuery.isNotBlank()
+                ZxEmpty(
+                    if (hasQuery) "没有匹配的文件" else "暂无常用文件",
+                    if (hasQuery) "可清除搜索" else "当前只有内部文件",
+                    actionLabel = if (hasQuery) "清除搜索" else "查看全部文件",
+                    onAction = if (hasQuery) ({ fileQuery = "" }) else ({ showInternalFiles = true }),
+                    iconName = "files",
+                )
+            }
             visible.forEach { file ->
                 val selected = file.path in selectedPaths
                 ZxRow(file.path.substringAfterLast('/'),
@@ -931,7 +940,10 @@ fun ZhaoxiWorkspaceScene(
             if (sessionId.isBlank()) ZxEmpty("尚未打开会话", "进入一个聊天或工作会话后可以查看产物")
             else if (conversation.isEmpty) ZxEmpty("暂无会话产物", "当前会话尚未产生可查看的文件")
             else if (visibleArtifacts.isEmpty() && visibleInvolved.isEmpty()) {
-                ZxEmpty("没有匹配的会话文件", "调整搜索条件或清空搜索内容")
+                ZxEmpty("没有匹配的会话文件", "可清除搜索",
+                    actionLabel = if (fileQuery.isNotBlank()) "清除搜索" else null,
+                    onAction = if (fileQuery.isNotBlank()) ({ fileQuery = "" }) else null,
+                    iconName = "files")
             }
             if (visibleArtifacts.isNotEmpty()) ZxSection("产物")
             visibleArtifacts.forEach { file ->
