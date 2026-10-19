@@ -54,14 +54,23 @@ internal fun recoverChatPostTurnProjections(log: LocalSessionEventLog, store: Ch
         }
     }
     scan { event ->
-        if (event.type == LOCAL_CHAT_DOMAIN_STATE_EVENT_TYPE &&
-            event.data["reason"]?.jsonPrimitive?.contentOrNull == "post-turn-updated") {
-            event.data[DIARY_PROJECTION]?.let { encoded ->
-                val request = postTurnJson.decodeFromJsonElement(ChatDiaryWriteRequest.serializer(), encoded)
-                if ((request.sourceUserMessageIds + request.sourceAssistantMessageIds).none { it in discarded }) {
-                    checkActive()
-                    store.record(request.copy(projectionId = "${request.sourceSessionId}:${event.sequence}"))
-                }
+        val encoded = when {
+            event.type == LOCAL_CHAT_DOMAIN_STATE_EVENT_TYPE &&
+                event.data["reason"]?.jsonPrimitive?.contentOrNull == "post-turn-updated" ->
+                event.data[DIARY_PROJECTION]
+            event.type == "group/diary-projection" -> event.data["request"]
+            else -> null
+        }
+        if (encoded != null) {
+            val request = postTurnJson.decodeFromJsonElement(ChatDiaryWriteRequest.serializer(), encoded)
+            if ((request.sourceUserMessageIds + request.sourceAssistantMessageIds).none { it in discarded }) {
+                checkActive()
+                // Group proposals already carry a stable member/batch projectionId; direct
+                // post-turn projections retain their event-sequence identity.
+                val identity = if (event.type == "group/diary-projection")
+                    request.projectionId ?: "${request.sourceSessionId}:group:${event.sequence}"
+                else "${request.sourceSessionId}:${event.sequence}"
+                store.record(request.copy(projectionId = identity))
             }
         }
     }
