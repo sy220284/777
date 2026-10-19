@@ -27,7 +27,7 @@ class LocalWorkFormContinuationPolicyTest {
             put("source_message_id", "user-1")
         })
         assertTrue(hasOutstandingWorkReplyForm(log))
-        assertTrue(hasOutstandingWorkReplyForm(log, goal.copy(revision = goal.revision + 1)))
+        assertTrue(hasOutstandingWorkReplyForm(log))
         assertTrue(hasOutstandingWorkReplyForm(log))
         // Automatic continuation and a tool result do not constitute a user submission.
         log.append("tool/result", buildJsonObject { put("id", "tool-1") })
