@@ -364,8 +364,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             member.personaId,
         ) ?: return
         runCatching {
-            diaryStore.record(
-                ChatDiaryWriteRequest(
+            val request = ChatDiaryWriteRequest(
                     subjectKey = subjectKey,
                     personaName = persona.name,
                     delta = delta,
@@ -393,8 +392,13 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         append(':')
                         append(sharedPending.maxOfOrNull(ChatPendingTurn::sequence) ?: 0L)
                     },
-                ),
             )
+            // Persist the projection recipe BEFORE the external diary document write.
+            // A cursor advance or process death can no longer discard this derived fact.
+            eventLog.append("group/diary-projection", buildJsonObject {
+                put("request", json.encodeToJsonElement(ChatDiaryWriteRequest.serializer(), request))
+            })
+            diaryStore.record(request)
         }.onSuccess { diary ->
             if (diary != null) {
                 eventLog.append("group/diary", buildJsonObject {
