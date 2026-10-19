@@ -29,7 +29,6 @@ class ZhaoxiFullPackAdmissionTest {
         val documents = unreachablePort<UiDocumentUiPort>()
         val forms = unreachablePort<UiDocumentFormUiPort>()
         val media = unreachablePort<MediaUiPort>()
-        val evidence = unreachablePort<WorkEvidenceUiPort>()
         val gallery = unreachablePort<PersonaGalleryUiPort>()
         val selection = unreachablePort<PersonaSelectionUiPort>()
         val groups = unreachablePort<ChatGroupUiPort>()
@@ -58,7 +57,7 @@ class ZhaoxiFullPackAdmissionTest {
             conversations = ZhaoxiConversationPorts(
                 chat = chat, work = work, drafts = drafts, reading = reading,
                 attachments = attachments, history = history, documents = documents,
-                forms = forms, media = media, evidence = evidence,
+                forms = forms, media = media,
                 gallery = gallery, selection = selection, groups = groups,
                 stories = stories, galleryDeletion = galleryDeletion,
                 personaAuthoring = authoring, workReads = workReads,
@@ -85,7 +84,7 @@ class ZhaoxiFullPackAdmissionTest {
         val capabilities = LocalUiConnectedCapabilities.from(
             chat = chat, work = work, drafts = drafts, documents = documents, forms = forms,
             attachments = attachments, transcript = history, groups = groups, team = team,
-            workReads = workReads, workPolicy = policy, shell = shell, evidence = evidence,
+            workReads = workReads, workPolicy = policy, shell = shell,
             gallery = gallery, personas = selection, personaTransfer = transfer,
             stories = stories, galleryDeletion = galleryDeletion, gallerySave = gallerySave,
             portraits = portraits, authoring = authoring, currentPersona = currentPersona,
