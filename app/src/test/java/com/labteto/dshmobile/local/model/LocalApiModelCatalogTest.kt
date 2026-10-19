@@ -97,7 +97,7 @@ class LocalApiModelCatalogTest {
         ), requested)
     }
 
-    @Test fun miniMaxCatalog401KeepsBearerHeaderAndExplainsRegionWithoutEchoingKey() = runBlocking {
+    @Test fun miniMaxChinaCatalog401KeepsBearerHeaderAndExplainsAuthenticationWithoutEchoingKey() = runBlocking {
         val observed = mutableListOf<String>()
         val http = OkHttpClient.Builder().addInterceptor { chain ->
             observed += chain.request().url.toString() + "|" + chain.request().header("Authorization")
@@ -106,11 +106,11 @@ class LocalApiModelCatalogTest {
         }.build()
         val error = assertThrows(IllegalStateException::class.java) {
             runBlocking {
-                LocalApiModelCatalog(http).query("sample-only-key", "https://api.minimax.io/v1", LocalModelProtocol.CHAT_COMPLETIONS)
+                LocalApiModelCatalog(http).query("sample-only-key", "https://api.minimaxi.com/v1", LocalModelProtocol.CHAT_COMPLETIONS)
             }
         }
-        assertEquals(listOf("https://api.minimax.io/v1/models|Bearer sample-only-key"), observed)
-        assertTrue(error.message!!.contains("国际区"))
+        assertEquals(listOf("https://api.minimaxi.com/v1/models|Bearer sample-only-key"), observed)
+        assertTrue(error.message!!.contains("鉴权失败"))
         assertFalse(error.message!!.contains("sample-only-key"))
     }
 
