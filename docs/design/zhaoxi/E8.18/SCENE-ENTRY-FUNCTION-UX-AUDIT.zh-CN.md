@@ -24,7 +24,7 @@
 | 7 | 日记 | route.diary、chat.diary | DiaryUiPort 的日记场景 | 公开/私人、纠错、来源与删除状态的证据 |
 | 8 | 工作区 | route.workspace | FilesUiPort.workspaceFiles/conversationFiles，工作区与会话产物分域 | 搜索、长文件名、分享/导出（当前 FilesUiPort 能力约束） |
 | 9 | 文件预览 | workspace.preview | FilesUiPort.previewWorkspaceFile，大小、正文、截断状态 | 大文件滚动、二进制与文件分享 |
-| 10 | 运行详情/证据 | work.requirement_evidence、work.plan_review | Work Owner 真实需求/文件证据/版本状态，不再直出 data class toString | 设计进度环、事件时间线、逐步审批及实际运行夹具 |
+| 10 | Work 计划与事件 | work.plan_review | Work Owner 真实计划、工具执行事件和状态 | 计划审阅、事件时间线与真实运行夹具 |
 | 11 | 定时任务 | route.tasks、automation.tasks | AutomationUiPort：状态筛选、真实暂停/继续/立即运行，任务操作行独立避免拥挤 | 各状态与调度策略设备验收 |
 | 12 | 任务编辑 | automation.editor、automation.persona_interaction | Create/Update、generation fence、当前聊天身份；单次、固定间隔、日、周、月、沉默、时段及原自然语言规划，非真实支持项不伪造 | 失败策略设计、编辑旧调度、后台实际执行 |
 | 13 | 工具中心 | route.tools、work.capabilities | ToolsUiPort：按能力家族、技能、连接分区，跳独立功能页 | 高数量/长名称、错误态、权限样本 |
