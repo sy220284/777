@@ -684,13 +684,13 @@ fun ToolsScreen(
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
-                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapSection),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                         Text(
                             stringResource(R.string.cap_center_settings_group),
-                            style = DsType.std14.withReadingWeight(),
-                            color = colors.textTertiary,
+                            style = DsType.std14Strong.withReadingWeight(),
+                            color = colors.textSecondary,
                         )
                         Text(
                             stringResource(R.string.cap_center_settings_group_hint),
@@ -698,7 +698,7 @@ fun ToolsScreen(
                             color = colors.textSecondary,
                         )
                     }
-                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
                         ToolCapabilityRow(
                             icon = SyEntryIcons.Search,
                             title = stringResource(R.string.tools_network_search),
@@ -745,10 +745,10 @@ fun ToolsScreen(
 
                     Text(
                         stringResource(R.string.cap_center_extensions_group),
-                        style = DsType.std14.withReadingWeight(),
-                        color = colors.textTertiary,
+                        style = DsType.std14Strong.withReadingWeight(),
+                        color = colors.textSecondary,
                     )
-                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
                         val builtinAvailable = "android-local-builtins" in state.localPlugins
                         ToolCapabilityRow(
                             iconPainter = painterResource(R.drawable.ic_ui_plugin),
@@ -1085,14 +1085,14 @@ private fun ToolCapabilityRow(
         modifier = Modifier.fillMaxWidth(),
         onClick = { onClick?.invoke() },
         enabled = onClick != null,
-        shape = DsShapes.block,
-        color = androidx.compose.ui.graphics.Color.Transparent,
+        shape = DsShapes.row,
+        color = colors.materialL2,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 70.dp)
-                .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
+                .heightIn(min = 64.dp)
+                .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
