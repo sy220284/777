@@ -112,7 +112,7 @@ class LocalSystemPromptContinuityTest {
     fun incompleteOrUnrelatedToolBatchesAreNotRewritten() {
         val incomplete = listOf(callBatch("a", "b"), system("新规则"), receipt("a"))
         val unrelated = listOf(callBatch("a"), system("新规则"),
-            buildJsonObject { put("role", "user"); put("content", "打断" }, receipt("a"))
+            buildJsonObject { put("role", "user"); put("content", "打断") }, receipt("a"))
         assertEquals(incomplete, reorderInterleavedSystemPromptUpdates(incomplete))
         assertEquals(unrelated, reorderInterleavedSystemPromptUpdates(unrelated))
     }
