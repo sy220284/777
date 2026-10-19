@@ -1,0 +1,33 @@
+name: 恢复 V6 后重建功能索引
+on:
+  push:
+    branches:
+      - refactor/restore-native-v63-remove-ui3-zhaoxi-20261019
+    paths:
+      - .github/workflows/v6-feature-index-refresh.yml
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild-index:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: true
+      - name: 根据实际生产源码完整重建功能索引
+        run: |
+          python3 .github/scripts/sync-feature-tree.py
+          python3 .github/scripts/check-feature-tree-sync.py
+      - name: 写回真实来源索引与功能树
+        run: |
+          git add docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html docs/ACCEPTANCE-MATRIX.json docs/FEATURE-TREE-SOURCE-REGISTRY.json docs/FEATURE-SOURCE-INDEX.auto.json docs/FEATURE-REVIEW.auto.json
+          if git diff --cached --quiet; then
+            echo "功能索引已与现有源码一致"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "基于 V6 原生代码重建功能树和源码索引，移除已退役 UI 入口"
+            git push origin "HEAD:refactor/restore-native-v63-remove-ui3-zhaoxi-20261019"
+          fi
