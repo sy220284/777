@@ -34,6 +34,8 @@ data class UiChartPoint(val label: String, val value: Double)
 
 /** A field's storage policy comes from the authored document contract, not its guessed name. */
 enum class UiFieldRetention { SAVED_STATE, MEMORY_ONLY }
+/** Local, declarative arithmetic: a generated document cannot provide executable code. */
+enum class UiArithmeticOperation { ADD, SUBTRACT, MULTIPLY, DIVIDE }
 
 sealed interface UiDocumentNode {
     val id: String
@@ -55,6 +57,11 @@ sealed interface UiDocumentNode {
         val multiline: Boolean, val retention: UiFieldRetention = UiFieldRetention.SAVED_STATE) : UiDocumentNode
     data class Select(override val id: String, val label: String, val options: List<String>, val initial: String) : UiDocumentNode
     data class Switch(override val id: String, val label: String, val initial: Boolean) : UiDocumentNode
+    data class Slider(override val id: String, val label: String, val minimum: Double,
+        val maximum: Double, val step: Double, val initial: Double) : UiDocumentNode
+    data class Calculated(override val id: String, val label: String, val leftId: String,
+        val rightId: String, val operation: UiArithmeticOperation, val prefix: String,
+        val suffix: String, val decimals: Int) : UiDocumentNode
     data class Button(override val id: String, val label: String, val actionId: String) : UiDocumentNode
     data class Disclosure(override val id: String, val title: String, val children: List<UiDocumentNode>) : UiDocumentNode
 }
@@ -157,6 +164,23 @@ fun UiDocument.validate(
                 if (node.options.isEmpty() || node.options.distinct().size != node.options.size || node.initial !in node.options) problems += "select_options"
             }
             is UiDocumentNode.Switch -> textChars += node.label.length
+            is UiDocumentNode.Slider -> {
+                textChars += node.label.length
+                val intervals = (node.maximum - node.minimum) / node.step
+                if (node.label.isBlank() || !node.minimum.isFinite() || !node.maximum.isFinite() ||
+                    !node.step.isFinite() || !node.initial.isFinite() ||
+                    node.minimum < 0 || node.maximum > 1.0e9 || node.maximum <= node.minimum ||
+                    node.step <= 0 || node.initial !in node.minimum..node.maximum ||
+                    !intervals.isFinite() || intervals < 1 || intervals > 100 ||
+                    kotlin.math.abs(intervals - kotlin.math.round(intervals)) > 1.0e-5)
+                    problems += "slider_range"
+            }
+            is UiDocumentNode.Calculated -> {
+                textChars += node.label.length.toLong() + node.prefix.length + node.suffix.length
+                if (node.label.isBlank() || node.decimals !in 0..4 ||
+                    node.prefix.length > 32 || node.suffix.length > 32)
+                    problems += "calculation_shape"
+            }
             is UiDocumentNode.Button -> {
                 textChars += node.label.length
                 if (node.actionId !in actionById) problems += "button_action"
@@ -164,12 +188,21 @@ fun UiDocument.validate(
         }
     }
     nodes.forEach { walk(it, 1) }
+    nodesById.values.filterIsInstance<UiDocumentNode.Calculated>().forEach { computed ->
+        if (computed.leftId == computed.rightId ||
+            (nodesById[computed.leftId] !is UiDocumentNode.Field &&
+                nodesById[computed.leftId] !is UiDocumentNode.Slider) ||
+            (nodesById[computed.rightId] !is UiDocumentNode.Field &&
+                nodesById[computed.rightId] !is UiDocumentNode.Slider))
+            problems += "calculation_reference"
+    }
     actions.forEach { action ->
         when (action) {
             is UiDocumentAction.SendUserInput -> {
                 textChars += action.text.length
                 if (action.fieldIds.distinct().size != action.fieldIds.size || action.fieldIds.any {
-                    nodesById[it] !is UiDocumentNode.Field && nodesById[it] !is UiDocumentNode.Select && nodesById[it] !is UiDocumentNode.Switch
+                    nodesById[it] !is UiDocumentNode.Field && nodesById[it] !is UiDocumentNode.Select &&
+                    nodesById[it] !is UiDocumentNode.Switch && nodesById[it] !is UiDocumentNode.Slider
                 }) problems += "input_reference"
             }
             is UiDocumentAction.OpenKnownScene -> if (action.sceneId !in knownScenes) problems += "unknown_scene"

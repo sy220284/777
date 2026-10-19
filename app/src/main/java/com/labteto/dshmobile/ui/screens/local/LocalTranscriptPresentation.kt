@@ -61,6 +61,10 @@ internal sealed interface LocalTranscriptItem {
         override val key: String = "work-artifact:${artifact.category}:${artifact.reference}"
     }
 
+    data class WorkNode(val node: LocalWorkProcessNode) : LocalTranscriptItem {
+        override val key: String = "work-node:${node.eventId}"
+    }
+
     data class WorkStep(
         val message: LocalHarnessMessage,
         val repeatCount: Int = 1,
@@ -85,28 +89,9 @@ internal fun buildLocalDisplayTranscript(items: List<LocalTranscriptItem>): List
                 add(item)
                 return@forEach
             }
-            var visibleCount = 0
-            item.messages.forEach { message ->
-                if (message.role !in setOf("tool", "progress", "assistant")) return@forEach
-                if (message.role != "tool" && localWorkTimelineText(message.content) == null) {
-                    return@forEach
-                }
-                val previous = lastOrNull() as? LocalTranscriptItem.WorkStep
-                val samePoll = message.role == "tool" && previous?.message?.role == "tool" &&
-                    message.toolName == previous.message.toolName &&
-                    // Same action name alone is insufficient: parallel jobs may use one API.
-                    message.content == previous.message.content &&
-                    isRepeatedWorkPollingTool(message.toolName) &&
-                    (message.toolIsError ?: localWorkToolFailed(message.content)) ==
-                    (previous.message.toolIsError ?: localWorkToolFailed(previous.message.content))
-                if (samePoll && previous != null) {
-                    set(lastIndex, previous.copy(repeatCount = previous.repeatCount + 1))
-                } else {
-                    add(LocalTranscriptItem.WorkStep(message))
-                    visibleCount++
-                }
-            }
-            if (visibleCount == 0 && item.messages.any { it.role == "reasoning" }) {
+            val nodes = conversationWorkProcessNodes(buildWorkProcessNodes(item.messages))
+            nodes.forEach { add(LocalTranscriptItem.WorkNode(it)) }
+            if (nodes.isEmpty() && item.messages.any { it.role == "reasoning" }) {
                 add(item) // Only a generic thinking indicator; never display reasoning body.
             }
         }
@@ -243,6 +228,7 @@ internal fun mergeLocalMediaTimeline(
         is LocalTranscriptItem.Thinking -> item.messages.first().createdAt
         is LocalTranscriptItem.WorkProcess -> item.messages.first().createdAt
         is LocalTranscriptItem.WorkStep -> item.message.createdAt
+        is LocalTranscriptItem.WorkNode -> item.node.createdAt
         is LocalTranscriptItem.MediaResult ->
             operationTimestamps[item.result.id] ?: item.result.createdAtMillis
         is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis

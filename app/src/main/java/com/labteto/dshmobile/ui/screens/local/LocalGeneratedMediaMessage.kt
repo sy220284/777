@@ -418,7 +418,7 @@ private fun MediaSaveButton(file: File, mime: String) {
 }
 
 @Composable
-private fun MediaInlinePicture(
+internal fun MediaInlinePicture(
     file: File?, remoteUrl: String?, onOpen: (() -> Unit)? = null,
 ) {
     val resources = LocalResources.current
@@ -612,7 +612,7 @@ private fun MediaVideoPoster(file: File?, onPlay: () -> Unit) {
 }
 
 @Composable
-private fun InlineSpeechPlayer(file: File) {
+internal fun InlineSpeechPlayer(file: File) {
     val resources = LocalResources.current
     var playing by remember(file.absolutePath) { mutableStateOf(false) }
     var preparing by remember(file.absolutePath) { mutableStateOf(false) }
@@ -728,7 +728,7 @@ private fun formatMediaDuration(ms: Int): String {
 }
 
 @Composable
-private fun InlineVideoPlayer(url: String?, localFile: File?, onError: (String) -> Unit) {
+internal fun InlineVideoPlayer(url: String?, localFile: File?, onError: (String) -> Unit) {
     val resources = LocalResources.current
     val source = localFile?.takeIf { it.isFile }?.let(Uri::fromFile)
         ?: url?.takeIf(String::isNotBlank)?.let(Uri::parse)

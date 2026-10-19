@@ -72,6 +72,10 @@ internal object LocalUiDocumentCodec {
                 "field", "textarea" -> mapOf("label" to text, "initial" to text, "required" to boolean, "retention" to text)
                 "select" -> mapOf("label" to text, "options" to strings, "initial" to text)
                 "switch" -> mapOf("label" to text, "initial" to boolean)
+                "slider" -> mapOf("label" to text, "minimum" to number, "maximum" to number,
+                    "step" to number, "initial" to number)
+                "calculated" -> mapOf("label" to text, "leftId" to text, "rightId" to text,
+                    "operation" to text, "prefix" to text, "suffix" to text, "decimals" to integer)
                 "button" -> mapOf("label" to text, "actionId" to text)
                 else -> error("unsupported_node:$kind")
             }
@@ -106,6 +110,15 @@ internal object LocalUiDocumentCodec {
                         ?: com.labteto.dshmobile.uicontract.UiFieldRetention.SAVED_STATE)
                 "select" -> UiDocumentNode.Select(id, value.string("label"), value.array("options").map { it.jsonPrimitive.content }, value.string("initial"))
                 "switch" -> UiDocumentNode.Switch(id, value.string("label"), value.bool("initial"))
+                "slider" -> UiDocumentNode.Slider(id, value.string("label"),
+                    value.getValue("minimum").jsonPrimitive.double,
+                    value.getValue("maximum").jsonPrimitive.double,
+                    value.getValue("step").jsonPrimitive.double,
+                    value.getValue("initial").jsonPrimitive.double)
+                "calculated" -> UiDocumentNode.Calculated(id, value.string("label"),
+                    value.string("leftId"), value.string("rightId"),
+                    com.labteto.dshmobile.uicontract.UiArithmeticOperation.valueOf(value.string("operation")),
+                    value.string("prefix"), value.string("suffix"), value.getValue("decimals").jsonPrimitive.int)
                 else -> UiDocumentNode.Button(id, value.string("label"), value.string("actionId"))
             }
         }
@@ -168,6 +181,17 @@ internal object LocalUiDocumentCodec {
                 is UiDocumentNode.Field -> { put("type", if (value.multiline) "textarea" else "field"); put("label", value.label); put("initial", value.initial); put("required", value.required); put("retention", value.retention.name) }
                 is UiDocumentNode.Select -> { put("type", "select"); put("label", value.label); put("options", JsonArray(value.options.map(::JsonPrimitive))); put("initial", value.initial) }
                 is UiDocumentNode.Switch -> { put("type", "switch"); put("label", value.label); put("initial", value.initial) }
+                is UiDocumentNode.Slider -> {
+                    put("type", "slider"); put("label", value.label)
+                    put("minimum", value.minimum); put("maximum", value.maximum)
+                    put("step", value.step); put("initial", value.initial)
+                }
+                is UiDocumentNode.Calculated -> {
+                    put("type", "calculated"); put("label", value.label)
+                    put("leftId", value.leftId); put("rightId", value.rightId)
+                    put("operation", value.operation.name); put("prefix", value.prefix)
+                    put("suffix", value.suffix); put("decimals", value.decimals)
+                }
                 is UiDocumentNode.Button -> { put("type", "button"); put("label", value.label); put("actionId", value.actionId) }
             }
         }

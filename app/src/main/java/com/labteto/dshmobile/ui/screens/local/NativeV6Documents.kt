@@ -11,6 +11,8 @@ internal class NativeV6Documents(
     private val port: UiDocumentUiPort,
     private val conversations: LocalConversationUiPortComposition,
     private val drafts: NativeV6DocumentDraftPort,
+    val forms: UiDocumentFormUiPort,
+    val media: MediaUiPort,
 ) {
     /** The message cards and V6 document drawer share one durable Owner and draft destination. */
     val snapshots = port.snapshots
