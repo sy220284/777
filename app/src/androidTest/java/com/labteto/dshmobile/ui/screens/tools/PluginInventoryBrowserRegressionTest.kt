@@ -238,29 +238,80 @@ class PluginInventoryBrowserRegressionTest {
     }
 
     @Test
-    fun skillCardsKeepDescriptionsBelowTheActionRow() {
+    fun skillCardsKeepDescriptionAndActionInOneCompactRow() {
         compose.setContent {
             DshTheme {
-                PluginInventoryBrowser(
-                    localIds = emptyList(),
-                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
-                        "research-check", "核查改动正确性并追踪异常、复盘及验证修复结果", true,
-                    )),
-                    skillsOnly = true,
-                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
-                    onUseCapability = {},
-                )
+                Box(Modifier.width(320.dp)) {
+                    PluginInventoryBrowser(
+                        localIds = emptyList(),
+                        skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                            "research-check", "核查改动正确性并追踪异常、复盘及验证修复结果", true,
+                        )),
+                        skillsOnly = true,
+                        onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                        onUseCapability = {},
+                    )
+                }
             }
         }
         val title = compose.onNodeWithTag("plugin-inventory-title-skill:research-check", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
         val details = compose.onNodeWithTag("plugin-inventory-detail-skill:research-check", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
+        val action = compose.onNodeWithTag("plugin-inventory-action-skill:research-check", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
         val card = compose.onNodeWithTag("plugin-inventory-card-skill:research-check")
             .getUnclippedBoundsInRoot()
-        assertTrue("Skill title should not be a one-character column", (title.right - title.left) >= 100.dp)
-        assertTrue("Description should use the whole card width", (details.right - details.left) > (title.right - title.left))
-        assertTrue("Skill card should remain compact", (card.bottom - card.top) < 180.dp)
+        assertTrue("Title must remain readable on narrow screens", (title.right - title.left) >= 100.dp)
+        assertTrue("Description stays below title", details.top >= title.bottom)
+        assertTrue("Action must not overlap the description", details.right <= action.left)
+        assertTrue("One-row skill cards must not waste vertical space", (card.bottom - card.top) < 130.dp)
+    }
+
+    @Test
+    fun consecutiveSkillRowsStayDense() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    skills = listOf(
+                        com.labteto.dshmobile.local.presentation.LocalSkillUiEntry("first", "排查问题并验证修复", true),
+                        com.labteto.dshmobile.local.presentation.LocalSkillUiEntry("second", "对代码变更执行审计", true),
+                    ),
+                    skillsOnly = true,
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onUseCapability = {},
+                )
+            }
+        }
+        val first = compose.onNodeWithTag("plugin-inventory-card-skill:first")
+            .getUnclippedBoundsInRoot()
+        val second = compose.onNodeWithTag("plugin-inventory-card-skill:second")
+            .getUnclippedBoundsInRoot()
+        assertTrue("Skill cards must not have giant gaps", (second.top - first.bottom) <= 12.dp)
+    }
+
+    @Test
+    fun skillSearchPrioritizesResultsOverCreationToolsOnNarrowScreens() {
+        compose.setContent {
+            DshTheme {
+                Box(Modifier.width(320.dp)) {
+                    PluginInventoryBrowser(
+                        localIds = emptyList(),
+                        skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                            "research-check", "研究资料并核实来源", true,
+                        )),
+                        skillsOnly = true,
+                        onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                        onImportSkill = {}, onUseCapability = {},
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("skill-import-file").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-search").performTextInput("research")
+        compose.onNodeWithTag("skill-import-file").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-card-skill:research-check").assertIsDisplayed()
     }
 
     @Test

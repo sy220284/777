@@ -1147,6 +1147,8 @@ fun LocalHarnessScreen(
     if (showNativeDocuments && shell.sessionId.isNotBlank()) {
         NativeV6DocumentsSheet(
             port = viewModel.interactiveDocuments,
+            forms = viewModel.documentForms,
+            media = viewModel.nativeDocuments.media,
             identity = viewModel::documentIdentity,
             currentMessageId = viewModel::activeDocumentMessageId,
             workMode = shell.usageMode == LocalUsageMode.WORK,

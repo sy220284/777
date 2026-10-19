@@ -49,9 +49,9 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
             actionIcon = FeatherIcons.RefreshCw, onAction = onRefresh, actionEnabled = !loading,
             actionContentDescription = stringResource(R.string.tools_refresh))
         SySearchField(query, { query = it }, placeholder = stringResource(R.string.tools_catalog_search),
-            modifier = Modifier.padding(horizontal = SyMetric.gapLg))
-        Row(Modifier.fillMaxWidth().padding(SyMetric.gapLg),
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+            modifier = Modifier.padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapSm))
+        Row(Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapSm),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
             SyButton(stringResource(R.string.tools_catalog_title), onPlugins,
                 variant = SyButtonVariant.Ghost, modifier = Modifier.weight(1f))
             SyButton(stringResource(R.string.skills_title), onSkills,
@@ -60,8 +60,9 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
                 variant = SyButtonVariant.Ghost, modifier = Modifier.weight(1f))
         }
         LazyColumn(Modifier.weight(1f),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(SyMetric.gapLg),
-            verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                horizontal = SyMetric.gapSection, vertical = SyMetric.gapMd),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             item {
                 SyGlassCard {
                     Text(stringResource(R.string.fluid_capability_count, entries.size, families.size, connections),
@@ -82,11 +83,13 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
                 val visible = tools.filter { query.isBlank() || it.name.contains(query, true) || family.contains(query, true) }
                 if (visible.isNotEmpty()) {
                     item(key = "heading:$family") {
-                        Text(family, style = DsType.caption11Strong, color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary)
+                        Text(family, modifier = Modifier.padding(top = SyMetric.gapSm),
+                            style = DsType.small13Strong.withReadingWeight(),
+                            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
                     }
                     items(visible, key = { it.name }) { entry ->
                         SySheetChoiceRow(title = entry.name,
-                            modifier = Modifier.heightIn(min = 72.dp),
+                            modifier = Modifier.heightIn(min = 60.dp),
                             icon = com.labteto.dshmobile.ui.components.SyEntryIcons.Tools, onClick = { selected = entry })
                     }
                 }

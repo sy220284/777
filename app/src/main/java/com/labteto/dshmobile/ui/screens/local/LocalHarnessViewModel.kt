@@ -38,6 +38,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** A user/tool row must not become the source of a generated assistant document. */
+internal fun nativeV6SourceAssistantMessageId(
+    messages: List<com.labteto.dshmobile.local.session.LocalHarnessMessage>,
+): String? = messages.lastOrNull { it.role == "assistant" }?.id
+
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
     private val runtime: LocalUiRuntime,
@@ -47,6 +52,8 @@ class LocalHarnessViewModel @Inject constructor(
     private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
     private val teamUi: com.labteto.dshmobile.uicontract.WorkTeamUiPort,
     private val documentFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
+    private val documentMedia: com.labteto.dshmobile.uicontract.MediaUiPort,
+    private val savedStateHandle: androidx.lifecycle.SavedStateHandle,
     private val conversationPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val approvalPreferences: LocalApprovalPreferences,
     private val networkSearchSettings: LocalNetworkSearchSettings,
@@ -93,6 +100,9 @@ class LocalHarnessViewModel @Inject constructor(
     )
 
     private val nativeDocumentDrafts = NativeV6DocumentDraftPort()
+    internal val documentForms = NativeV6DocumentFormState(
+        savedStateHandle.get<ArrayList<String>>("v6_document_forms").orEmpty(),
+    ) { savedStateHandle["v6_document_forms"] = it }
     private val _documentRoute = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
     internal val documentRoute: kotlinx.coroutines.flow.StateFlow<String?> = _documentRoute
     private val documentSceneNames = setOf("route.home", "route.persona_gallery", "route.diary",
@@ -101,9 +111,9 @@ class LocalHarnessViewModel @Inject constructor(
         viewModelScope, nativeDocumentDrafts,
         documentSceneNames.map { com.labteto.dshmobile.uicontract.UiSceneId(it) }.toSet(),
     ) { scene -> _documentRoute.value = scene.value }
-    internal val nativeDocuments = NativeV6Documents(interactiveDocuments, conversationPorts, nativeDocumentDrafts)
+    internal val nativeDocuments = NativeV6Documents(interactiveDocuments, conversationPorts, nativeDocumentDrafts, documentForms, documentMedia)
     internal fun documentIdentity() = conversationPorts.identitySnapshot()
-    internal fun activeDocumentMessageId(): String? = state.value.messages.lastOrNull()?.id
+    internal fun activeDocumentMessageId(): String? = nativeV6SourceAssistantMessageId(state.value.messages)
     internal fun consumeDocumentRoute(route: String) {
         if (_documentRoute.value == route) _documentRoute.value = null
     }

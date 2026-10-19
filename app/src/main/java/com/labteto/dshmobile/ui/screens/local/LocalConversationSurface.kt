@@ -483,6 +483,16 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val transcriptMessages = remember(pagedOlderMessages, state.messages) {
         mergeLocalTranscriptHistory(pagedOlderMessages, state.messages)
     }
+    // Cold historical cards are read-only. They are not part of the live Owner snapshot.
+    var olderDocumentSnapshots by remember(state.sessionId) {
+        mutableStateOf<List<com.labteto.dshmobile.uicontract.UiDocumentSnapshot>>(emptyList())
+    }
+    LaunchedEffect(state.sessionId, pagedOlderMessages, nativeDocuments) {
+        val ids = pagedOlderMessages.filter { it.role == "assistant" ||
+            state.usageMode == LocalUsageMode.WORK && it.role == "user" }.map { it.id }.toSet()
+        olderDocumentSnapshots = if (nativeDocuments == null || ids.isEmpty()) emptyList()
+            else nativeDocuments.olderDocuments(state.sessionId, ids)
+    }
     // Media is a persistent chat/Work timeline projection, not an assistant text message.
     val mediaStudioViewModel: LocalMediaStudioViewModel = hiltViewModel()
     var mediaLimit by rememberSaveable(state.sessionId) { mutableStateOf(com.labteto.dshmobile.local.presentation.LocalMediaCreationRuntime.PAGE_SIZE) }
@@ -1083,13 +1093,21 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 onSelectVariant = onSelectMessageVariant,
                                 onRegenerate = onRegenerate,
                             )
-                            if (nativeDocuments != null && transcriptItem.message.role == "assistant" &&
-                                nativeDocumentSnapshot.sessionId == state.sessionId) {
+                            val isHistoricalDocumentSource = state.messages.none { it.id == transcriptItem.message.id }
+                            val inlineDocuments = nativeV6DocumentsForMessage(
+                                messageId = transcriptItem.message.id,
+                                role = transcriptItem.message.role,
+                                workMode = state.usageMode == LocalUsageMode.WORK,
+                                snapshots = if (isHistoricalDocumentSource) olderDocumentSnapshots
+                                    else nativeDocumentSnapshot.documents,
+                            )
+                            if (nativeDocuments != null &&
+                                (nativeDocumentSnapshot.sessionId == state.sessionId || isHistoricalDocumentSource) &&
+                                (transcriptItem.message.role == "assistant" || inlineDocuments.isNotEmpty())) {
                                 NativeV6DocumentMessage(
                                     messageId = transcriptItem.message.id,
-                                    documents = nativeDocumentSnapshot.documents.filter {
-                                        it.document.source.messageId == transcriptItem.message.id
-                                    },
+                                    documents = inlineDocuments,
+                                    readOnly = isHistoricalDocumentSource,
                                     controller = nativeDocuments,
                                     onPreparedDraft = {
                                         nativeDocuments.consumePreparedDraft(state.sessionId)?.let { prepared ->
@@ -1151,6 +1169,16 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         )
                         is LocalTranscriptItem.Thinking -> ChatThinkingRow(transcriptItem.messages)
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
+                        is LocalTranscriptItem.WorkNode -> Box(
+                            modifier = Modifier.fillMaxWidth().animateItem(),
+                        ) {
+                            WorkContentBlock(
+                                node = transcriptItem.node,
+                                running = state.running && !transcriptItem.node.failed &&
+                                    transcriptItem.node.count == 0 &&
+                                    transcriptItem.key == transcriptItems.lastOrNull()?.key,
+                            )
+                        }
                         is LocalTranscriptItem.WorkStep -> Box(
                             modifier = Modifier.fillMaxWidth().animateItem(
                                 fadeInSpec = tween(durationMillis = com.shenyan.designsystem.foundation.SyMotion.duration(
@@ -1189,6 +1217,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 sessionId = state.sessionId,
                                 streamingState = streamingState,
                                 hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkStep ||
+                                    transcriptItems.lastOrNull() is LocalTranscriptItem.WorkNode ||
                                     transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
                                 lastDurableNarrative = transcriptItems.asReversed().firstNotNullOfOrNull { item ->
                                     when (item) {
