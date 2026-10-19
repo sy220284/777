@@ -2589,7 +2589,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/HostConversationSessionUiPort.kt",
-      "sha256": "04a0fef6a9b5d254"
+      "sha256": "507cd78d9930cef9"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationFeaturePortsOwner.kt",
@@ -3425,7 +3425,7 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedPersona.kt",
-      "sha256": "5ca361ad9f455ea4"
+      "sha256": "6d4f737338939b7f"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedSettings.kt",
@@ -3509,18 +3509,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "dac1f505f9f5",
+  "source_snapshot": "426b0eecee1e",
   "observed_delta": {
-    "baseline": "0202ba83b7ff",
+    "baseline": "ed06f3feb090",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalPersonaPortraitOwner.kt",
-      "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/PersonaPortraitUiPort.kt",
-      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiAutomationScenes.kt",
-      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedMedia.kt",
-      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedPersona.kt",
-      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConversationScenes.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/host/HostConversationSessionUiPort.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

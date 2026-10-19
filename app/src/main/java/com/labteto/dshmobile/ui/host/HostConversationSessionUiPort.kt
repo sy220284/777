@@ -11,12 +11,14 @@ import kotlinx.coroutines.flow.onEach
 /** A new Work must be issued by the Session Owner and match the exact accepted handoff. */
 internal fun matchesAcceptedWorkHandoff(
     command: SessionUiCommand.Create, snapshot: UiSessionsSnapshot, storedSummary: String?,
-): Boolean = !snapshot.loading && snapshot.identity != null &&
-    snapshot.identity.sessionId != command.identity?.sessionId &&
+): Boolean {
+    val identity = snapshot.identity ?: return false
+    return !snapshot.loading && identity.sessionId != command.identity?.sessionId &&
     snapshot.usageMode == com.labteto.dshmobile.local.LocalUsageMode.WORK &&
     snapshot.usageMode == command.usageMode &&
     command.handoffSummary != null && command.handoffSummary == storedSummary &&
     command.handoffAttachments.isNotEmpty()
+}
 
 /** Session owns deletion; Host removes only presentation state for Owner-confirmed IDs. */
 internal class HostConversationSessionUiPort(
