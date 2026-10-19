@@ -103,6 +103,13 @@ internal fun zxPinnedSessionsFirst(
         }.thenBy { it.index }
     ).map { it.value }
 
+/** 空白会话保留在 Session Owner 中，但不占据普通最近历史。 */
+internal fun zxHomeRecentSessions(
+    sessions: List<com.labteto.dshmobile.local.session.LocalSessionSummary>,
+    pinned: Set<String>,
+): List<com.labteto.dshmobile.local.session.LocalSessionSummary> =
+    zxPinnedSessionsFirst(sessions.filterNot { it.blank }, pinned)
+
 /** route.home / shell.new_session — 历史侧栏功能与当前 Owner 一一对应。 */
 @Composable
 fun ZhaoxiHomeScene(
@@ -115,6 +122,7 @@ fun ZhaoxiHomeScene(
         .collectAsState(initial = UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null))
     var commandReceipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     var drawerQuery by rememberSaveable { mutableStateOf("") }
+    var showBlankSessions by rememberSaveable { mutableStateOf(false) }
     var selectedSessionAction by remember { mutableStateOf<String?>(null) }
     var renameSessionId by remember { mutableStateOf<String?>(null) }
     var renameTitle by remember { mutableStateOf("") }
@@ -133,13 +141,16 @@ fun ZhaoxiHomeScene(
     val c = ZhaoxiTheme.colors
     val workMode = snap.usageMode == LocalUsageMode.WORK
     val modeSessions = snap.sessions.filter { it.usageMode == snap.usageMode }
-    val visibleSessions = zxPinnedSessionsFirst(
-        if (drawerQuery.isBlank()) modeSessions else modeSessions.filter { session ->
-            renamedTitles.getOrDefault(session.id, session.title)
-                .contains(drawerQuery.trim(), ignoreCase = true) ||
-                session.summaryPreview.orEmpty().contains(drawerQuery.trim(), ignoreCase = true)
-        }, pinnedIds,
-    )
+    val matchedSessions = if (drawerQuery.isBlank()) modeSessions else modeSessions.filter { session ->
+        renamedTitles.getOrDefault(session.id, session.title)
+            .contains(drawerQuery.trim(), ignoreCase = true) ||
+            session.summaryPreview.orEmpty().contains(drawerQuery.trim(), ignoreCase = true)
+    }
+    val visibleSessions = zxHomeRecentSessions(matchedSessions, pinnedIds)
+    val blankSessions = matchedSessions.filter { it.blank }
+    val blankExpanded = showBlankSessions
+    val shownSessionIds = (visibleSessions + if (blankExpanded) blankSessions else emptyList())
+        .map { it.id }.toSet()
     fun create(mode: LocalUsageMode) {
         val receipt = sessions?.submit(SessionUiCommand.Create(
             snap.identity, LocalConversationMode.INDEPENDENT, mode,
@@ -177,10 +188,6 @@ fun ZhaoxiHomeScene(
                     ) {
                         Text("朝夕", Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
                         ZxIconButton(
-                            onClick = { create(snap.usageMode) },
-                            contentDescription = if (workMode) "新建工作" else "新建会话",
-                        ) { ZxIcon("plus") }
-                        ZxIconButton(
                             onClick = { navigate("shell.search") },
                             contentDescription = "全局搜索",
                         ) { ZxIcon("search") }
@@ -194,57 +201,54 @@ fun ZhaoxiHomeScene(
                     )
                     CommandFeedback(commandReceipt)
                     managementFeedback?.let { ZxFooterNote(it) }
-                    Spacer(Modifier.height(12.dp))
-                    ZxModeSwitch(workMode, onChange = { selectedWork ->
-                        val receipt = sessions?.submit(SessionUiCommand.SelectMode(
-                            if (selectedWork) LocalUsageMode.WORK else LocalUsageMode.CHAT,
-                            openConversation = false,
-                        )) ?: UiCommandReceipt.NotAdmitted
-                        commandReceipt = receipt
-                        bulkIds = emptySet()
-                        bulkMode = false
-                    })
-                    Spacer(Modifier.height(14.dp))
-                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ZxChip(if (bulkMode) "完成多选" else "管理多选", bulkMode) {
-                            bulkMode = !bulkMode
-                            bulkIds = emptySet()
-                        }
-                        if (bulkMode) {
-                            val shownIds = visibleSessions.map { it.id }.toSet()
-                            val checked = bulkIds.intersect(shownIds)
-                            ZxChip("全选本页", shownIds.isNotEmpty() && checked.size == shownIds.size) {
-                                bulkIds = if (checked.size == shownIds.size) bulkIds - shownIds
-                                    else bulkIds + shownIds
-                            }
-                            ZxChip("删除 ${checked.size} 项", false) {
-                                if (checked.isNotEmpty() && !deleting) confirmBulkDelete = true
-                            }
-                        }
-                    }
+                    Spacer(Modifier.height(8.dp))
                     LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         item {
-                            Text("快捷操作", fontSize = 11.sp, color = c.ink2, fontWeight = FontWeight.SemiBold,
+                            Text("功能", fontSize = 11.sp, color = c.ink2, fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
                         }
-                        if (workMode) {
-                            item { ZxHomeDrawerEntry("files", "工作区文件", onClick = { navigate("route.workspace") }) }
-                            item { ZxHomeDrawerEntry("tasks", "定时任务", onClick = { navigate("route.tasks") }) }
-                            item { ZxHomeDrawerEntry("tools", "工具", onClick = { navigate("route.tools") }) }
-                        } else {
-                            item { ZxHomeDrawerEntry("people", "人物图集", onClick = { navigate("route.persona_gallery") }) }
-                            item { ZxHomeDrawerEntry("diary", "日记", onClick = { navigate("route.diary") }) }
-                            item { ZxHomeDrawerEntry("tasks", "聊天任务", onClick = { navigate("route.tasks") }) }
+                        item {
+                            FlowRow(
+                                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                ZxChip("人物图集", false) { navigate("route.persona_gallery") }
+                                ZxChip("日记", false) { navigate("route.diary") }
+                                ZxChip("任务", false) { navigate("route.tasks") }
+                                ZxChip("工作区文件", false) { navigate("route.workspace") }
+                                ZxChip("工具", false) { navigate("route.tools") }
+                            }
                         }
                         item {
-                            Spacer(Modifier.height(10.dp))
-                            Text(if (workMode) "工作历史" else "聊天历史", fontSize = 11.sp, color = c.ink2, fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                            Spacer(Modifier.height(8.dp))
+                            Text(if (workMode) "工作历史" else "聊天历史", fontSize = 11.sp,
+                                color = c.ink2, fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
                         }
-                        if (visibleSessions.isEmpty()) {
+                        item {
+                            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ZxChip(if (bulkMode) "完成多选" else "管理多选", bulkMode) {
+                                    bulkMode = !bulkMode
+                                    bulkIds = emptySet()
+                                }
+                                if (bulkMode) {
+                                    val checked = bulkIds.intersect(shownSessionIds)
+                                    ZxChip("全选当前", shownSessionIds.isNotEmpty() && checked.size == shownSessionIds.size) {
+                                        bulkIds = if (checked.size == shownSessionIds.size) bulkIds - shownSessionIds
+                                            else bulkIds + shownSessionIds
+                                    }
+                                    ZxChip("删除 ${checked.size} 项", false) {
+                                        if (checked.isNotEmpty() && !deleting) confirmBulkDelete = true
+                                    }
+                                }
+                            }
+                        }
+                        if (visibleSessions.isEmpty() && blankSessions.isEmpty()) {
                             item {
                                 Text(
-                                    if (drawerQuery.isBlank()) (if (workMode) "暂无工作会话，可点击顶部新建" else "暂无聊天会话，可点击顶部新建")
+                                    if (drawerQuery.isBlank()) (if (workMode) "暂无工作历史，可返回首页新建" else "暂无聊天历史，可返回首页新建")
                                     else "没有匹配的会话",
                                     fontSize = 12.sp, color = c.ink2, modifier = Modifier.padding(12.dp),
                                 )
@@ -254,6 +258,40 @@ fun ZhaoxiHomeScene(
                                     ZxButton("清除筛选", { drawerQuery = "" },
                                         modifier = Modifier.fillMaxWidth(),
                                         variant = ZxButtonVariant.Outline)
+                                }
+                            }
+                        }
+                        if (blankSessions.isNotEmpty()) {
+                            item {
+                                ZxHomeDrawerEntry(
+                                    "file", "未开始的会话（${blankSessions.size}）",
+                                    detail = "可能包含未发送草稿 · 点击${if (blankExpanded) "收起" else "展开"}",
+                                    testTag = "zhaoxi.drawer.blank_toggle",
+                                    onClick = {
+                                        showBlankSessions = !showBlankSessions
+                                        bulkIds = emptySet()
+                                    },
+                                )
+                            }
+                            if (blankExpanded) {
+                                items(blankSessions, key = { it.id }) { session ->
+                                    ZxHomeDrawerEntry(
+                                        "diary", (if (bulkMode) {
+                                            if (session.id in bulkIds) "☑ " else "☐ "
+                                        } else "") + (renamedTitles[session.id] ?: session.title).take(40),
+                                        detail = "未开始 · 可继续编辑",
+                                        selected = if (bulkMode) session.id in bulkIds
+                                            else snap.identity?.sessionId == session.id,
+                                        testTag = "zhaoxi.drawer.reopen_blank.${session.id}",
+                                        onClick = {
+                                            if (bulkMode) bulkIds = if (session.id in bulkIds) bulkIds - session.id
+                                                else bulkIds + session.id
+                                            else openSession(session.id)
+                                        },
+                                        onLongClick = if (bulkMode || conversationShell == null) null else {
+                                            { selectedSessionAction = session.id }
+                                        },
+                                    )
                                 }
                             }
                         }
@@ -298,12 +336,12 @@ fun ZhaoxiHomeScene(
             },
         ) {
             CommandFeedback(commandReceipt)
-            Spacer(Modifier.height(28.dp))
-            Text(if (workMode) "开始一项工作" else "开启一段对话",
+            Spacer(Modifier.height(20.dp))
+            Text(if (workMode) "开始一项工作" else "今天想聊点什么？",
                 fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
             Spacer(Modifier.height(8.dp))
             Text(
-                if (workMode) "描述目标，朝夕会带着上下文继续执行。" else "选择一段会话继续，或从这里开始新的聊天。",
+                if (workMode) "描述你的目标，剩下的交给朝夕。" else "开启新对话，或者继续上次的话题。",
                 fontSize = 13.sp, color = c.ink2, lineHeight = 20.sp,
             )
             Spacer(Modifier.height(24.dp))
@@ -311,55 +349,30 @@ fun ZhaoxiHomeScene(
                 icon = if (workMode) "tasks" else "plus",
                 title = if (workMode) "新工作" else "新会话",
                 detail = if (workMode) "创建新的工作会话" else "开始新的聊天会话",
-                prominent = true,
                 tag = if (workMode) "zhaoxi.home.create_work" else "zhaoxi.home.create_chat",
             ) { create(if (workMode) LocalUsageMode.WORK else LocalUsageMode.CHAT) }
-            Spacer(Modifier.height(10.dp))
-            ZxHomeAction(
-                icon = if (workMode) "plus" else "tasks",
-                title = if (workMode) "新会话" else "新工作",
-                detail = if (workMode) "创建普通聊天会话" else "开始一项新任务",
-                prominent = false,
-                tag = if (workMode) "zhaoxi.home.create_chat" else "zhaoxi.home.create_work",
-            ) { create(if (workMode) LocalUsageMode.CHAT else LocalUsageMode.WORK) }
-            Spacer(Modifier.height(30.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("最近会话", Modifier.weight(1f), fontSize = 15.sp,
+            val recent = zxHomeRecentSessions(modeSessions, pinnedIds).take(5)
+            if (recent.isNotEmpty()) {
+                Spacer(Modifier.height(28.dp))
+                Text(if (workMode) "最近工作" else "最近聊天", fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold, color = c.ink)
-                ZxIconButton(
-                    onClick = { drawerScope.launch { drawerState.open() } },
-                    contentDescription = "查看全部会话",
-                ) { ZxIcon("menu") }
-            }
-            Spacer(Modifier.height(8.dp))
-            if (modeSessions.isEmpty() && !snap.loading) {
-                ZxEmpty("还没有会话", "点击「新会话」开始")
-            }
-            zxPinnedSessionsFirst(modeSessions, pinnedIds).take(6).forEach { session ->
-                ZxHomeDrawerEntry(
-                    icon = "diary",
-                    title = (renamedTitles[session.id] ?: session.title).take(40),
-                    detail = session.summaryPreview.orEmpty().take(56),
-                    selected = snap.identity?.sessionId == session.id,
-                    testTag = "zhaoxi.home.reopen_session.${session.id}",
-                    onClick = { openSession(session.id) },
-                )
-            }
-            Spacer(Modifier.height(24.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ZxHomeShortcut("people", "人物") { navigate("route.persona_gallery") }
-                ZxHomeShortcut("files", "文件") { navigate("route.workspace") }
-            }
-            Spacer(Modifier.height(8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ZxHomeShortcut("tools", "工具") { navigate("route.tools") }
-                ZxHomeShortcut("settings", "设置") { navigate("route.settings") }
+                Spacer(Modifier.height(8.dp))
+                recent.forEach { session ->
+                    ZxHomeDrawerEntry(
+                        icon = "diary",
+                        title = (renamedTitles[session.id] ?: session.title).take(40),
+                        detail = session.summaryPreview.orEmpty().take(56),
+                        selected = snap.identity?.sessionId == session.id,
+                        testTag = "zhaoxi.home.reopen_session.${session.id}",
+                        onClick = { openSession(session.id) },
+                    )
+                }
             }
             Spacer(Modifier.height(24.dp))
         }
     }
     if (confirmBulkDelete) {
-        val validIds = bulkIds.intersect(visibleSessions.map { it.id }.toSet())
+        val validIds = bulkIds.intersect(shownSessionIds)
         ZxDialog("批量删除 ${validIds.size} 条会话？",
             "所选聊天或工作会话及历史将永久删除，不能恢复。取消不会产生任何更改。",
             "确认删除", {
@@ -525,7 +538,6 @@ private fun ZxHomeAction(
     icon: String,
     title: String,
     detail: String,
-    prominent: Boolean,
     tag: String,
     onClick: () -> Unit,
 ) {
@@ -533,7 +545,7 @@ private fun ZxHomeAction(
     val interaction = remember { MutableInteractionSource() }
     Row(
         Modifier.fillMaxWidth().zxPressSurface(interaction).clip(RoundedCornerShape(20.dp))
-            .background(if (prominent) c.tint else c.glass)
+            .background(c.tint)
             .clickable(role = Role.Button, onClick = onClick,
                 interactionSource = interaction,
                 indication = androidx.compose.foundation.LocalIndication.current)
@@ -549,29 +561,6 @@ private fun ZxHomeAction(
             Text(detail, fontSize = 12.sp, color = c.ink2)
         }
         ZxIcon("chevron-right")
-    }
-}
-
-@Composable
-private fun androidx.compose.foundation.layout.RowScope.ZxHomeShortcut(
-    icon: String,
-    title: String,
-    onClick: () -> Unit,
-) {
-    val c = ZhaoxiTheme.colors
-    val interaction = remember { MutableInteractionSource() }
-    Column(
-        Modifier.weight(1f).zxPressSurface(interaction).clip(RoundedCornerShape(14.dp))
-            .background(c.glass)
-            .clickable(role = Role.Button, onClick = onClick,
-                interactionSource = interaction,
-                indication = androidx.compose.foundation.LocalIndication.current)
-            .heightIn(min = 72.dp).padding(vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        ZxIcon(icon)
-        Text(title, fontSize = 11.sp, color = c.ink)
     }
 }
 
