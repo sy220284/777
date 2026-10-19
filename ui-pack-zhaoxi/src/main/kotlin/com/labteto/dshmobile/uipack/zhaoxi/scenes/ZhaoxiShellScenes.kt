@@ -654,8 +654,8 @@ fun ZhaoxiSearchScene(
         value = files?.let { runCatching { it.workspaceFiles() } }
     }
     val sessionResults = if (needle.isEmpty()) emptyList() else snapshot.sessions.filter {
-        it.title.contains(needle, ignoreCase = true) ||
-            it.summaryPreview.orEmpty().contains(needle, ignoreCase = true)
+        !it.blank && (it.title.contains(needle, ignoreCase = true) ||
+            it.summaryPreview.orEmpty().contains(needle, ignoreCase = true))
     }.take(30)
     val personaResults = if (needle.isEmpty()) emptyList() else
         (galleryRead as? com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt.Available)
