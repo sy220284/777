@@ -21,8 +21,8 @@ class LocalMiniMaxCompatibilityTest {
             for (path in listOf("/v1", "/anthropic/v1")) {
                 val base = "https://$host$path"
                 assertEquals(1_000_000, LocalModelPresets.find("MiniMax-M3", base)?.contextWindowTokens)
-                assertEquals(true, LocalModelPresets.documentedImageInputSupport("MiniMax-M3.1-Flash", base))
                 assertEquals(1_000_000, LocalModelPresets.find("MiniMax-M3.1-Flash", base)?.contextWindowTokens)
+                assertEquals(true, LocalModelPresets.documentedImageInputSupport("MiniMax-M3.1-Flash", base))
                 assertEquals(204_800, LocalModelPresets.find("MiniMax-M2.5", base)?.contextWindowTokens)
                 assertEquals(false, LocalModelPresets.documentedImageInputSupport("MiniMax-M2.7", base))
                 assertEquals(10_000_000L, LocalModelPresets.maxNativeImageBytesFor("MiniMax-M3", base))
@@ -48,10 +48,10 @@ class LocalMiniMaxCompatibilityTest {
         val preview = LocalReasoningRequestPolicy.resolve(profile.copy(model = "MiniMax-M3.1-Flash-Preview"))!!
         assertEquals("low", preview.disabledEffort)
         assertEquals("max", preview.maxEffort)
-        assertEquals("max", stable.maxEffort)
-        assertEquals("high", stable.enabledEffort)
-        assertEquals("low", stable.disabledEffort)
         val stable = LocalReasoningRequestPolicy.resolve(profile.copy(model = "MiniMax-M3.1-Flash"))!!
+        assertEquals("low", stable.disabledEffort)
+        assertEquals("high", stable.enabledEffort)
+        assertEquals("max", stable.maxEffort)
     }
 
     @Test fun anthropicWritesNativeThinkingAndEffortOnlyForSupportedModel() {
@@ -64,40 +64,40 @@ class LocalMiniMaxCompatibilityTest {
         assertEquals("max", payload("MiniMax-M3.1-Flash-Preview", "max")["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
         assertEquals("adaptive", payload("MiniMax-M3.1-Flash-Preview", "max")["thinking"]!!.jsonObject["type"]!!.jsonPrimitive.content)
         assertThrows(IllegalArgumentException::class.java) { payload("MiniMax-M3.1-Flash-Preview", "none") }
-        assertEquals("完成", reply.content)
-        assertFalse(captured!!.containsKey("reasoning_split"))
-        assertFalse(captured!!.containsKey("thinking"))
-        assertEquals("low", captured!!["reasoning_effort"]!!.jsonPrimitive.content)
-        assertEquals("MiniMax-M3.1-Flash", captured!!["model"]!!.jsonPrimitive.content)
-        )
-            reasoningEffort = "low",
-            tools = JsonArray(emptyList()),
-            messages = emptyList(),
-            baseUrl = "https://api.minimaxi.com/v1",
-            model = "MiniMax-M3.1-Flash",
-            apiKey = "test",
-        val reply = DeepSeekClient(http, json).complete(
-        }.build()
-                .message("OK").body(result.toResponseBody("application/json".toMediaType())).build()
-            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200)
-            val result = """{"choices":[{"message":{"role":"assistant","content":"完成"},"finish_reason":"stop"}]}"""
-            ).jsonObject
-                Buffer().also { chain.request().body!!.writeTo(it) }.readUtf8(),
-            captured = json.parseToJsonElement(
-        val http = OkHttpClient.Builder().addInterceptor { chain ->
-        var captured: JsonObject? = null
-    @Test fun stableM31OpenAiRequestUsesDocumentedNativeEffortWithoutLegacySwitch() = runBlocking {
-
-    }
-        assertFalse(nativeOpenAi.containsKey("thinking"))
-        assertEquals("low", nativeOpenAi["reasoning_effort"]!!.jsonPrimitive.content)
-        }
-            LocalMiniMaxPolicy.writeThinking(this, "MiniMax-M3.1-Flash", "low", anthropic = false)
-        val nativeOpenAi = buildJsonObject {
-        assertThrows(IllegalArgumentException::class.java) { payload("MiniMax-M3.1-Flash", "none") }
-        assertFalse(latest.containsKey("thinking"))
-        assertEquals("high", latest["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
         val latest = payload("MiniMax-M3.1-Flash", "high")
+        assertEquals("high", latest["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+        assertFalse(latest.containsKey("thinking"))
+        assertThrows(IllegalArgumentException::class.java) { payload("MiniMax-M3.1-Flash", "none") }
+        val nativeOpenAi = buildJsonObject {
+            LocalMiniMaxPolicy.writeThinking(this, "MiniMax-M3.1-Flash", "low", anthropic = false)
+        }
+        assertEquals("low", nativeOpenAi["reasoning_effort"]!!.jsonPrimitive.content)
+        assertFalse(nativeOpenAi.containsKey("thinking"))
+    }
+
+    @Test fun stableM31OpenAiRequestUsesDocumentedNativeEffortWithoutLegacySwitch() = runBlocking {
+        var captured: JsonObject? = null
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            captured = json.parseToJsonElement(
+                Buffer().also { chain.request().body!!.writeTo(it) }.readUtf8(),
+            ).jsonObject
+            val result = """{"choices":[{"message":{"role":"assistant","content":"完成"},"finish_reason":"stop"}]}"""
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200)
+                .message("OK").body(result.toResponseBody("application/json".toMediaType())).build()
+        }.build()
+        val reply = DeepSeekClient(http, json).complete(
+            apiKey = "test",
+            model = "MiniMax-M3.1-Flash",
+            baseUrl = "https://api.minimaxi.com/v1",
+            messages = emptyList(),
+            tools = JsonArray(emptyList()),
+            reasoningEffort = "low",
+        )
+        assertEquals("MiniMax-M3.1-Flash", captured!!["model"]!!.jsonPrimitive.content)
+        assertEquals("low", captured!!["reasoning_effort"]!!.jsonPrimitive.content)
+        assertFalse(captured!!.containsKey("thinking"))
+        assertFalse(captured!!.containsKey("reasoning_split"))
+        assertEquals("完成", reply.content)
     }
 
     @Test fun streamingThinkingDetailsSurviveToolHistoryOnlyOnSameRoute() = runBlocking {

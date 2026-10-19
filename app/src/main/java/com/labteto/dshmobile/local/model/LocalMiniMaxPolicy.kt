@@ -17,10 +17,10 @@ internal object LocalMiniMaxPolicy {
             setOf("api.minimaxi.com", "api.minimax.cn", "api.minimax.io")
     }.getOrDefault(false)
 
-
-        !model.equals("MiniMax-M3.1-Flash", ignoreCase = true)
-    fun needsLegacyReasoningSplit(model: String): Boolean =
     /** M3.1 already separates reasoning_content natively; older models use the legacy flag. */
+    fun needsLegacyReasoningSplit(model: String): Boolean =
+        !model.equals("MiniMax-M3.1-Flash", ignoreCase = true)
+
     /** Authentication is rejected by the provider; this is not proof that the header was omitted. */
     fun authenticationFailureHint(): String =
         "MiniMax 鉴权失败（HTTP 401）：服务端拒绝当前 API 密钥。请确认密钥由当前接口对应的官方开放平台签发、仍有效且具有模型调用权限；请勿混用其他产品或套餐凭据。"
@@ -34,8 +34,8 @@ internal object LocalMiniMaxPolicy {
 
     fun selection(model: String): LocalReasoningSelection? = when (model.lowercase()) {
         "minimax-m3" -> LocalReasoningSelection("high", "none")
-            LocalReasoningSelection("high", "low", maxEffort = "max")
         "minimax-m3.1-flash", "minimax-m3.1-flash-preview" ->
+            LocalReasoningSelection("high", "low", maxEffort = "max")
         else -> null // M2.x always thinks; an off switch would be misleading.
     }
 
@@ -49,11 +49,11 @@ internal object LocalMiniMaxPolicy {
                 require(effort in setOf("low", "medium", "high", "xhigh", "max")) {
                     "MiniMax M3.1 必须保留思考，请选择基础思考或更高档位"
                 }
-                }
-                    builder.put("thinking", buildJsonObject { put("type", "adaptive") })
-                if (model.equals("MiniMax-M3.1-Flash-Preview", ignoreCase = true)) {
-                // transport's explicit adaptive flag unchanged for compatibility.
                 // The stable release controls depth directly. Keep the already-saved Preview
+                // transport's explicit adaptive flag unchanged for compatibility.
+                if (model.equals("MiniMax-M3.1-Flash-Preview", ignoreCase = true)) {
+                    builder.put("thinking", buildJsonObject { put("type", "adaptive") })
+                }
                 if (anthropic) builder.put("output_config", buildJsonObject { put("effort", effort) })
                 else builder.put("reasoning_effort", effort)
             }
