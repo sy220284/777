@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.local.chat.ChatDiaryStore
-import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.LocalChatSessionLifecyclePlanner
 import com.labteto.dshmobile.local.chat.LocalChatSessionModeRoute
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
@@ -50,20 +49,6 @@ internal fun localDeletedCurrentSessionMode(
     deletedIds: Set<String>,
     usageMode: LocalUsageMode,
 ): LocalUsageMode? = usageMode.takeIf { currentSessionId in deletedIds }
-
-/** A mode tab chooses an empty landing session, not a historical conversation. */
-internal fun localModeLandingSession(
-    mode: LocalUsageMode,
-    sessions: List<LocalSessionSummary>,
-): LocalSessionSummary? = sessions.firstOrNull { session ->
-    session.usageMode == mode && session.blank &&
-        if (mode == LocalUsageMode.CHAT) {
-            session.chatMode == LocalChatMode.SINGLE.name && session.groupMemberCount == 0
-        } else {
-            // Work project sessions must never masquerade as the generic Work landing.
-            session.projectId == null
-        }
-}
 
 internal class LocalSessionLifecycleCoordinator(
     private val scope: CoroutineScope,
@@ -308,11 +293,8 @@ internal class LocalSessionLifecycleCoordinator(
                     stored.transcriptIndex.totalMessageCount == 0L &&
                     stored.transcriptWindow.isEmpty())
             }
-        val target = localModeLandingSession(mode, snapshot.sessions)
         return if (pendingId != null) {
             startSessionSwitch(pendingId)
-        } else if (target != null) {
-            startSessionSwitch(target.id)
         } else {
             createSession(
                 mode = LocalConversationMode.INDEPENDENT,
