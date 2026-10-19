@@ -71,6 +71,27 @@ class LocalChatPostTurnCommitTest {
         } finally { log.close() }
     }
 
+    @Test fun groupDiaryProjectionRecoversAfterFailedWriteWithoutRecreatingModelResult() {
+        val log = log()
+        val store = store()
+        try {
+            val groupRequest = diary().copy(
+                sourceMode = ChatDiarySourceMode.GROUP,
+                projectionId = "s:group:gallery:a:1:42",
+            )
+            // The group Owner has already committed the source recipe but the diary write died.
+            log.append("group/diary-projection", buildJsonObject {
+                put("request", json.encodeToJsonElement(ChatDiaryWriteRequest.serializer(), groupRequest))
+            })
+            assertTrue(store.listActive("gallery:a").isEmpty())
+            recoverChatPostTurnProjections(log, store)
+            recoverChatPostTurnProjections(log, store)
+            val entries = store.listActive("gallery:a")
+            assertEquals(1, entries.size)
+            assertEquals(1, entries.single().revisions.size)
+        } finally { log.close() }
+    }
+
     @Test fun emptyRecipeTailAdvancesMarkerWithoutRepeatedWrites() {
         val log = log()
         try {
