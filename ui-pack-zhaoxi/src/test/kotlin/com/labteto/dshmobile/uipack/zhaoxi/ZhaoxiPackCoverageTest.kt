@@ -5,6 +5,8 @@ import com.labteto.dshmobile.uicontract.UiSceneId
 import org.junit.Test
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
+import com.labteto.dshmobile.uicontract.UiCapabilityId
 
 /**
  * 朝夕包结构一致性回归（E8.14 实装）。
@@ -25,6 +27,13 @@ class ZhaoxiPackCoverageTest {
     fun fullInventoryMatchesMergedCatalog() {
         assertEquals("朝夕 75 场景目标清单与 LocalUiSceneCatalog 非 hostProvided 全集不一致", 75, ZhaoxiUiPackManifest.fullSceneIds.size)
         assertEquals("朝夕 36 能力目标清单与 LocalUiConnectedCapabilities 投影不一致", 36, ZhaoxiUiPackManifest.fullCapabilityIds.size)
+    }
+
+    /** The user explicitly retired the separate Work evidence screen and capability. */
+    @Test
+    fun retiredWorkEvidenceFeatureCannotReappear() {
+        assertFalse(ZhaoxiUiPackManifest.fullSceneIds.contains(UiSceneId("work.requirement_evidence")))
+        assertFalse(ZhaoxiUiPackManifest.fullCapabilityIds.contains(UiCapabilityId("work.evidence_reference")))
     }
 
     @Test
