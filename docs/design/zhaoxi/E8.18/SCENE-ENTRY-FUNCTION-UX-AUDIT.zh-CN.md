@@ -6,7 +6,7 @@
 ## 1. 全场景入口覆盖
 
 - `ZhaoxiUiPackManifest.fullSceneIds` 包含 **75 个非宿主 Scene**，`ZhaoxiApplicationScenePack.RenderScene` 对每个 ID 都存在静态分支；这只证明分发完整，**不代表业务运行和所有按钮已验收**。
-- `ZhaoxiUiPackManifest.fullCapabilityIds` 共 **37 个能力 ID**；运行时按真实注入端口裁剪，**不能把常量声明视为成功连接**。
+- `ZhaoxiUiPackManifest.fullCapabilityIds` 共 **36 个能力 ID**；运行时按真实注入端口裁剪，**不能把常量声明视为成功连接**。
 - `conversation.attachments`、`shell.notifications`、`system.permissions` 属于 Host 负责的 3 个系统场景，不应在 UI Pack 再渲染一份。
 - 扫描应用场景分发与主要 scenes 文件内的显式 `UiSceneId("...")` 后，未发现指向 fullSceneIds 外部的字符串导航目标。动态菜单、宿主提案以及运行时动作仍须设备验证。
 - 七个顶级路由：`route.home`、`route.persona_gallery`、`route.diary`、`route.workspace`、`route.tasks`、`route.tools`、`route.settings`；四类能力共用外壳时允许别名，但**独立设计目的地不得复用同屏空态充数**。
@@ -57,7 +57,7 @@
 
 ## 4. 文案清理原则与已改项
 
-已移除测试演示入口、硬编码旧版号、API/Owner/route 术语和常见 `toString()` 文本泄漏，覆盖诊断、工作证据、媒体、设置、自动化、记忆、文件与人物空态；只保留有用户决策价值的费用、系统授权、历史用量偏差和失败说明。不得移除真正的错误回执或危险操作提示。
+已移除测试演示入口、硬编码旧版号、API/Owner/route 术语和常见 `toString()` 文本泄漏，覆盖诊断、工作计划、媒体、设置、自动化、记忆、文件与人物空态；只保留有用户决策价值的费用、系统授权、历史用量偏差和失败说明。不得移除真正的错误回执或危险操作提示。
 
 ## 5. 验收硬门槛和遗留项
 
