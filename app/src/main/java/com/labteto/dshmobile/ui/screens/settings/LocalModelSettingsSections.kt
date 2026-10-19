@@ -410,7 +410,9 @@ internal fun LocalModelSettingsCard(
                             Row(Modifier.fillMaxWidth().padding(SyMetric.gapSection),
                                 verticalAlignment = Alignment.CenterVertically) {
                                 Text(if (custom) model.ifBlank { stringResource(R.string.local_model_custom) }
-                                    else selectedPreset?.let { "${it.provider} · ${it.model}" } ?: model,
+                                    else LocalModelPresets.entries.firstOrNull {
+                                        it.model == model && it.baseUrl == baseUrl
+                                    }?.let { "${it.provider} · ${it.model}" } ?: model,
                                     style = DsType.std14Strong.withReadingWeight(), color = colors.text,
                                     modifier = Modifier.weight(1f))
                                 Icon(FeatherIcons.ChevronRight, contentDescription = null)
