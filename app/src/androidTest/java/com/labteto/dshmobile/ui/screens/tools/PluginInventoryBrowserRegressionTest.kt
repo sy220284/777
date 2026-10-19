@@ -14,7 +14,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
-import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
+import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot as McpServerSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
