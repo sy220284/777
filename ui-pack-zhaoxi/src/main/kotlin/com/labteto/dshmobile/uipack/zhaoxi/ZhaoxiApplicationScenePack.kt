@@ -107,7 +107,7 @@ class ZhaoxiApplicationScenePack(
         setOf(UiSceneId("settings.session"), UiSceneId("settings.chat"))
 
     private val conversationScenes = if (conversations == null) emptySet() else
-        setOf("route.home", "conversation.chat", "conversation.work",
+        setOf("conversation.chat", "conversation.work",
             "conversation.header", "conversation.timeline", "conversation.composer",
             "conversation.reply_status", "work.approval", "work.question").map(::UiSceneId).toSet()
 
@@ -177,9 +177,16 @@ class ZhaoxiApplicationScenePack(
         setOf("route.tasks", "automation.tasks", "automation.editor",
             "automation.persona_interaction").map(::UiSceneId).toSet() else emptySet()
 
-    private val secondaryShell = if (secondary?.sessions != null)
-        setOf("shell.new_session", "shell.onboarding", "shell.empty").map(::UiSceneId).toSet()
-        else emptySet()
+    private val secondaryShell = buildSet {
+        if (secondary?.sessions != null) {
+            add(UiSceneId("shell.onboarding"))
+            add(UiSceneId("shell.empty"))
+            if (conversations != null) {
+                add(UiSceneId("route.home"))
+                add(UiSceneId("shell.new_session"))
+            }
+        }
+    }
 
     private val secondarySearch = if (secondary?.sessions != null && secondary.transcript != null)
         setOf(UiSceneId("shell.search")) else emptySet()
