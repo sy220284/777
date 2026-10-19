@@ -292,7 +292,7 @@ class ZhaoxiAcceptanceAndroidTest {
     @Test fun appearancePersistsExactStandardScaleAndExposesSelection() {
         val ports = ready()
         compose.enableAccessibilityChecks()
-        compose.onNodeWithText("设置").performClick()
+        compose.onNodeWithText("设置", useUnmergedTree = true).performClick()
         compose.onNodeWithText("外观", useUnmergedTree = true).performScrollTo().performClick()
         compose.onNodeWithText("大").performScrollTo().performClick()
         compose.onNodeWithText("大").assertIsSelected()
@@ -318,7 +318,7 @@ class ZhaoxiAcceptanceAndroidTest {
 
     @Test fun localModelFormSavesWithoutNetworkAndKeepsFieldLabels() {
         val ports = ready()
-        compose.onNodeWithText("设置").performClick()
+        compose.onNodeWithText("设置", useUnmergedTree = true).performClick()
         compose.onNodeWithText("模型", useUnmergedTree = true).performScrollTo().performClick()
         compose.onNodeWithContentDescription("模型名称").performTextInput("acceptance-local-model")
         compose.onNodeWithContentDescription("模型名称").assertExists()
@@ -332,7 +332,7 @@ class ZhaoxiAcceptanceAndroidTest {
 
     @Test fun switchSemanticsExposeRealStateAndToggleOwner() {
         val ports = ready()
-        compose.onNodeWithText("设置").performClick()
+        compose.onNodeWithText("设置", useUnmergedTree = true).performClick()
         compose.onNodeWithText("记忆").performClick()
         compose.onNodeWithText("记忆设置").performClick()
         val old = runBlocking { ports.settingsUiPort.state.first { !it.loading }.autoMemory }
