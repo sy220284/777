@@ -22,7 +22,7 @@ import com.labteto.dshmobile.uicontract.UiSceneId
  */
 object ZhaoxiUiPackManifest {
 
-    /** 朝夕完整形态需要覆盖的 76 个非 hostProvided 场景（与目录逐项 diff 为空）。 */
+    /** 朝夕完整形态需要覆盖的 75 个非 hostProvided 场景（与目录逐项 diff 为空）。 */
     val fullSceneIds: Set<UiSceneId> = setOf(
         // 会话域
         "conversation.chat", "conversation.work", "conversation.header",
@@ -37,7 +37,7 @@ object ZhaoxiUiPackManifest {
         "chat.gallery_delete", "chat.gallery_portrait", "chat.diary",
         // 工作域
         "work.approval", "work.steering_choice", "work.question",
-        "work.plan_review", "work.requirement_evidence", "work.team",
+        "work.plan_review", "work.team",
         "work.capabilities", "workspace.preview",
         // 自动化
         "automation.tasks", "automation.editor", "automation.persona_interaction",
@@ -58,7 +58,7 @@ object ZhaoxiUiPackManifest {
         "route.tasks", "route.tools", "route.settings",
     ).map(::UiSceneId).toSet()
 
-    /** 宿主连接投影的全量能力清单（37 项）；实际声明按注入端口取子集。 */
+    /** 宿主连接投影的全量能力清单（36 项）；实际声明按注入端口取子集。 */
     val fullCapabilityIds: Set<UiCapabilityId> = setOf(
         // 会话主链路（chat/work + drafts 已连接）
         "chat.send_text", "chat.edit", "chat.regenerate", "chat.select_variant", "chat.stop",
@@ -68,9 +68,9 @@ object ZhaoxiUiPackManifest {
         "ui_document.generate", "ui_document.generate_local", "ui_document.prepare_input",
         // 附件与历史
         "attachment.import", "session.transcript_read",
-        // 群聊 / 团队 / 计划 / 证据
+        // 群聊 / 团队 / 计划
         "chat.group_members", "work.team_control", "work.team",
-        "work.plan_review", "work.evidence_reference",
+        "work.plan_review",
         // 外壳
         "shell.session_preferences",
         // 图库与人物（S1 端口系）
