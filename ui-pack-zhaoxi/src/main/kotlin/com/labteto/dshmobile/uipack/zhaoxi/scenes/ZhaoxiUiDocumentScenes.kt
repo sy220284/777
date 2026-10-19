@@ -184,9 +184,7 @@ fun ZhaoxiUiDocumentGenerateScene(
     }
     ZxPage("生成文档", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        ZxSection("整理当前对话")
-        Text("把当前会话内容整理成可阅读、编辑或继续操作的交互文档。", fontSize = 14.sp, color = ZhaoxiTheme.colors.ink)
-        ZxFooterNote("模型生成会发起真实请求；离线模板只在本机生成，不表示模型已经处理内容。")
+        ZxFooterNote("模型生成会发起真实请求；离线模板仅在本机生成。")
         Spacer(Modifier.height(10.dp))
         feedback?.let { ZxFooterNote(it) }
         snapshot.error?.let { ZxBanner(it, ZxTone.Err) }

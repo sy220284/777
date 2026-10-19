@@ -128,10 +128,9 @@ fun ZhaoxiAutomationTasksScene(
     }
     ZxPage("自动化", onBack = { scope.onBack() }) {
         if (snap.tasks.isEmpty()) {
-            ZxSection("按你的计划自动执行")
             ZxEmpty(
                 "还没有自动化任务",
-                "创建一次提醒或周期任务，之后可以在这里查看执行时间、结果和失败原因。",
+                "新建提醒或周期任务",
                 actionLabel = "新建自动化",
                 onAction = onCreate,
                 iconName = "tasks",
@@ -156,8 +155,7 @@ fun ZhaoxiAutomationTasksScene(
         }
         ZxValueRow("当前列表", value = "${filtered.size} / ${snap.tasks.size}")
         feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        if (snap.tasks.isEmpty()) ZxEmpty("暂无自动化任务", "可以创建第一个真实任务")
-        else if (filtered.isEmpty()) ZxEmpty("没有符合条件的任务", "可调整搜索、模式或状态筛选")
+        if (filtered.isEmpty()) ZxEmpty("没有符合条件的任务", "试试调整筛选条件")
         filtered.forEach { task ->
             val paused = task.status == com.labteto.dshmobile.automation.AutomationStatus.PAUSED
             val mayRetry = task.status in setOf(
@@ -363,7 +361,7 @@ fun ZhaoxiAutomationEditorScene(
             ZxEmpty("切换到任务所属的聊天会话", "为防止跨会话修改，聊天自动化只能在绑定会话编辑")
         } else {
             ZxSection("任务目标")
-            ZxFooterNote(if (chatMode) "这项互动只会关联当前单人聊天会话。" else "工作自动化会按保存的任务内容运行，执行前仍遵守现有权限规则。")
+            if (chatMode) ZxFooterNote("仅在当前聊天会话生效")
             ZxValueRow("执行模式", value = if (chatMode) "聊天 · 当前会话" else "工作")
             if (chatMode && editingTaskId == null) {
                 ZxChip("智能理解时间", natural) { natural = !natural }
@@ -905,8 +903,7 @@ fun ZhaoxiToolsScene(
                 }
             }
             else -> {
-                ZxSection("你可以使用的工具")
-                // Compact tool categories without repeated feature introductions.
+                // Tool categories are the content, not another introductory title.
                 catalogue.groupBy { it.family }.forEach { (family, items) ->
                     ZxRow(zxToolFamilyLabel(family), "",
                         onClick = { expandedFamily = if (expandedFamily == family) null else family })

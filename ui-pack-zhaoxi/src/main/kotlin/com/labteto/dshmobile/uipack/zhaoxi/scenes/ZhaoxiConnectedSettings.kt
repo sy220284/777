@@ -494,20 +494,26 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val jobs = rememberCoroutineScope()
     var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var authorizationBusy by remember { mutableStateOf(false) }
+    var cancelAuthorizationBusy by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf<String?>(null) }
     var showAccountDangerId by remember { mutableStateOf<String?>(null) }
     var accountModelSearch by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(snap.selectedAccountId) { expanded = snap.selectedAccountId }
     var removeConfirm by remember { mutableStateOf<String?>(null) }
     var disconnectConfirm by remember { mutableStateOf<String?>(null) }
-    fun execute(action: suspend () -> String?) {
+    fun execute(authorization: Boolean = false, action: suspend () -> String?) {
         if (busy) return
         busy = true
+        if (authorization) authorizationBusy = true
         jobs.launch {
             try { status = action() }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { status = failure.message ?: "账户操作未完成，请核对状态后重试" }
-            finally { busy = false }
+            finally {
+                if (authorization) authorizationBusy = false
+                busy = false
+            }
         }
     }
     ZxPage("账户管理", onBack = { scope.onBack() }) {
@@ -537,7 +543,7 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         ZxSection("连接与添加")
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ZxButton("添加账户", { execute {
+            ZxButton("添加账户", { execute(authorization = true) {
                 settings.connectChatGpt(requestPlanConsent = true)
                 "账户授权已完成，请核对套餐访问状态"
             } }, Modifier.weight(1f), enabled = !busy && snap.pendingAccountId == null)
@@ -546,9 +552,32 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                 "已请求刷新，请以账户状态为准"
             } }, Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
         }
-        if (snap.pendingAccountId != null) ZxButton("取消进行中的授权", {
-            execute { settings.cancelChatGptAuthorization(); "取消授权请求已发出" }
-        }, variant = ZxButtonVariant.Outline, enabled = !busy)
+        // 第一次添加账户时 pendingAccountId 为空，依授权阶段判定而非账户编号。
+        val canCancelAuthorization = when (snap.phase) {
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.PREPARING,
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.WAITING_FOR_BROWSER,
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.EXCHANGING_CODE,
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.VALIDATING_IDENTITY -> true
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.LOADING_MODELS -> authorizationBusy
+            else -> false
+        }
+        if (canCancelAuthorization) ZxButton("取消进行中的授权", {
+            if (!cancelAuthorizationBusy) {
+                cancelAuthorizationBusy = true
+                jobs.launch {
+                    try {
+                        settings.cancelChatGptAuthorization()
+                        status = "已请求取消授权，请以账户状态为准"
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        status = failure.message ?: "取消授权失败"
+                    } finally {
+                        cancelAuthorizationBusy = false
+                    }
+                }
+            }
+        }, variant = ZxButtonVariant.Outline, enabled = !cancelAuthorizationBusy)
         ZxSection("已添加账户 · ${snap.accounts.size}")
         if (snap.accounts.isEmpty()) ZxEmpty("尚未添加 ChatGPT 账户", "点击“添加账户”，通过浏览器完成登录和套餐授权。")
         snap.accounts.forEach { account ->
@@ -561,7 +590,7 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                 trailing = {
                     if (account.signedIn && !account.sharingEnabled) {
                         ZxChip("授权套餐", false) {
-                            execute {
+                            execute(authorization = true) {
                                 settings.connectChatGpt(account.id, requestPlanConsent = true)
                                 "套餐授权已完成，请核对可用模型"
                             }
@@ -586,7 +615,7 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ZxButton("测试连接", { execute { settings.testChatGptAccount(account.id) } },
                         Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
-                    ZxButton("重新连接", { execute {
+                    ZxButton("重新连接", { execute(authorization = true) {
                         settings.restartChatGptAuthorization(account.id)
                         "已发起重新授权，请在浏览器完成操作"
                     } }, Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)

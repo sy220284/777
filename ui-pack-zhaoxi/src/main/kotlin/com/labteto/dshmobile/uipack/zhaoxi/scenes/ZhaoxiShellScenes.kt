@@ -201,7 +201,7 @@ fun ZhaoxiHomeScene(
                 Column(Modifier.fillMaxHeight().statusBarsPadding().navigationBarsPadding()
                     .padding(horizontal = 12.dp)) {
                     Row(
-                        Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 12.dp),
+                        Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("朝夕", Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
@@ -210,7 +210,7 @@ fun ZhaoxiHomeScene(
                             contentDescription = "全局搜索",
                         ) { ZxIcon("search") }
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(4.dp))
                     ZxField(
                         value = drawerQuery,
                         onValueChange = { drawerQuery = it; bulkIds = emptySet() },
@@ -228,8 +228,8 @@ fun ZhaoxiHomeScene(
                         item {
                             FlowRow(
                                 Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
                                 if (sceneAvailable("route.persona_gallery")) ZxChip("人物图集", false) { navigate("route.persona_gallery") }
                                 if (sceneAvailable("route.diary")) ZxChip("日记", false) { navigate("route.diary") }
@@ -244,7 +244,7 @@ fun ZhaoxiHomeScene(
                                 color = c.ink2, fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
                         }
-                        item {
+                        if (visibleSessions.isNotEmpty() || bulkMode) item {
                             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 ZxChip(if (bulkMode) "完成多选" else "管理多选", bulkMode) {
@@ -283,7 +283,7 @@ fun ZhaoxiHomeScene(
                             item {
                                 ZxHomeDrawerEntry(
                                     "file", "未发送草稿（${blankSessions.size + transientDrafts.size}）",
-                                    detail = "独立保存，不占聊天历史 · 点击${if (draftExpanded) "收起" else "展开"}",
+                                    detail = if (draftExpanded) "收起" else "展开",
                                     testTag = "zhaoxi.drawer.blank_toggle",
                                     onClick = {
                                         showDraftSessions = !showDraftSessions
@@ -460,14 +460,16 @@ fun ZhaoxiHomeScene(
     renameSessionId?.let { id ->
         Dialog(onDismissRequest = { renameSessionId = null }) {
             Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
-                    .background(c.card).padding(20.dp),
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
+                    .background(c.card).padding(horizontal = 20.dp, vertical = 22.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("重命名会话", color = c.ink, fontWeight = FontWeight.SemiBold)
+                Text("重命名会话", fontSize = 17.sp, color = c.ink, fontWeight = FontWeight.SemiBold)
                 ZxField(renameTitle, { renameTitle = it }, Modifier.fillMaxWidth(),
-                    placeholder = "会话标题（最多 80 字）")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    placeholder = "会话标题（最多 80 字）",
+                    error = renameTitle.trim().length > 80,
+                    errorMessage = "标题不能超过 80 个字")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     ZxButton("取消", { renameSessionId = null }, Modifier.weight(1f),
                         ZxButtonVariant.Outline)
                     ZxButton("保存", {
@@ -475,7 +477,7 @@ fun ZhaoxiHomeScene(
                             ConversationShellUiCommand.Rename(id, renameTitle.trim()),
                         ) ?: UiCommandReceipt.NotAdmitted
                         if (commandReceipt?.admitted() == true) renameSessionId = null
-                    }, Modifier.weight(1f), enabled = renameTitle.isNotBlank())
+                    }, Modifier.weight(1f), enabled = renameTitle.trim().isNotBlank() && renameTitle.trim().length <= 80)
                 }
             }
         }
@@ -567,13 +569,13 @@ private fun ZxHomeAction(
     val c = ZhaoxiTheme.colors
     val interaction = remember { MutableInteractionSource() }
     Row(
-        Modifier.fillMaxWidth().zxPressSurface(interaction).clip(RoundedCornerShape(20.dp))
+        Modifier.fillMaxWidth().zxPressSurface(interaction).clip(RoundedCornerShape(16.dp))
             .background(c.tint)
             .clickable(role = Role.Button, onClick = onClick,
                 interactionSource = interaction,
                 indication = androidx.compose.foundation.LocalIndication.current)
             .testTag(tag)
-            .heightIn(min = 76.dp).padding(horizontal = 18.dp, vertical = 12.dp),
+            .heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {

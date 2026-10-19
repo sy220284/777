@@ -137,14 +137,12 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
         ZxNavRow("历史结果", sub = "${page.results.size} 项") {
             scope.onNavigate(UiSceneId("media.result"))
         }
-        ZxSection("创建作品")
-        ZxFooterNote("先选择生成模型，填写描述后提交任务；进度与作品会显示在媒体结果中。")
         ZxSection("生成模型")
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
         offers.forEach { candidate -> ZxChip(candidate.label, candidate.id == offer?.id) { offerId = candidate.id } }
         }
-        if (offers.isEmpty()) ZxNavRow("配置媒体模型", sub = "先添加受支持的图像、语音或视频模型") {
+        if (offers.isEmpty()) ZxNavRow("配置媒体模型") {
             scope.onNavigate(UiSceneId("settings.models"))
         }
         if (offer?.kind != LocalMediaKind.TRANSCRIBE) {
@@ -186,7 +184,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
             }
         }, enabled = !busy && sessionId.isNotBlank() && offer != null && (prompt.isNotBlank() || offer?.kind == LocalMediaKind.TRANSCRIBE), loading = busy)
         } else {
-        ZxNavRow("新建生成", sub = "图像 · 视频 · 语音与转写") {
+        ZxNavRow("新建生成") {
             scope.onNavigate(UiSceneId("media.creation"))
         }
         ZxSection("生成结果 · ${page.results.size}")
@@ -348,6 +346,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
 
                 },
                 { pendingRegenerate = null },
+                confirmVariant = ZxButtonVariant.Ink,
             )
         }
         pendingDeleteFamily?.let { id -> ZxDialog("删除此作品全部版本？", "会移除这份作品及其所有再生成版本的本地记录，无法恢复。", "删除全部版本", {

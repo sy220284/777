@@ -201,7 +201,9 @@ class LocalSessionRepositoryTest {
 
         assertEquals(LocalChatMode.GROUP.name, summary.chatMode)
         assertEquals(2, summary.groupMemberCount)
-        assertTrue(summary.blank)
+        // Group membership is durable session work, even without transcript messages.
+        // A legacy sidecar's stale blank=true must not override the authoritative payload.
+        assertFalse(summary.blank)
         assertTrue(summaryFile.readText().contains("\"version\":2"))
         assertTrue(summaryFile.readText().contains("\"groupMemberCount\":2"))
     }

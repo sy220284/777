@@ -154,7 +154,7 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
             }
         }
         val coreFields = listOf(draft.name, draft.coreIdentity, draft.franchise)
-        ZxFooterNote("核心资料已填写 ${coreFields.count(String::isNotBlank)} / 3 项 · 补充设定 ${draft.fields.values.count(String::isNotBlank)} 项 · 独立事实 ${draft.facts.size} 条 · 世界书 ${draft.lore.size} 条")
+        ZxFooterNote("基础 ${coreFields.count(String::isNotBlank)}/3 · 事实 ${draft.facts.size} · 世界书 ${draft.lore.size}")
         }
         ZxTabRow(listOf("核心档案", "独立事实", "世界书", "表达与边界"), selectedTab) { selectedTab = it }
         when (selectedTab) {
@@ -280,7 +280,6 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
             }
             2 -> {
                 ZxSection("世界书 · ${draft.lore.size} 条")
-                ZxFooterNote("先选择条目，再查看或修改完整正文。所有更改通过底部保存归档。")
                 if (draft.lore.isEmpty()) ZxEmpty("尚无世界书条目", "添加背景、地点、规则等设定")
                 draft.lore.forEachIndexed { index, lore ->
                     ZxRow(lore.title.ifBlank { "条目 ${index + 1}" },

@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -91,22 +94,26 @@ fun ZxDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    confirmVariant: ZxButtonVariant = ZxButtonVariant.Danger,
 ) {
     val c = ZhaoxiTheme.colors
     Dialog(onDismissRequest = onDismiss) {
         Column(
-            modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
+            modifier.fillMaxWidth().widthIn(max = 420.dp)
+                .clip(RoundedCornerShape(22.dp))
                 .zxMaterial(ZhaoxiMaterial.M3)
-                .padding(20.dp),
+                .padding(horizontal = 20.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
-            Spacer(Modifier.height(8.dp))
-            Text(body, fontSize = 13.sp, color = c.ink2, lineHeight = 20.sp)
-            Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, fontSize = 17.sp, lineHeight = 24.sp,
+                fontWeight = FontWeight.SemiBold, color = c.ink)
+            // On 130%-200% text and long risk copy, keep actions visible and body scrollable.
+            Text(body, Modifier.fillMaxWidth().heightIn(max = 260.dp)
+                .verticalScroll(rememberScrollState()),
+                fontSize = 13.sp, color = c.ink2, lineHeight = 21.sp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ZxButton("取消", onDismiss, Modifier.weight(1f), ZxButtonVariant.Outline)
-                ZxButton(confirmText, onConfirm, Modifier.weight(1f), ZxButtonVariant.Danger)
+                ZxButton(confirmText, onConfirm, Modifier.weight(1f), confirmVariant)
             }
         }
     }
@@ -136,7 +143,12 @@ fun ZxSheet(
                 .background(c.line),
         )
         Spacer(Modifier.height(10.dp))
-        Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, Modifier.weight(1f), fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold, color = c.ink)
+            ZxButton("关闭", onDismiss, variant = ZxButtonVariant.Ghost)
+        }
         Spacer(Modifier.height(8.dp))
         content()
     }
@@ -233,6 +245,6 @@ fun ZxSection(text: String, modifier: Modifier = Modifier) {
 /** 页面注脚。 */
 @Composable
 fun ZxFooterNote(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 10.dp),
+    Text(text, modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 7.dp),
         textAlign = TextAlign.Start, fontSize = 12.sp, lineHeight = 18.sp, color = ZhaoxiTheme.colors.ink2)
 }

@@ -135,7 +135,6 @@ fun ZhaoxiPersonaGalleryScene(
     }
     ZxPage("人物图集", onBack = { scope.onBack() }) {
         feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        ZxSection("人物")
         ZxField(search, { search = it }, Modifier.fillMaxWidth(), placeholder = "搜索人物")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
