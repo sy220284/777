@@ -165,7 +165,7 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
     val draft = storedDrafts[sessionId].orEmpty()
     fun writeDraft(text: String) { if (sessionId.isNotBlank()) drafts.updateDraft(sessionId, text) }
     var receipt by remember(sessionId) { mutableStateOf<UiCommandReceipt?>(null) }
-    var questionAnswer by remember { mutableStateOf("") }
+    var questionAnswer by remember(sessionId, snap.question?.pendingId) { mutableStateOf("") }
     var showAddMenu by remember(sessionId) { mutableStateOf(false) }
     var useTeam by androidx.compose.runtime.saveable.rememberSaveable(sessionId) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().fillMaxSize().imePadding()) {

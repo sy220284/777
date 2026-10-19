@@ -736,7 +736,7 @@ fun ZhaoxiPortraitEditor(port: PersonaPortraitUiPort, galleryId: String, scope: 
         else if (stagedUri != null) confirmLeave = true
         else scope.onBack()
     }
-    BackHandler(enabled = stagedUri != null) { leave() }
+    BackHandler(enabled = stagedUri != null || busy) { leave() }
     var confirmRemove by remember(galleryId) { mutableStateOf(false) }
     val preview by produceState<UiPersonaPortraitPreviewReceipt?>(null, galleryId, stagedUri, revision) {
         value = null

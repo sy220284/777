@@ -315,7 +315,8 @@ private fun ZxDocumentNodeView(
         }
         is UiDocumentNode.Select -> Column {
             ZxRow(node.label, fields[node.id].orEmpty())
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 node.options.forEach { option ->
                     ZxChip(option, fields[node.id] == option, onClick = { onFieldChange(node.id, option) })
                 }
