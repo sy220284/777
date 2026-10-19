@@ -113,6 +113,14 @@ class VersionedSessionStore(
         return loaded
     }
 
+    /** Adopt a restored snapshot into an existing durable catalog without re-writing it. */
+    @Synchronized
+    fun adoptRestored(id: String) {
+        validateId(id)
+        catalog.adopt(id)
+        check(id in catalog.ids()) { "恢复的会话快照缺少合法身份：$id" }
+    }
+
     @Synchronized
     fun repair(id: String): SessionLoadResult? = read(id)
 
