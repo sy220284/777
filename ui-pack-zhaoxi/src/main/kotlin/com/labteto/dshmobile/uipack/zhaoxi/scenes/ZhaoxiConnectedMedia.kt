@@ -348,6 +348,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
 
                 },
                 { pendingRegenerate = null },
+                confirmVariant = ZxButtonVariant.Ink,
             )
         }
         pendingDeleteFamily?.let { id -> ZxDialog("删除此作品全部版本？", "会移除这份作品及其所有再生成版本的本地记录，无法恢复。", "删除全部版本", {

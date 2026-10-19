@@ -125,7 +125,27 @@ fun ZxNavRow(label: String, sub: String = "", value: String = "", onClick: () ->
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // One stable icon column across every settings entry; never infer icon by substring.
-        val designIcon = when (label) {
+        val designIcon = zxSettingsNavigationIcon(label)
+        if (designIcon != null) {
+            Box(Modifier.width(22.dp), contentAlignment = Alignment.Center) {
+                ZxIcon(designIcon)
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            Text(label, fontSize = 14.sp, color = c.ink, lineHeight = 20.sp)
+            // Function entrances show a title and optional live status, not repeated descriptions.
+        }
+        if (value.isNotEmpty()) {
+            Text(value, modifier = Modifier.weight(.75f), fontSize = 12.sp, color = c.ink2, fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        ZxIcon("chevron-right", modifier = Modifier.width(18.dp), description = null)
+    }
+}
+
+/** Explicit settings icon mapping; avoids substring-based collisions and mixed alignment. */
+internal fun zxSettingsNavigationIcon(label: String): String? = when (label) {
+
             "外观" -> "palette"
             "聊天风格" -> "quote"
             "个人规则" -> "user"
@@ -144,21 +164,7 @@ fun ZxNavRow(label: String, sub: String = "", value: String = "", onClick: () ->
             "检查更新" -> "refresh"
             else -> null
         }
-        if (designIcon != null) {
-            Box(Modifier.width(22.dp), contentAlignment = Alignment.Center) {
-                ZxIcon(designIcon)
-            }
-        }
-        Column(Modifier.weight(1f)) {
-            Text(label, fontSize = 14.sp, color = c.ink, lineHeight = 20.sp)
-            // Function entrances show a title and optional live status, not repeated descriptions.
-        }
-        if (value.isNotEmpty()) {
-            Text(value, modifier = Modifier.weight(.75f), fontSize = 12.sp, color = c.ink2, fontFamily = FontFamily.Monospace,
-                textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-        ZxIcon("chevron-right", modifier = Modifier.width(18.dp), description = null)
-    }
+    else -> null
 }
 
 @Composable

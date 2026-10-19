@@ -141,6 +141,7 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
     }
     var glow by remember(snap.ambientGlow) { mutableFloatStateOf(snap.ambientGlow) }
     var glass by remember(snap.transparency) { mutableFloatStateOf(snap.transparency) }
+    var showAdvancedAppearance by remember { mutableStateOf(false) }
     var wallpaperSaving by remember { mutableStateOf(false) }
     var wallpaperError by remember { mutableStateOf<String?>(null) }
     ZxPage("外观", onBack = { scope.onBack() }) {
@@ -169,15 +170,10 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
             labels = listOf("小", "标准", "大"),
             onChange = { v -> writeAppearance(textScale = listOf(0.9f, 1f, 1.3f)[v]) },
         )
-        ZxSection("字重")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(0 to "常规字重", 1 to "略粗", 2 to "加粗").forEach { (value, label) ->
-                ZxChip(label, snap.textWeight == value) { writeAppearance(textWeight = value) }
-            }
-        }
         ZxSection("背景与材质")
         ZxSwitchRow("启用主题壁纸", "开启后显示选中的壁纸；自动模式随主题和明暗切换",
             snap.presetWallpaperEnabled) { writeAppearance(presetWallpaperEnabled = it) }
+        if (snap.presetWallpaperEnabled) {
         ZxSection("选择壁纸")
         ZhaoxiWallpaperPicker(
             selectedPreset = snap.selectedWallpaperPreset,
@@ -203,6 +199,18 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
         }
         if (wallpaperSaving) ZxFooterNote("正在保存壁纸")
         wallpaperError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
+        }
+        Spacer(Modifier.height(10.dp))
+        ZxChip(if (showAdvancedAppearance) "收起高级外观" else "高级外观", showAdvancedAppearance) {
+            showAdvancedAppearance = !showAdvancedAppearance
+        }
+        if (showAdvancedAppearance) {
+        ZxSection("字重")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(0 to "常规字重", 1 to "略粗", 2 to "加粗").forEach { (value, label) ->
+                ZxChip(label, snap.textWeight == value) { writeAppearance(textWeight = value) }
+            }
+        }
         ZxSwitchRow("智能对比度", "根据壁纸与明暗模式保持文字可读",
             snap.adaptiveContrast) { writeAppearance(adaptiveContrast = it) }
         Text("环境光强度 · ${(glow * 100).toInt()}%", fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
@@ -227,7 +235,7 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
         ZxSwitchRow("界面动效", "关闭后停用场景与组件过渡动画",
             checked = snap.motionScale > 0f,
             onChange = { writeAppearance(motionScale = if (it) 1f else 0f) })
-
+        }
     }
 }
 

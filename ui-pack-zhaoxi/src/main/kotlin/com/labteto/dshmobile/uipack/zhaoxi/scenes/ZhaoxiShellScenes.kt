@@ -460,14 +460,16 @@ fun ZhaoxiHomeScene(
     renameSessionId?.let { id ->
         Dialog(onDismissRequest = { renameSessionId = null }) {
             Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
-                    .background(c.card).padding(20.dp),
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
+                    .background(c.card).padding(horizontal = 20.dp, vertical = 22.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("重命名会话", color = c.ink, fontWeight = FontWeight.SemiBold)
+                Text("重命名会话", fontSize = 17.sp, color = c.ink, fontWeight = FontWeight.SemiBold)
                 ZxField(renameTitle, { renameTitle = it }, Modifier.fillMaxWidth(),
-                    placeholder = "会话标题（最多 80 字）")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    placeholder = "会话标题（最多 80 字）",
+                    error = renameTitle.trim().length > 80,
+                    errorMessage = "标题不能超过 80 个字")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     ZxButton("取消", { renameSessionId = null }, Modifier.weight(1f),
                         ZxButtonVariant.Outline)
                     ZxButton("保存", {
@@ -475,7 +477,7 @@ fun ZhaoxiHomeScene(
                             ConversationShellUiCommand.Rename(id, renameTitle.trim()),
                         ) ?: UiCommandReceipt.NotAdmitted
                         if (commandReceipt?.admitted() == true) renameSessionId = null
-                    }, Modifier.weight(1f), enabled = renameTitle.isNotBlank())
+                    }, Modifier.weight(1f), enabled = renameTitle.trim().isNotBlank() && renameTitle.trim().length <= 80)
                 }
             }
         }
