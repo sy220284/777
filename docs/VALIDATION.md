@@ -314,6 +314,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - ChatGPT 身份登录与套餐推理授权必须独立建模：缺少任一套餐推理 scope 时保留合法登录身份，但不得发现、暴露或继续使用套餐模型 Profile。
 - refresh 成功后若套餐 scope 降级，必须先原子保存轮换后的 access/refresh token 与新 scopes，再退休对应套餐 Profile；当前活动套餐路由立即变为未配置，禁止静默回退到 API Key 或其他可能计费来源。
 - Responses 请求固定 `store=false`、`stream=true`；不发送套餐共享暂不支持的采样字段。
+- 套餐专用 Responses Lite 必须始终携带 `reasoning.context=all_turns` 和 `parallel_tool_calls=false`；推理档位未指定时只省略 `reasoning.effort`，API Key Responses 不得继承这两个套餐专属字段。
 - ChatGPT 套餐 HTTP Responses 每次必须有非空 `input`；system 内容只进入 `instructions`，后台状态整理不得产生 system-only 请求。
 - ChatGPT 套餐 Responses 长流不得按固定六分钟整次超时切断正在正常传输的请求；保留连接/读空闲超时与协程取消。收到成功 HTTP 响应后若 SSE 在 `response.completed` 前断开，视为“执行结果未知”，禁止自动整轮重放；仅明确的服务端可重试错误按官方恢复语义退避。
 - DeepSeek、Anthropic、Responses 和视觉推理不得使用固定整次调用时长切断仍正常工作的请求；连接超时、空闲读超时、显式取消、HTTP 错误和业务安全边界分别判定。
