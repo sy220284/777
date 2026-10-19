@@ -520,6 +520,18 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == snap.selectedAccountId
     }
     val jobs = rememberCoroutineScope()
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    // Read persisted sign-in state when opening Accounts and when returning from the browser.
+    // The Account owner skips refresh while an OAuth exchange is in progress.
+    DisposableEffect(settings, lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                jobs.launch { settings.refreshChatGpt() }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var authorizationBusy by remember { mutableStateOf(false) }
@@ -530,6 +542,10 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     LaunchedEffect(snap.selectedAccountId) { expanded = snap.selectedAccountId }
     var removeConfirm by remember { mutableStateOf<String?>(null) }
     var disconnectConfirm by remember { mutableStateOf<String?>(null) }
+    val canCancelAuthorization = zxChatGptCanCancelAuthorization(snap.phase, authorizationBusy)
+    LaunchedEffect(snap.phase) {
+        if (canCancelAuthorization) status = null
+    }
     fun execute(authorization: Boolean = false, action: suspend () -> String?) {
         if (busy) return
         busy = true
@@ -553,7 +569,8 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.EXCHANGING_CODE -> "正在验证登录"
             com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.VALIDATING_IDENTITY -> "正在核实账户"
             com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.LOADING_MODELS -> "正在读取可用模型"
-            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.CONNECTED -> "已连接"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.CONNECTED ->
+                if (snap.connected) "已连接" else "已登录 · 套餐未启用"
             com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.UNVERIFIED -> "账户待验证"
             com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.ERROR -> "连接失败"
         }
@@ -566,7 +583,7 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     zxChatGptAccountAuthLabel(it), showChevron = false)
             }
         }
-        (status ?: snap.error)?.let { ZxBanner(it, ZxTone.Warn) }
+        (snap.error ?: status)?.let { ZxBanner(it, ZxTone.Warn) }
         if (busy) ZxFooterNote("正在执行账户操作，请以返回后的账户状态为准。")
         ZxSection("连接与添加")
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -574,14 +591,13 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             ZxButton("添加账户", { execute(authorization = true) {
                 settings.connectChatGpt(requestPlanConsent = true)
                 "账户授权已完成，请核对套餐访问状态"
-            } }, Modifier.weight(1f), enabled = !busy && snap.pendingAccountId == null)
+            } }, Modifier.weight(1f), enabled = !busy && !canCancelAuthorization && snap.pendingAccountId == null)
             ZxButton("刷新状态", { execute {
                 settings.refreshChatGpt()
                 "已请求刷新，请以账户状态为准"
             } }, Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
         }
         // 第一次添加账户时 pendingAccountId 为空，依授权阶段判定而非账户编号。
-        val canCancelAuthorization = zxChatGptCanCancelAuthorization(snap.phase, authorizationBusy)
         if (canCancelAuthorization) ZxButton("取消进行中的授权", {
             if (!cancelAuthorizationBusy) {
                 cancelAuthorizationBusy = true
