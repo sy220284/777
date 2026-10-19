@@ -258,7 +258,6 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
 internal fun ZhaoxiWorkSkillActions(ports: ZhaoxiConversationPorts, tools: ToolsUiPort) {
     val work by ports.work.snapshots.collectAsState(initial = ports.work.snapshot())
     val sourceSessionId = work.identity?.sessionId
-    val existingDrafts by ports.drafts.drafts.collectAsState()
     var skillRefresh by remember(sourceSessionId) { mutableIntStateOf(0) }
     var showPicker by remember(sourceSessionId) { mutableStateOf(false) }
     var showCreate by remember(sourceSessionId) { mutableStateOf(false) }
@@ -267,6 +266,7 @@ internal fun ZhaoxiWorkSkillActions(ports: ZhaoxiConversationPorts, tools: Tools
     var skillDescription by remember(sourceSessionId) { mutableStateOf("") }
     var skillInstructions by remember(sourceSessionId) { mutableStateOf("") }
     var saving by remember(sourceSessionId) { mutableStateOf(false) }
+    var checkingSkillId by remember(sourceSessionId) { mutableStateOf<String?>(null) }
     var outcome by remember(sourceSessionId) { mutableStateOf<String?>(null) }
     var skillsError by remember(sourceSessionId) { mutableStateOf(false) }
     val jobs = rememberCoroutineScope()
@@ -283,7 +283,7 @@ internal fun ZhaoxiWorkSkillActions(ports: ZhaoxiConversationPorts, tools: Tools
     }
     val replies = work.messages.filter {
         it.role == UiMessageRole.ASSISTANT && it.text.isNotBlank()
-    }.takeLast(16).asReversed()
+    }.takeLast(5).asReversed()
 
     ZxSection("本次工作 · 技能")
     outcome?.let { ZxFooterNote(it) }
@@ -299,29 +299,52 @@ internal fun ZhaoxiWorkSkillActions(ports: ZhaoxiConversationPorts, tools: Tools
         return
     }
     if (showPicker) {
-        ZxFooterNote("选择后只写入 Work 草稿第一行；请检查任务内容并主动发送，实际模型执行结果须在工作时间线核验。")
+        ZxFooterNote("点击后先向现有 Skill Store 确认规则文件可读取，再写入 Work 草稿第一行。发送后仍需核验工作执行结果。")
         if (skillsError) ZxFooterNote("读取本地技能失败，请刷新后重试")
         else if (installed == null) ZxFooterNote("正在读取已安装技能…")
         else if (installed.orEmpty().isEmpty()) ZxEmpty("尚无可调用技能", "先在工具中心安装技能")
         installed.orEmpty().forEach { skill ->
             ZxRow(skill.displayName, "${skill.name} · ${if (skill.modelInvocable) "支持模型自动发现" else "仅手动调用"}",
                 onClick = {
+                    if (checkingSkillId != null) return@ZxRow
                     if (ports.work.snapshot().identity?.sessionId != sourceSessionId) {
                         outcome = "Work 会话已切换，请重新选择技能"
                     } else {
-                        val current = existingDrafts[sourceSessionId].orEmpty()
-                        val prepared = zxWorkSkillDraft(skill.name, current)
-                        if (prepared == null) {
-                            outcome = "输入框已有其他技能前缀，请先确认或移除后再选择"
-                        } else {
-                            if (prepared != current) ports.drafts.updateDraft(sourceSessionId, prepared)
-                            outcome = "已为当前 Work 准备 @skill:${skill.name}；尚未发送或执行"
-                            showPicker = false
+                        checkingSkillId = skill.name
+                        jobs.launch {
+                            try {
+                                val content = tools.readSkillDocument(skill.name)
+                                if (content.isBlank()) {
+                                    outcome = "技能规则为空，请到技能管理检查 SKILL.md"
+                                } else if (ports.work.snapshot().identity?.sessionId != sourceSessionId) {
+                                    outcome = "Work 会话已切换，本次未写入草稿"
+                                } else {
+                                    // Re-read the Owner draft after the suspend point; never replace text
+                                    // the user typed during skill validation.
+                                    val current = kotlinx.coroutines.flow.first(ports.drafts.drafts)[sourceSessionId].orEmpty()
+                                    val prepared = zxWorkSkillDraft(skill.name, current)
+                                    if (prepared == null) {
+                                        outcome = "输入框已有其他技能前缀，请先确认或移除后再选择"
+                                    } else {
+                                        if (prepared != current) ports.drafts.updateDraft(sourceSessionId, prepared)
+                                        outcome = "已确认技能规则可读取并写入 Work 草稿；发送及实际执行仍需用户确认"
+                                        showPicker = false
+                                    }
+                                }
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                outcome = "技能规则无法读取，请到工具中心刷新或重新安装"
+                            } finally {
+                                checkingSkillId = null
+                            }
                         }
                     }
                 })
         }
-        ZxButton("刷新已安装技能", { skillRefresh++ }, variant = ZxButtonVariant.Outline)
+        if (checkingSkillId != null) ZxFooterNote("正在核实本地技能规则…")
+        ZxButton("刷新已安装技能", { skillRefresh++ }, variant = ZxButtonVariant.Outline,
+            enabled = checkingSkillId == null)
     }
     if (showCreate) {
         ZxSection("根据可见回复整理技能")
