@@ -32,8 +32,13 @@ class LocalSettingsDataFacade @Inject internal constructor(
     private val memoryManager: MemoryManager,
     private val chatMemoryProjection: LocalChatMemoryProjectionPort,
     private val pricing: DeepSeekPricingRepository,
+    private val usage: DeepSeekUsageTracker,
 ) : com.labteto.dshmobile.uicontract.MemoryUiPort, PricingUiPort {
     internal val deepSeekPricing: StateFlow<DeepSeekPricingState> = pricing.state
+    internal val usageRevision: StateFlow<Long> = usage.analyticsRevision
+    internal fun usageSnapshot(): TokenUsageAnalyticsSnapshot = usage.analyticsSnapshot()
+    internal fun usageGroupDetail(kind: TokenUsageGroupKind, key: String, modelFilter: String?): TokenUsageGroupDetail? = usage.analyticsGroupDetail(kind, key, modelFilter)
+    internal fun usageRecord(requestId: String): TokenUsageRecord? = usage.analyticsRecord(requestId)
     override val snapshots: Flow<UiProviderPricingSnapshot> = pricing.state.map {
         it.asUiProviderPricing()
     }

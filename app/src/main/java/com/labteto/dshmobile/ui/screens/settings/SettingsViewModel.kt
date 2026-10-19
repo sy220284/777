@@ -59,11 +59,11 @@ class SettingsViewModel @Inject constructor(
     private val _state = MutableStateFlow(AppSettings())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
 
-    val localHarnessState: StateFlow<LocalHarnessSettingsState> = localHarness.state
+    val localHarnessState: StateFlow<LocalHarnessSettingsState> = localHarness.nativeState
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = localHarness.initialState,
+            initialValue = localHarness.nativeInitialState,
         )
     val chatGptState: StateFlow<ChatGptUiState> = localHarness.chatGptState
     val chatStyleGuardBuiltInPhrases: List<String> get() = localHarness.chatStyleGuardBuiltInPhrases
