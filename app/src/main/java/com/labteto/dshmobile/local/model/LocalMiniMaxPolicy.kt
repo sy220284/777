@@ -41,9 +41,11 @@ internal object LocalMiniMaxPolicy {
                 require(effort in setOf("low", "medium", "high", "xhigh", "max")) {
                     "MiniMax M3.1 必须保留思考，请选择基础思考或更高档位"
                 }
-                // M3.1 always thinks. The official APIs select depth directly:
-                // Anthropic output_config.effort / OpenAI reasoning_effort.
-                // Do not send a redundant thinking override for this mandatory-thinking model.
+                // The stable release controls depth directly. Keep the already-saved Preview
+                // transport's explicit adaptive flag unchanged for compatibility.
+                if (model.equals("MiniMax-M3.1-Flash-Preview", ignoreCase = true)) {
+                    builder.put("thinking", buildJsonObject { put("type", "adaptive") })
+                }
                 if (anthropic) builder.put("output_config", buildJsonObject { put("effort", effort) })
                 else builder.put("reasoning_effort", effort)
             }
