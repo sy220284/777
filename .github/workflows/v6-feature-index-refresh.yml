@@ -8,6 +8,8 @@ on:
       - docs/FEATURE-TREE-EXPLICIT-EVIDENCE.json
       - docs/FEATURE-TREE-SOURCE-REGISTRY.json
       - docs/FEATURE-TREE-LEGACY-IDENTITIES.json
+      - docs/FEATURE-EXISTENCE-TRIAGE.json
+      - .github/scripts/sync-feature-tree.py
 
 permissions:
   contents: write
@@ -15,6 +17,7 @@ permissions:
 jobs:
   rebuild-index:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
