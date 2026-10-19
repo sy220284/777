@@ -52,7 +52,6 @@ class LocalHarnessViewModel @Inject constructor(
     private val networkSearchSettings: LocalNetworkSearchSettings,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
-    internal val nativeDocuments = NativeV6Documents(documentFactory, conversationPorts, viewModelScope)
 
     internal suspend fun installedSkillDisplayNames(): Map<String, String> =
         toolsUi.installedSkills().associate { it.name to it.displayName }
@@ -102,6 +101,7 @@ class LocalHarnessViewModel @Inject constructor(
         viewModelScope, nativeDocumentDrafts,
         documentSceneNames.map { com.labteto.dshmobile.uicontract.UiSceneId(it) }.toSet(),
     ) { scene -> _documentRoute.value = scene.value }
+    internal val nativeDocuments = NativeV6Documents(interactiveDocuments, conversationPorts, nativeDocumentDrafts)
     internal fun documentIdentity() = conversationPorts.identitySnapshot()
     internal fun activeDocumentMessageId(): String? = state.value.messages.lastOrNull()?.id
     internal fun consumeDocumentRoute(route: String) {
