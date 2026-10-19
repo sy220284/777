@@ -350,13 +350,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             ZxRow((p.displayName ?: p.model) + if (duplicate) " · ${p.id.takeLast(4)}" else "",
                 (if (active) "当前使用" else "已保存") + " · " +
                     p.provider.ifBlank { "自定义来源" } + " · ${p.model}",
-                onClick = { expandedModelId = if (expandedModelId == p.id) null else p.id },
-                trailing = {
-                    ZxChip(if (expandedModelId == p.id) "收起" else "管理",
-                        expandedModelId == p.id) {
-                        expandedModelId = if (expandedModelId == p.id) null else p.id
-                    }
-                })
+                onClick = { expandedModelId = if (expandedModelId == p.id) null else p.id })
             if (expandedModelId == p.id) {
                 ZxValueRow("地址", value = p.baseUrl)
                 ZxValueRow("协议", value = p.protocol.name)
@@ -512,13 +506,7 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             ZxRow(account.displayName ?: account.email ?: account.id,
                 (if (active) "当前使用" else "其他账户") + " · " +
                     zxChatGptAccountAuthLabel(account),
-                onClick = { expanded = if (expanded == account.id) null else account.id },
-                trailing = {
-                    ZxChip(if (expanded == account.id) "收起" else "管理",
-                        expanded == account.id) {
-                        expanded = if (expanded == account.id) null else account.id
-                    }
-                })
+                onClick = { expanded = if (expanded == account.id) null else account.id })
             if (expanded == account.id) {
                 ZxValueRow("登录", value = if (account.signedIn) "已登录" else "需要重新授权")
                 ZxValueRow("ChatGPT 套餐访问", value = when {
