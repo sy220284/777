@@ -1,10 +1,8 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
 import com.labteto.dshmobile.local.interaction.LocalQuestion
-import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.model.recordRuntimeSystemPromptUpdate
 import com.labteto.dshmobile.local.model.workSystemPrompt
@@ -98,16 +96,15 @@ internal class LocalWorkPlanModeCoordinator @Inject constructor(
  * approval semantics while Runtime keeps
  * interaction, model-history and Session persistence mechanics.
  */
+internal const val APPROVED_PLAN_TOOL_RESULT = "计划已获批准，已进入执行模式"
+
 internal suspend fun exitWorkPlanMode(
     call: LocalToolCall,
     plan: String,
     state: LocalWorkStatePort,
     interactions: LocalInteractionCoordinator,
-    aggregateSnapshot: () -> LocalHarnessState,
-    history: LocalModelHistoryBuffer,
     eventLog: LocalSessionEventLog,
     persist: () -> Unit,
-    updateContextMetrics: () -> Unit,
 ): String {
     if (!state.snapshot().planMode) return "当前未启用规划模式"
 
@@ -137,18 +134,10 @@ internal suspend fun exitWorkPlanMode(
         })
     }
 
-    val snapshot = aggregateSnapshot()
-    if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
-        recordRuntimeSystemPromptUpdate(
-            history = history,
-            prompt = workSystemPrompt(snapshot.workspacePath, planMode = false),
-            modelState = snapshot.modelState,
-            log = eventLog,
-        )
-        updateContextMetrics()
-    }
+    // The approving tool still has an outstanding receipt. The Work event sink publishes the
+    // updated system instruction only after the entire tool batch is durably settled.
     persist()
-    return "计划已获批准，已进入执行模式"
+    return APPROVED_PLAN_TOOL_RESULT
 }
 
 /** Commit both approval facts before exposing either through Work state. */

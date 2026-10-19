@@ -240,6 +240,8 @@ internal fun WorkOperationIcon(
         AgentOperationKind.Image -> FeatherIcons.Image
         AgentOperationKind.Background -> FeatherIcons.Clock
         AgentOperationKind.Generic -> FeatherIcons.Sparkles
+        AgentOperationKind.Question -> FeatherIcons.Sparkles
+        AgentOperationKind.Plan -> FeatherIcons.FileText
         AgentOperationKind.Delegate -> FeatherIcons.Users
         AgentOperationKind.External -> FeatherIcons.Gear
     }

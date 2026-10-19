@@ -12,6 +12,8 @@ import com.labteto.dshmobile.local.runtime.MODEL_HISTORY_CHECKPOINT_TURN_INTERVA
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.model.workSystemPrompt
+import com.labteto.dshmobile.local.model.recordRuntimeSystemPromptUpdate
+import com.labteto.dshmobile.local.model.reorderInterleavedSystemPromptUpdates
 import com.labteto.dshmobile.local.model.stableJsonSha256
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -54,6 +56,38 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
         )
         binding.eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
         updateContextMetrics(binding)
+    }
+
+    /**
+     * Repair only the proven legacy ordering defect: a system override emitted while a tool
+     * receipt was still pending. Complete tool calls and their original results are preserved.
+     */
+    internal fun repairInterleavedPromptUpdates(binding: LocalWorkRunBinding) {
+        val history = binding.runHandle.modelHistory
+        val before = history.snapshot()
+        val repaired = reorderInterleavedSystemPromptUpdates(before)
+        if (repaired == before) return
+        history.reset(repaired)
+        binding.eventLog.append("model-history/prompt-order-repaired", buildJsonObject {
+            put("message_count", repaired.size)
+            put("reason", "interleaved_system_prompt_in_tool_batch")
+        })
+        checkpoint(binding, "model-history/prompt-order-repaired")
+        updateContextMetrics(binding)
+        persist(binding)
+    }
+
+    /** The approving tool's result is already durable when this is called. */
+    internal fun publishApprovedPlanPrompt(binding: LocalWorkRunBinding) {
+        val snapshot = binding.aggregateSnapshot()
+        recordRuntimeSystemPromptUpdate(
+            history = binding.runHandle.modelHistory,
+            prompt = workSystemPrompt(sessionStorage.files.workspace.path, planMode = false),
+            modelState = snapshot.modelState,
+            log = binding.eventLog,
+        )
+        updateContextMetrics(binding)
+        persist(binding)
     }
 
     internal suspend fun drainPendingInputs(binding: LocalWorkRunBinding) {

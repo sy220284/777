@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.chat.timelineRewriteModelHistory
 import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
 import com.labteto.dshmobile.local.model.LocalModelPromptUpdateMode
+import com.labteto.dshmobile.local.model.reorderInterleavedSystemPromptUpdates
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.assistantModelMessageFromEvent
 import kotlinx.serialization.json.JsonArray
@@ -77,7 +78,8 @@ internal fun restoreLocalModelHistory(
     val invalidCheckpointAfterRestore = latestCheckpointIndex > checkpointIndex
     val checkpointNeedsWatermark =
         checkpointMessages != null && checkpointAsOfSequence == null
-    val (sanitizedHistory, repairedStructure) = sanitizeRestoredModelHistory(history)
+    val reorderedHistory = reorderInterleavedSystemPromptUpdates(history)
+    val (sanitizedHistory, repairedStructure) = sanitizeRestoredModelHistory(reorderedHistory)
     return LocalModelHistoryRestore(
         messages = sanitizedHistory,
         replayedTail = replayed,
@@ -87,7 +89,8 @@ internal fun restoreLocalModelHistory(
                 replayed ||
                 invalidCheckpointAfterRestore ||
                 checkpointNeedsWatermark ||
-                repairedStructure,
+                repairedStructure ||
+                reorderedHistory != history,
     )
 }
 
