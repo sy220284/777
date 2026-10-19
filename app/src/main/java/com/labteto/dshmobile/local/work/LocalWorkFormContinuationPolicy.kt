@@ -18,8 +18,7 @@ internal const val WORK_REPLY_FORM_WAIT_EVENT = "work/reply-form-awaiting-submis
 internal fun hasOutstandingWorkReplyForm(log: LocalSessionEventLog, goal: LocalGoal): Boolean {
     if (goal.id.isBlank()) return false
     val waiting = log.latestMatching(setOf(WORK_REPLY_FORM_WAIT_EVENT)) { data ->
-        (data["goal_id"] as? JsonPrimitive)?.contentOrNull == goal.id &&
-            (data["goal_revision"] as? JsonPrimitive)?.longOrNull == goal.revision
+        (data["goal_id"] as? JsonPrimitive)?.contentOrNull == goal.id
     } ?: return false
     val submitted = log.latestMatching(setOf("user/message", LOCAL_AGENT_INBOX_EVENT_TYPE)) { data ->
         if ("action" !in data) return@latestMatching true // real user/message event
