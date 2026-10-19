@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.session
 
 import com.labteto.dshmobile.harness.session.SessionEventFileSnapshot
 import com.labteto.dshmobile.harness.session.SessionEventLog
+import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import java.io.File
 import java.io.InputStream
 import java.io.ByteArrayInputStream
@@ -15,6 +16,9 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 /**
  * User-facing governance for append-only local Session Event storage.
@@ -153,9 +157,10 @@ internal class LocalSessionStorageManager(
             val eligible = grouped.filterKeys { it !in existing }
             require(eligible.isNotEmpty()) { "全部会话已存在，恢复不会覆盖当前数据" }
             // Never stage a snapshot without its append-only event source.
-            require(eligible.values.all { fileNames ->
-                fileNames.any { it.contains(".events.jsonl") }
-            }) { "备份缺少会话事件源，已拒绝导入" }
+            require(eligible.all { (id, fileNames) ->
+                fileNames.any { it.startsWith("$id.events.jsonl") } &&
+                    fileNames.any { it == "$id.json" || it == "$id.backup.json" }
+            }) { "备份缺少会话快照或事件源，已拒绝导入" }
             grouped.filterKeys { it in existing }.values.flatten().forEach { File(staging, it).delete() }
             eligible.values.flatten().forEach { validateRestoredFile(File(staging, it)) }
             File(staging, "READY").writeText("v1")
@@ -193,6 +198,10 @@ internal class LocalSessionStorageManager(
             }
             committed++
         }
+        // A pre-existing valid catalog does not discover copied files. Register only
+        // restored snapshot identities, after every file copy has been verified.
+        val catalog = VersionedSessionStore(root, json)
+        sources.mapNotNull(::sessionIdOf).toSet().forEach(catalog::adoptRestored)
         check(pending.deleteRecursively()) { "已恢复，但无法清理隔离区" }
         return committed
     }
@@ -299,12 +308,29 @@ internal class LocalSessionStorageManager(
             }
 
     private fun sessionIdOf(file: File): String? {
-        val name = file.getName()
-        return when {
-            ".events.jsonl" in name -> name.substringBefore(".events.jsonl").takeIf(String::isNotBlank)
-            name.endsWith(".json") -> name.removeSuffix(".json").takeIf(String::isNotBlank)
-            else -> null
+        val name = file.name
+        if (".events.jsonl" in name) {
+            return name.substringBefore(".events.jsonl").takeIf(RESTORE_SESSION_ID::matches)
         }
+        if (!name.endsWith(".json")) return null
+        val base = name.removeSuffix(".json")
+        // A backup or migration checkpoint belongs to its Session, not a new
+        // Session named 'id.backup' or 'id.checkpoint-v0'. Dotted IDs remain legal.
+        val candidates = buildList {
+            if (base.endsWith(".backup")) add(base.removeSuffix(".backup"))
+            CHECKPOINT_BASENAME.matchEntire(base)?.let { add(it.groupValues[1]) }
+            add(base)
+        }.distinct().filter(RESTORE_SESSION_ID::matches)
+        val withEvents = candidates.filter { File(file.parentFile, "$it.events.jsonl").exists() }
+        if (withEvents.size == 1) return withEvents.single()
+        if (withEvents.size > 1) {
+            val embedded = runCatching {
+                json.parseToJsonElement(file.readText()).jsonObject["id"]
+                    ?.jsonPrimitive?.contentOrNull
+            }.getOrNull()
+            return withEvents.firstOrNull { it == embedded } ?: withEvents.first()
+        }
+        return candidates.firstOrNull()
     }
 
     private fun isRawSegment(name: String): Boolean =
@@ -318,7 +344,9 @@ internal class LocalSessionStorageManager(
         val COMPRESSED_SEGMENT = Regex("^.+\\.events\\.jsonl\\.part-[0-9]+\\.gz$")
         const val COMPACTION_YIELD_MILLIS = 25L
         const val COPY_BUFFER_BYTES = 32 * 1024
-        private val SAFE_RESTORE_NAME = Regex("^[A-Za-z0-9_-]{1,128}\\.(?:json|events\\.jsonl(?:\\.part-[0-9]+(?:\\.gz)?)?)$")
+        private val RESTORE_SESSION_ID = Regex("[A-Za-z0-9._-]{1,128}")
+        private val CHECKPOINT_BASENAME = Regex("^(.*)\\.checkpoint-v[0-9]+$")
+        private val SAFE_RESTORE_NAME = Regex("^[A-Za-z0-9._-]{1,128}\\.(?:json|backup\\.json|checkpoint-v[0-9]+\\.json|events\\.jsonl(?:\\.part-[0-9]+(?:\\.gz)?)?)$")
         private const val MAX_RESTORE_ZIP_BYTES = 64 * 1024 * 1024
         private const val MAX_RESTORE_ENTRY_BYTES = 64L * 1024 * 1024
         private const val MAX_RESTORE_UNPACKED_BYTES = 256L * 1024 * 1024
