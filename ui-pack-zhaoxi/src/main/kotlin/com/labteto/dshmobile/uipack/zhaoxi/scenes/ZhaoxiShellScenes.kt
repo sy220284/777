@@ -207,11 +207,19 @@ fun ZhaoxiHomeScene(
                             Text("功能", fontSize = 11.sp, color = c.ink2, fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
                         }
-                        item { ZxHomeDrawerEntry("people", "人物图集", onClick = { navigate("route.persona_gallery") }) }
-                        item { ZxHomeDrawerEntry("diary", "日记", onClick = { navigate("route.diary") }) }
-                        item { ZxHomeDrawerEntry("tasks", "任务", onClick = { navigate("route.tasks") }) }
-                        item { ZxHomeDrawerEntry("files", "工作区文件", onClick = { navigate("route.workspace") }) }
-                        item { ZxHomeDrawerEntry("tools", "工具", onClick = { navigate("route.tools") }) }
+                        item {
+                            FlowRow(
+                                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                ZxChip("人物图集", false) { navigate("route.persona_gallery") }
+                                ZxChip("日记", false) { navigate("route.diary") }
+                                ZxChip("任务", false) { navigate("route.tasks") }
+                                ZxChip("工作区文件", false) { navigate("route.workspace") }
+                                ZxChip("工具", false) { navigate("route.tools") }
+                            }
+                        }
                         item {
                             Spacer(Modifier.height(8.dp))
                             Text(if (workMode) "工作历史" else "聊天历史", fontSize = 11.sp,
