@@ -12,9 +12,8 @@ internal fun resolveLocalWorkSkillGuidance(
     val pinnedConnectors = selectedInvocations.filter {
         it.kind == LocalPinnedInvocation.Kind.CONNECTOR
     }.joinToString("、") { it.id }
-    val installed = workspace.skills().toSet()
     val pinnedSkills = selectedInvocations.filter {
-        it.kind == LocalPinnedInvocation.Kind.SKILL && it.id in installed
+        it.kind == LocalPinnedInvocation.Kind.SKILL
     }.map { selection ->
         val document = try {
             workspace.readSkill(selection.id)

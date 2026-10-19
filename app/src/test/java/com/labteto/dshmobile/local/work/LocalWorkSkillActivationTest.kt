@@ -30,7 +30,7 @@ class LocalWorkSkillActivationTest {
     }
 
     @Test
-    fun explicitOnlySkillRunsWhenPinnedButRemovedSkillDoesNot() {
+    fun explicitOnlySkillRunsWhenPinnedAndMissingPinFailsClearly() {
         val root = Files.createTempDirectory("skill-pin-disabled").toFile()
         try {
             val workspace = LocalWorkspace(root)
@@ -40,9 +40,12 @@ class LocalWorkSkillActivationTest {
                 LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "private-doc"),
                 LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "missing-skill"),
             )
-            val guidance = resolveLocalWorkSkillGuidance(workspace, "继续", pinned)
+            val error = assertThrows(IllegalArgumentException::class.java) {
+                resolveLocalWorkSkillGuidance(workspace, "继续", pinned)
+            }
+            assertTrue(error.message!!.contains("missing-skill"))
+            val guidance = resolveLocalWorkSkillGuidance(workspace, "继续", pinned.take(1))
             assertTrue(guidance.contains("Secret policy."))
-            assertFalse(guidance.contains("missing-skill"))
         } finally { root.deleteRecursively() }
     }
 
