@@ -6,7 +6,6 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.longOrNull
 
 internal const val WORK_REPLY_FORM_WAIT_EVENT = "work/reply-form-awaiting-submission"
 
