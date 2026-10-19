@@ -31,6 +31,7 @@ internal fun localShellFeatureUiContribution(
     sessionTitleOverrides: Map<String, String>,
     actions: LocalShellFeatureUiActions,
     workActions: LocalWorkFeatureUiActions,
+    nativeDocuments: NativeV6Documents,
     onOpenWorkArtifact: (String) -> Unit,
     onSettingsDestinationChange: (SettingsDestination) -> Unit,
     onPushFeature: (LocalFeaturePage) -> Unit,
@@ -56,6 +57,7 @@ internal fun localShellFeatureUiContribution(
         LocalConversationSurface(
             state = surface,
             workActions = workActions,
+            nativeDocuments = nativeDocuments,
             onOpenWorkArtifact = onOpenWorkArtifact,
             usageRevision = actions.usageRevision,
             loadTurnSummaries = actions.turnUsageSummaries,

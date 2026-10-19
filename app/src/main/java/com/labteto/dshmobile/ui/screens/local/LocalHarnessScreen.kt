@@ -538,6 +538,7 @@ fun LocalHarnessScreen(
             sessionTitleOverrides = sessionTitleOverrides,
             actions = shellActions,
             workActions = workActions,
+            nativeDocuments = viewModel.nativeDocuments,
             onOpenWorkArtifact = { path ->
                 requestedFilePath = path
                 filesMode = LocalFilesMode.CONVERSATION

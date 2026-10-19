@@ -46,12 +46,16 @@ class LocalHarnessViewModel @Inject constructor(
     private val toolsUi: LocalToolsUiFacade,
     private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
     private val teamUi: com.labteto.dshmobile.uicontract.WorkTeamUiPort,
+    documentFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
+    conversationPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val documentFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
     private val conversationPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val approvalPreferences: LocalApprovalPreferences,
     private val networkSearchSettings: LocalNetworkSearchSettings,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
+    internal val nativeDocuments = NativeV6Documents(documentFactory, conversationPorts, viewModelScope)
+
     internal suspend fun installedSkillDisplayNames(): Map<String, String> =
         toolsUi.installedSkills().associate { it.name to it.displayName }
 

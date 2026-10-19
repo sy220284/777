@@ -137,6 +137,7 @@ internal data class LocalModeIntro(val usageMode: LocalUsageMode)
 internal class LocalConversationSurfaceArgs(
     val state: LocalConversationSurfaceState,
     val workActions: LocalWorkFeatureUiActions?,
+    val nativeDocuments: NativeV6Documents?,
     val onOpenWorkArtifact: (String) -> Unit,
     val activeModelProfile: LocalModelProfile?,
     val sendFeedback: LocalSendFeedbackState,
@@ -200,6 +201,7 @@ internal class LocalConversationSurfaceArgs(
 internal fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
     workActions: LocalWorkFeatureUiActions? = null,
+    nativeDocuments: NativeV6Documents? = null,
     onOpenWorkArtifact: (String) -> Unit = {},
     activeModelProfile: LocalModelProfile?,
     sendFeedback: LocalSendFeedbackState,
@@ -261,6 +263,7 @@ internal fun LocalConversationSurface(
     val args = LocalConversationSurfaceArgs(
         state = state,
         workActions = workActions,
+        nativeDocuments = nativeDocuments,
         onOpenWorkArtifact = onOpenWorkArtifact,
         activeModelProfile = activeModelProfile,
         sendFeedback = sendFeedback,
@@ -326,6 +329,10 @@ internal fun LocalConversationSurface(
 private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val state = args.state
     val workActions = args.workActions
+    val nativeDocuments = args.nativeDocuments
+    val nativeDocumentSnapshot by (nativeDocuments?.snapshots ?: kotlinx.coroutines.flow.flowOf(
+        com.labteto.dshmobile.uicontract.UiDocumentsSceneSnapshot(null, emptyList(), false, null)
+    )).collectAsState(initial = com.labteto.dshmobile.uicontract.UiDocumentsSceneSnapshot(null, emptyList(), false, null))
     val onOpenWorkArtifact = args.onOpenWorkArtifact
     val activeModelProfile = args.activeModelProfile
     val sendFeedback = args.sendFeedback
@@ -427,6 +434,12 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             drafts.putBoundedLocalDraft(state.sessionId, listOf(composerHandoff[1], previous).filter(String::isNotBlank).joinToString("\n\n"))
             onConsumeComposerHandoff()
         }
+    }
+    val documentPreparedDrafts by (nativeDocuments?.preparedDrafts ?: kotlinx.coroutines.flow.flowOf(emptyMap()))
+        .collectAsState(initial = emptyMap())
+    val pendingDocumentDraft = documentPreparedDrafts[state.sessionId]
+    LaunchedEffect(state.sessionId, pendingDocumentDraft) {
+        if (pendingDocumentDraft != null) drafts.putBoundedLocalDraft(state.sessionId, pendingDocumentDraft)
     }
     val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
@@ -1076,6 +1089,16 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 onSelectVariant = onSelectMessageVariant,
                                 onRegenerate = onRegenerate,
                             )
+                            if (nativeDocuments != null && transcriptItem.message.role == "assistant" &&
+                                nativeDocumentSnapshot.sessionId == state.sessionId) {
+                                NativeV6DocumentMessage(
+                                    messageId = transcriptItem.message.id,
+                                    documents = nativeDocumentSnapshot.documents.filter {
+                                        it.document.source.messageId == transcriptItem.message.id
+                                    },
+                                    controller = nativeDocuments,
+                                )
+                            }
                             if (state.usageMode == LocalUsageMode.CHAT && transcriptItem.message.role == "user") {
                                 turnUsage.summaries[transcriptItem.message.id]?.let { aggregate ->
                                     LocalChatTurnUsageButton(aggregate) { turnUsage.open(transcriptItem.message.id) }
