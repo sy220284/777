@@ -13,7 +13,8 @@ sealed interface SessionUiCommand {
     /** A drawer-mode switch need not request conversation navigation. */
     data class SelectMode(val mode: LocalUsageMode, val openConversation: Boolean = true) : SessionUiCommand
     data class Create(val identity: UiSessionIdentity?, val mode: LocalConversationMode,
-        val usageMode: LocalUsageMode, val handoffSummary: String? = null) : SessionUiCommand
+        val usageMode: LocalUsageMode, val handoffSummary: String? = null,
+        val handoffAttachments: List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = emptyList()) : SessionUiCommand
 }
 sealed interface UiSessionDeletionReceipt {
     data class Deleted(val sessionIds: Set<String>) : UiSessionDeletionReceipt
