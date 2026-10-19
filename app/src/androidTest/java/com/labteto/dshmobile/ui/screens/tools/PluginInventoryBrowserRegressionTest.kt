@@ -292,6 +292,29 @@ class PluginInventoryBrowserRegressionTest {
     }
 
     @Test
+    fun skillSearchPrioritizesResultsOverCreationToolsOnNarrowScreens() {
+        compose.setContent {
+            DshTheme {
+                Box(Modifier.width(320.dp)) {
+                    PluginInventoryBrowser(
+                        localIds = emptyList(),
+                        skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                            "research-check", "研究资料并核实来源", true,
+                        )),
+                        skillsOnly = true,
+                        onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                        onImportSkill = {}, onUseCapability = {},
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("skill-import-file").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-search").performTextInput("research")
+        compose.onNodeWithTag("skill-import-file").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-card-skill:research-check").assertIsDisplayed()
+    }
+
+    @Test
     fun searchingDescriptionsHasAUsefulEmptyState() {
         compose.setContent {
             DshTheme {
