@@ -29,7 +29,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.setContent {
             DshTheme {
                 PluginInventoryBrowser(
-                    localIds = listOf("local-builtin"),
+                    localIds = listOf("android-local-builtins"),
 
                     onBack = {},
                     onManageConnections = {},
@@ -104,7 +104,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.setContent {
             DshTheme {
                 PluginInventoryBrowser(
-                    localIds = listOf("local-builtin"),
+                    localIds = listOf("android-local-builtins"),
                     skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry("report", "Build a report", true)),
                     skillsOnly = true, onBack = {}, onManageConnections = {}, onReturnToChat = {},
                 )
