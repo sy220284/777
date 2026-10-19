@@ -33,6 +33,22 @@ class LocalReplyUiDocumentTest {
         assertEquals(raw, LocalReplyUiDocumentProtocol.split(windows).definition)
     }
 
+    @Test fun workNeverShowsAnUnansweredFormWhileThatModelStepStillRunsTools() {
+        assertFalse(LocalReplyUiDocumentProtocol.workFormMayBePublished(raw, modelToolCallCount = 1))
+        assertFalse(LocalReplyUiDocumentProtocol.workFormMayBePublished(raw, modelToolCallCount = 2))
+        assertTrue(LocalReplyUiDocumentProtocol.workFormMayBePublished(raw, modelToolCallCount = 0))
+        assertFalse(LocalReplyUiDocumentProtocol.workFormMayBePublished(null, modelToolCallCount = 0))
+    }
+
+    @Test fun protocolDistinguishesConfirmAndSendFromPreparingUnsentDraft() {
+        assertTrue(LocalReplyUiDocumentProtocol.instruction.contains(
+            "submit_user_input for confirmation or submission buttons",
+        ))
+        assertTrue(LocalReplyUiDocumentProtocol.instruction.contains(
+            "Do not call send_user_input a confirmation or submission",
+        ))
+    }
+
     @Test fun streamingHidesProtocolEvenWhenMarkerIsSplitAtEveryPossibleBoundary() {
         val output = "Progress 😀\n```ui_document\n$raw\n```"
         for (width in 1..30) {
