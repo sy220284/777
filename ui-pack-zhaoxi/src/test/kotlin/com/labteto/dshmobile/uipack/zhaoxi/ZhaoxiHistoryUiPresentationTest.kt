@@ -12,6 +12,8 @@ import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxCapabilityPermissionLabel
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkspaceKindLabel
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxUsageActionLabel
 import com.labteto.dshmobile.local.TokenUsageAction
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxLorePriorityInput
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxLoreSpoilerInput
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkspaceFileVisible
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxSettingsNavigationIcon
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxChatGptCanCancelAuthorization
@@ -62,6 +64,18 @@ class ZhaoxiHistoryUiPresentationTest {
         assertTrue(zxAutomationTaskMatches("小雨", "晚间互动", "小雨", "每周"))
         assertTrue(zxAutomationTaskMatches("每周", "备份文件", null, "每周"))
         assertFalse(zxAutomationTaskMatches("未匹配", "备份文件", null, "每日"))
+    }
+    @Test fun personaLoreAdvancedFieldsRespectOwnerRanges() {
+        assertEquals(0, zxLorePriorityInput("0"))
+        assertEquals(50, zxLorePriorityInput("50"))
+        assertEquals(100, zxLorePriorityInput("100"))
+        assertNull(zxLorePriorityInput("-1"))
+        assertNull(zxLorePriorityInput("101"))
+        assertNull(zxLorePriorityInput(""))
+        assertEquals(0, zxLoreSpoilerInput("0"))
+        assertEquals(3, zxLoreSpoilerInput("3"))
+        assertNull(zxLoreSpoilerInput("4"))
+        assertNull(zxLoreSpoilerInput("none"))
     }
     @Test fun commonCapabilityGroupsGetHumanNames() {
         assertEquals("设备操作", zxToolFamilyLabel("Android"))
