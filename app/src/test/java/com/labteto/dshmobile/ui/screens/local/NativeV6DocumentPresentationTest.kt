@@ -48,6 +48,26 @@ class NativeV6DocumentPresentationTest {
         org.junit.Assert.assertTrue(nativeV6DocumentReceiptMessage(rejected).contains("已失效"))
     }
 
+    @Test fun onlyAcceptedOrQueuedSubmissionLocksTheFormAgainstRepeatedTap() {
+        val receipt = com.labteto.dshmobile.uicontract.UiDocumentReceipt.OwnerReceipt(
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted,
+        )
+        val queued = com.labteto.dshmobile.uicontract.UiDocumentReceipt.OwnerReceipt(
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued,
+        )
+        val rejected = com.labteto.dshmobile.uicontract.UiDocumentReceipt.OwnerReceipt(
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Rejected(
+                com.labteto.dshmobile.uicontract.UiCommandRejection.LOADING,
+            ),
+        )
+        org.junit.Assert.assertTrue(nativeV6SubmittedToOwner(receipt))
+        org.junit.Assert.assertTrue(nativeV6SubmittedToOwner(queued))
+        org.junit.Assert.assertFalse(nativeV6SubmittedToOwner(rejected))
+        org.junit.Assert.assertFalse(nativeV6SubmittedToOwner(
+            com.labteto.dshmobile.uicontract.UiDocumentReceipt.DraftPrepared,
+        ))
+    }
+
     @Test fun singleSelectRendersCurrentChoiceWithoutPretendingToBeMultipleChoice() {
         val select = UiDocumentNode.Select("city", "目的地", listOf("成都", "上海"), "成都")
         assertEquals("成都", nativeV6SelectLabel(select, emptyMap()))
