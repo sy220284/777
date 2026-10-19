@@ -1094,14 +1094,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 onRegenerate = onRegenerate,
                             )
                             val isHistoricalDocumentSource = state.messages.none { it.id == transcriptItem.message.id }
-                            val inlineDocuments = (if (isHistoricalDocumentSource) olderDocumentSnapshots
-                                else nativeDocumentSnapshot.documents).filter { snapshot ->
-                                snapshot.document.source.messageId == transcriptItem.message.id &&
-                                    (transcriptItem.message.role == "assistant" ||
-                                        state.usageMode == LocalUsageMode.WORK &&
-                                        transcriptItem.message.role == "user" &&
-                                        snapshot.document.documentId.startsWith("work-live:"))
-                            }
+                            val inlineDocuments = nativeV6DocumentsForMessage(
+                                messageId = transcriptItem.message.id,
+                                role = transcriptItem.message.role,
+                                workMode = state.usageMode == LocalUsageMode.WORK,
+                                snapshots = if (isHistoricalDocumentSource) olderDocumentSnapshots
+                                    else nativeDocumentSnapshot.documents,
+                            )
                             if (nativeDocuments != null &&
                                 (nativeDocumentSnapshot.sessionId == state.sessionId || isHistoricalDocumentSource) &&
                                 (transcriptItem.message.role == "assistant" || inlineDocuments.isNotEmpty())) {
