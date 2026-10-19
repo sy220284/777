@@ -442,7 +442,7 @@ fun ZhaoxiSteeringScene(
                     drafts.updateDraft(sessionId, "")
                 }
             }
-        }, enabled = snap.identity != null && draft.isNotBlank() && snap.send.enabled)
+        }, enabled = snap.identity != null && draft.isNotBlank() && snap.send.available)
         if (snap.identity == null) ZxFooterNote("请先打开一个 Work 会话")
         if (snap.queuedInputCount > 0)
             ZxFooterNote("执行引擎已报告排队指令 ${snap.queuedInputCount} 条")
