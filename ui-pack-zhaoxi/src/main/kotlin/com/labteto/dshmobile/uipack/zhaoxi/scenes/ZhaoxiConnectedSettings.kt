@@ -108,6 +108,19 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         presetQuery = ""
         showAdvancedConnection = false
     }
+    fun selectPreset(option: LocalModelPreset) {
+        profileId = null
+        credentialSourceProfileId = null
+        model = option.model
+        baseUrl = option.baseUrl
+        protocol = option.protocol
+        contextWindowTokens = ""
+        apiKey = ""
+        resetCatalog()
+        status = null
+        showAdvancedConnection = false
+        showPresets = false
+    }
     val activeProfile = snap.modelProfiles.firstOrNull { snap.modelSelection.isActive(it) }
     ZxPage("模型与账户", onBack = { scope.onBack() }, scrollState = modelScroll) {
         snap.error?.let { ZxBanner(it, ZxTone.Err) }
@@ -132,7 +145,17 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         if (showModelForm) {
             ZxSettingsGroup {
                 ZxSection(if (profileId == null && credentialSourceProfileId == null) "添加模型" else "编辑模型")
-                ZxButton(if (showPresets) "收起预设模型" else "选择预设模型", {
+                ZxFooterNote("常用来源可直接选择；其他模型仍支持搜索和手动填写。")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    settings.apiModelPresets.distinctBy { it.provider }.take(3).forEach { option ->
+                        ZxChip("${option.provider} · ${option.model}", model == option.model &&
+                            baseUrl.trimEnd('/') == option.baseUrl.trimEnd('/')) {
+                            selectPreset(option)
+                        }
+                    }
+                }
+                ZxButton(if (showPresets) "收起全部预设" else "查看全部预设 · ${settings.apiModelPresets.size} 项", {
                     showPresets = !showPresets
                     if (!showPresets) presetQuery = ""
                 }, Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline, enabled = !busy)
@@ -152,17 +175,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                                 ZxChip(option.model, model == option.model &&
                                     baseUrl.trimEnd('/') == option.baseUrl.trimEnd('/'),
                                     modifier = Modifier.testTag("zx-model-preset-${option.model}")) {
-                                    profileId = null
-                                    credentialSourceProfileId = null
-                                    model = option.model
-                                    baseUrl = option.baseUrl
-                                    protocol = option.protocol
-                                    contextWindowTokens = ""
-                                    apiKey = ""
-                                    resetCatalog()
-                                    status = null
-                                    showAdvancedConnection = false
-                                    showPresets = false
+                                    selectPreset(option)
                                 }
                             }
                         }
