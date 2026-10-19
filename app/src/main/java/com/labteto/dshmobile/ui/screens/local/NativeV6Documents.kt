@@ -10,16 +10,12 @@ import com.labteto.dshmobile.uicontract.*
 internal class NativeV6Documents(
     private val port: UiDocumentUiPort,
     private val conversations: LocalConversationUiPortComposition,
-    private val drafts: ConversationDraftUiPort,
+    private val drafts: NativeV6DocumentDraftPort,
 ) {
     /** The message cards and V6 document drawer share one durable Owner and draft destination. */
     val snapshots = port.snapshots
     /** Single-use handoff: transferring prepared text must never replay on recomposition. */
-    fun consumePreparedDraft(sessionId: String): String? {
-        val text = drafts.drafts.value[sessionId]?.takeIf(String::isNotBlank) ?: return null
-        drafts.updateDraft(sessionId, "")
-        return text
-    }
+    fun consumePreparedDraft(sessionId: String): String? = drafts.consumeDraft(sessionId)
 
     fun submit(snapshot: UiDocumentSnapshot, actionId: String, fields: Map<String, String>, confirmed: Boolean): UiDocumentReceipt {
         val identity = conversations.identitySnapshot()

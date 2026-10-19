@@ -16,6 +16,12 @@ internal class NativeV6DocumentDraftPort : ConversationDraftUiPort {
         textState.value = if (text.isBlank()) textState.value - sessionId
             else textState.value + (sessionId to text)
     }
+    /** A prepared draft is a one-shot handoff. Never replay it after editing or switching sessions. */
+    fun consumeDraft(sessionId: String): String? {
+        val text = textState.value[sessionId]?.takeIf(String::isNotBlank) ?: return null
+        updateDraft(sessionId, "")
+        return text
+    }
     override fun addAttachment(sessionId: String, attachment: LocalImportedAttachment) {
         attachmentState.value = attachmentState.value + (
             sessionId to (attachmentState.value[sessionId].orEmpty() + attachment)
