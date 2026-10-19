@@ -22,6 +22,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -787,21 +790,59 @@ private fun ZhaoxiReasoningStrip(
         UiConversationReasoningMode.DEEP to "深度",
         UiConversationReasoningMode.MAX to "最大",
     )
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-        .padding(horizontal = 12.dp, vertical = 3.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (!workMode) ZxButton("收起", onCollapse, variant = ZxButtonVariant.Outline)
-        options.available.forEach { choice ->
-            ZxChip(titles[choice] ?: choice.name, choice == options.selected) {
-                if (reasoning.select(sessionId, workMode, profile, choice)) {
-                    revision++
-                    hint = null
-                } else hint = "模型或会话已变化，未保存此档位"
+    var menuExpanded by remember(sessionId) { mutableStateOf(false) }
+    // One compact selector instead of a permanently expanded row of model modes.
+    // Both Chat and Work use the same persisted reasoning Owner and navigation.
+    Box(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+        ZxChip("推理 · ${titles[options.selected] ?: options.selected.name} ⌄", false) {
+            menuExpanded = true
+        }
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+            modifier = Modifier.widthIn(min = 168.dp, max = 224.dp),
+            containerColor = ZhaoxiTheme.colors.bg,
+        ) {
+            options.available.forEach { choice ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            (if (choice == options.selected) "✓  " else "　") +
+                                (titles[choice] ?: choice.name),
+                            fontSize = 14.sp,
+                            color = ZhaoxiTheme.colors.ink,
+                        )
+                    },
+                    onClick = {
+                        if (reasoning.select(sessionId, workMode, profile, choice)) {
+                            revision++
+                            hint = null
+                            menuExpanded = false
+                        } else hint = "模型或会话已变化，未保存此档位"
+                    },
+                )
+            }
+            if (workMode && UiSceneId("work.plan_review") in knownScenes) {
+                androidx.compose.material3.HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text("计划", fontSize = 14.sp, color = ZhaoxiTheme.colors.ink) },
+                    onClick = {
+                        menuExpanded = false
+                        scope.onNavigate(UiSceneId("work.plan_review"))
+                    },
+                )
+            }
+            if (!workMode) {
+                androidx.compose.material3.HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text("收起", fontSize = 14.sp, color = ZhaoxiTheme.colors.ink) },
+                    onClick = {
+                        menuExpanded = false
+                        onCollapse()
+                    },
+                )
             }
         }
-        if (workMode && UiSceneId("work.plan_review") in knownScenes)
-            ZxButton("计划", { scope.onNavigate(UiSceneId("work.plan_review")) },
-                variant = ZxButtonVariant.Outline)
     }
     hint?.let { ZxFooterNote(it) }
 }
