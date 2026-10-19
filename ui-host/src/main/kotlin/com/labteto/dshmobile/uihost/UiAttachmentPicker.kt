@@ -13,6 +13,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import com.labteto.dshmobile.uicontract.UiSessionIdentity
 
 /**
  * Host is the only Android document picker. Its request is admitted by the
@@ -83,64 +86,108 @@ fun <T> rememberUiAttachmentPickerFor(
  * The caller must delete the temporary file after the attachment Owner has
  * finished reading it.
  */
+/**
+ * Camera results are delivered by Android after another Activity returns. Unlike a regular
+ * document picker, TakePicture has a Host-owned output file that must survive Activity
+ * re-creation; a plain remember/File + DisposableEffect delete loses the photographed bytes.
+ * The saved target is only an identity fence: the Feature Owner re-checks it before import.
+ */
 @Composable
-fun <T> rememberUiCameraCaptureFor(
+fun rememberUiCameraCaptureFor(
     onRejected: (String) -> Unit = {},
-    onSelected: (T, String, () -> Unit) -> Unit,
-): (T) -> Unit {
+    onSelected: (UiSessionIdentity, String, () -> Unit) -> Unit,
+): (UiSessionIdentity) -> Unit {
     val context = LocalContext.current
     val owner = LocalUiHostSystemOperationOwner.current
         ?: remember { UiHostSystemOperationOwner() }
     val latestSelected by rememberUpdatedState(onSelected)
     val latestRejected by rememberUpdatedState(onRejected)
-    val gate = remember(owner) { UiHostDocumentOperationGate<T>() }
+    val gate = remember(owner) { UiHostDocumentOperationGate<UiSessionIdentity>() }
     val lease = remember(owner) { UiHostSystemOperationLease(owner, UiHostPlatformAction.PICK_ATTACHMENT) }
-    var captureFile by remember { androidx.compose.runtime.mutableStateOf<File?>(null) }
+
+    // ActivityResultRegistry restores the camera callback after re-creation. Restore the
+    // exact activation token and FileProvider source alongside it, not the new foreground chat.
+    var capturePath by rememberSaveable { mutableStateOf<String?>(null) }
+    var requestSession by rememberSaveable { mutableStateOf<String?>(null) }
+    var requestActivation by rememberSaveable { mutableStateOf<String?>(null) }
+    var requestGeneration by rememberSaveable { mutableStateOf(0L) }
+    var requestProfile by rememberSaveable { mutableStateOf<String?>(null) }
+    var requestProject by rememberSaveable { mutableStateOf<String?>(null) }
+    fun clearCapture() {
+        capturePath = null
+        requestSession = null
+        requestActivation = null
+        requestGeneration = 0L
+        requestProfile = null
+        requestProject = null
+    }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         val ticket = gate.cancelSelection()
-        val file = captureFile
-        captureFile = null
+        val pendingPath = capturePath
+        val file = pendingPath?.let(::File)
+        val restoredIdentity = if (pendingPath != null &&
+            !requestSession.isNullOrBlank() && !requestActivation.isNullOrBlank()) {
+            UiSessionIdentity(
+                sessionId = requireNotNull(requestSession),
+                activationId = requireNotNull(requestActivation),
+                contextGeneration = requestGeneration,
+                profileId = requestProfile,
+                projectId = requestProject,
+            )
+        } else null
+        val target = ticket?.request ?: restoredIdentity
+        clearCapture()
         lease.finish()
-        if (ticket != null && success && file != null) {
+        if (target != null && success && file != null && file.isFile && file.length() > 0L) {
             try {
                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
-                latestSelected(ticket.request, uri.toString()) { file.delete() }
+                latestSelected(target, uri.toString()) { file.delete() }
             } catch (failure: Exception) {
                 file.delete()
                 latestRejected("相机照片无法读取，请重试")
             }
         } else {
             file?.delete()
-            if (ticket == null) latestRejected("HOST_PICKER_STALE_RESULT")
+            if (success) latestRejected("拍照未生成有效照片，请重试")
+            else if (target == null) latestRejected("拍照结果已失效，请重新拍摄")
         }
     }
     DisposableEffect(gate, lease) {
         onDispose {
             gate.cancelSelection()
-            captureFile?.delete()
-            captureFile = null
+            // Do not delete the saved output: the camera Activity may still be writing it.
+            // Its result callback owns removal on cancel/failure, or after completed import.
             lease.finish()
         }
     }
     return { request ->
-        val ticket = gate.begin(request)
-        if (ticket == null) latestRejected("HOST_PLATFORM_OPERATION_BUSY")
-        else if (!lease.begin()) {
-            gate.failToLaunch(ticket)
-            latestRejected("HOST_PLATFORM_OPERATION_BUSY")
+        if (capturePath != null) {
+            latestRejected("上一张照片仍在拍摄，请先返回相机")
         } else {
-            try {
-                val directory = File(context.cacheDir, "camera").apply { mkdirs() }
-                val file = File.createTempFile("zhaoxi-", ".jpg", directory)
-                captureFile = file
-                val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
-                launcher.launch(uri)
-            } catch (failure: Exception) {
+            val ticket = gate.begin(request)
+            if (ticket == null) latestRejected("HOST_PLATFORM_OPERATION_BUSY")
+            else if (!lease.begin()) {
                 gate.failToLaunch(ticket)
-                captureFile?.delete()
-                captureFile = null
-                lease.finish()
-                latestRejected("相机无法打开，请检查可用的拍摄应用")
+                latestRejected("HOST_PLATFORM_OPERATION_BUSY")
+            } else {
+                try {
+                    val directory = File(context.cacheDir, "camera").apply { mkdirs() }
+                    val file = File.createTempFile("zhaoxi-", ".jpg", directory)
+                    capturePath = file.absolutePath
+                    requestSession = request.sessionId
+                    requestActivation = request.activationId
+                    requestGeneration = request.contextGeneration
+                    requestProfile = request.profileId
+                    requestProject = request.projectId
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                    launcher.launch(uri)
+                } catch (failure: Exception) {
+                    gate.failToLaunch(ticket)
+                    capturePath?.let { File(it).delete() }
+                    clearCapture()
+                    lease.finish()
+                    latestRejected("相机无法打开，请检查可用的拍摄应用")
+                }
             }
         }
     }
