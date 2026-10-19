@@ -48,8 +48,10 @@ internal class LocalModelProfileStore(
             // Missing enum fields are legitimate old-format data. An explicitly unknown
             // enum is not: interpreting it as API_KEY changes credential identity.
             val auth = obj["authKind"]?.jsonPrimitive?.contentOrNull
-                ?.let(LocalModelAuthKind::valueOf)
+                ?.let { LocalModelAuthKind.valueOf(it) }
                 ?: LocalModelAuthKind.API_KEY
+            val recordedProtocol = obj["protocol"]?.jsonPrimitive?.contentOrNull
+                ?.let { LocalModelProtocol.valueOf(it) }
             val credentialRef = obj["credentialRef"]?.jsonPrimitive?.contentOrNull
             val preset = LocalModelPresets.find(model, baseUrl)
             LocalModelProfile(
@@ -63,8 +65,7 @@ internal class LocalModelProfileStore(
                     LocalModelAuthKind.CHATGPT_PLAN -> LocalModelProtocol.RESPONSES
                     LocalModelAuthKind.API_KEY ->
                         preset?.protocol?.takeIf { it == LocalModelProtocol.ANTHROPIC_MESSAGES }
-                            ?: obj["protocol"]?.jsonPrimitive?.contentOrNull
-                                ?.let(LocalModelProtocol::valueOf)
+                            ?: recordedProtocol
                             ?: preset?.protocol
                             ?: LocalModelProtocol.CHAT_COMPLETIONS
                 },
