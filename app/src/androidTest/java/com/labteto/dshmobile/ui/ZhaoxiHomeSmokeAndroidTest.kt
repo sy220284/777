@@ -28,7 +28,15 @@ class ZhaoxiHomeSmokeAndroidTest {
         ]
         compose.waitUntil(30_000) { !owner.sessions.snapshot().loading && owner.sessions.snapshot().identity != null }
         if (owner.sessions.snapshot().usageMode != com.labteto.dshmobile.local.LocalUsageMode.CHAT) {
-            compose.onNodeWithText("聊天", useUnmergedTree = true).performClick()
+            val receipt = owner.sessions.submit(
+                com.labteto.dshmobile.uicontract.SessionUiCommand.SelectMode(
+                    com.labteto.dshmobile.local.LocalUsageMode.CHAT, openConversation = false,
+                ),
+            )
+            org.junit.Assert.assertTrue(
+                receipt == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted ||
+                    receipt == com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued,
+            )
             compose.waitUntil(30_000) {
                 !owner.sessions.snapshot().loading &&
                     owner.sessions.snapshot().usageMode == com.labteto.dshmobile.local.LocalUsageMode.CHAT
