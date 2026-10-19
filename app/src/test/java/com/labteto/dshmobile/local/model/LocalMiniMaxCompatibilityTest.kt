@@ -21,6 +21,8 @@ class LocalMiniMaxCompatibilityTest {
             for (path in listOf("/v1", "/anthropic/v1")) {
                 val base = "https://$host$path"
                 assertEquals(1_000_000, LocalModelPresets.find("MiniMax-M3", base)?.contextWindowTokens)
+                assertEquals(1_000_000, LocalModelPresets.find("MiniMax-M3.1-Flash", base)?.contextWindowTokens)
+                assertEquals(true, LocalModelPresets.documentedImageInputSupport("MiniMax-M3.1-Flash", base))
                 assertEquals(204_800, LocalModelPresets.find("MiniMax-M2.5", base)?.contextWindowTokens)
                 assertEquals(false, LocalModelPresets.documentedImageInputSupport("MiniMax-M2.7", base))
                 assertEquals(10_000_000L, LocalModelPresets.maxNativeImageBytesFor("MiniMax-M3", base))
@@ -46,6 +48,10 @@ class LocalMiniMaxCompatibilityTest {
         val preview = LocalReasoningRequestPolicy.resolve(profile.copy(model = "MiniMax-M3.1-Flash-Preview"))!!
         assertEquals("low", preview.disabledEffort)
         assertEquals("max", preview.maxEffort)
+        val stable = LocalReasoningRequestPolicy.resolve(profile.copy(model = "MiniMax-M3.1-Flash"))!!
+        assertEquals("low", stable.disabledEffort)
+        assertEquals("high", stable.enabledEffort)
+        assertEquals("max", stable.maxEffort)
     }
 
     @Test fun anthropicWritesNativeThinkingAndEffortOnlyForSupportedModel() {
@@ -57,6 +63,15 @@ class LocalMiniMaxCompatibilityTest {
         assertFalse(payload("MiniMax-M2.7", "none").containsKey("thinking"))
         assertEquals("max", payload("MiniMax-M3.1-Flash-Preview", "max")["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
         assertThrows(IllegalArgumentException::class.java) { payload("MiniMax-M3.1-Flash-Preview", "none") }
+        val latest = payload("MiniMax-M3.1-Flash", "high")
+        assertEquals("high", latest["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+        assertFalse(latest.containsKey("thinking"))
+        assertThrows(IllegalArgumentException::class.java) { payload("MiniMax-M3.1-Flash", "none") }
+        val nativeOpenAi = buildJsonObject {
+            LocalMiniMaxPolicy.writeThinking(this, "MiniMax-M3.1-Flash", "low", anthropic = false)
+        }
+        assertEquals("low", nativeOpenAi["reasoning_effort"]!!.jsonPrimitive.content)
+        assertFalse(nativeOpenAi.containsKey("thinking"))
     }
 
     @Test fun streamingThinkingDetailsSurviveToolHistoryOnlyOnSameRoute() = runBlocking {
