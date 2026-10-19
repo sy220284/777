@@ -153,7 +153,7 @@ internal class LocalSessionStorageManager(
             }
             require(names.isNotEmpty()) { "备份中没有可恢复的会话文件" }
             val existing = durableFiles().mapNotNull(::sessionIdOf).toSet()
-            val grouped = names.groupBy { name -> sessionIdOf(File(name))!! }
+            val grouped = names.groupBy { name -> sessionIdOf(File(staging, name))!! }
             val eligible = grouped.filterKeys { it !in existing }
             require(eligible.isNotEmpty()) { "全部会话已存在，恢复不会覆盖当前数据" }
             // Never stage a snapshot without its append-only event source.
