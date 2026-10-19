@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,19 +42,37 @@ internal fun SettingsUiReceipt.zxUserMessage(action: String = "操作"): String 
 fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.state.collectAsState(initial = settings.initialState)
     val jobs = rememberCoroutineScope()
+    // Plan-backed routes are managed by Account Owner, never edited as API-key profiles.
+    val apiProfiles = snap.modelProfiles.filter { it.authKind == LocalModelAuthKind.API_KEY }
+    val planProfiles = snap.modelProfiles.count { it.authKind == LocalModelAuthKind.CHATGPT_PLAN }
     var profileId by rememberSaveable { mutableStateOf<String?>(null) }
+    var credentialSourceProfileId by rememberSaveable { mutableStateOf<String?>(null) }
     var showModelForm by rememberSaveable { mutableStateOf(false) }
     var expandedModelId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingRemoveModel by remember { mutableStateOf<String?>(null) }
     var model by rememberSaveable { mutableStateOf("") }
     var baseUrl by rememberSaveable { mutableStateOf("https://api.deepseek.com") }
     var protocol by rememberSaveable { mutableStateOf(LocalModelProtocol.CHAT_COMPLETIONS) }
+    var contextWindowTokens by rememberSaveable { mutableStateOf("") }
     var apiKey by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var discoveredModels by remember { mutableStateOf<List<String>?>(null) }
     var catalogFilter by remember { mutableStateOf("") }
     var catalogFailure by remember { mutableStateOf<String?>(null) }
+    val preset = LocalModelPresets.find(model, baseUrl)
+    val isKimiK3 = preset?.provider == "Kimi Code" && preset.model == "k3"
+    val supportsWindowOverride = preset == null || isKimiK3
+    val window = contextWindowTokens.toIntOrNull()
+    val validWindow = contextWindowTokens.isBlank() || (window != null && (
+        if (isKimiK3) window == 262_144 || window == 1_048_576
+        else window in 4_096..16_000_000
+    ))
+    fun resetCatalog() {
+        discoveredModels = null
+        catalogFailure = null
+        catalogFilter = ""
+    }
     fun execute(action: suspend () -> String) {
         if (busy) return
         busy = true
@@ -64,139 +83,292 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             finally { busy = false }
         }
     }
-    ZxPage("模型", onBack = { scope.onBack() }) {
+    fun startNewModel() {
+        profileId = null
+        credentialSourceProfileId = null
+        model = ""
+        baseUrl = "https://api.deepseek.com"
+        protocol = LocalModelProtocol.CHAT_COMPLETIONS
+        contextWindowTokens = ""
+        apiKey = ""
+        status = null
+        resetCatalog()
+        showModelForm = true
+    }
+    ZxPage("模型与账户", onBack = { scope.onBack() }) {
         snap.error?.let { ZxBanner(it, ZxTone.Err) }
-        status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        ZxButton("添加模型", {
-            profileId = null; model = ""; apiKey = ""; status = null
-            discoveredModels = null; catalogFailure = null; catalogFilter = ""
-            showModelForm = true
-        }, Modifier.fillMaxWidth(), enabled = !busy)
-        if (showModelForm || snap.modelProfiles.isEmpty()) {
+        status?.let { ZxBanner(it, ZxTone.Warn) }
+        ZxSection("模型配置")
+        ZxFooterNote("已配置 API 模型 ${apiProfiles.size} 个 · ChatGPT 套餐模型 ${planProfiles} 个。账号授权独立管理。")
+        ZxButton("添加模型", { startNewModel() }, Modifier.fillMaxWidth(), enabled = !busy)
+        if (showModelForm || apiProfiles.isEmpty()) {
             ZxSettingsGroup {
-        ZxSection(if (profileId == null) "添加模型" else "编辑模型")
-        ZxSection("模型名称")
-        ZxField(model, { model = it }, Modifier.fillMaxWidth(), placeholder = "模型名称（支持手动输入）",
-            fieldLabel = "模型名称")
-        ZxFooterNote("可使用供应商目录选择模型，也可手动填写目录里没有的自定义模型。")
-        ZxSection("接口地址")
-        ZxField(baseUrl, { baseUrl = it }, Modifier.fillMaxWidth(), placeholder = "接口地址")
-        ZxSection("访问凭据")
-        ZxField(apiKey, { apiKey = it }, Modifier.fillMaxWidth(), placeholder = "API Key（编辑时留空保留原凭据）",
-            visualTransformation = PasswordVisualTransformation())
-        ZxFooterNote(if (profileId == null) "凭据仅用于连接该模型" else
-            "不填写密钥时保留原凭据；不会在界面中回显已有密钥")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            LocalModelProtocol.entries.forEach { p -> ZxChip(p.name, p == protocol) {
-                protocol = p
-                discoveredModels = null
-                catalogFailure = null
-            } }
-        }
-        ZxSection("从提供商读取可用模型")
-        ZxButton("读取 /models 目录", {
-            if (!busy) {
-                val oldAddress = baseUrl.trim()
-                val oldProtocol = protocol
-                val oldProfile = profileId
-                val oldKey = apiKey
-                busy = true
-                catalogFailure = null
-                discoveredModels = null
-                jobs.launch {
-                    try {
-                        val names = settings.discoverApiModels(oldKey, oldAddress, oldProtocol, oldProfile)
-                            .map(String::trim).filter(String::isNotBlank).distinct().sorted()
-                        if (oldAddress != baseUrl.trim() || oldProtocol != protocol ||
-                            oldProfile != profileId || oldKey != apiKey) {
-                            catalogFailure = "连接配置已变化，请重新查询模型列表"
-                        } else {
-                            discoveredModels = names
-                            status = if (names.isEmpty()) "目录没有返回模型，可以继续手动填写" else
-                                "已读取 ${names.size} 个可用模型，请选择后保存"
+                ZxSection(if (profileId == null && credentialSourceProfileId == null) "添加 API 模型" else "编辑 / 复制模型配置")
+                ZxFooterNote("常用供应商可一键填入地址和协议，其他模型可手动配置。")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LocalModelPresets.entries.forEach { option ->
+                        ZxChip("${option.provider} · ${option.model}",
+                            model == option.model && baseUrl.trimEnd('/') == option.baseUrl.trimEnd('/')) {
+                            profileId = null
+                            credentialSourceProfileId = null
+                            model = option.model
+                            baseUrl = option.baseUrl
+                            protocol = option.protocol
+                            contextWindowTokens = ""
+                            apiKey = ""
+                            resetCatalog()
+                            status = null
+                            showModelForm = true
                         }
-                    } catch (cancelled: CancellationException) { throw cancelled }
-                    catch (failure: Exception) {
-                        catalogFailure = failure.message ?: "读取模型目录失败"
-                        status = "目录不可用，不影响手动填写模型"
-                    } finally { busy = false }
+                    }
+                    ZxChip("自定义模型", model.isBlank() || preset == null) {
+                        profileId = null
+                        credentialSourceProfileId = null
+                        model = ""
+                        baseUrl = ""
+                        protocol = LocalModelProtocol.CHAT_COMPLETIONS
+                        contextWindowTokens = ""
+                        apiKey = ""
+                        resetCatalog()
+                    }
                 }
-            }
-        }, enabled = !busy && baseUrl.isNotBlank() && (apiKey.isNotBlank() || profileId != null),
-            variant = ZxButtonVariant.Outline, loading = busy)
-        catalogFailure?.let { ZxFooterNote("目录读取失败：$it。可手动填写模型名称并测试。") }
-        discoveredModels?.let { names ->
-            if (names.isEmpty()) ZxFooterNote("当前目录为空，手动配置仍然可用")
-            else {
-                ZxField(catalogFilter, { catalogFilter = it }, Modifier.fillMaxWidth(),
-                    placeholder = "筛选可用模型")
-                names.filter { it.contains(catalogFilter.trim(), ignoreCase = true) }
-                    .take(60).forEach { available ->
-                        ZxRow(available, "选用此模型标识", onClick = {
-                            model = available
-                            status = "已选择模型标识，还需要点击保存模型"
-                        }, trailing = {
-                            ZxChip(if (model == available) "已选择" else "选择", model == available) {
+                ZxSection("模型名称")
+                ZxField(model, { value ->
+                    if (value != model) {
+                        if (profileId != null) credentialSourceProfileId = profileId
+                        profileId = null
+                        model = value.take(160)
+                        resetCatalog()
+                    }
+                }, Modifier.fillMaxWidth(), placeholder = "模型标识（支持手动输入）", fieldLabel = "模型名称")
+                ZxSection("接口地址")
+                ZxField(baseUrl, { value ->
+                    if (value != baseUrl) {
+                        if (value.trimEnd('/') != baseUrl.trimEnd('/')) {
+                            profileId = null
+                            credentialSourceProfileId = null
+                        }
+                        baseUrl = value.take(1000)
+                        resetCatalog()
+                    }
+                }, Modifier.fillMaxWidth(), placeholder = "https://…", fieldLabel = "接口地址")
+                ZxSection("请求协议")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LocalModelProtocol.entries.forEach { p ->
+                        val label = when (p) {
+                            LocalModelProtocol.CHAT_COMPLETIONS -> "Chat Completions"
+                            LocalModelProtocol.RESPONSES -> "Responses"
+                            LocalModelProtocol.ANTHROPIC_MESSAGES -> "Anthropic Messages"
+                        }
+                        ZxChip(label, p == protocol) {
+                            protocol = p
+                            resetCatalog()
+                        }
+                    }
+                }
+                preset?.modelsEndpoint?.let { ZxFooterNote("官方模型目录：$it") }
+                if (supportsWindowOverride) {
+                    ZxSection("上下文窗口（可选）")
+                    ZxField(contextWindowTokens, { value ->
+                        contextWindowTokens = value.filter(Char::isDigit).take(8)
+                    }, Modifier.fillMaxWidth(), placeholder = if (isKimiK3) "262144 或 1048576" else "留空使用默认值",
+                        fieldLabel = "Token 上下文上限")
+                    ZxFooterNote(if (isKimiK3)
+                        "Kimi K3 默认 256K；仅具有相应套餐权限时选择 1048576，设置不会赋予套餐权限。"
+                    else "自定义模型填写 4096–16000000；留空使用模型的默认上下文窗口。")
+                    if (!validWindow) ZxBanner("上下文窗口数值不支持，请检查后保存", ZxTone.Err)
+                }
+                ZxSection("访问凭据")
+                ZxField(apiKey, { apiKey = it.take(8000); resetCatalog() },
+                    Modifier.fillMaxWidth(), placeholder = "API Key（编辑时留空保留原凭据）",
+                    visualTransformation = PasswordVisualTransformation(), fieldLabel = "API Key")
+                ZxFooterNote(if (profileId != null || credentialSourceProfileId != null)
+                    "留空可沿用同一接口地址的已保存密钥；修改接口地址时必须重新提供凭据。"
+                else "API Key 仅交由模型配置接口保存，不在此页面回显。")
+                ZxSection("从提供商读取可用模型")
+                ZxButton("刷新 /models 目录", {
+                    if (!busy) {
+                        val oldAddress = baseUrl.trim()
+                        val oldProtocol = protocol
+                        val oldProfile = profileId
+                        val oldSource = credentialSourceProfileId
+                        val oldKey = apiKey
+                        busy = true
+                        catalogFailure = null
+                        discoveredModels = null
+                        jobs.launch {
+                            try {
+                                val names = settings.discoverApiModels(
+                                    oldKey, oldAddress, oldProtocol, oldSource ?: oldProfile
+                                ).map(String::trim).filter(String::isNotBlank).distinct().sorted()
+                                if (oldAddress != baseUrl.trim() || oldProtocol != protocol ||
+                                    oldProfile != profileId || oldSource != credentialSourceProfileId ||
+                                    oldKey != apiKey) {
+                                    catalogFailure = "连接配置发生变化，请重新查询模型列表"
+                                } else {
+                                    discoveredModels = names
+                                    status = if (names.isEmpty()) "目录为空，可手动填写模型" else
+                                        "已读取 ${names.size} 个模型，选择后仍需保存"
+                                }
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (failure: Exception) {
+                                catalogFailure = failure.message ?: "读取模型目录失败"
+                                status = "目录不可用，仍可手动填写和测试"
+                            } finally { busy = false }
+                        }
+                    }
+                }, enabled = !busy && baseUrl.isNotBlank() &&
+                    (apiKey.isNotBlank() || profileId != null || credentialSourceProfileId != null),
+                    variant = ZxButtonVariant.Outline, loading = busy)
+                catalogFailure?.let { ZxFooterNote("目录读取失败：$it；不会清除手动填写内容。") }
+                discoveredModels?.let { names ->
+                    if (names.isEmpty()) ZxFooterNote("当前目录未返回可选模型")
+                    else {
+                        ZxField(catalogFilter, { catalogFilter = it }, Modifier.fillMaxWidth(),
+                            placeholder = "搜索模型名称", fieldLabel = "筛选模型")
+                        val matched = names.filter { it.contains(catalogFilter.trim(), ignoreCase = true) }
+                        matched.take(60).forEach { available ->
+                            ZxRow(available, "选择模型标识；保存后才生效", onClick = {
+                                if (profileId != null) credentialSourceProfileId = profileId
+                                profileId = null
                                 model = available
+                                status = "已选择 $available，点击保存以应用"
+                            }, trailing = {
+                                ZxChip(if (model == available) "已选择" else "选择", model == available) {
+                                    if (profileId != null) credentialSourceProfileId = profileId
+                                    profileId = null
+                                    model = available
+                                }
+                            })
+                        }
+                        if (matched.size > 60) ZxFooterNote("结果较多，请继续输入名称筛选")
+                    }
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZxButton("测试连接", {
+                        execute {
+                            settings.testModel(apiKey, model, baseUrl, protocol, profileId,
+                                credentialSourceProfileId)
+                        }
+                    }, enabled = !busy && model.isNotBlank() && baseUrl.isNotBlank() &&
+                        (apiKey.isNotBlank() || profileId != null || credentialSourceProfileId != null),
+                        variant = ZxButtonVariant.Outline)
+                    ZxButton("保存模型", {
+                        if (!validWindow && supportsWindowOverride) {
+                            status = "请先填写有效的上下文窗口"
+                        } else {
+                            execute {
+                                val request = SettingsUiCommand.SaveModel(apiKey, model.trim(),
+                                    baseUrl.trim(), protocol, profileId,
+                                    if (supportsWindowOverride) window ?: 0 else null,
+                                    credentialSourceProfileId)
+                                when (val receipt = settings.save(request)) {
+                                    SettingsUiReceipt.Applied -> {
+                                        apiKey = ""
+                                        profileId = null
+                                        credentialSourceProfileId = null
+                                        showModelForm = false
+                                        "模型已保存；当前使用模型以列表标记为准"
+                                    }
+                                    SettingsUiReceipt.Submitted -> "保存请求已提交"
+                                    SettingsUiReceipt.Rejected -> "无法保存模型"
+                                    is SettingsUiReceipt.Failed -> receipt.message ?: "保存失败"
+                                }
                             }
-                        })
-                    }
-                if (names.size > 60) ZxFooterNote("列表较长，使用上方搜索框快速定位模型")
+                        }
+                    }, enabled = !busy && model.isNotBlank() && baseUrl.isNotBlank() &&
+                        (apiKey.isNotBlank() || profileId != null || credentialSourceProfileId != null))
+                }
+                ZxButton("收起编辑", { showModelForm = false },
+                    variant = ZxButtonVariant.Outline, enabled = !busy)
             }
         }
-        ZxButton("测试连接", { execute { settings.testModel(apiKey, model, baseUrl, protocol, profileId) } }, enabled = !busy && model.isNotBlank())
-        ZxButton("保存模型", { execute {
-            when (val result = settings.save(SettingsUiCommand.SaveModel(apiKey, model, baseUrl, protocol, profileId))) {
-                SettingsUiReceipt.Applied -> { apiKey = ""; profileId = null; showModelForm = false; "模型已保存" }
-                SettingsUiReceipt.Submitted -> "保存已提交"
-                SettingsUiReceipt.Rejected -> "无法保存模型"
-                is SettingsUiReceipt.Failed -> result.message ?: "保存失败"
-            }
-        } }, enabled = !busy && model.isNotBlank())
-        ZxButton("收起表单", { showModelForm = false }, variant = ZxButtonVariant.Outline, enabled = !busy)
-            }
-        }
-        ZxSection("已配置模型 · ${snap.modelProfiles.size}")
-        if (snap.modelProfiles.isEmpty()) ZxEmpty("还没有模型", "在上方添加第一个可用模型")
-        snap.modelProfiles.sortedByDescending { snap.modelSelection.isActive(it) }.forEach { p ->
+        ZxSection("已配置 API 模型 · ${apiProfiles.size}")
+        if (apiProfiles.isEmpty()) ZxEmpty("还没有 API 模型", "在上方添加模型，或到账户管理连接 ChatGPT 套餐")
+        apiProfiles.sortedByDescending { snap.modelSelection.isActive(it) }.forEach { p ->
             val active = snap.modelSelection.isActive(p)
-            ZxRow(p.displayName ?: p.model,
-                if (active) "当前使用 · ${p.model}" else p.model,
-                onClick = { expandedModelId = if (expandedModelId == p.id) null else p.id })
-            if (expandedModelId == p.id) {
-                ZxValueRow("接口", value = p.baseUrl)
-                ZxValueRow("协议", value = p.protocol.name)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (!active) ZxChip("使用此模型", false) {
-                        status = settings.submit(SettingsUiCommand.SelectModel(p.id)).zxUserMessage("切换模型")
+            val duplicate = apiProfiles.count { it.model == p.model && it.baseUrl == p.baseUrl } > 1
+            ZxRow((p.displayName ?: p.model) + if (duplicate) " · ${p.id.takeLast(4)}" else "",
+                (if (active) "当前使用" else "已保存") + " · " +
+                    p.provider.ifBlank { "自定义来源" } + " · ${p.model}",
+                onClick = { expandedModelId = if (expandedModelId == p.id) null else p.id },
+                trailing = {
+                    ZxChip(if (expandedModelId == p.id) "收起" else "管理",
+                        expandedModelId == p.id) {
+                        expandedModelId = if (expandedModelId == p.id) null else p.id
                     }
-                    ZxChip("编辑", false) {
-                        profileId = p.id; model = p.model; baseUrl = p.baseUrl
-                        protocol = p.protocol; apiKey = ""; showModelForm = true
+                })
+            if (expandedModelId == p.id) {
+                ZxValueRow("地址", value = p.baseUrl)
+                ZxValueRow("协议", value = p.protocol.name)
+                p.contextWindowTokensOverride?.let { ZxValueRow("上下文上限", value = "$it Token") }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!active) ZxChip("使用此模型", false) {
+                        status = settings.submit(SettingsUiCommand.SelectModel(p.id))
+                            .zxUserMessage("切换模型")
+                    }
+                    ZxChip("编辑配置", false) {
+                        profileId = p.id
+                        credentialSourceProfileId = p.id
+                        model = p.model
+                        baseUrl = p.baseUrl
+                        protocol = p.protocol
+                        contextWindowTokens = p.contextWindowTokensOverride?.toString().orEmpty()
+                        apiKey = ""
+                        showModelForm = true
+                        status = null
+                        resetCatalog()
+                    }
+                    ZxChip("连接测试", false) {
+                        execute { settings.testModel("", p.model, p.baseUrl, p.protocol, p.id) }
                     }
                     ZxChip("移除", false) { pendingRemoveModel = p.id }
                 }
             }
         }
         pendingRemoveModel?.let { id ->
-            ZxDialog("移除模型？", "此操作会删除本地模型配置。", "移除", {
-                pendingRemoveModel = null
-                status = when (val receipt = settings.submit(SettingsUiCommand.RemoveModel(id))) {
-                    SettingsUiReceipt.Applied -> "模型已移除"
-                    SettingsUiReceipt.Submitted -> "移除已提交"
-                    SettingsUiReceipt.Rejected -> "当前无法移除"
-                    is SettingsUiReceipt.Failed -> receipt.message ?: "移除失败"
-                }
-                if (profileId == id) profileId = null
-                if (expandedModelId == id) expandedModelId = null
-            }, { pendingRemoveModel = null })
+            ZxDialog("移除 API 模型？", "会删除此配置的本地模型和密钥，不影响其他 API 模型或 ChatGPT 账户。",
+                "移除", {
+                    pendingRemoveModel = null
+                    status = when (val receipt = settings.submit(SettingsUiCommand.RemoveModel(id))) {
+                        SettingsUiReceipt.Applied -> "模型已移除"
+                        SettingsUiReceipt.Submitted -> "移除已提交，列表更新后生效"
+                        SettingsUiReceipt.Rejected -> "当前无法移除"
+                        is SettingsUiReceipt.Failed -> receipt.message ?: "移除失败"
+                    }
+                }, { pendingRemoveModel = null })
         }
-        ZxNavRow("查看模型用量", sub = "按模型对照 Token 与估算费用") {
+        ZxSection("图片输入方式")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LocalImageInputMode.entries.forEach { mode ->
+                val label = when (mode) {
+                    LocalImageInputMode.AUTO -> "自动"
+                    LocalImageInputMode.NATIVE -> "原生输入"
+                    LocalImageInputMode.TOOL -> "工具识图"
+                }
+                ZxChip(label, snap.imageInputMode == mode) {
+                    status = settings.submit(SettingsUiCommand.ImageInputMode(mode))
+                        .zxUserMessage("切换图片输入方式")
+                }
+            }
+        }
+        ZxFooterNote("依据当前模型实际支持能力选择；自动模式优先使用可用的原生图片输入。")
+        ZxSection("账户与消耗")
+        ZxNavRow("ChatGPT 套餐账户", sub = "多账户 · 授权 · 可用模型 · 重新连接") {
+            scope.onNavigate(UiSceneId("settings.account"))
+        }
+        ZxNavRow("查看模型用量", sub = "按模型对照 Token 和估算费用") {
             scope.onNavigate(UiSceneId("settings.model_usage"))
         }
-        ZxNavRow("ChatGPT 账户") { scope.onNavigate(UiSceneId("settings.account")) }
-        ZxNavRow("套餐额度") { scope.onNavigate(UiSceneId("settings.minimax_quota")) }
-        ZxNavRow("模型性能") { scope.onNavigate(UiSceneId("settings.model_performance")) }
+        ZxNavRow("MiniMax 套餐额度") { scope.onNavigate(UiSceneId("settings.minimax_quota")) }
+        ZxNavRow("模型表现", sub = "推理上限与温度上限") {
+            scope.onNavigate(UiSceneId("settings.model_performance"))
+        }
         ZxNavRow("官方价格") { scope.onNavigate(UiSceneId("settings.pricing")) }
     }
 }
@@ -211,6 +383,11 @@ internal fun zxChatGptAccountAuthLabel(account: com.labteto.dshmobile.local.mode
 @Composable
 fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.chatGptState.collectAsState()
+    val modelState by settings.state.collectAsState(initial = settings.initialState)
+    val uriHandler = LocalUriHandler.current
+    val selectedPlanProfiles = modelState.modelProfiles.filter {
+        it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == snap.selectedAccountId
+    }
     val jobs = rememberCoroutineScope()
     var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -258,8 +435,12 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                 "已重新读取账户状态"
             } }, Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
         }
+        ZxButton("查看 ChatGPT 官方套餐额度", {
+            uriHandler.openUri("https://chatgpt.com/#settings/Usage")
+        }, Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline, enabled = !busy)
+        ZxFooterNote("打开 ChatGPT 官方额度页面；本地 Token 用量和 ChatGPT 套餐剩余额度是不同统计。")
         ZxNavRow("查看本地模型用量",
-            sub = "查看已记录的 Token 和估算费用；此处不代表 ChatGPT 平台套餐剩余额度") {
+            sub = "按已配置模型查询请求记录和费用估算") {
             scope.onNavigate(UiSceneId("settings.model_usage"))
         }
         if (snap.pendingAccountId != null) ZxButton("取消进行中的授权", {
@@ -312,6 +493,27 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                 ZxButton("移除本地账户", { removeConfirm = account.id },
                     Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline, enabled = !busy)
                 ZxFooterNote("重新连接只更新此账户的授权状态，不会自动切换到其他付费模型。")
+            }
+        }
+        ZxSection("当前账户可用套餐模型 · ${snap.models.size}")
+        if (!snap.connected) {
+            ZxFooterNote("需要先完成登录与套餐授权，才可从当前账户使用套餐模型。")
+        } else if (snap.models.isEmpty()) {
+            ZxEmpty("模型目录暂无内容", "刷新账户状态以重新读取套餐可用模型")
+        } else {
+            snap.models.forEach { option ->
+                val route = selectedPlanProfiles.firstOrNull { it.model == option.slug }
+                val active = route != null && modelState.modelSelection.isActive(route)
+                ZxRow(option.displayName,
+                    (if (active) "当前使用" else "套餐模型") +
+                        (if (option.slug == option.displayName) "" else " · ${option.slug}"),
+                    trailing = {
+                        if (active) ZxChip("已选择", true) {}
+                        else if (route != null) ZxChip("使用此模型", false) {
+                            status = settings.submit(SettingsUiCommand.SelectModel(route.id))
+                                .zxUserMessage("切换套餐模型")
+                        }
+                    })
             }
         }
     }
