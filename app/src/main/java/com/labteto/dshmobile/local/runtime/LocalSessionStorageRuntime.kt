@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import com.labteto.dshmobile.local.session.LocalCurrentSessionSnapshotProvider
 import com.labteto.dshmobile.local.session.LocalHarnessSession
+import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.session.localSessionSnapshotBoundary
 import com.labteto.dshmobile.local.session.LocalSessionFilesRuntime
 import com.labteto.dshmobile.local.session.LocalSessionStorageManager
@@ -40,6 +41,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     internal val files: LocalSessionFilesRuntime,
     domainCodecs: Set<@JvmSuppressWildcards LocalSessionDomainCodec>,
     private val currentSnapshotProvider: LocalCurrentSessionSnapshotProvider,
+    private val pendingSessions: LocalPendingSessionRegistry,
 ) {
     private val sessionsRoot = File(context.filesDir, "local-harness/sessions").apply { mkdirs() }
     private val scope = CoroutineScope(
@@ -130,6 +132,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     private fun publishSummaries() {
         runCatching { coordinator.summaries() }
             .onSuccess { summaries ->
+                pendingSessions.forget(summaries.filterNot { it.blank }.map { it.id }.toSet())
                 runtimeStateStore.projection.publishSessions(summaries)
             }
             .onFailure { error ->
