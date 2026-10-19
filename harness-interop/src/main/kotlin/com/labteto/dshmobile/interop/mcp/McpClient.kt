@@ -147,6 +147,9 @@ class McpStreamableHttpTransport(
     private val clientCapabilities: JsonObject = JsonObject(emptyMap()),
 ) : McpTransport {
     private val ids = AtomicLong(1L)
+    // MCP calls may mutate remote state; do not replay after connection failure or redirect.
+    private val nonReplayHttp = http.newBuilder().retryOnConnectionFailure(false)
+        .followRedirects(false).followSslRedirects(false).build()
 
     override suspend fun request(method: String, params: JsonObject): JsonObject =
         withContext(Dispatchers.IO) {
@@ -181,7 +184,7 @@ class McpStreamableHttpTransport(
                 builder.header("Mcp-Name", encodeHeaderValue(it))
             }
 
-            http.newCall(builder.build()).executeCancellable { response ->
+            nonReplayHttp.newCall(builder.build()).executeCancellable { response ->
                 if (!response.isSuccessful) {
                     throw McpHttpException(response.code, response.readMcpBodyBounded())
                 }
