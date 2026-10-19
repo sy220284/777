@@ -321,9 +321,13 @@ class OpenAiResponsesClient @Inject constructor(
         if (!planSharing) systemInstructions.takeIf(String::isNotBlank)?.let { put("instructions", it) }
         put("store", false)
         put("stream", true)
-        reasoningEffort?.let { effort ->
-            put("reasoning", buildJsonObject { put("effort", effort) })
+        if (planSharing || reasoningEffort != null) {
+            put("reasoning", buildJsonObject {
+                if (planSharing) put("context", "all_turns")
+                reasoningEffort?.let { put("effort", it) }
+            })
         }
+        if (planSharing) put("parallel_tool_calls", false)
         if (!planSharing) {
             promptCacheKey?.trim()?.takeIf(String::isNotBlank)?.let { key ->
                 put("prompt_cache_key", key.take(MAX_PROMPT_CACHE_KEY_CHARS))

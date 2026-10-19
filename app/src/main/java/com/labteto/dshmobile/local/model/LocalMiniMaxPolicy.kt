@@ -17,6 +17,10 @@ internal object LocalMiniMaxPolicy {
             setOf("api.minimaxi.com", "api.minimax.cn", "api.minimax.io")
     }.getOrDefault(false)
 
+    /** Authentication is rejected by the provider; this is not proof that the header was omitted. */
+    fun authenticationFailureHint(): String =
+        "MiniMax 鉴权失败（HTTP 401）：服务端拒绝当前 API 密钥。请确认密钥由当前接口对应的官方开放平台签发、仍有效且具有模型调用权限；请勿混用其他产品或套餐凭据。"
+
     fun requireSuccessfulResponse(root: JsonObject) {
         val status = root["base_resp"] as? JsonObject ?: return
         val code = status["status_code"]?.jsonPrimitive?.intOrNull ?: return

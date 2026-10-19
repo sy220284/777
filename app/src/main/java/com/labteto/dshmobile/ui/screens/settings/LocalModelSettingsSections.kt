@@ -562,11 +562,8 @@ internal fun LocalModelSettingsCard(
                         val testedProfileId = editingProfileId
                         val testedCredentialSourceProfileId = credentialSourceProfileId
                         val testedGeneration = editorGeneration
-                        // Model inventory is independent of inference support and should be
-                        // discoverable immediately, even if the selected model is obsolete.
-                        if (testedKey.isNotBlank() || testedCredentialSourceProfileId != null) {
-                            refreshModels()
-                        }
+                        // A connection probe verifies inference only; do not also call /models.
+                        // Model catalog discovery has its own explicit action and error state.
                         scope.launch {
                             try {
                                 val result = viewModel.testLocalModel(testedKey, testedModel, testedUrl, testedProtocol, testedProfileId, testedCredentialSourceProfileId)

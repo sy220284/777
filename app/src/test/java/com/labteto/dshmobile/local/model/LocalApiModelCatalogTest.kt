@@ -6,6 +6,8 @@ import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -93,6 +95,23 @@ class LocalApiModelCatalogTest {
             "https://api.anthropic.com/v1/models",
             "https://api.anthropic.com/v1/models?after_id=claude-1",
         ), requested)
+    }
+
+    @Test fun miniMaxChinaCatalog401KeepsBearerHeaderAndExplainsAuthenticationWithoutEchoingKey() = runBlocking {
+        val observed = mutableListOf<String>()
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            observed += chain.request().url.toString() + "|" + chain.request().header("Authorization")
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(401)
+                .message("Unauthorized").body("""{"error":{"message":"login fail: Please carry the API secret key (1004)"}}""".toResponseBody()).build()
+        }.build()
+        val error = assertThrows(IllegalStateException::class.java) {
+            runBlocking {
+                LocalApiModelCatalog(http).query("sample-only-key", "https://api.minimaxi.com/v1", LocalModelProtocol.CHAT_COMPLETIONS)
+            }
+        }
+        assertEquals(listOf("https://api.minimaxi.com/v1/models|Bearer sample-only-key"), observed)
+        assertTrue(error.message!!.contains("鉴权失败"))
+        assertFalse(error.message!!.contains("sample-only-key"))
     }
 
 }

@@ -72,7 +72,11 @@ internal class LocalApiModelCatalog @Inject constructor(private val http: OkHttp
                     val request = requestBuilder.get().build()
                     val page = withCancellableHttpResponse(client.newCall(request)) { response ->
                         check(response.isSuccessful) {
-                            "模型目录查询失败（HTTP ${response.code}）；请检查密钥、地址或服务商是否支持 /models"
+                            if (response.code == 401 && LocalMiniMaxPolicy.isOfficial(baseUrl)) {
+                                LocalMiniMaxPolicy.authenticationFailureHint()
+                            } else {
+                                "模型目录查询失败（HTTP ${response.code}）；请检查密钥、地址或服务商是否支持 /models"
+                            }
                         }
                         val raw = response.peekBody(2_097_153L).string()
                         check(raw.length <= 2_097_152) { "服务商模型目录响应过大" }
