@@ -2903,7 +2903,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "sha256": "16f1162fcc2f8beb"
+      "sha256": "0078985f8b765294"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationTemperatureUi.kt",
@@ -2971,7 +2971,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "sha256": "4afc6e0f25628aa7"
+      "sha256": "026ba8b2aac3c92b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModelDefaults.kt",
@@ -3087,7 +3087,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/NativeV6DocumentCard.kt",
-      "sha256": "460b91d3fb047c7d"
+      "sha256": "524b43346aaa36d2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/NativeV6DocumentDraftPort.kt",
@@ -3095,7 +3095,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/NativeV6Documents.kt",
-      "sha256": "141d411f6d134fb0"
+      "sha256": "96864da4711e3ecf"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/NativeV6DocumentsSheet.kt",
@@ -3959,12 +3959,17 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "273be8ce59a4",
+  "source_snapshot": "6432962f4cf6",
   "observed_delta": {
-    "baseline": "de717ffea950",
+    "baseline": "273be8ce59a4",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/NativeV6DocumentCard.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/NativeV6Documents.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],

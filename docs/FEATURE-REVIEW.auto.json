@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "273be8ce59a4",
+  "snapshot": "6432962f4cf6",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1559,
   "production_sources_scanned": 974,
@@ -9259,10 +9259,15 @@
   "followup_production_or_compatibility": 11,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "de717ffea950",
+    "baseline": "273be8ce59a4",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/NativeV6DocumentCard.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/NativeV6Documents.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
