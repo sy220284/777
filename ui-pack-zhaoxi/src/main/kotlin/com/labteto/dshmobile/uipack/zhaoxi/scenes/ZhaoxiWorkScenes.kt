@@ -397,7 +397,8 @@ fun ZhaoxiRequirementEvidenceScene(
                                 }
                             }
                             if (!current) ZxFooterNote("文件失效或已修改，旧审核与检查不能证明当前版本")
-                            if (current && info.goalId != null) {
+                            val verifiedGoalId = info.goalId
+                            if (current && verifiedGoalId != null) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     ZxButton("确认内容", { reviewConfirmation = link to true },
                                         Modifier.weight(1f), enabled = !busy)
@@ -410,7 +411,7 @@ fun ZhaoxiRequirementEvidenceScene(
                                 ZxButton("执行文字存在性检查", {
                                     execute({
                                         evidence.checkText(com.labteto.dshmobile.uicontract.CheckWorkEvidenceTextCommand(
-                                            identity, info.goalId, target.index, target.text,
+                                            identity, verifiedGoalId, target.index, target.text,
                                             link.artifactPath, link.eventSequence, link.versionAtLink,
                                             requiredText))
                                     }, "文字检查")
