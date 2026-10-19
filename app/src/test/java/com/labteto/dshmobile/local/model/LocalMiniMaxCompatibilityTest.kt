@@ -147,7 +147,7 @@ class LocalMiniMaxCompatibilityTest {
         assertEquals("检查完成", differentRoute["content"]!!.jsonPrimitive.content)
         assertEquals(null, differentRoute["reasoning_content"])
     }
-    @Test fun miniMaxCompletion401UsesRegionalHintAndStillSendsTheProvidedBearerKey() = runBlocking {
+    @Test fun miniMaxChinaCompletion401RetainsBearerAndExplainsAuthentication() = runBlocking {
         var authorization: String? = null
         val http = OkHttpClient.Builder().addInterceptor { chain ->
             authorization = chain.request().header("Authorization")
@@ -164,7 +164,7 @@ class LocalMiniMaxCompatibilityTest {
         }
         assertEquals("Bearer sample-only-key", authorization)
         assertEquals(401, error.status)
-        assertTrue(error.message!!.contains("中国区"))
+        assertTrue(error.message!!.contains("鉴权失败"))
         assertFalse(error.message!!.contains("sample-only-key"))
     }
 
