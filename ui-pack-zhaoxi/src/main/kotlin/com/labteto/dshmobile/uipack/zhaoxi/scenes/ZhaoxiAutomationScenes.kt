@@ -745,6 +745,7 @@ fun ZhaoxiToolsScene(
     var busy by remember { mutableStateOf(false) }
     var refresh by remember { mutableStateOf(0) }
     var expandedFamily by rememberSaveable { mutableStateOf<String?>(null) }
+    var expandedCapability by rememberSaveable { mutableStateOf<String?>(null) }
     var skillQuery by rememberSaveable { mutableStateOf("") }
     var pluginQuery by rememberSaveable { mutableStateOf("") }
     fun submitConfiguration(command: ToolsUiCommand, clearTokenOnSuccess: Boolean = false) {
@@ -929,7 +930,40 @@ fun ZhaoxiToolsScene(
                     })
                     if (expandedFamily == group) items.forEach { cap ->
                         ZxRow(zxCapabilityActionLabel(cap.name), zxCapabilityPermissionLabel(cap.access, cap.approval),
-                            showChevron = false)
+                            onClick = { expandedCapability = if (expandedCapability == cap.name) null else cap.name })
+                        if (expandedCapability == cap.name) {
+                            ZxSection("能力详情")
+                            ZxFooterNote("调用权限：${zxCapabilityPermissionLabel(cap.access, cap.approval)}")
+                            if (cap.requirements.isNotEmpty()) {
+                                ZxSection("使用条件")
+                                cap.requirements.forEach { ZxFooterNote(it) }
+                            }
+                            val properties = cap.parameterSchema?.get("properties") as? kotlinx.serialization.json.JsonObject
+                            if (properties != null) {
+                                ZxSection("参数结构")
+                                val required = cap.parameterSchema["required"] as? kotlinx.serialization.json.JsonArray
+                                properties.forEach { (name, definition) ->
+                                    val attrs = definition as? kotlinx.serialization.json.JsonObject
+                                    val description = (attrs?.get("description") as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty()
+                                    val requiredField = required?.any {
+                                        (it as? kotlinx.serialization.json.JsonPrimitive)?.content == name
+                                    } == true
+                                    ZxRow(name + if (requiredField) " *" else "", description, showChevron = false)
+                                }
+                                var draft by remember(cap.name) { mutableStateOf("{}") }
+                                var check by remember(cap.name) { mutableStateOf<String?>(null) }
+                                ZxField(draft, { draft = it; check = null }, Modifier.fillMaxWidth().height(100.dp),
+                                    placeholder = "JSON 参数草稿（仅校验）")
+                                ZxButton("检查参数", {
+                                    check = when (val result = tools.validateCapabilityDraft(cap.name, cap.parameterSchema, draft)) {
+                                        com.labteto.dshmobile.uicontract.UiToolDraftValidation.Valid -> "参数符合当前已注册能力的结构要求"
+                                        is com.labteto.dshmobile.uicontract.UiToolDraftValidation.Rejected -> result.reason
+                                    }
+                                }, variant = ZxButtonVariant.Outline)
+                                check?.let { ZxFooterNote(it) }
+                            }
+                            ZxFooterNote("这里只能查看与校验参数，不会执行工具或绕过工作审批。")
+                        }
                     }
                 }
             }
