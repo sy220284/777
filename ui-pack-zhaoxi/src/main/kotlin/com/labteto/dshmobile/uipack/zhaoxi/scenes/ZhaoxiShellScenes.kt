@@ -240,7 +240,7 @@ fun ZhaoxiHomeScene(
                         if (visibleSessions.isEmpty() && blankSessions.isEmpty()) {
                             item {
                                 Text(
-                                    if (drawerQuery.isBlank()) (if (workMode) "暂无工作会话，可点击顶部新建" else "暂无聊天会话，可点击顶部新建")
+                                    if (drawerQuery.isBlank()) (if (workMode) "暂无工作历史，可返回首页新建" else "暂无聊天历史，可返回首页新建")
                                     else "没有匹配的会话",
                                     fontSize = 12.sp, color = c.ink2, modifier = Modifier.padding(12.dp),
                                 )
@@ -341,7 +341,6 @@ fun ZhaoxiHomeScene(
                 icon = if (workMode) "tasks" else "plus",
                 title = if (workMode) "新工作" else "新会话",
                 detail = if (workMode) "创建新的工作会话" else "开始新的聊天会话",
-                prominent = true,
                 tag = if (workMode) "zhaoxi.home.create_work" else "zhaoxi.home.create_chat",
             ) { create(if (workMode) LocalUsageMode.WORK else LocalUsageMode.CHAT) }
             val recent = zxHomeRecentSessions(modeSessions, pinnedIds).take(5)
@@ -531,7 +530,6 @@ private fun ZxHomeAction(
     icon: String,
     title: String,
     detail: String,
-    prominent: Boolean,
     tag: String,
     onClick: () -> Unit,
 ) {
@@ -539,7 +537,7 @@ private fun ZxHomeAction(
     val interaction = remember { MutableInteractionSource() }
     Row(
         Modifier.fillMaxWidth().zxPressSurface(interaction).clip(RoundedCornerShape(20.dp))
-            .background(if (prominent) c.tint else c.glass)
+            .background(c.tint)
             .clickable(role = Role.Button, onClick = onClick,
                 interactionSource = interaction,
                 indication = androidx.compose.foundation.LocalIndication.current)
