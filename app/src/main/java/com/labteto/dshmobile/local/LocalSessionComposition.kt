@@ -15,6 +15,7 @@ import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalSessionDomainCreateSpec
 import com.labteto.dshmobile.local.session.LocalSessionDomainModeCommand
 import com.labteto.dshmobile.local.session.LocalSessionLifecyclePort
+import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.work.LocalWorkComposition
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -44,6 +45,7 @@ internal class LocalSessionComposition @Inject constructor(
     loader: LocalForegroundSessionLoader,
     wake: LocalForegroundTurnWakeCoordinator,
     memoryStore: MemoryStore,
+    pendingSessions: LocalPendingSessionRegistry,
 ) : LocalSessionLifecyclePort {
     private val preferences = LocalHarnessPreferences.from(context)
     private val sessionsRoot = File(context.filesDir, "local-harness/sessions").apply { mkdirs() }
@@ -62,6 +64,7 @@ internal class LocalSessionComposition @Inject constructor(
         transitionMutex = transitionMutex,
         jobs = runtimeStateStore.jobManager,
         sessionCoordinator = sessionStorage.coordinator,
+        pendingSessions = pendingSessions,
         chatSessionLifecycle = LocalChatSessionLifecyclePlanner(chatPersistence.personaStore),
         approvalPreferences = approvalPreferences,
         resourceScheduler = runtimeStateStore.resourceScheduler,
