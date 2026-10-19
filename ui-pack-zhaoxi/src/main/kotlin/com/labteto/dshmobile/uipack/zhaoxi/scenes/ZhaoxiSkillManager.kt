@@ -47,6 +47,32 @@ private const val SKILL_IMPORT_LIMIT = 10 * 1024 * 1024
 internal fun zxSupportedSkillImportName(name: String): Boolean =
     name.equals("SKILL.md", ignoreCase = true) || name.endsWith(".zip", ignoreCase = true)
 
+/** Mirrors the existing Skill Store constraints; invalid drafts never reach the Owner. */
+internal fun zxValidSkillDraft(id: String, displayName: String, description: String, instructions: String): Boolean {
+    val name = displayName.trim()
+    val summary = description.trim()
+    val body = instructions.trim()
+    return Regex("[a-z][a-z0-9-]{1,47}").matches(id.trim()) &&
+        name.isNotEmpty() && name.length <= 40 &&
+        name.any { it in '\u4e00'..'\u9fff' } && '\n' !in name && '\r' !in name &&
+        summary.length in 1..240 && '\n' !in summary && '\r' !in summary &&
+        body.length in 1..12_000
+}
+
+/**
+ * The Work executor reads ONLY an exact first-line @skill:id marker.
+ * Preserve existing work instructions and never silently replace a different skill.
+ * A null return requires the user to review/remove the other marker first.
+ */
+internal fun zxWorkSkillDraft(skillId: String, currentDraft: String): String? {
+    if (!Regex("[a-z][a-z0-9-]{1,47}").matches(skillId)) return null
+    val marker = "@skill:$skillId"
+    if (currentDraft == marker || currentDraft.startsWith("$marker\n") ||
+        currentDraft.startsWith("$marker\r\n")) return currentDraft
+    if (currentDraft.startsWith("@skill:")) return null
+    return "$marker\n$currentDraft"
+}
+
 /** A bounded read before submitting to the real Skill Owner; never trust a remote document's length. */
 internal fun zxReadLimitedSkillPackage(stream: java.io.InputStream, limit: Int = SKILL_IMPORT_LIMIT): ByteArray {
     require(limit > 0)
