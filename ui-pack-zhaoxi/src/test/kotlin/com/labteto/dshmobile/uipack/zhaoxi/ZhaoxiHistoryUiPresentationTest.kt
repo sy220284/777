@@ -14,6 +14,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxUsageActionLabel
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkspaceFileVisible
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxSettingsNavigationIcon
+import com.labteto.dshmobile.uipack.zhaoxi.components.zxEmptyStateIcon
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -88,6 +89,13 @@ class ZhaoxiHistoryUiPresentationTest {
         assertEquals("palette", zxSettingsNavigationIcon("外观"))
         assertEquals("quota", zxSettingsNavigationIcon("模型性能"))
         assertNull(zxSettingsNavigationIcon("未知未来目的地"))
+    }
+    @Test fun emptyStatesHaveMeaningfulFallbackIconsWithoutFakeCapabilities() {
+        assertEquals("people", zxEmptyStateIcon("暂无人物"))
+        assertEquals("tasks", zxEmptyStateIcon("还没有自动化任务"))
+        assertEquals("files", zxEmptyStateIcon("工作区没有文件"))
+        assertEquals("search", zxEmptyStateIcon("没有匹配的内容"))
+        assertEquals("sparkle", zxEmptyStateIcon("欢迎使用"))
     }
     @Test fun workspaceAndUsagePresentationDoesNotExposeRawInternalIdentifiers() {
         assertEquals("PDF 文档", zxWorkspaceKindLabel("exports/report.pdf"))
