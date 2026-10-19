@@ -992,7 +992,8 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         .enqueuePendingDurably(
                         ChatPendingTurn(
                             sequence = assistantEvent.sequence,
-                            userMessageId = beforeAssistant.transcriptIndex.latestUserMessageId.orEmpty(),
+                            // Later queued messages must not replace this turn's durable source.
+                            userMessageId = sourceMessageId ?: beforeAssistant.transcriptIndex.latestUserMessageId.orEmpty(),
                             assistantMessageId = transcript.id,
                             branchHeadId = transcript.id,
                             userMessage = input,
