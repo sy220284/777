@@ -188,7 +188,9 @@ class ZhaoxiApplicationScenePack(
         }
     }
 
-    private val secondarySearch = if (secondary?.sessions != null && secondary.transcript != null)
+    // Session titles and other available domains remain searchable even if transcript search
+    // is not installed; only the message-body subsection requires its own History Port.
+    private val secondarySearch = if (secondary?.sessions != null)
         setOf(UiSceneId("shell.search")) else emptySet()
 
     private val shellErrorScene = if (conversations != null)
