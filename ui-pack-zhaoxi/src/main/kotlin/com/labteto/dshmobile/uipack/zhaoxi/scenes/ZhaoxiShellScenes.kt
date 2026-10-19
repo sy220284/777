@@ -365,16 +365,11 @@ fun ZhaoxiHomeScene(
             Spacer(Modifier.height(20.dp))
             Text(if (workMode) "开始一项工作" else "今天想聊点什么？",
                 fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                if (workMode) "描述你的目标，剩下的交给朝夕。" else "开启新对话，或者继续上次的话题。",
-                fontSize = 13.sp, color = c.ink2, lineHeight = 20.sp,
-            )
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(18.dp))
             ZxHomeAction(
                 icon = if (workMode) "tasks" else "plus",
                 title = if (workMode) "新工作" else "新会话",
-                detail = if (workMode) "创建新的工作会话" else "开始新的聊天会话",
+                detail = "",
                 tag = if (workMode) "zhaoxi.home.create_work" else "zhaoxi.home.create_chat",
             ) { create(if (workMode) LocalUsageMode.WORK else LocalUsageMode.CHAT) }
             val recent = zxHomeRecentSessions(modeSessions, pinnedIds).take(5)
@@ -583,8 +578,10 @@ private fun ZxHomeAction(
         ZxIcon(icon)
         Column(Modifier.weight(1f)) {
             Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
-            Spacer(Modifier.height(4.dp))
-            Text(detail, fontSize = 12.sp, color = c.ink2)
+            if (detail.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(detail, fontSize = 12.sp, color = c.ink2)
+            }
         }
         ZxIcon("chevron-right")
     }
