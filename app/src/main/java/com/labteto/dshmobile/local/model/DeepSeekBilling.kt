@@ -413,6 +413,9 @@ class DeepSeekUsageTracker @Inject constructor(
 
     fun analyticsRecord(requestId: String): TokenUsageRecord? =
         analyticsStore.recordById(requestId)
+    fun analyticsHistoryPage(model: String?, sinceMillis: Long?, cursor: String?, limit: Int) =
+        analyticsStore.historyPage(model, sinceMillis, cursor, limit)
+
 
     private fun load(): DeepSeekUsageSnapshot = DeepSeekUsageSnapshot(
         inputTokens = preferences.getLong(KEY_INPUT, 0L),
