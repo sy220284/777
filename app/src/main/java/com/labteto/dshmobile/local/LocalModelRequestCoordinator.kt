@@ -63,6 +63,14 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+/** Keep local history/policy failures separate from provider/network errors in exported diagnostics. */
+internal fun localModelRequestErrorOrigin(code: String?): String =
+    if (code in setOf("WORK_BUDGET_EXHAUSTED", "MODEL_CONTEXT_BUDGET_EXCEEDED", "MODEL_HISTORY_INVALID")) {
+        "local_preflight"
+    } else {
+        "provider_or_transport"
+    }
+
 /**
  * Owns foreground model transport semantics: request logging, retry, streaming preview and overflow
  * recovery. Callers supply the bounded product snapshot and durable compaction callback.
@@ -506,10 +514,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                         val preProviderMs = providerStartedNanos?.let { (it - attemptStartedNanos).coerceAtLeast(0L) / 1_000_000 }
                         val providerExecutionMs = providerStartedNanos?.let { (System.nanoTime() - it).coerceAtLeast(0L) / 1_000_000 }
                         val providerError = lastProviderError
-                        val localPreflight = providerError?.code in setOf(
-                            "WORK_BUDGET_EXHAUSTED",
-                            "MODEL_CONTEXT_BUDGET_EXCEEDED",
-                        )
+                        val localPreflight = localModelRequestErrorOrigin(providerError?.code) == "local_preflight"
                         AppLog.warn(
                             "LocalModelRequest",
                             buildString {
@@ -855,6 +860,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             lastProviderError = error
                             log.append("request/provider-error", buildJsonObject {
                                 put("request_uid", requestUid)
+                                put("origin", localModelRequestErrorOrigin(error.code))
                                 put("step", step)
                                 put("code", error.code)
                                 error.status?.let { put("status", it) }
