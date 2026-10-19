@@ -39,7 +39,7 @@ class LocalWorkFormContinuationPolicyTest {
         assertTrue(hasOutstandingWorkReplyForm(reopened, goal))
         reopened.append(com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE,
             encodeLocalAgentInboxEvent("queued", emptyList(),
-                listOf(QueuedAgentInput(content = "真实表单答案"))))
+                listOf(QueuedAgentInput(content = "真实表单答案", id = "submitted-1"))))
         assertFalse(hasOutstandingWorkReplyForm(reopened, goal))
         reopened.append(WORK_REPLY_FORM_WAIT_EVENT, buildJsonObject {
             put("goal_id", goal.id)
