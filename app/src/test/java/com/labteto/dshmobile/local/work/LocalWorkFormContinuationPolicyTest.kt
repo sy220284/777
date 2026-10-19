@@ -50,6 +50,29 @@ class LocalWorkFormContinuationPolicyTest {
         assertFalse(hasOutstandingWorkReplyForm(reopened, goal))
         reopened.close()
     }
+    @Test fun queuedRetryAndCrashRecoveryContinuationCannotPassUnsubmittedForm() {
+        val log = LocalSessionEventLog(File(temporary.root, "resume.events.jsonl"), Json, sessionId = "s")
+        val goal = LocalGoal("待用户决策", id = "g", revision = 1L)
+        val retry = com.labteto.dshmobile.harness.agent.AgentContinuationRef(
+            "original", 1L, "WORK_BUDGET_EXHAUSTED", 1, "user-1",
+        )
+        val input = QueuedAgentInput("内部续跑", id = "internal", kind =
+            com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.WORK_CONTINUATION,
+            continuation = retry)
+        val work = LocalWorkState(goal = goal)
+        assertFalse(shouldDiscardWorkGoalContinuation(input, emptyList(), work, log))
+        log.append(WORK_REPLY_FORM_WAIT_EVENT, buildJsonObject {
+            put("goal_id", goal.id)
+            put("goal_revision", goal.revision)
+        })
+        assertTrue(shouldDiscardWorkGoalContinuation(input, emptyList(), work, log))
+        assertFalse(isCurrentWorkGoalContinuation(retry, work, log))
+        log.append("user/message", buildJsonObject { put("content", "用户填写完成") })
+        assertFalse(shouldDiscardWorkGoalContinuation(input, emptyList(), work, log))
+        assertTrue(isCurrentWorkGoalContinuation(retry, work, log))
+        log.close()
+    }
+
     @Test fun pendingFormStopsGoalAutoContinuationUntilUserExplicitlySubmits() {
         assertFalse(shouldAutoContinueWorkGoalAfterForm(
             LocalWorkGoalDisposition.NEEDS_EXECUTION, awaitingSubmission = true))
