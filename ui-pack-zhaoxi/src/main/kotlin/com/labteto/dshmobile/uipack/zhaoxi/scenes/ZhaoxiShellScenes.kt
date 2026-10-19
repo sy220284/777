@@ -591,6 +591,13 @@ private fun ZxHomeAction(
     }
 }
 
+/** 有内容的非当前历史会话才参加跨会话正文检索；保留原始排序。 */
+internal fun zxSearchOtherSessionCandidates(
+    sessions: List<com.labteto.dshmobile.local.session.LocalSessionSummary>,
+    currentId: String?,
+): List<com.labteto.dshmobile.local.session.LocalSessionSummary> =
+    sessions.filter { !it.blank && it.id != currentId }
+
 /** shell.search — 按 Owner 的只读投影跨会话、人物、任务与工作区搜索。 */
 @Composable
 fun ZhaoxiSearchScene(
@@ -614,7 +621,7 @@ fun ZhaoxiSearchScene(
         .collectAsState(initial = sessions?.snapshot() ?: UiSessionsSnapshot(
             null, LocalUsageMode.CHAT, false, emptyList(), null))
     val messageIdentity = snapshot.identity
-    val otherSessions = snapshot.sessions.filter { !it.blank && it.id != messageIdentity?.sessionId }
+    val otherSessions = zxSearchOtherSessionCandidates(snapshot.sessions, messageIdentity?.sessionId)
     val otherSessionIds = otherSessions.map { it.id }
     var crossHits by remember(needle, otherSessionIds, refreshVersion) {
         mutableStateOf(emptyList<Triple<String, String, com.labteto.dshmobile.uicontract.UiMessageSnapshot>>())
@@ -735,8 +742,11 @@ fun ZhaoxiSearchScene(
         ZxField(query, { query = it }, Modifier.fillMaxWidth(),
             placeholder = "搜索会话、人物、任务和工作区文件")
         if (needle.isNotEmpty()) {
-            ZxButton("刷新搜索结果", { refreshVersion++ }, enabled = !loading,
-                variant = ZxButtonVariant.Outline)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ZxButton("刷新搜索结果", { refreshVersion++ }, enabled = !loading,
+                    variant = ZxButtonVariant.Outline)
+                ZxChip("清除关键词", false) { query = "" }
+            }
         }
         CommandFeedback(commandReceipt)
         Spacer(Modifier.height(8.dp))
