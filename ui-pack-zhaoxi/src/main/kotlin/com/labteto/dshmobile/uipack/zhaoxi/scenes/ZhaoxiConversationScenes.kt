@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,6 +67,12 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxCap
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxCapBar
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxComposer
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButtonVariant
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxFooterNote
+import com.labteto.dshmobile.uihost.rememberUiAttachmentPickerFor
+import com.labteto.dshmobile.uihost.rememberUiAttachmentMultiPickerFor
+import com.labteto.dshmobile.uihost.rememberUiCameraCaptureFor
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxMessageRow
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxModeSwitch
@@ -87,13 +95,14 @@ import com.labteto.dshmobile.uihost.UiSceneRenderScope
 @Composable
 fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, authorName: String, scope: UiSceneRenderScope, onMessage: (UiSessionIdentity, UiMessageSnapshot) -> Unit, menu: @Composable () -> Unit,
     documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
-    media: MediaUiPort? = null) {
+    media: MediaUiPort? = null, attachments: AttachmentUiPort? = null) {
     val snap by chat.snapshots.collectAsState(initial = chat.snapshot())
     val storedDrafts by drafts.drafts.collectAsState()
     val sessionId = snap.identity?.sessionId.orEmpty()
     val draft = storedDrafts[sessionId].orEmpty()
     fun writeDraft(text: String) { if (sessionId.isNotBlank()) drafts.updateDraft(sessionId, text) }
     var receipt by remember(sessionId) { mutableStateOf<UiCommandReceipt?>(null) }
+    var showAddMenu by remember(sessionId) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().fillMaxSize().imePadding()) {
         ZxConversationRoutes(scope, menu)
         CommandFeedback(receipt)
@@ -114,6 +123,8 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
             if (snap.queuedInputCount > 0)
                 ZxBanner("⇄ 已排队 ${snap.queuedInputCount} 条 · 队列满时将拒收", ZxTone.Warn)
         }
+        ZhaoxiComposerAddMenu(showAddMenu, snap.identity, { chat.snapshot().identity },
+            attachments, drafts, scope, knownScenes, onClose = { showAddMenu = false })
         ZxComposer(
             draft = draft, onDraftChange = ::writeDraft,
             send = snap.send,
@@ -125,6 +136,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
                 else sendZhaoxiDraft(drafts, id) { text, files -> chat.submit(ChatUiCommand.SendMessage(id, text, files)) }
             },
             placeholder = "问点什么",
+            onAddClick = { showAddMenu = !showAddMenu },
             onConnectModel = { scope.onNavigate(UiSceneId("settings.models")) },
         )
     }
@@ -134,7 +146,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
 @Composable
 fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPort, reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, scope: UiSceneRenderScope, onMessage: (UiSessionIdentity, UiMessageSnapshot) -> Unit, menu: @Composable () -> Unit,
     documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
-    media: MediaUiPort? = null) {
+    media: MediaUiPort? = null, attachments: AttachmentUiPort? = null) {
     val snap by work.snapshots.collectAsState(initial = work.snapshot())
     val storedDrafts by drafts.drafts.collectAsState()
     val sessionId = snap.identity?.sessionId.orEmpty()
@@ -142,6 +154,7 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
     fun writeDraft(text: String) { if (sessionId.isNotBlank()) drafts.updateDraft(sessionId, text) }
     var receipt by remember(sessionId) { mutableStateOf<UiCommandReceipt?>(null) }
     var questionAnswer by remember { mutableStateOf("") }
+    var showAddMenu by remember(sessionId) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().fillMaxSize().imePadding()) {
         ZxConversationRoutes(scope, menu)
         CommandFeedback(receipt)
@@ -177,6 +190,8 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
             if (snap.queuedInputCount > 0)
                 ZxBanner("⇄ 已排队 ${snap.queuedInputCount} 条 · 队列满时将拒收", ZxTone.Warn)
         }
+        ZhaoxiComposerAddMenu(showAddMenu, snap.identity, { work.snapshot().identity },
+            attachments, drafts, scope, knownScenes, onClose = { showAddMenu = false })
         ZxComposer(
             draft = draft, onDraftChange = ::writeDraft,
             send = snap.send,
@@ -188,6 +203,7 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
                 else sendZhaoxiDraft(drafts, id) { text, files -> work.submit(WorkConversationUiCommand.SendMessage(id, text, files)) }
             },
             placeholder = "描述任务目标",
+            onAddClick = { showAddMenu = !showAddMenu },
             onConnectModel = { scope.onNavigate(UiSceneId("settings.models")) },
         )
     }
