@@ -1,7 +1,7 @@
 # 神言神语 V6 · 现行实现反向设计规范
 
 > **状态：候选 V6.1 设计基线（文档 PR，待合并）** · 基准主线：`3cdd12f3395876b2d495721336d5d378b562a03c`（2026-10-14）
-> **判定顺序：真实生产 Compose + 已合并代码 > 本 V6 设计规范/交互原型 > Figma、截图及素材 > 历史方案。** UI 包之间的通用接口、替换和验收另遵守 [UI 3.0 权威规范](../UI-3.0.zh-CN.md)；业务事实与权限遵守架构 3.0。这里不是一套要求旧代码反向符合的“新 UI 构想”。
+> **判定顺序：真实生产 Compose + 已合并代码 > 本 V6 设计规范/交互原型 > Figma、截图及素材 > 历史方案。** UI 3.0 跨包体系已退役；业务事实与权限遵守架构 3.0。这里不是一套要求旧代码反向符合的“新 UI 构想”。
 >
 > **适用：Android 手机 V6 包。** 393dp / 412dp 为既有设计参考尺寸，另需检查 320/360dp、系统字体放大、手势导航、IME。离线原型是可编辑的视觉/流程投影，不能当作 Compose 渲染截图或真机验证。
 
@@ -9,7 +9,6 @@
 
 | 领域 | 唯一负责位置 | 下游使用规则 |
 |---|---|---|
-| 跨 UI 包接口、Scene/Slot、替换和验收 | `docs/design/UI-3.0.zh-CN.md` | 不复制 V6 视觉到其它 UI 包 |
 | 功能入口及业务归属 | `local/feature/LocalFeatureCatalog.kt`、`ui/screens/local/LocalFeaturePageContent.kt` 及 Feature UI Contribution | 当前七条顶层路由，每条恰有一个业务 Owner；侧栏跳转的二级目的地不另造路由 |
 | V6 调色板/语义色、全局材质/透明度 | `com/shenyan/designsystem/foundation/ShenyanFoundation.kt`、`components/ShenyanMaterial.kt`、`components/ShenyanMaterialColor.kt` | `LocalSyColors`、`SyMaterialTier`、`SyMaterialSurface`、`SyMaterialPolicy`；旧 `ui/shenyan` 仅兼容代理，不实现另一种材质 |
 | 场景背景/区域动态取色 | `ui/theme/AppBackground.kt` 和 `SySceneBackgroundSurface` | 主界面、侧栏、无白底弹层用同一场景和坐标；壁纸实际采样/裁切由背景 Host 持有 |

@@ -1,6 +1,6 @@
 # 手机端 UI 设计
 
-当前只覆盖 Android 手机 UI。**权威事实首先来自现行 Compose 与已合并 PR**，本文件是补充性体验说明，不能覆盖 [V6 现行规范](v6/V6-CURRENT-IMPLEMENTATION.zh-CN.md)和 [UI 3.0](UI-3.0.zh-CN.md)。
+当前只覆盖 Android 手机 UI。**权威事实首先来自现行 Compose 与已合并 PR**，本文件是补充性体验说明，不能覆盖 [V6 现行规范](v6/V6-CURRENT-IMPLEMENTATION.zh-CN.md)，UI 3.0 已退役。
 
 ## 当前设计源
 
