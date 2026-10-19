@@ -4,6 +4,10 @@ import com.labteto.dshmobile.harness.session.SessionEventFileSnapshot
 import com.labteto.dshmobile.harness.session.SessionEventLog
 import java.io.File
 import java.io.InputStream
+import java.io.ByteArrayInputStream
+import java.security.MessageDigest
+import java.util.UUID
+import java.util.zip.ZipInputStream
 import java.io.OutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -95,6 +99,118 @@ internal class LocalSessionStorageManager(
         return exportedBytes
     }
 
+    /**
+     * Stage a user-chosen ZIP without touching running sessions. Only session IDs not already
+     * on this device are eligible. Runtime loads the staged archive before repositories start
+     * on the NEXT app process startup; this never hot-overwrites active event files.
+     */
+    @Synchronized
+    fun stageRestore(archive: ByteArray): Int {
+        require(archive.isNotEmpty() && archive.size <= MAX_RESTORE_ZIP_BYTES) {
+            "备份 ZIP 过大或为空（最大 64 MiB）"
+        }
+        val pending = File(root, ".restore-pending")
+        require(!pending.exists()) { "已有一个待生效的会话恢复，请先重启应用" }
+        val staging = File(root, ".restore-building-" + UUID.randomUUID())
+        check(staging.mkdirs()) { "无法创建会话恢复隔离目录" }
+        try {
+            val names = linkedSetOf<String>()
+            var totalBytes = 0L
+            ZipInputStream(ByteArrayInputStream(archive)).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    val name = entry.name
+                    require(!entry.isDirectory && SAFE_RESTORE_NAME.matches(name)) {
+                        "备份中含不允许的文件名称"
+                    }
+                    require(names.add(name) && names.size <= MAX_RESTORE_ENTRIES) {
+                        "备份包含重复文件或文件数量超限"
+                    }
+                    val target = File(staging, name)
+                    target.outputStream().buffered().use { output ->
+                        val buffer = ByteArray(32 * 1024)
+                        var entryBytes = 0L
+                        while (true) {
+                            val count = zip.read(buffer)
+                            if (count < 0) break
+                            totalBytes += count
+                            entryBytes += count
+                            require(totalBytes <= MAX_RESTORE_UNPACKED_BYTES &&
+                                entryBytes <= MAX_RESTORE_ENTRY_BYTES) {
+                                "备份解压数据超出安全上限"
+                            }
+                            output.write(buffer, 0, count)
+                        }
+                    }
+                    zip.closeEntry() // Enforce ZIP CRC for every file.
+                }
+            }
+            require(names.isNotEmpty()) { "备份中没有可恢复的会话文件" }
+            val existing = durableFiles().mapNotNull(::sessionIdOf).toSet()
+            val grouped = names.groupBy { name -> sessionIdOf(File(name))!! }
+            val eligible = grouped.filterKeys { it !in existing }
+            require(eligible.isNotEmpty()) { "全部会话已存在，恢复不会覆盖当前数据" }
+            // Never stage a snapshot without its append-only event source.
+            require(eligible.values.all { fileNames ->
+                fileNames.any { it.contains(".events.jsonl") }
+            }) { "备份缺少会话事件源，已拒绝导入" }
+            grouped.filterKeys { it in existing }.values.flatten().forEach { File(staging, it).delete() }
+            File(staging, "READY").writeText("v1")
+            check(staging.renameTo(pending)) { "无法提交恢复计划，请核对剩余存储空间" }
+            return eligible.size
+        } finally {
+            if (staging.exists()) staging.deleteRecursively()
+        }
+    }
+
+    /**
+     * Apply before LocalSessionRepository / event readers are initialized. Replaying after a
+     * crash is idempotent: already copied bytes are checked, and no existing data is replaced.
+     * Staged sources are retained until all destinations have been verified.
+     */
+    @Synchronized
+    fun applyPendingRestore(): Int {
+        val pending = File(root, ".restore-pending")
+        if (!pending.exists() || !File(pending, "READY").isFile) return 0
+        val sources = pending.listFiles().orEmpty().filter { it.isFile && it.name != "READY" }
+        require(sources.isNotEmpty()) { "待恢复备份的文件清单为空" }
+        require(sources.all { SAFE_RESTORE_NAME.matches(it.name) }) { "待恢复的文件路径非法" }
+        var committed = 0
+        for (source in sources.sortedBy { it.name }) {
+            val destination = File(root, source.name)
+            if (destination.exists()) {
+                require(destination.isFile && hashesEqual(source, destination)) {
+                    "本地会话与待恢复备份重名，已中止以避免覆盖"
+                }
+            } else {
+                val temporary = File(root, source.name + ".tmp")
+                if (temporary.exists()) require(temporary.delete()) { "无法清理上次中断的临时文件" }
+                source.copyTo(temporary, overwrite = false)
+                check(temporary.renameTo(destination)) { "恢复写入失败；下次启动将继续未完成的文件" }
+            }
+            committed++
+        }
+        check(pending.deleteRecursively()) { "已恢复，但无法清理隔离区" }
+        return committed
+    }
+
+    private fun hashesEqual(a: File, b: File): Boolean {
+        if (a.length() != b.length()) return false
+        fun hash(file: File): ByteArray {
+            val digest = MessageDigest.getInstance("SHA-256")
+            file.inputStream().buffered().use { input ->
+                val buffer = ByteArray(32 * 1024)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    digest.update(buffer, 0, count)
+                }
+            }
+            return digest.digest()
+        }
+        return hash(a).contentEquals(hash(b))
+    }
+
     private fun copyZipEntry(source: File, zip: ZipOutputStream): Long =
         source.inputStream().buffered().use { input ->
             copyZipEntry(
@@ -167,5 +283,10 @@ internal class LocalSessionStorageManager(
         val COMPRESSED_SEGMENT = Regex("^.+\\.events\\.jsonl\\.part-[0-9]+\\.gz$")
         const val COMPACTION_YIELD_MILLIS = 25L
         const val COPY_BUFFER_BYTES = 32 * 1024
+        private val SAFE_RESTORE_NAME = Regex("^[A-Za-z0-9_-]{1,128}\\\\.(?:json|events\\\\.jsonl(?:\\\\.part-[0-9]+(?:\\\\.gz)?)?)$")
+        private const val MAX_RESTORE_ZIP_BYTES = 64 * 1024 * 1024
+        private const val MAX_RESTORE_ENTRY_BYTES = 64L * 1024 * 1024
+        private const val MAX_RESTORE_UNPACKED_BYTES = 256L * 1024 * 1024
+        private const val MAX_RESTORE_ENTRIES = 2_000
     }
 }
