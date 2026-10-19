@@ -122,6 +122,34 @@ class LocalSessionDomainCodecBehaviorTest {
         assertFalse(legacy.blank)
     }
 
+    @Test
+    fun newEditorIsNotDurableUntilItHasActualConversationOrWorkFacts() {
+        val newChat = LocalHarnessSession(id = "pending-chat", usageMode = LocalUsageMode.CHAT)
+        assertTrue(isUnstartedSessionSnapshot(newChat, emptyList()))
+        assertFalse(isUnstartedSessionSnapshot(
+            newChat.copy(transcriptIndex = LocalTranscriptRuntimeIndex(totalMessageCount = 1L)),
+            emptyList(),
+        ))
+        assertFalse(isUnstartedSessionSnapshot(
+            newChat.copy(transcriptWindow = listOf(message("u", "hello"))), emptyList(),
+        ))
+        assertFalse(isUnstartedSessionSnapshot(
+            newChat.copy(handoffSummary = "移交的内容"), emptyList(),
+        ))
+        assertFalse(isUnstartedSessionSnapshot(
+            LocalHarnessSession(id = "work", plan = listOf("真实任务")),
+            emptyList(),
+        ))
+        val featureCodec = object : LocalSessionDomainCodec {
+            override val id = "feature"
+            override fun normalizeLoaded(session: LocalHarnessSession) = session
+            override fun hasSessionWork(session: LocalHarnessSession) = session.personaId == "custom"
+        }
+        assertFalse(isUnstartedSessionSnapshot(
+            newChat.copy(personaId = "custom"), listOf(featureCodec),
+        ))
+    }
+
     private fun message(id: String, content: String) = LocalHarnessMessage(
         id = id,
         role = "user",
