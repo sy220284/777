@@ -23,7 +23,7 @@ internal fun NativeV6DocumentMedia(
     sessionId: String,
     media: MediaUiPort,
 ) {
-    val owned = remember(node.assetId, sessionId) { media.assetForSession(node.assetId, sessionId) }
+    val owned = media.assetForSession(node.assetId, sessionId)
     if (owned == null || (owned.kind != null && owned.kind != node.kind)) {
         Text("媒体结果暂不可用")
         return
