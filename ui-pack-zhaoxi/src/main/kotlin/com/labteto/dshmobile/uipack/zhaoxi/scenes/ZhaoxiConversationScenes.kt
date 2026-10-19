@@ -106,6 +106,8 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
     val storedDrafts by drafts.drafts.collectAsState()
     val sessionId = snap.identity?.sessionId.orEmpty()
     val draft = storedDrafts[sessionId].orEmpty()
+    val storedFiles by drafts.attachments.collectAsState()
+    val sessionFiles = storedFiles[sessionId].orEmpty()
     fun writeDraft(text: String) { if (sessionId.isNotBlank()) drafts.updateDraft(sessionId, text) }
     var receipt by remember(sessionId) { mutableStateOf<UiCommandReceipt?>(null) }
     var showAddMenu by remember(sessionId) { mutableStateOf(false) }
@@ -138,6 +140,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
             reasoning, settings, scope, knownScenes, onCollapse = { reasoningExpanded = false })
         ZhaoxiComposerAddMenu(showAddMenu, snap.identity, { chat.snapshot().identity },
             attachments, drafts, scope, knownScenes, onClose = { showAddMenu = false })
+        ZhaoxiDraftAttachmentChips(sessionId, sessionFiles, drafts)
         ZxComposer(
             draft = draft, onDraftChange = ::writeDraft,
             send = snap.send,
@@ -152,6 +155,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
             onAddClick = { showAddMenu = !showAddMenu },
             onFocusedChange = { inputFocused = it; if (it) reasoningExpanded = true },
             onConnectModel = { scope.onNavigate(UiSceneId("settings.models")) },
+            hasAttachments = sessionFiles.isNotEmpty(),
         )
     }
 }
@@ -166,6 +170,8 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
     val storedDrafts by drafts.drafts.collectAsState()
     val sessionId = snap.identity?.sessionId.orEmpty()
     val draft = storedDrafts[sessionId].orEmpty()
+    val storedFiles by drafts.attachments.collectAsState()
+    val sessionFiles = storedFiles[sessionId].orEmpty()
     fun writeDraft(text: String) { if (sessionId.isNotBlank()) drafts.updateDraft(sessionId, text) }
     var receipt by remember(sessionId) { mutableStateOf<UiCommandReceipt?>(null) }
     var questionAnswer by remember(sessionId, snap.question?.pendingId) { mutableStateOf("") }
@@ -220,6 +226,7 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
             reasoning, settings, scope, knownScenes)
         ZhaoxiComposerAddMenu(showAddMenu, snap.identity, { work.snapshot().identity },
             attachments, drafts, scope, knownScenes, onClose = { showAddMenu = false })
+        ZhaoxiDraftAttachmentChips(sessionId, sessionFiles, drafts)
         ZxComposer(
             draft = draft, onDraftChange = ::writeDraft,
             send = snap.send,
@@ -237,6 +244,7 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
             placeholder = "描述任务目标",
             onAddClick = { showAddMenu = !showAddMenu },
             onConnectModel = { scope.onNavigate(UiSceneId("settings.models")) },
+            hasAttachments = sessionFiles.isNotEmpty(),
         )
     }
 }
@@ -678,6 +686,29 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
     }
 }
 
+/** Show actual pending files next to the composer; removing a chip updates the one Draft Owner. */
+@Composable
+private fun ZhaoxiDraftAttachmentChips(
+    sessionId: String,
+    files: List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment>,
+    drafts: ConversationDraftUiPort,
+) {
+    if (files.isEmpty()) return
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        files.forEach { file ->
+            val label = if (file.name.startsWith("zhaoxi-") && file.mediaType.startsWith("image/"))
+                "已拍摄照片" else file.name.take(24)
+            ZxChip("$label · 移除", false) {
+                drafts.removeAttachment(sessionId, file.relativePath)
+            }
+        }
+    }
+}
+
 /** A single composer panel for four real actions; attachment bytes remain Owner-managed. */
 @Composable
 private fun ZhaoxiComposerAddMenu(
@@ -722,7 +753,7 @@ private fun ZhaoxiComposerAddMenu(
                         else -> feedback = result.zxAttachmentFeedback()
                     }
                 }
-                if (imported > 0 && feedback == null) feedback = "已加入 ${imported} 项附件，可在会话菜单查看或移除"
+                if (imported > 0 && feedback == null) feedback = "已加入 ${imported} 项附件，可在输入区查看或移除"
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
