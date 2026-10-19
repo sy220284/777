@@ -218,7 +218,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         if (!showModelForm) ZxButton("＋ 添加 API 模型", { startNewModel() },
             Modifier.fillMaxWidth(), variant = ZxButtonVariant.Ink, enabled = !busy)
         if (showModelForm) {
-            ZxSettingsGroup {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ZxSection(if (profileId == null && credentialSourceProfileId == null) "添加模型" else "编辑模型")
                 ZxSection("模型")
                 ZxRow(if (model.isBlank()) "选择模型预设" else model,
@@ -237,9 +237,18 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     }, Modifier.fillMaxWidth(), placeholder = "填写服务商返回的模型标识",
                         fieldLabel = "自定义模型标识")
                 }
-                if (preset != null && !showAdvancedConnection) {
-                    ZxFooterNote("已套用 ${preset.provider} 的地址及协议，保存前可展开修改。")
-                }
+                ZxSection("API Key")
+                ZxField(apiKey, { apiKey = it.take(8000); resetCatalog() },
+                    Modifier.fillMaxWidth(), placeholder = "API Key（编辑时留空保留原凭据）",
+                    visualTransformation = PasswordVisualTransformation())
+                ZxFooterNote(if (profileId != null || credentialSourceProfileId != null)
+                    "留空可沿用同一接口地址的已保存密钥；修改接口地址时必须重新提供凭据。"
+                else "API Key 仅交由模型配置接口保存，不在此页面回显。")
+                ZxFooterNote("必要信息填写完成后即可保存。以下选项通常无需更改。")
+                if (!showAdvancedConnection) ZxFooterNote(
+                    if (preset != null) "已套用 ${preset.provider} 的连接参数"
+                    else if (baseUrl.isNotBlank()) "接口：$baseUrl · ${protocol.name}"
+                    else "自定义模型请先填写接口地址")
                 ZxButton(if (showAdvancedConnection) "收起高级连接参数" else "高级连接参数 · 按需展开",
                     { showAdvancedConnection = !showAdvancedConnection },
                     Modifier.fillMaxWidth(), variant = ZxButtonVariant.Ghost, enabled = !busy)
@@ -283,16 +292,10 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     if (!validWindow) ZxBanner("上下文窗口数值不支持，请检查后保存", ZxTone.Err)
                 }
                 }
-                ZxSection("API Key")
-                ZxField(apiKey, { apiKey = it.take(8000); resetCatalog() },
-                    Modifier.fillMaxWidth(), placeholder = "API Key（编辑时留空保留原凭据）",
-                    visualTransformation = PasswordVisualTransformation())
-                ZxFooterNote(if (profileId != null || credentialSourceProfileId != null)
-                    "留空可沿用同一接口地址的已保存密钥；修改接口地址时必须重新提供凭据。"
-                else "API Key 仅交由模型配置接口保存，不在此页面回显。")
+
                 ZxButton(if (showModelTools) "收起连接验证" else "验证连接与获取模型",
                     { showModelTools = !showModelTools }, Modifier.fillMaxWidth(),
-                    variant = ZxButtonVariant.Ghost)
+                    variant = ZxButtonVariant.Outline)
                 if (showModelTools) {
                 ZxFooterNote("获取目录只说明名称可查询，测试连接才校验调用能力。")
                 ZxButton("获取可选模型", {
