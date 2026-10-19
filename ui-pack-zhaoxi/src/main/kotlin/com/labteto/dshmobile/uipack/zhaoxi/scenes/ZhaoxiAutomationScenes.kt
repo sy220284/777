@@ -2,6 +2,8 @@ package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
 import java.util.Calendar
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import android.text.format.DateFormat
 import android.app.TimePickerDialog
 import android.app.DatePickerDialog
@@ -676,6 +678,8 @@ fun ZhaoxiToolsScene(
                 ZxSection("可用能力")
                 catalogue.filter { it.family.contains("github", ignoreCase = true) }
                     .forEach { cap -> ZxRow(cap.name, "${cap.access} · ${cap.approval}") }
+                if (githubConfigured) ZhaoxiGitHubBrowser(tools)
+                else ZxFooterNote("先连接 GitHub，再查看真实仓库目录。")
                 if (!githubConfigured) {
                     ZxSection("连接账户")
                     com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
@@ -774,4 +778,99 @@ internal fun AutomationScheduleType.zxAutomationScheduleLabel(): String = when (
     AutomationScheduleType.MONTHLY -> "每月"
     AutomationScheduleType.SILENCE -> "沉默后"
     AutomationScheduleType.WINDOW -> "指定时段"
+}
+
+
+/** Read-only GitHub repository browsing. Writable GitHub tools still use Work approval. */
+@Composable
+private fun ZhaoxiGitHubBrowser(tools: com.labteto.dshmobile.uicontract.ToolsUiPort) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    var revision by remember { mutableStateOf(0) }
+    var selected by remember { mutableStateOf<com.labteto.dshmobile.uicontract.UiGitHubRepo?>(null) }
+    var directory by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    val repositories by produceState<List<com.labteto.dshmobile.uicontract.UiGitHubRepo>?>(null, tools, revision) {
+        value = try {
+            tools.githubRepositories()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            error = failure.message ?: "读取仓库失败，请确认 GitHub 权限和网络"
+            emptyList()
+        }
+    }
+    val entries by produceState<List<com.labteto.dshmobile.uicontract.UiGitHubEntry>?>(
+        null, tools, selected?.fullName, directory, revision
+    ) {
+        value = try {
+            selected?.let { tools.githubEntries(it.fullName, directory) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            error = failure.message ?: "GitHub 目录读取失败"
+            emptyList()
+        }
+    }
+    ZxSection("真实仓库浏览 · 只读")
+    ZxFooterNote("仓库列表来自当前已授权的 GitHub 账户；创建 PR、提交修改和其他写操作仍经原有 Work/GitHub 工具审批。")
+    error?.let { ZxFooterNote(it) }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ZxButton("刷新仓库", { error = null; revision++ },
+            variant = ZxButtonVariant.Outline)
+        if (selected != null) {
+            ZxButton("返回仓库列表", { selected = null; directory = ""; error = null },
+                variant = ZxButtonVariant.Outline)
+        }
+    }
+    if (selected == null) {
+        when {
+            repositories == null -> ZxFooterNote("正在读取仓库…")
+            repositories.orEmpty().isEmpty() -> ZxEmpty("没有可展示的仓库", "请确认授权范围；可刷新重试")
+            else -> repositories.orEmpty().forEach { repo ->
+                ZxRow(repo.fullName, buildString {
+                    append(if (repo.privateRepo) "私有" else "公开")
+                    if (repo.description.isNotBlank()) append(" · ").append(repo.description.take(130))
+                }, onClick = { selected = repo; directory = ""; error = null })
+            }
+        }
+    } else {
+        val repo = selected!!
+        ZxSection(repo.fullName)
+        ZxFooterNote("当前目录：/" + directory)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ZxButton("复制仓库地址", {
+                clipboard.setText(AnnotatedString("https://github.com/${repo.fullName}"))
+            }, variant = ZxButtonVariant.Outline)
+            if (directory.isNotBlank()) ZxButton("上级目录", {
+                directory = directory.substringBeforeLast('/', "")
+                error = null
+            }, variant = ZxButtonVariant.Outline)
+        }
+        when {
+            entries == null -> ZxFooterNote("读取目录中…")
+            entries.orEmpty().isEmpty() -> ZxEmpty("目录没有可显示内容", "可返回上级或刷新")
+            else -> entries.orEmpty().forEach { file ->
+                ZxRow(
+                    if (file.directory) "文件夹 · ${file.name}" else file.name,
+                    if (file.directory) "进入目录" else "${file.size} 字节 · 在 GitHub 查看",
+                    onClick = {
+                        if (file.directory) {
+                            directory = file.path
+                            error = null
+                        } else {
+                            val url = "https://github.com/${repo.fullName}/blob/" +
+                                android.net.Uri.encode(repo.defaultBranch) + "/" +
+                                file.path.split('/').joinToString("/") { android.net.Uri.encode(it) }
+                            try {
+                                context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse(url)))
+                            } catch (failure: Exception) {
+                                error = "没有可用的浏览器，请复制仓库地址后打开"
+                            }
+                        }
+                    })
+            }
+        }
+    }
 }
