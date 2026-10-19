@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1559,
+  "repository_code_file_count": 1560,
   "production_source_count": 974,
-  "test_code_file_count": 459,
+  "test_code_file_count": 460,
   "workflow_files": [
     ".github/workflows/ci.yml",
     ".github/workflows/cleanup-old-releases.yml",
@@ -3091,11 +3091,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/NativeV6DocumentDraftPort.kt",
-      "sha256": "50444d52157b8774"
+      "sha256": "aeeccb6ae84ef7d6"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/NativeV6Documents.kt",
-      "sha256": "96864da4711e3ecf"
+      "sha256": "8e96ab1c9fd0b9d1"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/NativeV6DocumentsSheet.kt",
@@ -3959,15 +3959,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "6432962f4cf6",
+  "source_snapshot": "dc868a6042e8",
   "observed_delta": {
-    "baseline": "273be8ce59a4",
+    "baseline": "6432962f4cf6",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/NativeV6DocumentCard.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/NativeV6DocumentDraftPort.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/screens/local/NativeV6Documents.kt"
     ],
     "moved_unchanged_files": [],
