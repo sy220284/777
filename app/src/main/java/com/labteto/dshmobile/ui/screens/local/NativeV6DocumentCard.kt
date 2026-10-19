@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.uicontract.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -113,14 +114,27 @@ private fun NativeV6DocumentCard(
     }
     var confirmation by remember(doc.documentId, doc.revision) { mutableStateOf<String?>(null) }
     var deleting by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
+    var submitting by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
     var confirmDelete by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
     var progressDetailsExpanded by remember(doc.documentId) { mutableStateOf(false) }
     fun perform(actionId: String, confirmed: Boolean) {
+        if (submitting) return
+        submitting = true
         val values = fields
         scope.launch {
-            val receipt = withContext(Dispatchers.IO) { controller.submit(snapshot, actionId, values, confirmed) }
-            onFeedback(nativeV6DocumentReceiptMessage(receipt))
-            if (receipt == UiDocumentReceipt.DraftPrepared) onPreparedDraft()
+            try {
+                val receipt = withContext(Dispatchers.IO) {
+                    controller.submit(snapshot, actionId, values, confirmed)
+                }
+                onFeedback(nativeV6DocumentReceiptMessage(receipt))
+                if (receipt == UiDocumentReceipt.DraftPrepared) onPreparedDraft()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                onFeedback("表单提交失败：${failure.message.orEmpty().ifBlank { failure.javaClass.simpleName }}")
+            } finally {
+                submitting = false
+            }
         }
     }
     Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 2.dp,
@@ -135,13 +149,13 @@ private fun NativeV6DocumentCard(
                 nativeV6InlineVisibleNodes(doc, progressDetailsExpanded).forEach { node ->
                     NativeV6DocumentNode(
                         node, snapshot.bindings, fields,
-                        onFieldChange = { id, value -> if (!readOnly) controller.forms.update(formKey, id, value) },
-                        readOnly = readOnly, media = controller.media, sessionId = doc.source.sessionId,
+                        onFieldChange = { id, value -> if (!readOnly && !submitting) controller.forms.update(formKey, id, value) },
+                        readOnly = readOnly || submitting, media = controller.media, sessionId = doc.source.sessionId,
                         actions = doc.actions,
                     ) { actionId ->
                         val action = doc.actions.firstOrNull { it.id == actionId }
                         if (snapshot.actions[actionId]?.available != true) {
-                            onFeedback("当前会话中的操作不可用")
+                            onFeedback("当前会话中的操作不可用：${snapshot.actions[actionId]?.reason ?: UiCommandRejection.STALE_IDENTITY}")
                         } else if (action is UiDocumentAction.AnswerApproval ||
                             action is UiDocumentAction.SendUserInput && action.submit) {
                             confirmation = actionId
@@ -172,7 +186,7 @@ private fun NativeV6DocumentCard(
         TextButton(onClick = {
                 confirmation = null
                 perform(actionId, true)
-            }) { Text("确认") }
+            }, enabled = !submitting) { Text(if (submitting) "正在提交…" else "确认") }
     }
 }
     }
