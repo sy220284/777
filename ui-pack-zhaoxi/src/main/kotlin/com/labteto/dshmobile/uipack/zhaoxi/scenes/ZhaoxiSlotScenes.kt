@@ -396,3 +396,41 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
         }
     }
 }
+
+/** route.diary: choose the actual persona before reading its diary. */
+@Composable
+fun ZhaoxiDiaryHubScene(
+    gallery: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort,
+    scope: UiSceneRenderScope,
+    onOpenDiary: (String) -> Unit,
+) {
+    var refresh by remember { mutableStateOf(0) }
+    var query by remember { mutableStateOf("") }
+    val response by produceState<com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt?>(
+        null, gallery, refresh) {
+        value = gallery.read()
+    }
+    ZxPage("人物手记", onBack = { scope.onBack() }) {
+        ZxFooterNote("选择人物，打开其公开日记。")
+        ZxField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = "搜索人物")
+        when (val result = response) {
+            null -> ZxFooterNote("正在读取人物目录")
+            is com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt.Failed -> {
+                ZxFooterNote(result.message ?: "人物目录读取失败")
+                ZxButton("重试", { refresh++ })
+            }
+            is com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt.Available -> {
+                val visible = result.entries.filter {
+                    query.isBlank() || it.name.contains(query.trim(), ignoreCase = true)
+                }
+                if (visible.isEmpty()) ZxEmpty("没有匹配的人物", "可从人物图集添加人物")
+                visible.forEach { item ->
+                    ZxRow(item.name, "查看公开日记", onClick = { onOpenDiary(item.id) })
+                }
+                ZxButton("前往人物图集", {
+                    scope.onNavigate(UiSceneId("route.persona_gallery"))
+                }, variant = ZxButtonVariant.Outline)
+            }
+        }
+    }
+}
