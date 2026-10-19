@@ -749,6 +749,7 @@ fun ZhaoxiSearchScene(
             }
         }
         CommandFeedback(commandReceipt)
+        if (transcript == null) ZxFooterNote("当前未连接消息历史读取能力，只能搜索会话标题、摘要及其他可用数据。")
         Spacer(Modifier.height(8.dp))
         if (needle.isEmpty()) {
             ZxEmpty("搜索内容", "输入名称或关键词，在本机数据中查找")
@@ -834,7 +835,8 @@ fun ZhaoxiSearchScene(
             }
             if (!loading && sessionResults.isEmpty() && personaResults.isEmpty() &&
                 taskResults.isEmpty() && fileResults.isEmpty() && messageHits.isEmpty() && crossHits.isEmpty() &&
-                !messageLoading && !crossLoading && crossScanned == otherSessions.size &&
+                !messageLoading && !crossLoading && crossErrors == 0 &&
+                (transcript == null || crossScanned == otherSessions.size) &&
                 messageError == null && searchCursor == null) {
                 ZxEmpty("没有找到匹配的内容", "可以换一个关键词重试")
             }
