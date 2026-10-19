@@ -483,6 +483,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val transcriptMessages = remember(pagedOlderMessages, state.messages) {
         mergeLocalTranscriptHistory(pagedOlderMessages, state.messages)
     }
+    // Cold historical cards are read-only. They are not part of the live Owner snapshot.
+    var olderDocumentSnapshots by remember(state.sessionId) {
+        mutableStateOf<List<com.labteto.dshmobile.uicontract.UiDocumentSnapshot>>(emptyList())
+    }
+    LaunchedEffect(state.sessionId, pagedOlderMessages, nativeDocuments) {
+        val ids = pagedOlderMessages.filter { it.role == "assistant" }.map { it.id }.toSet()
+        olderDocumentSnapshots = if (nativeDocuments == null || ids.isEmpty()) emptyList()
+            else nativeDocuments.olderDocuments(state.sessionId, ids)
+    }
     // Media is a persistent chat/Work timeline projection, not an assistant text message.
     val mediaStudioViewModel: LocalMediaStudioViewModel = hiltViewModel()
     var mediaLimit by rememberSaveable(state.sessionId) { mutableStateOf(com.labteto.dshmobile.local.presentation.LocalMediaCreationRuntime.PAGE_SIZE) }
@@ -1083,13 +1092,16 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 onSelectVariant = onSelectMessageVariant,
                                 onRegenerate = onRegenerate,
                             )
+                            val isHistoricalDocumentSource = state.messages.none { it.id == transcriptItem.message.id }
                             if (nativeDocuments != null && transcriptItem.message.role == "assistant" &&
-                                nativeDocumentSnapshot.sessionId == state.sessionId) {
+                                (nativeDocumentSnapshot.sessionId == state.sessionId || isHistoricalDocumentSource)) {
                                 NativeV6DocumentMessage(
                                     messageId = transcriptItem.message.id,
-                                    documents = nativeDocumentSnapshot.documents.filter {
+                                    documents = (if (isHistoricalDocumentSource) olderDocumentSnapshots
+                                        else nativeDocumentSnapshot.documents).filter {
                                         it.document.source.messageId == transcriptItem.message.id
                                     },
+                                    readOnly = isHistoricalDocumentSource,
                                     controller = nativeDocuments,
                                     onPreparedDraft = {
                                         nativeDocuments.consumePreparedDraft(state.sessionId)?.let { prepared ->
