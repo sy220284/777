@@ -9,6 +9,10 @@ import com.labteto.dshmobile.observability.AppLog
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
@@ -26,6 +30,9 @@ class ChatGptSettingsController @Inject constructor(
     private val planTester: ChatGptPlanConnectionTester,
 ) {
     val state: StateFlow<ChatGptUiState> = auth.state
+    // Browser authorization must survive the Settings scene leaving composition.
+    // The singleton Account owner, not a composable, owns its full authorization lifecycle.
+    private val authorizationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val accountMutationMutex = Mutex()
     @Volatile private var latestSelectedAccountId: String? = null
 
@@ -45,21 +52,25 @@ class ChatGptSettingsController @Inject constructor(
     }
 
     suspend fun connect(existingAccountId: String? = null, requestPlanConsent: Boolean = false) {
-        // OAuth can stay open while awaiting the browser; never hold the account
-        // switch mutex across it, or Restart could not cancel the old authorization.
+        // Never hold the account-switch mutex while a browser is open: Restart
+        // must still be able to cancel the old authorization.
         modelRuntime.requireChatGptAccountSelectionAllowed()
-        val account = auth.connect(existingAccountId, requestPlanConsent)
-        accountMutationMutex.withLock {
-            reconcilePlanProfiles(selectFirstAccountId = account.id)
-        }
+        authorizationScope.async {
+            val account = auth.connect(existingAccountId, requestPlanConsent)
+            accountMutationMutex.withLock {
+                reconcilePlanProfiles(selectFirstAccountId = account.id)
+            }
+        }.await()
     }
 
     suspend fun restart(existingAccountId: String? = null) {
         modelRuntime.requireChatGptAccountSelectionAllowed()
-        val account = auth.restartAuthorization(existingAccountId)
-        accountMutationMutex.withLock {
-            reconcilePlanProfiles(selectFirstAccountId = account.id)
-        }
+        authorizationScope.async {
+            val account = auth.restartAuthorization(existingAccountId)
+            accountMutationMutex.withLock {
+                reconcilePlanProfiles(selectFirstAccountId = account.id)
+            }
+        }.await()
     }
 
     suspend fun cancelAuthorization() = auth.cancelPendingAuthorization()
