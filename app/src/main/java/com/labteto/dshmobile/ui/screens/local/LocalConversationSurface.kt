@@ -452,7 +452,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
     var renameSessionOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
-    val attachments = remember(state.sessionId) { mutableStateListOf<LocalImportedAttachment>() }
+    val attachmentDrafts = rememberSaveable(
+        saver = listSaver(
+            save = { cache: LocalSessionAttachmentDraftCache -> cache.save() },
+            restore = { saved -> LocalSessionAttachmentDraftCache.restore(saved) },
+        ),
+    ) { LocalSessionAttachmentDraftCache() }
+    val attachments = attachmentDrafts.forSession(state.sessionId)
     val listState = rememberLazyListState()
     var composerTailViewportAnchor by remember(state.sessionId) { mutableStateOf<Int?>(null) }
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
