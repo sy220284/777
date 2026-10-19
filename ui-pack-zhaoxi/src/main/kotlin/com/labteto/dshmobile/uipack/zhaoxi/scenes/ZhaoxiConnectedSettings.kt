@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -149,7 +150,8 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                             verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             models.forEach { option ->
                                 ZxChip(option.model, model == option.model &&
-                                    baseUrl.trimEnd('/') == option.baseUrl.trimEnd('/')) {
+                                    baseUrl.trimEnd('/') == option.baseUrl.trimEnd('/'),
+                                    modifier = Modifier.testTag("zx-model-preset-${option.model}")) {
                                     profileId = null
                                     credentialSourceProfileId = null
                                     model = option.model
