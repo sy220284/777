@@ -498,10 +498,11 @@ fun ZhaoxiDiaryHubScene(
         val persons = (response as? com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt.Available)?.entries
         if (diary != null && persons != null && persons.isNotEmpty()) {
             ZxSection("最近手记")
+            val currentRecent = recent
             when {
-                recent == null -> ZxFooterNote("正在读取人物的公开日记…")
-                recent.first.isEmpty() -> ZxEmpty("目前没有公开手记", "可继续检索其他人物，或直接选择人物")
-                else -> recent.first.forEach { (galleryId, item) ->
+                currentRecent == null -> ZxFooterNote("正在读取人物的公开日记…")
+                currentRecent.first.isEmpty() -> ZxEmpty("目前没有公开手记", "可继续检索其他人物，或直接选择人物")
+                else -> currentRecent.first.forEach { (galleryId, item) ->
                     ZxRow(item.personaName, item.event.take(115) +
                         item.feeling.takeIf(String::isNotBlank)?.let { " · ${it.take(35)}" }.orEmpty(),
                         onClick = { onOpenDiary(galleryId) })
