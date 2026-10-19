@@ -73,6 +73,18 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     }
     val isKimiK3 = preset?.provider == "Kimi Code" && preset.model == "k3"
     val supportsWindowOverride = preset == null || isKimiK3
+    val editingProfile = apiProfiles.firstOrNull { it.id == profileId }
+    val formDirty = if (editingProfile != null) {
+        model != editingProfile.model || baseUrl != editingProfile.baseUrl ||
+            protocol != editingProfile.protocol ||
+            contextWindowTokens != editingProfile.contextWindowTokensOverride?.toString().orEmpty() ||
+            apiKey.isNotBlank()
+    } else {
+        model.isNotBlank() || apiKey.isNotBlank() ||
+            baseUrl != "https://api.deepseek.com" || contextWindowTokens.isNotBlank()
+    }
+    var confirmDiscardModel by remember { mutableStateOf(false) }
+    var backAfterDiscard by remember { mutableStateOf(false) }
     val window = contextWindowTokens.toIntOrNull()
     val validWindow = contextWindowTokens.isBlank() || (window != null && (
         if (isKimiK3) window == 262_144 || window == 1_048_576
@@ -93,6 +105,24 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             finally { busy = false }
         }
     }
+    fun closeModelForm() {
+        showModelForm = false
+        profileId = null
+        credentialSourceProfileId = null
+        apiKey = ""
+        resetCatalog()
+    }
+    fun dismissModelForm(back: Boolean) {
+        if (showModelForm && formDirty) {
+            backAfterDiscard = back
+            confirmDiscardModel = true
+        } else if (back) {
+            scope.onBack()
+        } else {
+            closeModelForm()
+        }
+    }
+    BackHandler(enabled = showModelForm && formDirty) { dismissModelForm(true) }
     fun startNewModel() {
         profileId = null
         credentialSourceProfileId = null
@@ -122,7 +152,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         showPresets = false
     }
     val activeProfile = snap.modelProfiles.firstOrNull { snap.modelSelection.isActive(it) }
-    ZxPage("模型与账户", onBack = { scope.onBack() }, scrollState = modelScroll) {
+    ZxPage("模型与账户", onBack = { dismissModelForm(true) }, scrollState = modelScroll) {
         snap.error?.let { ZxBanner(it, ZxTone.Err) }
         status?.let { ZxBanner(it, ZxTone.Warn) }
         ZxSection("当前使用")
@@ -137,15 +167,11 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             }
         }
         ZxSection("API 模型 · ${apiProfiles.size}")
-        ZxFooterNote("已保存的模型可展开管理，切换后以“当前使用”标记为准。")
-        ZxButton(if (showModelForm) "正在编辑模型" else "＋ 添加 API 模型", {
-            startNewModel()
-        }, Modifier.fillMaxWidth(), variant = if (showModelForm) ZxButtonVariant.Outline
-            else ZxButtonVariant.Ink, enabled = !busy)
+        if (!showModelForm) ZxButton("＋ 添加 API 模型", { startNewModel() },
+            Modifier.fillMaxWidth(), variant = ZxButtonVariant.Ink, enabled = !busy)
         if (showModelForm) {
             ZxSettingsGroup {
                 ZxSection(if (profileId == null && credentialSourceProfileId == null) "添加模型" else "编辑模型")
-                ZxFooterNote("常用来源可直接选择；其他模型仍支持搜索和手动填写。")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     settings.apiModelPresets.distinctBy { it.provider }.take(3).forEach { option ->
@@ -258,7 +284,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     "留空可沿用同一接口地址的已保存密钥；修改接口地址时必须重新提供凭据。"
                 else "API Key 仅交由模型配置接口保存，不在此页面回显。")
                 ZxSection("验证与保存")
-                ZxFooterNote("“获取可选模型”读取供应商目录；“测试连接”才会尝试请求当前模型。目录中出现不代表密钥有调用权限。")
+                ZxFooterNote("目录查询不代表有调用权限；请用“测试连接”验证。")
                 ZxButton("获取可选模型", {
                     if (!busy) {
                         val oldAddress = baseUrl.trim()
@@ -350,7 +376,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     }, enabled = !busy && model.isNotBlank() && baseUrl.isNotBlank() &&
                         (apiKey.isNotBlank() || profileId != null || credentialSourceProfileId != null))
                 }
-                ZxButton("取消编辑", { showModelForm = false; apiKey = ""; resetCatalog() },
+                ZxButton("取消编辑", { dismissModelForm(false) },
                     Modifier.fillMaxWidth(), variant = ZxButtonVariant.Ghost, enabled = !busy)
             }
         }
@@ -363,17 +389,19 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             ZxRow((p.displayName ?: p.model) + if (duplicate) " · ${p.id.takeLast(4)}" else "",
                 (if (active) "当前使用" else "已保存") + " · " +
                     p.provider.ifBlank { "自定义来源" } + " · ${p.model}",
-                onClick = { expandedModelId = if (expandedModelId == p.id) null else p.id })
+                onClick = { expandedModelId = if (expandedModelId == p.id) null else p.id },
+                trailing = {
+                    if (!active) ZxChip("使用", false) {
+                        status = settings.submit(SettingsUiCommand.SelectModel(p.id))
+                            .zxUserMessage("切换模型")
+                    }
+                })
             if (expandedModelId == p.id) {
                 ZxValueRow("地址", value = p.baseUrl)
                 ZxValueRow("协议", value = p.protocol.name)
                 p.contextWindowTokensOverride?.let { ZxValueRow("上下文上限", value = "$it Token") }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (!active) ZxChip("使用此模型", false) {
-                        status = settings.submit(SettingsUiCommand.SelectModel(p.id))
-                            .zxUserMessage("切换模型")
-                    }
                     ZxChip("编辑配置", false) {
                         profileId = p.id
                         credentialSourceProfileId = p.id
@@ -424,18 +452,28 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         }
         ZxFooterNote("依据当前模型实际支持能力选择；自动模式优先使用可用的原生图片输入。")
         ZxSection("其他模型与用量")
-        ZxNavRow("ChatGPT 套餐账户 · ${planProfiles} 个模型", sub = "查看套餐授权状态、切换账户和模型") {
+        ZxNavRow("ChatGPT 套餐账户 · ${planProfiles} 个模型") {
             scope.onNavigate(UiSceneId("settings.account"))
         }
-        ZxNavRow("查看模型用量", sub = "按模型对照 Token 和估算费用") {
+        ZxNavRow("查看模型用量") {
             scope.onNavigate(UiSceneId("settings.model_usage"))
         }
         ZxNavRow("MiniMax 套餐额度") { scope.onNavigate(UiSceneId("settings.minimax_quota")) }
-        ZxNavRow("模型表现", sub = "推理上限与温度上限") {
+        ZxNavRow("模型表现") {
             scope.onNavigate(UiSceneId("settings.model_performance"))
         }
         ZxNavRow("官方价格") { scope.onNavigate(UiSceneId("settings.pricing")) }
     }
+    if (confirmDiscardModel) ZxDialog(
+        "放弃未保存的模型配置？", "当前表单内容将丢弃。", "放弃修改",
+        {
+            val navigateBack = backAfterDiscard
+            confirmDiscardModel = false
+            closeModelForm()
+            if (navigateBack) scope.onBack()
+        },
+        { confirmDiscardModel = false },
+    )
 }
 
 /** Dedicated account management, separate from API model configuration. */
@@ -500,18 +538,18 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ZxButton("添加账户", { execute {
-                settings.connectChatGpt()
-                "已发起浏览器授权，请完成登录"
-            } }, Modifier.weight(1f), enabled = !busy)
+                settings.connectChatGpt(requestPlanConsent = true)
+                "账户授权已完成，请核对套餐访问状态"
+            } }, Modifier.weight(1f), enabled = !busy && snap.pendingAccountId == null)
             ZxButton("刷新状态", { execute {
                 settings.refreshChatGpt()
-                "账户状态已刷新"
+                "已请求刷新，请以账户状态为准"
             } }, Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
         }
         if (snap.pendingAccountId != null) ZxButton("取消进行中的授权", {
             execute { settings.cancelChatGptAuthorization(); "取消授权请求已发出" }
         }, variant = ZxButtonVariant.Outline, enabled = !busy)
-        ZxSection("已授权账户 · ${snap.accounts.size}")
+        ZxSection("已添加账户 · ${snap.accounts.size}")
         if (snap.accounts.isEmpty()) ZxEmpty("尚未添加 ChatGPT 账户", "点击“添加账户”，通过浏览器完成登录和套餐授权。")
         snap.accounts.forEach { account ->
             val active = snap.selectedAccountId == account.id
@@ -519,7 +557,24 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             ZxRow(account.displayName ?: account.email ?: account.id,
                 (if (active) "当前使用" else "其他账户") + " · " +
                     zxChatGptAccountAuthLabel(account),
-                onClick = { expanded = if (expanded == account.id) null else account.id })
+                onClick = { expanded = if (expanded == account.id) null else account.id },
+                trailing = {
+                    if (account.signedIn && !account.sharingEnabled) {
+                        ZxChip("授权套餐", false) {
+                            execute {
+                                settings.connectChatGpt(account.id, requestPlanConsent = true)
+                                "套餐授权已完成，请核对可用模型"
+                            }
+                        }
+                    } else if (!active && account.signedIn && account.sharingEnabled) {
+                        ZxChip("切换", false) {
+                            execute {
+                                settings.selectChatGptAccount(account.id)
+                                "已请求账户切换，请以当前账户标记为准"
+                            }
+                        }
+                    }
+                })
             if (expanded == account.id) {
                 ZxValueRow("登录", value = if (account.signedIn) "已登录" else "需要重新授权")
                 ZxValueRow("ChatGPT 套餐访问", value = when {
@@ -527,17 +582,6 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     account.sharingEnabled -> "已取得套餐授权"
                     else -> "尚未取得套餐授权"
                 })
-                if (account.signedIn && !account.sharingEnabled) {
-                    ZxFooterNote("此账户已登录，但尚未授权套餐模型访问。可单独进行套餐授权；不会自动转为 API Key 计费。")
-                    ZxButton("启用套餐访问", { execute {
-                        settings.connectChatGpt(account.id, requestPlanConsent = true)
-                        "套餐授权已请求，请在浏览器明确确认；完成后刷新账户状态"
-                    } }, Modifier.fillMaxWidth(), enabled = !busy)
-                }
-                if (!active) ZxButton("切换至此账户", { execute {
-                    settings.selectChatGptAccount(account.id)
-                    "账户切换已提交，请核对当前账户状态"
-                } }, Modifier.fillMaxWidth(), enabled = !busy)
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ZxButton("测试连接", { execute { settings.testChatGptAccount(account.id) } },
@@ -570,6 +614,13 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         } else if (snap.models.isEmpty()) {
             ZxEmpty("模型目录暂无内容", "刷新账户状态以重新读取套餐可用模型")
         } else {
+            val hasUnsyncedRoutes = snap.models.any { option ->
+                selectedPlanProfiles.none { it.model == option.slug }
+            }
+            if (hasUnsyncedRoutes) ZxButton("同步套餐模型", { execute {
+                settings.refreshChatGpt()
+                "已请求同步，请以模型列表状态为准"
+            } }, Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline, enabled = !busy)
             if (snap.models.size > 12) ZxField(accountModelSearch,
                 { accountModelSearch = it.take(128) }, Modifier.fillMaxWidth(),
                 placeholder = "搜索套餐模型", fieldLabel = "搜索套餐模型")
@@ -589,7 +640,7 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                         else if (route != null) ZxChip("选用", false) {
                             status = settings.submit(SettingsUiCommand.SelectModel(route.id))
                                 .zxUserMessage("切换套餐模型")
-                        }
+                        } else Text("待同步", color = ZhaoxiTheme.colors.ink2)
                     })
             }
             if (visible.size > 12) ZxFooterNote("仅展示前 12 项，可通过搜索快速定位其他模型。")
