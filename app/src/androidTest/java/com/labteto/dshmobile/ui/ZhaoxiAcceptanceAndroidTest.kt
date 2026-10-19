@@ -325,14 +325,17 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.onNodeWithText("保存模型").assertIsDisplayed()
         // The create action must not remain active while a draft is open.
         compose.onAllNodesWithText("＋ 添加 API 模型").assertCountEquals(0)
-        compose.onNodeWithText("查看全部预设", substring = true).performScrollTo().performClick()
+        compose.onNodeWithTag("zx-model-picker-open").performScrollTo().performClick()
+        compose.onNodeWithText("选择模型").assertExists()
         compose.onNodeWithContentDescription("搜索预设模型").performTextInput("deepseek-flash")
         compose.onNodeWithTag("zx-model-preset-deepseek-flash").performScrollTo().performClick()
+        compose.onNodeWithText("验证连接与获取模型").performScrollTo().performClick()
         compose.onNodeWithText("获取可选模型").performScrollTo().assertExists()
-        // 预设不会锁死自定义模型：改名后仍可编辑端点并保存。
-        compose.onNodeWithContentDescription("模型名称").performTextReplacement("acceptance-local-model")
-        compose.onNodeWithContentDescription("模型名称").assertExists()
-        compose.onNodeWithContentDescription("接口地址").performTextReplacement("http://127.0.0.1:9")
+        // 预设不锁死自定义模型：重新打开选择弹窗，改走手动填写。
+        compose.onNodeWithTag("zx-model-picker-open").performScrollTo().performClick()
+        compose.onNodeWithText("手动配置其他模型").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("自定义模型标识").performTextInput("acceptance-local-model")
+        compose.onNodeWithContentDescription("接口地址").performScrollTo().performTextInput("http://127.0.0.1:9")
         compose.onNodeWithContentDescription("API Key（编辑时留空保留原凭据）").performTextInput("local-acceptance-placeholder")
         compose.onNodeWithText("保存模型").assertIsDisplayed().performClick()
         compose.waitUntil(15_000) { compose.onAllNodesWithText("模型已保存").fetchSemanticsNodes().isNotEmpty() }
@@ -346,15 +349,17 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.onNodeWithText("模型", useUnmergedTree = true).performScrollTo().performClick()
         compose.onNodeWithText("＋ 添加 API 模型").performScrollTo().performClick()
         compose.onNodeWithText("保存模型").assertIsDisplayed()
-        compose.onNodeWithContentDescription("模型名称").performTextInput("keep-unsaved-model")
-        compose.onNodeWithContentDescription("模型名称").assertTextContains("keep-unsaved-model")
+        compose.onNodeWithTag("zx-model-picker-open").performScrollTo().performClick()
+        compose.onNodeWithText("手动配置其他模型").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("自定义模型标识").performTextInput("keep-unsaved-model")
+        compose.onNodeWithContentDescription("自定义模型标识").assertTextContains("keep-unsaved-model")
         compose.onNodeWithText("取消编辑").performScrollTo().performClick()
         compose.waitUntil(10_000) {
             compose.onAllNodesWithText("放弃未保存的模型配置？").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("放弃未保存的模型配置？").assertExists()
         compose.onNodeWithText("取消").performClick()
-        compose.onNodeWithContentDescription("模型名称").assertTextContains("keep-unsaved-model")
+        compose.onNodeWithContentDescription("自定义模型标识").assertTextContains("keep-unsaved-model")
         compose.onNodeWithText("取消编辑").performScrollTo().performClick()
         compose.onNodeWithText("放弃修改").performClick()
         compose.onNodeWithText("＋ 添加 API 模型").assertExists()
