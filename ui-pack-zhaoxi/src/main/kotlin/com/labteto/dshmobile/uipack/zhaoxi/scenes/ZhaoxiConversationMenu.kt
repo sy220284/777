@@ -56,6 +56,8 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
     val handoffSourceId = conv?.takeUnless { it.workMode() }?.chat?.snapshot()?.identity?.sessionId
     var showHandoff by remember(handoffSourceId) { mutableStateOf(false) }
     var handoffGoal by remember(handoffSourceId) { mutableStateOf("") }
+    var handoffPreview by remember(handoffSourceId) { mutableStateOf(false) }
+    var handoffSummaryDraft by remember(handoffSourceId) { mutableStateOf("") }
     var selectedHandoffIds by remember(handoffSourceId) { mutableStateOf(emptySet<String>()) }
     var handoffMessages by remember(handoffSourceId) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
     var handoffVisibleLimit by remember(handoffSourceId) { mutableStateOf(80) }
@@ -139,6 +141,8 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                             handoffCursor = null
                             handoffHasMore = historyOwner != null
                             handoffProblem = null
+                            handoffPreview = false
+                            handoffSummaryDraft = ""
                         }
                     }
                 }
@@ -146,11 +150,11 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                     val origin = chatSnapshot.identity!!
                     ZxSection("创建关联 Work · 来源：当前聊天")
                     ZxFooterNote("仅交接你勾选的用户/助手可见文字，系统消息、工具日志与附件不会转移；创建后需自行发送任务。")
-                    ZxField(handoffGoal, { handoffGoal = it }, Modifier.fillMaxWidth(),
+                    if (!handoffPreview) ZxField(handoffGoal, { handoffGoal = it }, Modifier.fillMaxWidth(),
                         placeholder = "工作目标：例如整理这次讨论并给出执行方案")
                     val ordered = zxShareableChatHistory(handoffMessages).distinctBy { it.id }
-                    if (ordered.isEmpty()) ZxEmpty("暂无可交接消息", "仅展示可以明确选择的聊天正文")
-                    else ordered.takeLast(handoffVisibleLimit).forEach { message ->
+                    if (!handoffPreview && ordered.isEmpty()) ZxEmpty("暂无可交接消息", "仅展示可以明确选择的聊天正文")
+                    else if (!handoffPreview) ordered.takeLast(handoffVisibleLimit).forEach { message ->
                         val picked = message.id in selectedHandoffIds
                         val label = if (message.role == UiMessageRole.USER) "我" else
                             if (message.role == UiMessageRole.ASSISTANT) "助手" else message.role.name
@@ -165,11 +169,11 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                                 }
                             })
                     }
-                    if (ordered.size > handoffVisibleLimit) {
+                    if (!handoffPreview && ordered.size > handoffVisibleLimit) {
                         ZxButton("显示更早的消息", {
                             handoffVisibleLimit = (handoffVisibleLimit + 60).coerceAtMost(ordered.size)
                         }, variant = ZxButtonVariant.Outline)
-                    } else if (historyOwner != null && handoffHasMore) {
+                    } else if (!handoffPreview && historyOwner != null && handoffHasMore) {
                         ZxButton("加载更多历史消息", {
                             if (!handoffLoading) jobs.launch {
                                 handoffLoading = true
@@ -188,23 +192,51 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                         }, enabled = !handoffLoading, loading = handoffLoading)
                     }
                     handoffProblem?.let { ZxFooterNote(it) }
-                    ZxFooterNote("已选 ${selectedHandoffIds.size} 条。摘要最多保留 80 条已选消息，超长内容会截断。")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ZxButton("确认创建 Work", {
-                            val source = ordered.filter { it.id in selectedHandoffIds }
-                            try {
-                                val handoff = zxHandoffSummary(handoffGoal, source)
-                                receipt = sessions.submit(SessionUiCommand.Create(
-                                    origin, com.labteto.dshmobile.local.session.LocalConversationMode.CONTINUATION,
-                                    LocalUsageMode.WORK, handoff))
-                                if (receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued) {
-                                    showHandoff = false
+                    if (handoffPreview) {
+                        ZxSection("公开内容预览 · 创建前核对")
+                        ZxFooterNote("下面是将写入新 Work 的完整文本。可修改或删减私密资料；此操作不会直接启动 AI 执行。")
+                        ZxField(handoffSummaryDraft, { updated ->
+                            if (updated.length <= 12000) handoffSummaryDraft = updated
+                            handoffProblem = null
+                        }, Modifier.fillMaxWidth().heightIn(min = 180.dp),
+                            fieldLabel = "交接 Work 的可编辑公开摘要")
+                        ZxFooterNote("本次交接 ${handoffSummaryDraft.length} 字；上限 12000 字。原聊天和已选附件保持不变。")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ZxButton("返回修改选择", { handoffPreview = false },
+                                variant = ZxButtonVariant.Outline)
+                            ZxButton("确认创建 Work", {
+                                val result = handoffSummaryDraft.trim()
+                                if (result.isBlank()) handoffProblem = "请填写要交接的公开内容"
+                                else {
+                                    receipt = sessions.submit(SessionUiCommand.Create(
+                                        origin, com.labteto.dshmobile.local.session.LocalConversationMode.CONTINUATION,
+                                        LocalUsageMode.WORK, result))
+                                    if (receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued) {
+                                        showHandoff = false
+                                        handoffPreview = false
+                                    }
                                 }
-                            } catch (failure: IllegalArgumentException) {
-                                handoffProblem = failure.message
-                            }
-                        }, enabled = handoffGoal.isNotBlank() && selectedHandoffIds.isNotEmpty())
-                        ZxButton("取消", { showHandoff = false }, variant = ZxButtonVariant.Outline)
+                            }, enabled = handoffSummaryDraft.isNotBlank())
+                        }
+                    } else {
+                        ZxFooterNote("已选 ${selectedHandoffIds.size} 条。最多交接 80 条；超长正文将在预览中完整显示实际保留的部分。")
+                        if (selectedHandoffIds.size > 80)
+                            ZxFooterNote("已选消息超过 80 条，请取消部分选择后继续；不会悄悄丢弃剩余消息。")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ZxButton("预览并编辑摘要", {
+                                val source = ordered.filter { it.id in selectedHandoffIds }
+                                try {
+                                    require(source.size <= 80) { "单次最多交接 80 条消息，请减少选择" }
+                                    handoffSummaryDraft = zxHandoffSummary(handoffGoal, source)
+                                    handoffProblem = null
+                                    handoffPreview = true
+                                } catch (failure: IllegalArgumentException) {
+                                    handoffProblem = failure.message
+                                }
+                            }, enabled = handoffGoal.isNotBlank() &&
+                                selectedHandoffIds.isNotEmpty() && selectedHandoffIds.size <= 80)
+                            ZxButton("取消", { showHandoff = false }, variant = ZxButtonVariant.Outline)
+                        }
                     }
                 }
             }
