@@ -104,5 +104,11 @@ class ZhaoxiFullPackAdmissionTest {
         )
         assertTrue("All 75 scenes with connected owners must be admitted: $admission",
             admission is UiApplicationPackAdmission.Admitted)
+        assertTrue("Retired evidence route must be absent from Host catalog",
+            LocalUiSceneCatalog.requirements.none { it.id == UiSceneId("work.requirement_evidence") })
+        assertTrue("Retired evidence scene must never render",
+            UiSceneId("work.requirement_evidence") !in pack.manifest.scenes)
+        assertTrue("Retired evidence capability must never be required",
+            UiCapabilityId("work.evidence_reference") !in pack.manifest.requiredCapabilities)
     }
 }
