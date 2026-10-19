@@ -4,6 +4,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxReadLimitedSkillPackage
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxSupportedSkillImportName
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxValidSkillDraft
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkSkillDraft
+import com.labteto.dshmobile.uipack.zhaoxi.components.zxComposerCanSendDraft
 import java.io.ByteArrayInputStream
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
@@ -62,6 +63,15 @@ class ZhaoxiSkillImportTest {
         assertFalse(zxValidSkillDraft("report-check", "报告核验", "多行\n描述", "规则"))
         assertFalse(zxValidSkillDraft("report-check", "报告核验", "核查", ""))
         assertFalse(zxValidSkillDraft("report-check", "报告核验", "核查", "规则".repeat(6001)))
+    }
+
+    @Test fun skillPrefixAloneDoesNotSubmitAnEmptyWorkTask() {
+        assertFalse(zxComposerCanSendDraft("@skill:code-review"))
+        assertFalse(zxComposerCanSendDraft("@skill:code-review\n"))
+        assertFalse(zxComposerCanSendDraft("@skill:code-review\r\n  "))
+        assertTrue(zxComposerCanSendDraft("@skill:code-review\n核查这份报告"))
+        assertTrue(zxComposerCanSendDraft("普通 Work 任务"))
+        assertFalse(zxComposerCanSendDraft("  "))
     }
 
 }
