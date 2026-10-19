@@ -33,7 +33,9 @@ internal fun zxHandoffSummary(
 ): String {
     val trimmedGoal = goal.trim()
     require(trimmedGoal.isNotBlank()) { "先填写工作目标" }
-    val lines = zxShareableChatHistory(messages).take(80).map { message ->
+    val shareable = zxShareableChatHistory(messages)
+    require(shareable.size <= 80) { "单次最多交接 80 条消息，请减少选择" }
+    val lines = shareable.map { message ->
         val who = if (message.role == UiMessageRole.USER) "用户" else "助手"
         "[$who] ${message.text.trim().take(1200)}"
     }
@@ -226,7 +228,7 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                             ZxButton("预览并编辑摘要", {
                                 val source = ordered.filter { it.id in selectedHandoffIds }
                                 try {
-                                    require(source.size <= 80) { "单次最多交接 80 条消息，请减少选择" }
+                                    require(source.size == selectedHandoffIds.size) { "部分已选消息已不可用，请重新核对选择" }
                                     handoffSummaryDraft = zxHandoffSummary(handoffGoal, source)
                                     handoffProblem = null
                                     handoffPreview = true
