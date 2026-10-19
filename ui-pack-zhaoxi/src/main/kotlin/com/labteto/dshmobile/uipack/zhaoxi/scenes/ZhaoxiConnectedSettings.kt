@@ -40,6 +40,7 @@ internal fun SettingsUiReceipt.zxUserMessage(action: String = "操作"): String 
 }
 
 /** Credentials exist only in the current form; all writes stay with the existing Model owner. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.state.collectAsState(initial = settings.initialState)
