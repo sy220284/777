@@ -386,6 +386,29 @@
         }
       ],
       "conclusion": "Chat单聊/群聊与Work从原回复抽取封闭卡片，经原Session日志存储和恢复；原生确认文本后交原会话Owner发送。自动卡不增加模型调用，不授予工具/支付/审批权限。实际设备和完整跨包恢复仍待验收。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生首页：唯一新建入口，未开始编辑器不生成正式会话记录，未发送草稿独立保留与恢复",
+      "kind": "native_v6_session_and_draft_binding",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationDraftCache.kt",
+          "symbol": "LocalSessionDraftCache"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationDraftCache.kt",
+          "symbol": "LocalSessionAttachmentDraftCache"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/ui/screens/local/LocalSessionAttachmentDraftCacheTest.kt",
+          "method": "savedStateRestoresValidAttachmentDraftsOnly"
+        }
+      ],
+      "conclusion": "恢复到 V6 原生输入器的会话级草稿、附件恢复与隔离机制已有生产源码和单测；空白会话是否产生正式记录及全流程冷启动效果还需要设备验收，不能以静态入口作为通过证明。"
     }
   ]
 }
