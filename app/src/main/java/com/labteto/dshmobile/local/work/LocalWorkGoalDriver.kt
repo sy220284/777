@@ -101,6 +101,7 @@ internal fun driveLocalWorkGoalAfterTurn(
 ): LocalWorkGoalDriveResult {
     val work = binding.workState.snapshot()
     val goal = work.goal ?: return LocalWorkGoalDriveResult.IDLE
+    if (hasOutstandingWorkReplyForm(binding.eventLog, goal)) return LocalWorkGoalDriveResult.WAITING
     val start = binding.eventLog.latestMatching(
         setOf(com.labteto.dshmobile.local.runtime.LOCAL_AGENT_RUN_CHECKPOINT_EVENT),
     ) { data ->
