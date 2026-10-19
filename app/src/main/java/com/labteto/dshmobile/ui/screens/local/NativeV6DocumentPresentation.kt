@@ -36,6 +36,14 @@ internal fun nativeV6ActionLabel(label: String, action: UiDocumentAction?): Stri
         "放入输入框（仍需点击发送）"
     else label
 
+/** Owner admission (not visual tap) is the only local evidence of a submitted form. */
+internal fun nativeV6SubmittedToOwner(receipt: com.labteto.dshmobile.uicontract.UiDocumentReceipt): Boolean =
+    receipt is com.labteto.dshmobile.uicontract.UiDocumentReceipt.OwnerReceipt &&
+        receipt.receipt in setOf(
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted,
+            com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued,
+        )
+
 /** A Select has one value. The UI must not present it as a multi-choice checkbox group. */
 internal fun nativeV6SelectLabel(
     node: UiDocumentNode.Select,
