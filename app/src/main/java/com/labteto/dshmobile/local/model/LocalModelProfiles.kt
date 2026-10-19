@@ -146,6 +146,20 @@ object LocalModelPresets {
             systemPromptUpdateMode = LocalModelPromptUpdateMode.APPEND_ONLY,
             toolUpdateMode = LocalModelPromptUpdateMode.APPEND_ONLY,
         ),
+        // Current stable MiniMax model; legacy M3/M2.7 routes remain selectable and saved routes keep their IDs.
+        LocalModelPreset(
+            provider = "MiniMax",
+            model = "MiniMax-M3.1-Flash",
+            baseUrl = "https://api.minimaxi.com/v1",
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+                LocalModelCapability.VIDEO,
+            ),
+            imageInputSupported = true,
+            modelsEndpoint = "https://api.minimaxi.com/v1/models",
+            contextWindowTokens = 1_000_000,
+        ),
         LocalModelPreset(
             provider = "MiniMax",
             model = "MiniMax-M3",
@@ -478,7 +492,7 @@ object LocalModelPresets {
             val native = entries.firstOrNull { it.provider == "MiniMax" && it.model.equals(normalizedModel, true) }
             if (native != null) return native.copy(baseUrl = normalizedBaseUrl)
             if (normalizedModel.equals("MiniMax-M3.1-Flash-Preview", true)) {
-                return entries.first { it.model == "MiniMax-M3" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
+                return entries.first { it.model == "MiniMax-M3.1-Flash" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
             }
             if (normalizedModel.lowercase() in setOf("minimax-m2", "minimax-m2.1", "minimax-m2.1-highspeed", "minimax-m2.5", "minimax-m2.5-highspeed")) {
                 return entries.first { it.model == "MiniMax-M2.7" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
