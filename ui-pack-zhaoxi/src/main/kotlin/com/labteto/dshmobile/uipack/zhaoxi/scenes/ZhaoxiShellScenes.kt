@@ -701,7 +701,7 @@ fun ZhaoxiOnboardingScene(scope: UiSceneRenderScope) {
     val steps = listOf(
         ZxOnboardingStep("01", "朝夕之间", "一个更安静的 Agent 界面"),
         ZxOnboardingStep("02", "人物图集", "创造、迁移、与人物相处"),
-        ZxOnboardingStep("03", "工作模式", "计划、证据、团队协作"),
+        ZxOnboardingStep("03", "工作模式", "计划、执行进度、团队协作"),
         ZxOnboardingStep("04", "准备好了", "从一次对话开始"),
     )
     ZxPage("欢迎使用", onBack = { scope.onBack() }) {
