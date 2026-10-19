@@ -108,6 +108,35 @@ internal class LocalApplicationFeaturePortsOwner @Inject constructor(
     val forms: UiDocumentFormUiPort = formState
     val shell: ConversationShellUiPort = shellPreferences
     val modelPerformance = LocalModelPerformanceUiOwner
+    val reasoningUiPort: ConversationReasoningUiPort = object : ConversationReasoningUiPort {
+        override fun options(sessionId: String, workMode: Boolean,
+            profile: com.labteto.dshmobile.local.model.LocalModelProfile?,
+        ): UiConversationReasoningOptions {
+            val usage = if (workMode) LocalUsageMode.WORK else LocalUsageMode.CHAT
+            val controls = com.labteto.dshmobile.local.presentation.LocalReasoningControls
+            val available = controls.availableModes(profile, usage)
+            val saved = controls.mode(sessionId, usage)
+            val selected = controls.effectiveMode(saved, available,
+                controls.requiresBasicReasoning(profile, usage))
+            return UiConversationReasoningOptions(
+                UiConversationReasoningMode.valueOf(selected.name),
+                available.map { UiConversationReasoningMode.valueOf(it.name) })
+        }
+        override fun select(sessionId: String, workMode: Boolean,
+            profile: com.labteto.dshmobile.local.model.LocalModelProfile?,
+            mode: UiConversationReasoningMode,
+        ): Boolean {
+            val snap = sessions.snapshot()
+            val usage = if (workMode) LocalUsageMode.WORK else LocalUsageMode.CHAT
+            if (sessionId.isBlank() || snap.identity?.sessionId != sessionId ||
+                snap.usageMode != usage) return false
+            val controls = com.labteto.dshmobile.local.presentation.LocalReasoningControls
+            val chosen = com.labteto.dshmobile.local.presentation.LocalReasoningUiMode.valueOf(mode.name)
+            if (chosen !in controls.availableModes(profile, usage)) return false
+            controls.setMode(sessionId, chosen)
+            return true
+        }
+    }
     val pricing: PricingUiPort? = memoryUiPort as? PricingUiPort
     fun currentSessionId(): String = sessions.snapshot().identity?.sessionId.orEmpty()
     fun isWorkMode(): Boolean = sessions.snapshot().usageMode == LocalUsageMode.WORK
