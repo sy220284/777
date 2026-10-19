@@ -61,6 +61,7 @@ data class ZhaoxiConversationPorts(
     val workTeam: WorkTeamUiPort? = null,
     val replySuggestions: ReplySuggestionsUiPort? = null,
     val files: FilesUiPort? = null,
+    val reasoning: com.labteto.dshmobile.uicontract.ConversationReasoningUiPort? = null,
     val workMode: () -> Boolean,
     val workModeUpdates: Flow<Boolean>? = null,
 )
