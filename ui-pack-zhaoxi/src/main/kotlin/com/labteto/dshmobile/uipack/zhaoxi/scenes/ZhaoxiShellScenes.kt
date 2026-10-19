@@ -66,6 +66,7 @@ import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.SessionUiPort
 import com.labteto.dshmobile.uicontract.ConversationShellUiPort
+import com.labteto.dshmobile.uicontract.ConversationDraftUiPort
 import com.labteto.dshmobile.uicontract.ConversationShellUiCommand
 import com.labteto.dshmobile.uicontract.UiSessionDeletionReceipt
 import com.labteto.dshmobile.uicontract.SessionUiCommand
@@ -116,13 +117,14 @@ fun ZhaoxiHomeScene(
     sessions: SessionUiPort?,
     scope: UiSceneRenderScope,
     conversationShell: ConversationShellUiPort? = null,
+    draftPort: ConversationDraftUiPort? = null,
 ) {
     val snap by (sessions?.snapshots
         ?: kotlinx.coroutines.flow.flowOf(UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null)))
         .collectAsState(initial = UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null))
     var commandReceipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     var drawerQuery by rememberSaveable { mutableStateOf("") }
-    var showBlankSessions by rememberSaveable { mutableStateOf(false) }
+    var showDraftSessions by rememberSaveable { mutableStateOf(false) }
     var selectedSessionAction by remember { mutableStateOf<String?>(null) }
     var renameSessionId by remember { mutableStateOf<String?>(null) }
     var renameTitle by remember { mutableStateOf("") }
@@ -147,9 +149,23 @@ fun ZhaoxiHomeScene(
             session.summaryPreview.orEmpty().contains(drawerQuery.trim(), ignoreCase = true)
     }
     val visibleSessions = zxHomeRecentSessions(matchedSessions, pinnedIds)
-    val blankSessions = matchedSessions.filter { it.blank }
-    val blankExpanded = showBlankSessions
-    val shownSessionIds = (visibleSessions + if (blankExpanded) blankSessions else emptyList())
+    val unsentText by (draftPort?.drafts ?: kotlinx.coroutines.flow.flowOf(emptyMap<String, String>()))
+        .collectAsState(initial = emptyMap())
+    val unsentFiles by (draftPort?.attachments
+        ?: kotlinx.coroutines.flow.flowOf(emptyMap<String, List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment>>()))
+        .collectAsState(initial = emptyMap())
+    fun hasDraft(id: String): Boolean =
+        !unsentText[id].isNullOrBlank() || unsentFiles[id].orEmpty().isNotEmpty()
+    val blankSessions = matchedSessions.filter { it.blank && hasDraft(it.id) }
+    val transientDrafts = snap.pendingSessions.filter { pending ->
+        pending.usageMode == snap.usageMode &&
+            modeSessions.none { it.id == pending.sessionId } &&
+            hasDraft(pending.sessionId) &&
+            (drawerQuery.isBlank() || unsentText[pending.sessionId].orEmpty()
+                .contains(drawerQuery.trim(), ignoreCase = true))
+    }
+    val draftExpanded = showDraftSessions
+    val shownSessionIds = (visibleSessions + if (draftExpanded) blankSessions else emptyList())
         .map { it.id }.toSet()
     fun create(mode: LocalUsageMode) {
         val receipt = sessions?.submit(SessionUiCommand.Create(
@@ -245,7 +261,7 @@ fun ZhaoxiHomeScene(
                                 }
                             }
                         }
-                        if (visibleSessions.isEmpty() && blankSessions.isEmpty()) {
+                        if (visibleSessions.isEmpty() && blankSessions.isEmpty() && transientDrafts.isEmpty()) {
                             item {
                                 Text(
                                     if (drawerQuery.isBlank()) (if (workMode) "暂无工作历史，可返回首页新建" else "暂无聊天历史，可返回首页新建")
@@ -261,25 +277,35 @@ fun ZhaoxiHomeScene(
                                 }
                             }
                         }
-                        if (blankSessions.isNotEmpty()) {
+                        if (blankSessions.isNotEmpty() || transientDrafts.isNotEmpty()) {
                             item {
                                 ZxHomeDrawerEntry(
-                                    "file", "未开始的会话（${blankSessions.size}）",
-                                    detail = "可能包含未发送草稿 · 点击${if (blankExpanded) "收起" else "展开"}",
+                                    "file", "未发送草稿（${blankSessions.size + transientDrafts.size}）",
+                                    detail = "独立保存，不占聊天历史 · 点击${if (draftExpanded) "收起" else "展开"}",
                                     testTag = "zhaoxi.drawer.blank_toggle",
                                     onClick = {
-                                        showBlankSessions = !showBlankSessions
+                                        showDraftSessions = !showDraftSessions
                                         bulkIds = emptySet()
                                     },
                                 )
                             }
-                            if (blankExpanded) {
+                            if (draftExpanded) {
+                                items(transientDrafts, key = { "draft.${it.sessionId}" }) { pending ->
+                                    ZxHomeDrawerEntry(
+                                        "diary", "未发送草稿",
+                                        detail = unsentText[pending.sessionId].orEmpty().take(56)
+                                            .ifBlank { "已添加附件 · 继续编辑" },
+                                        testTag = "zhaoxi.drawer.reopen_blank.${pending.sessionId}",
+                                        onClick = { openSession(pending.sessionId) },
+                                    )
+                                }
                                 items(blankSessions, key = { it.id }) { session ->
                                     ZxHomeDrawerEntry(
                                         "diary", (if (bulkMode) {
                                             if (session.id in bulkIds) "☑ " else "☐ "
                                         } else "") + (renamedTitles[session.id] ?: session.title).take(40),
-                                        detail = "未开始 · 可继续编辑",
+                                        detail = unsentText[session.id].orEmpty().take(56)
+                                            .ifBlank { "附件草稿 · 可继续编辑" },
                                         selected = if (bulkMode) session.id in bulkIds
                                             else snap.identity?.sessionId == session.id,
                                         testTag = "zhaoxi.drawer.reopen_blank.${session.id}",
