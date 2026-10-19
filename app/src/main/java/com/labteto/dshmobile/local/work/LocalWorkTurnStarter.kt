@@ -118,6 +118,7 @@ internal class LocalWorkTurnStarter(
                 val polled = pending.pollCommitted { next, remaining ->
                     staleGoal = shouldDiscardWorkGoalContinuation(
                         next, remaining, runtimeStateStore.state.value.work,
+                        sessionStorage.eventLogs.get(sessionId),
                     )
                     val message = next.modelMessage ?: buildJsonObject {
                 put("role", "user")
