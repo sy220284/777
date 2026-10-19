@@ -460,7 +460,14 @@ internal class LocalWorkAgentTurnExecutor(
                     val deliveryReply = guardWorkCompletionDelivery(cleanReply, runState.value, runEventLog, File(workspacePath))
                     modelStep += 1
                     repliesByStep[modelStep] = deliveryReply
-                    uiDefinitionsByStep[modelStep] = parts.definition.takeIf { deliveryReply.content == cleanReply.content }
+                    // A form with outstanding tools is not a user-input checkpoint: this
+                    // Work turn will keep executing. Publish it only on a tool-free final reply
+                    // so users never see a form while the agent is already moving ahead.
+                    uiDefinitionsByStep[modelStep] = parts.definition.takeIf {
+                        deliveryReply.content == cleanReply.content &&
+                            com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol
+                                .workFormMayBePublished(parts.definition, deliveryReply.toolCalls.size)
+                    }
                     return@AgentModel AgentModelReply(
                         content = deliveryReply.content.orEmpty(),
                         toolCalls = if (runPolicy.allowToolExecution) {
