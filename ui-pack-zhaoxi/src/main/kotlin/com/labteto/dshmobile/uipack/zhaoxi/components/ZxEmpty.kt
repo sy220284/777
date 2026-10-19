@@ -40,19 +40,19 @@ fun ZxEmpty(
             .fillMaxWidth()
             .then(if (hasAction) Modifier.background(c.card, shape)
                 .border(1.dp, c.line, shape) else Modifier)
-            .padding(horizontal = 24.dp, vertical = if (hasAction) 30.dp else 20.dp),
+            .padding(horizontal = 20.dp, vertical = if (hasAction) 24.dp else 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(Modifier.size(52.dp).background(c.bg2, CircleShape),
+        Box(Modifier.size(44.dp).background(c.bg2, CircleShape),
             contentAlignment = Alignment.Center) {
             ZxIcon(iconName, Modifier.size(22.dp))
         }
         Spacer(Modifier.height(4.dp))
         Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
             color = c.ink, textAlign = TextAlign.Center)
-        Text(body, fontSize = 13.sp, color = c.ink2,
-            lineHeight = 21.sp, textAlign = TextAlign.Center)
+        if (body.isNotBlank()) Text(body, fontSize = 12.sp, color = c.ink2,
+            lineHeight = 19.sp, textAlign = TextAlign.Center)
         if (!actionLabel.isNullOrBlank() && onAction != null) {
             Spacer(Modifier.height(8.dp))
             ZxButton(actionLabel, onAction, variant = ZxButtonVariant.Outline)

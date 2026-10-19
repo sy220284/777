@@ -103,7 +103,7 @@ fun ZxSettingsGroup(modifier: Modifier = Modifier, content: @Composable ColumnSc
             .clip(RoundedCornerShape(ZhaoxiTheme.shapes.card))
             .background(ZhaoxiTheme.colors.bg2)
             .border(1.dp, ZhaoxiTheme.colors.line, RoundedCornerShape(ZhaoxiTheme.shapes.card))
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 4.dp),
         content = content,
     )
 }
@@ -119,25 +119,36 @@ fun ZxNavRow(label: String, sub: String = "", value: String = "", onClick: () ->
             .clickable(
                 role = Role.Button, onClick = onClick, interactionSource = interaction,
                 indication = androidx.compose.foundation.LocalIndication.current)
-            .heightIn(min = 56.dp)
-            .padding(horizontal = 8.dp, vertical = 12.dp),
+            .heightIn(min = 52.dp)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val designIcon = when {
-            label.contains("模型") -> "sparkle"
-            label.contains("通知") -> "alert"
-            label.contains("外观") -> "palette"
-            label.contains("用量") || label.contains("费用") -> "usage"
-            label.contains("记忆") -> "diary"
-            label.contains("备份") || label.contains("迁移") -> "files"
-            label.contains("诊断") || label.contains("更新") -> "info"
-            label.contains("工具") -> "tools"
-            label.contains("任务") -> "tasks"
-            label.contains("人物") -> "user"
+        // One stable icon column across every settings entry; never infer icon by substring.
+        val designIcon = when (label) {
+            "外观" -> "palette"
+            "聊天风格" -> "quote"
+            "个人规则" -> "user"
+            "记忆" -> "diary"
+            "模型" -> "sparkle"
+            "模型性能" -> "quota"
+            "ChatGPT 账户" -> "user"
+            "套餐额度" -> "usage"
+            "操作审批模式" -> "check"
+            "权限与设备" -> "settings"
+            "通知" -> "alert"
+            "用量统计" -> "usage"
+            "会话存储" -> "files"
+            "高级设置" -> "tools"
+            "诊断与网络" -> "info"
+            "检查更新" -> "refresh"
             else -> null
         }
-        if (designIcon != null) ZxIcon(designIcon)
+        if (designIcon != null) {
+            Box(Modifier.width(22.dp), contentAlignment = Alignment.Center) {
+                ZxIcon(designIcon)
+            }
+        }
         Column(Modifier.weight(1f)) {
             Text(label, fontSize = 14.sp, color = c.ink, lineHeight = 20.sp)
             // Function entrances show a title and optional live status, not repeated descriptions.
@@ -225,11 +236,10 @@ fun ZxRow(
     Row(
         modifier
             .fillMaxWidth()
-            .padding(vertical = if (onClick != null) 3.dp else 0.dp)
+            .padding(vertical = if (onClick != null) 2.dp else 0.dp)
             .then(if (onClick != null) Modifier.zxPressSurface(interaction) else Modifier)
             .clip(RoundedCornerShape(12.dp))
-            .then(if (onClick != null) Modifier.background(c.card)
-                .border(1.dp, c.line, RoundedCornerShape(12.dp)) else Modifier)
+            .then(if (onClick != null) Modifier.background(c.card) else Modifier)
             .then(if (onClick != null) Modifier.clickable(
                 role = Role.Button, onClick = onClick, interactionSource = interaction,
                 indication = androidx.compose.foundation.LocalIndication.current) else Modifier)
