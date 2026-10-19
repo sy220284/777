@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
@@ -183,6 +184,7 @@ fun ZxComposer(
     onStop: () -> Unit = {},
     onConnectModel: (() -> Unit)? = null,
     onAddClick: (() -> Unit)? = null,
+    onFocusedChange: (Boolean) -> Unit = {},
 ) {
     val c = ZhaoxiTheme.colors
     Row(
@@ -204,7 +206,7 @@ fun ZxComposer(
             value = draft,
             onValueChange = onDraftChange,
             placeholder = if (send.available) placeholder else rejectionHint(send.reason),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).onFocusChanged { onFocusedChange(it.isFocused) },
             inputTestTag = "zhaoxi.composer.input",
         )
         if (running) {
