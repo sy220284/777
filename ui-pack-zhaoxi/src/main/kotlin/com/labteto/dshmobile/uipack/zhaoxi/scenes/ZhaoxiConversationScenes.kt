@@ -739,7 +739,7 @@ private fun ZhaoxiComposerAddMenu(
     val photoPicker = rememberUiAttachmentMultiPickerFor<UiSessionIdentity>(
         mimeTypes = arrayOf("image/*"), onRejected = { feedback = it },
     ) { target, uris -> if (uris.isNotEmpty()) importSelected(target, uris) }
-    val cameraPicker = rememberUiCameraCaptureFor<UiSessionIdentity>(
+    val cameraPicker = rememberUiCameraCaptureFor(
         onRejected = { feedback = it },
     ) { target, uri, cleanup -> importSelected(target, listOf(uri), cleanup) }
     if (expanded) {
