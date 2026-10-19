@@ -8,6 +8,8 @@ import java.io.ByteArrayInputStream
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.zip.ZipInputStream
+import java.util.zip.GZIPInputStream
+import kotlinx.serialization.json.JsonObject
 import java.io.OutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -155,6 +157,7 @@ internal class LocalSessionStorageManager(
                 fileNames.any { it.contains(".events.jsonl") }
             }) { "备份缺少会话事件源，已拒绝导入" }
             grouped.filterKeys { it in existing }.values.flatten().forEach { File(staging, it).delete() }
+            eligible.values.flatten().forEach { validateRestoredFile(File(staging, it)) }
             File(staging, "READY").writeText("v1")
             check(staging.renameTo(pending)) { "无法提交恢复计划，请核对剩余存储空间" }
             return eligible.size
@@ -192,6 +195,38 @@ internal class LocalSessionStorageManager(
         }
         check(pending.deleteRecursively()) { "已恢复，但无法清理隔离区" }
         return committed
+    }
+
+    private fun validateRestoredFile(file: File) {
+        when {
+            file.name.endsWith(".json") -> {
+                require(json.parseToJsonElement(file.readText()) is JsonObject) {
+                    "会话快照 JSON 格式无效"
+                }
+            }
+            file.name.endsWith(".gz") -> {
+                // Validate nested gzip integrity and cap its own expanded bytes.
+                GZIPInputStream(file.inputStream().buffered()).use { input ->
+                    val buf = ByteArray(32 * 1024)
+                    var length = 0L
+                    while (true) {
+                        val count = input.read(buf)
+                        if (count < 0) break
+                        length += count
+                        require(length <= MAX_RESTORE_UNPACKED_BYTES) {
+                            "会话压缩事件解码后超过安全上限"
+                        }
+                    }
+                }
+            }
+            file.name.contains(".events.jsonl") -> {
+                file.forEachLine { line ->
+                    if (line.isNotBlank()) require(json.parseToJsonElement(line) is JsonObject) {
+                        "备份包含损坏的会话事件 JSON"
+                    }
+                }
+            }
+        }
     }
 
     private fun hashesEqual(a: File, b: File): Boolean {
