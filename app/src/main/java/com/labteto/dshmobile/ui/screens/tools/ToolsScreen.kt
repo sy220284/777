@@ -147,7 +147,7 @@ class ToolsViewModel @Inject constructor(
     fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
     private val operationGate = ToolsOperationGate()
     private val _githubBrowse = MutableStateFlow(GitHubBrowseState())
-    val githubBrowse: StateFlow<GitHubBrowseState> = _githubBrowse.asStateFlow()
+    internal val githubBrowse: StateFlow<GitHubBrowseState> = _githubBrowse.asStateFlow()
 
     fun loadGitHubRepositories() {
         launchOperation {
