@@ -772,18 +772,6 @@
       "tests": []
     },
     {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 朝夕 E8.17 独立界面接入（PR #740，未合并）",
-      "sources": [
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/MainActivity.kt",
-          "symbols": [
-            "MainActivity"
-          ]
-        }
-      ],
-      "scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。"
-    },
-    {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 页面返回、抽屉和浮层管理",
       "sources": [
         {
