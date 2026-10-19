@@ -21,6 +21,8 @@ class LocalUsageUiFacade @Inject constructor(private val usage: DeepSeekUsageTra
     override fun turnSummaries(sessionId: String) = usage.analyticsTurnSummaries(sessionId)
     override fun turnDetail(sessionId: String, turnId: String) = usage.analyticsTurnDetail(sessionId, turnId)
     override fun requestDetail(requestId: String): TokenUsageRecord? = usage.analyticsRecord(requestId)
+    override fun historyPage(model: String?, sinceMillis: Long?, cursor: String?, limit: Int) =
+        usage.analyticsHistoryPage(model, sinceMillis, cursor, limit)
 }
 
 @dagger.Module
