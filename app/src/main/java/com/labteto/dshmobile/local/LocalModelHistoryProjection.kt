@@ -243,11 +243,16 @@ private fun applyModelHistoryEvent(
             // must never manufacture an orphan result when an assistant event was lost/corrupted.
             var ownerIndex = history.lastIndex
             val currentBatchResults = linkedSetOf<String>()
+            // Older runs interleaved system/prompt with an unfinished tool batch.
+            // Accept its matching receipts during replay, then reorder the override after
+            // the completed batch before any request is constructed.
             while (ownerIndex >= 0 &&
-                history[ownerIndex]["role"]?.jsonPrimitive?.contentOrNull == "tool"
+                history[ownerIndex]["role"]?.jsonPrimitive?.contentOrNull in setOf("tool", "system")
             ) {
-                history[ownerIndex]["tool_call_id"]?.jsonPrimitive?.contentOrNull
-                    ?.let(currentBatchResults::add)
+                if (history[ownerIndex]["role"]?.jsonPrimitive?.contentOrNull == "tool") {
+                    history[ownerIndex]["tool_call_id"]?.jsonPrimitive?.contentOrNull
+                        ?.let(currentBatchResults::add)
+                }
                 ownerIndex -= 1
             }
             val owner = history.getOrNull(ownerIndex)
