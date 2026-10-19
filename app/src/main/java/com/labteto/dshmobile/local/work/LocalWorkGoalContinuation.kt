@@ -210,6 +210,7 @@ internal fun queueWorkGoalProgressFollowUp(
 ): Boolean {
     val work = binding.state.value.work
     val goal = work.goal
+    if (goal != null && hasOutstandingWorkReplyForm(binding.eventLog, goal)) return false
     // Resolve the same evidence contract used by Goal completion; never trust model prose.
     val assessment = assessLocalWorkGoal(
         work,
