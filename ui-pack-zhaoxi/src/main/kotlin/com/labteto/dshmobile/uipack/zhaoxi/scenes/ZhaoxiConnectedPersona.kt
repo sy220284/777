@@ -117,6 +117,7 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
     ZxPage(if (galleryId == null) "新建人物" else "人物编辑", onBack = ::leave) {
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         ZxSection("人物档案")
+        ZxSettingsGroup {
         ZxBadge(if (draft != original) "有未保存修改" else "内容已同步")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ZxAvatar(draft.name.ifBlank { "人" }, Modifier.size(48.dp), accent = true)
@@ -125,7 +126,16 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
                 Text(if (galleryId == null) "新建人物 · 尚未归档" else "已关联人物归档", color = ZhaoxiTheme.colors.ink2)
             }
         }
+        val coreFields = listOf(draft.name, draft.coreIdentity, draft.franchise)
+        ZxFooterNote("核心资料已填写 ${coreFields.count(String::isNotBlank)} / 3 项 · 补充设定 ${draft.fields.values.count(String::isNotBlank)} 项 · 独立事实 ${draft.facts.size} 条 · 世界书 ${draft.lore.size} 条")
+        }
         ZxTabRow(listOf("核心档案", "独立事实", "世界书", "表达与边界"), selectedTab) { selectedTab = it }
+        ZxFooterNote(when (selectedTab) {
+            0 -> "先完善身份与性格，再补充说话方式；每组内容均可逐步编辑。"
+            1 -> "记录可单独更新的事实，避免将所有细节堆入一个大文本框。"
+            2 -> "管理背景、地点与世界规则；修改完成后统一保存归档。"
+            else -> "调整表达参数与边界设定，留空时沿用全局值。"
+        })
         when (selectedTab) {
             0 -> {
         ZhaoxiPersonaField("姓名", draft.name) { draft = draft.copy(name = it) }

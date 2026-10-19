@@ -75,7 +75,14 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
     var expandedLatest by remember(sessionId, historyRefresh) { mutableStateOf(false) }
     ZxPage("计划审查", onBack = { scope.onBack() }) {
         if (plan == null) {
-            com.labteto.dshmobile.uipack.zhaoxi.components.ZxEmpty("没有进行中的计划", "计划由工作运行时提供")
+            ZxEmpty("没有进行中的计划", "在工作会话中开始任务后，这里会出现计划、真实执行进度与运行事件。", actionLabel = "返回工作会话", onAction = { scope.onBack() }, iconName = "tasks")
+        } else if (plan.plan.isEmpty() && plan.todos.isEmpty() &&
+            history.records.isEmpty() && olderEvents.isEmpty() &&
+            snapshot.question == null && snapshot.approval == null &&
+            workReads.toolActivitiesForUi(sessionId).isEmpty()) {
+            ZxSection("计划状态")
+            ZxEmpty("正在等待计划与执行记录", "当前没有已报告的步骤和事件。运行时开始反馈后将显示真实进度；不会用 0/0 冒充已完成。", iconName = "tasks")
+            ZxChip("刷新状态", false) { historyRefresh++ }
         } else {
             // Plan and Todo lists are separate Owner projections: their positions are not related.
             val progress = zxWorkTodoProgress(plan)

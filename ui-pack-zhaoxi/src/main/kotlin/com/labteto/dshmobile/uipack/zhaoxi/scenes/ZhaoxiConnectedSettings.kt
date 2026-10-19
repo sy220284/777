@@ -532,7 +532,7 @@ fun ZhaoxiPricingScene(port: PricingUiPort, scope: UiSceneRenderScope) {
             }
         } }, Modifier.fillMaxWidth(), enabled = !snap.refreshing, loading = snap.refreshing)
         (result ?: snap.error)?.let { ZxBanner(it, if (snap.error != null) ZxTone.Warn else ZxTone.Info) }
-        if (snap.models.isEmpty()) ZxEmpty("没有可展示的价格", "可以刷新官方价格；实际计费以服务商账单为准。")
+        if (snap.models.isEmpty()) ZxEmpty("没有可展示的价格", "可以刷新官方价格；实际计费以服务商账单为准。", iconName = "usage")
         snap.models.forEach { model ->
             ZxSection(model.displayName)
             ZxSettingsGroup {

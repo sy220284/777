@@ -913,7 +913,7 @@ fun ZhaoxiWorkspaceScene(
                 ZxFooterNote("所选文件经系统文件选择器保存为 ZIP 后，才能分享给其他应用；最多 100 项。")
             }
             if (files == null) ZxEmpty("工作区不可用", "暂时无法读取文件")
-            else if (workspace.isEmpty()) ZxEmpty("还没有工作文件", "执行任务后产生的文档、图片与代码会出现在这里。你也可以查看当前会话的产物。", actionLabel = "查看会话产物", onAction = { selectedDomain = 1 })
+            else if (workspace.isEmpty()) ZxEmpty("还没有工作文件", "执行任务后产生的文档、图片与代码会出现在这里。你也可以查看当前会话的产物。", actionLabel = "查看会话产物", onAction = { selectedDomain = 1 }, iconName = "files")
             else if (visible.isEmpty()) ZxEmpty("没有匹配的文件", "可调整搜索条件，或选择包含内部文件")
             visible.forEach { file ->
                 val selected = file.path in selectedPaths

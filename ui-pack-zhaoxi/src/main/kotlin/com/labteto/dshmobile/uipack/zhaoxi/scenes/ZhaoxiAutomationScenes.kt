@@ -134,6 +134,7 @@ fun ZhaoxiAutomationTasksScene(
                 "创建一次提醒或周期任务，之后可以在这里查看执行时间、结果和失败原因。",
                 actionLabel = "新建自动化",
                 onAction = onCreate,
+                iconName = "tasks",
             )
         } else {
         Spacer(Modifier.height(8.dp))
@@ -361,7 +362,8 @@ fun ZhaoxiAutomationEditorScene(
             (snap.context.identity?.sessionId != editing.targetSessionId || !snap.context.canPlanChat)) {
             ZxEmpty("切换到任务所属的聊天会话", "为防止跨会话修改，聊天自动化只能在绑定会话编辑")
         } else {
-            ZxSection("目标")
+            ZxSection("任务目标")
+            ZxFooterNote(if (chatMode) "这项互动只会关联当前单人聊天会话。" else "工作自动化会按保存的任务内容运行，执行前仍遵守现有权限规则。")
             ZxValueRow("执行模式", value = if (chatMode) "聊天 · 当前会话" else "工作")
             if (chatMode && editingTaskId == null) {
                 ZxChip("智能理解时间", natural) { natural = !natural }
@@ -369,7 +371,7 @@ fun ZhaoxiAutomationEditorScene(
             }
             ZxSection("任务内容")
             ZxField(prompt, { prompt = it }, Modifier.fillMaxWidth().height(104.dp),
-                placeholder = "描述要完成的任务…")
+                placeholder = "描述要完成的任务…", fieldLabel = "任务内容")
             if (!natural) {
                 ZxSection("调度方式")
                 val options = buildList {
@@ -395,6 +397,7 @@ fun ZhaoxiAutomationEditorScene(
                         firstRun = it
                         firstRunError = null
                     }, Modifier.fillMaxWidth(), placeholder = "YYYY-MM-DD HH:mm",
+                        fieldLabel = "首次运行时间 · 设备本地时间",
                         error = firstRunError != null, errorMessage = firstRunError)
                     ZxButton("选择日期与时间", { chooseFirstRun() },
                         Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline)
@@ -404,12 +407,13 @@ fun ZhaoxiAutomationEditorScene(
                     ZxSection("重复间隔（分钟）")
                     ZxField(interval, { interval = it }, Modifier.fillMaxWidth(),
                         placeholder = if (chatMode) "最短 60 分钟" else "最短 15 分钟",
+                        fieldLabel = "重复间隔 · 分钟",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 }
                 if (selected == AutomationScheduleType.SILENCE) {
                     ZxSection("沉默触发（分钟）")
                     ZxField(silence, { silence = it }, Modifier.fillMaxWidth(),
-                        placeholder = "至少 60 分钟",
+                        placeholder = "至少 60 分钟", fieldLabel = "沉默触发 · 分钟",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 }
                 if (selected == AutomationScheduleType.WINDOW) {
