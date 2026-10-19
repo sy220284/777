@@ -773,24 +773,38 @@ private fun ZhaoxiComposerAddMenu(
     val cameraPicker = rememberUiCameraCaptureFor(
         onRejected = { feedback = it },
     ) { target, uri, cleanup -> importSelected(target, listOf(uri), cleanup) }
-    if (expanded) {
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ZxButton("拍照", { identity?.let(cameraPicker); onClose() },
-                enabled = identity != null && attachments != null && !busy,
-                variant = ZxButtonVariant.Outline)
-            ZxButton("图片", { identity?.let(photoPicker); onClose() },
-                enabled = identity != null && attachments != null && !busy,
-                variant = ZxButtonVariant.Outline)
-            ZxButton("文件", { identity?.let(filePicker); onClose() },
-                enabled = identity != null && attachments != null && !busy,
-                variant = ZxButtonVariant.Outline)
-            ZxButton("创作", {
-                onClose()
-                scope.onNavigate(UiSceneId("media.creation"))
-            }, enabled = UiSceneId("media.creation") in knownScenes,
-                variant = ZxButtonVariant.Outline)
+    // Keep the four attachment actions in one anchored popup; never push the composer up.
+    Box(Modifier.padding(start = 12.dp)) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = onClose,
+            modifier = Modifier.widthIn(min = 164.dp, max = 212.dp),
+            containerColor = ZhaoxiTheme.colors.bg,
+        ) {
+            val canAttach = identity != null && attachments != null && !busy
+            DropdownMenuItem(
+                text = { Text("拍照", color = ZhaoxiTheme.colors.ink) },
+                onClick = { identity?.let(cameraPicker); onClose() },
+                enabled = canAttach,
+            )
+            DropdownMenuItem(
+                text = { Text("图片", color = ZhaoxiTheme.colors.ink) },
+                onClick = { identity?.let(photoPicker); onClose() },
+                enabled = canAttach,
+            )
+            DropdownMenuItem(
+                text = { Text("文件", color = ZhaoxiTheme.colors.ink) },
+                onClick = { identity?.let(filePicker); onClose() },
+                enabled = canAttach,
+            )
+            DropdownMenuItem(
+                text = { Text("创作", color = ZhaoxiTheme.colors.ink) },
+                onClick = {
+                    onClose()
+                    scope.onNavigate(UiSceneId("media.creation"))
+                },
+                enabled = UiSceneId("media.creation") in knownScenes,
+            )
         }
     }
     if (busy) ZxFooterNote("附件导入中…")
