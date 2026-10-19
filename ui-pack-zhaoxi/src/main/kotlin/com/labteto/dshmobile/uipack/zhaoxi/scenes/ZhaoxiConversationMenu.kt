@@ -12,6 +12,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.*
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uihost.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 
 /** Attachment import receipts do not include permissioned user data in output. */
 internal fun UiAttachmentReceipt.zxAttachmentFeedback(): String = when (this) {
@@ -321,7 +322,7 @@ internal fun ZhaoxiWorkSkillActions(ports: ZhaoxiConversationPorts, tools: Tools
                                 } else {
                                     // Re-read the Owner draft after the suspend point; never replace text
                                     // the user typed during skill validation.
-                                    val current = kotlinx.coroutines.flow.first(ports.drafts.drafts)[sourceSessionId].orEmpty()
+                                    val current = ports.drafts.drafts.first()[sourceSessionId].orEmpty()
                                     val prepared = zxWorkSkillDraft(skill.name, current)
                                     if (prepared == null) {
                                         outcome = "输入框已有其他技能前缀，请先确认或移除后再选择"
