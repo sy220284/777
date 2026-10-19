@@ -306,13 +306,13 @@ class ZhaoxiApplicationScenePack(
                     menu = { ZhaoxiConversationMenu(conversations, secondary, scope,
                         hasSettings = settings != null, renderSlot = { RenderScene(it, scope) }) },
                     documents = conv.documents, knownScenes = manifest.scenes, media = conv.media,
-                    attachments = conv.attachments)
+                    attachments = conv.attachments, reasoning = conv.reasoning, settings = settings)
             }
             "conversation.work" -> conv?.let { ZhaoxiWorkScene(it.work, it.drafts, it.reading, it.history, scope,
                 onMessage = { identity, message -> targets.message = identity to message.id; messagePreview = identity to message; scope.onNavigate(UiSceneId("conversation.message_actions")) },
                 menu = { ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) }) },
                     documents = conv.documents, knownScenes = manifest.scenes, media = conv.media,
-                    attachments = conv.attachments) }
+                    attachments = conv.attachments, reasoning = conv.reasoning, settings = settings) }
             "conversation.header" -> conv?.let {
                 ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) })
             }
