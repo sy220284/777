@@ -54,6 +54,12 @@ class LocalReplyUiDocumentTest {
         assertTrue(LocalReplyUiDocumentProtocol.instruction.contains(
             "Do not call send_user_input a confirmation or submission",
         ))
+        assertTrue(LocalReplyUiDocumentProtocol.instruction.contains(
+            """"label":"确认并发送表单","actionId":"submit"""",
+        ))
+        assertTrue(LocalReplyUiDocumentProtocol.instruction.contains(
+            """"type":"submit_user_input","text":"按所选方式继续："""",
+        ))
     }
 
     @Test fun streamingHidesProtocolEvenWhenMarkerIsSplitAtEveryPossibleBoundary() {
