@@ -543,6 +543,7 @@ fun ZhaoxiToolsScene(
     var feedback by remember { mutableStateOf<String?>(null) }
     var endpoint by remember { mutableStateOf("") }
     var serverId by remember { mutableStateOf("") }
+    var expandedServer by rememberSaveable { mutableStateOf<String?>(null) }
     var githubToken by remember { mutableStateOf("") }
     var pendingClearGitHub by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -603,7 +604,23 @@ fun ZhaoxiToolsScene(
                 ZxSection("已登记服务器")
                 if (servers.isEmpty()) ZxEmpty("尚未添加 MCP 服务器", "填写名称和地址后连接")
                 servers.forEach { server ->
-                    ZxRow(server.id, "${server.transport} · ${server.connection} · ${server.tools.size} 个工具")
+                    ZxRow(server.id, "${server.transport} · ${server.connection} · ${server.tools.size} 个工具",
+                        onClick = { expandedServer = if (expandedServer == server.id) null else server.id })
+                    if (expandedServer == server.id) {
+                        ZxSection("已登记工具 · ${server.tools.size}")
+                        if (server.tools.isEmpty())
+                            ZxFooterNote("当前服务没有上报工具；检查连接并刷新后查看。")
+                        server.tools.forEach { name ->
+                            val registered = catalogue.firstOrNull { it.name == name }
+                            ZxRow(name,
+                                registered?.let {
+                                    "权限 ${it.access} · 审批 ${it.approval}" +
+                                        if (it.requirements.isEmpty()) "" else " · ${it.requirements.joinToString("、").take(110)}"
+                                } ?: "仅服务端上报名称，应用尚未核实其调用权限",
+                                showChevron = false)
+                        }
+                        ZxFooterNote("这里只显示工具与授权要求；任何执行仍需真实工作任务和工具审批。")
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ZxChip("检查连接", false) { if (!busy) co.launch {
                             busy = true
