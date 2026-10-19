@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -522,9 +523,9 @@ fun ZhaoxiPricingScene(port: PricingUiPort, scope: UiSceneRenderScope) {
     val snap by port.snapshots.collectAsState(initial = port.snapshot())
     val jobs = rememberCoroutineScope()
     var result by remember { mutableStateOf<String?>(null) }
+    val uriHandler = LocalUriHandler.current
     ZxPage("官方价格", onBack = { scope.onBack() }) {
-        ZxSection("计价方式")
-        ZxFooterNote("所有金额为人民币元 / 每百万 Token；缓存命中、普通输入、模型输出分开计价。峰谷时段按服务商公布的规则执行。")
+        ZxFooterNote("人民币元 / 百万 Token · 实际以服务商账单为准")
         ZxButton(if (snap.refreshing) "正在刷新价格…" else "刷新官方价格", { jobs.launch {
             result = when (val receipt = port.refreshOfficial()) {
                 PricingUiReceipt.Completed -> "价格已更新"
@@ -536,14 +537,26 @@ fun ZhaoxiPricingScene(port: PricingUiPort, scope: UiSceneRenderScope) {
         snap.models.forEach { model ->
             ZxSection(model.displayName)
             ZxSettingsGroup {
-                ZxValueRow("缓存命中", value = "高峰 ¥${model.peak.cacheHitCnyPerMillion} · 低峰 ¥${model.offPeak.cacheHitCnyPerMillion}")
-                ZxValueRow("普通输入", value = "高峰 ¥${model.peak.cacheMissCnyPerMillion} · 低峰 ¥${model.offPeak.cacheMissCnyPerMillion}")
-                ZxValueRow("模型输出", value = "高峰 ¥${model.peak.outputCnyPerMillion} · 低峰 ¥${model.offPeak.outputCnyPerMillion}")
+                listOf(
+                    Triple("缓存命中", model.peak.cacheHitCnyPerMillion, model.offPeak.cacheHitCnyPerMillion),
+                    Triple("普通输入", model.peak.cacheMissCnyPerMillion, model.offPeak.cacheMissCnyPerMillion),
+                    Triple("模型输出", model.peak.outputCnyPerMillion, model.offPeak.outputCnyPerMillion),
+                ).forEach { (kind, peak, low) ->
+                    Column(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
+                        Text(kind, fontSize = 13.sp, color = ZhaoxiTheme.colors.ink)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("高峰 ¥$peak", fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
+                            Text("低峰 ¥$low", fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
+                        }
+                    }
+                }
             }
         }
-        ZxSection("价格来源")
-        ZxFooterNote(snap.sourceUrl.ifBlank { "当前没有来源地址" })
-        ZxFooterNote("本页仅显示已经获取的官方价格快照，不表示账单金额或实时消耗。")
+        if (snap.sourceUrl.startsWith("https://") || snap.sourceUrl.startsWith("http://")) {
+            ZxButton("查看价格来源", { uriHandler.openUri(snap.sourceUrl) },
+                Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline)
+        }
     }
 }
 
