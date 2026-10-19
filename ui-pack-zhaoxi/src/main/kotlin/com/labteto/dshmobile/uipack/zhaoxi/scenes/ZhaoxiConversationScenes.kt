@@ -106,6 +106,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
     var receipt by remember(sessionId) { mutableStateOf<UiCommandReceipt?>(null) }
     var showAddMenu by remember(sessionId) { mutableStateOf(false) }
     var inputFocused by remember(sessionId) { mutableStateOf(false) }
+    var reasoningExpanded by remember(sessionId) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().fillMaxSize().imePadding()) {
         ZxConversationRoutes(scope, menu)
         CommandFeedback(receipt)
@@ -126,8 +127,8 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
             if (snap.queuedInputCount > 0)
                 ZxBanner("⇄ 已排队 ${snap.queuedInputCount} 条 · 队列满时将拒收", ZxTone.Warn)
         }
-        ZhaoxiReasoningStrip(sessionId, false, inputFocused || draft.contains("\n"),
-            reasoning, settings, scope, knownScenes)
+        ZhaoxiReasoningStrip(sessionId, false, reasoningExpanded || inputFocused || draft.contains("\n"),
+            reasoning, settings, scope, knownScenes, onCollapse = { reasoningExpanded = false })
         ZhaoxiComposerAddMenu(showAddMenu, snap.identity, { chat.snapshot().identity },
             attachments, drafts, scope, knownScenes, onClose = { showAddMenu = false })
         ZxComposer(
@@ -142,7 +143,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
             },
             placeholder = "问点什么",
             onAddClick = { showAddMenu = !showAddMenu },
-            onFocusedChange = { inputFocused = it },
+            onFocusedChange = { inputFocused = it; if (it) reasoningExpanded = true },
             onConnectModel = { scope.onNavigate(UiSceneId("settings.models")) },
         )
     }
@@ -742,6 +743,7 @@ private fun ZhaoxiReasoningStrip(
     sessionId: String, workMode: Boolean, expanded: Boolean,
     reasoning: ConversationReasoningUiPort?, settings: SettingsUiPort?,
     scope: UiSceneRenderScope, knownScenes: Set<UiSceneId>,
+    onCollapse: () -> Unit = {},
 ) {
     if (!expanded || sessionId.isBlank() || reasoning == null || settings == null) return
     val settingsSnapshot by settings.state.collectAsState(initial = settings.initialState)
@@ -762,6 +764,7 @@ private fun ZhaoxiReasoningStrip(
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
         .padding(horizontal = 12.dp, vertical = 3.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (!workMode) ZxButton("收起", onCollapse, variant = ZxButtonVariant.Outline)
         options.available.forEach { choice ->
             ZxChip(titles[choice] ?: choice.name, choice == options.selected) {
                 if (reasoning.select(sessionId, workMode, profile, choice)) {
