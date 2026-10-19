@@ -153,10 +153,13 @@ internal fun isCurrentWorkGoalContinuation(
     work: LocalWorkState,
     eventLog: LocalSessionEventLog? = null,
 ): Boolean {
+    // A user-facing form blocks *every* autonomous continuation, including retry and
+    // recovery ones. Only a subsequent real user send can release its durable fence.
+    if (continuation != null && eventLog != null &&
+        work.goal?.let { hasOutstandingWorkReplyForm(eventLog, it) } == true) return false
     if (continuation?.failureCode != WORK_GOAL_PROGRESS_CONTINUATION) return true
     val goal = work.goal ?: return false
-    return (eventLog == null || !hasOutstandingWorkReplyForm(eventLog, goal)) &&
-        !work.planMode && goal.status == "active" &&
+    return !work.planMode && goal.status == "active" &&
         continuation.goalId?.isNotBlank() == true &&
         continuation.goalId == goal.id &&
         (continuation.goalRevision?.let { it == goal.revision } ?: (
@@ -183,9 +186,9 @@ internal fun shouldDiscardWorkGoalContinuation(
     eventLog: LocalSessionEventLog? = null,
 ): Boolean =
     input.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.WORK_CONTINUATION &&
-        input.continuation?.failureCode == WORK_GOAL_PROGRESS_CONTINUATION &&
-        (remaining.any { it.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.USER } ||
-            !isCurrentWorkGoalContinuation(input.continuation, work, eventLog))
+        (!isCurrentWorkGoalContinuation(input.continuation, work, eventLog) ||
+            (input.continuation?.failureCode == WORK_GOAL_PROGRESS_CONTINUATION &&
+                remaining.any { it.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.USER }))
 
 internal const val WORK_GOAL_PROGRESS_CONTINUATION = "WORK_GOAL_PROGRESS"
 
