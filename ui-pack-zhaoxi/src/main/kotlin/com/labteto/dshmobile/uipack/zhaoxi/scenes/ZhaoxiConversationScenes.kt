@@ -639,3 +639,91 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
         }
     }
 }
+
+/** A single composer panel for four real actions; attachment bytes remain Owner-managed. */
+@Composable
+private fun ZhaoxiComposerAddMenu(
+    expanded: Boolean,
+    identity: UiSessionIdentity?,
+    currentIdentity: () -> UiSessionIdentity?,
+    attachments: AttachmentUiPort?,
+    drafts: ConversationDraftUiPort,
+    scope: UiSceneRenderScope,
+    knownScenes: Set<UiSceneId>,
+    onClose: () -> Unit,
+) {
+    val jobs = androidx.compose.runtime.rememberCoroutineScope()
+    val sessionId = identity?.sessionId
+    var busy by remember(sessionId) { mutableStateOf(false) }
+    var feedback by remember(sessionId) { mutableStateOf<String?>(null) }
+    fun importSelected(target: UiSessionIdentity, uris: List<String>, cleanup: () -> Unit = {}) {
+        if (target != currentIdentity()) {
+            feedback = "会话已切换，请在当前会话重新选择附件"
+            cleanup()
+            return
+        }
+        if (attachments == null || busy) {
+            feedback = "附件暂不可用或仍在导入，请稍后重试"
+            cleanup()
+            return
+        }
+        busy = true
+        jobs.launch {
+            try {
+                var imported = 0
+                for (uri in uris.take(20)) {
+                    if (target != currentIdentity()) {
+                        feedback = "会话已切换，剩余附件未导入"
+                        break
+                    }
+                    when (val result = attachments.import(ImportUiAttachmentCommand(target, uri))) {
+                        is UiAttachmentReceipt.Imported -> {
+                            drafts.addAttachment(target.sessionId, result.attachment)
+                            imported++
+                        }
+                        else -> feedback = result.zxAttachmentFeedback()
+                    }
+                }
+                if (imported > 0 && feedback == null) feedback = "已加入 ${imported} 项附件，可在会话菜单查看或移除"
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                feedback = failure.message ?: "附件导入失败，请重新选择"
+            } finally {
+                busy = false
+                cleanup()
+            }
+        }
+    }
+    val filePicker = rememberUiAttachmentPickerFor<UiSessionIdentity>(
+        mimeTypes = arrayOf("*/*"), onRejected = { feedback = it },
+    ) { target, uri -> if (uri != null) importSelected(target, listOf(uri)) }
+    val photoPicker = rememberUiAttachmentMultiPickerFor<UiSessionIdentity>(
+        mimeTypes = arrayOf("image/*"), onRejected = { feedback = it },
+    ) { target, uris -> if (uris.isNotEmpty()) importSelected(target, uris) }
+    val cameraPicker = rememberUiCameraCaptureFor<UiSessionIdentity>(
+        onRejected = { feedback = it },
+    ) { target, uri, cleanup -> importSelected(target, listOf(uri), cleanup) }
+    if (expanded) {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ZxButton("拍照", { identity?.let(cameraPicker); onClose() },
+                enabled = identity != null && attachments != null && !busy,
+                variant = ZxButtonVariant.Outline)
+            ZxButton("图片", { identity?.let(photoPicker); onClose() },
+                enabled = identity != null && attachments != null && !busy,
+                variant = ZxButtonVariant.Outline)
+            ZxButton("文件", { identity?.let(filePicker); onClose() },
+                enabled = identity != null && attachments != null && !busy,
+                variant = ZxButtonVariant.Outline)
+            ZxButton("创作", {
+                onClose()
+                scope.onNavigate(UiSceneId("media.creation"))
+            }, enabled = UiSceneId("media.creation") in knownScenes,
+                variant = ZxButtonVariant.Outline)
+        }
+    }
+    if (busy) ZxFooterNote("附件导入中…")
+    feedback?.let { ZxFooterNote(it) }
+}
