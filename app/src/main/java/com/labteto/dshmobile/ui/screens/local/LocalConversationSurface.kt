@@ -1210,6 +1210,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 sessionId = state.sessionId,
                                 streamingState = streamingState,
                                 hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkStep ||
+                                    transcriptItems.lastOrNull() is LocalTranscriptItem.WorkNode ||
                                     transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
                                 lastDurableNarrative = transcriptItems.asReversed().firstNotNullOfOrNull { item ->
                                     when (item) {
