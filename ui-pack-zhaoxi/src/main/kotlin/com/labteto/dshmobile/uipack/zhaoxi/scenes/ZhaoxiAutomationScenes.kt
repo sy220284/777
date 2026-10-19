@@ -634,7 +634,7 @@ internal fun zxCapabilityActionLabel(name: String): String {
     val id = name.lowercase()
     val android = mapOf(
         "android_device_info" to "设备信息", "android_app_list" to "应用列表",
-        "android_app_info" to "查看应用和设备信息", "android_app_launch" to "启动应用",
+        "android_app_info" to "应用信息", "android_app_launch" to "启动应用",
         "android_settings_get" to "系统设置", "android_screen" to "界面结构",
         "android_find" to "查找控件", "android_click_node" to "点击控件",
         "android_set_text_node" to "填写控件", "android_scroll" to "滚动界面",
@@ -676,6 +676,15 @@ internal fun zxPluginDisplayName(id: String): String =
             else -> part.replaceFirstChar { it.titlecase() }
         }
     }.ifBlank { id }
+
+internal fun zxMcpConnectionLabel(state: String): String = when (state.uppercase()) {
+    "HEALTH_UNCHECKED" -> "未检查"
+    "CONNECTING" -> "连接中"
+    "RECONNECTING" -> "重连中"
+    "DISCONNECTING" -> "断开中"
+    "FAILED" -> "连接失败"
+    else -> "状态未知"
+}
 
 internal fun zxPluginStateLabel(state: String): String = when (state.uppercase()) {
     "INSTALLING" -> "安装中"
@@ -784,7 +793,7 @@ fun ZhaoxiToolsScene(
                 ZxSection("已登记服务器")
                 if (servers.isEmpty()) ZxEmpty("尚未添加 MCP 服务器", "填写名称和地址后连接")
                 servers.forEach { server ->
-                    ZxRow(server.id, "${server.tools.size} 个工具 · ${server.connection}",
+                    ZxRow(server.id, "${server.tools.size} 项 · ${zxMcpConnectionLabel(server.connection.name)}",
                         onClick = { expandedServer = if (expandedServer == server.id) null else server.id })
                     if (expandedServer == server.id) {
                         ZxSection("已登记工具 · ${server.tools.size}")
