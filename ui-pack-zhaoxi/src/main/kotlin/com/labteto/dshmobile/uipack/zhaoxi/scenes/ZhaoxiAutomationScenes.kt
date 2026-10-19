@@ -7,6 +7,7 @@ import androidx.compose.ui.text.AnnotatedString
 import android.text.format.DateFormat
 import android.app.TimePickerDialog
 import android.app.DatePickerDialog
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
@@ -344,6 +345,16 @@ fun ZhaoxiAutomationEditorScene(
     var natural by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
+    val editorValues = listOf(prompt, selected.name, firstRun, interval, silence, windowStart,
+        windowEnd, notify.toString(), quietEnabled.toString(), quietStart, quietEnd,
+        proactiveGapInput, maxUnanswered, natural.toString()).joinToString("\u001f")
+    var savedValues by remember(editingTaskId, editing?.id) { mutableStateOf(editorValues) }
+    val hasChanges = editorValues != savedValues
+    var confirmDiscard by remember(editingTaskId) { mutableStateOf(false) }
+    fun leaveEditor() {
+        if (hasChanges) confirmDiscard = true else scope.onBack()
+    }
+    BackHandler(enabled = hasChanges) { leaveEditor() }
     fun minuteOfDay(value: String): Int? {
         val pieces = value.trim().split(":")
         if (pieces.size != 2) return null
@@ -353,12 +364,13 @@ fun ZhaoxiAutomationEditorScene(
     }
     fun showReceipt(receipt: AutomationUiReceipt) {
         feedback = zxAutomationReceiptText("任务", receipt)
+        if (receipt is AutomationUiReceipt.Applied) savedValues = editorValues
     }
     val canSubmitEditor = (editingTaskId == null || editing != null) &&
         !(editing?.mode == AutomationMode.CHAT &&
             (snap.context.identity?.sessionId != editing.targetSessionId || !snap.context.canPlanChat))
     ZxPage(if (editingTaskId == null) "新建自动化" else "编辑自动化",
-        onBack = { scope.onBack() },
+        onBack = { leaveEditor() },
         footer = {
             if (canSubmitEditor) {
                 Column(Modifier.fillMaxWidth().background(ZhaoxiTheme.colors.bg)
@@ -542,10 +554,15 @@ fun ZhaoxiAutomationEditorScene(
             } else ZxFooterNote("智能规划会确定任务内容和时间；创建后可在表单中调整通知与互动规则。")
             feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
             Spacer(Modifier.height(12.dp))
-
-
         }
     }
+    if (confirmDiscard) ZxDialog(
+        "放弃未保存的任务修改？",
+        "本次表单内容尚未保存到调度器，离开后这些修改不会生效。",
+        "放弃并离开",
+        { confirmDiscard = false; scope.onBack() },
+        { confirmDiscard = false },
+    )
 }
 
 /** Current-chat automation page backed by the real scheduler rather than sample event cards. */
