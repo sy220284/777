@@ -60,7 +60,9 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     var discoveredModels by remember { mutableStateOf<List<String>?>(null) }
     var catalogFilter by remember { mutableStateOf("") }
     var catalogFailure by remember { mutableStateOf<String?>(null) }
-    val preset = LocalModelPresets.find(model, baseUrl)
+    val preset = settings.apiModelPresets.firstOrNull {
+        it.model == model.trim() && it.baseUrl.trimEnd('/') == baseUrl.trim().trimEnd('/')
+    }
     val isKimiK3 = preset?.provider == "Kimi Code" && preset.model == "k3"
     val supportsWindowOverride = preset == null || isKimiK3
     val window = contextWindowTokens.toIntOrNull()
@@ -107,7 +109,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                 ZxFooterNote("常用供应商可一键填入地址和协议，其他模型可手动配置。")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LocalModelPresets.entries.forEach { option ->
+                    settings.apiModelPresets.forEach { option ->
                         ZxChip("${option.provider} · ${option.model}",
                             model == option.model && baseUrl.trimEnd('/') == option.baseUrl.trimEnd('/')) {
                             profileId = null
