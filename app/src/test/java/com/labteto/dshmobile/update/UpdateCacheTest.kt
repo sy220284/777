@@ -6,6 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -70,6 +71,36 @@ class UpdateCacheTest {
         assertTrue(apk.exists())
         assertFalse(residue.exists())
         assertEquals(2, root.listFiles()?.size)
+    }
+
+    @Test
+    fun `handoff marker can be replaced without deleting the protected apk`() {
+        val cacheDir = temporary.newFolder("cache-replace")
+        val root = prepare(cacheDir)
+        val apk = File(root, "app-release.apk").apply { writeBytes(ByteArray(12)) }
+
+        UpdateCache.markInstallerHandoff(root, apk, 101L, 1_000_000L)
+        UpdateCache.markInstallerHandoff(root, apk, 102L, 1_050_000L)
+
+        assertEquals(
+            UpdateCache.INSTALLER_HANDOFF_GRACE_MS,
+            UpdateCache.cleanupStale(cacheDir, 100L, 1_050_000L),
+        )
+        assertTrue(apk.isFile)
+        assertFalse(File(root, ".installer-handoff.tmp").exists())
+    }
+
+    @Test
+    fun `unreadable handoff marker never triggers deletion of installer apk`() {
+        val cacheDir = temporary.newFolder("cache-unreadable")
+        val root = prepare(cacheDir)
+        val apk = File(root, "app-release.apk").apply { writeBytes(ByteArray(12)) }
+        File(root, ".installer-handoff").mkdir()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            UpdateCache.cleanupStale(cacheDir, 100L, 1_050_000L)
+        }
+        assertTrue(apk.isFile)
     }
 
     @Test

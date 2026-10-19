@@ -2,6 +2,11 @@ package com.labteto.dshmobile.update
 
 import java.io.File
 import java.io.IOException
+import java.io.FileOutputStream
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.StandardCopyOption
 
 /**
  * Update artifacts are installer staging files, not a persistent download cache.
@@ -133,25 +138,33 @@ internal object UpdateCache {
     private fun writeHandoff(root: File, handoff: InstallerHandoff) {
         val marker = File(root, HANDOFF_MARKER)
         val temp = File(root, "$HANDOFF_MARKER.tmp")
-        temp.writeText(
-            listOf(
-                HANDOFF_SCHEMA,
-                handoff.apkName,
-                handoff.targetVersionCode.toString(),
-                handoff.handedAtMillis.toString(),
-            ).joinToString("\n", postfix = "\n"),
-        )
-        marker.delete()
-        if (!temp.renameTo(marker)) {
-            temp.copyTo(marker, overwrite = true)
-            temp.delete()
+        val bytes = listOf(
+            HANDOFF_SCHEMA,
+            handoff.apkName,
+            handoff.targetVersionCode.toString(),
+            handoff.handedAtMillis.toString(),
+        ).joinToString("\n", postfix = "\n").toByteArray(Charsets.UTF_8)
+        FileOutputStream(temp).use { output ->
+            output.write(bytes)
+            output.fd.sync()
+        }
+        // Never delete the old live marker before its durable replacement is ready.
+        try {
+            Files.move(temp.toPath(), marker.toPath(),
+                StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(temp.toPath(), marker.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
     }
 
     private fun readHandoff(root: File): InstallerHandoff? {
         val marker = File(root, HANDOFF_MARKER)
-        if (!marker.isFile) return null
-        val lines = runCatching { marker.readLines() }.getOrNull() ?: return null
+        val path = marker.toPath()
+        if (Files.notExists(path, LinkOption.NOFOLLOW_LINKS)) return null
+        require(Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+            "安装交接标记不可读取，不应删除正在安装的 APK"
+        }
+        val lines = marker.readLines()
         if (lines.size < 4 || lines[0] != HANDOFF_SCHEMA) return null
 
         val apkName = lines[1]
