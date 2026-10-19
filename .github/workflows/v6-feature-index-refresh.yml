@@ -5,6 +5,9 @@ on:
       - refactor/restore-native-v63-remove-ui3-zhaoxi-20261019
     paths:
       - .github/workflows/v6-feature-index-refresh.yml
+      - docs/FEATURE-TREE-EXPLICIT-EVIDENCE.json
+      - docs/FEATURE-TREE-SOURCE-REGISTRY.json
+      - docs/FEATURE-TREE-LEGACY-IDENTITIES.json
 
 permissions:
   contents: write
