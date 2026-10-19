@@ -708,6 +708,24 @@ fun ZhaoxiDiagnosticsSettingsScene(settings: SettingsUiPort, scope: UiSceneRende
     var report by remember { mutableStateOf<String?>(null) }
     var feedback by remember { mutableStateOf<String?>(null) }
     var networkTarget by rememberSaveable { mutableStateOf("") }
+    var confirmExport by remember { mutableStateOf(false) }
+    val saveDiagnostic = rememberUiStreamDocumentSaver<Unit>(
+        "text/plain", { "777-diagnostic.txt" },
+        { _, output ->
+            // Generate the full report from the owner only after the user picks a destination.
+            val content = settings.diagnosticReport()
+            output.write(content.toByteArray(Charsets.UTF_8))
+            UiDocumentWriteReceipt.Saved
+        },
+        { _, result ->
+            feedback = when (result) {
+                UiDocumentWriteReceipt.Saved -> "诊断报告已保存到用户选择的位置"
+                UiDocumentWriteReceipt.Cancelled -> "已取消报告导出"
+                is UiDocumentWriteReceipt.Failed -> result.message ?: "诊断报告导出失败"
+            }
+        },
+        { failure -> feedback = failure.message }
+    )
     fun read(label: String, action: suspend () -> String) {
         if (loading) return
         loading = true
@@ -734,6 +752,15 @@ fun ZhaoxiDiagnosticsSettingsScene(settings: SettingsUiPort, scope: UiSceneRende
         ZxFooterNote("报告可能包含模型与应用状态，请自行核对后再决定是否分享。")
         ZxButton("生成本地诊断报告", { read("诊断报告") { settings.diagnosticReport() } },
             Modifier.fillMaxWidth(), enabled = !loading, variant = ZxButtonVariant.Outline)
+        ZxButton("导出诊断报告", { confirmExport = true },
+            Modifier.fillMaxWidth(), enabled = !loading, variant = ZxButtonVariant.Outline)
+        if (confirmExport) ZxDialog(
+            "导出诊断报告？",
+            "报告可能包含本机路径、配置及运行信息。确认后需要你在 Android 文件选择器手动选择保存位置；应用不会自动发送给第三方。",
+            "选择保存位置", {
+                confirmExport = false
+                saveDiagnostic(Unit)
+            }, { confirmExport = false })
         ZxSection("网络诊断")
         ZxField(networkTarget, { networkTarget = it }, Modifier.fillMaxWidth(),
             placeholder = "目标地址（例如 api.example.com）")
