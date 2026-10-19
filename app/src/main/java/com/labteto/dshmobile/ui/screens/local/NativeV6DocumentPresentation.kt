@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.uicontract.UiDocument
+import com.labteto.dshmobile.uicontract.UiDocumentAction
 import com.labteto.dshmobile.uicontract.UiDocumentNode
 
 /** Work facts remain in their durable document; only dense diagnostics are initially folded. */
@@ -28,6 +29,12 @@ internal fun nativeV6InlineVisibleNodes(
     if (document.documentId.startsWith("work-live:") && !detailsExpanded) {
         document.nodes.take(1)
     } else document.nodes
+
+/** The text must agree with the action's actual capability, not an AI-authored label. */
+internal fun nativeV6ActionLabel(label: String, action: UiDocumentAction?): String =
+    if (action is UiDocumentAction.SendUserInput && !action.submit)
+        "放入输入框（仍需点击发送）"
+    else label
 
 /** A Select has one value. The UI must not present it as a multi-choice checkbox group. */
 internal fun nativeV6SelectLabel(
