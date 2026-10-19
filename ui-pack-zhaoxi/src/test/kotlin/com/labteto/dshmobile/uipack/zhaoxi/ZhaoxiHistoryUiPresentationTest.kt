@@ -3,6 +3,7 @@ package com.labteto.dshmobile.uipack.zhaoxi
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxAutomationTaskMatches
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxUsageModelNames
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxPinnedSessionsFirst
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxHomeRecentSessions
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxHumanFileSize
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxToolFamilyLabel
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkspaceFileVisible
@@ -16,6 +17,18 @@ class ZhaoxiHistoryUiPresentationTest {
         }
         assertEquals(listOf("c", "a", "b"), zxPinnedSessionsFirst(all, setOf("c")).map { it.id })
         assertEquals(listOf("a", "b", "c"), zxPinnedSessionsFirst(all, emptySet()).map { it.id })
+    }
+    @Test fun homeHistoryExcludesOnlyUnsentSessionsAndPreservesOrdering() {
+        val sessions = listOf(
+            com.labteto.dshmobile.local.session.LocalSessionSummary("draft", "新会话", 40, blank = true),
+            com.labteto.dshmobile.local.session.LocalSessionSummary("first", "已聊过", 30, blank = false),
+            com.labteto.dshmobile.local.session.LocalSessionSummary("work", "继续工作", 20, blank = false),
+        )
+        assertEquals(listOf("work", "first"),
+            zxHomeRecentSessions(sessions, setOf("work", "draft")).map { it.id })
+        assertEquals(listOf("first", "work"),
+            zxHomeRecentSessions(sessions, emptySet()).map { it.id })
+        assertTrue("隐藏是展示策略，不能删除底层草稿", sessions.any { it.id == "draft" && it.blank })
     }
     @Test fun humanReadableFileSizes() {
         assertEquals("0 字节", zxHumanFileSize(0))
