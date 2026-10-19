@@ -26,7 +26,8 @@ internal object LocalMiniMaxPolicy {
 
     fun selection(model: String): LocalReasoningSelection? = when (model.lowercase()) {
         "minimax-m3" -> LocalReasoningSelection("high", "none")
-        "minimax-m3.1-flash-preview" -> LocalReasoningSelection("high", "low", maxEffort = "max")
+        "minimax-m3.1-flash", "minimax-m3.1-flash-preview" ->
+            LocalReasoningSelection("high", "low", maxEffort = "max")
         else -> null // M2.x always thinks; an off switch would be misleading.
     }
 
@@ -36,11 +37,13 @@ internal object LocalMiniMaxPolicy {
             "minimax-m3" -> builder.put("thinking", buildJsonObject {
                 put("type", if (effort == "none") "disabled" else "adaptive")
             })
-            "minimax-m3.1-flash-preview" -> {
+            "minimax-m3.1-flash", "minimax-m3.1-flash-preview" -> {
                 require(effort in setOf("low", "medium", "high", "xhigh", "max")) {
                     "MiniMax M3.1 必须保留思考，请选择基础思考或更高档位"
                 }
-                builder.put("thinking", buildJsonObject { put("type", "adaptive") })
+                // M3.1 always thinks. The official APIs select depth directly:
+                // Anthropic output_config.effort / OpenAI reasoning_effort.
+                // Do not send a redundant thinking override for this mandatory-thinking model.
                 if (anthropic) builder.put("output_config", buildJsonObject { put("effort", effort) })
                 else builder.put("reasoning_effort", effort)
             }
