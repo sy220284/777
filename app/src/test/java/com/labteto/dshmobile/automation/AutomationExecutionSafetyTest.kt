@@ -217,7 +217,7 @@ class AutomationExecutionSafetyTest {
             id = "manual", prompt = "work", createdAt = 1L, nextRunAt = 2L,
             scheduleGeneration = 10L, status = AutomationStatus.PAUSED,
         )
-        val claimed = task.copy(activeManualRunId = "work-request-a")
+        val claimed = task.copy(activeManualRunId = "work-request-a", activeManualStartedAt = 10L)
         assertFalse(ownsAutomationSettlement(claimed, 9L, 10L, manualRun = true, manualExecutionId = "work-request-a"))
         assertFalse(ownsAutomationSettlement(claimed, 10L, 10L, manualRun = true))
         assertFalse(ownsAutomationSettlement(claimed, 10L, 10L, manualRun = true, manualExecutionId = "work-request-b"))
@@ -225,9 +225,11 @@ class AutomationExecutionSafetyTest {
         assertFalse(ownsAutomationSettlement(claimed, 10L, 10L, manualRun = false))
         // Replacing a manual WorkManager request revokes every late settlement of
         // its predecessor even when the scheduler generation is unchanged.
-        val replacement = claimed.copy(activeManualRunId = "work-request-b")
+        val replacement = claimed.copy(activeManualRunId = "work-request-b", activeManualStartedAt = null)
         assertFalse(ownsAutomationSettlement(replacement, 10L, 10L, manualRun = true, manualExecutionId = "work-request-a"))
-        assertTrue(ownsAutomationSettlement(replacement, 10L, 10L, manualRun = true, manualExecutionId = "work-request-b"))
+        assertFalse(ownsAutomationSettlement(replacement, 10L, 10L, manualRun = true, manualExecutionId = "work-request-b"))
+        val restarted = replacement.copy(activeManualStartedAt = 11L)
+        assertTrue(ownsAutomationSettlement(restarted, 10L, 11L, manualRun = true, manualExecutionId = "work-request-b"))
         assertFalse(ownsAutomationSettlement(replacement.copy(activeManualRunId = null), 10L, 10L,
             manualRun = true, manualExecutionId = "work-request-b"))
     }
@@ -245,13 +247,13 @@ class AutomationExecutionSafetyTest {
             assertNull(task.activeManualRunId)
             assertNotNull(firstProcess.updateIf("manual", predicate = {
                 it.scheduleGeneration == task.scheduleGeneration
-            }) { it.copy(activeManualRunId = "request-a") })
+            }) { it.copy(activeManualRunId = "request-a", activeManualStartedAt = 100L) })
 
             val restarted = AutomationStore(file, json)
             assertEquals("request-a", restarted.get("manual")!!.activeManualRunId)
             assertNotNull(restarted.updateIf("manual", predicate = {
                 it.scheduleGeneration == task.scheduleGeneration
-            }) { it.copy(activeManualRunId = "request-b") })
+            }) { it.copy(activeManualRunId = "request-b", activeManualStartedAt = 200L) })
             val staleCommit = restarted.updateIf("manual", predicate = {
                 ownsAutomationSettlement(it, task.scheduleGeneration, 100L,
                     manualRun = true, manualExecutionId = "request-a")
@@ -262,7 +264,7 @@ class AutomationExecutionSafetyTest {
             val currentCommit = restarted.updateIf("manual", predicate = {
                 ownsAutomationSettlement(it, task.scheduleGeneration, 200L,
                     manualRun = true, manualExecutionId = "request-b")
-            }) { it.copy(lastResult = "genuine", activeManualRunId = null) }
+            }) { it.copy(lastResult = "genuine", activeManualRunId = null, activeManualStartedAt = null) }
             assertNotNull(currentCommit)
             assertNull(restarted.updateIf("manual", predicate = {
                 ownsAutomationSettlement(it, task.scheduleGeneration, 200L,
