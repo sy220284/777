@@ -401,7 +401,7 @@ private fun ZxConversationEmpty(workMode: Boolean, missingSession: Boolean, modi
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun ZxConversationRoutes(scope: UiSceneRenderScope, menu: @Composable () -> Unit) {
+internal fun ZxConversationRoutes(scope: UiSceneRenderScope, menu: @Composable () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Column {
         Row(

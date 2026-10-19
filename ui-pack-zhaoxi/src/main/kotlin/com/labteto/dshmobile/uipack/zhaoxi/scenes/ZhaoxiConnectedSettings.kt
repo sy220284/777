@@ -480,15 +480,25 @@ fun ZhaoxiRuntimeSettingsScene(
 @Composable
 fun ZhaoxiPerformanceScene(port: ModelPerformanceUiPort, scope: UiSceneRenderScope) {
     val snap by port.snapshots.collectAsState(initial = port.snapshot())
-    var temperature by rememberSaveable(snap.temperatureCeiling) { mutableStateOf(snap.temperatureCeiling.toString()) }
+    var temperature by rememberSaveable(snap.temperatureCeiling) { mutableStateOf(snap.temperatureCeiling.toFloat().toString()) }
     var status by remember { mutableStateOf<String?>(null) }
     var showTemperatureError by remember { mutableStateOf(false) }
     val temperatureError = if (showTemperatureError) zxTemperatureCeilingError(temperature) else null
     ZxPage("模型性能", onBack = { scope.onBack() }) {
-        ZxSection("推理强度")
-        UiModelReasoningCeiling.entries.forEach { ceiling ->
-            ZxChip(ceiling.name, ceiling == snap.reasoning) {
-                status = port.submit(ModelPerformanceUiCommand.SetReasoning(ceiling)).zxPerformanceMessage()
+        ZxSection("推理强度上限")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            UiModelReasoningCeiling.entries.forEach { ceiling ->
+                val label = when (ceiling) {
+                    UiModelReasoningCeiling.CUSTOM -> "跟随会话"
+                    UiModelReasoningCeiling.DEFAULT -> "默认"
+                    UiModelReasoningCeiling.FAST -> "快速"
+                    UiModelReasoningCeiling.LOW -> "轻量推理"
+                    UiModelReasoningCeiling.DEEP -> "深入推理"
+                    UiModelReasoningCeiling.MAX -> "最大上限"
+                }
+                ZxChip(label, ceiling == snap.reasoning) {
+                    status = port.submit(ModelPerformanceUiCommand.SetReasoning(ceiling)).zxPerformanceMessage()
+                }
             }
         }
         ZxSection("温度上限")

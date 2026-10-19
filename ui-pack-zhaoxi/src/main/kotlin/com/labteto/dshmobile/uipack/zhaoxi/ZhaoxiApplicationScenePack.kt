@@ -321,7 +321,9 @@ class ZhaoxiApplicationScenePack(
                     documents = conv.documents, knownScenes = manifest.scenes, media = conv.media,
                     attachments = conv.attachments, reasoning = conv.reasoning, settings = settings, forms = conv.forms) }
             "conversation.header" -> conv?.let {
-                ZhaoxiConversationMenu(conversations, secondary, scope)
+                ZxConversationRoutes(scope) {
+                    ZhaoxiConversationMenu(conversations, secondary, scope, hasSettings = settings != null)
+                }
             }
             "conversation.timeline" -> conv?.let {
                 ZhaoxiTimelineScene(it.chat, it.reading, it.history, it.documents, manifest.scenes, it.media, it.forms)

@@ -70,8 +70,11 @@ class ZhaoxiAcceptanceAndroidTest {
         val screenshot = if (sceneId == null) {
             requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         } else {
-            compose.onNodeWithTag("zx-acceptance-$sceneId")
-                .assertIsDisplayed().captureToImage().asAndroidBitmap()
+            val scene = compose.onNodeWithTag("zx-acceptance-$sceneId").assertIsDisplayed()
+            if (sceneId == "chat.gallery_delete") {
+                compose.onNodeWithText("确认删除").assertIsDisplayed()
+                requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+            } else scene.captureToImage().asAndroidBitmap()
         }
         File(directory, "$name.png").outputStream().use {
             check(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)) { "Screenshot failed: $name" }
