@@ -61,6 +61,7 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
     var handoffPreview by remember(handoffSourceId) { mutableStateOf(false) }
     var handoffSummaryDraft by remember(handoffSourceId) { mutableStateOf("") }
     var selectedHandoffIds by remember(handoffSourceId) { mutableStateOf(emptySet<String>()) }
+    var selectedHandoffFiles by remember(handoffSourceId) { mutableStateOf(emptySet<String>()) }
     var handoffMessages by remember(handoffSourceId) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
     var handoffVisibleLimit by remember(handoffSourceId) { mutableStateOf(80) }
     var handoffCursor by remember(handoffSourceId) { mutableStateOf<UiTranscriptCursor?>(null) }
@@ -138,6 +139,7 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                         showHandoff = !showHandoff
                         if (showHandoff) {
                             selectedHandoffIds = emptySet()
+                            selectedHandoffFiles = emptySet()
                             handoffMessages = chatSnapshot.messages
                             handoffVisibleLimit = 80
                             handoffCursor = null
@@ -151,10 +153,29 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                 if (showHandoff && chatSnapshot.identity != null) {
                     val origin = chatSnapshot.identity!!
                     ZxSection("创建关联 Work · 来源：当前聊天")
-                    ZxFooterNote("仅交接你勾选的用户/助手可见文字，系统消息、工具日志与附件不会转移；创建后需自行发送任务。")
+                    ZxFooterNote("仅交接已选正文与当前会话已导入的附件；系统日志和未选材料不转移，Work 仍需你主动发送。")
                     if (!handoffPreview) ZxField(handoffGoal, { handoffGoal = it }, Modifier.fillMaxWidth(),
                         placeholder = "工作目标：例如整理这次讨论并给出执行方案")
                     val ordered = zxShareableChatHistory(handoffMessages).distinctBy { it.id }
+                    val availableFiles = attachments[origin.sessionId].orEmpty()
+                    if (!handoffPreview && availableFiles.isNotEmpty()) {
+                        ZxSection("本会话已有附件")
+                        availableFiles.forEach { file ->
+                            val selected = file.relativePath in selectedHandoffFiles
+                            ZxRow(file.name, "${file.mediaType} · ${file.bytes} 字节",
+                                onClick = {
+                                    selectedHandoffFiles = if (selected)
+                                        selectedHandoffFiles - file.relativePath
+                                    else selectedHandoffFiles + file.relativePath
+                                }, trailing = {
+                                    ZxChip(if (selected) "已选" else "选择", selected) {
+                                        selectedHandoffFiles = if (selected)
+                                            selectedHandoffFiles - file.relativePath
+                                        else selectedHandoffFiles + file.relativePath
+                                    }
+                                })
+                        }
+                    }
                     if (!handoffPreview && ordered.isEmpty()) ZxEmpty("暂无可交接消息", "仅展示可以明确选择的聊天正文")
                     else if (!handoffPreview) ordered.takeLast(handoffVisibleLimit).forEach { message ->
                         val picked = message.id in selectedHandoffIds
@@ -202,7 +223,7 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                             handoffProblem = null
                         }, Modifier.fillMaxWidth().heightIn(min = 180.dp),
                             fieldLabel = "交接 Work 的可编辑公开摘要")
-                        ZxFooterNote("本次交接 ${handoffSummaryDraft.length} 字；上限 12000 字。原聊天和已选附件保持不变。")
+                        ZxFooterNote("交接摘要 ${handoffSummaryDraft.length} 字；所选 ${selectedHandoffFiles.size} 个附件只加入新 Work 草稿，原会话保留。")
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             ZxButton("返回修改选择", { handoffPreview = false },
                                 variant = ZxButtonVariant.Outline)
@@ -210,10 +231,15 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                                 val result = handoffSummaryDraft.trim()
                                 if (result.isBlank()) handoffProblem = "请填写要交接的公开内容"
                                 else {
-                                    receipt = sessions.submit(SessionUiCommand.Create(
-                                        origin, com.labteto.dshmobile.local.session.LocalConversationMode.CONTINUATION,
-                                        LocalUsageMode.WORK, result))
-                                    if (receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued) {
+                                    val selectedFiles = availableFiles.filter { it.relativePath in selectedHandoffFiles }
+                                    if (selectedFiles.size != selectedHandoffFiles.size) {
+                                        handoffProblem = "选中的附件已改变，请返回重新选择"
+                                    } else {
+                                        receipt = sessions.submit(SessionUiCommand.Create(
+                                            origin, com.labteto.dshmobile.local.session.LocalConversationMode.CONTINUATION,
+                                            LocalUsageMode.WORK, result, handoffAttachments = selectedFiles))
+                                    }
+                                    if (handoffProblem == null && (receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued)) {
                                         showHandoff = false
                                         handoffPreview = false
                                     }
