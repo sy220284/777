@@ -42,6 +42,8 @@ import com.labteto.dshmobile.uicontract.UiHostPreferencesCommand
 import com.labteto.dshmobile.uicontract.UiHostPreferences
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadge
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadgeTone
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDetentSlider
@@ -70,48 +72,48 @@ fun ZhaoxiSettingsHomeScene(
     updateStatus: kotlinx.coroutines.flow.StateFlow<String?>? = null,
     checkForUpdate: (() -> Unit)? = null,
     settingsOwner: SettingsUiPort? = null,
+    availableScenes: Set<UiSceneId>,
 ) {
+    fun enabled(id: String) = UiSceneId(id) in availableScenes
     val updateFlow = updateStatus ?: remember { kotlinx.coroutines.flow.MutableStateFlow<String?>(null) }
     val currentUpdateStatus by updateFlow.collectAsState()
     ZxPage("设置", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("对话与体验")
         ZxSettingsGroup {
-        ZxNavRow("外观", sub = "明暗主题 · 强调色 · 环境光") { scope.onNavigate(UiSceneId("settings.appearance")) }
-        ZxNavRow("聊天风格", sub = "过滤词 · 命中记录") { scope.onNavigate(UiSceneId("settings.chat")) }
-        ZxNavRow("个人规则") { scope.onNavigate(UiSceneId("settings.session")) }
-        ZxNavRow("记忆", sub = "记忆概览 · 管理") { scope.onNavigate(UiSceneId("settings.memory")) }
+        if (enabled("settings.appearance")) ZxNavRow("外观") { scope.onNavigate(UiSceneId("settings.appearance")) }
+        if (enabled("settings.chat")) ZxNavRow("聊天风格") { scope.onNavigate(UiSceneId("settings.chat")) }
+        if (enabled("settings.session")) ZxNavRow("个人规则") { scope.onNavigate(UiSceneId("settings.session")) }
+        if (enabled("settings.memory")) ZxNavRow("记忆") { scope.onNavigate(UiSceneId("settings.memory")) }
         }
         ZxSection("模型与账户")
         ZxSettingsGroup {
-        ZxNavRow("模型", sub = "当前模型 · API Key · 协议") { scope.onNavigate(UiSceneId("settings.models")) }
-        ZxNavRow("模型性能", sub = "推理强度 · 温度") { scope.onNavigate(UiSceneId("settings.model_performance")) }
-        ZxNavRow("ChatGPT 账户", sub = "授权与登录状态") { scope.onNavigate(UiSceneId("settings.account")) }
-        ZxNavRow("套餐额度", sub = "MiniMax 模型额度") { scope.onNavigate(UiSceneId("settings.minimax_quota")) }
+        if (enabled("settings.models")) ZxNavRow("模型") { scope.onNavigate(UiSceneId("settings.models")) }
+        if (enabled("settings.model_performance")) ZxNavRow("模型性能") { scope.onNavigate(UiSceneId("settings.model_performance")) }
+        if (enabled("settings.account")) ZxNavRow("ChatGPT 账户") { scope.onNavigate(UiSceneId("settings.account")) }
+        if (enabled("settings.minimax_quota")) ZxNavRow("套餐额度") { scope.onNavigate(UiSceneId("settings.minimax_quota")) }
 
         }
         ZxSection("Agent 与安全")
         ZxSettingsGroup {
         settingsOwner?.let {
-            ZxNavRow("操作审批模式") { scope.onNavigate(UiSceneId("settings.approval_mode")) }
+            if (enabled("settings.approval_mode")) ZxNavRow("操作审批模式") { scope.onNavigate(UiSceneId("settings.approval_mode")) }
         }
-        ZxNavRow("权限与设备", sub = "通知与媒体权限状态") { scope.onNavigate(UiSceneId("settings.permissions")) }
-        ZxNavRow("通知", sub = "提醒类型 · 免打扰") { scope.onNavigate(UiSceneId("settings.notifications")) }
+        if (enabled("settings.permissions")) ZxNavRow("权限与设备") { scope.onNavigate(UiSceneId("settings.permissions")) }
+        if (enabled("settings.notifications")) ZxNavRow("通知") { scope.onNavigate(UiSceneId("settings.notifications")) }
 
         }
         ZxSection("数据与系统")
         ZxSettingsGroup {
-        ZxNavRow("用量统计", sub = "模型消耗 · 请求记录") { scope.onNavigate(UiSceneId("settings.usage")) }
-        ZxNavRow("会话存储", sub = "占用空间 · 压缩 · 导出") { scope.onNavigate(UiSceneId("settings.session_storage")) }
-        ZxNavRow("高级设置", sub = "运行限制") { scope.onNavigate(UiSceneId("settings.advanced")) }
-        ZxNavRow("诊断与网络", sub = "环境信息 · 本地诊断报告 · 目标连接检查") {
+        if (enabled("settings.usage")) ZxNavRow("用量统计") { scope.onNavigate(UiSceneId("settings.usage")) }
+        if (enabled("settings.session_storage")) ZxNavRow("会话存储") { scope.onNavigate(UiSceneId("settings.session_storage")) }
+        if (enabled("settings.advanced")) ZxNavRow("高级设置") { scope.onNavigate(UiSceneId("settings.advanced")) }
+        if (enabled("settings.diagnostics")) ZxNavRow("诊断与网络") {
             scope.onNavigate(UiSceneId("settings.diagnostics"))
         }
         if (checkForUpdate != null) {
-            ZxNavRow("检查更新", sub = "直接向应用更新服务检查新版本") { checkForUpdate() }
+            ZxNavRow("检查更新") { checkForUpdate() }
             currentUpdateStatus?.takeIf(String::isNotBlank)?.let { ZxFooterNote(it) }
-        } else {
-            ZxFooterNote("当前构建未提供应用内更新检查")
         }
         }
     }
@@ -139,6 +141,7 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
     }
     var glow by remember(snap.ambientGlow) { mutableFloatStateOf(snap.ambientGlow) }
     var glass by remember(snap.transparency) { mutableFloatStateOf(snap.transparency) }
+    var showAdvancedAppearance by remember { mutableStateOf(false) }
     var wallpaperSaving by remember { mutableStateOf(false) }
     var wallpaperError by remember { mutableStateOf<String?>(null) }
     ZxPage("外观", onBack = { scope.onBack() }) {
@@ -167,15 +170,10 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
             labels = listOf("小", "标准", "大"),
             onChange = { v -> writeAppearance(textScale = listOf(0.9f, 1f, 1.3f)[v]) },
         )
-        ZxSection("字重")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(0 to "常规字重", 1 to "略粗", 2 to "加粗").forEach { (value, label) ->
-                ZxChip(label, snap.textWeight == value) { writeAppearance(textWeight = value) }
-            }
-        }
         ZxSection("背景与材质")
         ZxSwitchRow("启用主题壁纸", "开启后显示选中的壁纸；自动模式随主题和明暗切换",
             snap.presetWallpaperEnabled) { writeAppearance(presetWallpaperEnabled = it) }
+        if (snap.presetWallpaperEnabled) {
         ZxSection("选择壁纸")
         ZhaoxiWallpaperPicker(
             selectedPreset = snap.selectedWallpaperPreset,
@@ -201,6 +199,18 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
         }
         if (wallpaperSaving) ZxFooterNote("正在保存壁纸")
         wallpaperError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
+        }
+        Spacer(Modifier.height(10.dp))
+        ZxChip(if (showAdvancedAppearance) "收起高级外观" else "高级外观", showAdvancedAppearance) {
+            showAdvancedAppearance = !showAdvancedAppearance
+        }
+        if (showAdvancedAppearance) {
+        ZxSection("字重")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(0 to "常规字重", 1 to "略粗", 2 to "加粗").forEach { (value, label) ->
+                ZxChip(label, snap.textWeight == value) { writeAppearance(textWeight = value) }
+            }
+        }
         ZxSwitchRow("智能对比度", "根据壁纸与明暗模式保持文字可读",
             snap.adaptiveContrast) { writeAppearance(adaptiveContrast = it) }
         Text("环境光强度 · ${(glow * 100).toInt()}%", fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
@@ -225,7 +235,7 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
         ZxSwitchRow("界面动效", "关闭后停用场景与组件过渡动画",
             checked = snap.motionScale > 0f,
             onChange = { writeAppearance(motionScale = if (it) 1f else 0f) })
-
+        }
     }
 }
 
@@ -234,6 +244,18 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
 fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneRenderScope) {
     val snap by preferences.snapshots.collectAsState(initial = UiHostPreferences())
     val jobs = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var permissionRevision by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) permissionRevision++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val systemNotificationGranted = remember(preferences, permissionRevision) {
+        preferences.notificationPermissionGranted()
+    }
     var status by remember { mutableStateOf<String?>(null) }
     var triedQuietSave by remember { mutableStateOf(false) }
     var startTime by remember(snap.quietStartMinute) {
@@ -272,6 +294,12 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
     val quietError = if (triedQuietSave) zxQuietHoursError(startTime, endTime) else null
     ZxPage("通知", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
+        if (systemNotificationGranted == false) {
+            ZxBanner("系统通知权限尚未授权。下方偏好可以保存，但目前可能无法投递提醒。", ZxTone.Warn)
+            ZxButton("前往系统通知授权", { preferences.openSystemNotifications() }, Modifier.fillMaxWidth())
+        } else if (systemNotificationGranted == true) {
+            ZxFooterNote("系统通知已授权；具体提醒仍以各类别开关和免打扰设置为准。")
+        }
         ZxSection("提醒类型")
         ZxSwitchRow("任务执行", "定时任务和自动化事件", snap.notifyJobs) { update(jobsEnabled = it) }
         ZxSwitchRow("执行结果", "任务完成后的结果提示", snap.notifyResults) { update(resultsEnabled = it) }

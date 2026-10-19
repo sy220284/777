@@ -3,9 +3,20 @@ package com.labteto.dshmobile.uipack.zhaoxi
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxAutomationTaskMatches
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxUsageModelNames
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxPinnedSessionsFirst
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxHomeRecentSessions
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxHumanFileSize
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxToolFamilyLabel
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxPluginStateLabel
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxCapabilityActionLabel
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxCapabilityPermissionLabel
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkspaceKindLabel
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxUsageActionLabel
+import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkspaceFileVisible
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxSettingsNavigationIcon
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxChatGptCanCancelAuthorization
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase
+import com.labteto.dshmobile.uipack.zhaoxi.components.zxEmptyStateIcon
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -16,6 +27,18 @@ class ZhaoxiHistoryUiPresentationTest {
         }
         assertEquals(listOf("c", "a", "b"), zxPinnedSessionsFirst(all, setOf("c")).map { it.id })
         assertEquals(listOf("a", "b", "c"), zxPinnedSessionsFirst(all, emptySet()).map { it.id })
+    }
+    @Test fun homeHistoryExcludesOnlyUnsentSessionsAndPreservesOrdering() {
+        val sessions = listOf(
+            com.labteto.dshmobile.local.session.LocalSessionSummary("draft", "新会话", 40, blank = true),
+            com.labteto.dshmobile.local.session.LocalSessionSummary("first", "已聊过", 30, blank = false),
+            com.labteto.dshmobile.local.session.LocalSessionSummary("work", "继续工作", 20, blank = false),
+        )
+        assertEquals(listOf("work", "first"),
+            zxHomeRecentSessions(sessions, setOf("work", "draft")).map { it.id })
+        assertEquals(listOf("first", "work"),
+            zxHomeRecentSessions(sessions, emptySet()).map { it.id })
+        assertTrue("隐藏是展示策略，不能删除底层草稿", sessions.any { it.id == "draft" && it.blank })
     }
     @Test fun humanReadableFileSizes() {
         assertEquals("0 字节", zxHumanFileSize(0))
@@ -44,5 +67,53 @@ class ZhaoxiHistoryUiPresentationTest {
         assertEquals("设备操作", zxToolFamilyLabel("Android"))
         assertEquals("代码分析", zxToolFamilyLabel("LSP"))
         assertEquals("MCP", zxToolFamilyLabel("MCP"))
+    }
+    @Test fun toolPermissionAndLifecycleLabelsAreHumanReadable() {
+        assertEquals("应用信息", zxCapabilityActionLabel("android_app_info"))
+        assertEquals("读取 GitHub 信息", zxCapabilityActionLabel("github_api_get"))
+        assertEquals("启动应用", zxCapabilityActionLabel("android_app_launch"))
+        assertEquals("屏幕点击", zxCapabilityActionLabel("android_tap"))
+        assertEquals("滑动屏幕", zxCapabilityActionLabel("android_swipe"))
+        assertEquals("屏幕截图", zxCapabilityActionLabel("android_screenshot"))
+        assertEquals("android_unknown_future_action", zxCapabilityActionLabel("android_unknown_future_action"))
+        assertEquals("读取 · 无需额外确认", zxCapabilityPermissionLabel("READ_ONLY", "NEVER"))
+        assertEquals("读取 · 需操作确认", zxCapabilityPermissionLabel("READ_ONLY", "MUTATION"))
+        assertEquals("设备操作 · 需操作确认", zxCapabilityPermissionLabel("DEVICE", "MUTATION"))
+        assertEquals("可修改 · 需操作确认", zxCapabilityPermissionLabel("MUTATION", "ALWAYS"))
+        assertEquals("已启用", zxPluginStateLabel("ACTIVE"))
+        assertEquals("需要修复", zxPluginStateLabel("FAILED"))
+    }
+    @Test fun oauthBrowserWaitCanAlwaysBeCancelledIncludingFirstAccount() {
+        assertTrue(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.PREPARING, false))
+        assertTrue(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.WAITING_FOR_BROWSER, false))
+        assertTrue(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.EXCHANGING_CODE, true))
+        assertTrue(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.VALIDATING_IDENTITY, true))
+        assertTrue(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.LOADING_MODELS, true))
+        assertFalse(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.LOADING_MODELS, false))
+        assertFalse(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.DISCONNECTED, false))
+        assertFalse(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.CONNECTED, false))
+    }
+
+    @Test fun everySettingsDestinationGetsAStableIconAndUnknownRowsRemainPlain() {
+        val entries = listOf("外观", "聊天风格", "个人规则", "记忆", "模型",
+            "模型性能", "ChatGPT 账户", "套餐额度", "操作审批模式", "权限与设备",
+            "通知", "用量统计", "会话存储", "高级设置", "诊断与网络", "检查更新")
+        assertTrue(entries.all { !zxSettingsNavigationIcon(it).isNullOrBlank() })
+        assertEquals("palette", zxSettingsNavigationIcon("外观"))
+        assertEquals("quota", zxSettingsNavigationIcon("模型性能"))
+        assertNull(zxSettingsNavigationIcon("未知未来目的地"))
+    }
+    @Test fun emptyStatesHaveMeaningfulFallbackIconsWithoutFakeCapabilities() {
+        assertEquals("people", zxEmptyStateIcon("暂无人物"))
+        assertEquals("tasks", zxEmptyStateIcon("还没有自动化任务"))
+        assertEquals("files", zxEmptyStateIcon("工作区没有文件"))
+        assertEquals("search", zxEmptyStateIcon("没有匹配的内容"))
+        assertEquals("sparkle", zxEmptyStateIcon("欢迎使用"))
+    }
+    @Test fun workspaceAndUsagePresentationDoesNotExposeRawInternalIdentifiers() {
+        assertEquals("PDF 文档", zxWorkspaceKindLabel("exports/report.pdf"))
+        assertEquals("图片", zxWorkspaceKindLabel("output/photo.png"))
+        assertEquals("工作任务", zxUsageActionLabel(TokenUsageAction.WORK_MAIN))
+        assertEquals("图像理解", zxUsageActionLabel(TokenUsageAction.VISION))
     }
 }

@@ -78,6 +78,13 @@ internal fun LocalHarnessSession.withChatSessionDomain(chat: LocalChatState): Lo
 internal object LocalChatSessionDomainCodec : LocalSessionDomainCodec {
     override val id: String = "chat"
 
+    override fun hasSessionWork(session: LocalHarnessSession): Boolean {
+        val group = session.groupChat
+        return group.members.isNotEmpty() || group.mode != LocalChatMode.SINGLE ||
+            session.galleryId != null || session.galleryStoryId != null ||
+            session.personaId != "default"
+    }
+
     override fun normalizeLoaded(session: LocalHarnessSession): LocalHarnessSession {
         val decoded = session.decodeChatSessionDomain()
         val canonicalState = decoded.chatState

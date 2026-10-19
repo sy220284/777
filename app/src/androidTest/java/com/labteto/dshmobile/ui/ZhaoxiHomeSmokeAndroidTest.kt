@@ -22,10 +22,35 @@ import org.junit.Test
 class ZhaoxiHomeSmokeAndroidTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    private fun ensureChatMode() {
+        val owner = androidx.lifecycle.ViewModelProvider(compose.activity)[
+            com.labteto.dshmobile.ui.host.LocalApplicationFeaturePortsOwner::class.java
+        ]
+        compose.waitUntil(30_000) { !owner.sessions.snapshot().loading && owner.sessions.snapshot().identity != null }
+        if (owner.sessions.snapshot().usageMode != com.labteto.dshmobile.local.LocalUsageMode.CHAT) {
+            val receipt = owner.sessions.submit(
+                com.labteto.dshmobile.uicontract.SessionUiCommand.SelectMode(
+                    com.labteto.dshmobile.local.LocalUsageMode.CHAT, openConversation = false,
+                ),
+            )
+            org.junit.Assert.assertTrue(
+                receipt == com.labteto.dshmobile.uicontract.UiCommandReceipt.Accepted ||
+                    receipt == com.labteto.dshmobile.uicontract.UiCommandReceipt.Queued,
+            )
+            compose.waitUntil(30_000) {
+                !owner.sessions.snapshot().loading &&
+                    owner.sessions.snapshot().usageMode == com.labteto.dshmobile.local.LocalUsageMode.CHAT
+            }
+        }
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithTag("zhaoxi.home.create_chat").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     @Test fun homeShowsInteractiveSessionAndMainRoutes() {
+        ensureChatMode()
         compose.onNodeWithContentDescription("打开侧栏").assertExists()
         compose.onNodeWithTag("zhaoxi.home.create_chat").assertExists()
-        compose.onNodeWithText("人物").assertExists()
         compose.onNodeWithContentDescription("打开侧栏").performClick()
         val drawer = compose.onNodeWithTag("zhaoxi.drawer.surface", useUnmergedTree = true)
             .assertTopPositionInRootIsEqualTo(0.dp)
@@ -34,8 +59,8 @@ class ZhaoxiHomeSmokeAndroidTest {
         org.junit.Assert.assertEquals("侧栏背景必须延伸至导航栏底部",
             viewportBottom.value, drawerBottom.value, 1f)
         compose.onNodeWithContentDescription("全局搜索").assertExists()
-        compose.onNodeWithContentDescription("新建会话").assertExists()
-        compose.onNodeWithText("人物图集").assertExists()
+        compose.onNodeWithText("工作区文件", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("人物图集", useUnmergedTree = true).assertExists()
         // #758: search is a real global page, and the drawer no longer needs a redundant close icon.
         compose.onNodeWithContentDescription("全局搜索").performClick()
         compose.onNodeWithText("搜索").assertExists()
@@ -43,13 +68,14 @@ class ZhaoxiHomeSmokeAndroidTest {
         compose.waitUntil(10_000) {
             compose.onAllNodesWithText("人物图集").fetchSemanticsNodes().isEmpty()
         }
-        compose.onNodeWithText("设置").performClick()
+        compose.onNodeWithText("设置", useUnmergedTree = true).performClick()
         compose.onNodeWithText("模型与账户").assertExists()
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithTag("zhaoxi.home.create_chat").assertExists()
     }
     @Test fun newConversationDraftSurvivesActivityRecreationAndReturn() {
         val owner = androidx.lifecycle.ViewModelProvider(compose.activity)[com.labteto.dshmobile.ui.host.LocalApplicationFeaturePortsOwner::class.java]
+        ensureChatMode()
         compose.waitUntil(30_000) { owner.sessions.snapshot().identity != null && !owner.sessions.snapshot().loading }
         compose.onNodeWithTag("zhaoxi.home.create_chat").performClick()
         // Select the actual composer. The offscreen session drawer has its own
@@ -66,9 +92,19 @@ class ZhaoxiHomeSmokeAndroidTest {
         compose.onNodeWithTag("zhaoxi.composer.input", useUnmergedTree = true)
             .assertTextEquals("待发送的草稿")
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-        // Reopen the exact same session through the home recent-session entry.
-        // Clicking the generic “聊天” tab only selects a mode; it does not open a session.
-        val reopenTag = "zhaoxi.home.reopen_session.$createdSessionId"
+        // Unsent drafts are hidden from ordinary history, but can still be reopened in
+        // the drawer's collapsed unfinished-session group. No stored draft is deleted.
+        val recentTag = "zhaoxi.home.reopen_session.$createdSessionId"
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithTag("zhaoxi.home.create_chat").fetchSemanticsNodes().isNotEmpty()
+        }
+        org.junit.Assert.assertTrue(
+            "空白草稿不应进入普通最近历史",
+            compose.onAllNodesWithTag(recentTag).fetchSemanticsNodes().isEmpty(),
+        )
+        compose.onNodeWithContentDescription("打开侧栏").performClick()
+        compose.onNodeWithTag("zhaoxi.drawer.blank_toggle").performClick()
+        val reopenTag = "zhaoxi.drawer.reopen_blank.$createdSessionId"
         compose.waitUntil(30_000) {
             compose.onAllNodesWithTag(reopenTag).fetchSemanticsNodes().isNotEmpty()
         }

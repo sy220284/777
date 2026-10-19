@@ -107,7 +107,7 @@ class ZhaoxiApplicationScenePack(
         setOf(UiSceneId("settings.session"), UiSceneId("settings.chat"))
 
     private val conversationScenes = if (conversations == null) emptySet() else
-        setOf("route.home", "conversation.chat", "conversation.work",
+        setOf("conversation.chat", "conversation.work",
             "conversation.header", "conversation.timeline", "conversation.composer",
             "conversation.reply_status", "work.approval", "work.question").map(::UiSceneId).toSet()
 
@@ -133,16 +133,22 @@ class ZhaoxiApplicationScenePack(
     private val teamScene = if (conversations?.workTeam != null)
         setOf(UiSceneId("work.team")) else emptySet()
 
-    private val settingsSuite = if (settings == null) emptySet() else setOf(
-        "settings.root", "route.settings",
-        "settings.models", "conversation.model_picker",
-        "settings.account", "settings.minimax_quota",
-        "settings.model_performance", "settings.pricing",
-        "settings.usage", "settings.model_usage", "settings.usage_log",
-        "settings.usage_detail", "settings.memory", "settings.memory_settings",
-        "settings.advanced", "settings.session_storage", "settings.diagnostics",
-        "settings.approval_mode",
-    ).map(::UiSceneId).toSet()
+    private val settingsSuite = buildSet {
+        if (settings != null) addAll(setOf(
+            "settings.root", "route.settings", "settings.models", "conversation.model_picker",
+            "settings.account", "settings.minimax_quota", "settings.memory_settings",
+            "settings.advanced", "settings.session_storage", "settings.diagnostics",
+            "settings.approval_mode",
+        ).map(::UiSceneId))
+        if (secondary?.modelPerformance != null) add(UiSceneId("settings.model_performance"))
+        if (secondary?.pricing != null) add(UiSceneId("settings.pricing"))
+        if (usageOwner != null) addAll(setOf(
+            "settings.usage", "settings.model_usage", "settings.usage_log",
+            "settings.usage_detail",
+        ).map(::UiSceneId))
+        if (secondary?.memory != null && (settings != null || secondary.settings != null))
+            add(UiSceneId("settings.memory"))
+    }
 
     private val updateScene = if (settings != null && checkForUpdate != null &&
         updateStatus != null) setOf(UiSceneId("settings.update")) else emptySet()
@@ -171,11 +177,20 @@ class ZhaoxiApplicationScenePack(
         setOf("route.tasks", "automation.tasks", "automation.editor",
             "automation.persona_interaction").map(::UiSceneId).toSet() else emptySet()
 
-    private val secondaryShell = if (secondary?.sessions != null)
-        setOf("shell.new_session", "shell.onboarding", "shell.empty").map(::UiSceneId).toSet()
-        else emptySet()
+    private val secondaryShell = buildSet {
+        if (secondary?.sessions != null) {
+            add(UiSceneId("shell.onboarding"))
+            add(UiSceneId("shell.empty"))
+            if (conversations != null) {
+                add(UiSceneId("route.home"))
+                add(UiSceneId("shell.new_session"))
+            }
+        }
+    }
 
-    private val secondarySearch = if (secondary?.sessions != null && secondary.transcript != null)
+    // Session titles and other available domains remain searchable even if transcript search
+    // is not installed; only the message-body subsection requires its own History Port.
+    private val secondarySearch = if (secondary?.sessions != null)
         setOf(UiSceneId("shell.search")) else emptySet()
 
     private val shellErrorScene = if (conversations != null)
@@ -276,7 +291,7 @@ class ZhaoxiApplicationScenePack(
         val sessionId = identity?.sessionId ?: sec?.sessionId?.invoke().orEmpty()
         when (scene.value) {
             // ---- 壳层 ----
-            "route.home", "shell.new_session" -> ZhaoxiHomeScene(sec?.sessions, scope, sec?.conversationShell)
+            "route.home", "shell.new_session" -> ZhaoxiHomeScene(sec?.sessions, scope, sec?.conversationShell, conv?.drafts, manifest.scenes)
             "shell.search" -> ZhaoxiSearchScene(
                 sec?.sessions,
                 sec?.gallery ?: conv?.gallery,
@@ -511,7 +526,7 @@ class ZhaoxiApplicationScenePack(
 
             // ---- 设置 ----
             "settings.root", "route.settings" -> ZhaoxiSettingsHomeScene(
-                scope, updateStatus, checkForUpdate, settings ?: sec?.settings)
+                scope, updateStatus, checkForUpdate, settings ?: sec?.settings, manifest.scenes)
             "settings.appearance" -> ZhaoxiAppearanceScene(preferences, scope)
             "settings.notifications" -> ZhaoxiNotificationsScene(preferences, scope)
             "settings.permissions" -> ZhaoxiPermissionsScene(preferences, scope)

@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.local.chat.ChatDiaryStore
-import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.LocalChatSessionLifecyclePlanner
 import com.labteto.dshmobile.local.chat.LocalChatSessionModeRoute
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
@@ -20,6 +19,7 @@ import com.labteto.dshmobile.local.session.LocalSessionDomainCreateSpec
 import com.labteto.dshmobile.local.session.LocalSessionDomainModeCommand
 import com.labteto.dshmobile.local.session.LocalSessionCoordinator
 import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.work.LocalWorkSessionLifecyclePlanner
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
 import java.io.File
@@ -50,26 +50,13 @@ internal fun localDeletedCurrentSessionMode(
     usageMode: LocalUsageMode,
 ): LocalUsageMode? = usageMode.takeIf { currentSessionId in deletedIds }
 
-/** A mode tab chooses an empty landing session, not a historical conversation. */
-internal fun localModeLandingSession(
-    mode: LocalUsageMode,
-    sessions: List<LocalSessionSummary>,
-): LocalSessionSummary? = sessions.firstOrNull { session ->
-    session.usageMode == mode && session.blank &&
-        if (mode == LocalUsageMode.CHAT) {
-            session.chatMode == LocalChatMode.SINGLE.name && session.groupMemberCount == 0
-        } else {
-            // Work project sessions must never masquerade as the generic Work landing.
-            session.projectId == null
-        }
-}
-
 internal class LocalSessionLifecycleCoordinator(
     private val scope: CoroutineScope,
     private val state: com.labteto.dshmobile.local.runtime.LocalAggregateProjectionPort,
     private val transitionMutex: Mutex,
     private val jobs: LocalJobManager,
     private val sessionCoordinator: LocalSessionCoordinator,
+    private val pendingSessions: LocalPendingSessionRegistry,
     private val chatSessionLifecycle: LocalChatSessionLifecyclePlanner,
     private val approvalPreferences: LocalApprovalPreferences,
     private val resourceScheduler: HarnessResourceScheduler,
@@ -164,6 +151,7 @@ internal class LocalSessionLifecycleCoordinator(
                     persist()
 
                     val nextSessionId = UUID.randomUUID().toString()
+                    pendingSessions.remember(nextSessionId, usageMode)
                     activateSession(nextSessionId, -1L)
                     resetModelHistory()
 
@@ -297,9 +285,16 @@ internal class LocalSessionLifecycleCoordinator(
         if (snapshot.usageMode == mode &&
             !(mode == LocalUsageMode.CHAT && snapshot.chat.groupChat.enabled)
         ) return true
-        val target = localModeLandingSession(mode, snapshot.sessions)
-        return if (target != null) {
-            startSessionSwitch(target.id)
+        // Prefer the most recent pending editor, not an old completed conversation.
+        val pendingId = pendingSessions.latestFor(mode)
+            ?.takeIf { candidate ->
+                val stored = sessionCoordinator.read(candidate)
+                stored == null || (stored.usageMode == mode &&
+                    stored.transcriptIndex.totalMessageCount == 0L &&
+                    stored.transcriptWindow.isEmpty())
+            }
+        return if (pendingId != null) {
+            startSessionSwitch(pendingId)
         } else {
             createSession(
                 mode = LocalConversationMode.INDEPENDENT,
@@ -312,7 +307,8 @@ internal class LocalSessionLifecycleCoordinator(
     }
 
     private fun isKnownSession(sessionId: String): Boolean =
-        state.value.sessions.any { it.id == sessionId } ||
+        pendingSessions.modeFor(sessionId) != null ||
+            state.value.sessions.any { it.id == sessionId } ||
             sessionCoordinator.summaries().any { it.id == sessionId }
 
     fun switchSession(sessionId: String): Boolean {
@@ -336,7 +332,8 @@ internal class LocalSessionLifecycleCoordinator(
             try {
                 transitionMutex.withLock {
                     try {
-                        if (sessionCoordinator.summaries().none { it.id == sessionId }) {
+                        if (sessionCoordinator.summaries().none { it.id == sessionId } &&
+                            pendingSessions.modeFor(sessionId) == null) {
                             state.update { it.copy(error = "目标会话已不存在，请从历史记录重新选择") }
                             return@withLock
                         }
@@ -391,6 +388,7 @@ internal class LocalSessionLifecycleCoordinator(
                         // Deletion must not auto-select previous history or switch Chat/Work.
                         val sourceId = currentSessionId()
                         val nextSessionId = UUID.randomUUID().toString()
+                        pendingSessions.remember(nextSessionId, freshUsageMode)
                         val chatPlan = chatSessionLifecycle.prepareCreate(
                             mode = LocalConversationMode.INDEPENDENT,
                             usageMode = freshUsageMode,
@@ -451,6 +449,7 @@ internal class LocalSessionLifecycleCoordinator(
                     // Every old producer is now outside the deletion barrier; once the tombstone is
                     // released, future Automation runs must re-resolve the session from storage.
                     sessionCoordinator.releaseDeletionBarrier(ids)
+                    pendingSessions.forget(ids)
                     state.update { it.copy(sessions = sessionSummaries()) }
                     persist()
                     ids.toSet()

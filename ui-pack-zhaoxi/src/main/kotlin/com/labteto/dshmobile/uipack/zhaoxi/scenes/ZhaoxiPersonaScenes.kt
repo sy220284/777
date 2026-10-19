@@ -135,7 +135,6 @@ fun ZhaoxiPersonaGalleryScene(
     }
     ZxPage("人物图集", onBack = { scope.onBack() }) {
         feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        ZxSection("人物")
         ZxField(search, { search = it }, Modifier.fillMaxWidth(), placeholder = "搜索人物")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -182,8 +181,22 @@ fun ZhaoxiPersonaGalleryScene(
                 com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner("读取失败 · ${r.message ?: "未知"}", com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
             is UiPersonaGalleryReadReceipt.Available -> {
                 val visible = r.entries.filter { search.isBlank() || it.name.contains(search, ignoreCase = true) }
-                if (visible.isEmpty()) ZxEmpty(if (search.isBlank()) "暂无人物" else "没有匹配的人物", "可以新建或导入人物")
-                LazyVerticalGrid(
+                if (visible.isEmpty()) ZxEmpty(
+                    if (search.isBlank()) "暂无人物" else "没有匹配的人物",
+                    if (search.isBlank()) "可以创建新人物，或从预设与本地文件导入。" else "请调整关键词，或清除当前搜索。",
+                    actionLabel = when {
+                        search.isNotBlank() -> "清除搜索"
+                        authoring != null -> "新建人物"
+                        else -> null
+                    },
+                    onAction = when {
+                        search.isNotBlank() -> ({ search = "" })
+                        authoring != null -> ({ onOpenPersona("new") })
+                        else -> null
+                    },
+                    iconName = "people",
+                )
+                if (visible.isNotEmpty()) LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),

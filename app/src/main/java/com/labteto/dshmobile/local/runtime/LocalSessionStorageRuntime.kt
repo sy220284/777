@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import com.labteto.dshmobile.local.session.LocalCurrentSessionSnapshotProvider
 import com.labteto.dshmobile.local.session.LocalHarnessSession
+import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.session.localSessionSnapshotBoundary
 import com.labteto.dshmobile.local.session.LocalSessionFilesRuntime
 import com.labteto.dshmobile.local.session.LocalSessionStorageManager
@@ -40,6 +41,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     internal val files: LocalSessionFilesRuntime,
     domainCodecs: Set<@JvmSuppressWildcards LocalSessionDomainCodec>,
     private val currentSnapshotProvider: LocalCurrentSessionSnapshotProvider,
+    private val pendingSessions: LocalPendingSessionRegistry,
 ) {
     private val sessionsRoot = File(context.filesDir, "local-harness/sessions").apply { mkdirs() }
     private val scope = CoroutineScope(
@@ -52,6 +54,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
             },
     )
 
+    private val orderedCodecs = domainCodecs.sortedBy(LocalSessionDomainCodec::id)
     private val repository: LocalSessionRepository
     private val storageManager = LocalSessionStorageManager(sessionsRoot, json)
     internal val coordinator: LocalSessionCoordinator
@@ -64,7 +67,6 @@ class LocalSessionStorageRuntime @Inject internal constructor(
             runtimeStateStore.projection.publishError(
                 "会话备份恢复未全部完成：${failure.message ?: "请检查本地存储"}")
         }
-        val orderedDomainCodecs = domainCodecs.sortedBy(LocalSessionDomainCodec::id)
         repository = LocalSessionRepository(
             root = sessionsRoot,
             json = json,
@@ -73,13 +75,13 @@ class LocalSessionStorageRuntime @Inject internal constructor(
             onError = { error ->
                 runtimeStateStore.projection.publishError(error.message ?: "会话写入失败")
             },
-            domainCodecs = orderedDomainCodecs,
+            domainCodecs = orderedCodecs,
         )
         coordinator = LocalSessionCoordinator(
             repository = repository,
             eventLogFor = eventLogs::get,
             runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
-            domainCodecs = orderedDomainCodecs,
+            domainCodecs = orderedCodecs,
         )
     }
 
@@ -101,6 +103,10 @@ class LocalSessionStorageRuntime @Inject internal constructor(
 
     internal fun enqueueCurrentSnapshot(expectedSessionId: String): Boolean {
         val snapshot = currentSnapshot(expectedSessionId) ?: return false
+        // A new editor needs a stable runtime identity for its encrypted draft, but not a
+        // durable Session catalog entry. Existing historical sessions are never discarded here.
+        if (com.labteto.dshmobile.local.session.isUnstartedSessionSnapshot(snapshot, orderedCodecs) &&
+            coordinator.read(expectedSessionId) == null) return true
         coordinator.enqueue(snapshot)
         return true
     }
@@ -126,6 +132,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     private fun publishSummaries() {
         runCatching { coordinator.summaries() }
             .onSuccess { summaries ->
+                pendingSessions.forget(summaries.filterNot { it.blank }.map { it.id }.toSet())
                 runtimeStateStore.projection.publishSessions(summaries)
             }
             .onFailure { error ->

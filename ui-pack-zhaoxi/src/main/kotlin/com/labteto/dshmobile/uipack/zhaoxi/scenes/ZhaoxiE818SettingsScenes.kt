@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.TokenUsageGroupKind
 import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryManagementQuery
@@ -32,6 +33,27 @@ import com.labteto.dshmobile.uihost.UiSceneRenderScope
 /** 先列出真实保存的配置，再补齐曾有请求记录但现在未保存的历史模型。 */
 internal fun zxUsageModelNames(configured: List<String>, recorded: Set<String>): List<String> =
     (configured + recorded).distinct().sorted()
+
+/** Display names for the canonical Owner action type; storage values remain unchanged. */
+internal fun zxUsageActionLabel(action: TokenUsageAction): String = when (action) {
+    TokenUsageAction.CHAT_REPLY -> "聊天回复"
+    TokenUsageAction.CHAT_REPAIR -> "回复修复"
+    TokenUsageAction.CHAT_STATE_REFRESH -> "聊天状态更新"
+    TokenUsageAction.REPLY_SUGGESTIONS -> "回复建议"
+    TokenUsageAction.UI_STRUCTURE_GENERATION -> "文档生成"
+    TokenUsageAction.GROUP_REPLY -> "群聊回复"
+    TokenUsageAction.GROUP_STATE_REFRESH -> "群聊状态更新"
+    TokenUsageAction.GROUP_ANNOUNCEMENT -> "群公告"
+    TokenUsageAction.PERSONA_AUTOFILL -> "人物设定生成"
+    TokenUsageAction.PERSONA_INSPECTION -> "人物设定核查"
+    TokenUsageAction.WORK_MAIN -> "工作任务"
+    TokenUsageAction.WORK_SUBAGENT -> "子任务"
+    TokenUsageAction.AUTOMATION -> "自动化"
+    TokenUsageAction.AUTOMATION_CHAT -> "聊天自动化"
+    TokenUsageAction.WEB_SEARCH -> "网络搜索"
+    TokenUsageAction.VISION -> "图像理解"
+    TokenUsageAction.OTHER -> "其他请求"
+}
 
 /** All totals here are rendered from the existing Usage Owner; no locally computed billing facts. */
 @Composable
@@ -69,10 +91,17 @@ fun ZhaoxiUsageOverviewScene(
                 }
             }
         }
-        if (!selectedHasRecords) {
-            ZxFooterNote("该模型尚无保留的请求用量记录，下面显示的是零记录统计，并非所有模型总和。")
+        ZxSection("统计口径")
+        if (!selectedHasRecords || snapshot.tracked.requestCount.toLong() == 0L) {
+            ZxBanner("当前仅展示已保留的请求记录。零记录不代表此模型历史上从未产生费用。", ZxTone.Info)
+        } else {
+            ZxFooterNote("基于本地可追踪请求统计，费用为估算值；服务商账单可能不同。")
+        }
+        if (snapshot.modelHistoryPartial || source.modelHistoryPartial) {
+            ZxBanner("部分历史明细未保留，单模型统计可能不完整。", ZxTone.Warn)
         }
         ZxSection("用量总览")
+        ZxSettingsGroup {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.weight(1f)) {
                 Text("Token 总量", fontSize = 11.sp, color = ZhaoxiTheme.colors.ink2)
@@ -90,15 +119,13 @@ fun ZhaoxiUsageOverviewScene(
                     fontWeight = FontWeight.SemiBold, color = ZhaoxiTheme.colors.ink)
             }
         }
+        }
         ZxValueRow("输入 / 输出", value = "${snapshot.tracked.inputTokens} / ${snapshot.tracked.outputTokens}", mono = true)
         if (snapshot.tracked.requestCount.toLong() == 0L) {
             ZxFooterNote("这里只统计已记录的模型请求；已有会话不一定保留旧请求的用量明细。")
         }
         if (snapshot.tracked.unreportedRequestCount > 0) {
             ZxFooterNote("${snapshot.tracked.unreportedRequestCount} 次请求未上报精确用量，统计仅反映可追踪事实")
-        }
-        if (snapshot.modelHistoryPartial || source.modelHistoryPartial) {
-            ZxFooterNote("部分较早用量记录未保留，单模型历史统计可能不完整")
         }
         ZxSection("会话与任务")
         if (snapshot.sessions.isEmpty() && snapshot.tasks.isEmpty()) {
@@ -207,7 +234,7 @@ fun ZhaoxiUsageLogScene(
         else if (page != null && records.isEmpty()) ZxEmpty("所选条件没有请求记录", "可以调整模型或时间范围")
         records.forEach { record ->
             ZxRow(record.model,
-                "${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(record.timestamp))} · ${record.context.action.name} · ${record.totalTokens} Token · ¥${"%.4f".format(record.estimatedCostCny)}" +
+                "${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(record.timestamp))} · ${zxUsageActionLabel(record.context.action)} · ${record.totalTokens} Token · ¥${"%.4f".format(record.estimatedCostCny)}" +
                     if (record.reported) "" else " · 用量未完整上报",
                 onClick = { openRequest(record.requestId) })
         }
@@ -238,7 +265,7 @@ fun ZhaoxiUsageDetailScene(usage: UsageUiPort, requestId: String?, scope: UiScen
         } else {
             ZxSection("请求归属")
             ZxValueRow("模型", value = record.model)
-            ZxValueRow("行为", value = record.context.action.name)
+            ZxValueRow("行为", value = zxUsageActionLabel(record.context.action))
             record.context.sessionTitle?.let { ZxValueRow("会话", value = it) }
             record.context.taskLabel?.let { ZxValueRow("任务", value = it) }
             ZxSection("Token 用量")
@@ -385,16 +412,36 @@ fun ZhaoxiApprovalModeScene(settings: SettingsUiPort, scope: UiSceneRenderScope)
 fun ZhaoxiApprovalModeSelector(settings: SettingsUiPort) {
     val mode by settings.approvalMode.collectAsState()
     var status by remember { mutableStateOf<String?>(null) }
+    var confirmAuto by remember { mutableStateOf(false) }
     ZxSection("操作审批模式")
+    ZxFooterNote("手动审批会逐次询问；自动审批会改变后续工具操作的全局授权方式。")
     LocalApprovalMode.entries.forEach { candidate ->
         ZxChip(when (candidate) {
             LocalApprovalMode.DEFAULT -> "默认"
             LocalApprovalMode.MANUAL -> "手动审批"
             LocalApprovalMode.AUTO -> "自动审批"
         }, mode == candidate) {
-            status = settings.submit(SettingsUiCommand.ApprovalMode(candidate)).zxUserMessage("更新审批模式")
+            if (candidate == LocalApprovalMode.AUTO && mode != LocalApprovalMode.AUTO) {
+                confirmAuto = true
+            } else {
+                status = settings.submit(SettingsUiCommand.ApprovalMode(candidate)).zxUserMessage("更新审批模式")
+            }
         }
     }
-    ZxFooterNote("审批模式不会修改系统权限")
+    if (mode == LocalApprovalMode.AUTO) {
+        ZxBanner("全局自动审批已开启。后续工具操作可能不再逐次询问，请仅在可信环境中使用。", ZxTone.Warn)
+    } else {
+        ZxFooterNote("审批模式不改变 Android 系统权限，随时可切回手动审批。")
+    }
     status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
+    if (confirmAuto) ZxDialog(
+        "启用全局自动审批？",
+        "此设置影响之后进入审批链的工具操作，包括可能涉及文件修改、Shell 和设备高权限操作。开启后不再逐次向你确认。可在本页随时改回手动审批；Android 系统权限不会改变。",
+        "确认启用",
+        {
+            confirmAuto = false
+            status = settings.submit(SettingsUiCommand.ApprovalMode(LocalApprovalMode.AUTO)).zxUserMessage("更新审批模式")
+        },
+        { confirmAuto = false },
+    )
 }

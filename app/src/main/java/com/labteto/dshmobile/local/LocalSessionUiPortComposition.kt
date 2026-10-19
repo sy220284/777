@@ -3,11 +3,13 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalSessionLifecyclePort
+import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.uicontract.SessionUiPort
 import com.labteto.dshmobile.uicontract.SessionUiCommand
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiCommandRejection
 import com.labteto.dshmobile.uicontract.UiSessionsSnapshot
+import com.labteto.dshmobile.uicontract.UiPendingSession
 import com.labteto.dshmobile.uicontract.UiSessionDeletionReceipt
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
 import javax.inject.Inject
@@ -21,12 +23,14 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 class LocalSessionUiPortComposition @Inject internal constructor(
     private val state: LocalRuntimeStateStore,
     private val lifecycle: LocalSessionLifecyclePort,
+    private val pendingSessions: LocalPendingSessionRegistry? = null,
 ) : SessionUiPort {
     override val snapshots = state.state.map { snapshot() }.distinctUntilChanged()
     override fun snapshot(): UiSessionsSnapshot = synchronized(state.foregroundRunHandle.lock) {
         val current = state.state.value
         UiSessionsSnapshot(state.uiBindingIdentity(current), current.usageMode, current.loading,
-            current.sessions.toList(), current.error)
+            current.sessions.toList(), current.error,
+            pendingSessions?.entries().orEmpty().map { (id, mode) -> UiPendingSession(id, mode) })
     }
     override fun submit(command: SessionUiCommand): UiCommandReceipt = try {
         synchronized(state.foregroundRunHandle.lock) {

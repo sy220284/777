@@ -8,6 +8,7 @@ import android.text.format.DateFormat
 import android.app.TimePickerDialog
 import android.app.DatePickerDialog
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.text.input.KeyboardType
@@ -29,6 +30,7 @@ import com.labteto.dshmobile.uicontract.UiMcpHealth
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -127,7 +129,17 @@ fun ZhaoxiAutomationTasksScene(
         }
     }
     ZxPage("自动化", onBack = { scope.onBack() }) {
+        if (snap.tasks.isEmpty()) {
+            ZxEmpty(
+                "还没有自动化任务",
+                "新建提醒或周期任务",
+                actionLabel = "新建自动化",
+                onAction = onCreate,
+                iconName = "tasks",
+            )
+        } else {
         Spacer(Modifier.height(8.dp))
+        ZxButton("新建自动化", onCreate, Modifier.fillMaxWidth())
         ZxField(taskQuery, { taskQuery = it }, Modifier.fillMaxWidth(),
             placeholder = "搜索任务内容、人物或执行周期")
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -145,8 +157,7 @@ fun ZhaoxiAutomationTasksScene(
         }
         ZxValueRow("当前列表", value = "${filtered.size} / ${snap.tasks.size}")
         feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        if (snap.tasks.isEmpty()) ZxEmpty("暂无自动化任务", "可以创建第一个真实任务")
-        else if (filtered.isEmpty()) ZxEmpty("没有符合条件的任务", "可调整搜索、模式或状态筛选")
+        if (filtered.isEmpty()) ZxEmpty("没有符合条件的任务", "试试调整筛选条件")
         filtered.forEach { task ->
             val paused = task.status == com.labteto.dshmobile.automation.AutomationStatus.PAUSED
             val mayRetry = task.status in setOf(
@@ -232,8 +243,7 @@ fun ZhaoxiAutomationTasksScene(
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
-        ZxButton("新建自动化", onCreate, Modifier.fillMaxWidth())
+        }
         deleteTaskId?.let { id ->
             com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog(
                 "删除自动化任务？", "删除后不再调度此任务，已产生的会话和结果会保留。", "删除任务",
@@ -344,94 +354,15 @@ fun ZhaoxiAutomationEditorScene(
     fun showReceipt(receipt: AutomationUiReceipt) {
         feedback = zxAutomationReceiptText("任务", receipt)
     }
-    ZxPage(if (editingTaskId == null) "新建自动化" else "编辑自动化", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        if (editingTaskId != null && editing == null) {
-            ZxEmpty("任务已不可用", "原任务可能被删除或当前尚未加载；请返回任务列表")
-        } else if (editing?.mode == AutomationMode.CHAT &&
-            (snap.context.identity?.sessionId != editing.targetSessionId || !snap.context.canPlanChat)) {
-            ZxEmpty("切换到任务所属的聊天会话", "为防止跨会话修改，聊天自动化只能在绑定会话编辑")
-        } else {
-            ZxSection("目标")
-            ZxValueRow("执行模式", value = if (chatMode) "聊天 · 当前会话" else "工作")
-            if (chatMode && editingTaskId == null) {
-                ZxChip("智能理解时间", natural) { natural = !natural }
-
-            }
-            ZxSection("任务内容")
-            ZxField(prompt, { prompt = it }, Modifier.fillMaxWidth().height(104.dp),
-                placeholder = "描述要完成的任务…")
-            if (!natural) {
-                ZxSection("调度方式")
-                val options = buildList {
-                    add(AutomationScheduleType.ONCE to "单次")
-                    add(AutomationScheduleType.INTERVAL to "固定间隔")
-                    add(AutomationScheduleType.DAILY to "每天")
-                    add(AutomationScheduleType.WEEKLY to "每周")
-                    add(AutomationScheduleType.MONTHLY to "每月")
-                    if (chatMode) {
-                        add(AutomationScheduleType.SILENCE to "沉默后")
-                        add(AutomationScheduleType.WINDOW to "指定时段")
-                    }
-                }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    options.forEach { (type, title) ->
-                        ZxChip(title, selected == type) { selected = type }
-                    }
-                }
-                if (selected !in setOf(AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW)) {
-                    ZxSection("首次运行时间")
-                    ZxField(firstRun, {
-                        firstRun = it
-                        firstRunError = null
-                    }, Modifier.fillMaxWidth(), placeholder = "YYYY-MM-DD HH:mm",
-                        error = firstRunError != null, errorMessage = firstRunError)
-                    ZxButton("选择日期与时间", { chooseFirstRun() },
-                        Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline)
-                    ZxFooterNote("设备本地时间")
-                }
-                if (selected == AutomationScheduleType.INTERVAL) {
-                    ZxSection("重复间隔（分钟）")
-                    ZxField(interval, { interval = it }, Modifier.fillMaxWidth(),
-                        placeholder = if (chatMode) "最短 60 分钟" else "最短 15 分钟",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                }
-                if (selected == AutomationScheduleType.SILENCE) {
-                    ZxSection("沉默触发（分钟）")
-                    ZxField(silence, { silence = it }, Modifier.fillMaxWidth(),
-                        placeholder = "至少 60 分钟",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                }
-                if (selected == AutomationScheduleType.WINDOW) {
-                    ZxSection("活动时段")
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ZxField(windowStart, { windowStart = it }, Modifier.weight(1f),
-                            placeholder = "开始 HH:mm")
-                        ZxField(windowEnd, { windowEnd = it }, Modifier.weight(1f),
-                            placeholder = "结束 HH:mm")
-                    }
-                }
-            }
-            if (!natural) {
-                ZxSection("通知与互动")
-                ZxSettingsGroup {
-                    ZxSwitchRow("运行通知", "完成与需要处理时提醒", notify) { notify = it }
-                    if (chatMode) {
-                        ZxSwitchRow("免打扰时段", "可设置跨夜时段", quietEnabled) { quietEnabled = it }
-                        if (quietEnabled) {
-                            ZxField(quietStart, { quietStart = it }, Modifier.fillMaxWidth(), fieldLabel = "免打扰开始", placeholder = "23:00")
-                            ZxField(quietEnd, { quietEnd = it }, Modifier.fillMaxWidth(), fieldLabel = "免打扰结束", placeholder = "07:00")
-                        }
-                        ZxField(proactiveGapInput, { proactiveGapInput = it }, Modifier.fillMaxWidth(), fieldLabel = "最短互动间隔（至少60分钟）",
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                        ZxField(maxUnanswered, { maxUnanswered = it }, Modifier.fillMaxWidth(), fieldLabel = "连续未回复上限（1–5次）",
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                    }
-                }
-            } else ZxFooterNote("智能规划会确定任务内容和时间；创建后可在表单中调整通知与互动规则。")
-            feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-            Spacer(Modifier.height(12.dp))
+    val canSubmitEditor = (editingTaskId == null || editing != null) &&
+        !(editing?.mode == AutomationMode.CHAT &&
+            (snap.context.identity?.sessionId != editing.targetSessionId || !snap.context.canPlanChat))
+    ZxPage(if (editingTaskId == null) "新建自动化" else "编辑自动化",
+        onBack = { scope.onBack() },
+        footer = {
+            if (canSubmitEditor) {
+                Column(Modifier.fillMaxWidth().background(ZhaoxiTheme.colors.bg)
+                    .padding(horizontal = 18.dp, vertical = 8.dp)) {
             ZxButton(if (editingTaskId == null) "创建任务" else "保存修改", {
                 if (prompt.isBlank()) {
                     feedback = "请填写任务内容"
@@ -518,6 +449,100 @@ fun ZhaoxiAutomationEditorScene(
                     }
                 }
             }, Modifier.fillMaxWidth(), enabled = !busy && prompt.isNotBlank(), loading = busy)
+                }
+            }
+        }) {
+        Spacer(Modifier.height(8.dp))
+        if (editingTaskId != null && editing == null) {
+            ZxEmpty("任务已不可用", "原任务可能被删除或当前尚未加载；请返回任务列表")
+        } else if (editing?.mode == AutomationMode.CHAT &&
+            (snap.context.identity?.sessionId != editing.targetSessionId || !snap.context.canPlanChat)) {
+            ZxEmpty("切换到任务所属的聊天会话", "为防止跨会话修改，聊天自动化只能在绑定会话编辑")
+        } else {
+            ZxSection("任务目标")
+            if (chatMode) ZxFooterNote("仅在当前聊天会话生效")
+            ZxValueRow("执行模式", value = if (chatMode) "聊天 · 当前会话" else "工作")
+            if (chatMode && editingTaskId == null) {
+                ZxChip("智能理解时间", natural) { natural = !natural }
+
+            }
+            ZxSection("任务内容")
+            ZxField(prompt, { prompt = it }, Modifier.fillMaxWidth().height(104.dp),
+                placeholder = "描述要完成的任务…", fieldLabel = "任务内容")
+            if (!natural) {
+                ZxSection("调度方式")
+                val options = buildList {
+                    add(AutomationScheduleType.ONCE to "单次")
+                    add(AutomationScheduleType.INTERVAL to "固定间隔")
+                    add(AutomationScheduleType.DAILY to "每天")
+                    add(AutomationScheduleType.WEEKLY to "每周")
+                    add(AutomationScheduleType.MONTHLY to "每月")
+                    if (chatMode) {
+                        add(AutomationScheduleType.SILENCE to "沉默后")
+                        add(AutomationScheduleType.WINDOW to "指定时段")
+                    }
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    options.forEach { (type, title) ->
+                        ZxChip(title, selected == type) { selected = type }
+                    }
+                }
+                if (selected !in setOf(AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW)) {
+                    ZxSection("首次运行时间")
+                    ZxField(firstRun, {
+                        firstRun = it
+                        firstRunError = null
+                    }, Modifier.fillMaxWidth(), placeholder = "YYYY-MM-DD HH:mm",
+                        fieldLabel = "首次运行时间 · 设备本地时间",
+                        error = firstRunError != null, errorMessage = firstRunError)
+                    ZxButton("选择日期与时间", { chooseFirstRun() },
+                        Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline)
+                    ZxFooterNote("设备本地时间")
+                }
+                if (selected == AutomationScheduleType.INTERVAL) {
+                    ZxSection("重复间隔（分钟）")
+                    ZxField(interval, { interval = it }, Modifier.fillMaxWidth(),
+                        placeholder = if (chatMode) "最短 60 分钟" else "最短 15 分钟",
+                        fieldLabel = "重复间隔 · 分钟",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }
+                if (selected == AutomationScheduleType.SILENCE) {
+                    ZxSection("沉默触发（分钟）")
+                    ZxField(silence, { silence = it }, Modifier.fillMaxWidth(),
+                        placeholder = "至少 60 分钟", fieldLabel = "沉默触发 · 分钟",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }
+                if (selected == AutomationScheduleType.WINDOW) {
+                    ZxSection("活动时段")
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ZxField(windowStart, { windowStart = it }, Modifier.weight(1f),
+                            placeholder = "开始 HH:mm")
+                        ZxField(windowEnd, { windowEnd = it }, Modifier.weight(1f),
+                            placeholder = "结束 HH:mm")
+                    }
+                }
+            }
+            if (!natural) {
+                ZxSection("通知与互动")
+                ZxSettingsGroup {
+                    ZxSwitchRow("运行通知", "完成与需要处理时提醒", notify) { notify = it }
+                    if (chatMode) {
+                        ZxSwitchRow("免打扰时段", "可设置跨夜时段", quietEnabled) { quietEnabled = it }
+                        if (quietEnabled) {
+                            ZxField(quietStart, { quietStart = it }, Modifier.fillMaxWidth(), fieldLabel = "免打扰开始", placeholder = "23:00")
+                            ZxField(quietEnd, { quietEnd = it }, Modifier.fillMaxWidth(), fieldLabel = "免打扰结束", placeholder = "07:00")
+                        }
+                        ZxField(proactiveGapInput, { proactiveGapInput = it }, Modifier.fillMaxWidth(), fieldLabel = "最短互动间隔（至少60分钟）",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                        ZxField(maxUnanswered, { maxUnanswered = it }, Modifier.fillMaxWidth(), fieldLabel = "连续未回复上限（1–5次）",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    }
+                }
+            } else ZxFooterNote("智能规划会确定任务内容和时间；创建后可在表单中调整通知与互动规则。")
+            feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
+            Spacer(Modifier.height(12.dp))
+
 
         }
     }
@@ -598,6 +623,88 @@ internal fun zxMcpStdioCommand(value: String): List<String>? {
         text.content
     }
     return args.takeIf { it.isNotEmpty() && it.first().isNotBlank() }
+}
+
+/** Render capability permissions as user-facing guidance; never alter Owner policy. */
+internal fun zxCapabilityPermissionLabel(access: String, approval: String): String {
+    // Access and approval are independent. Read-only actions may still require confirmation.
+    val effect = when (access.uppercase()) {
+        "READ_ONLY" -> "读取"
+        "MUTATION", "WRITE" -> "可修改"
+        "DEVICE" -> "设备操作"
+        else -> "按实际权限"
+    }
+    val consent = when (approval.uppercase()) {
+        "NEVER" -> "无需额外确认"
+        "ALWAYS", "MUTATION" -> "需操作确认"
+        else -> "按授权策略确认"
+    }
+    return "$effect · $consent"
+}
+
+internal fun zxCapabilityActionLabel(name: String): String {
+    val id = name.lowercase()
+    val android = mapOf(
+        "android_device_info" to "设备信息", "android_app_list" to "应用列表",
+        "android_app_info" to "应用信息", "android_app_launch" to "启动应用",
+        "android_settings_get" to "系统设置", "android_screen" to "界面结构",
+        "android_find" to "查找控件", "android_click_node" to "点击控件",
+        "android_set_text_node" to "填写控件", "android_scroll" to "滚动界面",
+        "android_wait" to "等待控件", "android_open_uri" to "打开链接",
+        "android_tap_text" to "点击文字", "android_type" to "输入文字",
+        "android_tap" to "屏幕点击", "android_swipe" to "滑动屏幕",
+        "android_back" to "返回", "android_home" to "主屏幕",
+        "android_screenshot" to "屏幕截图",
+        "android_notification_status" to "通知授权状态",
+        "android_notification_list" to "通知列表",
+        "android_clipboard_get" to "读取剪贴板",
+        "android_clipboard_set" to "写入剪贴板",
+        "android_vscreen_create" to "创建虚拟屏幕",
+        "android_vscreen_list" to "虚拟屏幕列表",
+        "android_vscreen_status" to "虚拟屏幕状态",
+        "android_vscreen_launch" to "在虚拟屏幕启动应用",
+        "android_vscreen_tap" to "虚拟屏幕点击",
+        "android_vscreen_swipe" to "虚拟屏幕滑动",
+        "android_vscreen_screenshot" to "虚拟屏幕截图",
+        "android_vscreen_close" to "关闭虚拟屏幕",
+    )
+    return android[id] ?: when {
+        id.contains("github") && (id.contains("get") || id.contains("list")) -> "读取 GitHub 信息"
+        id.contains("github") -> "管理 GitHub 内容"
+        id.contains("browser") -> "浏览网页"
+        id.contains("search") -> "搜索信息"
+        id.contains("shell") || id.contains("terminal") -> "运行命令"
+        id.contains("file") || id.contains("workspace") -> "处理文件"
+        id.contains("lsp") || id.contains("code") -> "分析代码"
+        id.contains("web") -> "访问网络"
+        else -> name // Unknown IDs stay unmodified to avoid false labels.
+    }
+}
+
+internal fun zxPluginDisplayName(id: String): String =
+    id.split('_', '-').filter(String::isNotBlank).joinToString(" ") { part ->
+        when (part.lowercase()) {
+            "github" -> "GitHub"; "mcp" -> "MCP"; "api" -> "API"
+            else -> part.replaceFirstChar { it.titlecase() }
+        }
+    }.ifBlank { id }
+
+internal fun zxMcpConnectionLabel(state: String): String = when (state.uppercase()) {
+    "HEALTH_UNCHECKED" -> "未检查"
+    "CONNECTING" -> "连接中"
+    "RECONNECTING" -> "重连中"
+    "DISCONNECTING" -> "断开中"
+    "FAILED" -> "连接失败"
+    else -> "状态未知"
+}
+
+internal fun zxPluginStateLabel(state: String): String = when (state.uppercase()) {
+    "INSTALLING" -> "安装中"
+    "ACTIVE" -> "已启用"
+    "REPLACING" -> "更新中"
+    "UNINSTALLING" -> "正在移除"
+    "FAILED" -> "需要修复"
+    else -> "状态未确认"
 }
 
 /** 按 E8.18 独立场景分派工具中心、MCP、插件和 GitHub；所有状态来自 ToolsUiPort。 */
@@ -698,7 +805,7 @@ fun ZhaoxiToolsScene(
                 ZxSection("已登记服务器")
                 if (servers.isEmpty()) ZxEmpty("尚未添加 MCP 服务器", "填写名称和地址后连接")
                 servers.forEach { server ->
-                    ZxRow(server.id, "${server.transport} · ${server.connection} · ${server.tools.size} 个工具",
+                    ZxRow(server.id, "${server.tools.size} 项 · ${zxMcpConnectionLabel(server.connection.name)}",
                         onClick = { expandedServer = if (expandedServer == server.id) null else server.id })
                     if (expandedServer == server.id) {
                         ZxSection("已登记工具 · ${server.tools.size}")
@@ -706,9 +813,9 @@ fun ZhaoxiToolsScene(
                             ZxFooterNote("当前服务没有上报工具；检查连接并刷新后查看。")
                         server.tools.forEach { name ->
                             val registered = catalogue.firstOrNull { it.name == name }
-                            ZxRow(name,
+                            ZxRow(zxCapabilityActionLabel(name),
                                 registered?.let {
-                                    "权限 ${it.access} · 审批 ${it.approval}" +
+                                    zxCapabilityPermissionLabel(it.access, it.approval) +
                                         if (it.requirements.isEmpty()) "" else " · ${it.requirements.joinToString("、").take(110)}"
                                 } ?: "仅服务端上报名称，应用尚未核实其调用权限",
                                 showChevron = false)
@@ -730,6 +837,7 @@ fun ZhaoxiToolsScene(
             }
             "tools.plugins" -> {
                 ZxSection("已安装插件")
+                // Current plugin status is shown alongside each plugin.
                 ZxValueRow("已安装数量", value = installedIds.size.toString())
                 ZxField(pluginQuery, { pluginQuery = it }, Modifier.fillMaxWidth(),
                     placeholder = "搜索插件名称或运行状态")
@@ -748,10 +856,10 @@ fun ZhaoxiToolsScene(
                     ZxEmpty("没有匹配的插件", "尝试搜索其他名称或状态")
                 matchingInstalled.forEach { id ->
                     val lifecycle = plugins.firstOrNull { it.id == id }
-                    ZxRow(id, lifecycle?.state?.name ?: "已安装 · 未提供生命周期状态")
+                    ZxRow(zxPluginDisplayName(id), lifecycle?.state?.name?.let(::zxPluginStateLabel) ?: "已安装")
                 }
                 matchingOthers.forEach { item ->
-                    ZxRow(item.id, item.state.name)
+                    ZxRow(zxPluginDisplayName(item.id), zxPluginStateLabel(item.state.name))
                 }
                 plugins.filter { it.state == com.labteto.dshmobile.uicontract.UiPluginLifecycleState.FAILED &&
                         (pluginQuery.isBlank() ||
@@ -766,10 +874,7 @@ fun ZhaoxiToolsScene(
             }
             "tools.github" -> {
                 ZxSection("连接状态")
-                ZxValueRow("GitHub", value = if (githubConfigured) "已配置" else "未配置")
-                ZxSection("可用能力")
-                catalogue.filter { it.family.contains("github", ignoreCase = true) }
-                    .forEach { cap -> ZxRow(cap.name, "${cap.access} · ${cap.approval}") }
+                ZxValueRow("GitHub", value = if (githubConfigured) "已连接" else "尚未连接")
                 if (githubConfigured) ZhaoxiGitHubBrowser(tools)
                 else ZxFooterNote("先连接 GitHub，再查看真实仓库目录。")
                 if (!githubConfigured) {
@@ -798,23 +903,27 @@ fun ZhaoxiToolsScene(
                 )
             }
             "work.capabilities" -> {
+                // Capability entries retain exact Owner approval metadata.
                 val grouped = catalogue.groupBy { it.family }
                 if (grouped.isEmpty()) ZxEmpty("暂无能力", "已注册的能力会在这里出现")
                 grouped.forEach { (group, items) ->
-                    ZxSection(zxToolFamilyLabel(group))
-                    items.forEach { cap ->
-                        ZxRow(cap.name, "${cap.access} · ${cap.approval}")
+                    ZxRow(zxToolFamilyLabel(group), "", onClick = {
+                        expandedFamily = if (expandedFamily == group) null else group
+                    })
+                    if (expandedFamily == group) items.forEach { cap ->
+                        ZxRow(zxCapabilityActionLabel(cap.name), zxCapabilityPermissionLabel(cap.access, cap.approval),
+                            showChevron = false)
                     }
                 }
             }
             else -> {
-                ZxSection("可用能力")
+                // Tool categories are the content, not another introductory title.
                 catalogue.groupBy { it.family }.forEach { (family, items) ->
-                    ZxRow(zxToolFamilyLabel(family), "${items.size} 项已登记能力",
+                    ZxRow(zxToolFamilyLabel(family), "",
                         onClick = { expandedFamily = if (expandedFamily == family) null else family })
                     if (expandedFamily == family) {
                         items.forEach { cap ->
-                            ZxRow(cap.name, "${cap.access} · ${cap.approval}")
+                            ZxRow(zxCapabilityActionLabel(cap.name), zxCapabilityPermissionLabel(cap.access, cap.approval))
                         }
                     }
                 }
@@ -830,14 +939,14 @@ fun ZhaoxiToolsScene(
                 else if (skills.orEmpty().isEmpty()) ZxEmpty("暂无已安装技能", "打开插件与技能管理，可上传 SKILL.md 或创建技能")
                 else if (matchedSkills.isEmpty()) ZxEmpty("没有匹配的技能", "可修改名称或说明关键词")
                 matchedSkills.forEach { item ->
-                    ZxRow(item.displayName, item.description, onClick = {
+                    ZxRow(item.displayName, "", onClick = {
                         scope.onNavigate(UiSceneId("tools.plugins"))
                     })
                 }
                 ZxSection("连接与扩展")
-                ZxRow("MCP 服务器", "${servers.size} 个已登记连接",
+                ZxRow("MCP 服务器", "",
                     onClick = { scope.onNavigate(UiSceneId("tools.mcp")) })
-                ZxRow("插件与技能管理", "${installedIds.size} 个插件 · ${skills.orEmpty().size} 项已安装技能",
+                ZxRow("插件与技能管理", "",
                     onClick = { scope.onNavigate(UiSceneId("tools.plugins")) })
                 ZxRow("GitHub", if (githubConfigured) "已配置" else "未配置",
                     onClick = { scope.onNavigate(UiSceneId("tools.github")) })
@@ -905,7 +1014,7 @@ private fun ZhaoxiGitHubBrowser(tools: com.labteto.dshmobile.uicontract.ToolsUiP
         }
     }
     ZxSection("真实仓库浏览 · 只读")
-    ZxFooterNote("仓库列表来自当前已授权的 GitHub 账户；创建 PR、提交修改和其他写操作仍经原有 Work/GitHub 工具审批。")
+    // Owner retains approval rules for GitHub writes.
     error?.let { ZxFooterNote(it) }
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ZxButton("刷新仓库", { error = null; revision++ },

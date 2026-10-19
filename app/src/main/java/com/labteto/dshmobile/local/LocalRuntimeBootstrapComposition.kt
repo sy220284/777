@@ -14,6 +14,7 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.prepareLocalHarnessStartup
 import com.labteto.dshmobile.local.session.LocalSessionArchiveMaintenance
+import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.migrateLegacySessionFiles
 import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
@@ -39,6 +40,7 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
     private val json: Json,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
+    private val pendingSessions: LocalPendingSessionRegistry,
     private val tools: LocalToolCompositionRoot,
     private val skillManager: com.labteto.dshmobile.local.tools.LocalSkillManager,
     private val work: LocalWorkComposition,
@@ -80,6 +82,10 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
             }
         }
         migrateLegacySessionFiles(root, sessionsRoot, initialSessionId)
+        if (sessionStorage.coordinator.read(initialSessionId) == null &&
+            pendingSessions.modeFor(initialSessionId) == null) {
+            pendingSessions.remember(initialSessionId, runtimeStateStore.state.value.usageMode)
+        }
         prepareLocalHarnessStartup(
             prepareRuntime = bundledRuntimeManager::prepare,
             installPlugins = { tools.plugins.installStartup() },

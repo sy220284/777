@@ -142,17 +142,17 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
         offers.forEach { candidate -> ZxChip(candidate.label, candidate.id == offer?.id) { offerId = candidate.id } }
         }
-        if (offers.isEmpty()) ZxNavRow("配置媒体模型", sub = "先添加受支持的图像、语音或视频模型") {
+        if (offers.isEmpty()) ZxNavRow("配置媒体模型") {
             scope.onNavigate(UiSceneId("settings.models"))
         }
         if (offer?.kind != LocalMediaKind.TRANSCRIBE) {
             ZxSection("生成描述")
             ZxField(prompt, { prompt = it }, Modifier.fillMaxWidth().heightIn(min = 96.dp),
-                placeholder = "描述想生成的内容…")
+                placeholder = "描述想生成的内容…", fieldLabel = "生成描述")
         }
         if (offer?.kind == LocalMediaKind.IMAGE) {
             ZxSection("画面比例")
-            ZxField(ratio, { ratio = it }, Modifier.fillMaxWidth(), placeholder = "例如 1:1")
+            ZxField(ratio, { ratio = it }, Modifier.fillMaxWidth(), placeholder = "例如 1:1", fieldLabel = "画面比例")
             if (!validImageRatio) ZxBanner("比例格式应为正整数:正整数，例如 1:1、16:9", ZxTone.Err)
         }
         if (offer?.kind == LocalMediaKind.SPEECH) {
@@ -164,6 +164,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
             }
             voices.forEach { item -> ZxChip(item.name, voice == item.id) { voice = item.id } }
         }
+        ZxFooterNote("生成请求可能产生模型费用；提交代表请求受理，不代表作品已完成。")
         ZxButton(if (offer?.kind == LocalMediaKind.TRANSCRIBE) "选择音频转写" else "开始生成", {
             val target = offer
             if (target != null) {
@@ -183,7 +184,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
             }
         }, enabled = !busy && sessionId.isNotBlank() && offer != null && (prompt.isNotBlank() || offer?.kind == LocalMediaKind.TRANSCRIBE), loading = busy)
         } else {
-        ZxNavRow("新建生成", sub = "图像 · 视频 · 语音与转写") {
+        ZxNavRow("新建生成") {
             scope.onNavigate(UiSceneId("media.creation"))
         }
         ZxSection("生成结果 · ${page.results.size}")
@@ -345,6 +346,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
 
                 },
                 { pendingRegenerate = null },
+                confirmVariant = ZxButtonVariant.Ink,
             )
         }
         pendingDeleteFamily?.let { id -> ZxDialog("删除此作品全部版本？", "会移除这份作品及其所有再生成版本的本地记录，无法恢复。", "删除全部版本", {

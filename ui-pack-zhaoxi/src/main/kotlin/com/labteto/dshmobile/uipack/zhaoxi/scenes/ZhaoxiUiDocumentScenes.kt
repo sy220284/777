@@ -73,9 +73,15 @@ fun ZhaoxiUiDocumentScene(
             ZxProgressBar(progress = null)
             Spacer(Modifier.height(8.dp))
         }
-        if (snap.documents.isEmpty() && !snap.generating) ZxEmpty("还没有文档", "文档由模型或工具生成")
+        if (snap.documents.isEmpty() && !snap.generating) {
+            if (UiSceneId("conversation.ui_document_generate") in knownScenes)
+                ZxEmpty("还没有交互文档", "可从当前对话生成，也可以使用本地离线模板。", actionLabel = "生成文档", onAction = {
+                    scope.onNavigate(UiSceneId("conversation.ui_document_generate"))
+                }, iconName = "file")
+            else ZxEmpty("还没有交互文档", "文档由当前会话中的模型或工具生成。", iconName = "file")
+        }
         batchFeedback?.let { ZxFooterNote(it) }
-        ZxChip(if (selecting) "退出多选" else "多选管理文档", selecting) {
+        if (snap.documents.isNotEmpty()) ZxChip(if (selecting) "退出多选" else "多选管理文档", selecting) {
             selecting = !selecting
             selectedDocuments = emptyMap()
         }
@@ -178,7 +184,7 @@ fun ZhaoxiUiDocumentGenerateScene(
     }
     ZxPage("生成文档", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        Text("从当前对话生成交互文档", fontSize = 14.sp, color = ZhaoxiTheme.colors.ink)
+        ZxFooterNote("模型生成会发起真实请求；离线模板仅在本机生成。")
         Spacer(Modifier.height(10.dp))
         feedback?.let { ZxFooterNote(it) }
         snapshot.error?.let { ZxBanner(it, ZxTone.Err) }

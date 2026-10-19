@@ -6,6 +6,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import com.labteto.dshmobile.uipack.zhaoxi.components.zxPressSurface
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,14 +54,18 @@ fun ZxPage(
     onBack: (() -> Unit)? = null,
     menu: Boolean = false,
     topRight: @Composable () -> Unit = {},
+    footer: @Composable () -> Unit = {},
+    scrollState: ScrollState = rememberScrollState(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(modifier.fillMaxSize().imePadding()) {
         // Keep the scene surface transparent so E8.17 ambient light remains visible.
         ZxTopBar(title, onNav = { onBack?.invoke() }, canBack = !menu, showNav = onBack != null) { topRight() }
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 24.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(scrollState)
+            .padding(start = 18.dp, end = 18.dp, bottom = 24.dp)) {
             content()
         }
+        footer()
     }
 }
 
@@ -96,7 +102,8 @@ fun ZxSettingsGroup(modifier: Modifier = Modifier, content: @Composable ColumnSc
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(ZhaoxiTheme.shapes.card))
             .background(ZhaoxiTheme.colors.bg2)
-            .padding(horizontal = 14.dp, vertical = 4.dp),
+            .border(1.dp, ZhaoxiTheme.colors.line, RoundedCornerShape(ZhaoxiTheme.shapes.card))
+            .padding(horizontal = 12.dp, vertical = 4.dp),
         content = content,
     )
 }
@@ -112,28 +119,21 @@ fun ZxNavRow(label: String, sub: String = "", value: String = "", onClick: () ->
             .clickable(
                 role = Role.Button, onClick = onClick, interactionSource = interaction,
                 indication = androidx.compose.foundation.LocalIndication.current)
-            .heightIn(min = 56.dp)
-            .padding(horizontal = 8.dp, vertical = 12.dp),
+            .heightIn(min = 52.dp)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val designIcon = when {
-            label.contains("模型") -> "sparkle"
-            label.contains("通知") -> "alert"
-            label.contains("外观") -> "palette"
-            label.contains("用量") || label.contains("费用") -> "usage"
-            label.contains("记忆") -> "diary"
-            label.contains("备份") || label.contains("迁移") -> "files"
-            label.contains("诊断") || label.contains("更新") -> "info"
-            label.contains("工具") -> "tools"
-            label.contains("任务") -> "tasks"
-            label.contains("人物") -> "user"
-            else -> null
+        // One stable icon column across every settings entry; never infer icon by substring.
+        val designIcon = zxSettingsNavigationIcon(label)
+        if (designIcon != null) {
+            Box(Modifier.width(22.dp), contentAlignment = Alignment.Center) {
+                ZxIcon(designIcon)
+            }
         }
-        if (designIcon != null) ZxIcon(designIcon)
         Column(Modifier.weight(1f)) {
             Text(label, fontSize = 14.sp, color = c.ink, lineHeight = 20.sp)
-            if (sub.isNotEmpty()) Text(sub, fontSize = 12.sp, color = c.ink2, lineHeight = 18.sp)
+            // Function entrances show a title and optional live status, not repeated descriptions.
         }
         if (value.isNotEmpty()) {
             Text(value, modifier = Modifier.weight(.75f), fontSize = 12.sp, color = c.ink2, fontFamily = FontFamily.Monospace,
@@ -141,6 +141,27 @@ fun ZxNavRow(label: String, sub: String = "", value: String = "", onClick: () ->
         }
         ZxIcon("chevron-right", modifier = Modifier.width(18.dp), description = null)
     }
+}
+
+/** Explicit settings icon mapping; avoids substring-based collisions and mixed alignment. */
+internal fun zxSettingsNavigationIcon(label: String): String? = when (label) {
+    "外观" -> "palette"
+    "聊天风格" -> "quote"
+    "个人规则" -> "user"
+    "记忆" -> "diary"
+    "模型" -> "sparkle"
+    "模型性能" -> "quota"
+    "ChatGPT 账户" -> "user"
+    "套餐额度" -> "usage"
+    "操作审批模式" -> "check"
+    "权限与设备" -> "settings"
+    "通知" -> "alert"
+    "用量统计" -> "usage"
+    "会话存储" -> "files"
+    "高级设置" -> "tools"
+    "诊断与网络" -> "info"
+    "检查更新" -> "refresh"
+    else -> null
 }
 
 @Composable
@@ -218,8 +239,10 @@ fun ZxRow(
     Row(
         modifier
             .fillMaxWidth()
+            .padding(vertical = if (onClick != null) 2.dp else 0.dp)
             .then(if (onClick != null) Modifier.zxPressSurface(interaction) else Modifier)
             .clip(RoundedCornerShape(12.dp))
+            .then(if (onClick != null) Modifier.background(c.card) else Modifier)
             .then(if (onClick != null) Modifier.clickable(
                 role = Role.Button, onClick = onClick, interactionSource = interaction,
                 indication = androidx.compose.foundation.LocalIndication.current) else Modifier)

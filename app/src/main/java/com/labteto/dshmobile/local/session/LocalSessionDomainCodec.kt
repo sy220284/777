@@ -33,6 +33,9 @@ internal interface LocalSessionDomainCodec {
         session: LocalHarnessSession,
         summary: LocalSessionSummary,
     ): LocalSessionSummary = summary
+
+    /** Product-owned durable state that must survive even without a visible transcript. */
+    fun hasSessionWork(session: LocalHarnessSession): Boolean = false
 }
 
 internal fun normalizeLocalSessionDomains(
@@ -51,9 +54,7 @@ internal fun projectLocalSessionSummary(
         title = normalized.title,
         updatedAt = normalized.updatedAt,
         usageMode = normalized.usageMode,
-        blank = normalized.transcriptIndex.totalMessageCount == 0L &&
-            normalized.transcriptWindow.none { it.content.isNotBlank() } &&
-            normalized.messages.none { it.content.isNotBlank() },
+        blank = isUnstartedSessionSnapshot(normalized, domainCodecs),
         summaryPreview = normalized.transcriptIndex.latestUserContent
             ?.replace(Regex("\\s+"), " ")
             ?.trim()
@@ -66,3 +67,16 @@ internal fun projectLocalSessionSummary(
         codec.projectSummary(normalized, current)
     }
 }
+
+/** A freshly opened editor is not a durable conversation until it owns user work. */
+internal fun isUnstartedSessionSnapshot(
+    snapshot: LocalHarnessSession,
+    domainCodecs: List<LocalSessionDomainCodec>,
+): Boolean =
+    snapshot.transcriptIndex.totalMessageCount == 0L &&
+        snapshot.transcriptWindow.none { it.content.isNotBlank() || it.blocks.isNotEmpty() } &&
+        snapshot.messages.none { it.content.isNotBlank() || it.blocks.isNotEmpty() } &&
+        snapshot.handoffSummary.isNullOrBlank() &&
+        snapshot.plan.isEmpty() && snapshot.todosPayload.isEmpty() &&
+        snapshot.goalPayload == null && !snapshot.planMode &&
+        domainCodecs.none { it.hasSessionWork(snapshot) }
