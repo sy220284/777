@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
@@ -110,21 +112,31 @@ internal class LocalWorkTurnStarter(
             "Work 排队续跑前台会话已切换"
         }
         val pending = runtimeStateStore.foregroundRunHandle.pendingInputs
-        val input = pending.pollCommitted { next, remaining ->
-            val message = next.modelMessage ?: buildJsonObject {
+        fun nextAdmissible(): QueuedAgentInput? {
+            while (true) {
+                var staleGoal = false
+                val polled = pending.pollCommitted { next, remaining ->
+                    staleGoal = shouldDiscardWorkGoalContinuation(
+                        next, remaining, runtimeStateStore.state.value.work,
+                    )
+                    val message = next.modelMessage ?: buildJsonObject {
                 put("role", "user")
                 put("content", next.content)
             }
             sessionStorage.eventLogs.get(sessionId).append(
                 LOCAL_AGENT_INBOX_EVENT_TYPE,
                 encodeLocalAgentInboxEvent(
-                    action = "resumed",
+                    action = if (staleGoal) "goal-continuation-discarded-stale" else "resumed",
                     pending = remaining,
                     affected = listOf(next),
-                    modelMessages = listOf(message),
+                    modelMessages = if (staleGoal) emptyList() else listOf(message),
                 ),
             )
-        } ?: return null
+                } ?: return null
+                if (!staleGoal) return polled
+            }
+        }
+        val input = nextAdmissible() ?: return null
         val durableMessage = input.modelMessage ?: buildJsonObject {
             put("role", "user")
             put("content", input.content)
@@ -137,7 +149,7 @@ internal class LocalWorkTurnStarter(
                 "Work 排队续跑持久化时前台会话已切换"
             }
         }
-        return startBound(input.content, input.memoryInput, input.id, sessionLease)
+        return startBound(input.content, input.memoryInput, input.id, sessionLease, resumed = input)
     }
 
     internal fun startExisting(
@@ -177,6 +189,7 @@ internal class LocalWorkTurnStarter(
         memoryInput: String,
         sourceMessageId: String,
         sessionLease: LocalSessionRuntimeLease,
+        resumed: QueuedAgentInput? = null,
     ): Job {
         val sessionId = requireWorkSession()
         val sessionBase = sessionStorage.currentSnapshot(sessionId)
@@ -199,6 +212,14 @@ internal class LocalWorkTurnStarter(
         )
         // The recovered foreground inbox becomes this Work run's single executable inbox.
         runHandle.pendingInputs.transferTo(binding.runHandle.pendingInputs)
+        // The cold inlet must carry the full typed continuation into the new binding.
+        if (resumed?.kind == QueuedAgentInputKind.WORK_CONTINUATION) {
+            val continuation = requireNotNull(resumed.continuation) {
+                "已持久化的 Work 续接命令缺少原任务与检查点坐标"
+            }
+            binding.automaticContinuationCount = continuation.index
+            binding.continuationParentRunId = continuation.sourceRunId
+        }
         try {
             workRunRegistry.attach(binding)
             binding.runHandle.projectionJob = scope.launch {
