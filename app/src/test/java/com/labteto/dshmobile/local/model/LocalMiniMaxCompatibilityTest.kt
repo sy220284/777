@@ -75,6 +75,31 @@ class LocalMiniMaxCompatibilityTest {
         assertFalse(nativeOpenAi.containsKey("thinking"))
     }
 
+    @Test fun stableM31OpenAiRequestUsesDocumentedNativeEffortWithoutLegacySwitch() = runBlocking {
+        var captured: JsonObject? = null
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            captured = json.parseToJsonElement(
+                Buffer().also { chain.request().body!!.writeTo(it) }.readUtf8(),
+            ).jsonObject
+            val result = """{"choices":[{"message":{"role":"assistant","content":"完成"},"finish_reason":"stop"}]}"""
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200)
+                .message("OK").body(result.toResponseBody("application/json".toMediaType())).build()
+        }.build()
+        val reply = DeepSeekClient(http, json).complete(
+            apiKey = "test",
+            model = "MiniMax-M3.1-Flash",
+            baseUrl = "https://api.minimaxi.com/v1",
+            messages = emptyList(),
+            tools = JsonArray(emptyList()),
+            reasoningEffort = "low",
+        )
+        assertEquals("MiniMax-M3.1-Flash", captured!!["model"]!!.jsonPrimitive.content)
+        assertEquals("low", captured!!["reasoning_effort"]!!.jsonPrimitive.content)
+        assertFalse(captured!!.containsKey("thinking"))
+        assertFalse(captured!!.containsKey("reasoning_split"))
+        assertEquals("完成", reply.content)
+    }
+
     @Test fun streamingThinkingDetailsSurviveToolHistoryOnlyOnSameRoute() = runBlocking {
         var request: JsonObject? = null
         val stream = """
