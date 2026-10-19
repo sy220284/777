@@ -164,6 +164,7 @@ fun ZhaoxiUiDocumentGenerateScene(
     val snapshot by port.snapshots.collectAsState(initial = port.snapshot())
     var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
+    var prompt by remember { mutableStateOf("请根据当前会话生成结构化交互文档") }
     fun generate(local: Boolean) {
         val live = context()
         if (live == null) { feedback = "请先进入包含消息的会话"; return }
@@ -174,7 +175,7 @@ fun ZhaoxiUiDocumentGenerateScene(
                 val result = if (local) port.generateLocal(GenerateLocalUiDocumentCommand(
                     live.identity, live.workMode, live.messageId, UiLocalDocumentTemplate.STATUS))
                 else port.generate(GenerateUiDocumentCommand(live.identity, live.workMode,
-                    live.messageId, "请根据当前会话生成结构化交互文档", true))
+                    live.messageId, prompt.trim(), true))
                 feedback = result.zxDocumentFeedback()
                 if (result is UiDocumentReceipt.Published) scope.onNavigate(UiSceneId("conversation.ui_document"))
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
@@ -188,8 +189,11 @@ fun ZhaoxiUiDocumentGenerateScene(
         Spacer(Modifier.height(10.dp))
         feedback?.let { ZxFooterNote(it) }
         snapshot.error?.let { ZxBanner(it, ZxTone.Err) }
+        ZxSection("生成要求")
+        ZxField(prompt, { prompt = it.take(4000) }, Modifier.fillMaxWidth().heightIn(min = 100.dp),
+            placeholder = "希望生成什么内容、表格或交互？")
         ZxButton("确认生成（调用模型）", { generate(false) }, Modifier.fillMaxWidth(),
-            enabled = !busy && !snapshot.generating, loading = busy || snapshot.generating)
+            enabled = !busy && !snapshot.generating && prompt.isNotBlank(), loading = busy || snapshot.generating)
         ZxButton("本地生成（离线模板）", { generate(true) }, Modifier.fillMaxWidth(),
             enabled = !busy && !snapshot.generating, variant = ZxButtonVariant.Outline)
 
