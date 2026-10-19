@@ -26,6 +26,15 @@ class NativeV6DocumentPresentationTest {
         assertEquals(listOf(status, details), nativeV6InlineVisibleNodes(regular, detailsExpanded = false))
     }
 
+    @Test fun aDraftActionCannotMasqueradeAsConfirmingOrSubmittingTheForm() {
+        val draft = com.labteto.dshmobile.uicontract.UiDocumentAction.SendUserInput(
+            "send", "", listOf("city"), submit = false,
+        )
+        val direct = draft.copy(submit = true)
+        assertEquals("放入输入框（仍需点击发送）", nativeV6ActionLabel("确认表单", draft))
+        assertEquals("确认并发送表单", nativeV6ActionLabel("确认并发送表单", direct))
+    }
+
     @Test fun singleSelectRendersCurrentChoiceWithoutPretendingToBeMultipleChoice() {
         val select = UiDocumentNode.Select("city", "目的地", listOf("成都", "上海"), "成都")
         assertEquals("成都", nativeV6SelectLabel(select, emptyMap()))
