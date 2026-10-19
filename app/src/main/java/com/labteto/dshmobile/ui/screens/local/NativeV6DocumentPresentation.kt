@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.DropdownMenu
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -65,7 +65,7 @@ internal fun NativeV6CompactSelect(
                 Text("${nativeV6SelectLabel(node, fields)}  ▾", maxLines = 1,
                     overflow = TextOverflow.Ellipsis)
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            SyPopupMenu(expanded = expanded, onDismiss = { expanded = false }) {
                 node.options.forEach { option ->
                     DropdownMenuItem(
                         text = { Text(option) },
