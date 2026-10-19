@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -205,7 +206,7 @@ internal fun PluginInventoryBrowser(
             SySearchField(
                 value = query,
                 onValueChange = { query = it },
-                modifier = Modifier.padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg)
+                modifier = Modifier.padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapMd)
                     .testTag("plugin-inventory-search"),
                 placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
             )
@@ -236,20 +237,35 @@ internal fun PluginInventoryBrowser(
                             )
                         }
                     }
-                    if (onCreateSkill != null) {
-                        SyButton(
-                            text = stringResource(R.string.skills_create_manual),
-                            variant = SyButtonVariant.Ghost,
-                            onClick = { showCreateSkill = true },
-                            enabled = !loading,
-                            modifier = Modifier.testTag("skill-create-manual"),
-                        )
-                    }
                     Text(
                         stringResource(R.string.skills_import_hint),
+                        modifier = Modifier.fillMaxWidth(),
                         style = DsType.small13.withReadingWeight(),
-                        color = colors.textTertiary,
+                        color = colors.textSecondary,
+                        maxLines = 2,
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            stringResource(R.string.skills_catalog_overview, skills.size, availablePresets.size),
+                            style = DsType.small13Strong.withReadingWeight(),
+                            color = colors.textSecondary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (onCreateSkill != null) {
+                            SyButton(
+                                text = stringResource(R.string.skills_create_manual),
+                                variant = SyButtonVariant.Ghost,
+                                onClick = { showCreateSkill = true },
+                                enabled = !loading,
+                                size = SyButtonSize.Small,
+                                modifier = Modifier.testTag("skill-create-manual"),
+                            )
+                        }
+                    }
                 }
             }
             if (!skillsOnly) LazyRow(
@@ -338,75 +354,78 @@ internal fun PluginInventoryBrowser(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(SyMetric.gapSection),
-                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
+                    contentPadding = PaddingValues(
+                        horizontal = SyMetric.gapSection,
+                        vertical = SyMetric.gapMd,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                 ) {
                     items(list, key = { it.id }) { item ->
                         Surface(
                             modifier = Modifier.fillMaxWidth().testTag("plugin-inventory-card-${item.id}"),
                             onClick = { selectedRow = item },
-                            color = androidx.compose.ui.graphics.Color.Transparent,
-                            shape = DsShapes.block,
+                            color = colors.materialL2,
+                            shape = DsShapes.row,
                         ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(SyMetric.gapSection),
-                                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .heightIn(min = 72.dp)
+                                    .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                                Box(
+                                    modifier = Modifier.size(32.dp).testTag("plugin-inventory-icon-${item.id}"),
+                                    contentAlignment = Alignment.Center,
                                 ) {
-                                    Box(
-                                        modifier = Modifier.size(40.dp).testTag("plugin-inventory-icon-${item.id}"),
-                                    ) {
-                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = item.icon,
-                                                contentDescription = null,
-                                                tint = colors.textSecondary,
-                                                modifier = Modifier.size(20.dp),
-                                            )
-                                        }
-                                    }
+                                    Icon(
+                                        imageVector = item.icon,
+                                        contentDescription = null,
+                                        tint = colors.textSecondary,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
+                                ) {
                                     Text(
                                         item.name,
-                                        modifier = Modifier.weight(1f).testTag("plugin-inventory-title-${item.id}"),
+                                        modifier = Modifier.fillMaxWidth()
+                                            .testTag("plugin-inventory-title-${item.id}"),
                                         color = colors.text,
                                         style = DsType.std14Strong.withReadingWeight(),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        item.detail,
+                                        modifier = Modifier.fillMaxWidth()
+                                            .testTag("plugin-inventory-detail-${item.id}"),
+                                        color = colors.textSecondary,
+                                        style = DsType.small13.withReadingWeight(),
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }
-                                Text(
-                                    item.detail,
-                                    modifier = Modifier.fillMaxWidth().testTag("plugin-inventory-detail-${item.id}"),
-                                    color = colors.textTertiary,
-                                    style = DsType.small13.withReadingWeight(),
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
+                                val usePrompt = if (item.installedSkill) "@skill:${item.id.substringAfter(":")}\n"
+                                    else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
+                                SyButton(
+                                    enabled = !loading,
+                                    text = stringResource(
+                                        if (item.installablePreset && onInstallPreset != null) R.string.skills_install
+                                        else if (onUseCapability != null && item.available) R.string.plugin_use
+                                        else R.string.tools_catalog_details
+                                    ),
+                                    variant = SyButtonVariant.Info,
+                                    size = SyButtonSize.Small,
+                                    modifier = Modifier.testTag("plugin-inventory-action-${item.id}"),
+                                    onClick = {
+                                        if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
+                                        else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
+                                        else selectedRow = item
+                                    },
                                 )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End,
-                                ) {
-                                    val usePrompt = if (item.installedSkill) "@skill:${item.id.substringAfter(":")}\n" else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
-                                    SyButton(
-                                        enabled = !loading,
-                                        text = stringResource(
-                                            if (item.installablePreset && onInstallPreset != null) R.string.skills_install
-                                            else if (onUseCapability != null && item.available) R.string.plugin_use
-                                            else R.string.tools_catalog_details
-                                        ),
-                                        variant = SyButtonVariant.Info,
-                                        size = SyButtonSize.Small,
-                                        onClick = {
-                                            if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
-                                            else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
-                                            else selectedRow = item
-                                        },
-                                    )
-                                }
                             }
                         }
                     }
