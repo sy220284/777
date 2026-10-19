@@ -213,7 +213,7 @@ class LocalWorkRunRegistry internal constructor(
                     var staleGoal = false
                     val polled = binding.runHandle.pendingInputs.pollCommitted { input, remaining ->
                         staleGoal = shouldDiscardWorkGoalContinuation(
-                            input, remaining, binding.workState.snapshot())
+                            input, remaining, binding.workState.snapshot(), binding.eventLog)
                         val message = input.modelMessage ?: buildJsonObject {
                             put("role", "user")
                             put("content", input.content)
