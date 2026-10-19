@@ -28,7 +28,7 @@ class LocalReplyUiDocumentTest {
         val incomplete = LocalReplyUiDocumentProtocol.split("Still useful\n```ui_document\n{unfinished")
         assertEquals("Still useful", incomplete.text)
         assertNull(incomplete.definition)
-        val windows = answer.replace("```ui_document\\n", "```ui_document\\r\\n")
+        val windows = answer.replace("```ui_document\n", "```ui_document\r\n")
         assertEquals("Choose an option.", LocalReplyUiDocumentProtocol.split(windows).text)
         assertEquals(raw, LocalReplyUiDocumentProtocol.split(windows).definition)
     }
@@ -41,10 +41,10 @@ class LocalReplyUiDocumentTest {
             assertEquals("Progress 😀\n", visible)
             assertEquals("", preview.append("more hidden JSON"))
         }
-        val windows = output.replace("```ui_document\\n", "```ui_document\\r\\n")
+        val windows = output.replace("```ui_document\n", "```ui_document\r\n")
         for (width in 1..30) {
             val preview = LocalReplyUiDocumentPreview()
-            assertEquals("Progress 😀\\n", windows.chunked(width).joinToString("") { preview.append(it) })
+            assertEquals("Progress 😀\n", windows.chunked(width).joinToString("") { preview.append(it) })
         }
         val plain = LocalReplyUiDocumentPreview()
         assertEquals("Normal code", plain.append("Normal code"))
