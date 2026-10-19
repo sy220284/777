@@ -264,6 +264,7 @@ internal class LocalWorkAgentTurnExecutor(
             var hadSuccessfulToolReceipt = false
             var hadToolFailure = false
             var completedGoalDisposition: LocalWorkGoalDisposition? = null
+            var approvedPlanPromptPending = false
 
             fun settlePendingTools(reason: String) {
                 val settlements = pendingToolSettlements(
@@ -299,6 +300,7 @@ internal class LocalWorkAgentTurnExecutor(
                     // Persistent history stays compact; user rules, recalled memory and handoff are
                     // assembled per request and are deliberately never written back into runHistory.
                     if (!requestPrepared) {
+                        workModelHistoryRuntime.repairInterleavedPromptUpdates(binding)
                         workModelHistoryRuntime.ensureSystemMessage(binding)
                         val snapshot = runState.value
                         workPromptContext = contextComposer.composeWorkTurnContext(
@@ -636,6 +638,19 @@ internal class LocalWorkAgentTurnExecutor(
                             })
                             runHistory.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention))
                             completedToolCallIds += event.call.id
+                            if (!event.isError && event.call.name == "exit_plan_mode" &&
+                                event.output == APPROVED_PLAN_TOOL_RESULT
+                            ) {
+                                approvedPlanPromptPending = true
+                            }
+                            // Update prompt only after ALL tool receipts in this assistant batch exist.
+                            // A system message between tool_calls and tool results corrupts the history.
+                            if (approvedPlanPromptPending &&
+                                activeToolCalls.all { it.id in completedToolCallIds }
+                            ) {
+                                workModelHistoryRuntime.publishApprovedPlanPrompt(binding)
+                                approvedPlanPromptPending = false
+                            }
                             // Count only real tool receipts after their authoritative event is durable.
                             if (event.isError) hadToolFailure = true else hadSuccessfulToolReceipt = true
                             workModelHistoryRuntime.updateContextMetrics(binding)

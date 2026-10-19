@@ -3,8 +3,12 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelPromptUpdateMode
 import com.labteto.dshmobile.local.model.applyRuntimeSystemPromptUpdate
+import com.labteto.dshmobile.local.model.reorderInterleavedSystemPromptUpdates
+import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
+import com.labteto.dshmobile.local.model.validateCanonicalModelHistory
 import com.labteto.dshmobile.local.model.workSystemPrompt
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -65,6 +69,53 @@ class LocalSystemPromptContinuityTest {
         assertTrue(prompt.contains("在批准之前保持规划权限边界"))
     }
 
+
+    private fun callBatch(vararg ids: String) = buildJsonObject {
+        put("role", "assistant")
+        put("tool_calls", JsonArray(ids.map { id -> buildJsonObject {
+            put("id", id); put("type", "function")
+            put("function", buildJsonObject {
+                put("name", "exit_plan_mode"); put("arguments", "{}")
+            })
+        } }))
+    }
+
+    private fun receipt(id: String) = buildJsonObject {
+        put("role", "tool"); put("tool_call_id", id); put("content", "执行成功")
+    }
+
+    @Test
+    fun legacyApprovalWithInterleavedSystemPromptKeepsToolReceiptAndCachedPrefix() {
+        val original = listOf(
+            system("原始系统规则"),
+            callBatch("plan-approval"),
+            system("【系统规则更新；后续以本条为准】\\n执行模式"),
+            receipt("plan-approval"),
+            buildJsonObject { put("role", "user"); put("content", "继续完成任务") },
+        )
+        val repaired = reorderInterleavedSystemPromptUpdates(original)
+        assertEquals(listOf(original[0], original[1], original[3], original[2], original[4]), repaired)
+        validateCanonicalModelHistory(repaired.map(LocalCanonicalModelCodec::message))
+    }
+
+    @Test
+    fun legacyMultipleToolReceiptsPreservedBeforeDeferredSystemPrompt() {
+        val original = listOf(
+            callBatch("a", "b"), receipt("b"), system("新规则"), receipt("a"),
+        )
+        val repaired = reorderInterleavedSystemPromptUpdates(original)
+        assertEquals(listOf(original[0], original[1], original[3], original[2]), repaired)
+        validateCanonicalModelHistory(repaired.map(LocalCanonicalModelCodec::message))
+    }
+
+    @Test
+    fun incompleteOrUnrelatedToolBatchesAreNotRewritten() {
+        val incomplete = listOf(callBatch("a", "b"), system("新规则"), receipt("a"))
+        val unrelated = listOf(callBatch("a"), system("新规则"),
+            buildJsonObject { put("role", "user"); put("content", "打断") }, receipt("a"))
+        assertEquals(incomplete, reorderInterleavedSystemPromptUpdates(incomplete))
+        assertEquals(unrelated, reorderInterleavedSystemPromptUpdates(unrelated))
+    }
     @Test
     fun unknownRouteKeepsReplacementSemantics() {
         val history = LocalModelHistoryBuffer().apply { append(system("原始规则")) }

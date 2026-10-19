@@ -298,6 +298,43 @@ class LocalModelHistoryProjectionTest {
         assertEquals("second", restored.messages.last()["content"].toString().trim('"'))
     }
 
+
+    @Test
+    fun oldApprovalTailReplayRecoversToolReceiptAcrossEarlySystemUpdate() {
+        val events = listOf(
+            event(0L, "system/prompt", buildJsonObject { put("content", "原始系统规则") }),
+            event(1L, "assistant/message", assistantCall("approve")),
+            event(2L, "system/prompt", buildJsonObject {
+                put("content", "执行模式")
+                put("update_mode", "append_only")
+            }),
+            event(3L, "tool/result", buildJsonObject {
+                put("id", "approve")
+                put("content", "计划已获批准，已进入执行模式")
+            }),
+        )
+        val restored = restoreLocalModelHistory(events, emptyList(), codec)
+        assertEquals(listOf("system", "assistant", "tool", "system"), restored.messages.map {
+            it["role"].toString().trim('"')
+        })
+        assertEquals("approve", restored.messages[2]["tool_call_id"].toString().trim('"'))
+        assertTrue(restored.checkpointRecommended)
+    }
+
+    @Test
+    fun oldCheckpointRepairsInterleavedSystemWithoutDiscardingCompleteBatch() {
+        val broken = listOf(
+            assistantCall("approve"),
+            message("system", "执行模式"),
+            buildJsonObject { put("role", "tool"); put("tool_call_id", "approve"); put("content", "已批准") },
+        )
+        val restored = restoreLocalModelHistory(
+            listOf(event(0L, ModelHistoryCheckpointCodec.EVENT_TYPE, codec.encode(broken, "legacy-bug"))),
+            emptyList(), codec,
+        )
+        assertEquals(listOf(broken[0], broken[2], broken[1]), restored.messages)
+        assertTrue(restored.checkpointRecommended)
+    }
     @Test
     fun duplicateToolResultIsNotReapplied() {
         val checkpoint = listOf(

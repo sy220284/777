@@ -14,7 +14,6 @@ import org.junit.Test
 class LocalWorkBuiltinToolRuntimeTest {
     private val runtime = LocalWorkBuiltinToolRuntime(
         persist = { error("无绑定路径不得持久化") },
-        updateContextMetrics = { error("无绑定路径不得更新上下文指标") },
     )
 
     @Test

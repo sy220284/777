@@ -39,6 +39,8 @@ internal enum class AgentOperationKind {
     Delegate,
     External,
     Generic,
+    Question,
+    Plan,
 }
 
 /**
@@ -52,6 +54,8 @@ internal fun agentOperationKind(toolName: String?): AgentOperationKind {
     val name = toolName?.trim()?.lowercase().orEmpty()
     if (name.isEmpty()) return AgentOperationKind.Generic
     return when {
+        name == "ask_user_question" -> AgentOperationKind.Question
+        name == "exit_plan_mode" -> AgentOperationKind.Plan
         name == "web_search" || name == "grep" || name == "glob" ||
             name == "find" || name == "search" || name.endsWith("_search") ->
             AgentOperationKind.Search
@@ -107,6 +111,8 @@ internal fun agentOperationLabelRes(kind: AgentOperationKind): Int = when (kind)
     AgentOperationKind.Delegate -> R.string.agent_operation_delegate
     AgentOperationKind.External -> R.string.agent_operation_external
     AgentOperationKind.Generic -> R.string.agent_operation_generic
+    AgentOperationKind.Question -> R.string.agent_operation_question
+    AgentOperationKind.Plan -> R.string.agent_operation_plan
 }
 
 @StringRes

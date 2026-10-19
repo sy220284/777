@@ -5,6 +5,10 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalModelState
+import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
+import com.labteto.dshmobile.local.model.applyRuntimeSystemPromptUpdate
+import com.labteto.dshmobile.local.model.validateCanonicalModelHistory
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.model.workSystemPrompt
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -18,6 +22,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -57,11 +62,8 @@ class LocalWorkPlanModeCoordinatorTest {
                 plan = "第一版方案",
                 state = port,
                 interactions = runtime.foregroundInteractions,
-                aggregateSnapshot = { runtime.state.value },
-                history = LocalModelHistoryBuffer(),
                 eventLog = logs.get("plan-rewrite"),
                 persist = { error("重新规划不得提交已批准计划") },
-                updateContextMetrics = { error("重新规划不得改变执行模式") },
             )
         }
         runCurrent()
@@ -206,6 +208,68 @@ class LocalWorkPlanModeCoordinatorTest {
         logs.clearAndEvict(setOf("pending-plan"))
     }
 
+
+    @Test
+    fun approvalDoesNotInsertSystemInstructionBeforeOutstandingToolReceipt() = runTest {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(
+            sessionId = "plan-approved", loading = false, usageMode = LocalUsageMode.WORK,
+        ))
+        val logs = LocalSessionEventLogRegistry(
+            File(temporary.root, "plan-approved-logs").apply { mkdirs() }, json,
+        )
+        var work = LocalWorkState(planMode = true)
+        val port = object : LocalWorkStatePort {
+            override fun snapshot(): LocalWorkState = work
+            override fun update(transform: (LocalWorkState) -> LocalWorkState) {
+                work = transform(work)
+            }
+        }
+        val history = LocalModelHistoryBuffer().apply {
+            append(buildJsonObject { put("role", "system"); put("content", "旧规则") })
+            append(buildJsonObject {
+                put("role", "assistant")
+                put("tool_calls", JsonArray(listOf(buildJsonObject {
+                    put("id", "approve-call")
+                    put("type", "function")
+                    put("function", buildJsonObject {
+                        put("name", "exit_plan_mode")
+                        put("arguments", "{}")
+                    })
+                })))
+            })
+        }
+        val beforeApproval = history.snapshot()
+        val call = LocalToolCall("approve-call", "exit_plan_mode", buildJsonObject {}, "{}")
+        var persisted = false
+        val awaiting = async {
+            exitWorkPlanMode(
+                call = call,
+                plan = "先调查，再执行",
+                state = port,
+                interactions = runtime.foregroundInteractions,
+                eventLog = logs.get("plan-approved"),
+                persist = { persisted = true },
+            )
+        }
+        runCurrent()
+        val question = requireNotNull(runtime.state.value.work.pendingQuestion)
+        assertTrue(runtime.foregroundInteractions.answerQuestion(question.callId, "批准并进入执行模式"))
+        assertEquals(APPROVED_PLAN_TOOL_RESULT, awaiting.await())
+        assertTrue(persisted)
+        assertFalse(work.planMode)
+        assertEquals(beforeApproval, history.snapshot())
+
+        // The Work event sink first persists the matching result, THEN refreshes the prompt.
+        history.append(buildJsonObject {
+            put("role", "tool"); put("tool_call_id", "approve-call"); put("content", APPROVED_PLAN_TOOL_RESULT)
+        })
+        applyRuntimeSystemPromptUpdate(history, "执行规则", LocalModelState())
+        assertEquals(listOf("system", "assistant", "tool", "system"),
+            history.snapshot().map { it["role"]?.jsonPrimitive?.contentOrNull })
+        validateCanonicalModelHistory(history.snapshot().map(LocalCanonicalModelCodec::message))
+        logs.clearAndEvict(setOf("plan-approved"))
+    }
     private fun fixture(): Fixture {
         val runtime = LocalRuntimeStateStore()
         runtime.initialize(

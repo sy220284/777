@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -57,4 +58,54 @@ internal fun applyRuntimeSystemPromptUpdate(
         else -> history.replaceSystem(message)
     }
     return mode
+}
+
+/**
+ * Historical builds could append a system override between an assistant's tool call and its
+ * receipts (notably exit_plan_mode). Move only those interleaved overrides past a COMPLETE
+ * matching batch; do not synthesize tool results or rewrite incomplete/unrelated history.
+ */
+internal fun reorderInterleavedSystemPromptUpdates(history: List<JsonObject>): List<JsonObject> {
+    val reordered = mutableListOf<JsonObject>()
+    var index = 0
+    while (index < history.size) {
+        val message = history[index]
+        val calls = if (message["role"]?.jsonPrimitive?.contentOrNull == "assistant") {
+            runCatching { LocalCanonicalModelCodec.canonicalToolCalls(message) }.getOrNull().orEmpty()
+        } else emptyList()
+        val pending = calls.mapTo(linkedSetOf()) { it.id }
+        if (calls.isEmpty() || pending.size != calls.size) {
+            reordered += message
+            index += 1
+            continue
+        }
+
+        val results = mutableListOf<JsonObject>()
+        val overrides = mutableListOf<JsonObject>()
+        var cursor = index + 1
+        while (pending.isNotEmpty() && cursor < history.size) {
+            val next = history[cursor]
+            when (next["role"]?.jsonPrimitive?.contentOrNull) {
+                "system" -> overrides += next
+                "tool" -> {
+                    val id = next["tool_call_id"]?.jsonPrimitive?.contentOrNull
+                    if (id == null || !pending.remove(id)) break
+                    results += next
+                }
+                else -> break
+            }
+            cursor += 1
+        }
+
+        if (pending.isEmpty() && overrides.isNotEmpty()) {
+            reordered += message
+            reordered += results
+            reordered += overrides
+            index = cursor
+        } else {
+            reordered += message
+            index += 1
+        }
+    }
+    return reordered
 }

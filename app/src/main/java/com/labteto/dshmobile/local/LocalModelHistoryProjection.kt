@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.chat.timelineRewriteModelHistory
 import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
 import com.labteto.dshmobile.local.model.LocalModelPromptUpdateMode
+import com.labteto.dshmobile.local.model.reorderInterleavedSystemPromptUpdates
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.assistantModelMessageFromEvent
 import kotlinx.serialization.json.JsonArray
@@ -77,7 +78,8 @@ internal fun restoreLocalModelHistory(
     val invalidCheckpointAfterRestore = latestCheckpointIndex > checkpointIndex
     val checkpointNeedsWatermark =
         checkpointMessages != null && checkpointAsOfSequence == null
-    val (sanitizedHistory, repairedStructure) = sanitizeRestoredModelHistory(history)
+    val reorderedHistory = reorderInterleavedSystemPromptUpdates(history)
+    val (sanitizedHistory, repairedStructure) = sanitizeRestoredModelHistory(reorderedHistory)
     return LocalModelHistoryRestore(
         messages = sanitizedHistory,
         replayedTail = replayed,
@@ -87,7 +89,8 @@ internal fun restoreLocalModelHistory(
                 replayed ||
                 invalidCheckpointAfterRestore ||
                 checkpointNeedsWatermark ||
-                repairedStructure,
+                repairedStructure ||
+                reorderedHistory != history,
     )
 }
 
@@ -240,11 +243,16 @@ private fun applyModelHistoryEvent(
             // must never manufacture an orphan result when an assistant event was lost/corrupted.
             var ownerIndex = history.lastIndex
             val currentBatchResults = linkedSetOf<String>()
+            // Older runs interleaved system/prompt with an unfinished tool batch.
+            // Accept its matching receipts during replay, then reorder the override after
+            // the completed batch before any request is constructed.
             while (ownerIndex >= 0 &&
-                history[ownerIndex]["role"]?.jsonPrimitive?.contentOrNull == "tool"
+                history[ownerIndex]["role"]?.jsonPrimitive?.contentOrNull in setOf("tool", "system")
             ) {
-                history[ownerIndex]["tool_call_id"]?.jsonPrimitive?.contentOrNull
-                    ?.let(currentBatchResults::add)
+                if (history[ownerIndex]["role"]?.jsonPrimitive?.contentOrNull == "tool") {
+                    history[ownerIndex]["tool_call_id"]?.jsonPrimitive?.contentOrNull
+                        ?.let(currentBatchResults::add)
+                }
                 ownerIndex -= 1
             }
             val owner = history.getOrNull(ownerIndex)
