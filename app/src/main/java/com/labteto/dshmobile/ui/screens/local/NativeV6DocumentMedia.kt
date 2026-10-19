@@ -28,7 +28,7 @@ internal fun NativeV6DocumentMedia(
         Text("媒体结果暂不可用")
         return
     }
-    val file = owned.localPath?.let(::File)?.takeIf(File::isFile)
+    val file = owned.localPath?.let(::File)?.takeIf { it.isFile }
     var playbackError by remember(node.assetId, sessionId) { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
         Text(node.label)
