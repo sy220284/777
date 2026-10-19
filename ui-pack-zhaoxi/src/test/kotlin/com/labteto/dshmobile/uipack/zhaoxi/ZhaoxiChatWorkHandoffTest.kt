@@ -61,7 +61,7 @@ class ZhaoxiChatWorkHandoffTest {
 
     @Test(expected = IllegalArgumentException::class)
     fun refusesMoreThanEightySelectedMessagesInsteadOfSilentlyDroppingThem() {
-        val selected = (1..81).map { message("u$"+"it", UiMessageRole.USER, "需求") }
+        val selected = (1..81).map { message("u" + it, UiMessageRole.USER, "需求") }
         zxHandoffSummary("处理需求", selected)
     }
 
