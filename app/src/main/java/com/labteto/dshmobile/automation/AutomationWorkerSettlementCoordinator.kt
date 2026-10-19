@@ -81,6 +81,7 @@ internal class AutomationWorkerSettlementCoordinator(
             }
             current.copy(
                 activeManualRunId = if (manualRun) null else current.activeManualRunId,
+                activeManualStartedAt = if (manualRun) null else current.activeManualStartedAt,
                 workSessionId = if (current.mode == AutomationMode.WORK) {
                     run.sessionId
                 } else {
@@ -142,6 +143,7 @@ internal class AutomationWorkerSettlementCoordinator(
         ) { current ->
             current.copy(
                 activeManualRunId = if (manualRun) null else current.activeManualRunId,
+                activeManualStartedAt = if (manualRun) null else current.activeManualStartedAt,
                 workSessionId = sessionId ?: current.workSessionId,
                 status = if (manualRun) current.status else AutomationStatus.BLOCKED,
                 lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
@@ -188,6 +190,7 @@ internal class AutomationWorkerSettlementCoordinator(
             ) { current ->
                 current.copy(
                     activeManualRunId = null,
+                    activeManualStartedAt = null,
                     workSessionId = if (persistWorkSessionId) sessionId else current.workSessionId,
                     lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
                     runReceipts = appendAutomationReceipt(
