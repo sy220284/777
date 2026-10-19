@@ -88,9 +88,9 @@ fun ZhaoxiSettingsHomeScene(
         }
         ZxSection("模型与账户")
         ZxSettingsGroup {
-        if (enabled("settings.models")) ZxNavRow("模型", sub = "当前模型 · API Key · 协议") { scope.onNavigate(UiSceneId("settings.models")) }
+        if (enabled("settings.models")) ZxNavRow("模型") { scope.onNavigate(UiSceneId("settings.models")) }
         if (enabled("settings.model_performance")) ZxNavRow("模型性能", sub = "推理强度 · 温度") { scope.onNavigate(UiSceneId("settings.model_performance")) }
-        if (enabled("settings.account")) ZxNavRow("ChatGPT 账户", sub = "授权与登录状态") { scope.onNavigate(UiSceneId("settings.account")) }
+        if (enabled("settings.account")) ZxNavRow("ChatGPT 账户") { scope.onNavigate(UiSceneId("settings.account")) }
         if (enabled("settings.minimax_quota")) ZxNavRow("套餐额度", sub = "MiniMax 模型额度") { scope.onNavigate(UiSceneId("settings.minimax_quota")) }
 
         }

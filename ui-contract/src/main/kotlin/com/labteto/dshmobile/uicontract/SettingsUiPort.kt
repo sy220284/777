@@ -3,6 +3,7 @@ package com.labteto.dshmobile.uicontract
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.local.model.LocalImageInputMode
+import com.labteto.dshmobile.local.model.LocalModelPreset
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
@@ -32,6 +33,8 @@ data class UiSettingsSnapshot(
 interface SettingsUiPort {
     val state: Flow<UiSettingsSnapshot>
     val initialState: UiSettingsSnapshot
+    /** Model-owned public catalog; renderers never duplicate preset/model policy. */
+    val apiModelPresets: List<LocalModelPreset>
     val chatGptState: StateFlow<ChatGptUiState>
     val chatStyleGuardBuiltInPhrases: List<String>
     val approvalMode: StateFlow<LocalApprovalMode>

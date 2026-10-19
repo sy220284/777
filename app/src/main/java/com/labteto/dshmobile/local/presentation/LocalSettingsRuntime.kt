@@ -6,6 +6,7 @@ import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelRuntime
+import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.MiniMaxProviderQuotaClient
 import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
@@ -42,6 +43,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     private val runtimeState = runtimeStateStore.state
     override val state: Flow<com.labteto.dshmobile.uicontract.UiSettingsSnapshot> = runtimeState.map { it.toSettingsUiState().toNeutralSnapshot() }.distinctUntilChanged()
     override val initialState get() = runtimeState.value.toSettingsUiState().toNeutralSnapshot()
+    override val apiModelPresets get() = LocalModelPresets.entries
     override val chatGptState: StateFlow<ChatGptUiState> = chatGpt.state
     override val chatStyleGuardBuiltInPhrases: List<String> get() = chatStyleGuardSettings.builtInPhrases
     override val approvalMode: StateFlow<LocalApprovalMode> = approvalPreferences.approvalMode

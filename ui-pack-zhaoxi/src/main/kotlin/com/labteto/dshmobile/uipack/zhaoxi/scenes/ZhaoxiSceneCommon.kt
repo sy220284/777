@@ -7,6 +7,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.labteto.dshmobile.uipack.zhaoxi.components.zxPressSurface
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,12 +55,13 @@ fun ZxPage(
     menu: Boolean = false,
     topRight: @Composable () -> Unit = {},
     footer: @Composable () -> Unit = {},
+    scrollState: ScrollState = rememberScrollState(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(modifier.fillMaxSize().imePadding()) {
         // Keep the scene surface transparent so E8.17 ambient light remains visible.
         ZxTopBar(title, onNav = { onBack?.invoke() }, canBack = !menu, showNav = onBack != null) { topRight() }
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())
+        Column(Modifier.weight(1f).verticalScroll(scrollState)
             .padding(start = 18.dp, end = 18.dp, bottom = 24.dp)) {
             content()
         }
