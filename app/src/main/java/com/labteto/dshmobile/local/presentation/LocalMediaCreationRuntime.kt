@@ -59,6 +59,9 @@ class LocalMediaCreationRuntime @Inject internal constructor(
 ) : MediaUiPort {
     companion object { const val PAGE_SIZE = LocalMediaStore.PAGE_SIZE }
     override val pageSize: Int get() = PAGE_SIZE
+    suspend fun matchesOriginalCredential(draft: LocalMediaRevisionDraft, offer: LocalMediaOffer): Boolean =
+        draft.originalOffer(listOf(offer)) != null &&
+            draft.matchesOriginalCredential(credentialResolver.mediaCredentialSignature(offer.profile))
     override fun offers(profiles: List<LocalModelProfile>) = LocalMediaCatalog.offers(profiles)
     override fun canRefresh(task: LocalMediaVideoTask, offer: LocalMediaOffer) = task.belongsTo(offer)
     override fun asset(id: String): UiMediaAsset? {

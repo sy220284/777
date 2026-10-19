@@ -37,6 +37,7 @@ internal data class LocalFeatureModule(
  * Product features register their subfeature routes here once at application composition time.
  * Runtime plugin hot-swap remains owned by PluginCatalog/PluginManager and is intentionally separate.
  */
+// FEATURE_TREE: {"id":"ui.scene.catalog","path":"第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生功能路由与页面恢复校验","entry":"LocalFeatureCatalog","owner":"SHELL","test":"app/src/test/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalogTest.kt#everyRouteHasExactlyOneStableOwnerAndModuleRouteList"}
 internal object LocalFeatureCatalog {
     val modules: List<LocalFeatureModule> = listOf(
         LocalFeatureModule(LocalFeatureModuleId.SHELL, listOf(LocalFeatureRoute.HOME)),

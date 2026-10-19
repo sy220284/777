@@ -1098,7 +1098,7 @@ def generate(root):
                 "explanation": entry["conclusion"],
             }
         if set(followup) != expected:
-            raise ValueError("存在性核查必须覆盖全部未纳入旧历史源码证据的条目")
+            raise ValueError(f"存在性核查未对齐现行证据：新增待核={sorted(expected - set(followup))}; 不再待核={sorted(set(followup) - expected)}")
         for item in unresolved_features:
             item["followup"] = followup[item["path"]]
     for record in evidence:

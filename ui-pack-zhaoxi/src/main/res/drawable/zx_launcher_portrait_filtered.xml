@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Keep the original portrait unchanged. Enable filtering and mipmaps whenever
-     Android scales this bitmap as the adaptive launcher foreground. -->
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/zx_launcher_portrait"
-    android:gravity="fill"
-    android:antialias="true"
-    android:filter="true"
-    android:mipMap="true" />

@@ -71,6 +71,9 @@ class LocalSessionUiFacade @Inject constructor(
         }
         page.messages to page.nextCursor?.let { Cursor(sessionId, frame.instance, frame.reset, it) }
     }
+    /** Legacy V6 reads the same authorized, bounded native Session pager. */
+    internal fun transcriptPage(sessionId: String, cursor: LocalTranscriptPageCursor?, limit: Int) = session.transcriptPage(sessionId, cursor, limit)
+
     override suspend fun messagePage(sessionId: String, cursor: UiTranscriptCursor?, limit: Int): UiMessagePage {
         val (messages, nextCursor) = rawTranscriptPage(sessionId, cursor, limit)
         return UiMessagePage(messages.map(::projectTranscriptHistoryMessage), nextCursor)

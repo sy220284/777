@@ -41,6 +41,8 @@ class LocalSettingsRuntime @Inject internal constructor(
     runtimeStateStore: LocalRuntimeStateStore,
 ) : com.labteto.dshmobile.uicontract.SettingsUiPort {
     private val runtimeState = runtimeStateStore.state
+    internal val nativeState: Flow<LocalHarnessSettingsState> = runtimeState.map { it.toSettingsUiState() }.distinctUntilChanged()
+    internal val nativeInitialState: LocalHarnessSettingsState get() = runtimeState.value.toSettingsUiState()
     override val state: Flow<com.labteto.dshmobile.uicontract.UiSettingsSnapshot> = runtimeState.map { it.toSettingsUiState().toNeutralSnapshot() }.distinctUntilChanged()
     override val initialState get() = runtimeState.value.toSettingsUiState().toNeutralSnapshot()
     override val apiModelPresets get() = LocalModelPresets.entries

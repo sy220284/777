@@ -68,26 +68,18 @@
     {
       "id": "ui.document.local_builder",
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
-      "source": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilder.kt",
+      "source": "app/src/main/java/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilder.kt",
       "entry": "LocalUiDocumentBuilder",
       "owner": "SHELL",
-      "test": "ui-contract/src/test/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilderTest.kt#freeTextCannotAcquireActionsOrBecomeACompletionFact"
+      "test": "app/src/test/java/com/labteto/dshmobile/local/presentation/document/LocalUiDocumentCodecTest.kt#sourceIdentityComesFromTheOwnerAndModelCannotReplaceIt"
     },
     {
       "id": "ui.scene.catalog",
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / UI 场景覆盖清单与兼容性检查（迁移中）",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalog.kt",
-      "entry": "LocalUiSceneCatalog",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生功能路由与页面恢复校验",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt",
+      "entry": "LocalFeatureCatalog",
       "owner": "SHELL",
-      "test": "app/src/test/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalogTest.kt#verificationPackCannotBeSelectedAsACompleteApplicationPack"
-    },
-    {
-      "id": "ui.zhaoxi.e817",
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 朝夕 E8.17 独立界面接入（PR #740，未合并）",
-      "source": "app/src/main/java/com/labteto/dshmobile/MainActivity.kt",
-      "entry": "MainActivity",
-      "owner": "SHELL",
-      "test": "app/src/androidTest/java/com/labteto/dshmobile/ui/ZhaoxiHomeSmokeAndroidTest.kt#homeShowsInteractiveSessionAndMainRoutes"
+      "test": "app/src/test/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalogTest.kt#everyRouteHasExactlyOneStableOwnerAndModuleRouteList"
     }
   ]
 }

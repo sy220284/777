@@ -681,7 +681,7 @@ if root_types != allowed_root_types:
         + ", ".join(sorted(root_types - allowed_root_types))
     )
 
-usage_api = strip_comments(read("ui-contract/src/main/kotlin/com/labteto/dshmobile/local/LocalUsageMode.kt"))
+usage_api = strip_comments(read("app/src/main/java/com/labteto/dshmobile/local/LocalUsageMode.kt"))
 if declared_top_level_types(usage_api) != {"LocalUsageMode"}:
     die("the neutral usage mode API must declare exactly LocalUsageMode")
 
@@ -906,15 +906,10 @@ for route_id in route_ids:
     if count != 1:
         die(f"Feature route {route_id} must have exactly one startup owner, found {count}")
 
-# No visual Feature contribution is installed in the backend-only baseline.
-# Feature owner, route, state and capability assertions above still run unchanged.
-if (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens").exists():
-    die("Backend-only baseline must not restore retired Feature screens")
-
-# The old callback-composing Shell is retired. Route ownership is still checked
-# above against FeatureCatalog; the sole application renderer is now the Scene Host.
-if (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt").exists():
-    die("Retired Shell source must not be restored; shared feedback belongs to LocalSendFeedback")
+# V6.3 reinstates the native screen while preserving Architecture 3.0 business ownership.
+# Historical backend-only "no visual Feature screens" assertions are no longer valid.
+if not (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt").is_file():
+    die("V6.3 native conversation screen missing")
 
 plugin_composition = strip_comments(read(
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt"
@@ -947,16 +942,11 @@ if "transportFactory = { endpoint ->" not in plugin_composition or (
 ) or plugin_composition.count("McpPluginWorkerTransport(") < 2:
     die("R4 production MCP HTTP and stdio must both use Binder worker without local fallback")
 main_activity = strip_comments(read("app/src/main/java/com/labteto/dshmobile/MainActivity.kt"))
-if any(token in main_activity for token in ("AppRoot(", "V6VisualBridge(", "DshTheme(")):
-    die("E8.17 MainActivity cannot restore the old visual Shell")
-if "setContent {" not in main_activity or "ZhaoxiApplicationRoot(" not in main_activity:
-    die("E8.17 requires the independent Zhaoxi root in MainActivity")
-if not (ROOT / "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiApplicationScenePack.kt").is_file():
-    die("Generic UI Host contracts must survive UI removal")
-for retired in ("LocalHarnessViewModel", "LocalHarnessScreen", "LocalLegacyApplicationEntry"):
-    for path, source in kotlin_sources_under(ROOT / "app/src/main/java"):
-        if references_type(source, retired) or re.search(r"\b(?:class|fun)\s+" + retired + r"\b", source):
-            die(f"R4 retired Shell entry is still executable: {path}: {retired}")
+if "setContent {" not in main_activity or "AppRoot(" not in main_activity:
+    die("Native V6 AppRoot must remain Android's only UI entry")
+for retired_path in ("ui-pack-zhaoxi", "ui-pack-v6", "ui-host", "ui-contract"):
+    if (ROOT / retired_path).exists():
+        die("Retired UI3 and Zhaoxi module remains: " + retired_path)
 
 worker_process_guard = strip_comments(read(APPLICATION_PATH))
 if "if (isMcpWorkerProcess(Application.getProcessName(), packageName)) return" not in worker_process_guard:

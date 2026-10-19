@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from E8.17; run tools/ui/generate-zhaoxi-icons.py -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-    <path android:pathData="M 12 3 l 1.8 5.2 L 19 10 l -5.2 1.8 L 12 17 l -1.8 -5.2 L 5 10 l 5.2 -1.8 z" android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" />
-    <path android:pathData="M 18.5 15.5 l .9 2.6 l 2.6 .9 l -2.6 .9 l -.9 2.6 l -.9 -2.6 l -2.6 -.9 l 2.6 -.9 z" android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" />
-</vector>

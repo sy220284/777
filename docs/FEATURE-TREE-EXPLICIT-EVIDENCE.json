@@ -527,13 +527,13 @@
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度",
       "sources": [
         {
-          "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedSettings.kt",
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MiniMaxQuotaPage.kt",
           "symbols": [
-            "ZhaoxiQuotaScene"
+            "MiniMaxQuotaPage"
           ]
         }
       ],
-      "scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
+      "scope": "恢复 V6 原生界面后的静态源码定位；具体交互、状态及设备效果以本 PR 最新 Head 的运行测试为准。",
       "tests": []
     },
     {
@@ -597,7 +597,7 @@
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 当前目标、阶段与执行步骤",
       "sources": [
         {
-          "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/WorkReadUiPort.kt",
+          "path": "app/src/main/java/com/labteto/dshmobile/uicontract/WorkReadUiPort.kt",
           "symbols": [
             "WorkReadUiPort"
           ]
@@ -609,14 +609,14 @@
           ]
         }
       ],
-      "scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
+      "scope": "保留现行业务数据与端口，V6 原生页面消费；此处仅证明对应声明存在。",
       "tests": []
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
       "sources": [
         {
-          "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/WorkReadUiPort.kt",
+          "path": "app/src/main/java/com/labteto/dshmobile/uicontract/WorkReadUiPort.kt",
           "symbols": [
             "WorkReadUiPort"
           ]
@@ -628,7 +628,7 @@
           ]
         }
       ],
-      "scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
+      "scope": "保留现行业务数据与端口，V6 原生页面消费；此处仅证明对应声明存在。",
       "tests": []
     },
     {
@@ -711,101 +711,89 @@
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
       "sources": [
         {
-          "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/AutomationUiPort.kt",
+          "path": "app/src/main/java/com/labteto/dshmobile/uicontract/AutomationUiPort.kt",
           "symbols": [
             "AutomationUiReceipt"
           ]
         }
       ],
-      "scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
+      "scope": "保留现行业务数据与端口，V6 原生页面消费；此处仅证明对应声明存在。",
       "tests": []
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 加号统一能力入口",
       "sources": [
         {
-          "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConversationMenu.kt",
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
           "symbols": [
-            "ZhaoxiConversationMenu"
+            "LocalConversationComposer"
           ]
         }
       ],
-      "scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
+      "scope": "恢复 V6 原生界面后的静态源码定位；具体交互、状态及设备效果以本 PR 最新 Head 的运行测试为准。",
       "tests": []
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 导航转场和加载状态",
       "sources": [
         {
-          "path": "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiHostSceneNavigation.kt",
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureNavigation.kt",
           "symbols": [
-            "navigate"
+            "localFeaturePush"
           ]
         }
       ],
-      "scope": "R4旧Shell退场后现行入口声明；已迁移源码，尚未运行行为验证"
+      "scope": "恢复 V6 原生界面后的静态源码定位；具体交互、状态及设备效果以本 PR 最新 Head 的运行测试为准。"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 运行中、排队中、拒绝发送的反馈",
       "sources": [
         {
-          "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiCommandFeedback.kt",
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
           "symbols": [
-            "CommandFeedback"
+            "LocalConversationComposer"
           ]
         }
       ],
-      "scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
+      "scope": "恢复 V6 原生界面后的静态源码定位；具体交互、状态及设备效果以本 PR 最新 Head 的运行测试为准。",
       "tests": []
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 应用启动及初始化界面",
       "sources": [
         {
-          "path": "app/src/main/java/com/labteto/dshmobile/ui/host/ZhaoxiApplicationRoot.kt",
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt",
           "symbols": [
-            "ZhaoxiApplicationRoot"
+            "AppRoot"
           ]
         }
       ],
-      "scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。",
+      "scope": "恢复 V6 原生界面后的静态源码定位；具体交互、状态及设备效果以本 PR 最新 Head 的运行测试为准。",
       "tests": []
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 朝夕 E8.17 独立界面接入（PR #740，未合并）",
-      "sources": [
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/MainActivity.kt",
-          "symbols": [
-            "MainActivity"
-          ]
-        }
-      ],
-      "scope": "现行接口或朝夕场景声明可定位；仅证明静态来源存在，动作、设备及真实账户效果以当前 Head 测试为准，旧 V6 页面证据不作为新界面验收。"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 页面返回、抽屉和浮层管理",
       "sources": [
         {
-          "path": "app/src/main/java/com/labteto/dshmobile/ui/host/ZhaoxiApplicationRoot.kt",
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
           "symbols": [
-            "ZhaoxiApplicationRoot"
+            "LocalHarnessScreen"
           ]
         }
       ],
-      "scope": "现行宿主处理系统返回、导航及焦点输入法边界；仅静态实现依据，抽屉、辅助技术和实际设备体验仍待验收。"
+      "scope": "恢复 V6 原生界面后的静态源码定位；具体交互、状态及设备效果以本 PR 最新 Head 的运行测试为准。"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 触控、无障碍与输入法适配",
       "sources": [
         {
-          "path": "app/src/main/java/com/labteto/dshmobile/ui/host/ZhaoxiApplicationRoot.kt",
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
           "symbols": [
-            "ZhaoxiApplicationRoot"
+            "LocalConversationSurface"
           ]
         }
       ],
-      "scope": "现行宿主处理系统返回、导航及焦点输入法边界；仅静态实现依据，抽屉、辅助技术和实际设备体验仍待验收。"
+      "scope": "恢复 V6 原生界面后的静态源码定位；具体交互、状态及设备效果以本 PR 最新 Head 的运行测试为准。"
     }
   ]
 }

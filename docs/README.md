@@ -22,7 +22,6 @@
 | [ANDROID-HARNESS-STATUS.zh-CN.md](ANDROID-HARNESS-STATUS.zh-CN.md) | 当前 Android 原生 Harness 已实现能力与平台限制 |
 | [ANDROID-HARNESS-ROADMAP.zh-CN.md](ANDROID-HARNESS-ROADMAP.zh-CN.md) | 当前版本之后仍需继续收敛的架构与工程工作 |
 | [VALIDATION.md](VALIDATION.md) | CI、差分验证、Android 16 / 17、架构与性能门禁 |
-| [release/ZHAOXI-E817-READINESS-20261018.zh-CN.md](release/ZHAOXI-E817-READINESS-20261018.zh-CN.md) | 当前朝夕 E8.17 发布条件、主线验收及待验证范围 |
 | [history/UI-BACKEND-RESET-20261017.zh-CN.md](history/UI-BACKEND-RESET-20261017.zh-CN.md) | 旧后端保留版、UI 清空及禁发标志历史记录（已退出当前状态） |
 
 ## 历史归档与扫描证据
