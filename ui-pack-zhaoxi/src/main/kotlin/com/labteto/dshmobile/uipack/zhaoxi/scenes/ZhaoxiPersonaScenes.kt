@@ -365,10 +365,20 @@ fun ZxGroupMembersScene(groups: ChatGroupUiPort, scope: UiSceneRenderScope) {
         }
         Text("${selected.size} / ${snap.maximumMembers} 位成员", color = ZhaoxiTheme.colors.ink2)
         selectionError?.let { Text(it, color = ZhaoxiTheme.colors.err) }
-        ZxButton("保存成员", {
-            snap.identity?.let { receipt = groups.submit(ChatGroupUiCommand.ConfigureMembers(it, selected.toList())) }
-        }, enabled = !snap.busy && snap.identity != null &&
-            selectionError == null && selected != snap.memberIds)
+        if (snap.active) {
+            ZxButton("保存成员", {
+                snap.identity?.let { receipt = groups.submit(ChatGroupUiCommand.ConfigureMembers(it, selected.toList())) }
+            }, enabled = !snap.busy && snap.identity != null &&
+                selectionError == null && selected != snap.memberIds)
+        } else {
+            ZxFooterNote("从当前已选人物创建独立的新群聊；原单聊历史会保留。")
+            ZxButton("创建新群聊", {
+                snap.identity?.let { id ->
+                    receipt = groups.submit(ChatGroupUiCommand.CreateGroupSession(id, selected.toList()))
+                    if (receipt?.admitted() == true) scope.onBack()
+                }
+            }, enabled = !snap.busy && snap.identity != null && selectionError == null)
+        }
     }
 }
 
