@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +27,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.uicontract.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Real V6 conversation cards. Rendered nodes are presentation only; every command passes
@@ -96,7 +97,11 @@ private fun NativeV6DocumentCard(
     var confirmation by remember(doc.documentId, doc.revision) { mutableStateOf<String?>(null) }
     var deleting by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
     fun perform(actionId: String, confirmed: Boolean) {
-        onFeedback(nativeV6DocumentReceiptMessage(controller.submit(snapshot, actionId, fields.toMap(), confirmed)))
+        val values = fields.toMap()
+        scope.launch {
+            val receipt = withContext(Dispatchers.IO) { controller.submit(snapshot, actionId, values, confirmed) }
+            onFeedback(nativeV6DocumentReceiptMessage(receipt))
+        }
     }
     Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 2.dp,
         modifier = Modifier.fillMaxWidth()) {
@@ -123,7 +128,7 @@ private fun NativeV6DocumentCard(
             TextButton(onClick = {
                 deleting = true
                 scope.launch {
-                    try { onFeedback(nativeV6DocumentReceiptMessage(controller.delete(snapshot))) }
+                    try { onFeedback(nativeV6DocumentReceiptMessage(withContext(Dispatchers.IO) { controller.delete(snapshot) })) }
                     finally { deleting = false }
                 }
             }, enabled = !deleting && snapshot.recoveryNotice == null) { Text("删除文档") }
