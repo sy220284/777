@@ -614,6 +614,14 @@ fun ZhaoxiSearchScene(
         .collectAsState(initial = sessions?.snapshot() ?: UiSessionsSnapshot(
             null, LocalUsageMode.CHAT, false, emptyList(), null))
     val messageIdentity = snapshot.identity
+    val otherSessions = snapshot.sessions.filter { !it.blank && it.id != messageIdentity?.sessionId }
+    val otherSessionIds = otherSessions.map { it.id }
+    var crossHits by remember(needle, otherSessionIds, refreshVersion) {
+        mutableStateOf(emptyList<Triple<String, String, com.labteto.dshmobile.uicontract.UiMessageSnapshot>>())
+    }
+    var crossScanned by remember(needle, otherSessionIds, refreshVersion) { mutableStateOf(0) }
+    var crossLoading by remember(needle, otherSessionIds, refreshVersion) { mutableStateOf(false) }
+    var crossErrors by remember(needle, otherSessionIds, refreshVersion) { mutableStateOf(0) }
     var messageHits by remember(needle, messageIdentity, refreshVersion) {
         mutableStateOf(emptyList<com.labteto.dshmobile.uicontract.UiMessageSnapshot>())
     }
@@ -640,6 +648,48 @@ fun ZhaoxiSearchScene(
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (failure: Exception) { messageError = "消息搜索失败，请刷新后重试" }
         finally { messageLoading = false }
+    }
+    suspend fun searchOtherSessions() {
+        val owner = transcript ?: return
+        if (needle.isBlank() || crossLoading) return
+        crossLoading = true
+        try {
+            val batch = otherSessions.drop(crossScanned).take(5)
+            for (session in batch) {
+                var cursor: com.labteto.dshmobile.uicontract.UiMessageSearchCursor? = null
+                var pages = 0
+                var found = 0
+                do {
+                    when (val response = owner.searchMessages(session.id, needle, cursor)) {
+                        is com.labteto.dshmobile.uicontract.UiMessageSearchReceipt.Available -> {
+                            val hits = response.result.page.messages.filter {
+                                it.id in response.result.hitIds &&
+                                    it.role in setOf(com.labteto.dshmobile.uicontract.UiMessageRole.USER,
+                                        com.labteto.dshmobile.uicontract.UiMessageRole.ASSISTANT)
+                            }.take(3 - found)
+                            crossHits = (crossHits + hits.map { Triple(session.id, session.title, it) })
+                                .distinctBy { it.first to it.third.id }
+                            found += hits.size
+                            cursor = response.result.nextCursor
+                        }
+                        is com.labteto.dshmobile.uicontract.UiMessageSearchReceipt.Failed -> {
+                            crossErrors++
+                            cursor = null
+                        }
+                    }
+                    pages++
+                } while (cursor != null && found < 3 && pages < 3)
+                crossScanned++
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (failure: Exception) { crossErrors++ }
+        finally { crossLoading = false }
+    }
+    androidx.compose.runtime.LaunchedEffect(transcript, needle, otherSessionIds, refreshVersion) {
+        if (needle.isNotBlank() && transcript != null && otherSessions.isNotEmpty()) {
+            kotlinx.coroutines.delay(250)
+            searchOtherSessions()
+        }
     }
     androidx.compose.runtime.LaunchedEffect(transcript, needle, messageIdentity, refreshVersion) {
         if (needle.isNotBlank() && messageIdentity != null && transcript != null) {
@@ -720,6 +770,26 @@ fun ZhaoxiSearchScene(
                         enabled = !messageLoading, loading = messageLoading, variant = ZxButtonVariant.Outline)
                 }
             }
+            if (transcript != null && otherSessions.isNotEmpty()) {
+                ZxSection("其他会话的消息正文")
+                crossHits.forEach { (sessionId, title, message) ->
+                    ZxRow(title.take(48),
+                        message.text.take(160) + " · 打开对应会话", onClick = {
+                            val receipt = sessions?.submit(SessionUiCommand.Open(sessionId))
+                                ?: UiCommandReceipt.NotAdmitted
+                            commandReceipt = receipt
+                            if (receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued)
+                                scope.onNavigate(UiSceneId("conversation.chat"))
+                        })
+                }
+                if (crossLoading) ZxFooterNote("正在逐个检索历史会话…")
+                if (crossErrors > 0) ZxBanner("有 ${crossErrors} 次历史读取失败；未将失败会话当成无结果", ZxTone.Warn)
+                if (crossScanned < otherSessions.size) {
+                    ZxButton("继续搜索其他会话（${crossScanned}/${otherSessions.size}）", {
+                        searchJobs.launch { searchOtherSessions() }
+                    }, enabled = !crossLoading, loading = crossLoading, variant = ZxButtonVariant.Outline)
+                } else ZxFooterNote("本次已检查全部 ${crossScanned} 个可见历史会话；每会话显示至多 3 条命中")
+            }
             if (personaResults.isNotEmpty()) {
                 ZxSection("人物")
                 personaResults.forEach { item ->
@@ -753,8 +823,9 @@ fun ZhaoxiSearchScene(
                 ZxBanner("工作区文件读取失败，请返回工作区检查文件状态", ZxTone.Warn)
             }
             if (!loading && sessionResults.isEmpty() && personaResults.isEmpty() &&
-                taskResults.isEmpty() && fileResults.isEmpty() && messageHits.isEmpty() &&
-                !messageLoading && messageError == null && searchCursor == null) {
+                taskResults.isEmpty() && fileResults.isEmpty() && messageHits.isEmpty() && crossHits.isEmpty() &&
+                !messageLoading && !crossLoading && crossScanned == otherSessions.size &&
+                messageError == null && searchCursor == null) {
                 ZxEmpty("没有找到匹配的内容", "可以换一个关键词重试")
             }
         }
