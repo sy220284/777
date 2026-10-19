@@ -36,7 +36,8 @@ internal fun ownsAutomationSettlement(
     manualExecutionId: String? = null,
 ): Boolean = task.scheduleGeneration == generation &&
     (if (manualRun) {
-        !manualExecutionId.isNullOrBlank() && task.activeManualRunId == manualExecutionId
+        !manualExecutionId.isNullOrBlank() && task.activeManualRunId == manualExecutionId &&
+            task.activeManualStartedAt == startedAt
     } else {
         task.status == AutomationStatus.RUNNING && task.lastRunAt == startedAt
     })
