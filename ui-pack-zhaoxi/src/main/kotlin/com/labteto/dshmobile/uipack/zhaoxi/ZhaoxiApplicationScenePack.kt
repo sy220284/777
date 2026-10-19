@@ -439,7 +439,7 @@ class ZhaoxiApplicationScenePack(
                 ZhaoxiDiaryHubScene(gallery, scope, onOpenDiary = { galleryId ->
                     targets.galleryId = galleryId
                     scope.onNavigate(UiSceneId("chat.diary"))
-                })
+                }, diary = sec?.diary)
             } ?: ZxEmpty("人物目录暂不可用", "请从人物图集重新进入",
                 actionLabel = "返回", onAction = { scope.onBack() })
             "chat.gallery_profile", "chat.persona_editor", "chat.world_book",
