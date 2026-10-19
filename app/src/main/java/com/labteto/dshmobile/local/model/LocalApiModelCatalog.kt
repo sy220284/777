@@ -73,7 +73,7 @@ internal class LocalApiModelCatalog @Inject constructor(private val http: OkHttp
                     val page = withCancellableHttpResponse(client.newCall(request)) { response ->
                         check(response.isSuccessful) {
                             if (response.code == 401 && LocalMiniMaxPolicy.isOfficial(baseUrl)) {
-                                LocalMiniMaxPolicy.authenticationFailureHint(baseUrl)
+                                LocalMiniMaxPolicy.authenticationFailureHint()
                             } else {
                                 "模型目录查询失败（HTTP ${response.code}）；请检查密钥、地址或服务商是否支持 /models"
                             }
