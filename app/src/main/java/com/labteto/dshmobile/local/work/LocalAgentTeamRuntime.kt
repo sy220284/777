@@ -412,6 +412,23 @@ internal class LocalAgentTeamRuntime(
         )
     }
 
+    /** Preserve the existing event-sourced reassign transition and revision check. */
+    internal fun reassignUiTask(
+        sessionId: String, taskId: String, expectedRevision: Int, newMemberId: String?,
+    ): String = synchronized(commandLock) {
+        synchronizeTeamRuntime(sessionId)
+        val assigneeName = newMemberId?.let { memberId ->
+            project(sessionId).members.singleOrNull {
+                it.id == memberId && it.phase == LocalTeamMemberPhase.ACTIVE
+            }?.name ?: error("TEAM_MEMBER_NOT_FOUND：目标负责人已退出或不可用")
+        }
+        updateTask(
+            sessionId = sessionId, id = taskId, expectedRevision = expectedRevision,
+            action = "reassign", resultId = null, ownerName = assigneeName,
+            subject = null, description = null, blockedBy = null, writeScopes = null,
+        )
+    }
+
     internal fun outputForUi(sessionId: String, memberId: String, expectedJobId: String): String = synchronized(commandLock) {
         val member = project(sessionId).members.singleOrNull { it.id == memberId && it.jobId == expectedJobId }
             ?: error("TEAM_MEMBER_EXPIRED：助手执行身份已改变")
