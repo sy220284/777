@@ -147,19 +147,25 @@ fun ZhaoxiUsageLogScene(
     val source = remember(usage, revision) { usage.snapshot() }
     var selectedModel by rememberSaveable(initialModel) { mutableStateOf(initialModel) }
     var timeWindowDays by rememberSaveable { mutableIntStateOf(0) }
-    var visibleLimit by rememberSaveable { mutableIntStateOf(25) }
-    val nowMillis = remember(revision) { System.currentTimeMillis() }
-    val selectedRecords = zxUsageWindowRecords(
-        (selectedModel?.let { source.byModel[it] ?: TokenUsageAnalyticsSnapshot() } ?: source).recentRecords,
-        nowMillis, timeWindowDays,
-    )
+    var pageCursors by remember(selectedModel, timeWindowDays) {
+        mutableStateOf(listOf<String?>(null))
+    }
+    val currentCursor = pageCursors.last()
+    val since = remember(timeWindowDays, revision) {
+        if (timeWindowDays == 0) null else
+            System.currentTimeMillis() - timeWindowDays * 86_400_000L
+    }
+    val page by produceState<UiUsageHistoryPage?>(
+        initialValue = null, usage, revision, selectedModel, since, currentCursor) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            usage.historyPage(selectedModel, since, currentCursor, 25)
+        }
+    }
     ZxPage("用量日志", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("模型筛选")
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ZxChip("全部", selectedModel == null) { selectedModel = null }
             source.byModel.keys.sorted().forEach { model ->
                 ZxChip(model, selectedModel == model) { selectedModel = model }
@@ -170,24 +176,32 @@ fun ZhaoxiUsageLogScene(
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(0 to "所有已保留", 1 to "近 24 小时", 7 to "近 7 天", 30 to "近 30 天")
                 .forEach { (days, label) ->
-                    ZxChip(label, days == timeWindowDays) { timeWindowDays = days; visibleLimit = 25 }
+                    ZxChip(label, days == timeWindowDays) { timeWindowDays = days }
                 }
         }
-        ZxSection("请求记录 · ${selectedRecords.size}")
-        ZxFooterNote("以下仅包含本机 Owner 保留的最近请求，早期明细可能已经不可用。")
-        if (selectedRecords.isEmpty()) ZxEmpty("所选条件没有请求记录", "可以调整模型或时间范围")
-        selectedRecords.take(visibleLimit).forEach { record ->
+        val records = page?.records.orEmpty()
+        ZxSection("请求记录 · 共 ${page?.totalMatching ?: 0} 条")
+        ZxFooterNote("从本地 SQLite 已保留的请求记录逐页读取。超过数据库留存期限的明细无法恢复，累计统计不受影响。")
+        if (page == null) ZxFooterNote("正在读取历史用量…")
+        else if (records.isEmpty()) ZxEmpty("所选条件没有请求记录", "可以调整模型或时间范围")
+        records.forEach { record ->
             ZxRow(record.model,
                 "${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(record.timestamp))} · ${record.context.action.name} · ${record.totalTokens} Token · ¥${"%.4f".format(record.estimatedCostCny)}" +
                     if (record.reported) "" else " · 用量未完整上报",
                 onClick = { openRequest(record.requestId) })
         }
-        if (selectedRecords.size > visibleLimit)
-            ZxButton("显示更多本地记录", { visibleLimit += 25 },
-                variant = com.labteto.dshmobile.uipack.zhaoxi.components.ZxButtonVariant.Outline)
-        if (source.tracked.unreportedRequestCount > 0) {
-            ZxFooterNote("部分请求未上报准确用量，费用仅是估算值。")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (pageCursors.size > 1) ZxButton("上一页", {
+                pageCursors = pageCursors.dropLast(1)
+            }, variant = ZxButtonVariant.Outline)
+            page?.nextCursor?.let { next ->
+                ZxButton("查看更早记录", { pageCursors = pageCursors + next },
+                    variant = ZxButtonVariant.Outline)
+            }
         }
+        if (page != null) ZxFooterNote("第 ${pageCursors.size} 页 · 每页最多 25 条")
+        if (source.tracked.unreportedRequestCount > 0)
+            ZxFooterNote("部分请求未上报准确用量，费用仅是估算值。")
     }
 }
 
