@@ -7,15 +7,19 @@ internal suspend fun executeWebhookRun(
     update: (status: WebhookRunStatus, result: String?, error: String?) -> Unit,
     run: suspend () -> String,
 ) {
-    try {
-        update(WebhookRunStatus.RUNNING, null, null)
-        update(WebhookRunStatus.COMPLETED, run(), null)
+    update(WebhookRunStatus.RUNNING, null, null)
+    val output = try {
+        run()
     } catch (cancelled: CancellationException) {
         update(WebhookRunStatus.CANCELLED, null, "Webhook 服务已停止")
         throw cancelled
     } catch (error: Exception) {
         update(WebhookRunStatus.FAILED, null, error.message ?: error::class.java.simpleName)
+        return
     }
+    // This is outside the execution catch: receipt persistence is not the run's outcome.
+    // A successful side effect must never be rewritten to FAILED if its receipt fails.
+    update(WebhookRunStatus.COMPLETED, output, null)
 }
 
 
