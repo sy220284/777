@@ -37,7 +37,7 @@ internal class LocalPendingSessionRegistry @Inject constructor(
     }
 
     fun latestFor(mode: LocalUsageMode): String? = synchronized(lock) {
-        read().lastOrNull { it.mode == mode }?.id
+        localPendingModeTarget(mode, read().associate { it.id to it.mode })
     }
 
     fun remember(id: String, mode: LocalUsageMode) = synchronized(lock) {
@@ -55,3 +55,9 @@ internal class LocalPendingSessionRegistry @Inject constructor(
         }
     }
 }
+
+/** Mode tabs resume a pending editor; the persisted conversation catalog is never a fallback. */
+internal fun localPendingModeTarget(
+    mode: LocalUsageMode,
+    editors: Map<String, LocalUsageMode>,
+): String? = editors.entries.lastOrNull { it.value == mode }?.key
