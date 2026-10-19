@@ -247,8 +247,26 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
             if (secondary?.currentPersona != null)
                 ZxNavRow("当前人物采样") { scope.onNavigate(UiSceneId("chat.character_tuning")) }
             if (ports.groups != null) {
-                ZxNavRow("群成员") { scope.onNavigate(UiSceneId("chat.group_members")) }
-                ZxNavRow("群公告") { scope.onNavigate(UiSceneId("chat.group_announcement")) }
+                val group by ports.groups.snapshots.collectAsState(initial = ports.groups.snapshot())
+                ZxNavRow(if (group.active) "管理群成员" else "创建群聊", sub = "从人物列表选择 2–6 人") {
+                    scope.onNavigate(UiSceneId("chat.group_members"))
+                }
+                if (group.active) {
+                    ZxNavRow("群公告") { scope.onNavigate(UiSceneId("chat.group_announcement")) }
+                    secondary?.sessions?.let { sessions ->
+                        ZxNavRow("退出当前群聊", sub = "原群聊保留；另开一个空白单聊") {
+                            val current = sessions.snapshot()
+                            if (current.loading) feedback = "正在切换会话，请稍后再试"
+                            else {
+                                val result = sessions.submit(SessionUiCommand.Create(current.identity,
+                                    com.labteto.dshmobile.local.session.LocalConversationMode.INDEPENDENT,
+                                    LocalUsageMode.CHAT))
+                                receipt = result
+                                if (result.admitted()) scope.onNavigate(UiSceneId("conversation.chat"))
+                            }
+                        }
+                    }
+                }
             }
             if (ports.replySuggestions != null || secondary?.replySuggestions != null)
                 ZxNavRow("回复建议") { scope.onNavigate(UiSceneId("chat.reply_suggestions")) }
