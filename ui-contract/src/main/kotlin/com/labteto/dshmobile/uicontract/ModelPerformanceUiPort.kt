@@ -40,5 +40,7 @@ data class UiConversationReasoningOptions(
 interface ConversationReasoningUiPort {
     fun options(sessionId: String, workMode: Boolean,
         profile: com.labteto.dshmobile.local.model.LocalModelProfile?): UiConversationReasoningOptions
-    fun select(sessionId: String, mode: UiConversationReasoningMode): Boolean
+    fun select(sessionId: String, workMode: Boolean,
+        profile: com.labteto.dshmobile.local.model.LocalModelProfile?,
+        mode: UiConversationReasoningMode): Boolean
 }
