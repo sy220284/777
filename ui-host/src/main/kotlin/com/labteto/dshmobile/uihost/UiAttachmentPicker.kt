@@ -2,6 +2,9 @@ package com.labteto.dshmobile.uihost
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import java.io.File
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -67,6 +70,75 @@ fun <T> rememberUiAttachmentPickerFor(
                 gate.failToLaunch(ticket)
                 lease.finish()
                 latestRejected(failure.javaClass.simpleName)
+            }
+        }
+    }
+}
+
+/**
+ * Host-owned camera launch. A source session ticket and platform lease stop a
+ * late camera result from silently being imported into another chat.
+ * The caller must delete the temporary file after the attachment Owner has
+ * finished reading it.
+ */
+@Composable
+fun <T> rememberUiCameraCaptureFor(
+    onRejected: (String) -> Unit = {},
+    onSelected: (T, String, () -> Unit) -> Unit,
+): (T) -> Unit {
+    val context = LocalContext.current
+    val owner = LocalUiHostSystemOperationOwner.current
+        ?: remember { UiHostSystemOperationOwner() }
+    val latestSelected by rememberUpdatedState(onSelected)
+    val latestRejected by rememberUpdatedState(onRejected)
+    val gate = remember(owner) { UiHostDocumentOperationGate<T>() }
+    val lease = remember(owner) { UiHostSystemOperationLease(owner, UiHostPlatformAction.PICK_ATTACHMENT) }
+    var captureFile by remember { androidx.compose.runtime.mutableStateOf<File?>(null) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val ticket = gate.cancelSelection()
+        val file = captureFile
+        captureFile = null
+        lease.finish()
+        if (ticket != null && success && file != null) {
+            try {
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                latestSelected(ticket.request, uri.toString()) { file.delete() }
+            } catch (failure: Exception) {
+                file.delete()
+                latestRejected("相机照片无法读取，请重试")
+            }
+        } else {
+            file?.delete()
+            if (ticket == null) latestRejected("HOST_PICKER_STALE_RESULT")
+        }
+    }
+    DisposableEffect(gate, lease) {
+        onDispose {
+            gate.cancelSelection()
+            captureFile?.delete()
+            captureFile = null
+            lease.finish()
+        }
+    }
+    return { request ->
+        val ticket = gate.begin(request)
+        if (ticket == null) latestRejected("HOST_PLATFORM_OPERATION_BUSY")
+        else if (!lease.begin()) {
+            gate.failToLaunch(ticket)
+            latestRejected("HOST_PLATFORM_OPERATION_BUSY")
+        } else {
+            try {
+                val directory = File(context.cacheDir, "camera").apply { mkdirs() }
+                val file = File.createTempFile("zhaoxi-", ".jpg", directory)
+                captureFile = file
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                launcher.launch(uri)
+            } catch (failure: Exception) {
+                gate.failToLaunch(ticket)
+                captureFile?.delete()
+                captureFile = null
+                lease.finish()
+                latestRejected("相机无法打开，请检查可用的拍摄应用")
             }
         }
     }
