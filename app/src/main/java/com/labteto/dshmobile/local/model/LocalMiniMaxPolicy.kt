@@ -17,6 +17,13 @@ internal object LocalMiniMaxPolicy {
             setOf("api.minimaxi.com", "api.minimax.cn", "api.minimax.io")
     }.getOrDefault(false)
 
+    /** A wrong-region key can be reported as a missing Authorization header. */
+    fun authenticationFailureHint(baseUrl: String): String {
+        val host = URI(normalizeModelBaseUrl(baseUrl)).host?.lowercase()
+        val region = if (host == "api.minimax.io") "国际区" else "中国区"
+        return "MiniMax 鉴权失败（HTTP 401）：当前使用" + region + "接口。请确认密钥来自该区域的 MiniMax 开放平台，且填写的是 API 密钥；国际区为 api.minimax.io，中国区为 api.minimaxi.com。"
+    }
+
     fun requireSuccessfulResponse(root: JsonObject) {
         val status = root["base_resp"] as? JsonObject ?: return
         val code = status["status_code"]?.jsonPrimitive?.intOrNull ?: return
