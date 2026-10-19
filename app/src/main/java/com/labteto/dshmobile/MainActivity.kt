@@ -1,53 +1,103 @@
 package com.labteto.dshmobile
 
+import android.app.UiModeManager
+import android.content.Intent
+import android.graphics.drawable.ColorDrawable
+import androidx.compose.runtime.mutableStateOf
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.core.view.WindowCompat
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.lifecycleScope
+import com.labteto.dshmobile.connection.HostsStore
+import com.labteto.dshmobile.local.presentation.ChatGptSettingsController
 import com.labteto.dshmobile.notify.DshNotifications
-import com.labteto.dshmobile.ui.AppViewModel
-import com.labteto.dshmobile.ui.host.LocalApplicationFeaturePortsOwner
-import com.labteto.dshmobile.ui.host.ZhaoxiApplicationRoot
-import com.labteto.dshmobile.uicontract.HostPreferencesUiPort
-import com.labteto.dshmobile.uicontract.UiHostPreferences
+import com.labteto.dshmobile.ui.AppRoot
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** One independent E8.17 Compose entry; all domain owners and data remain in App/Feature Ports. */
-// FEATURE_TREE: {"id":"ui.zhaoxi.e817","path":"第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 朝夕 E8.17 独立界面接入（PR #740，未合并）","entry":"MainActivity","owner":"SHELL","test":"app/src/androidTest/java/com/labteto/dshmobile/ui/ZhaoxiHomeSmokeAndroidTest.kt#homeShowsInteractiveSessionAndMainRoutes"}
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
-    @Inject lateinit var notifications: DshNotifications
-    @Inject lateinit var hostPreferences: HostPreferencesUiPort
-    private val features: LocalApplicationFeaturePortsOwner by viewModels()
-    private val app: AppViewModel by viewModels()
 
+    @Inject lateinit var hostsStore: HostsStore
+    @Inject lateinit var chatGptAccounts: ChatGptSettingsController
+    @Inject lateinit var notifications: DshNotifications
+
+    private val requestedLocalSession = mutableStateOf<String?>(null)
+    private var appliedApplicationNightMode: Int? = null
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Draw the E8.18 wallpaper behind both system bars; Compose content handles safe insets.
-        enableEdgeToEdge()
+        installSplashScreen()
         super.onCreate(savedInstanceState)
+        val storedTheme = DshApplication.storedThemePreference(this)
+        val uiModeManager = getSystemService(UiModeManager::class.java)
+        appliedApplicationNightMode =
+            DshApplication.applicationNightModeFor(storedTheme, uiModeManager.nightMode)
+        requestedLocalSession.value = savedInstanceState?.getString("pending_local_session")
+            ?: notificationLocalSession(intent)
+        applyWindowBackground(storedTheme)
+        enableEdgeToEdge()
         notifications.ensureChannels()
-        setContent {
-            val appearance by hostPreferences.snapshots.collectAsState(initial = UiHostPreferences())
-            val systemDark = isSystemInDarkTheme()
-            val dark = when (appearance.theme) {
-                "dark", "matte_black" -> true
-                "light" -> false
-                else -> systemDark
+
+        // Keep runtime appearance aligned with persisted settings.
+        lifecycleScope.launch {
+            hostsStore.settings.collect { settings ->
+                applyWindowBackground(settings.themePreference)
+                applyNightMode(settings.themePreference)
             }
-            SideEffect {
-                WindowCompat.getInsetsController(window, window.decorView).apply {
-                    isAppearanceLightStatusBars = !dark
-                    isAppearanceLightNavigationBars = !dark
-                }
-            }
-            ZhaoxiApplicationRoot(features, app, hostPreferences, onAtRootBack = { finish() })
         }
+
+        setContent {
+            AppRoot(
+                requestedLocalSessionId = requestedLocalSession.value,
+                onLocalSessionRequestConsumed = {
+                    requestedLocalSession.value = null
+                    intent.removeExtra(DshNotifications.EXTRA_LOCAL_SESSION_ID)
+                },
+            )
+        }
+        // Permission is requested by an explicit user action in Settings,
+        // after an explanation, rather than interrupting first launch.
+    }
+
+    override fun onResume() {
+        super.onResume()
+        lifecycleScope.launch { chatGptAccounts.refresh() }
+    }
+
+    private fun notificationLocalSession(intent: Intent): String? =
+        intent.getStringExtra(DshNotifications.EXTRA_LOCAL_SESSION_ID)
+            ?.takeIf { it.isNotBlank() && it.length <= 256 && it.none(Char::isISOControl) }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        requestedLocalSession.value = notificationLocalSession(intent)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("pending_local_session", requestedLocalSession.value)
+        super.onSaveInstanceState(outState)
+    }
+
+    /** Persist the app-local qualifier so the platform splash uses the same day/night scheme. */
+    private fun applyNightMode(themePreference: String) {
+        val uiModeManager = getSystemService(UiModeManager::class.java)
+        val mode = DshApplication.applicationNightModeFor(themePreference, uiModeManager.nightMode)
+        if (appliedApplicationNightMode == mode) return
+        appliedApplicationNightMode = mode
+        uiModeManager.setApplicationNightMode(mode)
+    }
+
+    /** Match the post-splash window to the exact Compose canvas, including Matte black. */
+    private fun applyWindowBackground(themePreference: String?) {
+        val color = when (themePreference) {
+            "light" -> getColor(R.color.window_background_light)
+            "dark" -> getColor(R.color.window_background_dark)
+            "matte_black" -> getColor(R.color.window_background_matte_black)
+            else -> getColor(R.color.window_background)
+        }
+        window.setBackgroundDrawable(ColorDrawable(color))
     }
 }

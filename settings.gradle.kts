@@ -30,8 +30,4 @@ include(":harness-runtime-android")
 include(":harness-interop")
 include(":harness-device-android")
 
-include(":ui-contract")
-include(":ui-host")
 
-// 朝夕 E8.17 独立视觉模块；业务逻辑保留在 App Feature Owner。
-include(":ui-pack-zhaoxi")

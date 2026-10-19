@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cap_center_settings_group">能力设置</string>
+    <string name="cap_center_settings_group_hint">管理网络搜索、自动审批与智能体运行配置。</string>
+    <string name="cap_center_auto_approval">自动审批</string>
+    <string name="cap_center_auto_approval_hint">开启后会自动批准所有工具操作，包括高风险操作</string>
+    <string name="cap_center_extensions_group">技能与扩展</string>
+    <string name="cap_center_view_tools">工具清单</string>
+    <string name="cap_center_auto_approval_confirm_title">开启自动审批？</string>
+    <string name="cap_center_auto_approval_confirm_body">开启后所有工具调用都可能无需确认执行，包括文件修改、命令执行和设备操作。仅在你理解并信任当前任务时开启。</string>
+    <string name="cap_center_auto_approval_confirm_action">确认开启</string>
+</resources>
