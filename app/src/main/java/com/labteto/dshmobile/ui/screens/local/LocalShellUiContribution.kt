@@ -44,6 +44,7 @@ internal fun localShellFeatureUiContribution(
     onOpenGlobalSearch: () -> Unit,
     onOpenPersonaGallery: () -> Unit,
     onOpenWorkspaceFiles: () -> Unit,
+    onOpenNativeDocuments: () -> Unit,
 ): LocalFeatureUiContribution {
     val scope = rememberCoroutineScope()
     val surface by state.collectAsStateWithLifecycle()
@@ -68,6 +69,7 @@ internal fun localShellFeatureUiContribution(
             onOpenGlobalSearch = onOpenGlobalSearch,
             onOpenPersonaGallery = onOpenPersonaGallery,
             onOpenWorkspaceFiles = onOpenWorkspaceFiles,
+            onOpenNativeDocuments = onOpenNativeDocuments,
             activeModelProfile = activeModelProfile,
             sendFeedback = sendFeedback,
             streamingState = actions.streamingState,

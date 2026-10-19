@@ -188,6 +188,7 @@ internal class LocalConversationSurfaceArgs(
     val onOpenGlobalSearch: () -> Unit,
     val onOpenPersonaGallery: () -> Unit,
     val onOpenWorkspaceFiles: () -> Unit,
+    val onOpenNativeDocuments: () -> Unit,
     val onUseWorkCapability: ((String) -> Unit)?,
     val usageRevision: StateFlow<Long>?,
     val loadTurnSummaries: (String) -> Map<String, com.labteto.dshmobile.local.TokenUsageAggregate>,
@@ -250,6 +251,7 @@ internal fun LocalConversationSurface(
     onOpenGlobalSearch: () -> Unit = {},
     onOpenPersonaGallery: () -> Unit = {},
     onOpenWorkspaceFiles: () -> Unit = {},
+    onOpenNativeDocuments: () -> Unit = {},
     onUseWorkCapability: ((String) -> Unit)? = null,
     usageRevision: StateFlow<Long>? = null,
     loadTurnSummaries: (String) -> Map<String, com.labteto.dshmobile.local.TokenUsageAggregate> = { emptyMap() },
@@ -310,6 +312,7 @@ internal fun LocalConversationSurface(
         onOpenGlobalSearch = onOpenGlobalSearch,
         onOpenPersonaGallery = onOpenPersonaGallery,
         onOpenWorkspaceFiles = onOpenWorkspaceFiles,
+        onOpenNativeDocuments = onOpenNativeDocuments,
         onUseWorkCapability = onUseWorkCapability,
         usageRevision = usageRevision,
         loadTurnSummaries = loadTurnSummaries,
@@ -374,6 +377,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val onOpenGlobalSearch = args.onOpenGlobalSearch
     val onOpenPersonaGallery = args.onOpenPersonaGallery
     val onOpenWorkspaceFiles = args.onOpenWorkspaceFiles
+    val onOpenNativeDocuments = args.onOpenNativeDocuments
     val onUseWorkCapability = args.onUseWorkCapability
     val usageRevision = args.usageRevision
     val loadTurnSummaries = args.loadTurnSummaries
@@ -811,6 +815,12 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             }
         }
 
+        Row(Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+            horizontalArrangement = Arrangement.End) {
+            SyButton(text = "交互文档", onClick = onOpenNativeDocuments,
+                variant = SyButtonVariant.Ghost, size = SyButtonSize.Small,
+                enabled = state.sessionId.isNotBlank() && !state.loading)
+        }
         LocalModeIntroBanner(modeIntro)
 
         if (state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {

@@ -210,6 +210,7 @@ fun LocalHarnessScreen(
     var searchedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var taskEntryRequest by rememberSaveable { mutableIntStateOf(0) }
     var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var showNativeDocuments by rememberSaveable(shell.sessionId) { mutableStateOf(false) }
     var installedSkillDisplayNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var pendingWorkCapability by rememberSaveable { mutableStateOf<String?>(null) }
     var workHandoffSourceSessionId by rememberSaveable { mutableStateOf("") }
@@ -262,6 +263,28 @@ fun LocalHarnessScreen(
         if (page == LocalFeaturePage.WORKSPACE) filesEntryRequest++
         // Keep the drawer origin when opening nested feature pages.
         featureStack = localFeaturePush(featureStack, page)
+    }
+
+    val requestedDocumentRoute by viewModel.documentRoute.collectAsStateWithLifecycle()
+    LaunchedEffect(requestedDocumentRoute) {
+        val route = requestedDocumentRoute ?: return@LaunchedEffect
+        val destination = when (route) {
+            "route.home" -> LocalFeaturePage.HOME
+            "route.persona_gallery" -> LocalFeaturePage.PERSONA_GALLERY
+            "route.diary" -> LocalFeaturePage.DIARY
+            "route.workspace" -> LocalFeaturePage.WORKSPACE
+            "route.tasks" -> LocalFeaturePage.TASKS
+            "route.tools" -> LocalFeaturePage.TOOLS
+            "route.settings" -> LocalFeaturePage.SETTINGS
+            else -> error("文档请求的页面不存在: $route")
+        }
+        showNativeDocuments = false
+        if (destination == LocalFeaturePage.SETTINGS) {
+            settingsDestination = SettingsDestination.ROOT
+            settingsEntryRequest++
+        }
+        pushFeature(destination)
+        viewModel.consumeDocumentRoute(route)
     }
 
     fun prepareSettingsEntry(destination: SettingsDestination) {
@@ -541,6 +564,7 @@ fun LocalHarnessScreen(
                     pushFeature(LocalFeaturePage.PERSONA_GALLERY)
                 }
             },
+            onOpenNativeDocuments = { showNativeDocuments = true },
             onOpenWorkspaceFiles = {
                 filesMode = LocalFilesMode.WORKSPACE
                 requestedFilePath = null
@@ -1116,6 +1140,22 @@ fun LocalHarnessScreen(
                 showPersonaGallerySavePrompt = false
                 reopenDrawerWhenModalReturns(true)
             },
+        )
+    }
+
+    if (showNativeDocuments && shell.sessionId.isNotBlank()) {
+        NativeV6DocumentsSheet(
+            port = viewModel.interactiveDocuments,
+            identity = viewModel::documentIdentity,
+            currentMessageId = viewModel::activeDocumentMessageId,
+            workMode = shell.usageMode == LocalUsageMode.WORK,
+            onPreparedDraft = {
+                viewModel.consumePreparedDocumentDraft(shell.sessionId)?.let { text ->
+                    composerHandoff = listOf(shell.sessionId, text)
+                }
+                showNativeDocuments = false
+            },
+            onDismiss = { showNativeDocuments = false },
         )
     }
 

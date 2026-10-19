@@ -46,6 +46,8 @@ class LocalHarnessViewModel @Inject constructor(
     private val toolsUi: LocalToolsUiFacade,
     private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
     private val teamUi: com.labteto.dshmobile.uicontract.WorkTeamUiPort,
+    private val documentFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
+    private val conversationPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val approvalPreferences: LocalApprovalPreferences,
     private val networkSearchSettings: LocalNetworkSearchSettings,
     @ApplicationContext private val appContext: Context,
@@ -88,6 +90,26 @@ class LocalHarnessViewModel @Inject constructor(
         mcpToolsAvailable = mcpToolsAvailable, pluginsInstalled = pluginsInstalled,
         accessibilityActive = accessibilityActive, notificationAccessActive = notificationAccessActive,
     )
+
+    private val nativeDocumentDrafts = NativeV6DocumentDraftPort()
+    private val _documentRoute = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    internal val documentRoute: kotlinx.coroutines.flow.StateFlow<String?> = _documentRoute
+    private val documentSceneNames = setOf("route.home", "route.persona_gallery", "route.diary",
+        "route.workspace", "route.tasks", "route.tools", "route.settings")
+    internal val interactiveDocuments = documentFactory.create(
+        viewModelScope, nativeDocumentDrafts,
+        documentSceneNames.map { com.labteto.dshmobile.uicontract.UiSceneId(it) }.toSet(),
+    ) { scene -> _documentRoute.value = scene.value }
+    internal fun documentIdentity() = conversationPorts.identitySnapshot()
+    internal fun activeDocumentMessageId(): String? = state.value.messages.lastOrNull()?.id
+    internal fun consumeDocumentRoute(route: String) {
+        if (_documentRoute.value == route) _documentRoute.value = null
+    }
+    internal fun consumePreparedDocumentDraft(sessionId: String): String? {
+        val text = nativeDocumentDrafts.drafts.value[sessionId]?.takeIf(String::isNotBlank)
+        nativeDocumentDrafts.updateDraft(sessionId, "")
+        return text
+    }
 
     val approvalMode = approvalPreferences.approvalMode
     val networkSearchEnabled = networkSearchSettings.enabled
