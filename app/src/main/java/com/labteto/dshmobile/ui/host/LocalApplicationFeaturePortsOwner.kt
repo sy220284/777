@@ -30,7 +30,6 @@ internal class LocalApplicationFeaturePortsOwner @Inject constructor(
     private val businessSessions: SessionUiPort,
     private val toolsFacade: LocalToolsUiFacade,
     @ApplicationContext private val context: Context,
-    val workEvidenceUiPort: com.labteto.dshmobile.uicontract.WorkEvidenceUiPort,
     val workTeamUiPort: com.labteto.dshmobile.uicontract.WorkTeamUiPort,
     val workReadUiPort: com.labteto.dshmobile.uicontract.WorkReadUiPort,
     val filesUiPort: com.labteto.dshmobile.uicontract.FilesUiPort,
