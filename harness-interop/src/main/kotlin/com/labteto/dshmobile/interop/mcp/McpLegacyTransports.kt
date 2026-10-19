@@ -50,6 +50,8 @@ class McpLegacyStreamableHttpTransport(
     private val clientCapabilities: JsonObject = JsonObject(emptyMap()),
 ) : McpTransport {
     private val ids = AtomicLong(1L)
+    private val nonReplayHttp = http.newBuilder().retryOnConnectionFailure(false)
+        .followRedirects(false).followSslRedirects(false).build()
     private val mutex = Mutex()
     private var initialized = false
     private var sessionId: String? = null
@@ -138,7 +140,7 @@ class McpLegacyStreamableHttpTransport(
         if (includeProtocol) builder.header("MCP-Protocol-Version", LEGACY_MCP_PROTOCOL_VERSION)
         sessionId?.let { builder.header("Mcp-Session-Id", it) }
 
-        http.newCall(builder.build()).executeCancellable { response ->
+        nonReplayHttp.newCall(builder.build()).executeCancellable { response ->
             if (!response.isSuccessful) throw McpHttpException(response.code, response.readMcpBodyBounded())
             if (notification || response.code == 202) {
                 return@executeCancellable LegacyHttpResponse(
@@ -173,6 +175,8 @@ class McpLegacyHttpSseTransport(
     private val clientVersion: String = "1",
 ) : McpTransport, McpTerminationSource {
     private val ids = AtomicLong(1L)
+    private val nonReplayHttp = http.newBuilder().retryOnConnectionFailure(false)
+        .followRedirects(false).followSslRedirects(false).build()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutableTerminalEvents = MutableSharedFlow<Throwable>(replay = 1)
     override val terminalEvents: Flow<Throwable> = mutableTerminalEvents.asSharedFlow()
@@ -298,7 +302,7 @@ class McpLegacyHttpSseTransport(
             )
             .header("Content-Type", "application/json")
             .build()
-        http.newCall(request).executeCancellable { response ->
+        nonReplayHttp.newCall(request).executeCancellable { response ->
             val body = response.readMcpBodyBounded()
             if (!response.isSuccessful) throw McpHttpException(response.code, body)
             if (

@@ -26,6 +26,8 @@ internal fun localShellFeatureUiContribution(
     sendFeedback: LocalSendFeedbackState,
     gallery: List<PersonaGalleryEntry>,
     transcriptHistory: LocalTranscriptHistoryState,
+    transcriptJumpTarget: LocalTranscriptJumpTarget?,
+    onTranscriptJumpConsumed: (LocalTranscriptJumpTarget) -> Unit,
     modeIntro: LocalModeIntro?,
     pinnedSessionIds: Set<String>,
     sessionTitleOverrides: Map<String, String>,
@@ -77,6 +79,8 @@ internal fun localShellFeatureUiContribution(
             streamingState = actions.streamingState,
             gallery = gallery,
             transcriptHistory = transcriptHistory,
+            transcriptJumpTarget = transcriptJumpTarget,
+            onTranscriptJumpConsumed = onTranscriptJumpConsumed,
             modeIntro = modeIntro,
             onConfigure = {
                 onSettingsDestinationChange(SettingsDestination.ROOT)

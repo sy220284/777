@@ -18,6 +18,8 @@ import kotlinx.serialization.json.Json
 enum class WebhookRunStatus(val wireValue: String) {
     QUEUED("queued"),
     RUNNING("running"),
+    /** Previous process ended without a trustworthy result; remote side effects may have happened. */
+    INTERRUPTED("interrupted"),
     COMPLETED("completed"),
     CANCELLED("cancelled"),
     FAILED("failed");
@@ -75,7 +77,7 @@ class WebhookResultStore @Inject constructor(
                 result.requestId,
                 json.encodeToString(WebhookRunResult.serializer(), result),
             )
-            .apply()
+            .commit().also { check(it) { "Webhook 回执持久化失败" } }
         cleanup()
     }
 
@@ -95,6 +97,30 @@ class WebhookResultStore @Inject constructor(
                 error = error?.take(MAX_ERROR_CHARS),
             ),
         )
+    }
+
+    /** Reconcile nonterminal receipts once at service process start; never replay side effects. */
+    @Synchronized
+    fun settleInterruptedFromPreviousProcess(): Int {
+        val interrupted = preferences.all.mapNotNull { (id, raw) ->
+            val previous = (raw as? String)?.let { encoded ->
+                runCatching { json.decodeFromString(WebhookRunResult.serializer(), encoded) }.getOrNull()
+            } ?: return@mapNotNull null
+            if (previous.status != WebhookRunStatus.QUEUED &&
+                previous.status != WebhookRunStatus.RUNNING) return@mapNotNull null
+            id to previous.copy(
+                status = WebhookRunStatus.INTERRUPTED,
+                updatedAt = System.currentTimeMillis(),
+                error = "Webhook 运行被进程中断，副作用结果未知，请核查后决定是否重试",
+            )
+        }
+        if (interrupted.isEmpty()) return 0
+        check(preferences.edit().apply {
+            interrupted.forEach { (id, result) ->
+                putString(id, json.encodeToString(WebhookRunResult.serializer(), result))
+            }
+        }.commit()) { "Webhook 中断回执持久化失败" }
+        return interrupted.size
     }
 
     private fun cleanup() {

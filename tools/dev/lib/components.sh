@@ -60,8 +60,11 @@ component_ready() {
       [ "$gradle_version" = "$GRADLE_VERSION" ]
       ;;
     gradle-deps)
-      [ -d "$GRADLE_USER_HOME/caches/modules-2" ] &&
-        [ -d "$GRADLE_USER_HOME/wrapper/dists" ]
+      # An empty cache directory is not a usable offline dependency cache.
+      [ -d "$GRADLE_USER_HOME/caches/modules-2/files-2.1" ] &&
+        [ -n "$(find "$GRADLE_USER_HOME/caches/modules-2/files-2.1" -mindepth 1 -maxdepth 1 -print -quit)" ] &&
+        [ -d "$GRADLE_USER_HOME/wrapper/dists" ] &&
+        [ -n "$(find "$GRADLE_USER_HOME/wrapper/dists" -name gradle -type f -print -quit)" ]
       ;;
     runtime-cache)
       [ -n "${DEV777_REPO_ROOT:-}" ] || return 1

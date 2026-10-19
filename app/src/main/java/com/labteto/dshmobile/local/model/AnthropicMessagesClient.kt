@@ -42,6 +42,9 @@ internal class AnthropicMessagesClient @Inject constructor(
         .writeTimeout(WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         // Keep idle read timeout, but do not cut off a healthy long-lived model stream.
         .callTimeout(0, TimeUnit.SECONDS)
+        // Never forward model credentials through implicit redirects.
+        .followRedirects(false)
+        .followSslRedirects(false)
         .build()
 
     suspend fun complete(

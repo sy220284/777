@@ -233,7 +233,7 @@ internal fun CharacterDiaryScreen(
     loadEntries: suspend (String) -> List<ChatDiaryEntry>,
     onCorrectEntry: suspend (String, String, Long, ChatDiaryDelta) -> Boolean,
     onDeactivateEntry: suspend (String, String, Long) -> Boolean,
-    onOpenSourceSession: (String) -> Boolean,
+    onOpenSourceSession: (String, String) -> Boolean,
     onDismiss: () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
@@ -472,8 +472,8 @@ internal fun CharacterDiaryScreen(
                                 deactivatingEntry = entry
                                 mutationError = false
                             },
-                            onOpenSource = { sessionId ->
-                                if (onOpenSourceSession(sessionId)) {
+                            onOpenSource = { sessionId, messageId ->
+                                if (onOpenSourceSession(sessionId, messageId)) {
                                     sourceError = false
                                 } else {
                                     sourceError = true
@@ -619,7 +619,7 @@ private fun CharacterDiaryDayCard(
     onToggle: () -> Unit,
     onEdit: (ChatDiaryEntry) -> Unit,
     onDeactivate: (ChatDiaryEntry) -> Unit,
-    onOpenSource: (String) -> Unit,
+    onOpenSource: (String, String) -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val dateText = remember(day.dayStart) {
@@ -706,7 +706,8 @@ private fun CharacterDiaryDayCard(
                             entry.sources.lastOrNull()?.takeIf { it.sessionId.isNotBlank() }?.let { source ->
                                 SyButton(
                                     text = stringResource(R.string.chat_diary_open_source),
-                                    onClick = { onOpenSource(source.sessionId) },
+                                    onClick = { onOpenSource(source.sessionId,
+                                        source.assistantMessageId.ifBlank { source.userMessageId }) },
                                     variant = SyButtonVariant.Ghost,
                                     modifier = Modifier.testTag("diary_source_" + entry.id),
                                 )

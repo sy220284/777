@@ -112,16 +112,14 @@ class LocalConversationUiPortComposition @Inject internal constructor(
             val state = stateStore.state.value
             val active = state.usageMode == LocalUsageMode.WORK
             val approval = if (active && state.sessionId.isNotBlank() && !state.loading && !stateStore.sessionTransitioning)
-                approvalOwner.pendingApproval()?.takeIf {
-                it.requestId == state.work.pendingApproval?.requestId
-            } else null
+                approvalOwner.pendingApproval() else null
             val question = if (active && !state.loading && !stateStore.sessionTransitioning)
-                approvalOwner.pendingQuestion()?.takeIf { it.requestId == state.work.pendingQuestion?.requestId } else null
+                approvalOwner.pendingQuestion() else null
             WorkConversationSceneSnapshot(
                 identity = identity(state).takeIf { active },
                 status = if (active) status(state) else UiSceneStatus.EMPTY,
                 phase = when {
-                    active && (approval != null || state.work.pendingQuestion != null) -> UiExecutionPhase.WAITING_FOR_USER
+                    active && (approval != null || question != null) -> UiExecutionPhase.WAITING_FOR_USER
                     active && state.kernel.running -> UiExecutionPhase.RUNNING
                     else -> UiExecutionPhase.IDLE
                 },

@@ -125,8 +125,26 @@ class HarnessAutomationWorker(
             (!manualRun && !mayStartScheduledAutomation(task, requestedGeneration))
         ) return Result.success()
 
-        val recovering = !manualRun && task.status == AutomationStatus.RUNNING && task.lastRunAt != null
-        val started = if (recovering) task.lastRunAt!! else System.currentTimeMillis()
+        // Manual WorkManager re-entry must reconcile the SAME durable execution, not send it again.
+        val recovering = if (manualRun) task.activeManualStartedAt != null
+            else task.status == AutomationStatus.RUNNING && task.lastRunAt != null
+        val started = when {
+            manualRun && recovering -> requireNotNull(task.activeManualStartedAt)
+            !manualRun && recovering -> requireNotNull(task.lastRunAt)
+            else -> System.currentTimeMillis()
+        }
+        if (manualRun && !recovering) {
+            // Mark admission before session creation or any external side effect. This remains
+            // durable across Worker and process recreation for the same exact manual request.
+            task = store.updateIf(
+                id,
+                predicate = {
+                    it.scheduleGeneration == requestedGeneration &&
+                        it.activeManualRunId == manualExecutionId &&
+                        it.activeManualStartedAt == null
+                },
+            ) { it.copy(activeManualStartedAt = started) } ?: return Result.success()
+        }
         if (!manualRun) {
             task = store.updateIf(
                 id,

@@ -136,7 +136,7 @@ class LocalSessionStorageManagerTest {
     @Test
     fun stagedZipRestoreOnlyBecomesVisibleOnNextBoot() {
         val source = temporary.newFolder("restore-source")
-        File(source, "a.json").writeText("{\"v\":1}")
+        File(source, "a.json").writeText("{\"id\":\"a\",\"title\":\"恢复会话\"}")
         File(source, "a.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
         val output = ByteArrayOutputStream()
         manager(source).exportAll(output)
@@ -147,7 +147,8 @@ class LocalSessionStorageManagerTest {
         assertFalse(File(target, "a.events.jsonl").exists())
         assertEquals(2, manager(target).applyPendingRestore())
         assertEquals("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n", File(target, "a.events.jsonl").readText())
-        assertEquals("{\"v\":1}", File(target, "a.json").readText())
+        assertEquals("{\"id\":\"a\",\"title\":\"恢复会话\"}", File(target, "a.json").readText())
+        assertTrue(com.labteto.dshmobile.harness.session.VersionedSessionStore(target, json).ids().contains("a"))
         assertEquals(0, manager(target).applyPendingRestore())
     }
 
@@ -156,6 +157,8 @@ class LocalSessionStorageManagerTest {
         val source = temporary.newFolder("restore-multi-source")
         File(source, "a.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
         File(source, "b.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
+        File(source, "a.json").writeText("{\"id\":\"a\",\"title\":\"已有会话\"}")
+        File(source, "b.json").writeText("{\"id\":\"b\",\"title\":\"新会话\"}")
         val output = ByteArrayOutputStream()
         manager(source).exportAll(output)
 
@@ -163,16 +166,17 @@ class LocalSessionStorageManagerTest {
         File(target, "a.events.jsonl").writeText("live-events")
         val store = manager(target)
         assertEquals(1, store.stageRestore(output.toByteArray()))
-        assertEquals(1, store.applyPendingRestore())
+        assertEquals(2, store.applyPendingRestore())
         assertEquals("live-events", File(target, "a.events.jsonl").readText())
         assertEquals("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n", File(target, "b.events.jsonl").readText())
+        assertTrue(com.labteto.dshmobile.harness.session.VersionedSessionStore(target, json).ids().contains("b"))
     }
 
     @Test
     fun recoveryCanResumeAfterOneFileWasAlreadyCopied() {
         val source = temporary.newFolder("restore-resume-source")
         File(source, "c.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
-        File(source, "c.json").writeText("{\"id\":\"c\"}")
+        File(source, "c.json").writeText("{\"id\":\"c\",\"title\":\"中断恢复\"}")
         val output = ByteArrayOutputStream()
         manager(source).exportAll(output)
         val target = temporary.newFolder("restore-resume-target")
@@ -181,7 +185,8 @@ class LocalSessionStorageManagerTest {
         // Simulate a crash after the first completed copy and before deleting the staging area.
         File(target, "c.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
         assertEquals(2, store.applyPendingRestore())
-        assertEquals("{\"id\":\"c\"}", File(target, "c.json").readText())
+        assertEquals("{\"id\":\"c\",\"title\":\"中断恢复\"}", File(target, "c.json").readText())
+        assertTrue(com.labteto.dshmobile.harness.session.VersionedSessionStore(target, json).ids().contains("c"))
     }
 
     @Test

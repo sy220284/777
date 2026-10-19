@@ -55,7 +55,9 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.shenyan.designsystem.foundation.LocalSyColors
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * V6-native rendering of durable interactive documents. The Session/Work Owner performs
@@ -86,7 +88,7 @@ internal fun NativeV6DocumentsSheet(
         busy = true
         scope.launch {
             try {
-                val receipt = block()
+                val receipt = withContext(Dispatchers.IO) { block() }
                 notice = when (receipt) {
                     UiDocumentReceipt.DraftPrepared -> {
                         onPreparedDraft()

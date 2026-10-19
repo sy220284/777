@@ -60,6 +60,8 @@ FIXTURE_PROVENANCE_PATHS = {
     "tools/reference-validation/package-lock.json",
 }
 FIXTURE_PROVENANCE_PREFIXES = (
+    "reference-validation/src/test/resources/official/",
+    "reference-validation/src/test/resources/vectors/",
     "reference-validation/src/test/resources/official-semantic/",
 )
 

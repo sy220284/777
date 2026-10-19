@@ -270,6 +270,13 @@ class HarnessWebhookService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onCreate() {
+        super.onCreate()
+        // This service instance owns a new execution scope. Previous-process receipts cannot
+        // resume themselves and must never remain indefinitely RUNNING/QUEUED.
+        resultStore.settleInterruptedFromPreviousProcess()
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val persisted = controller.runtimeConfig()
         val promoted = runCatching { ensureForeground() }

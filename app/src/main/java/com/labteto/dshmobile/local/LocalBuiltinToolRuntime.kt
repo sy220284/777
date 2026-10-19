@@ -120,7 +120,16 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
             require(allowMutation) { "该子任务处于只读模式" }
             return LocalShellTool.executeResult(call.arguments, workspace, jobs, executionSessionId)
         }
-        return com.labteto.dshmobile.harness.tools.ToolResult(execute(call, allowMutation, executionSessionId))
+        val output = execute(call, allowMutation, executionSessionId)
+        if (call.name == "apply_patch") {
+            val code = when {
+                output.startsWith("[apply_patch][CHECK_FAILED]") -> "PATCH_CHECK_FAILED"
+                output.startsWith("[apply_patch][APPLY_FAILED]") -> "PATCH_APPLY_FAILED"
+                else -> null
+            }
+            if (code != null) return com.labteto.dshmobile.harness.tools.ToolResult(output, isError = true, errorCode = code)
+        }
+        return com.labteto.dshmobile.harness.tools.ToolResult(output)
     }
 
     internal suspend fun execute(

@@ -20,7 +20,7 @@ internal fun localChatFeatureUiContribution(
     onNewPersona: () -> Unit,
     onPopFeature: () -> Unit,
     sessions: List<LocalSessionSummary>,
-    onSwitchSession: (String) -> Boolean,
+    onSwitchSession: (String, String) -> Boolean,
     onSwitchSessionFromDrawer: (String) -> Boolean,
     onOpenGroupSetup: () -> Unit,
     onPromptPersonaSave: () -> Unit,
@@ -67,8 +67,8 @@ internal fun localChatFeatureUiContribution(
                 loadEntries = actions.diaryEntries,
                 onCorrectEntry = actions.correctDiaryEntry,
                 onDeactivateEntry = actions.deactivateDiaryEntry,
-                onOpenSourceSession = { sessionId ->
-                    onSwitchSession(sessionId)
+                onOpenSourceSession = { sessionId, messageId ->
+                    onSwitchSession(sessionId, messageId)
                 },
                 onDismiss = onPopFeature,
             )

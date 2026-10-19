@@ -204,6 +204,8 @@ fun LocalHarnessScreen(
     var settingsEntryRequest by rememberSaveable { mutableIntStateOf(0) }
     var memorySourceSessionId by rememberSaveable { mutableStateOf<String?>(null) }
     var memorySourceMessageId by rememberSaveable { mutableStateOf<String?>(null) }
+    var diarySourceSessionId by rememberSaveable { mutableStateOf("") }
+    var diarySourceMessageId by rememberSaveable { mutableStateOf("") }
     var drawerGalleryTargetId by rememberSaveable { mutableStateOf<String?>(null) }
     var drawerGalleryEntryVersion by rememberSaveable { mutableIntStateOf(0) }
     var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
@@ -328,11 +330,16 @@ fun LocalHarnessScreen(
     fun switchToSessionAndShowConversation(
         sessionId: String,
         fromDrawer: Boolean = false,
+        sourceMessageId: String = "",
     ): Boolean {
         // Selecting a concrete conversation always navigates to that conversation.
         drawerModeSwitchTarget = null
         val accepted = viewModel.switchSession(sessionId)
-        if (accepted) conversationOpenedFromDrawer = fromDrawer
+        if (accepted) {
+            conversationOpenedFromDrawer = fromDrawer
+            diarySourceSessionId = if (sourceMessageId.isNotBlank()) sessionId else ""
+            diarySourceMessageId = sourceMessageId
+        }
         if (accepted && sessionId == shell.sessionId) {
             // Tapping the current conversation must return to its conversation surface.
             resetFeatureNavigation()
@@ -533,6 +540,15 @@ fun LocalHarnessScreen(
             sendFeedback = sendFeedback,
             gallery = gallery,
             transcriptHistory = transcriptHistory,
+            transcriptJumpTarget = diarySourceMessageId.takeIf(String::isNotBlank)?.let { messageId ->
+                LocalTranscriptJumpTarget(diarySourceSessionId, messageId)
+            },
+            onTranscriptJumpConsumed = { target ->
+                if (diarySourceSessionId == target.sessionId && diarySourceMessageId == target.messageId) {
+                    diarySourceSessionId = ""
+                    diarySourceMessageId = ""
+                }
+            },
             modeIntro = modeIntro?.let(::LocalModeIntro),
             pinnedSessionIds = pinnedSessionIds,
             sessionTitleOverrides = sessionTitleOverrides,
@@ -592,7 +608,9 @@ fun LocalHarnessScreen(
             onNewPersona = { showNewPersona = true },
             onPopFeature = ::popFeature,
             sessions = shell.sessions,
-            onSwitchSession = { switchToSessionAndShowConversation(it) },
+            onSwitchSession = { sessionId, messageId ->
+                switchToSessionAndShowConversation(sessionId, sourceMessageId = messageId)
+            },
             onSwitchSessionFromDrawer = { switchToSessionAndShowConversation(it, fromDrawer = true) },
             onOpenGroupSetup = {
                 groupSetupOpenedFromDrawer = true

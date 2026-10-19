@@ -370,7 +370,7 @@ Feature UI
 
 各 Feature 自己贡献页面渲染、Back ownership、Drawer 入口和恢复策略，Shell 只按 `LocalFeatureCatalog` 与 contribution 契约执行导航。
 
-UI 3.0-R4 的当前代码边界与未签收动作见 [实施台账](UI-3.0-IMPLEMENTATION.zh-CN.md) 和 [正式任务清单](design/ui3/R4-CODE-TASKS.json)。合并 #705 后，生产 `AppRoot` 通过 `LocalApplicationUiHost` 装配唯一 `LocalV6StandaloneViewModel.pack(...)`，仅按实际 Feature Port 能力准入；旧 V6 Shell/contribution 不再是 `AppRoot` 的并行兜底入口。业务读写、会话身份及副作用仍由原 Feature/Shared Owner 持有。此结论只证明当前独立 V6 单包的生产装配，**不等于多 UI 包切换已交付或 173 项动作完成端到端验收**；未来 UI 包的视觉规范不能反向渗透共享契约。
+#766 恢复 V6.3 原生界面后，生产 `AppRoot` 通过 `LocalHarnessScreen` 与 `LocalFeatureCatalog` 的 Feature contributions 装配页面。朝夕 UI 及 UI 3.0 可插拔 Host 已退役；系统架构 3.0 的业务所有权、共享 Session 和副作用约束继续生效。原 UI 3.0 实施台账仅供历史迁移参考，不可当作现行生产装配或验收结论。
 
 ## 10. Product Feature 与 Runtime Plugin 的区别
 

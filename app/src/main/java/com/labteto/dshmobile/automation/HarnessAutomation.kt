@@ -257,6 +257,7 @@ class AutomationStore internal constructor(
             // A schedule edit creates a new run generation; never inherit a
             // WorkManager request identity claimed by the previous generation.
             activeManualRunId = null,
+            activeManualStartedAt = null,
         )
         val current = document.tasks.filterNot { it.id == task.id } + admitted
         write(document.copy(tasks = current, generationWatermark = admitted.scheduleGeneration))
@@ -282,14 +283,14 @@ class AutomationStore internal constructor(
         val current = read().tasks.firstOrNull { it.id == id } ?: return null
         if (current.scheduleGeneration != generation) return null
         updateIf(id, predicate = { it.scheduleGeneration == generation }) {
-            it.copy(activeManualRunId = requestId)
+            it.copy(activeManualRunId = requestId, activeManualStartedAt = null)
         } ?: return null
         return try {
             submit()
         } catch (error: Throwable) {
             updateIf(id, predicate = {
                 it.scheduleGeneration == generation && it.activeManualRunId == requestId
-            }) { it.copy(activeManualRunId = null) }
+            }) { it.copy(activeManualRunId = null, activeManualStartedAt = null) }
             throw error
         }
     }
@@ -304,7 +305,7 @@ class AutomationStore internal constructor(
     ): Boolean = updateIf(id, predicate = {
         it.scheduleGeneration == generation && it.activeManualRunId == requestId
     }) { task ->
-        task.copy(activeManualRunId = null, lastError = reason.take(4000))
+        task.copy(activeManualRunId = null, activeManualStartedAt = null, lastError = reason.take(4000))
     } != null
 
     @Synchronized

@@ -166,7 +166,9 @@ class LocalWebProvider @Inject constructor(
             safeHeaders.forEach { (name, value) -> builder.header(name, value) }
             route.hostHeader?.let { builder.header("Host", it) }
             val result = executeWithTransientRetry(
-                client = route.client,
+                client = if (verb in SAFE_RETRY_METHODS) route.client else route.client.newBuilder()
+                    .retryOnConnectionFailure(false).followRedirects(false)
+                    .followSslRedirects(false).build(),
                 request = builder.build(),
                 attempts = if (verb in SAFE_RETRY_METHODS) SAFE_HTTP_RETRY_ATTEMPTS else 1,
             ) { response ->
