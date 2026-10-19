@@ -81,7 +81,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
             repository = repository,
             eventLogFor = eventLogs::get,
             runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
-            domainCodecs = orderedDomainCodecs,
+            domainCodecs = orderedCodecs,
         )
     }
 
