@@ -3,6 +3,7 @@ package com.labteto.dshmobile.uipack.zhaoxi.scenes
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
@@ -151,10 +152,45 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         showAdvancedConnection = false
         showPresets = false
     }
+    fun submitModelForm() {
+                        if (!validWindow && supportsWindowOverride) {
+                            status = "请先填写有效的上下文窗口"
+                        } else {
+                            execute {
+                                val request = SettingsUiCommand.SaveModel(apiKey, model.trim(),
+                                    baseUrl.trim(), protocol, profileId,
+                                    if (supportsWindowOverride) window ?: 0 else null,
+                                    credentialSourceProfileId)
+                                when (val receipt = settings.save(request)) {
+                                    SettingsUiReceipt.Applied -> {
+                                        apiKey = ""
+                                        profileId = null
+                                        credentialSourceProfileId = null
+                                        showModelForm = false
+                                        "模型已保存"
+                                    }
+                                    SettingsUiReceipt.Submitted -> "保存请求已提交"
+                                    SettingsUiReceipt.Rejected -> "无法保存模型"
+                                    is SettingsUiReceipt.Failed -> receipt.message ?: "保存失败"
+                                }
+                            }
+                        }
+    }
     val activeProfile = snap.modelProfiles.firstOrNull { snap.modelSelection.isActive(it) }
-    ZxPage("模型与账户", onBack = { dismissModelForm(true) }, scrollState = modelScroll) {
+    ZxPage("模型与账户", onBack = { dismissModelForm(true) }, scrollState = modelScroll,
+        footer = {
+            if (showModelForm) {
+                Column(Modifier.fillMaxWidth().background(ZhaoxiTheme.colors.bg)
+                    .padding(horizontal = 18.dp, vertical = 8.dp)) {
+                    ZxButton("保存模型", { submitModelForm() }, Modifier.fillMaxWidth(),
+                        enabled = !busy && model.isNotBlank() && baseUrl.isNotBlank() &&
+                            (apiKey.isNotBlank() || profileId != null || credentialSourceProfileId != null))
+                }
+            }
+        }) {
         snap.error?.let { ZxBanner(it, ZxTone.Err) }
         status?.let { ZxBanner(it, ZxTone.Warn) }
+        if (!showModelForm) {
         ZxSection("当前使用")
         ZxSettingsGroup {
             if (activeProfile == null) {
@@ -165,6 +201,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                         activeProfile.provider.ifBlank { "API 模型" }) + " · ${activeProfile.model}",
                     showChevron = false)
             }
+        }
         }
         ZxSection("API 模型 · ${apiProfiles.size}")
         if (!showModelForm) ZxButton("＋ 添加 API 模型", { startNewModel() },
@@ -283,7 +320,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                 ZxFooterNote(if (profileId != null || credentialSourceProfileId != null)
                     "留空可沿用同一接口地址的已保存密钥；修改接口地址时必须重新提供凭据。"
                 else "API Key 仅交由模型配置接口保存，不在此页面回显。")
-                ZxSection("验证与保存")
+                ZxSection("验证连接")
                 ZxFooterNote("目录查询不代表有调用权限；请用“测试连接”验证。")
                 ZxButton("获取可选模型", {
                     if (!busy) {
@@ -350,36 +387,13 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     }, enabled = !busy && model.isNotBlank() && baseUrl.isNotBlank() &&
                         (apiKey.isNotBlank() || profileId != null || credentialSourceProfileId != null),
                         variant = ZxButtonVariant.Outline)
-                    ZxButton("保存模型", {
-                        if (!validWindow && supportsWindowOverride) {
-                            status = "请先填写有效的上下文窗口"
-                        } else {
-                            execute {
-                                val request = SettingsUiCommand.SaveModel(apiKey, model.trim(),
-                                    baseUrl.trim(), protocol, profileId,
-                                    if (supportsWindowOverride) window ?: 0 else null,
-                                    credentialSourceProfileId)
-                                when (val receipt = settings.save(request)) {
-                                    SettingsUiReceipt.Applied -> {
-                                        apiKey = ""
-                                        profileId = null
-                                        credentialSourceProfileId = null
-                                        showModelForm = false
-                                        "模型已保存"
-                                    }
-                                    SettingsUiReceipt.Submitted -> "保存请求已提交"
-                                    SettingsUiReceipt.Rejected -> "无法保存模型"
-                                    is SettingsUiReceipt.Failed -> receipt.message ?: "保存失败"
-                                }
-                            }
-                        }
-                    }, enabled = !busy && model.isNotBlank() && baseUrl.isNotBlank() &&
-                        (apiKey.isNotBlank() || profileId != null || credentialSourceProfileId != null))
+
                 }
                 ZxButton("取消编辑", { dismissModelForm(false) },
                     Modifier.fillMaxWidth(), variant = ZxButtonVariant.Ghost, enabled = !busy)
             }
         }
+        if (!showModelForm) {
         ZxSection("已配置模型")
         if (apiProfiles.isEmpty() && !showModelForm)
             ZxEmpty("还没有 API 模型", "点击上方“添加 API 模型”，选择预设或手动配置。")
@@ -463,6 +477,7 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             scope.onNavigate(UiSceneId("settings.model_performance"))
         }
         ZxNavRow("官方价格") { scope.onNavigate(UiSceneId("settings.pricing")) }
+        }
     }
     if (confirmDiscardModel) ZxDialog(
         "放弃未保存的模型配置？", "当前表单内容将丢弃。", "放弃修改",
@@ -474,6 +489,19 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
         },
         { confirmDiscardModel = false },
     )
+}
+
+/** Browser authorization may suspend; the real Auth Owner decides whether cancellation is still possible. */
+internal fun zxChatGptCanCancelAuthorization(
+    phase: com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase,
+    authorizationBusy: Boolean,
+): Boolean = when (phase) {
+    com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.PREPARING,
+    com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.WAITING_FOR_BROWSER,
+    com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.EXCHANGING_CODE,
+    com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.VALIDATING_IDENTITY -> true
+    com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.LOADING_MODELS -> authorizationBusy
+    else -> false
 }
 
 /** Dedicated account management, separate from API model configuration. */
@@ -553,14 +581,7 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             } }, Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
         }
         // 第一次添加账户时 pendingAccountId 为空，依授权阶段判定而非账户编号。
-        val canCancelAuthorization = when (snap.phase) {
-            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.PREPARING,
-            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.WAITING_FOR_BROWSER,
-            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.EXCHANGING_CODE,
-            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.VALIDATING_IDENTITY -> true
-            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.LOADING_MODELS -> authorizationBusy
-            else -> false
-        }
+        val canCancelAuthorization = zxChatGptCanCancelAuthorization(snap.phase, authorizationBusy)
         if (canCancelAuthorization) ZxButton("取消进行中的授权", {
             if (!cancelAuthorizationBusy) {
                 cancelAuthorizationBusy = true

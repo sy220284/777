@@ -14,6 +14,8 @@ import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxUsageActionLabel
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkspaceFileVisible
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxSettingsNavigationIcon
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxChatGptCanCancelAuthorization
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase
 import com.labteto.dshmobile.uipack.zhaoxi.components.zxEmptyStateIcon
 import org.junit.Assert.*
 import org.junit.Test
@@ -81,6 +83,17 @@ class ZhaoxiHistoryUiPresentationTest {
         assertEquals("已启用", zxPluginStateLabel("ACTIVE"))
         assertEquals("需要修复", zxPluginStateLabel("FAILED"))
     }
+    @Test fun oauthBrowserWaitCanAlwaysBeCancelledIncludingFirstAccount() {
+        assertTrue(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.PREPARING, false))
+        assertTrue(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.WAITING_FOR_BROWSER, false))
+        assertTrue(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.EXCHANGING_CODE, true))
+        assertTrue(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.VALIDATING_IDENTITY, true))
+        assertTrue(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.LOADING_MODELS, true))
+        assertFalse(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.LOADING_MODELS, false))
+        assertFalse(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.DISCONNECTED, false))
+        assertFalse(zxChatGptCanCancelAuthorization(ChatGptAuthPhase.CONNECTED, false))
+    }
+
     @Test fun everySettingsDestinationGetsAStableIconAndUnknownRowsRemainPlain() {
         val entries = listOf("外观", "聊天风格", "个人规则", "记忆", "模型",
             "模型性能", "ChatGPT 账户", "套餐额度", "操作审批模式", "权限与设备",

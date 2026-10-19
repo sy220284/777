@@ -321,6 +321,8 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.onNodeWithText("设置", useUnmergedTree = true).performClick()
         compose.onNodeWithText("模型", useUnmergedTree = true).performScrollTo().performClick()
         compose.onNodeWithText("＋ 添加 API 模型").performScrollTo().performClick()
+        // Primary save stays on screen even when advanced fields grow beyond the viewport.
+        compose.onNodeWithText("保存模型").assertIsDisplayed()
         // The create action must not remain active while a draft is open.
         compose.onAllNodesWithText("＋ 添加 API 模型").assertCountEquals(0)
         compose.onNodeWithText("查看全部预设", substring = true).performScrollTo().performClick()
@@ -332,7 +334,7 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.onNodeWithContentDescription("模型名称").assertExists()
         compose.onNodeWithContentDescription("接口地址").performTextReplacement("http://127.0.0.1:9")
         compose.onNodeWithContentDescription("API Key（编辑时留空保留原凭据）").performTextInput("local-acceptance-placeholder")
-        compose.onNodeWithText("保存模型").performScrollTo().performClick()
+        compose.onNodeWithText("保存模型").assertIsDisplayed().performClick()
         compose.waitUntil(15_000) { compose.onAllNodesWithText("模型已保存").fetchSemanticsNodes().isNotEmpty() }
         runBlocking { withTimeout(15_000) { ports.settingsUiPort.state.first { state -> state.modelProfiles.any { it.model == "acceptance-local-model" } } } }
         capture("interaction-model-saved")
@@ -343,6 +345,7 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.onNodeWithText("设置", useUnmergedTree = true).performClick()
         compose.onNodeWithText("模型", useUnmergedTree = true).performScrollTo().performClick()
         compose.onNodeWithText("＋ 添加 API 模型").performScrollTo().performClick()
+        compose.onNodeWithText("保存模型").assertIsDisplayed()
         compose.onNodeWithContentDescription("模型名称").performTextInput("keep-unsaved-model")
         compose.onNodeWithText("取消编辑").performScrollTo().performClick()
         compose.onNodeWithText("放弃未保存的模型配置？").assertExists()

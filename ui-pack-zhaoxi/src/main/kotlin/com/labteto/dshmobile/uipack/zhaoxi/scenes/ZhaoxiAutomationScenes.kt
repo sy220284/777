@@ -8,6 +8,7 @@ import android.text.format.DateFormat
 import android.app.TimePickerDialog
 import android.app.DatePickerDialog
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.text.input.KeyboardType
@@ -29,6 +30,7 @@ import com.labteto.dshmobile.uicontract.UiMcpHealth
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -352,7 +354,104 @@ fun ZhaoxiAutomationEditorScene(
     fun showReceipt(receipt: AutomationUiReceipt) {
         feedback = zxAutomationReceiptText("任务", receipt)
     }
-    ZxPage(if (editingTaskId == null) "新建自动化" else "编辑自动化", onBack = { scope.onBack() }) {
+    val canSubmitEditor = (editingTaskId == null || editing != null) &&
+        !(editing?.mode == AutomationMode.CHAT &&
+            (snap.context.identity?.sessionId != editing.targetSessionId || !snap.context.canPlanChat))
+    ZxPage(if (editingTaskId == null) "新建自动化" else "编辑自动化",
+        onBack = { scope.onBack() },
+        footer = {
+            if (canSubmitEditor) {
+                Column(Modifier.fillMaxWidth().background(ZhaoxiTheme.colors.bg)
+                    .padding(horizontal = 18.dp, vertical = 8.dp)) {
+            ZxButton(if (editingTaskId == null) "创建任务" else "保存修改", {
+                if (prompt.isBlank()) {
+                    feedback = "请填写任务内容"
+                } else if (natural) {
+                    val identity = snap.context.identity
+                    if (!snap.context.canPlanChat || identity == null) {
+                        feedback = "请切换到有效的单人聊天会话"
+                    } else {
+                        co.launch {
+                            busy = true
+                            try {
+                                showReceipt(automation.planAndSave(PlanChatAutomationCommand(
+                                    identity, prompt, editingTaskId)))
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                feedback = failure.message ?: "规划失败"
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    }
+                } else {
+                    val date = runCatching { formatter.parse(firstRun)?.time }.getOrNull()
+                    val duration = interval.toLongOrNull()
+                    val silenceDuration = silence.toLongOrNull()
+                    val start = minuteOfDay(windowStart)
+                    val end = minuteOfDay(windowEnd)
+                    val recurring = when (selected) {
+                        AutomationScheduleType.INTERVAL -> duration
+                        AutomationScheduleType.DAILY -> 1_440L
+                        AutomationScheduleType.WEEKLY -> 10_080L
+                        AutomationScheduleType.MONTHLY -> 43_200L
+                        else -> null
+                    }
+                    val timed = selected !in setOf(AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW)
+                    firstRunError = if (timed && (date == null || date <= System.currentTimeMillis()))
+                        "请选择有效且晚于当前时间的日期" else null
+                    val minGap = if (chatMode) 60L else 15L
+                    feedback = when {
+                        chatMode && quietEnabled && zxQuietHoursError(quietStart, quietEnd) != null -> zxQuietHoursError(quietStart, quietEnd)
+                        chatMode && (proactiveGapInput.toLongOrNull() == null || (proactiveGapInput.toLongOrNull() ?: 0) < 60L) -> "互动间隔至少为60分钟"
+                        chatMode && maxUnanswered.toIntOrNull() !in 1..5 -> "连续未回复上限应为1–5次"
+                        timed && firstRunError != null -> firstRunError
+                        selected == AutomationScheduleType.INTERVAL && (duration == null || duration < minGap) ->
+                            "间隔不得小于 ${minGap} 分钟"
+                        selected == AutomationScheduleType.SILENCE && (silenceDuration == null || silenceDuration < 60L) ->
+                            "沉默触发最短为 60 分钟"
+                        selected == AutomationScheduleType.WINDOW && (start == null || end == null || start == end) ->
+                            "请输入两个不同的 HH:mm 时间"
+                        else -> null
+                    }
+                    if (feedback == null) {
+                        val schedule = UiAutomationSchedule(
+                            prompt = prompt.trim(),
+                            firstRunAt = date ?: System.currentTimeMillis() + 60_000L,
+                            recurringMinutes = recurring,
+                            mode = mode,
+                            scheduleType = selected,
+                            silenceMinutes = if (selected == AutomationScheduleType.SILENCE) silenceDuration else null,
+                            windowStartMinuteOfDay = if (selected == AutomationScheduleType.WINDOW) start else null,
+                            windowEndMinuteOfDay = if (selected == AutomationScheduleType.WINDOW) end else null,
+                            quietHoursEnabled = if (chatMode) quietEnabled else editing?.quietHoursEnabled ?: false,
+                            quietStartHour = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietStart)) / 60 else editing?.quietStartHour ?: AutomationUiDefaults.DEFAULT_QUIET_START_HOUR,
+                            quietStartMinute = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietStart)) % 60 else editing?.quietStartMinute ?: AutomationUiDefaults.DEFAULT_QUIET_START_MINUTE,
+                            quietEndHour = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietEnd)) / 60 else editing?.quietEndHour ?: AutomationUiDefaults.DEFAULT_QUIET_END_HOUR,
+                            quietEndMinute = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietEnd)) % 60 else editing?.quietEndMinute ?: AutomationUiDefaults.DEFAULT_QUIET_END_MINUTE,
+                            proactiveMinGapMinutes = if (chatMode) requireNotNull(proactiveGapInput.toLongOrNull()) else editing?.proactiveMinGapMinutes ?: AutomationUiDefaults.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
+                            proactiveMaxUnanswered = if (chatMode) requireNotNull(maxUnanswered.toIntOrNull()) else editing?.proactiveMaxUnanswered ?: AutomationUiDefaults.DEFAULT_PROACTIVE_MAX_UNANSWERED,
+                            notify = notify,
+                        )
+                        busy = true
+                        try {
+                            showReceipt(automation.submit(if (editing == null) {
+                                AutomationUiCommand.Create(snap.context.identity, schedule)
+                            } else {
+                                AutomationUiCommand.Update(editing.id, editing.scheduleGeneration, schedule)
+                            }))
+                        } catch (failure: Exception) {
+                            feedback = failure.message ?: "保存未完成，请先确认任务状态"
+                        } finally {
+                            busy = false
+                        }
+                    }
+                }
+            }, Modifier.fillMaxWidth(), enabled = !busy && prompt.isNotBlank(), loading = busy)
+                }
+            }
+        }) {
         Spacer(Modifier.height(8.dp))
         if (editingTaskId != null && editing == null) {
             ZxEmpty("任务已不可用", "原任务可能被删除或当前尚未加载；请返回任务列表")
@@ -443,92 +542,7 @@ fun ZhaoxiAutomationEditorScene(
             } else ZxFooterNote("智能规划会确定任务内容和时间；创建后可在表单中调整通知与互动规则。")
             feedback?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
             Spacer(Modifier.height(12.dp))
-            ZxButton(if (editingTaskId == null) "创建任务" else "保存修改", {
-                if (prompt.isBlank()) {
-                    feedback = "请填写任务内容"
-                } else if (natural) {
-                    val identity = snap.context.identity
-                    if (!snap.context.canPlanChat || identity == null) {
-                        feedback = "请切换到有效的单人聊天会话"
-                    } else {
-                        co.launch {
-                            busy = true
-                            try {
-                                showReceipt(automation.planAndSave(PlanChatAutomationCommand(
-                                    identity, prompt, editingTaskId)))
-                            } catch (cancelled: CancellationException) {
-                                throw cancelled
-                            } catch (failure: Exception) {
-                                feedback = failure.message ?: "规划失败"
-                            } finally {
-                                busy = false
-                            }
-                        }
-                    }
-                } else {
-                    val date = runCatching { formatter.parse(firstRun)?.time }.getOrNull()
-                    val duration = interval.toLongOrNull()
-                    val silenceDuration = silence.toLongOrNull()
-                    val start = minuteOfDay(windowStart)
-                    val end = minuteOfDay(windowEnd)
-                    val recurring = when (selected) {
-                        AutomationScheduleType.INTERVAL -> duration
-                        AutomationScheduleType.DAILY -> 1_440L
-                        AutomationScheduleType.WEEKLY -> 10_080L
-                        AutomationScheduleType.MONTHLY -> 43_200L
-                        else -> null
-                    }
-                    val timed = selected !in setOf(AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW)
-                    firstRunError = if (timed && (date == null || date <= System.currentTimeMillis()))
-                        "请选择有效且晚于当前时间的日期" else null
-                    val minGap = if (chatMode) 60L else 15L
-                    feedback = when {
-                        chatMode && quietEnabled && zxQuietHoursError(quietStart, quietEnd) != null -> zxQuietHoursError(quietStart, quietEnd)
-                        chatMode && (proactiveGapInput.toLongOrNull() == null || (proactiveGapInput.toLongOrNull() ?: 0) < 60L) -> "互动间隔至少为60分钟"
-                        chatMode && maxUnanswered.toIntOrNull() !in 1..5 -> "连续未回复上限应为1–5次"
-                        timed && firstRunError != null -> firstRunError
-                        selected == AutomationScheduleType.INTERVAL && (duration == null || duration < minGap) ->
-                            "间隔不得小于 ${minGap} 分钟"
-                        selected == AutomationScheduleType.SILENCE && (silenceDuration == null || silenceDuration < 60L) ->
-                            "沉默触发最短为 60 分钟"
-                        selected == AutomationScheduleType.WINDOW && (start == null || end == null || start == end) ->
-                            "请输入两个不同的 HH:mm 时间"
-                        else -> null
-                    }
-                    if (feedback == null) {
-                        val schedule = UiAutomationSchedule(
-                            prompt = prompt.trim(),
-                            firstRunAt = date ?: System.currentTimeMillis() + 60_000L,
-                            recurringMinutes = recurring,
-                            mode = mode,
-                            scheduleType = selected,
-                            silenceMinutes = if (selected == AutomationScheduleType.SILENCE) silenceDuration else null,
-                            windowStartMinuteOfDay = if (selected == AutomationScheduleType.WINDOW) start else null,
-                            windowEndMinuteOfDay = if (selected == AutomationScheduleType.WINDOW) end else null,
-                            quietHoursEnabled = if (chatMode) quietEnabled else editing?.quietHoursEnabled ?: false,
-                            quietStartHour = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietStart)) / 60 else editing?.quietStartHour ?: AutomationUiDefaults.DEFAULT_QUIET_START_HOUR,
-                            quietStartMinute = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietStart)) % 60 else editing?.quietStartMinute ?: AutomationUiDefaults.DEFAULT_QUIET_START_MINUTE,
-                            quietEndHour = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietEnd)) / 60 else editing?.quietEndHour ?: AutomationUiDefaults.DEFAULT_QUIET_END_HOUR,
-                            quietEndMinute = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietEnd)) % 60 else editing?.quietEndMinute ?: AutomationUiDefaults.DEFAULT_QUIET_END_MINUTE,
-                            proactiveMinGapMinutes = if (chatMode) requireNotNull(proactiveGapInput.toLongOrNull()) else editing?.proactiveMinGapMinutes ?: AutomationUiDefaults.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
-                            proactiveMaxUnanswered = if (chatMode) requireNotNull(maxUnanswered.toIntOrNull()) else editing?.proactiveMaxUnanswered ?: AutomationUiDefaults.DEFAULT_PROACTIVE_MAX_UNANSWERED,
-                            notify = notify,
-                        )
-                        busy = true
-                        try {
-                            showReceipt(automation.submit(if (editing == null) {
-                                AutomationUiCommand.Create(snap.context.identity, schedule)
-                            } else {
-                                AutomationUiCommand.Update(editing.id, editing.scheduleGeneration, schedule)
-                            }))
-                        } catch (failure: Exception) {
-                            feedback = failure.message ?: "保存未完成，请先确认任务状态"
-                        } finally {
-                            busy = false
-                        }
-                    }
-                }
-            }, Modifier.fillMaxWidth(), enabled = !busy && prompt.isNotBlank(), loading = busy)
+
 
         }
     }
