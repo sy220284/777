@@ -7,6 +7,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -37,9 +38,9 @@ internal object WebhookRunStatusSerializer : KSerializer<WebhookRunStatus> {
 
     override fun deserialize(decoder: Decoder): WebhookRunStatus {
         val wireValue = decoder.decodeString()
+        // Unknown future states cannot prove that an external side effect failed.
         return WebhookRunStatus.entries.firstOrNull { it.wireValue == wireValue }
-            // Unknown future states remain readable on downgrade and settle conservatively.
-            ?: WebhookRunStatus.FAILED
+            ?: throw SerializationException("未知 Webhook 回执状态：$wireValue")
     }
 }
 
@@ -64,7 +65,9 @@ class WebhookResultStore @Inject constructor(
     fun get(id: String): WebhookRunResult? =
         preferences.getString(id, null)?.let { raw ->
             try {
-                json.decodeFromString(WebhookRunResult.serializer(), raw)
+                json.decodeFromString(WebhookRunResult.serializer(), raw).also { receipt ->
+                    require(receipt.requestId == id) { "Webhook 回执编号与存储键不一致" }
+                }
             } catch (error: Exception) {
                 AppLog.warn("WebhookResults", "failure=true operation=read_webhook_result " +
                     "request_id=${id.take(80)} cause_type=${error.javaClass.simpleName}")
@@ -114,7 +117,9 @@ class WebhookResultStore @Inject constructor(
         val interrupted = preferences.all.mapNotNull { (id, raw) ->
             val previous = try {
                 (raw as? String)?.let {
-                    json.decodeFromString(WebhookRunResult.serializer(), it)
+                    json.decodeFromString(WebhookRunResult.serializer(), it).also { receipt ->
+                        require(receipt.requestId == id) { "Webhook 回执编号与存储键不一致" }
+                    }
                 }
             } catch (error: Exception) {
                 AppLog.warn("WebhookResults", "failure=true operation=restore_webhook_result " +

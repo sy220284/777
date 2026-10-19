@@ -38,4 +38,32 @@ class WebhookResultStoreInstrumentedTest {
             preferences.edit().clear().commit()
         }
     }
+    @Test
+    fun unknownStatusAndWrongRequestIdentityAreNeverPresentedAsDefiniteResults() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val preferencesName = "webhook-identity-${UUID.randomUUID()}"
+        val wrapper = object : ContextWrapper(context) {
+            override fun getSharedPreferences(name: String, mode: Int): SharedPreferences =
+                context.getSharedPreferences(preferencesName, mode)
+        }
+        val preferences = wrapper.getSharedPreferences("unused", Context.MODE_PRIVATE)
+        try {
+            val future = """{"requestId":"future","status":"delivered-in-future-version","updatedAt":1}"""
+            val mismatch = """{"requestId":"somebody-else","status":"completed","updatedAt":1}"""
+            assertTrue(preferences.edit().putString("future", future)
+                .putString("requested", mismatch).commit())
+            val store = WebhookResultStore(wrapper, Json { ignoreUnknownKeys = true })
+            assertEquals(WebhookRunStatus.INTERRUPTED, store.get("future")?.status)
+            assertEquals(WebhookRunStatus.INTERRUPTED, store.get("requested")?.status)
+            assertEquals("requested", store.get("requested")?.requestId)
+            assertEquals(2, store.settleInterruptedFromPreviousProcess())
+            assertEquals(WebhookRunStatus.INTERRUPTED, store.get("future")?.status)
+            assertEquals(WebhookRunStatus.INTERRUPTED, store.get("requested")?.status)
+            assertTrue(store.get("future")!!.error!!.contains("副作用是否发生未知"))
+            assertEquals(0, store.settleInterruptedFromPreviousProcess())
+        } finally {
+            preferences.edit().clear().commit()
+        }
+    }
+
 }
