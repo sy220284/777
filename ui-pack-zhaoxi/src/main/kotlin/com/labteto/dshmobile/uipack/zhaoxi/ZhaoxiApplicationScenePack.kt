@@ -244,6 +244,7 @@ class ZhaoxiApplicationScenePack(
                 if (owners.memory != null && owners.settings != null) add("memory.manage")
                 if (owners.automation != null) add("automation.manage")
                 if (owners.media != null) add("media.create")
+                if (owners.gallerySave != null) add("chat.gallery_save")
                 if (owners.authoring != null) add("chat.persona_authoring")
                 if (owners.currentPersona != null) add("chat.current_persona")
                 if (owners.diary != null) add("chat.diary_manage")
@@ -294,6 +295,12 @@ class ZhaoxiApplicationScenePack(
                     targets.workspacePath = path
                     scope.onNavigate(UiSceneId("workspace.preview"))
                 },
+                transcript = conv?.history ?: sec?.transcript,
+                onMessageOpen = { source, message ->
+                    targets.message = source to message.id
+                    messagePreview = source to message
+                    scope.onNavigate(UiSceneId("conversation.reader"))
+                },
             )
             "shell.onboarding" -> ZhaoxiOnboardingScene(scope)
             "shell.empty" -> ZhaoxiEmptyDemoScene(scope)
@@ -304,17 +311,17 @@ class ZhaoxiApplicationScenePack(
                 ZhaoxiChatScene(it.chat, it.drafts, it.reading, it.history, authorName = "助手", scope,
                     onMessage = { identity, message -> targets.message = identity to message.id; messagePreview = identity to message; scope.onNavigate(UiSceneId("conversation.message_actions")) },
                     menu = { ZhaoxiConversationMenu(conversations, secondary, scope,
-                        hasSettings = settings != null, renderSlot = { RenderScene(it, scope) }) },
+                        hasSettings = settings != null) },
                     documents = conv.documents, knownScenes = manifest.scenes, media = conv.media,
-                    attachments = conv.attachments, reasoning = conv.reasoning, settings = settings)
+                    attachments = conv.attachments, reasoning = conv.reasoning, settings = settings, corrections = conv.corrections)
             }
             "conversation.work" -> conv?.let { ZhaoxiWorkScene(it.work, it.drafts, it.reading, it.history, scope,
                 onMessage = { identity, message -> targets.message = identity to message.id; messagePreview = identity to message; scope.onNavigate(UiSceneId("conversation.message_actions")) },
-                menu = { ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) }) },
+                menu = { ZhaoxiConversationMenu(conversations, secondary, scope) },
                     documents = conv.documents, knownScenes = manifest.scenes, media = conv.media,
                     attachments = conv.attachments, reasoning = conv.reasoning, settings = settings) }
             "conversation.header" -> conv?.let {
-                ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) })
+                ZhaoxiConversationMenu(conversations, secondary, scope)
             }
             "conversation.timeline" -> conv?.let {
                 ZhaoxiTimelineScene(it.chat, it.reading, it.history, it.documents, manifest.scenes, it.media)
@@ -354,6 +361,7 @@ class ZhaoxiApplicationScenePack(
                     "chat.branches" -> if (workMode) ZxEmpty("暂不支持工作分支切换", "返回工作会话继续") else ZhaoxiBranchesScene(msg, conv!!.chat, scope)
                     "conversation.reader" -> ZhaoxiReaderScene("阅读", msg.text, scope)
                     else -> ZhaoxiMessageActionsScene(msg, scope,
+                        allowBranchSwitch = !workMode,
                         onEdit = { scope.onNavigate(UiSceneId("conversation.edit")) },
                         onRegenerate = {
                             when {
@@ -373,7 +381,7 @@ class ZhaoxiApplicationScenePack(
             }
             "conversation.ui_document" -> conv?.documents?.let { ZhaoxiUiDocumentScene(it, scope, ::currentDocumentContext, manifest.scenes, { conversations?.work?.snapshot()?.approval?.pendingId }, conv?.media) }
             "conversation.ui_document_generate" -> conv?.documents?.let { ZhaoxiUiDocumentGenerateScene(it, scope, ::currentDocumentContext) }
-            "work.approval" -> conv?.let { ZhaoxiApprovalScene(it.work, scope) }
+            "work.approval" -> conv?.let { ZhaoxiApprovalScene(it.work, scope, it.workPolicy) }
             "work.question" -> conv?.let { ZhaoxiQuestionScene(it.work, scope) }
             "work.plan_review" -> conv?.workReads?.let {
                 ZhaoxiPlanReviewScene(it, conv.work, sessionId, scope)

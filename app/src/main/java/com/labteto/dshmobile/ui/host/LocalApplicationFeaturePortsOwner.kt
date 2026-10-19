@@ -54,6 +54,8 @@ internal class LocalApplicationFeaturePortsOwner @Inject constructor(
     val messageHistoryUiPort: com.labteto.dshmobile.uicontract.UiMessageHistoryPort,
     val usageUiPort: com.labteto.dshmobile.uicontract.UsageUiPort,
     val workPolicyUiPort: com.labteto.dshmobile.uicontract.WorkPolicyUiPort,
+    val composerInvocationUiPort: com.labteto.dshmobile.uicontract.ComposerInvocationUiPort,
+    val personaCorrectionUiPort: com.labteto.dshmobile.uicontract.PersonaCorrectionUiPort,
 ) : ViewModel() {
     private val secureDrafts = LocalEncryptedUiDraftStore(context)
     val privateTextCipher: com.labteto.dshmobile.uihost.UiPrivateTextCipher get() = secureDrafts

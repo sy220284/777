@@ -35,6 +35,21 @@ import org.junit.Test
 
 /** Boundary/admission tests. External model/tool execution and device interaction remain S2 evidence. */
 class LocalConversationUiPortTest {
+    @Test fun correctionUndoCarriesTheExactOwnerNoticeAndStaysInsideActiveChat() {
+        val fixture = Fixture(LocalUsageMode.CHAT)
+        val notice = com.labteto.dshmobile.local.chat.ChatPersonaCorrectionNotice(71L, "persona-1", "称呼使用小林")
+        fixture.state.value = fixture.state.value.copy(chat = fixture.state.value.chat.copy(personaCorrectionNotice = notice))
+        val snapshot = fixture.port.chat.snapshot()
+        val token = requireNotNull(snapshot.correctionUndo)
+        assertEquals(snapshot.identity, token.identity)
+        assertEquals(notice.id, token.noticeId)
+        assertEquals(notice.personaId, token.personaId)
+        assertEquals(notice.correction, token.correction)
+        fixture.state.value = fixture.state.value.copy(usageMode = LocalUsageMode.WORK)
+        assertNull(fixture.port.chat.snapshot().correctionUndo)
+        assertTrue(fixture.chat.sent.isEmpty())
+    }
+
     @Test fun editResultMappingRetainsEveryOwnerOutcomeWithoutCollapsingFailures() {
         val mapped = LocalUserMessageEditResult.entries.map { it.toUiEditOutcome() }
         org.junit.Assert.assertEquals(LocalUserMessageEditResult.entries.size, mapped.distinct().size)

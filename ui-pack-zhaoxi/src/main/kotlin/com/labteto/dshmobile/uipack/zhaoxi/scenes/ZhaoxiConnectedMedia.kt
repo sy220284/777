@@ -56,7 +56,13 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
     scope: UiSceneRenderScope, gallery: PersonaGalleryUiPort? = null, portraits: PersonaPortraitUiPort? = null,
     resultsOnly: Boolean = false) {
     val settingsSnap by settings.state.collectAsState(initial = settings.initialState)
-    val page by media.observe(sessionId.takeIf(String::isNotBlank), media.pageSize).collectAsState(initial = LocalMediaPage())
+    var visibleLimit by rememberSaveable(sessionId) { mutableStateOf(media.pageSize) }
+    val pageFlow = remember(media, sessionId, visibleLimit) {
+        if (sessionId.isBlank()) kotlinx.coroutines.flow.flowOf(LocalMediaPage())
+        else media.observe(sessionId, visibleLimit)
+    }
+    val page by pageFlow.collectAsState(initial = LocalMediaPage())
+    val storageError by media.storageError.collectAsState()
     val offers = remember(settingsSnap.modelProfiles) { media.offers(settingsSnap.modelProfiles) }
     var offerId by rememberSaveable { mutableStateOf<String?>(null) }
     val offer = offers.firstOrNull { it.id == offerId } ?: offers.firstOrNull()
@@ -68,7 +74,8 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
     var statusTone by remember { mutableStateOf(ZxTone.Info) }
     var busy by remember { mutableStateOf(false) }
     var selected by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
-    var pendingDelete by remember { mutableStateOf<String?>(null) }
+    var pendingDelete by remember(sessionId) { mutableStateOf<String?>(null) }
+    var dismissJobId by remember(sessionId) { mutableStateOf<String?>(null) }
     var pendingRegenerate by remember { mutableStateOf<String?>(null) }
     var galleryPicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -117,6 +124,12 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
     }
     ZxPage(if (resultsOnly) "媒体结果" else "媒体生成", onBack = { scope.onBack() }) {
         status?.let { ZxBanner(it, statusTone) }
+        if (page.unavailable || storageError != null) {
+            ZxBanner(storageError ?: "媒体记录暂时无法读取，已有作品不会按空列表处理", ZxTone.Err)
+            ZxButton("重新读取本地媒体记录", {
+                execute { receiptText(media.submit(MediaUiCommand.RetryStorage)) }
+            }, enabled = !busy, loading = busy)
+        }
         if (sessionId.isBlank()) {
             ZxEmpty("请先打开会话", "选择会话后继续")
         } else if (!resultsOnly) {
@@ -168,32 +181,6 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
                 }
             }
         }, enabled = !busy && sessionId.isNotBlank() && offer != null && (prompt.isNotBlank() || offer?.kind == LocalMediaKind.TRANSCRIBE), loading = busy)
-        if (page.jobs.isNotEmpty() || page.videos.isNotEmpty()) ZxSection("生成任务")
-        page.jobs.forEach { job ->
-            val kind = when (job.kind.uppercase()) {
-                "IMAGE" -> "图片"
-                "VIDEO" -> "视频"
-                "SPEECH" -> "语音"
-                "TRANSCRIBE" -> "音频转写"
-                else -> "媒体任务"
-            }
-            ZxRow(kind, listOf(job.phase.zxCreationPhaseLabel(),
-                job.error?.takeIf(String::isNotBlank)?.take(120)).filterNotNull().joinToString(" · "))
-            if (job.phase == LocalMediaCreationPhase.OUTCOME_UNKNOWN) {
-                ZxBanner("上次请求的远端执行结果尚不确定，请先核对记录，避免重复付费生成", ZxTone.Warn)
-            }
-        }
-        page.videos.forEach { task ->
-            ZxRow(task.model, listOf(task.phase.zxVideoPhaseLabel(),
-                task.lastError?.takeIf(String::isNotBlank)?.take(120)).filterNotNull().joinToString(" · "))
-            if (task.phase == LocalMediaVideoPhase.OUTCOME_UNKNOWN) {
-                ZxBanner("视频请求结果待确认，请勿直接重复生成；先检查服务端任务状态", ZxTone.Warn)
-            }
-            val original = offers.firstOrNull { it.id == task.offerId }
-            if (original != null && media.canRefresh(task, original)) ZxButton("查询视频状态", {
-                execute { receiptText(media.submit(MediaUiCommand.PollVideo(original, task.id))) }
-            }, enabled = !busy)
-        }
         } else {
         ZxNavRow("新建生成", sub = "图像 · 视频 · 语音与转写") {
             scope.onNavigate(UiSceneId("media.creation"))
@@ -285,6 +272,51 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
             ZxButton("删除结果", { pendingDelete = result.id },
                 variant = ZxButtonVariant.Danger, enabled = !busy)
         }
+        }
+        if (page.jobs.isNotEmpty() || page.videos.isNotEmpty()) ZxSection("生成任务")
+        page.jobs.forEach { job ->
+            val kind = when (job.kind.uppercase()) {
+                "IMAGE" -> "图片"
+                "VIDEO" -> "视频"
+                "SPEECH" -> "语音"
+                "TRANSCRIBE" -> "音频转写"
+                else -> "媒体任务"
+            }
+            ZxRow(kind, listOf(job.phase.zxCreationPhaseLabel(),
+                job.error?.takeIf(String::isNotBlank)?.take(120)).filterNotNull().joinToString(" · "))
+            if (job.phase == LocalMediaCreationPhase.FAILED) {
+                ZxChip("移除此失败记录", false) { dismissJobId = job.id }
+            }
+            if (job.phase == LocalMediaCreationPhase.OUTCOME_UNKNOWN) {
+                ZxBanner("上次请求的远端执行结果尚不确定，请先核对记录，避免重复付费生成", ZxTone.Warn)
+            }
+        }
+        page.videos.forEach { task ->
+            ZxRow(task.model, listOf(task.phase.zxVideoPhaseLabel(),
+                task.lastError?.takeIf(String::isNotBlank)?.take(120)).filterNotNull().joinToString(" · "))
+            if (task.phase == LocalMediaVideoPhase.OUTCOME_UNKNOWN) {
+                ZxBanner("视频请求结果待确认，请勿直接重复生成；先检查服务端任务状态", ZxTone.Warn)
+            }
+            if (task.phase == LocalMediaVideoPhase.SUCCEEDED &&
+                task.deliveryPhase == LocalMediaDeliveryPhase.FAILED) {
+                ZxButton("重试保存视频（不重新生成）", {
+                    execute { receiptText(media.submit(MediaUiCommand.RetryLocalVideoSave(task.id))) }
+                }, enabled = !busy, loading = busy)
+            }
+            val original = offers.firstOrNull { it.id == task.offerId }
+            if (original != null && media.canRefresh(task, original)) ZxButton("查询视频状态", {
+                execute { receiptText(media.submit(MediaUiCommand.PollVideo(original, task.id))) }
+            }, enabled = !busy)
+        }
+
+        if (page.hasMore && !page.unavailable) ZxButton("加载更早的媒体记录", {
+            visibleLimit += media.pageSize
+        }, variant = ZxButtonVariant.Outline, enabled = !busy)
+        dismissJobId?.let { id ->
+            ZxDialog("移除失败记录？", "仅移除本机这条失败记录，不会重新提交生成请求。", "移除记录", {
+                dismissJobId = null
+                execute { receiptText(media.submit(MediaUiCommand.DismissJob(id))) }
+            }, { dismissJobId = null })
         }
         pendingRegenerate?.let { resultId ->
             val previous = page.results.firstOrNull { it.id == resultId }

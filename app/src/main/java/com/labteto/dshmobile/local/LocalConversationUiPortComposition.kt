@@ -82,6 +82,10 @@ class LocalConversationUiPortComposition @Inject internal constructor(
                     )
                 },
                 livePreview = liveConversationPreview(state, LocalUsageMode.CHAT),
+                correctionUndo = state.chat.personaCorrectionNotice?.takeIf { active }?.let { notice ->
+                    identity(state)?.let { target -> com.labteto.dshmobile.uicontract.UiPersonaCorrectionUndo(
+                        target, notice.id, notice.personaId, notice.correction) }
+                },
             )
         }
         override fun submit(command: ChatUiCommand): UiCommandReceipt = synchronized(stateStore.foregroundRunHandle.lock) {

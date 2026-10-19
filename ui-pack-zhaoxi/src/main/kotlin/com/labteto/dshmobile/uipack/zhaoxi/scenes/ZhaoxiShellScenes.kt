@@ -585,6 +585,8 @@ fun ZhaoxiSearchScene(
     onGalleryOpen: (String) -> Unit,
     onTaskOpen: (String) -> Unit,
     onFileOpen: (String) -> Unit,
+    transcript: com.labteto.dshmobile.uicontract.UiMessageHistoryPort? = null,
+    onMessageOpen: (com.labteto.dshmobile.uicontract.UiSessionIdentity, com.labteto.dshmobile.uicontract.UiMessageSnapshot) -> Unit = { _, _ -> },
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var refreshVersion by remember { mutableStateOf(0) }
@@ -594,6 +596,40 @@ fun ZhaoxiSearchScene(
         ?: kotlinx.coroutines.flow.flowOf(UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null)))
         .collectAsState(initial = sessions?.snapshot() ?: UiSessionsSnapshot(
             null, LocalUsageMode.CHAT, false, emptyList(), null))
+    val messageIdentity = snapshot.identity
+    var messageHits by remember(needle, messageIdentity, refreshVersion) {
+        mutableStateOf(emptyList<com.labteto.dshmobile.uicontract.UiMessageSnapshot>())
+    }
+    var searchCursor by remember(needle, messageIdentity, refreshVersion) {
+        mutableStateOf<com.labteto.dshmobile.uicontract.UiMessageSearchCursor?>(null)
+    }
+    var messageLoading by remember(needle, messageIdentity, refreshVersion) { mutableStateOf(false) }
+    var messageError by remember(needle, messageIdentity, refreshVersion) { mutableStateOf<String?>(null) }
+    val searchJobs = androidx.compose.runtime.rememberCoroutineScope()
+    suspend fun readMessagePage(cursor: com.labteto.dshmobile.uicontract.UiMessageSearchCursor?) {
+        val owner = transcript ?: return
+        val target = messageIdentity ?: return
+        messageLoading = true
+        messageError = null
+        try {
+            when (val result = owner.searchMessages(target.sessionId, needle, cursor)) {
+                is com.labteto.dshmobile.uicontract.UiMessageSearchReceipt.Available -> {
+                    messageHits = (messageHits + result.result.page.messages.filter { it.id in result.result.hitIds }).distinctBy { it.id }
+                    searchCursor = result.result.nextCursor
+                }
+                is com.labteto.dshmobile.uicontract.UiMessageSearchReceipt.Failed ->
+                    messageError = result.message ?: "消息搜索失败，请刷新后重试"
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (failure: Exception) { messageError = "消息搜索失败，请刷新后重试" }
+        finally { messageLoading = false }
+    }
+    androidx.compose.runtime.LaunchedEffect(transcript, needle, messageIdentity, refreshVersion) {
+        if (needle.isNotBlank() && messageIdentity != null && transcript != null) {
+            kotlinx.coroutines.delay(250)
+            readMessagePage(null)
+        }
+    }
     val galleryRead by produceState<com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt?>(null, gallery, refreshVersion) {
         value = gallery?.read()
     }
@@ -654,6 +690,19 @@ fun ZhaoxiSearchScene(
                         })
                 }
             }
+            if (transcript != null && messageIdentity != null) {
+                ZxSection("当前会话的消息正文")
+                messageError?.let { ZxBanner(it, ZxTone.Warn) }
+                messageHits.forEach { message ->
+                    ZxRow(if (message.role == com.labteto.dshmobile.uicontract.UiMessageRole.USER) "我" else "助手",
+                        message.text.take(180), onClick = { onMessageOpen(messageIdentity, message) })
+                }
+                if (messageLoading) ZxFooterNote("正在检索会话历史…")
+                searchCursor?.let { cursor ->
+                    ZxButton("继续搜索较早的消息", { searchJobs.launch { readMessagePage(cursor) } },
+                        enabled = !messageLoading, loading = messageLoading, variant = ZxButtonVariant.Outline)
+                }
+            }
             if (personaResults.isNotEmpty()) {
                 ZxSection("人物")
                 personaResults.forEach { item ->
@@ -687,7 +736,8 @@ fun ZhaoxiSearchScene(
                 ZxBanner("工作区文件读取失败，请返回工作区检查文件状态", ZxTone.Warn)
             }
             if (!loading && sessionResults.isEmpty() && personaResults.isEmpty() &&
-                taskResults.isEmpty() && fileResults.isEmpty()) {
+                taskResults.isEmpty() && fileResults.isEmpty() && messageHits.isEmpty() &&
+                !messageLoading && messageError == null && searchCursor == null) {
                 ZxEmpty("没有找到匹配的内容", "可以换一个关键词重试")
             }
         }

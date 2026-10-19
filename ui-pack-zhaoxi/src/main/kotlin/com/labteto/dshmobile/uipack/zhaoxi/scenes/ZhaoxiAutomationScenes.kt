@@ -105,6 +105,7 @@ fun ZhaoxiAutomationTasksScene(
     var filter by rememberSaveable { mutableStateOf("全部") }
     var taskQuery by rememberSaveable { mutableStateOf("") }
     var modeFilter by rememberSaveable { mutableStateOf("全部模式") }
+    var deleteTaskId by remember { mutableStateOf<String?>(null) }
     var feedback by remember { mutableStateOf<String?>(null) }
     val filtered = remember(snap.tasks, filter, taskQuery, modeFilter) {
         snap.tasks.filter { task ->
@@ -201,6 +202,7 @@ fun ZhaoxiAutomationTasksScene(
                     ZxFooterNote("任务已阻断，请先检查所属会话、授权或调度配置")
                     ZxChip("检查任务配置", false) { onOpenEditor(task.id) }
                 }
+                ZxChip("删除任务", false) { deleteTaskId = task.id }
                 if (mayRetry || canChangeScheduleState) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 10.dp),
@@ -231,6 +233,17 @@ fun ZhaoxiAutomationTasksScene(
         }
         Spacer(Modifier.height(8.dp))
         ZxButton("新建自动化", onCreate, Modifier.fillMaxWidth())
+        deleteTaskId?.let { id ->
+            com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog(
+                "删除自动化任务？", "删除后不再调度此任务，已产生的会话和结果会保留。", "删除任务",
+                {
+                    val result = automation.submit(AutomationUiCommand.Delete(id))
+                    feedback = zxAutomationReceiptText("删除任务", result)
+                    if (result is AutomationUiReceipt.Applied) deleteTaskId = null
+                },
+                { deleteTaskId = null },
+            )
+        }
 
     }
 }
@@ -534,6 +547,18 @@ internal fun zxToolFamilyLabel(name: String): String = when (name.lowercase()) {
     else -> name
 }
 
+/** Preserve argv exactly; never split a command string or run it through an extra shell. */
+internal fun zxMcpStdioCommand(value: String): List<String>? {
+    val array = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(value) }
+        .getOrNull() as? kotlinx.serialization.json.JsonArray ?: return null
+    val args = array.map { element ->
+        val text = element as? kotlinx.serialization.json.JsonPrimitive ?: return null
+        if (!text.isString) return null
+        text.content
+    }
+    return args.takeIf { it.isNotEmpty() && it.first().isNotBlank() }
+}
+
 /** 按 E8.18 独立场景分派工具中心、MCP、插件和 GitHub；所有状态来自 ToolsUiPort。 */
 @Composable
 fun ZhaoxiToolsScene(
@@ -545,6 +570,10 @@ fun ZhaoxiToolsScene(
     var feedback by remember { mutableStateOf<String?>(null) }
     var endpoint by remember { mutableStateOf("") }
     var serverId by remember { mutableStateOf("") }
+    var transport by rememberSaveable { mutableStateOf("http") }
+    var stdioCommand by remember { mutableStateOf("") }
+    var workingDirectory by remember { mutableStateOf("") }
+    val argv = remember(stdioCommand) { zxMcpStdioCommand(stdioCommand) }
     var expandedServer by rememberSaveable { mutableStateOf<String?>(null) }
     var githubToken by remember { mutableStateOf("") }
     var pendingClearGitHub by remember { mutableStateOf(false) }
@@ -555,8 +584,8 @@ fun ZhaoxiToolsScene(
     var pluginQuery by rememberSaveable { mutableStateOf("") }
     fun submitConfiguration(command: ToolsUiCommand, clearTokenOnSuccess: Boolean = false) {
         if (busy) return
+        busy = true
         co.launch {
-            busy = true
             try {
                 val receipt = tools.submit(command)
                 feedback = zxToolReceiptText(receipt)
@@ -575,8 +604,13 @@ fun ZhaoxiToolsScene(
     val skills by produceState<List<com.labteto.dshmobile.uicontract.UiSkillSnapshot>?>(null, tools) {
         value = tools.installedSkills()
     }
+    androidx.compose.runtime.LaunchedEffect(tools) {
+        tools.serverChanges().collect { refresh++ }
+    }
     val servers by produceState(initialValue = emptyList<com.labteto.dshmobile.uicontract.UiMcpServerSnapshot>(), tools, refresh) {
-        value = tools.servers()
+        value = try { tools.servers() }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { feedback = "服务器列表读取失败，请刷新后重试"; emptyList() }
     }
     val githubConfigured by produceState(initialValue = false, tools, refresh) {
         value = tools.githubConfigured()
@@ -593,15 +627,32 @@ fun ZhaoxiToolsScene(
         feedback?.let { ZxSection("操作回执"); Text(it, color = ZhaoxiTheme.colors.ink2) }
         when (destination) {
             "tools.mcp" -> {
-                ZxSection("连接方式 · HTTP")
-                com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
-                    serverId, { serverId = it }, Modifier.fillMaxWidth(), placeholder = "服务器名称")
-                com.labteto.dshmobile.uipack.zhaoxi.components.ZxField(
-                    endpoint, { endpoint = it }, Modifier.fillMaxWidth(), placeholder = "HTTP 地址")
+                ZxSection("添加连接")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZxChip("HTTP 服务", transport == "http") { transport = "http" }
+                    ZxChip("本机 stdio", transport == "stdio") { transport = "stdio" }
+                    ZxChip("刷新", false) { refresh++ }
+                }
+                ZxField(serverId, { serverId = it }, Modifier.fillMaxWidth(), placeholder = "服务器名称")
+                if (transport == "http") {
+                    ZxField(endpoint, { endpoint = it }, Modifier.fillMaxWidth(), placeholder = "HTTP 地址")
+                } else {
+                    ZxFooterNote("启动本机 MCP 服务进程。命令及每个参数分别填写在 JSON 字符串数组中；工作目录可选。")
+                    ZxField(stdioCommand, { stdioCommand = it }, Modifier.fillMaxWidth(),
+                        fieldLabel = "本机启动命令", placeholder = "[\"node\", \"/path/to/server.js\"]",
+                        error = argv == null, errorMessage = if (argv == null) "请输入非空的命令字符串数组" else null)
+                    ZxField(workingDirectory, { workingDirectory = it }, Modifier.fillMaxWidth(),
+                        placeholder = "工作目录（可选）")
+                }
                 ZxButton("连接服务器", {
-                    submitConfiguration(ToolsUiCommand.ConnectHttp(serverId.trim(), endpoint.trim()))
+                    val command = if (transport == "http")
+                        ToolsUiCommand.ConnectHttp(serverId.trim(), endpoint.trim())
+                    else argv?.let { ToolsUiCommand.ConnectStdio(serverId.trim(), it,
+                        workingDirectory.trim().takeIf(String::isNotBlank)) }
+                    if (command != null) submitConfiguration(command)
                 }, enabled = !busy && serverId.isNotBlank() &&
-                    (endpoint.trim().startsWith("https://") || endpoint.trim().startsWith("http://")),
+                    (if (transport == "stdio") argv != null else
+                        endpoint.trim().startsWith("https://") || endpoint.trim().startsWith("http://")),
                     loading = busy)
                 ZxSection("已登记服务器")
                 if (servers.isEmpty()) ZxEmpty("尚未添加 MCP 服务器", "填写名称和地址后连接")

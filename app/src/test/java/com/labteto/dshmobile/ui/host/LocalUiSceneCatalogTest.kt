@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.host
 
 import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
 import com.labteto.dshmobile.uicontract.UiSceneId
+import com.labteto.dshmobile.uihost.restoreEncodedSnapshot
 import com.labteto.dshmobile.uicontract.UiSceneKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -29,6 +30,32 @@ class LocalUiSceneCatalogTest {
         assertFalse(LocalUiSceneCatalog.requirements.any {
             it.id == UiSceneId("settings.update") && it.kind == UiSceneKind.PAGE
         })
+    }
+
+    @Test fun detailActionsCanNavigateAndReturnThroughTheProductionHostCatalog() {
+        val manifest = com.labteto.dshmobile.uipack.zhaoxi.ZhaoxiUiPackManifest.let {
+            UiPackManifest("detail-navigation-test", 1, 1, 1, it.fullSceneIds,
+                emptySet(), UiWindowClass.entries.toSet(), UiAccessibility.entries.toSet(), true)
+        }
+        val root = UiSceneId("route.home")
+        val navigation = com.labteto.dshmobile.uihost.UiHostSceneNavigation(
+            LocalUiSceneCatalog.requirements, manifest, root)
+        for (id in listOf("conversation.ui_document", "work.plan_review", "chat.branches",
+            "media.result", "work.steering_choice", "work.team", "work.capabilities")) {
+            val entered = navigation.navigate(navigation.initial, UiSceneId(id))
+            assertTrue("$id must be a real destination", entered is com.labteto.dshmobile.uihost.UiSceneNavigationResult.Changed)
+            val state = (entered as com.labteto.dshmobile.uihost.UiSceneNavigationResult.Changed).state
+            assertEquals(UiSceneId(id), state.stack.last())
+            val restored = navigation.restoreEncodedSnapshot(
+                com.labteto.dshmobile.uihost.UiSceneNavigationSnapshotCodec.encode(state))
+            assertEquals(entered, restored)
+            val back = navigation.back(state) as com.labteto.dshmobile.uihost.UiSceneNavigationResult.Changed
+            assertEquals(listOf(root), back.state.stack)
+        }
+        for (id in listOf("conversation.header", "conversation.timeline", "conversation.composer", "settings.update")) {
+            assertTrue(navigation.navigate(navigation.initial, UiSceneId(id)) is
+                com.labteto.dshmobile.uihost.UiSceneNavigationResult.Rejected)
+        }
     }
 
     @Test fun requiredCoverageIncludesEveryOwnedRouteAndSettingsDestination() {

@@ -62,6 +62,7 @@ data class ZhaoxiConversationPorts(
     val replySuggestions: ReplySuggestionsUiPort? = null,
     val files: FilesUiPort? = null,
     val reasoning: com.labteto.dshmobile.uicontract.ConversationReasoningUiPort? = null,
+    val corrections: com.labteto.dshmobile.uicontract.PersonaCorrectionUiPort? = null,
     val workMode: () -> Boolean,
     val workModeUpdates: Flow<Boolean>? = null,
 )
@@ -92,4 +93,6 @@ data class ZhaoxiSecondaryPorts(
     val modelPerformance: ModelPerformanceUiPort? = null,
     val pricing: PricingUiPort? = null,
     val transfer: com.labteto.dshmobile.uicontract.PersonaTransferUiPort? = null,
+    val gallerySave: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort? = null,
+    val invocations: com.labteto.dshmobile.uicontract.ComposerInvocationUiPort? = null,
 )

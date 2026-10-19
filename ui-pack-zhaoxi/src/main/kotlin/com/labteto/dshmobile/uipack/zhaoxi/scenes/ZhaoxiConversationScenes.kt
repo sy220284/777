@@ -97,7 +97,8 @@ import com.labteto.dshmobile.uihost.UiSceneRenderScope
 fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, authorName: String, scope: UiSceneRenderScope, onMessage: (UiSessionIdentity, UiMessageSnapshot) -> Unit, menu: @Composable () -> Unit,
     documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
     media: MediaUiPort? = null, attachments: AttachmentUiPort? = null,
-    reasoning: ConversationReasoningUiPort? = null, settings: SettingsUiPort? = null) {
+    reasoning: ConversationReasoningUiPort? = null, settings: SettingsUiPort? = null,
+    corrections: PersonaCorrectionUiPort? = null) {
     val snap by chat.snapshots.collectAsState(initial = chat.snapshot())
     val storedDrafts by drafts.drafts.collectAsState()
     val sessionId = snap.identity?.sessionId.orEmpty()
@@ -113,6 +114,9 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
         snap.error?.let { ZxBanner(it, ZxTone.Err) }
         if (snap.status == UiSceneStatus.LOADING) com.labteto.dshmobile.uipack.zhaoxi.components.ZxProgressBar(null)
         Column(Modifier.weight(1f)) {
+            snap.correctionUndo?.let { notice ->
+                if (corrections != null) ZhaoxiCorrectionNotice(notice, corrections)
+            }
             snap.group?.let { g ->
                 ZxBanner("群聊 · ${g.memberNames.joinToString("、")}", ZxTone.Info)
                 Spacer(Modifier.height(6.dp))
@@ -178,11 +182,14 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
                 missingSession = snap.identity == null)
             snap.approval?.let { ap ->
                 Spacer(Modifier.height(6.dp))
-                ZxApprovalCard(ap, expired = snap.phase == UiExecutionPhase.IDLE && ap.pendingId.isBlank()) { approved ->
+                ZxApprovalCard(ap, expired = snap.identity == null || snap.phase != UiExecutionPhase.WAITING_FOR_USER) { approved ->
                     snap.identity?.let { id ->
                         receipt = work.submit(WorkConversationUiCommand.AnswerApproval(id, ap.pendingId, approved))
                     }
                 }
+            }
+            if (snap.approval != null && UiSceneId("work.approval") in knownScenes) {
+                ZxNavRow("查看完整审批与授权方式") { scope.onNavigate(UiSceneId("work.approval")) }
             }
             snap.question?.let { q ->
                 Spacer(Modifier.height(6.dp))
@@ -458,13 +465,13 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
         items.firstOrNull { it.document.isInlineWorkTaskCard() }
     }
     fun submitDocumentAction(
-        card: UiDocumentSnapshot, actionId: String, fields: Map<String, String>,
+        card: UiDocumentSnapshot, actionId: String, fields: Map<String, String>, confirmed: Boolean,
     ): UiDocumentReceipt {
         if (documents == null || identity == null || card.actions[actionId]?.available != true)
             return UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
         return documents.submit(identity, UiDocumentActionRequest(
             documentId = card.document.documentId, revision = card.document.revision,
-            source = card.document.source, actionId = actionId, fields = fields))
+            source = card.document.source, actionId = actionId, fields = fields, confirmed = confirmed))
     }
     // A cumulative model snapshot must not repeat already committed intermediate messages.
     val activeReply = timeline.lastOrNull { it is ZxTimelineEntry.Reply } as? ZxTimelineEntry.Reply
@@ -604,8 +611,8 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                                 .forEach { card ->
                                     androidx.compose.runtime.key(card.document.documentId) {
                                         ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
-                                            onAction = { actionId, fields ->
-                                                submitDocumentAction(card, actionId, fields)
+                                            onAction = { actionId, fields, confirmed ->
+                                                submitDocumentAction(card, actionId, fields, confirmed)
                                             }, media = media)
                                     }
                                 }
@@ -623,14 +630,14 @@ internal fun ConversationMessages(identity: UiSessionIdentity?, messages: List<U
                         // The single compact, collapsible Work status shares the reply slot.
                         entry.anchorId?.let { anchor -> workByTurn[anchor] }?.let { card ->
                             ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
-                                onAction = { actionId, fields -> submitDocumentAction(card, actionId, fields) },
+                                onAction = { actionId, fields, confirmed -> submitDocumentAction(card, actionId, fields, confirmed) },
                                 media = media)
                         }
                         entry.anchorId?.let { allCardsBySource[it] }.orEmpty()
                             .filterNot { it.document.isInlineWorkTaskCard() }
                             .forEach { card ->
                                 ZxDocumentCard(card.document, card.bindings, knownScenes, pendingApprovalId,
-                                    onAction = { actionId, fields -> submitDocumentAction(card, actionId, fields) },
+                                    onAction = { actionId, fields, confirmed -> submitDocumentAction(card, actionId, fields, confirmed) },
                                     media = media)
                             }
                     }

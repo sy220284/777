@@ -180,6 +180,7 @@ internal fun createZhaoxiApplicationPack(
             replySuggestions = owner.replySuggestionsUiPort,
             files = owner.filesUiPort,
             reasoning = owner.reasoningUiPort,
+            corrections = owner.personaCorrectionUiPort,
             workMode = owner::isWorkMode,
             workModeUpdates = owner.workModeUpdates,
         ),
@@ -207,5 +208,7 @@ internal fun createZhaoxiApplicationPack(
             modelPerformance = owner.modelPerformance,
             pricing = owner.pricing,
             transfer = owner.personaTransferUiPort,
+            gallerySave = owner.personaGallerySaveUiPort,
+            invocations = owner.composerInvocationUiPort,
         ),
     )

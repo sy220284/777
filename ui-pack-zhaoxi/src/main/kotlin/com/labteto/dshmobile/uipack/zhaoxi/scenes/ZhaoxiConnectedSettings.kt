@@ -420,6 +420,21 @@ fun ZhaoxiRuntimeSettingsScene(
                     rules, snap.autoRecall, snap.autoMemory)).zxUserMessage("保存规则")
             }, Modifier.fillMaxWidth())
         } else {
+            ZxSection("图片理解方式")
+            ZxFooterNote("自动按当前模型能力选择；原生将图片交给模型，工具模式通过已配置的视觉工具处理。")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LocalImageInputMode.entries.forEach { mode ->
+                    val label = when (mode) {
+                        LocalImageInputMode.AUTO -> "自动选择"
+                        LocalImageInputMode.NATIVE -> "模型原生"
+                        LocalImageInputMode.TOOL -> "视觉工具"
+                    }
+                    ZxChip(label, snap.imageInputMode == mode) {
+                        status = settings.submit(SettingsUiCommand.ImageInputMode(mode)).zxUserMessage("图片理解设置")
+                    }
+                }
+            }
             ZxSection("执行限制")
             ZxFooterNote("限制单次运行的步骤与尝试次数，不修改历史工作记录。")
             ZxSection("主任务最大步数（4–512）")

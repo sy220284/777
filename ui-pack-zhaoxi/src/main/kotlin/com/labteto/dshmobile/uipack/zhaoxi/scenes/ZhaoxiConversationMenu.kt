@@ -48,8 +48,7 @@ internal fun zxHandoffSummary(
 }
 
 @Composable
-fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSecondaryPorts?, scope: UiSceneRenderScope, hasSettings: Boolean = false, renderSlot: @Composable (UiSceneId) -> Unit = {}) {
-    var selectedSlot by remember { mutableStateOf<UiSceneId?>(null) }
+fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSecondaryPorts?, scope: UiSceneRenderScope, hasSettings: Boolean = false) {
     var receipt by remember { mutableStateOf<UiCommandReceipt?>(null) }
     var feedback by remember { mutableStateOf<String?>(null) }
     var importing by remember { mutableStateOf(false) }
@@ -79,6 +78,7 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
             // Wait for the Session owner activation before Host navigation.
         }
     }
+    secondary?.invocations?.let { ZhaoxiPinnedInvocationActions(it) }
     conv?.let { ports ->
         val identity = if (ports.workMode()) ports.work.snapshot().identity else ports.chat.snapshot().identity
         val attachments by ports.drafts.attachments.collectAsState()
@@ -112,6 +112,11 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
         if (ports.workMode()) {
             ports.workPolicy?.let { policy ->
                 val snap by policy.snapshots.collectAsState(initial = policy.snapshot())
+                if (snap.deviceApprovalLease) {
+                    ZxNavRow("撤销本轮设备授权", "后续设备操作重新逐项审批") {
+                        snap.identity?.let { receipt = policy.submit(WorkPolicyUiCommand.RevokeDeviceTurn(it)) }
+                    }
+                }
                 ZxSwitchRow("计划模式", "由工作运行时保存", snap.planMode) { enabled ->
                     snap.identity?.let { receipt = policy.submit(WorkPolicyUiCommand.SetPlanMode(it, enabled)) }
                 }
@@ -294,6 +299,8 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                     }
                 }
             }
+            if (ports.selection != null && secondary?.gallerySave != null)
+                ZhaoxiArchiveCurrentChat(ports.selection, secondary.gallerySave)
             if (ports.gallery != null && ports.selection != null)
                 ZxNavRow("选择人物") { scope.onNavigate(UiSceneId("chat.persona_picker")) }
             if (secondary?.currentPersona != null)
@@ -328,6 +335,7 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
         if (conv?.documents != null && conv.forms != null)
             add("conversation.ui_document" to "交互文档")
         if (conv?.workMode() == true) {
+            if (conv.workPolicy != null) add("work.steering_choice" to "调整工作指令")
             if (conv.workReads != null && conv.workPolicy != null)
                 add("work.plan_review" to "计划审查")
             if (conv.workTeam != null) add("work.team" to "团队运行")
@@ -336,11 +344,8 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
     }
     availableSlots.forEach { (id, label) ->
         ZxNavRow(label) {
-            selectedSlot = if (selectedSlot?.value == id) null else UiSceneId(id)
+            scope.onNavigate(UiSceneId(id))
         }
-    }
-    selectedSlot?.takeIf { selected -> availableSlots.any { it.first == selected.value } }?.let { id ->
-        Box(Modifier.fillMaxWidth().height(340.dp)) { renderSlot(id) }
     }
     if (conv?.documents != null && conv.forms != null)
         ZxNavRow("生成文档") { scope.onNavigate(UiSceneId("conversation.ui_document_generate")) }

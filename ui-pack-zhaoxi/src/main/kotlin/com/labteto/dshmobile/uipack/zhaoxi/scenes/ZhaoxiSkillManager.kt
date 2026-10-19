@@ -112,6 +112,7 @@ internal fun ZhaoxiSkillManager(tools: ToolsUiPort) {
     var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
     var newSkill by remember { mutableStateOf(false) }
+    var githubLink by remember { mutableStateOf("") }
     var id by remember { mutableStateOf("") }
     var displayName by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -136,8 +137,8 @@ internal fun ZhaoxiSkillManager(tools: ToolsUiPort) {
 
     fun submitSkill(command: ToolsUiCommand, success: String, onSuccess: () -> Unit = {}) {
         if (busy) return
+        busy = true
         jobs.launch {
-            busy = true
             try {
                 val receipt = tools.submit(command)
                 feedback = zxSkillReceiptText(receipt, success)
@@ -185,6 +186,17 @@ internal fun ZhaoxiSkillManager(tools: ToolsUiPort) {
             variant = ZxButtonVariant.Outline, enabled = !busy)
     }
     ZxFooterNote("支持 SKILL.md、ZIP（上限 10 MB）。安装和附属资料由现有 Skill Owner 负责。")
+
+    ZxSection("从 GitHub 安装技能")
+    ZxField(githubLink, { githubLink = it }, Modifier.fillMaxWidth(),
+        placeholder = "粘贴包含 SKILL.md 的 GitHub 目录链接")
+    ZxButton("安装链接中的技能", {
+        submitSkill(ToolsUiCommand.InstallGitHubSkill(githubLink.trim()),
+            "技能已安装，请核对规则后再调用") { githubLink = "" }
+    }, enabled = !busy && githubLink.isNotBlank(), loading = busy,
+        variant = ZxButtonVariant.Outline)
+    ZxButton("刷新技能列表", { generation++ }, enabled = !busy,
+        variant = ZxButtonVariant.Outline)
 
     if (newSkill) {
         ZxSection("创建技能")
