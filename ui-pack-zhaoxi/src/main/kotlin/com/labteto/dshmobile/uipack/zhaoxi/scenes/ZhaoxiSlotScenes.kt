@@ -408,7 +408,11 @@ fun ZhaoxiDiaryHubScene(
     var query by remember { mutableStateOf("") }
     val response by produceState<com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt?>(
         null, gallery, refresh) {
-        value = gallery.read()
+        value = try { gallery.read() }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt.Failed(failure.message)
+        }
     }
     ZxPage("人物手记", onBack = { scope.onBack() }) {
         ZxFooterNote("选择人物，打开其公开日记。")
