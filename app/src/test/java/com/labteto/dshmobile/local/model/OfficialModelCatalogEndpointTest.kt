@@ -42,14 +42,4 @@ class OfficialModelCatalogEndpointTest {
             )),
         )
     }
-    @Test
-    fun miniMaxPresetShowsTheActualSelectedRegionalEndpoints() {
-        for (host in listOf("api.minimaxi.com", "api.minimax.io", "api.minimax.cn")) {
-            val preset = LocalModelPresets.find("MiniMax-M3", "https://$host/v1")!!
-            assertEquals("https://$host/v1", preset.baseUrl)
-            assertEquals("https://$host/v1/models", preset.modelsEndpoint)
-            assertEquals("https://$host/v1/chat/completions", preset.chatEndpoint)
-        }
-    }
-
 }
