@@ -689,7 +689,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     LaunchedEffect(state.sessionId) {
         transcriptInitialPositionReady = false
         scrollHint.hide()
-        attachments.clear()
+        // Keep the session-scoped cached attachment draft across navigation.
         attachmentError = null
         showReplySuggestions = false
         if (transcriptItems.isNotEmpty()) {
