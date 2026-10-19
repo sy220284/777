@@ -362,11 +362,16 @@ fun ZxGroupMembersScene(groups: ChatGroupUiPort, scope: UiSceneRenderScope) {
     val snap by groups.snapshots.collectAsState(initial = groups.snapshot())
     var selected by remember(snap.identity, snap.memberIds) { mutableStateOf(snap.memberIds) }
     var receipt by remember(snap.identity) { mutableStateOf<UiCommandReceipt?>(null) }
+    var query by remember(snap.identity) { mutableStateOf("") }
     val selectionError = zxGroupMemberCountError(selected.size, snap.minimumMembers, snap.maximumMembers)
     ZxPage("群成员", onBack = { scope.onBack() }) {
         CommandFeedback(receipt)
         if (snap.available.isEmpty()) ZxEmpty("没有可选人物", "先创建人物再设置群聊")
-        snap.available.forEach { choice ->
+        else {
+            ZxField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = "搜索群聊成员")
+            val matched = snap.available.filter { it.displayName.contains(query.trim(), ignoreCase = true) }
+            if (matched.isEmpty()) ZxEmpty("没有匹配的人物", "可以修改搜索词")
+            matched.forEach { choice ->
             val picked = choice.galleryId in selected
             ZxRow(choice.displayName, if (picked) "已选" else "未选",
                 onClick = {
@@ -375,6 +380,7 @@ fun ZxGroupMembersScene(groups: ChatGroupUiPort, scope: UiSceneRenderScope) {
                 }, trailing = {
                     ZxBadge(if (picked) "已选" else "未选", ZxBadgeTone.Neutral)
                 })
+        }
         }
         Text("${selected.size} / ${snap.maximumMembers} 位成员", color = ZhaoxiTheme.colors.ink2)
         selectionError?.let { Text(it, color = ZhaoxiTheme.colors.err) }
