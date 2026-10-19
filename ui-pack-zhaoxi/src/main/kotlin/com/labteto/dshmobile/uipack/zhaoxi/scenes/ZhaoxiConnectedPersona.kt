@@ -314,7 +314,35 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
                             if (it.id == lore.id) it.copy(alwaysOn = checked) else it
                         })
                     }
-                    ZxFooterNote("优先级：${lore.priority} · 剧透等级：${lore.spoilerLevel}")
+                    var showAdvancedLore by remember(lore.id) { mutableStateOf(false) }
+                    ZxChip(if (showAdvancedLore) "收起高级设定" else "高级设定", showAdvancedLore) {
+                        showAdvancedLore = !showAdvancedLore
+                    }
+                    if (showAdvancedLore) {
+                        ZhaoxiPersonaField("次级关键词（顿号分隔）", lore.secondaryKeywords.joinToString("、")) { value ->
+                            draft = draft.copy(lore = draft.lore.map {
+                                if (it.id == lore.id) it.copy(secondaryKeywords = value.split("、")
+                                    .map(String::trim).filter(String::isNotBlank)) else it
+                            })
+                        }
+                        ZhaoxiPersonaField("所属阶段", lore.stage) { value ->
+                            draft = draft.copy(lore = draft.lore.map {
+                                if (it.id == lore.id) it.copy(stage = value) else it
+                            })
+                        }
+                        ZhaoxiPersonaField("优先级", lore.priority.toString()) { value ->
+                            val parsed = value.toIntOrNull()
+                            if (parsed != null) draft = draft.copy(lore = draft.lore.map {
+                                if (it.id == lore.id) it.copy(priority = parsed) else it
+                            })
+                        }
+                        ZhaoxiPersonaField("剧透等级", lore.spoilerLevel.toString()) { value ->
+                            val parsed = value.toIntOrNull()
+                            if (parsed != null) draft = draft.copy(lore = draft.lore.map {
+                                if (it.id == lore.id) it.copy(spoilerLevel = parsed) else it
+                            })
+                        }
+                    } else ZxFooterNote("优先级：${lore.priority} · 剧透等级：${lore.spoilerLevel}")
                     ZxButton("移除当前世界书条目", {
                         draft = draft.copy(lore = draft.lore.filterNot { it.id == lore.id })
                         selectedLoreId = null
