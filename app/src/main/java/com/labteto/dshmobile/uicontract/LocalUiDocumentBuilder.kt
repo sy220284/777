@@ -25,7 +25,7 @@ data class GenerateLocalUiDocumentCommand(val identity: UiSessionIdentity, val w
     val messageId: String, val template: UiLocalDocumentTemplate)
 
 /** Pure layout builder: no network, model, store, permission grant or pack-specific visual types. */
-// FEATURE_TREE: {"id":"ui.document.local_builder","path":"第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）","entry":"LocalUiDocumentBuilder","owner":"SHELL","test":"ui-contract/src/test/kotlin/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilderTest.kt#freeTextCannotAcquireActionsOrBecomeACompletionFact"}
+// FEATURE_TREE: {"id":"ui.document.local_builder","path":"第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）","entry":"LocalUiDocumentBuilder","owner":"SHELL","test":"app/src/test/java/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilderTest.kt#freeTextCannotAcquireActionsOrBecomeACompletionFact"}
 object LocalUiDocumentBuilder {
     fun build(documentId: String, source: UiDocumentSource, revision: Long, data: UiLocalDocumentData,
         budget: UiDocumentBudget, knownScenes: Set<UiSceneId>): Result<UiDocument> = runCatching {
