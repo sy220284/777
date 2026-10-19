@@ -444,30 +444,6 @@ internal fun LocalModelSettingsCard(
                         label = { Text(stringResource(R.string.advanced_endpoint)) })
                     LocalModelContextWindowField(contextWindowTokens) { contextWindowTokens = it; editorGeneration++; testStatus = null }
                 } else {
-                    if (selectedPreset?.provider == "MiniMax") {
-                        Text("MiniMax 服务区域", style = DsType.small13Strong.withReadingWeight(), color = colors.text)
-                        SySegmented(
-                            segments = listOf(SySegment("global", "国际区"), SySegment("cn", "中国区")),
-                            selectedKey = if (baseUrl == "https://api.minimax.io/v1") "global" else "cn",
-                            onSelect = { region ->
-                                val url = if (region == "global") "https://api.minimax.io/v1"
-                                    else "https://api.minimaxi.com/v1"
-                                if (baseUrl != url) {
-                                    baseUrl = url
-                                    editingProfileId = null
-                                    credentialSourceProfileId = null
-                                    discoveredModels = emptyList()
-                                    catalogStatus = null
-                                    catalogError = false
-                                    editorGeneration++
-                                    testStatus = null
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Text("密钥必须与签发平台的区域一致。切换区域后请填写该区域的 API 密钥，不会自动转用其他账号或接口。",
-                            style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
-                    }
                     Text(baseUrl, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
                     selectedPreset?.let { preset ->
                         Text(
