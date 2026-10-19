@@ -56,6 +56,8 @@ internal data class LocalWorkProcessNode(
     val count: Int = 0,
     val toolContent: String? = null,
     val toolName: String? = null,
+    val eventId: String = "",
+    val createdAt: Long = 0L,
 ) {
     val kind: AgentOperationKind
         get() = operationKinds.firstOrNull() ?: AgentOperationKind.Generic
@@ -107,9 +109,10 @@ internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<Lo
     if (messages.isEmpty()) return emptyList()
     val nodes = mutableListOf<LocalWorkProcessNode>()
 
-    fun appendSummary(content: String) {
-        localWorkProcessNarration(content)?.let { (summary, detail) ->
-            nodes += LocalWorkProcessNode(summary = summary, detail = detail)
+    fun appendSummary(message: LocalHarnessMessage) {
+        localWorkProcessNarration(message.content)?.let { (summary, detail) ->
+            nodes += LocalWorkProcessNode(summary = summary, detail = detail,
+                eventId = message.id, createdAt = message.createdAt)
         }
     }
 
@@ -120,12 +123,14 @@ internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<Lo
             count = 1,
             toolContent = message.content,
             toolName = message.toolName,
+            eventId = message.id,
+            createdAt = message.createdAt,
         )
     }
 
     messages.forEach { message ->
         when (message.role) {
-            "progress", "assistant" -> appendSummary(message.content)
+            "progress", "assistant" -> appendSummary(message)
             "tool" -> appendOperation(message)
         }
     }
@@ -159,6 +164,16 @@ internal fun semanticWorkProcessNodes(nodes: List<LocalWorkProcessNode>): List<L
                     failed = tools.any { it.failed } || node.failed,
                     count = tools.sumOf { it.count } + node.count,
                     toolName = tools.firstOrNull { !it.toolName.isNullOrBlank() }?.toolName ?: node.toolName,
+                )
+            }
+            node.summary == null && previous?.summary == null && previous != null &&
+                previous.failed == node.failed -> {
+                // Consecutive tool-only rows have no semantic progress description.
+                // Present one counted operation, while retaining the underlying event log.
+                result[result.lastIndex] = previous.copy(
+                    operationKinds = (previous.operationKinds + node.operationKinds).distinct(),
+                    count = previous.count + node.count,
+                    toolName = previous.toolName.takeIf { it == node.toolName },
                 )
             }
             else -> result += node.copy(toolContent = null)

@@ -1163,6 +1163,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         )
                         is LocalTranscriptItem.Thinking -> ChatThinkingRow(transcriptItem.messages)
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
+                        is LocalTranscriptItem.WorkNode -> Box(
+                            modifier = Modifier.fillMaxWidth().animateItem(),
+                        ) {
+                            WorkContentBlock(
+                                node = transcriptItem.node,
+                                running = state.running && !transcriptItem.node.failed &&
+                                    transcriptItem.key == transcriptItems.lastOrNull()?.key,
+                            )
+                        }
                         is LocalTranscriptItem.WorkStep -> Box(
                             modifier = Modifier.fillMaxWidth().animateItem(
                                 fadeInSpec = tween(durationMillis = com.shenyan.designsystem.foundation.SyMotion.duration(

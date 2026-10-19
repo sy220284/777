@@ -56,6 +56,10 @@ internal fun userFacingWorkToolActionRes(toolName: String?): Int? {
 internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
     val action = if (node.failed) {
         stringResource(R.string.local_reasoning_work_failed)
+    } else if (node.summary == null && node.count > 1 &&
+        (node.operationKinds.size > 1 ||
+            node.kind == com.labteto.dshmobile.ui.AgentOperationKind.Generic)) {
+        "工具操作"
     } else stringResource(agentOperationLabelRes(node.kind))
     val provider = userFacingWorkToolProvider(node.toolName)
     val summary = node.summary ?: if (provider != null) "$provider · $action" else action
@@ -81,12 +85,7 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
                 )
                 node.count > 0 -> WorkOperationIcon(node.kind, running = running)
                 running -> WorkOperationIcon(node.kind, running = true)
-                else -> Icon(
-                    FeatherIcons.CheckCircle,
-                    contentDescription = null,
-                    tint = colors.textSecondary,
-                    modifier = Modifier.size(18.dp),
-                )
+                else -> WorkOperationIcon(node.kind, running = false)
             }
             Text(
                 label,

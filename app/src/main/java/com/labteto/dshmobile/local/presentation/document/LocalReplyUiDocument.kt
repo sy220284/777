@@ -16,29 +16,41 @@ import kotlinx.serialization.json.jsonObject
 /** Optional presentation payload carried by the already authorized reply, never a new model call. */
 internal object LocalReplyUiDocumentProtocol {
     internal const val marker = "```ui_document\n"
+    internal val acceptedMarkers = listOf(marker, "```ui_document\r\n")
     val budget = UiDocumentBudget(512, 16, 262_144)
     val instruction = """
-        When a form, comparison table or chart materially helps this reply, optionally append one
-        final fenced block named ui_document after a useful plain-text answer. For ordinary conversation
-        and roleplay, use plain text. This uses the current reply only; never call a tool to create UI.
-        JSON required keys: schemaVersion=1, documentId="reply", revision=0, title, nodes, actions, fallbackText.
-        Nodes require id,type. Allowed: text(text), table(headers,rows),
-        bar_chart(title,unit,points:[{label,value}]), field(label,initial,required),
-        textarea(label,initial,required), select(label,options,initial), switch(label,initial),
-        button(label,actionId), column(children), row(children), disclosure(title,children).
-        Actions require id,type,text,fieldIds. send_user_input prepares an editable composer draft;
-        submit_user_input asks the user to confirm the exact text, then sends an ordinary user message.
-        UI cannot execute tools, grant approval, spend money, or claim verified completion.
-        No other properties, code, paths, URLs or invented media IDs. At most 8 table columns,
-        12 chart points (finite values 0..1e12), 512 nodes/cells/actions, depth 16, 262144 text characters.
-        Always provide useful fallbackText; the plain answer must remain usable without the card.
+        Reply normally in readable language. If the user specifically requests an interactive
+        document, editable form, choice, comparison, or chart, include a structured card in
+        the SAME reply, after the useful plain-text answer. No additional model request is needed.
+        For ordinary conversation do not emit a card. Append at most one final block, starting
+        exactly with a line containing ```ui_document and ending with a line containing ```.
+        The block body must be a single JSON object (not Markdown, comments or executable code).
+        Required top-level keys: schemaVersion=1, documentId="reply", revision=0, title,
+        nodes, actions, fallbackText. Each node needs a unique id and type.
+        Example of an editable choice:
+        ```ui_document
+        {"schemaVersion":1,"documentId":"reply","revision":0,"title":"选择下一步","nodes":[{"id":"choice","type":"select","label":"处理方式","options":["核对","修改"],"initial":"核对"},{"id":"go","type":"button","label":"继续","actionId":"draft"}],"actions":[{"id":"draft","type":"send_user_input","text":"按所选方式继续：","fieldIds":["choice"]}],"fallbackText":"请选择核对或修改。"}
+        ```
+        Supported nodes: text(text), table(headers,rows), bar_chart(title,unit,points),
+        line_chart(title,unit,points), field(label,initial,required), textarea(label,initial,required),
+        select(label,options,initial), switch(label,initial), button(label,actionId),
+        column(children), row(children), disclosure(title,children). Each point is {label,value}.
+        Supported actions: send_user_input or submit_user_input with id,type,text,fieldIds.
+        The former prepares a composer draft; the latter requires explicit user confirmation.
+        Actions may only reference existing input field IDs. Provide fallbackText describing
+        the card if it cannot be displayed, and keep the normal answer useful without the card.
+        Cards cannot execute tools, change permissions, spend money or assert verified progress.
+        Do not include URLs, code, paths, extra properties, media IDs or source identities.
+        At most 8 table columns, 12 chart points, 512 nodes/actions, depth 16, 262144 characters.
     """.trimIndent()
 
     data class Parts(val text: String, val definition: String?)
     fun split(content: String): Parts {
-        val start = content.indexOf(marker)
-        if (start < 0) return Parts(content, null)
-        val tail = content.substring(start + marker.length).trimEnd()
+        val found = acceptedMarkers.mapNotNull { candidate ->
+            content.indexOf(candidate).takeIf { it >= 0 }?.let { it to candidate.length }
+        }.minByOrNull { it.first } ?: return Parts(content, null)
+        val (start, markerLength) = found
+        val tail = content.substring(start + markerLength).trimEnd()
         // Reserved protocol fragments never become narrative, memory or future prompt text.
         val raw = if (tail.endsWith("```")) tail.dropLast(3).trim() else null
         val text = content.substring(0, start).trimEnd()
@@ -98,14 +110,18 @@ internal class LocalReplyUiDocumentPreview {
     fun append(delta: String): String {
         if (hidden) return ""
         val text = pending + delta
-        val marker = LocalReplyUiDocumentProtocol.marker
-        val start = text.indexOf(marker)
-        if (start >= 0) {
+        val markers = LocalReplyUiDocumentProtocol.acceptedMarkers
+        val start = markers.mapNotNull { marker ->
+            text.indexOf(marker).takeIf { it >= 0 }
+        }.minOrNull()
+        if (start != null) {
             hidden = true
             pending = ""
             return text.substring(0, start)
         }
-        val retained = (1 until marker.length).lastOrNull { text.endsWith(marker.take(it)) } ?: 0
+        val retained = markers.maxOf { marker ->
+            (1 until marker.length).lastOrNull { text.endsWith(marker.take(it)) } ?: 0
+        }
         pending = text.takeLast(retained)
         return text.dropLast(retained)
     }
