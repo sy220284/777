@@ -414,9 +414,12 @@ class ZhaoxiApplicationScenePack(
                 ?: ZxEmpty("工作调整暂不可用", "请先打开 Work 会话",
                     actionLabel = "返回", onAction = { scope.onBack() })
             "chat.reply_suggestions" -> (conv?.replySuggestions ?: sec?.replySuggestions)?.let {
-                ZxReplySuggestionsScene(it, onPick = { text ->
+                ZxReplySuggestionsScene(it, onPick = { identity, text ->
                     val current = conv?.chat?.snapshot()?.identity
-                    if (current != null) { conv?.drafts?.updateDraft(current.sessionId, text); scope.onBack() }
+                    if (current == identity) {
+                        conv?.drafts?.updateDraft(identity.sessionId, text)
+                        scope.onNavigate(UiSceneId("conversation.chat"))
+                    }
                 }, scope = scope)
             }
 
