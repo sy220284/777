@@ -62,6 +62,7 @@ class LocalMiniMaxCompatibilityTest {
         assertFalse(payload("MiniMax-M3", "high").containsKey("output_config"))
         assertFalse(payload("MiniMax-M2.7", "none").containsKey("thinking"))
         assertEquals("max", payload("MiniMax-M3.1-Flash-Preview", "max")["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+        assertEquals("adaptive", payload("MiniMax-M3.1-Flash-Preview", "max")["thinking"]!!.jsonObject["type"]!!.jsonPrimitive.content)
         assertThrows(IllegalArgumentException::class.java) { payload("MiniMax-M3.1-Flash-Preview", "none") }
         val latest = payload("MiniMax-M3.1-Flash", "high")
         assertEquals("high", latest["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
