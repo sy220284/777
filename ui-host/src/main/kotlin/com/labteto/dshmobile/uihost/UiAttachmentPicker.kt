@@ -143,3 +143,45 @@ fun <T> rememberUiCameraCaptureFor(
         }
     }
 }
+
+/** A multiple-document picker with the same scoped Host lease as single attachments. */
+@Composable
+fun <T> rememberUiAttachmentMultiPickerFor(
+    mimeTypes: Array<String> = arrayOf("image/*"),
+    onRejected: (String) -> Unit = {},
+    onSelected: (T, List<String>) -> Unit,
+): (T) -> Unit {
+    require(mimeTypes.isNotEmpty())
+    val owner = LocalUiHostSystemOperationOwner.current
+        ?: remember { UiHostSystemOperationOwner() }
+    val latestSelected by rememberUpdatedState(onSelected)
+    val latestRejected by rememberUpdatedState(onRejected)
+    val gate = remember(owner) { UiHostDocumentOperationGate<T>() }
+    val lease = remember(owner) { UiHostSystemOperationLease(owner, UiHostPlatformAction.PICK_ATTACHMENT) }
+    DisposableEffect(gate, lease) {
+        onDispose { if (gate.cancelSelection() != null) lease.finish() }
+    }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        val ticket = gate.cancelSelection()
+        if (ticket == null) latestRejected("HOST_PICKER_STALE_RESULT")
+        else {
+            lease.finish()
+            if (uris.isNotEmpty()) latestSelected(ticket.request, uris.map { it.toString() })
+        }
+    }
+    return { request ->
+        val ticket = gate.begin(request)
+        if (ticket == null) latestRejected("HOST_PLATFORM_OPERATION_BUSY")
+        else if (!lease.begin()) {
+            gate.failToLaunch(ticket)
+            latestRejected("HOST_PLATFORM_OPERATION_BUSY")
+        } else {
+            try { launcher.launch(mimeTypes) }
+            catch (failure: Exception) {
+                gate.failToLaunch(ticket)
+                lease.finish()
+                latestRejected("图片选择器无法打开")
+            }
+        }
+    }
+}
