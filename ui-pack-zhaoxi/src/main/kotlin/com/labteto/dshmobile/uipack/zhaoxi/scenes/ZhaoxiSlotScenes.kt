@@ -466,8 +466,10 @@ fun ZhaoxiDiaryHubScene(
     gallery: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort,
     scope: UiSceneRenderScope,
     onOpenDiary: (String) -> Unit,
+    diary: DiaryUiPort? = null,
 ) {
     var refresh by remember { mutableStateOf(0) }
+    var personBatch by remember { mutableStateOf(6) }
     var query by remember { mutableStateOf("") }
     val response by produceState<com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt?>(
         null, gallery, refresh) {
@@ -477,8 +479,42 @@ fun ZhaoxiDiaryHubScene(
             com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt.Failed(failure.message)
         }
     }
+    val recent by produceState<Pair<List<Pair<String, com.labteto.dshmobile.uicontract.UiDiaryEntry>>, Int>?>(
+        null, response, diary, personBatch,
+    ) {
+        val available = response as? com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt.Available
+        if (diary == null || available == null) { value = null; return@produceState }
+        val collected = mutableListOf<Pair<String, com.labteto.dshmobile.uicontract.UiDiaryEntry>>()
+        var failed = 0
+        for (person in available.entries.take(personBatch)) {
+            try {
+                collected += diary.entries(person.id).filter { it.active }.take(12).map { person.id to it }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (failure: Exception) { failed++ }
+        }
+        value = collected.sortedByDescending { it.second.updatedAt }.take(30) to failed
+    }
     ZxPage("人物手记", onBack = { scope.onBack() }) {
-        ZxFooterNote("选择人物，打开其公开日记。")
+        val persons = (response as? com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt.Available)?.entries
+        if (diary != null && persons != null && persons.isNotEmpty()) {
+            ZxSection("最近手记")
+            when {
+                recent == null -> ZxFooterNote("正在读取人物的公开日记…")
+                recent.first.isEmpty() -> ZxEmpty("目前没有公开手记", "可继续检索其他人物，或直接选择人物")
+                else -> recent.first.forEach { (galleryId, item) ->
+                    ZxRow(item.personaName, item.event.take(115) +
+                        item.feeling.takeIf(String::isNotBlank)?.let { " · ${it.take(35)}" }.orEmpty(),
+                        onClick = { onOpenDiary(galleryId) })
+                }
+            }
+            if ((recent?.second ?: 0) > 0) ZxFooterNote("有 ${recent?.second} 位人物的日记暂时无法读取")
+            if (persons.size > personBatch) {
+                ZxButton("查看更多人物的手记（${minOf(personBatch, persons.size)}/${persons.size}）", {
+                    personBatch += 6
+                }, variant = ZxButtonVariant.Outline)
+            }
+        }
+        ZxSection("按人物查看")
         ZxField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = "搜索人物")
         when (val result = response) {
             null -> ZxFooterNote("正在读取人物目录")
