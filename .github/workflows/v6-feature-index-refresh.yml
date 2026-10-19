@@ -11,6 +11,10 @@ on:
       - docs/FEATURE-TREE-LEGACY-IDENTITIES.json
       - docs/FEATURE-EXISTENCE-TRIAGE.json
       - .github/scripts/sync-feature-tree.py
+      - 'app/src/**'
+      - 'core/src/**'
+      - 'harness-core/src/**'
+      - '.github/scripts/check-feature-tree-sync.py'
 
 permissions:
   contents: write
