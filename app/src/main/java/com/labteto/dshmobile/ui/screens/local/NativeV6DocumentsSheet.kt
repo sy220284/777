@@ -14,6 +14,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +31,10 @@ import com.labteto.dshmobile.uicontract.EditUiDocumentTextCommand
 import com.labteto.dshmobile.uicontract.GenerateLocalUiDocumentCommand
 import com.labteto.dshmobile.uicontract.GenerateUiDocumentCommand
 import com.labteto.dshmobile.uicontract.UiDocument
+import com.labteto.dshmobile.uicontract.MediaUiPort
+import com.labteto.dshmobile.uicontract.UiDocumentFormUiPort
+import com.labteto.dshmobile.uicontract.UiDocumentFormKey
+import com.labteto.dshmobile.uicontract.fieldRetention
 import com.labteto.dshmobile.uicontract.UiDocumentAction
 import com.labteto.dshmobile.uicontract.UiDocumentActionRequest
 import com.labteto.dshmobile.uicontract.UiDocumentBinding
@@ -56,6 +61,8 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun NativeV6DocumentsSheet(
     port: UiDocumentUiPort,
+    forms: UiDocumentFormUiPort,
+    media: MediaUiPort,
     identity: () -> UiSessionIdentity?,
     currentMessageId: () -> String?,
     workMode: Boolean,
@@ -138,6 +145,8 @@ internal fun NativeV6DocumentsSheet(
             items.forEach { item ->
                 NativeV6DocumentCard(
                     item = item,
+                    forms = forms,
+                    media = media,
                     enabled = !busy && current != null,
                     onAction = { actionId, fields, confirmed ->
                         val id = identity()
@@ -150,10 +159,17 @@ internal fun NativeV6DocumentsSheet(
                     },
                     onDelete = {
                         val id = identity()
-                        if (id != null) doCommand { port.delete(DeleteUiDocumentCommand(
-                            id, item.document.documentId, item.document.revision,
-                            item.document.source,
-                        )) }
+                        if (id != null) doCommand {
+                            val receipt = port.delete(DeleteUiDocumentCommand(
+                                id, item.document.documentId, item.document.revision,
+                                item.document.source,
+                            ))
+                            if (receipt == UiDocumentReceipt.Deleted) {
+                                forms.forgetDocument(UiDocumentFormKey(
+                                    item.document.source.sessionId, item.document.documentId, item.document.revision))
+                            }
+                            receipt
+                        }
                     },
                     onEditText = { nodeId, value ->
                         val id = identity()
@@ -200,6 +216,8 @@ internal fun NativeV6DocumentsSheet(
 @Composable
 private fun NativeV6DocumentCard(
     item: UiDocumentSnapshot,
+    forms: UiDocumentFormUiPort,
+    media: MediaUiPort,
     enabled: Boolean,
     onAction: (String, Map<String, String>, Boolean) -> Unit,
     onDelete: () -> Unit,
@@ -209,8 +227,14 @@ private fun NativeV6DocumentCard(
 ) {
     val doc = item.document
     val colors = LocalSyColors.current
-    val fields = remember(doc.documentId, doc.revision, doc.source.sessionId) {
-        mutableStateMapOf<String, String>().apply { putAll(doc.initialFields()) }
+    val formKey = remember(doc.documentId, doc.revision, doc.source.sessionId) {
+        UiDocumentFormKey(doc.source.sessionId, doc.documentId, doc.revision)
+    }
+    val persisted by forms.values.collectAsStateWithLifecycle()
+    val fields = doc.initialFields() + persisted[formKey].orEmpty()
+    DisposableEffect(formKey) {
+        forms.bindRetention(formKey, doc.fieldRetention())
+        onDispose { forms.releaseRetention(formKey) }
     }
     var confirmAction by remember(doc.documentId, doc.revision) { mutableStateOf<String?>(null) }
     var confirmDelete by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
@@ -226,6 +250,8 @@ private fun NativeV6DocumentCard(
                 item = item,
                 fields = fields,
                 enabled = enabled,
+                onFieldChange = { id, value -> forms.update(formKey, id, value) },
+                media = media,
                 onEdit = { target, value -> edit = target; editValue = value },
                 onAction = { actionId ->
                     val action = doc.actions.firstOrNull { it.id == actionId }
@@ -298,8 +324,10 @@ private sealed interface NativeDocumentEdit {
 private fun NativeV6DocumentNode(
     node: UiDocumentNode,
     item: UiDocumentSnapshot,
-    fields: MutableMap<String, String>,
+    fields: Map<String, String>,
     enabled: Boolean,
+    onFieldChange: (String, String) -> Unit,
+    media: MediaUiPort,
     onEdit: (NativeDocumentEdit, String) -> Unit,
     onAction: (String) -> Unit,
 ) {
@@ -324,7 +352,7 @@ private fun NativeV6DocumentNode(
         }
         is UiDocumentNode.Field -> OutlinedTextField(
             value = fields[node.id] ?: node.initial,
-            onValueChange = { fields[node.id] = it },
+            onValueChange = { onFieldChange(node.id, it) },
             label = { Text(node.label) }, modifier = Modifier.fillMaxWidth(),
             maxLines = if (node.multiline) 5 else 1, enabled = enabled,
         )
@@ -332,7 +360,7 @@ private fun NativeV6DocumentNode(
             Text(node.label, color = colors.textSecondary)
             node.options.forEach { option ->
                 SyButton((if (fields[node.id] == option) "✓ " else "") + option,
-                    onClick = { fields[node.id] = option },
+                    onClick = { onFieldChange(node.id, option) },
                     size = SyButtonSize.Small, enabled = enabled,
                     variant = SyButtonVariant.Ghost)
             }
@@ -340,23 +368,23 @@ private fun NativeV6DocumentNode(
         is UiDocumentNode.Switch -> Row {
             Text(node.label, modifier = Modifier.weight(1f), color = colors.textSecondary)
             Switch(checked = (fields[node.id] ?: node.initial.toString()) == "true",
-                onCheckedChange = { fields[node.id] = it.toString() }, enabled = enabled)
+                onCheckedChange = { onFieldChange(node.id, it.toString()) }, enabled = enabled)
         }
         is UiDocumentNode.Button -> SyButton(node.label, onClick = { onAction(node.actionId) },
             enabled = enabled && item.actions[node.actionId]?.available == true,
             variant = SyButtonVariant.Outline, modifier = Modifier.fillMaxWidth())
         is UiDocumentNode.Column -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            node.children.forEach { child -> NativeV6DocumentNode(child, item, fields, enabled, onEdit, onAction) }
+            node.children.forEach { child -> NativeV6DocumentNode(child, item, fields, enabled, onFieldChange, media, onEdit, onAction) }
         }
         is UiDocumentNode.Row -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            node.children.forEach { child -> NativeV6DocumentNode(child, item, fields, enabled, onEdit, onAction) }
+            node.children.forEach { child -> NativeV6DocumentNode(child, item, fields, enabled, onFieldChange, media, onEdit, onAction) }
         }
         is UiDocumentNode.Disclosure -> {
             var expanded by remember(node.id) { mutableStateOf(false) }
             SyButton(node.title + if (expanded) " ▲" else " ▼",
                 onClick = { expanded = !expanded }, variant = SyButtonVariant.Ghost)
             if (expanded) node.children.forEach {
-                NativeV6DocumentNode(it, item, fields, enabled, onEdit, onAction)
+                NativeV6DocumentNode(it, item, fields, enabled, onFieldChange, media, onEdit, onAction)
             }
         }
         is UiDocumentNode.Table -> {
@@ -397,7 +425,6 @@ private fun NativeV6DocumentNode(
                 }
             }
         }
-        is UiDocumentNode.Media -> Text("${node.label} · ${node.kind}（会话媒体）",
-            color = colors.textSecondary)
+        is UiDocumentNode.Media -> NativeV6DocumentMedia(node, item.document.source.sessionId, media)
     }
 }
