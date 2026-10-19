@@ -418,7 +418,7 @@ class ZhaoxiApplicationScenePack(
                     val current = conv?.chat?.snapshot()?.identity
                     if (current == identity) {
                         conv?.drafts?.updateDraft(identity.sessionId, text)
-                        scope.onNavigate(UiSceneId("conversation.chat"))
+                        scope.onBack()
                     }
                 }, scope = scope)
             }
