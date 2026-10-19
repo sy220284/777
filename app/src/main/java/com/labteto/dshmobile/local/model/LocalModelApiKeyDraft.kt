@@ -42,6 +42,14 @@ internal suspend fun resolveLocalModelApiKeyDraft(
     require(!key.isNullOrBlank()) { "请填写该模型的密钥" }
     val preset = LocalModelPresets.find(name, url)
     val contextOverride = when {
+        // V6 explicitly supported subscription-dependent K3 windows. This value expresses
+        // the user's selected ceiling; it does not grant or claim provider entitlement.
+        preset?.provider == "Kimi Code" && preset.model == "k3" -> when (contextWindowTokensOverride) {
+            null -> existing?.contextWindowTokensOverride
+            0 -> null
+            262_144, 1_048_576 -> contextWindowTokensOverride
+            else -> throw IllegalArgumentException("Kimi K3 上下文只支持 262144 或 1048576 Token")
+        }
         preset != null -> null
         contextWindowTokensOverride == null -> existing?.contextWindowTokensOverride
         contextWindowTokensOverride == 0 -> null
