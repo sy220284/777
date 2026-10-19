@@ -4,6 +4,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
+import android.content.ClipData
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import java.io.File
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -86,6 +90,15 @@ fun <T> rememberUiAttachmentPickerFor(
  * The caller must delete the temporary file after the attachment Owner has
  * finished reading it.
  */
+/** Give OEM camera apps explicit temporary access to the FileProvider output URI. */
+private class UiCameraTakePicture : ActivityResultContracts.TakePicture() {
+    override fun createIntent(context: Context, input: Uri): Intent =
+        super.createIntent(context, input).apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            clipData = ClipData.newUri(context.contentResolver, "拍摄照片", input)
+        }
+}
+
 /**
  * Camera results are delivered by Android after another Activity returns. Unlike a regular
  * document picker, TakePicture has a Host-owned output file that must survive Activity
@@ -121,7 +134,7 @@ fun rememberUiCameraCaptureFor(
         requestProfile = null
         requestProject = null
     }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+    val launcher = rememberLauncherForActivityResult(UiCameraTakePicture()) { success ->
         val ticket = gate.cancelSelection()
         val pendingPath = capturePath
         val file = pendingPath?.let(::File)
