@@ -62,6 +62,7 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
     var handoffSummaryDraft by remember(handoffSourceId) { mutableStateOf("") }
     var selectedHandoffIds by remember(handoffSourceId) { mutableStateOf(emptySet<String>()) }
     var selectedHandoffFiles by remember(handoffSourceId) { mutableStateOf(emptySet<String>()) }
+    var handoffVerifying by remember(handoffSourceId) { mutableStateOf(false) }
     var handoffMessages by remember(handoffSourceId) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
     var handoffVisibleLimit by remember(handoffSourceId) { mutableStateOf(80) }
     var handoffCursor by remember(handoffSourceId) { mutableStateOf<UiTranscriptCursor?>(null) }
@@ -227,24 +228,49 @@ fun ZhaoxiConversationMenu(conv: ZhaoxiConversationPorts?, secondary: ZhaoxiSeco
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             ZxButton("返回修改选择", { handoffPreview = false },
                                 variant = ZxButtonVariant.Outline)
-                            ZxButton("确认创建 Work", {
+                            ZxButton("核验附件并创建 Work", {
                                 val result = handoffSummaryDraft.trim()
                                 if (result.isBlank()) handoffProblem = "请填写要交接的公开内容"
-                                else {
-                                    val selectedFiles = availableFiles.filter { it.relativePath in selectedHandoffFiles }
-                                    if (selectedFiles.size != selectedHandoffFiles.size) {
-                                        handoffProblem = "选中的附件已改变，请返回重新选择"
-                                    } else {
+                                else if (!handoffVerifying) jobs.launch {
+                                    handoffVerifying = true
+                                    try {
+                                        val selectedFiles = availableFiles.filter {
+                                            it.relativePath in selectedHandoffFiles
+                                        }
+                                        require(selectedFiles.size == selectedHandoffFiles.size) {
+                                            "选中的附件已改变，请返回重新选择"
+                                        }
+                                        require(selectedFiles.size <= 10) { "单次最多交接 10 个附件" }
+                                        if (selectedFiles.isNotEmpty()) {
+                                            val owner = requireNotNull(ports.attachments) {
+                                                "当前设备不支持文件校验，无法交接附件"
+                                            }
+                                            selectedFiles.forEach { file ->
+                                                val inspected = owner.inspect(
+                                                    InspectUiAttachmentCommand(origin, file))
+                                                require(inspected is UiAttachmentInspectionReceipt.Ready &&
+                                                    inspected.value.digestVerified &&
+                                                    inspected.value.bytes == file.bytes) {
+                                                    "附件“${file.name}”校验失败，请重新导入"
+                                                }
+                                            }
+                                        }
+                                        // Session Owner verifies source identity again before accepting the transition.
                                         receipt = sessions.submit(SessionUiCommand.Create(
                                             origin, com.labteto.dshmobile.local.session.LocalConversationMode.CONTINUATION,
                                             LocalUsageMode.WORK, result, handoffAttachments = selectedFiles))
-                                    }
-                                    if (handoffProblem == null && (receipt == UiCommandReceipt.Accepted || receipt == UiCommandReceipt.Queued)) {
-                                        showHandoff = false
-                                        handoffPreview = false
-                                    }
+                                        if (receipt == UiCommandReceipt.Accepted ||
+                                            receipt == UiCommandReceipt.Queued) {
+                                            showHandoff = false
+                                            handoffPreview = false
+                                        } else handoffProblem = "创建未被接收，请确认会话状态后重试"
+                                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                    catch (failure: Exception) {
+                                        handoffProblem = failure.message ?: "附件校验失败"
+                                    } finally { handoffVerifying = false }
                                 }
-                            }, enabled = handoffSummaryDraft.isNotBlank())
+                            }, enabled = handoffSummaryDraft.isNotBlank() && !handoffVerifying,
+                               loading = handoffVerifying)
                         }
                     } else {
                         ZxFooterNote("已选 ${selectedHandoffIds.size} 条。最多交接 80 条；超长正文将在预览中完整显示实际保留的部分。")
