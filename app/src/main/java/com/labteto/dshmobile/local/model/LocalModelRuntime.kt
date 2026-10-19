@@ -40,8 +40,13 @@ class LocalModelRuntime @Inject constructor(
 
     internal fun configure(apiKey: String, model: String, baseUrl: String) {
         scope.launch {
-            runCatching { saveConfiguration(apiKey, model, baseUrl) }
-                .onFailure { error -> state.publishError(error.message ?: "模型配置保存失败") }
+            try {
+                saveConfiguration(apiKey, model, baseUrl)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                state.publishError(error.message ?: "模型配置保存失败")
+            }
         }
     }
 
@@ -89,9 +94,13 @@ class LocalModelRuntime @Inject constructor(
         scope.launch {
             if (identityMutationLocked()) return@launch
             val before = state.value.modelState
-            runCatching { configuration.remove(id, before.model, before.baseUrl) }
-                .onSuccess { result -> result?.let(::commit) }
-                .onFailure { error -> state.publishError(error.message ?: "模型删除失败") }
+            try {
+                configuration.remove(id, before.model, before.baseUrl)?.let(::commit)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                state.publishError(error.message ?: "模型删除失败")
+            }
         }
     }
 
@@ -121,9 +130,13 @@ class LocalModelRuntime @Inject constructor(
                 return@launch
             }
             val before = state.value.modelState
-            runCatching { configuration.clearActive(before.model, before.baseUrl) }
-                .onSuccess(::commit)
-                .onFailure { error -> state.publishError(error.message ?: "模型凭据清除失败") }
+            try {
+                commit(configuration.clearActive(before.model, before.baseUrl))
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                state.publishError(error.message ?: "模型凭据清除失败")
+            }
         }
     }
 
