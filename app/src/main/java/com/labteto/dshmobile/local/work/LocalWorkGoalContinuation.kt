@@ -180,11 +180,12 @@ internal fun shouldDiscardWorkGoalContinuation(
     input: com.labteto.dshmobile.harness.agent.QueuedAgentInput,
     remaining: List<com.labteto.dshmobile.harness.agent.QueuedAgentInput>,
     work: LocalWorkState,
+    eventLog: LocalSessionEventLog? = null,
 ): Boolean =
     input.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.WORK_CONTINUATION &&
         input.continuation?.failureCode == WORK_GOAL_PROGRESS_CONTINUATION &&
         (remaining.any { it.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.USER } ||
-            !isCurrentWorkGoalContinuation(input.continuation, work))
+            !isCurrentWorkGoalContinuation(input.continuation, work, eventLog))
 
 internal const val WORK_GOAL_PROGRESS_CONTINUATION = "WORK_GOAL_PROGRESS"
 
