@@ -54,9 +54,7 @@ internal fun projectLocalSessionSummary(
         title = normalized.title,
         updatedAt = normalized.updatedAt,
         usageMode = normalized.usageMode,
-        blank = normalized.transcriptIndex.totalMessageCount == 0L &&
-            normalized.transcriptWindow.none { it.content.isNotBlank() } &&
-            normalized.messages.none { it.content.isNotBlank() },
+        blank = isUnstartedSessionSnapshot(normalized, domainCodecs),
         summaryPreview = normalized.transcriptIndex.latestUserContent
             ?.replace(Regex("\\s+"), " ")
             ?.trim()
@@ -76,7 +74,8 @@ internal fun isUnstartedSessionSnapshot(
     domainCodecs: List<LocalSessionDomainCodec>,
 ): Boolean =
     snapshot.transcriptIndex.totalMessageCount == 0L &&
-        snapshot.transcriptWindow.isEmpty() && snapshot.messages.isEmpty() &&
+        snapshot.transcriptWindow.none { it.content.isNotBlank() || it.blocks.isNotEmpty() } &&
+        snapshot.messages.none { it.content.isNotBlank() || it.blocks.isNotEmpty() } &&
         snapshot.handoffSummary.isNullOrBlank() &&
         snapshot.plan.isEmpty() && snapshot.todosPayload.isEmpty() &&
         snapshot.goalPayload == null && !snapshot.planMode &&
