@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.presentation.document
 import com.labteto.dshmobile.local.session.LocalUiDocumentSessionStore
 import com.labteto.dshmobile.uicontract.UiDocumentAction
 import com.labteto.dshmobile.uicontract.UiDocumentNode
+import com.labteto.dshmobile.uicontract.UiDocument
 import com.labteto.dshmobile.uicontract.UiDocumentBudget
 import com.labteto.dshmobile.uicontract.UiDocumentSource
 import com.labteto.dshmobile.uicontract.UiDocumentProvenance
@@ -12,6 +13,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
+
+/** A model-authored card is not an interaction waiter. Work must not run another goal slice
+ * while a real form is waiting for the user to commit their choices. */
+internal enum class WorkReplyFormHandling { NONE, DEFER_UNTIL_NO_TOOLS, WAIT_FOR_SUBMISSION }
 
 /** Optional presentation payload carried by the already authorized reply, never a new model call. */
 internal object LocalReplyUiDocumentProtocol {
@@ -68,6 +73,27 @@ internal object LocalReplyUiDocumentProtocol {
         Do not include URLs, code, paths, extra properties, media IDs or source identities.
         At most 8 table columns, 12 chart points, 512 nodes/actions, depth 16, 262144 characters.
     """.trimIndent()
+
+    /** Analyze ONLY a fully validated input card, never instructions in untrusted free text. */
+    fun workReplyFormHandling(definition: String?, hasToolCalls: Boolean): WorkReplyFormHandling {
+        if (definition == null) return WorkReplyFormHandling.NONE
+        val source = UiDocumentSource("work-form-validation", "answer", 0L, null, null, true)
+        val doc = LocalUiDocumentCodec.decode(definition, source, budget, emptySet(), null)
+            .getOrNull() ?: return WorkReplyFormHandling.NONE
+        val inputActions = doc.actions.filterIsInstance<UiDocumentAction.SendUserInput>()
+            .filter { it.fieldIds.isNotEmpty() }.mapTo(linkedSetOf()) { it.id }
+        if (inputActions.isEmpty()) return WorkReplyFormHandling.NONE
+        fun containsSubmission(node: UiDocumentNode): Boolean = when (node) {
+            is UiDocumentNode.Button -> node.actionId in inputActions
+            is UiDocumentNode.Row -> node.children.any(::containsSubmission)
+            is UiDocumentNode.Column -> node.children.any(::containsSubmission)
+            is UiDocumentNode.Disclosure -> node.children.any(::containsSubmission)
+            else -> false
+        }
+        if (!doc.nodes.any(::containsSubmission)) return WorkReplyFormHandling.NONE
+        return if (hasToolCalls) WorkReplyFormHandling.DEFER_UNTIL_NO_TOOLS
+            else WorkReplyFormHandling.WAIT_FOR_SUBMISSION
+    }
 
     data class Parts(val text: String, val definition: String?)
     fun split(content: String): Parts {
