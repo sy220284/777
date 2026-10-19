@@ -423,6 +423,32 @@ class TokenUsageAnalyticsStore @Inject constructor(
         )
     }
 
+    /** Stable request-ID cursor into the retained SQLite ledger, independent of the short dashboard tail. */
+    fun historyPage(
+        model: String?,
+        sinceMillis: Long?,
+        cursor: String?,
+        limit: Int,
+    ): com.labteto.dshmobile.uicontract.UiUsageHistoryPage = synchronized(lock) {
+        ensureLoaded()
+        require(limit in 1..100) { "单页查询数量不合法" }
+        val retained = database.retainedRecords().asReversed().filter { record ->
+            (model == null || record.model == model) &&
+                (sinceMillis == null || record.timestamp >= sinceMillis)
+        }
+        val start = if (cursor == null) 0 else {
+            val index = retained.indexOfFirst { it.requestId == cursor }
+            require(index >= 0) { "历史记录已变化，请从第一页重新加载" }
+            index + 1
+        }
+        val items = retained.drop(start).take(limit)
+        com.labteto.dshmobile.uicontract.UiUsageHistoryPage(
+            records = items,
+            nextCursor = items.lastOrNull()?.requestId?.takeIf { start + items.size < retained.size },
+            totalMatching = retained.size,
+        )
+    }
+
     fun recordById(requestId: String): TokenUsageRecord? = synchronized(lock) {
         ensureLoaded()
         database.recordById(requestId)
