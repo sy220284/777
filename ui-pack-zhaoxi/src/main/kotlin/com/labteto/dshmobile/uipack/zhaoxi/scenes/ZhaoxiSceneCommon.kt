@@ -162,8 +162,6 @@ internal fun zxSettingsNavigationIcon(label: String): String? = when (label) {
             "高级设置" -> "tools"
             "诊断与网络" -> "info"
             "检查更新" -> "refresh"
-            else -> null
-        }
     else -> null
 }
 
