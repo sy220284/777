@@ -13,6 +13,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkspaceKindLabel
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxUsageActionLabel
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxWorkspaceFileVisible
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxSettingsNavigationIcon
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -78,6 +79,15 @@ class ZhaoxiHistoryUiPresentationTest {
         assertEquals("可修改 · 需操作确认", zxCapabilityPermissionLabel("MUTATION", "ALWAYS"))
         assertEquals("已启用", zxPluginStateLabel("ACTIVE"))
         assertEquals("需要修复", zxPluginStateLabel("FAILED"))
+    }
+    @Test fun everySettingsDestinationGetsAStableIconAndUnknownRowsRemainPlain() {
+        val entries = listOf("外观", "聊天风格", "个人规则", "记忆", "模型",
+            "模型性能", "ChatGPT 账户", "套餐额度", "操作审批模式", "权限与设备",
+            "通知", "用量统计", "会话存储", "高级设置", "诊断与网络", "检查更新")
+        assertTrue(entries.all { !zxSettingsNavigationIcon(it).isNullOrBlank() })
+        assertEquals("palette", zxSettingsNavigationIcon("外观"))
+        assertEquals("quota", zxSettingsNavigationIcon("模型性能"))
+        assertNull(zxSettingsNavigationIcon("未知未来目的地"))
     }
     @Test fun workspaceAndUsagePresentationDoesNotExposeRawInternalIdentifiers() {
         assertEquals("PDF 文档", zxWorkspaceKindLabel("exports/report.pdf"))
