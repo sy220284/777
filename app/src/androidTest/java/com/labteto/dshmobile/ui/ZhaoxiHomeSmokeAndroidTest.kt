@@ -4,7 +4,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
@@ -72,7 +71,10 @@ class ZhaoxiHomeSmokeAndroidTest {
         compose.waitUntil(30_000) {
             compose.onAllNodesWithTag("zhaoxi.home.create_chat").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithTag(recentTag).assertDoesNotExist()
+        org.junit.Assert.assertTrue(
+            "空白草稿不应进入普通最近历史",
+            compose.onAllNodesWithTag(recentTag).fetchSemanticsNodes().isEmpty(),
+        )
         compose.onNodeWithContentDescription("打开侧栏").performClick()
         compose.onNodeWithTag("zhaoxi.drawer.blank_toggle").performClick()
         val reopenTag = "zhaoxi.drawer.reopen_blank.$createdSessionId"
