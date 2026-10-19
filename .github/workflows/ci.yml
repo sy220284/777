@@ -231,7 +231,7 @@ jobs:
           git diff --exit-code -- reference-validation/src/test/resources/official reference-validation/src/test/resources/official-semantic
 
   unit-tests:
-    needs: [scope, architecture-3-gates]
+    needs: [scope, static-gates, architecture-3-gates]
     if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_unit == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -254,7 +254,7 @@ jobs:
 
 
   build-arm64:
-    needs: [scope, architecture-3-gates]
+    needs: [scope, static-gates, architecture-3-gates]
     if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_build == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
