@@ -615,31 +615,67 @@ internal fun zxMcpStdioCommand(value: String): List<String>? {
 
 /** Render capability permissions as user-facing guidance; never alter Owner policy. */
 internal fun zxCapabilityPermissionLabel(access: String, approval: String): String {
-    val effect = if (access.uppercase().contains("MUTATION") || access.uppercase().contains("WRITE")) "可能修改内容" else "只读查询"
+    // Access and approval are independent. Read-only actions may still require confirmation.
+    val effect = when (access.uppercase()) {
+        "READ_ONLY" -> "读取"
+        "MUTATION", "WRITE" -> "可修改"
+        "DEVICE" -> "设备操作"
+        else -> "按实际权限"
+    }
     val consent = when (approval.uppercase()) {
         "NEVER" -> "无需额外确认"
-        "ALWAYS" -> "操作前须确认"
-        else -> "按实际授权规则确认"
+        "ALWAYS", "MUTATION" -> "需操作确认"
+        else -> "按授权策略确认"
     }
     return "$effect · $consent"
 }
 
 internal fun zxCapabilityActionLabel(name: String): String {
     val id = name.lowercase()
-    return when {
-        id == "android_app_info" -> "查看应用和设备信息"
+    val android = mapOf(
+        "android_device_info" to "设备信息", "android_app_list" to "应用列表",
+        "android_app_info" to "查看应用和设备信息", "android_app_launch" to "启动应用",
+        "android_settings_get" to "系统设置", "android_screen" to "界面结构",
+        "android_find" to "查找控件", "android_click_node" to "点击控件",
+        "android_set_text_node" to "填写控件", "android_scroll" to "滚动界面",
+        "android_wait" to "等待控件", "android_open_uri" to "打开链接",
+        "android_tap_text" to "点击文字", "android_type" to "输入文字",
+        "android_tap" to "屏幕点击", "android_swipe" to "滑动屏幕",
+        "android_back" to "返回", "android_home" to "主屏幕",
+        "android_screenshot" to "屏幕截图",
+        "android_notification_status" to "通知授权状态",
+        "android_notification_list" to "通知列表",
+        "android_clipboard_get" to "读取剪贴板",
+        "android_clipboard_set" to "写入剪贴板",
+        "android_vscreen_create" to "创建虚拟屏幕",
+        "android_vscreen_list" to "虚拟屏幕列表",
+        "android_vscreen_status" to "虚拟屏幕状态",
+        "android_vscreen_launch" to "在虚拟屏幕启动应用",
+        "android_vscreen_tap" to "虚拟屏幕点击",
+        "android_vscreen_swipe" to "虚拟屏幕滑动",
+        "android_vscreen_screenshot" to "虚拟屏幕截图",
+        "android_vscreen_close" to "关闭虚拟屏幕",
+    )
+    return android[id] ?: when {
         id.contains("github") && (id.contains("get") || id.contains("list")) -> "读取 GitHub 信息"
         id.contains("github") -> "管理 GitHub 内容"
         id.contains("browser") -> "浏览网页"
         id.contains("search") -> "搜索信息"
         id.contains("shell") || id.contains("terminal") -> "运行命令"
         id.contains("file") || id.contains("workspace") -> "处理文件"
-        id.contains("android") || id.contains("device") -> "使用设备功能"
         id.contains("lsp") || id.contains("code") -> "分析代码"
         id.contains("web") -> "访问网络"
-        else -> name.replace('_', ' ')
+        else -> name // Unknown IDs stay unmodified to avoid false labels.
     }
 }
+
+internal fun zxPluginDisplayName(id: String): String =
+    id.split('_', '-').filter(String::isNotBlank).joinToString(" ") { part ->
+        when (part.lowercase()) {
+            "github" -> "GitHub"; "mcp" -> "MCP"; "api" -> "API"
+            else -> part.replaceFirstChar { it.titlecase() }
+        }
+    }.ifBlank { id }
 
 internal fun zxPluginStateLabel(state: String): String = when (state.uppercase()) {
     "INSTALLING" -> "安装中"
@@ -748,7 +784,7 @@ fun ZhaoxiToolsScene(
                 ZxSection("已登记服务器")
                 if (servers.isEmpty()) ZxEmpty("尚未添加 MCP 服务器", "填写名称和地址后连接")
                 servers.forEach { server ->
-                    ZxRow(server.id, "${server.transport} · ${server.connection} · ${server.tools.size} 个工具",
+                    ZxRow(server.id, "${server.tools.size} 个工具 · ${server.connection}",
                         onClick = { expandedServer = if (expandedServer == server.id) null else server.id })
                     if (expandedServer == server.id) {
                         ZxSection("已登记工具 · ${server.tools.size}")
@@ -756,7 +792,7 @@ fun ZhaoxiToolsScene(
                             ZxFooterNote("当前服务没有上报工具；检查连接并刷新后查看。")
                         server.tools.forEach { name ->
                             val registered = catalogue.firstOrNull { it.name == name }
-                            ZxRow(name,
+                            ZxRow(zxCapabilityActionLabel(name),
                                 registered?.let {
                                     zxCapabilityPermissionLabel(it.access, it.approval) +
                                         if (it.requirements.isEmpty()) "" else " · ${it.requirements.joinToString("、").take(110)}"
@@ -780,7 +816,7 @@ fun ZhaoxiToolsScene(
             }
             "tools.plugins" -> {
                 ZxSection("已安装插件")
-                ZxFooterNote("状态表示插件是否已启用。发生故障时可在下方尝试恢复。")
+                // Current plugin status is shown alongside each plugin.
                 ZxValueRow("已安装数量", value = installedIds.size.toString())
                 ZxField(pluginQuery, { pluginQuery = it }, Modifier.fillMaxWidth(),
                     placeholder = "搜索插件名称或运行状态")
@@ -799,10 +835,10 @@ fun ZhaoxiToolsScene(
                     ZxEmpty("没有匹配的插件", "尝试搜索其他名称或状态")
                 matchingInstalled.forEach { id ->
                     val lifecycle = plugins.firstOrNull { it.id == id }
-                    ZxRow(id, lifecycle?.state?.name?.let(::zxPluginStateLabel) ?: "已安装 · 状态未上报")
+                    ZxRow(zxPluginDisplayName(id), lifecycle?.state?.name?.let(::zxPluginStateLabel) ?: "已安装")
                 }
                 matchingOthers.forEach { item ->
-                    ZxRow(item.id, zxPluginStateLabel(item.state.name))
+                    ZxRow(zxPluginDisplayName(item.id), zxPluginStateLabel(item.state.name))
                 }
                 plugins.filter { it.state == com.labteto.dshmobile.uicontract.UiPluginLifecycleState.FAILED &&
                         (pluginQuery.isBlank() ||
@@ -849,7 +885,7 @@ fun ZhaoxiToolsScene(
                 )
             }
             "work.capabilities" -> {
-                ZxFooterNote("按操作类型浏览已登记能力。实际执行仍由工作任务和权限审批决定。")
+                // Capability entries retain exact Owner approval metadata.
                 val grouped = catalogue.groupBy { it.family }
                 if (grouped.isEmpty()) ZxEmpty("暂无能力", "已注册的能力会在这里出现")
                 grouped.forEach { (group, items) ->
@@ -861,9 +897,9 @@ fun ZhaoxiToolsScene(
             }
             else -> {
                 ZxSection("你可以使用的工具")
-                ZxFooterNote("先选择操作类型查看详情；需要连接或授权的服务可在下方管理。")
+                // Compact tool categories without repeated feature introductions.
                 catalogue.groupBy { it.family }.forEach { (family, items) ->
-                    ZxRow(zxToolFamilyLabel(family), "查看相关操作 · ${items.size} 项",
+                    ZxRow(zxToolFamilyLabel(family), "",
                         onClick = { expandedFamily = if (expandedFamily == family) null else family })
                     if (expandedFamily == family) {
                         items.forEach { cap ->
@@ -883,14 +919,14 @@ fun ZhaoxiToolsScene(
                 else if (skills.orEmpty().isEmpty()) ZxEmpty("暂无已安装技能", "打开插件与技能管理，可上传 SKILL.md 或创建技能")
                 else if (matchedSkills.isEmpty()) ZxEmpty("没有匹配的技能", "可修改名称或说明关键词")
                 matchedSkills.forEach { item ->
-                    ZxRow(item.displayName, item.description, onClick = {
+                    ZxRow(item.displayName, "", onClick = {
                         scope.onNavigate(UiSceneId("tools.plugins"))
                     })
                 }
                 ZxSection("连接与扩展")
-                ZxRow("MCP 服务器", "${servers.size} 个已登记连接",
+                ZxRow("MCP 服务器", "",
                     onClick = { scope.onNavigate(UiSceneId("tools.mcp")) })
-                ZxRow("插件与技能管理", "${installedIds.size} 个插件 · ${skills.orEmpty().size} 项已安装技能",
+                ZxRow("插件与技能管理", "",
                     onClick = { scope.onNavigate(UiSceneId("tools.plugins")) })
                 ZxRow("GitHub", if (githubConfigured) "已配置" else "未配置",
                     onClick = { scope.onNavigate(UiSceneId("tools.github")) })
@@ -958,7 +994,7 @@ private fun ZhaoxiGitHubBrowser(tools: com.labteto.dshmobile.uicontract.ToolsUiP
         }
     }
     ZxSection("真实仓库浏览 · 只读")
-    ZxFooterNote("仓库列表来自当前已授权的 GitHub 账户；创建 PR、提交修改和其他写操作仍经原有 Work/GitHub 工具审批。")
+    // Owner retains approval rules for GitHub writes.
     error?.let { ZxFooterNote(it) }
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ZxButton("刷新仓库", { error = null; revision++ },
