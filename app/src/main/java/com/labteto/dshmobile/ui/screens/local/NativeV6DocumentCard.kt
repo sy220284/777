@@ -289,7 +289,7 @@ private fun NativeV6DocumentNode(
                     onFieldChange(node.id, snapped.toString())
                 },
                 valueRange = node.minimum.toFloat()..node.maximum.toFloat(),
-                steps = ((node.maximum - node.minimum) / node.step).toInt() - 1,
+                steps = kotlin.math.round((node.maximum - node.minimum) / node.step).toInt() - 1,
                 enabled = !readOnly)
         }
         is UiDocumentNode.Calculated -> Column {
