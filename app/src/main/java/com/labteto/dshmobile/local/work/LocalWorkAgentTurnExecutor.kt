@@ -850,9 +850,8 @@ internal class LocalWorkAgentTurnExecutor(
                         finally { serviceReleased = true }
                     } finally {
                         workRunRegistry.finishTurn(binding, ownerJob, onIdle = {
-                            if (!waitingForReplyFormSubmission &&
-                                (completedGoalDisposition == LocalWorkGoalDisposition.NEEDS_EXECUTION ||
-                                    completedGoalDisposition == LocalWorkGoalDisposition.READY_FOR_SETTLEMENT)) {
+                            if (shouldAutoContinueWorkGoalAfterForm(
+                                    completedGoalDisposition, waitingForReplyFormSubmission)) {
                                 driveLocalWorkGoalAfterTurn(
                                     binding = binding,
                                     originalGoal = goalAtTurnStart,
