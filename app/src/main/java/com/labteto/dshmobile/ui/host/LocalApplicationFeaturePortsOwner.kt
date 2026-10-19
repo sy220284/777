@@ -120,7 +120,7 @@ internal class LocalApplicationFeaturePortsOwner @Inject constructor(
         attachments = attachmentUiPort, transcript = messageHistoryUiPort,
         groups = chatGroupUiPort, team = workTeamUiPort,
         workReads = workReadUiPort, workPolicy = workPolicyUiPort,
-        shell = shellPreferences, evidence = workEvidenceUiPort,
+        shell = shellPreferences,
         gallery = personaGalleryUiPort, personas = personaSelectionUiPort,
         personaTransfer = personaTransferUiPort, stories = personaStoryUiPort,
         galleryDeletion = personaGalleryDeletionUiPort,
