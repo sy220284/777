@@ -4,6 +4,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxAutomationTaskMatches
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxUsageModelNames
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxPinnedSessionsFirst
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxHomeRecentSessions
+import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxSearchOtherSessionCandidates
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxHumanFileSize
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxToolFamilyLabel
 import com.labteto.dshmobile.uipack.zhaoxi.scenes.zxPluginStateLabel
@@ -41,6 +42,20 @@ class ZhaoxiHistoryUiPresentationTest {
         assertEquals(listOf("first", "work"),
             zxHomeRecentSessions(sessions, emptySet()).map { it.id })
         assertTrue("隐藏是展示策略，不能删除底层草稿", sessions.any { it.id == "draft" && it.blank })
+    }
+    @Test fun crossConversationSearchExcludesDraftsAndCurrentSession() {
+        val all = listOf(
+            com.labteto.dshmobile.local.session.LocalSessionSummary("current", "当前", 5L, blank = false),
+            com.labteto.dshmobile.local.session.LocalSessionSummary("draft", "草稿", 4L, blank = true),
+            com.labteto.dshmobile.local.session.LocalSessionSummary("older", "旧会话", 3L, blank = false),
+            com.labteto.dshmobile.local.session.LocalSessionSummary("another", "历史", 2L, blank = false),
+        )
+        assertEquals(listOf("older", "another"),
+            zxSearchOtherSessionCandidates(all, "current").map { it.id })
+        assertEquals(listOf("current", "older", "another"),
+            zxSearchOtherSessionCandidates(all, null).map { it.id })
+        assertEquals(emptyList<String>(),
+            zxSearchOtherSessionCandidates(all, "current").drop(10).take(5).map { it.id })
     }
     @Test fun humanReadableFileSizes() {
         assertEquals("0 字节", zxHumanFileSize(0))
