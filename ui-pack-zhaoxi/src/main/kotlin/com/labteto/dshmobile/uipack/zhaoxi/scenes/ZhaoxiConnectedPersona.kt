@@ -348,6 +348,9 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
     var showStoryHistory by remember(activeStoryId) { mutableStateOf(false) }
     var historyMessages by remember(activeStoryId) { mutableStateOf(emptyList<UiMessageSnapshot>()) }
     var historyCursor by remember(activeStoryId) { mutableStateOf<String?>(null) }
+    var historyPageCursors by remember(activeStoryId) { mutableStateOf<List<String?>>(listOf(null)) }
+    var expandedHistory by remember(activeStoryId) { mutableStateOf<String?>(null) }
+    var deleteHistory by remember(activeStoryId) { mutableStateOf<PersonaGalleryUiCommand.DeleteHistoryMessage?>(null) }
     var historyLoadStarted by remember(activeStoryId) { mutableStateOf(false) }
     var historyHasMore by remember(activeStoryId) { mutableStateOf(true) }
     var historyLoading by remember(activeStoryId) { mutableStateOf(false) }
@@ -366,6 +369,25 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
     BackHandler(enabled = changed) { pendingSwitch = { scope.onBack() } }
     val save = rememberUiDocumentSaver("application/octet-stream") { result ->
         status = if (result == UiDocumentWriteReceipt.Saved) "导出完成" else "导出结果未确认，请检查文件"
+    }
+    deleteHistory?.let { command ->
+        ZxDialog("删除这条归档消息？", "仅修改明确选中的人物故事记录。当前会话和其他故事不会切换。", "删除消息", {
+            deleteHistory = null
+            busy = true
+            jobs.launch {
+                try {
+                    val result = requireNotNull(gallery).submit(command)
+                    status = result.userHint()
+                    // Failure can follow a durable archive exclusion; always reread before another action.
+                    showStoryHistory = false
+                    historyLoadStarted = false
+                    historyMessages = emptyList()
+                    revision++
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (failure: Exception) { status = "删除结果未确认，请重新读取故事历史"; historyLoadStarted = false }
+                finally { busy = false }
+            }
+        }, { deleteHistory = null })
     }
     ZxPage(entry?.name ?: "人物档案", onBack = { protectThen { scope.onBack() } }) {
         Spacer(Modifier.height(8.dp))
@@ -434,6 +456,7 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
                                         is UiPersonaGalleryHistoryReceipt.Available -> {
                                             if (activeStoryId != storyId) return@launch
                                             historyMessages = page.page.messages
+                                            historyPageCursors = listOf(null)
                                             historyCursor = page.page.olderCursor
                                             historyHasMore = page.page.olderCursor != null
                                             historyLoadStarted = true
@@ -453,7 +476,7 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
                         if (historyLoading) ZxFooterNote("正在读取真实历史记录…")
                         if (!historyLoading && historyLoadStarted && historyMessages.isEmpty())
                             ZxEmpty("没有历史对白", "这条故事尚无保存的消息")
-                        historyMessages.takeLast(80).forEach { message ->
+                        historyMessages.forEach { message ->
                             ZxRow(
                                 when (message.role) {
                                     UiMessageRole.USER -> "用户"
@@ -462,8 +485,38 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
                                     UiMessageRole.TOOL -> "工具"
                                 },
                                 message.text.take(500).ifBlank { "此消息没有可展示的文本" },
+                                onClick = { expandedHistory = if (expandedHistory == message.id) null else message.id },
                                 showChevron = false,
                             )
+                            if (expandedHistory == message.id) {
+                                Text(message.text, color = ZhaoxiTheme.colors.ink, fontSize = 14.sp, lineHeight = 22.sp)
+                                ZxButton("删除这条归档消息", {
+                                    deleteHistory = PersonaGalleryUiCommand.DeleteHistoryMessage(galleryId, activeStory.id, message.id)
+                                }, variant = ZxButtonVariant.Danger, enabled = !busy && !historyLoading)
+                            }
+                        }
+                        if (historyPageCursors.size > 1) {
+                            ZxButton("查看较新的一页", {
+                                val storyId = activeStory.id
+                                val previousCursor = historyPageCursors[historyPageCursors.lastIndex - 1]
+                                historyLoading = true
+                                jobs.launch {
+                                    try {
+                                        when (val page = gallery.history(galleryId, storyId, previousCursor)) {
+                                            is UiPersonaGalleryHistoryReceipt.Available -> {
+                                                if (activeStoryId != storyId) return@launch
+                                                historyMessages = page.page.messages
+                                                historyCursor = page.page.olderCursor
+                                                historyHasMore = historyCursor != null
+                                                historyPageCursors = historyPageCursors.dropLast(1)
+                                            }
+                                            else -> { status = "故事历史已变化，请收起后重新打开"; historyLoadStarted = false }
+                                        }
+                                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                    catch (failure: Exception) { status = "读取较新记录失败，请重试" }
+                                    finally { historyLoading = false }
+                                }
+                            }, enabled = !historyLoading, variant = ZxButtonVariant.Outline)
                         }
                         if (historyLoadStarted && historyHasMore) {
                             ZxButton("加载更早的对话", {
@@ -476,14 +529,15 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
                                             when (val page = gallery.history(galleryId, storyId, cursor)) {
                                                 is UiPersonaGalleryHistoryReceipt.Available -> {
                                                     if (activeStoryId != storyId || historyCursor != cursor) return@launch
-                                                    historyMessages = (page.page.messages + historyMessages)
-                                                        .distinctBy { it.id }.takeLast(160)
+                                                    historyMessages = page.page.messages
+                                                    historyPageCursors = historyPageCursors + cursor
                                                     historyCursor = page.page.olderCursor
                                                     historyHasMore = page.page.olderCursor != null
                                                 }
                                                 UiPersonaGalleryHistoryReceipt.Stale -> {
                                                     status = "故事历史发生变化，请关闭后重新读取"
                                                     historyHasMore = false
+                                                    historyLoadStarted = false
                                                 }
                                                 UiPersonaGalleryHistoryReceipt.Missing -> {
                                                     status = "故事已经不存在，请刷新"
@@ -666,16 +720,35 @@ fun ZhaoxiPersonaProfileScene(galleryId: String, gallery: PersonaGalleryUiPort?,
 @Composable
 fun ZhaoxiPortraitEditor(port: PersonaPortraitUiPort, galleryId: String, scope: UiSceneRenderScope) {
     val jobs = rememberCoroutineScope()
-    var revision by remember { mutableStateOf(0) }
-    var status by remember { mutableStateOf<String?>(null) }
-    var confirmRemove by remember { mutableStateOf(false) }
-    val preview by produceState<UiPersonaPortraitPreviewReceipt?>(null, galleryId, revision) { value = port.preview(galleryId) }
-    val pick = rememberUiAttachmentPickerFor<String>(arrayOf("image/*"), { status = it }) { target, uri ->
-        if (uri != null) jobs.launch { status = port.submit(PersonaPortraitUiCommand.Import(target, uri)).zxPortraitFeedback(); revision++ }
+    var revision by remember(galleryId) { mutableIntStateOf(0) }
+    var status by remember(galleryId) { mutableStateOf<String?>(null) }
+    var busy by remember(galleryId) { mutableStateOf(false) }
+    var stagedUri by rememberSaveable(galleryId) { mutableStateOf<String?>(null) }
+    var cropLeft by rememberSaveable(galleryId, stagedUri) { mutableFloatStateOf(0f) }
+    var cropRight by rememberSaveable(galleryId, stagedUri) { mutableFloatStateOf(1f) }
+    var cropTop by rememberSaveable(galleryId, stagedUri) { mutableFloatStateOf(0f) }
+    var cropBottom by rememberSaveable(galleryId, stagedUri) { mutableFloatStateOf(1f) }
+    val horizontal = cropLeft..cropRight
+    val vertical = cropTop..cropBottom
+    var confirmLeave by remember { mutableStateOf(false) }
+    fun leave() {
+        if (busy) status = "画像正在保存，请稍后返回"
+        else if (stagedUri != null) confirmLeave = true
+        else scope.onBack()
     }
-    ZxPage("人物画像", onBack = { scope.onBack() }) {
+    BackHandler(enabled = stagedUri != null) { leave() }
+    var confirmRemove by remember(galleryId) { mutableStateOf(false) }
+    val preview by produceState<UiPersonaPortraitPreviewReceipt?>(null, galleryId, stagedUri, revision) {
+        value = null
+        value = stagedUri?.let { port.previewImport(it) } ?: port.preview(galleryId)
+    }
+    val pick = rememberUiAttachmentPickerFor<String>(arrayOf("image/*"), { status = it }) { target, uri ->
+        if (target == galleryId && uri != null) { stagedUri = uri; status = null }
+    }
+    ZxPage("人物画像", onBack = { leave() }) {
         val bytes = (preview as? UiPersonaPortraitPreviewReceipt.Ready)?.bytes
         val image by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, bytes) {
+            value = null
             if (bytes != null) try {
                 value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     android.graphics.ImageDecoder.decodeBitmap(android.graphics.ImageDecoder.createSource(java.nio.ByteBuffer.wrap(bytes))) { decoder, info, _ ->
@@ -688,21 +761,75 @@ fun ZhaoxiPortraitEditor(port: PersonaPortraitUiPort, galleryId: String, scope: 
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (failure: Exception) { status = failure.message ?: "画像无法解码" }
         }
-        image?.let { Image(it, "人物画像", Modifier.fillMaxWidth().height(280.dp)) }
-        status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
-        ZxButton("导入画像", { pick(galleryId) })
-        if (image != null) ZxButton("移除画像", { confirmRemove = true }, variant = ZxButtonVariant.Danger)
-        if (confirmRemove) ZxDialog(
-            "确定移除这张画像？", "移除后无法从当前人物档案恢复。", "确认移除",
-            {
-                confirmRemove = false
-                jobs.launch {
-                    status = port.submit(PersonaPortraitUiCommand.Remove(galleryId)).zxPortraitFeedback()
-                    revision++
+        ZxSection(if (stagedUri == null) "当前画像" else "替换预览 · 确认后才保存")
+        image?.let { bitmap ->
+            Box(Modifier.fillMaxWidth().height(300.dp)) {
+                Image(bitmap, "人物画像预览", Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+                if (stagedUri != null) androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                    val scale = minOf(size.width / bitmap.width, size.height / bitmap.height)
+                    val w = bitmap.width * scale
+                    val h = bitmap.height * scale
+                    val x = (size.width - w) / 2
+                    val y = (size.height - h) / 2
+                    drawRect(androidx.compose.ui.graphics.Color.White,
+                        topLeft = androidx.compose.ui.geometry.Offset(x + horizontal.start * w, y + vertical.start * h),
+                        size = androidx.compose.ui.geometry.Size((horizontal.endInclusive - horizontal.start) * w,
+                            (vertical.endInclusive - vertical.start) * h),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()))
                 }
-            },
-            { confirmRemove = false },
-        )
+            }
+        }
+        when (val result = preview) {
+            UiPersonaPortraitPreviewReceipt.Missing -> ZxEmpty("尚无画像", "选择一张图片，预览后保存")
+            is UiPersonaPortraitPreviewReceipt.Failed -> ZxBanner(result.message ?: "画像读取失败", ZxTone.Warn)
+            null -> ZxFooterNote("正在读取画像…")
+            else -> Unit
+        }
+        status?.let { ZxFooterNote(it) }
+        if (stagedUri != null) {
+            ZxSection("裁切范围")
+            ZxFooterNote("白框内的内容会保留。保留完整范围可直接保存原图；裁切后按原图分辨率无损保存。")
+            Text("左右范围", color = ZhaoxiTheme.colors.ink2)
+            androidx.compose.material3.RangeSlider(value = horizontal, onValueChange = { cropLeft = it.start; cropRight = it.endInclusive }, enabled = !busy)
+            Text("上下范围", color = ZhaoxiTheme.colors.ink2)
+            androidx.compose.material3.RangeSlider(value = vertical, onValueChange = { cropTop = it.start; cropBottom = it.endInclusive }, enabled = !busy)
+            ZxButton("确认保存画像", {
+                val uri = stagedUri
+                if (uri != null) {
+                    val crop = if (horizontal == (0f..1f) && vertical == (0f..1f)) null
+                        else UiPortraitCrop(horizontal.start, vertical.start, horizontal.endInclusive, vertical.endInclusive)
+                    busy = true
+                    jobs.launch {
+                        try {
+                            val result = port.submit(PersonaPortraitUiCommand.Import(galleryId, uri, crop))
+                            status = result.zxPortraitFeedback()
+                            if (result is UiPersonaPortraitReceipt.Updated) stagedUri = null
+                            revision++
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                        catch (failure: Exception) { status = "保存结果未确认，取消预览后可重新查看当前画像" }
+                        finally { busy = false }
+                    }
+                }
+            }, enabled = !busy && image != null && horizontal.start < horizontal.endInclusive && vertical.start < vertical.endInclusive,
+                loading = busy)
+            ZxButton("取消替换", { stagedUri = null }, variant = ZxButtonVariant.Outline, enabled = !busy)
+        }
+        if (confirmLeave) ZxDialog("放弃这次画像替换？", "尚未保存的新图片和裁切选择会被丢弃，原画像保留。", "放弃替换", {
+            confirmLeave = false; stagedUri = null; scope.onBack()
+        }, { confirmLeave = false })
+        ZxButton(if (stagedUri == null) "选择图片" else "重新选择", { pick(galleryId) }, enabled = !busy,
+            variant = ZxButtonVariant.Outline)
+        if (image != null && stagedUri == null) ZxButton("移除画像", { confirmRemove = true }, variant = ZxButtonVariant.Danger, enabled = !busy)
+        if (confirmRemove) ZxDialog("确定移除这张画像？", "移除后无法从当前人物档案恢复。", "确认移除", {
+            confirmRemove = false
+            busy = true
+            jobs.launch {
+                try { status = port.submit(PersonaPortraitUiCommand.Remove(galleryId)).zxPortraitFeedback(); revision++ }
+                catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (failure: Exception) { status = "移除结果未确认，请刷新查看" }
+                finally { busy = false }
+            }
+        }, { confirmRemove = false })
     }
 }
 

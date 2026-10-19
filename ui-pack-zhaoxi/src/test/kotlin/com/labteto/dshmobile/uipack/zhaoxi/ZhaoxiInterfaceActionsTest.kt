@@ -7,6 +7,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ZhaoxiInterfaceActionsTest {
+    @Test fun portraitCropUsesOriginalResolutionAndKeepsSmallValidSelections() {
+        assertEquals(listOf(0, 0, 800, 600), UiPortraitCrop(0f, 0f, 1f, 1f).pixels(800, 600))
+        assertEquals(listOf(100, 150, 700, 450), UiPortraitCrop(.125f, .25f, .875f, .75f).pixels(800, 600))
+        assertEquals(listOf(1, 1, 2, 2), UiPortraitCrop(.9f, .9f, .91f, .91f).pixels(2, 2))
+        assertThrows(IllegalArgumentException::class.java) { UiPortraitCrop(.5f, 0f, .5f, 1f) }
+        assertThrows(IllegalArgumentException::class.java) { UiPortraitCrop(Float.NaN, 0f, 1f, 1f) }
+    }
+
     @Test fun stdioPreservesArgumentsWithoutShellSplittingOrExpansion() {
         val source = """["/local/my program", "argument with spaces", "$(echo keep-literal)", ""]"""
         assertEquals(listOf("/local/my program", "argument with spaces", "$(echo keep-literal)", ""),

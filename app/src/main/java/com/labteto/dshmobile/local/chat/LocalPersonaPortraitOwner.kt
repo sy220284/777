@@ -56,6 +56,39 @@ class LocalPersonaPortraitOwner @Inject constructor(
         catch (failure: Exception) { UiPersonaPortraitPreviewReceipt.Failed(failure.message) }
     }
 
+    override suspend fun previewImport(contentUri: String): UiPersonaPortraitPreviewReceipt = withContext(Dispatchers.IO) {
+        try {
+            val uri = Uri.parse(contentUri)
+            val resolver = context.contentResolver
+            require(resolver.getType(uri).orEmpty().startsWith("image/")) { "请选择图片文件" }
+            val data = requireNotNull(resolver.openInputStream(uri)).use { input ->
+                val output = ByteArrayOutputStream()
+                val buffer = ByteArray(16 * 1024)
+                while (true) {
+                    coroutineContext.ensureActive()
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    require(output.size().toLong() + count <= maxImportBytes) { "图片超过20MB，请选择较小的文件" }
+                    output.write(buffer, 0, count)
+                }
+                output.toByteArray()
+            }
+            val bitmap = android.graphics.ImageDecoder.decodeBitmap(
+                android.graphics.ImageDecoder.createSource(java.nio.ByteBuffer.wrap(data))) { decoder, info, _ ->
+                decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
+                var sample = 1
+                while (maxOf(info.size.width, info.size.height) / sample > 1600) sample *= 2
+                decoder.setTargetSampleSize(sample)
+            }
+            try {
+                val output = ByteArrayOutputStream()
+                check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output)) { "图片预览生成失败" }
+                UiPersonaPortraitPreviewReceipt.Ready(output.toByteArray())
+            } finally { bitmap.recycle() }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { UiPersonaPortraitPreviewReceipt.Failed(failure.message) }
+    }
+
     override suspend fun submit(command: PersonaPortraitUiCommand): UiPersonaPortraitReceipt = withContext(Dispatchers.IO) {
         var target: File? = null
         try {
@@ -90,7 +123,24 @@ class LocalPersonaPortraitOwner @Inject constructor(
                     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     BitmapFactory.decodeFile(destination.absolutePath, bounds)
                     require(bounds.outWidth > 0 && bounds.outHeight > 0) { "人物形象图无法识别" }
-                    destination.absolutePath
+                    val crop = command.crop
+                    if (crop == null) destination.absolutePath else {
+                        val bitmap = android.graphics.ImageDecoder.decodeBitmap(
+                            android.graphics.ImageDecoder.createSource(destination)) { decoder, info, _ ->
+                            decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
+                            val rect = crop.pixels(info.size.width, info.size.height)
+                            decoder.crop = android.graphics.Rect(rect[0], rect[1], rect[2], rect[3])
+                        }
+                        val cropped = File(root, "${UUID.randomUUID()}.png")
+                        target = cropped
+                        try {
+                            cropped.outputStream().buffered().use { output ->
+                                check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output)) { "裁切图片保存失败" }
+                            }
+                            require(cropped.length() <= maxImportBytes) { "裁切结果超过20MB，请缩小范围或选择其他图片" }
+                            cropped.absolutePath
+                        } finally { bitmap.recycle(); destination.delete() }
+                    }
                 }
             }
             coroutineContext.ensureActive()

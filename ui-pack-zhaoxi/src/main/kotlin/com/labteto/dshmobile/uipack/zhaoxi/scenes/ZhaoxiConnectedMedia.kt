@@ -75,6 +75,7 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
     var busy by remember { mutableStateOf(false) }
     var selected by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
     var pendingDelete by remember(sessionId) { mutableStateOf<String?>(null) }
+    var pendingDeleteFamily by remember(sessionId) { mutableStateOf<String?>(null) }
     var dismissJobId by remember(sessionId) { mutableStateOf<String?>(null) }
     var pendingRegenerate by remember { mutableStateOf<String?>(null) }
     var galleryPicker by remember { mutableStateOf(false) }
@@ -269,6 +270,8 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
                 }
             }
             ZxSection("管理")
+            ZxButton("删除此作品全部版本", { pendingDeleteFamily = result.id },
+                variant = ZxButtonVariant.Danger, enabled = !busy)
             ZxButton("删除结果", { pendingDelete = result.id },
                 variant = ZxButtonVariant.Danger, enabled = !busy)
         }
@@ -344,6 +347,10 @@ fun ZhaoxiConnectedMediaScene(media: MediaUiPort, settings: SettingsUiPort, sess
                 { pendingRegenerate = null },
             )
         }
+        pendingDeleteFamily?.let { id -> ZxDialog("删除此作品全部版本？", "会移除这份作品及其所有再生成版本的本地记录，无法恢复。", "删除全部版本", {
+            pendingDeleteFamily = null
+            execute { receiptText(media.submit(MediaUiCommand.RemoveRevisionFamily(id))) }
+        }, { pendingDeleteFamily = null }) }
         pendingDelete?.let { id -> ZxDialog("删除媒体结果？", "删除本地结果无法恢复", "删除", {
             pendingDelete = null; execute { receiptText(media.submit(MediaUiCommand.RemoveResult(id))) }
         }, { pendingDelete = null }) }

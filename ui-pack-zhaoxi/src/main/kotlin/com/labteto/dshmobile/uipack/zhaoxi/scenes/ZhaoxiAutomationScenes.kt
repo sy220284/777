@@ -325,7 +325,7 @@ fun ZhaoxiAutomationEditorScene(
         mutableStateOf("%02d:%02d".format(editing?.quietEndHour ?: AutomationUiDefaults.DEFAULT_QUIET_END_HOUR,
             editing?.quietEndMinute ?: AutomationUiDefaults.DEFAULT_QUIET_END_MINUTE))
     }
-    var minGap by remember(editingTaskId, editing?.id) {
+    var proactiveGapInput by remember(editingTaskId, editing?.id) {
         mutableStateOf((editing?.proactiveMinGapMinutes ?: AutomationUiDefaults.DEFAULT_PROACTIVE_MIN_GAP_MINUTES).toString())
     }
     var maxUnanswered by remember(editingTaskId, editing?.id) {
@@ -423,7 +423,7 @@ fun ZhaoxiAutomationEditorScene(
                             ZxField(quietStart, { quietStart = it }, Modifier.fillMaxWidth(), fieldLabel = "免打扰开始", placeholder = "23:00")
                             ZxField(quietEnd, { quietEnd = it }, Modifier.fillMaxWidth(), fieldLabel = "免打扰结束", placeholder = "07:00")
                         }
-                        ZxField(minGap, { minGap = it }, Modifier.fillMaxWidth(), fieldLabel = "最短互动间隔（至少60分钟）",
+                        ZxField(proactiveGapInput, { proactiveGapInput = it }, Modifier.fillMaxWidth(), fieldLabel = "最短互动间隔（至少60分钟）",
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                         ZxField(maxUnanswered, { maxUnanswered = it }, Modifier.fillMaxWidth(), fieldLabel = "连续未回复上限（1–5次）",
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
@@ -473,7 +473,7 @@ fun ZhaoxiAutomationEditorScene(
                     val minGap = if (chatMode) 60L else 15L
                     feedback = when {
                         chatMode && quietEnabled && zxQuietHoursError(quietStart, quietEnd) != null -> zxQuietHoursError(quietStart, quietEnd)
-                        chatMode && (minGap.toLongOrNull() == null || (minGap.toLongOrNull() ?: 0) < 60L) -> "互动间隔至少为60分钟"
+                        chatMode && (proactiveGapInput.toLongOrNull() == null || (proactiveGapInput.toLongOrNull() ?: 0) < 60L) -> "互动间隔至少为60分钟"
                         chatMode && maxUnanswered.toIntOrNull() !in 1..5 -> "连续未回复上限应为1–5次"
                         timed && firstRunError != null -> firstRunError
                         selected == AutomationScheduleType.INTERVAL && (duration == null || duration < minGap) ->
@@ -499,7 +499,7 @@ fun ZhaoxiAutomationEditorScene(
                             quietStartMinute = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietStart)) % 60 else editing?.quietStartMinute ?: AutomationUiDefaults.DEFAULT_QUIET_START_MINUTE,
                             quietEndHour = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietEnd)) / 60 else editing?.quietEndHour ?: AutomationUiDefaults.DEFAULT_QUIET_END_HOUR,
                             quietEndMinute = if (chatMode && quietEnabled) requireNotNull(minuteOfDay(quietEnd)) % 60 else editing?.quietEndMinute ?: AutomationUiDefaults.DEFAULT_QUIET_END_MINUTE,
-                            proactiveMinGapMinutes = if (chatMode) requireNotNull(minGap.toLongOrNull()) else editing?.proactiveMinGapMinutes ?: AutomationUiDefaults.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
+                            proactiveMinGapMinutes = if (chatMode) requireNotNull(proactiveGapInput.toLongOrNull()) else editing?.proactiveMinGapMinutes ?: AutomationUiDefaults.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
                             proactiveMaxUnanswered = if (chatMode) requireNotNull(maxUnanswered.toIntOrNull()) else editing?.proactiveMaxUnanswered ?: AutomationUiDefaults.DEFAULT_PROACTIVE_MAX_UNANSWERED,
                             notify = notify,
                         )

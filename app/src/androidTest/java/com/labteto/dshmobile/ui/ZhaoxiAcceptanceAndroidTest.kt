@@ -79,6 +79,40 @@ class ZhaoxiAcceptanceAndroidTest {
         screenshot.recycle()
     }
 
+    @Test fun portraitSelectionDoesNotCommitAndCropKeepsOriginalPixels() {
+        val ports = ready()
+        val context = compose.activity
+        val source = File(context.cacheDir, "camera/portrait-crop-test.png").apply { parentFile?.mkdirs() }
+        val bitmap = Bitmap.createBitmap(200, 100, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(android.graphics.Color.RED)
+        android.graphics.Canvas(bitmap).drawRect(100f, 0f, 200f, 100f,
+            android.graphics.Paint().apply { color = android.graphics.Color.BLUE })
+        source.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        bitmap.recycle()
+        val saved = runBlocking { ports.personaAuthoringUiPort.create(UiPersonaDraft(name = "画像裁切测试", coreIdentity = "测试夹具")) }
+        val galleryId = (saved as UiPersonaAuthoringReceipt.Saved).galleryId
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", source).toString()
+        try {
+            val preview = runBlocking { ports.personaPortraitUiPort.previewImport(uri) }
+            assertTrue(preview is UiPersonaPortraitPreviewReceipt.Ready)
+            assertEquals(UiPersonaPortraitPreviewReceipt.Missing,
+                runBlocking { ports.personaPortraitUiPort.preview(galleryId) })
+            val result = runBlocking { ports.personaPortraitUiPort.submit(
+                PersonaPortraitUiCommand.Import(galleryId, uri, UiPortraitCrop(.5f, 0f, 1f, 1f))) }
+            assertTrue(result is UiPersonaPortraitReceipt.Updated)
+            val current = runBlocking { ports.personaPortraitUiPort.preview(galleryId) } as UiPersonaPortraitPreviewReceipt.Ready
+            val decoded = android.graphics.BitmapFactory.decodeByteArray(current.bytes, 0, current.bytes.size)
+            try {
+                assertEquals(100, decoded.width)
+                assertEquals(100, decoded.height)
+                assertEquals(android.graphics.Color.BLUE, decoded.getPixel(50, 50))
+            } finally { decoded.recycle() }
+        } finally {
+            source.delete()
+            runBlocking { ports.personaGalleryDeletionUiPort.delete(DeletePersonaGalleryCommand(ports.sessions.snapshot().identity, galleryId)) }
+        }
+    }
+
     @Test fun documentFieldsUseHostDraftsAndReleaseMemoryOnlyValuesWhenClosed() {
         ready()
         var saved: List<String> = emptyList()

@@ -399,6 +399,7 @@ private fun ZxConversationEmpty(workMode: Boolean, missingSession: Boolean, modi
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun ZxConversationRoutes(scope: UiSceneRenderScope, menu: @Composable () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
@@ -417,14 +418,19 @@ private fun ZxConversationRoutes(scope: UiSceneRenderScope, menu: @Composable ()
                 if (expanded) "×" else "···", active = expanded) { expanded = !expanded }
         }
         if (expanded) {
-            Box(
-                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
-                    .clip(RoundedCornerShape(ZhaoxiTheme.shapes.card))
-                    .background(ZhaoxiTheme.colors.bg2).padding(8.dp),
+            val maxHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp * .82f
+            androidx.compose.material3.ModalBottomSheet(
+                onDismissRequest = { expanded = false },
+                sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = ZhaoxiTheme.colors.card,
+                contentColor = ZhaoxiTheme.colors.ink,
             ) {
-                Column(Modifier.heightIn(max = 320.dp).verticalScroll(
-                    androidx.compose.foundation.rememberScrollState()
-                )) { menu() }
+                Column(Modifier.fillMaxWidth().heightIn(max = maxHeight)
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                    .padding(start = 18.dp, end = 18.dp, bottom = 24.dp)) {
+                    Text("会话操作", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = ZhaoxiTheme.colors.ink)
+                    menu()
+                }
             }
         }
     }

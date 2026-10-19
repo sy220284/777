@@ -117,7 +117,7 @@
 | `chat.gallery_profile` | `ZhaoxiPersonaProfileScene` | Gallery / Selection / Story / Transfer / Authoring | 选择人物、续接/新故事、历史分页、设定检查、编辑/删除故事、导出与更多管理 |
 | `chat.world_book` | `ZhaoxiPersonaEditorScene` | PersonaAuthoringUiPort | 四页签、13项字段、事实/世界书增删改、AI建议采纳、保存与离开确认 |
 | `chat.gallery_delete` | `ZxGalleryDeleteScene` | PersonaGalleryDeletionUiPort | 确认删除人物、缺失/失败回执与返回图集 |
-| `chat.gallery_portrait` | `ZhaoxiPortraitEditor` | PersonaPortraitUiPort / Host picker | 导入、预览、确认移除；裁切效果仍待设备核对 |
+| `chat.gallery_portrait` | `ZhaoxiPortraitEditor` | PersonaPortraitUiPort / Host picker | 选择、预览、范围裁切、确认保存、取消、确认移除；裁切效果待最终设备核对 |
 | `chat.diary` | `ZhaoxiDiaryScene` | DiaryUiPort | 公开日记阅读、版本勘误、停用 |
 | `automation.tasks` | `ZhaoxiAutomationTasksScene` | AutomationUiPort | 搜索、模式/状态筛选、编辑、暂停/恢复/立即运行、确认删除 |
 | `automation.editor` | `ZhaoxiAutomationEditorScene` | AutomationUiPort | 时间选择、周期/时段/沉默、创建/编辑、自然语言规划、保存回执 |
@@ -193,3 +193,13 @@
 - **构建闭环**：实际 Actions 编译发现 ZhaoxiSlotScenes 缺少 heightIn 导入，已修正；不能以先前静态通过取代该修复后的编译。
 
 当前仍需最终 SHA 的完整 CI 和 Android16/17 动作验收。肖像裁切、所有真实外部账户和付费媒体、全量视觉逐屏对拍若无运行证据，继续保留待验，不依据本段签收。
+
+
+## 2026-10-19 · 第三轮动作与恢复复查
+
+- 修复 Actions 编译暴露的自动化最短间隔字段与默认值同名遮蔽。
+- 会话更多操作使用原生底部弹层、82%屏高和可滚动内容；媒体支持确认删除全部版本。
+- 人物故事改为真实游标逐页查看较早/较新记录，不再截断到最新80条；支持展开全文和确认删除单条归档消息。
+- 人物画像接通临时预览与范围裁切，确认前不修改原画像；使用原 Owner 保存原分辨率裁切结果，保留大小校验和取消/返回放弃确认。新增像素边界单测与真实 Owner 的预览不写入、裁切保存设备用例。
+- UpdatePolicy、SetApprovalMode 等语义由现有完整更新/设置入口调用同一 Owner；归档内部事务边界不另造 UI 写入口。不会为了覆盖方法名重复添加入口。
+- 本轮源码与设备用例仍须最终提交 CI 执行后确认，不能提前视为设备通过。
