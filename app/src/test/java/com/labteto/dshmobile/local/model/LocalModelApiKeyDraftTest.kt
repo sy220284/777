@@ -146,6 +146,27 @@ class LocalModelApiKeyDraftTest {
         assertEquals(LocalModelProtocol.RESPONSES, created.profile.protocol)
     }
 
+    @Test fun kimiK3ContextCanBeExplicitlySelectedWithoutChangingUnrelatedPresets() = runBlocking {
+        val url = "https://api.kimi.com/coding/v1"
+        val k3 = resolveLocalModelApiKeyDraft("key", "k3", url, null, emptyList(), { null },
+            contextWindowTokensOverride = 1_048_576, newProfileId = { "k3-pro" })
+        assertEquals(1_048_576, k3.profile.contextWindowTokensOverride)
+        assertEquals(1_048_576, documentedContextWindowTokens("k3", url, k3.profile.contextWindowTokensOverride))
+        val reset = resolveLocalModelApiKeyDraft("", "k3", url, null, listOf(k3.profile),
+            { "key" }, k3.profile.id, contextWindowTokensOverride = 0)
+        assertNull(reset.profile.contextWindowTokensOverride)
+        assertEquals(262_144, documentedContextWindowTokens("k3", url, reset.profile.contextWindowTokensOverride))
+        val otherPreset = resolveLocalModelApiKeyDraft("key", "k3-256k", url, null, emptyList(),
+            { null }, contextWindowTokensOverride = 1_048_576, newProfileId = { "fixed" })
+        assertNull(otherPreset.profile.contextWindowTokensOverride)
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking {
+                resolveLocalModelApiKeyDraft("key", "k3", url, null, emptyList(), { null },
+                    contextWindowTokensOverride = 900_000, newProfileId = { "invalid" })
+            }
+        }
+    }
+
     @Test fun customContextOverrideIsValidatedAndOfficialPresetIgnoresIt() = runBlocking {
         val custom = resolveLocalModelApiKeyDraft(
             "key", "custom-model", "https://proxy.example/v1", null, emptyList(), { null },
