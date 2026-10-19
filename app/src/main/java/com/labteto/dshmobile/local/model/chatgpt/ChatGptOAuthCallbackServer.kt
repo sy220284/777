@@ -7,12 +7,14 @@ import java.io.InputStreamReader
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
@@ -20,6 +22,9 @@ import kotlinx.coroutines.withTimeout
 class ChatGptOAuthCallbackServer @Inject constructor() {
     fun open(): Listener {
         val server = ServerSocket(0, 1, InetAddress.getByName(LOOPBACK))
+        // ServerSocket.accept() is not reliably interrupted by coroutine cancellation.
+        // A short socket timeout lets the OAuth wait honor its deadline and cancellation.
+        server.soTimeout = ACCEPT_POLL_MILLIS
         return Listener(server)
     }
 
@@ -31,13 +36,25 @@ class ChatGptOAuthCallbackServer @Inject constructor() {
         internal suspend fun await(timeoutMillis: Long = CALLBACK_TIMEOUT_MILLIS): ChatGptOAuthCallback =
             withTimeout(timeoutMillis) {
                 withContext(Dispatchers.IO) {
-                    val client = runInterruptible { server.accept() }
-                    client.use { socket ->
-                        socket.soTimeout = SOCKET_TIMEOUT_MILLIS
-                        val callback = readCallback(socket)
-                        writeCompletionPage(socket, callback.error == null)
-                        callback
+                    var received: ChatGptOAuthCallback? = null
+                    while (received == null) {
+                        currentCoroutineContext().ensureActive()
+                        val client = try {
+                            server.accept()
+                        } catch (_: SocketTimeoutException) {
+                            continue
+                        }
+                        client.use { socket ->
+                            socket.soTimeout = SOCKET_TIMEOUT_MILLIS
+                            // Browser probes and unrelated localhost requests are not OAuth callbacks.
+                            val callback = readCallback(socket)
+                            if (callback != null) {
+                                writeCompletionPage(socket, callback.error == null)
+                                received = callback
+                            }
+                        }
                     }
+                    checkNotNull(received)
                 }
             }
 
@@ -45,15 +62,14 @@ class ChatGptOAuthCallbackServer @Inject constructor() {
             runCatching { server.close() }
         }
 
-        private fun readCallback(socket: Socket): ChatGptOAuthCallback {
+        private fun readCallback(socket: Socket): ChatGptOAuthCallback? {
             val reader = BufferedReader(InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8))
-            val requestLine = readBoundedLine(reader, MAX_REQUEST_LINE_CHARS)
-                ?: error("ChatGPT OAuth 回调为空")
+            val requestLine = readBoundedLine(reader, MAX_REQUEST_LINE_CHARS) ?: return null
             val parts = requestLine.split(' ')
-            require(parts.size >= 2 && parts[0] == "GET") { "ChatGPT OAuth 回调请求无效" }
+            if (parts.size < 2 || parts[0] != "GET") return null
             val target = parts[1]
             val path = target.substringBefore('?')
-            require(path == CALLBACK_PATH) { "ChatGPT OAuth 回调路径不匹配" }
+            if (path != CALLBACK_PATH) return null
             val query = target.substringAfter('?', "")
             val params = parseQuery(query)
             return ChatGptOAuthCallback(
@@ -67,8 +83,8 @@ class ChatGptOAuthCallbackServer @Inject constructor() {
         }
 
         private fun writeCompletionPage(socket: Socket, success: Boolean) {
-            val title = if (success) "授权回调已接收" else "授权未完成"
-            val body = if (success) "请返回神言神语查看身份校验与连接结果。" else "授权未完成，请返回神言神语查看详情。"
+            val title = if (success) "授权信息已返回应用" else "授权未完成"
+            val body = if (success) "应用正在验证身份并保存账户。请返回神言神语查看最终连接状态。" else "授权未完成，请返回神言神语查看详情。"
             val html = "<!doctype html><meta charset=\"utf-8\"><title>$title</title>" +
                 "<body style=\"font-family:sans-serif;padding:32px\"><h2>$title</h2><p>$body</p></body>"
             val bytes = html.toByteArray(StandardCharsets.UTF_8)
@@ -86,6 +102,7 @@ class ChatGptOAuthCallbackServer @Inject constructor() {
         internal const val LOOPBACK = "127.0.0.1"
         internal const val CALLBACK_PATH = "/auth/callback"
         private const val CALLBACK_TIMEOUT_MILLIS = 3 * 60_000L
+        private const val ACCEPT_POLL_MILLIS = 250
         private const val SOCKET_TIMEOUT_MILLIS = 10_000
         private const val MAX_REQUEST_LINE_CHARS = 16_384
 
