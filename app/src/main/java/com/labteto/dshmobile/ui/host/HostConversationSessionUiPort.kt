@@ -8,6 +8,16 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onEach
 
+/** A new Work must be issued by the Session Owner and match the exact accepted handoff. */
+internal fun matchesAcceptedWorkHandoff(
+    command: SessionUiCommand.Create, snapshot: UiSessionsSnapshot, storedSummary: String?,
+): Boolean = !snapshot.loading && snapshot.identity != null &&
+    snapshot.identity.sessionId != command.identity?.sessionId &&
+    snapshot.usageMode == com.labteto.dshmobile.local.LocalUsageMode.WORK &&
+    snapshot.usageMode == command.usageMode &&
+    command.handoffSummary != null && command.handoffSummary == storedSummary &&
+    command.handoffAttachments.isNotEmpty()
+
 /** Session owns deletion; Host removes only presentation state for Owner-confirmed IDs. */
 internal class HostConversationSessionUiPort(
     private val business: SessionUiPort,
@@ -39,9 +49,7 @@ internal class HostConversationSessionUiPort(
         }
         val id = snapshot.identity ?: return
         val request = pending.command
-        if (snapshot.loading || id.sessionId == request.identity?.sessionId ||
-            snapshot.usageMode != request.usageMode ||
-            business.handoffSummary(id) != request.handoffSummary) return
+        if (!matchesAcceptedWorkHandoff(request, snapshot, business.handoffSummary(id))) return
         val claimed = synchronized(this) {
             if (pendingHandoff === pending) { pendingHandoff = null; true } else false
         }
