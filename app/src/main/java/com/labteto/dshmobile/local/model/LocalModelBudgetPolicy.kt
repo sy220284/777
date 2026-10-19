@@ -21,7 +21,7 @@ internal object LocalModelBudgetPolicies {
             return LocalModelBudgetPolicy()
         }
         return when (model.trim().lowercase()) {
-            "minimax-m3", "minimax-m3.1-flash-preview" -> LocalModelBudgetPolicy(
+            "minimax-m3", "minimax-m3.1-flash", "minimax-m3.1-flash-preview" -> LocalModelBudgetPolicy(
                 historyCharScale = 2.0,
                 workRequestsPerSlice = 256,
                 pendingWorkTokens = 1_000_000L,
