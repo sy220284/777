@@ -124,4 +124,6 @@ data class AutomationTask(
     val dispatchPolicy: AutomationDispatchPolicy? = null,
     /** WorkManager request ID that currently owns manual-run settlement. Old records default to no owner. */
     val activeManualRunId: String? = null,
+    /** Durable admission marker for this exact manual WorkManager run, not the scheduled lastRunAt. */
+    val activeManualStartedAt: Long? = null,
 )
