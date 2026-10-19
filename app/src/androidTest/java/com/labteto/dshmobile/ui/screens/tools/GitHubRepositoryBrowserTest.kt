@@ -25,12 +25,48 @@ class GitHubRepositoryBrowserTest {
                     onBack = {},
                     onOpenRepository = { opened = it },
                     onOpenFolder = {},
+                    onRefresh = {},
+                    onOpenFile = {},
                     onDismiss = {},
                 )
             }
         }
         compose.onNodeWithText("owner/demo", substring = true).performClick()
         compose.runOnIdle { assertEquals("owner/demo", opened) }
+    }
+
+    @Test fun selectingFileOpensRepositoryBranchAndEncodedPath() {
+        var opened = ""
+        compose.setContent {
+            DshTheme {
+                GitHubRepositoryBrowserSheet(
+                    state = GitHubBrowseState(
+                        repositories = listOf(UiGitHubRepo("owner/demo", "演示", false, "main")),
+                        selectedRepository = "owner/demo",
+                        entries = listOf(UiGitHubEntry("a b.kt", "src/a b.kt", false, 12)),
+                    ),
+                    onBack = {}, onOpenRepository = {}, onOpenFolder = {},
+                    onRefresh = {}, onOpenFile = { opened = it }, onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithText("文件 · a b.kt").performClick()
+        compose.runOnIdle { assertEquals("https://github.com/owner/demo/blob/main/src/a%20b.kt", opened) }
+    }
+
+    @Test fun refreshIsAlwaysAvailableForRetry() {
+        var count = 0
+        compose.setContent {
+            DshTheme {
+                GitHubRepositoryBrowserSheet(
+                    state = GitHubBrowseState(error = "网络暂时不可用"),
+                    onBack = {}, onOpenRepository = {}, onOpenFolder = {},
+                    onRefresh = { count++ }, onOpenFile = {}, onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithText("刷新仓库").performClick()
+        compose.runOnIdle { assertEquals(1, count) }
     }
 
     @Test fun openingDirectoryAndReturningUseNavigationCallbacks() {
@@ -46,6 +82,8 @@ class GitHubRepositoryBrowserTest {
                     onBack = { backs++ },
                     onOpenRepository = {},
                     onOpenFolder = { folder = it },
+                    onRefresh = {},
+                    onOpenFile = {},
                     onDismiss = {},
                 )
             }

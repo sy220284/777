@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -182,6 +183,13 @@ class ToolsViewModel @Inject constructor(
         } else {
             loadGitHubDirectory(repo, browse.currentDirectory.substringBeforeLast('/', ""))
         }
+    }
+
+    fun refreshGitHubBrowse() {
+        val browse = _githubBrowse.value
+        val repository = browse.selectedRepository
+        if (repository == null) loadGitHubRepositories()
+        else loadGitHubDirectory(repository, browse.currentDirectory)
     }
 
     private fun loadGitHubDirectory(repo: String, directory: String) {
@@ -496,6 +504,7 @@ fun ToolsScreen(
     handleRootSystemBack: Boolean = true,
     viewModel: ToolsViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     val githubBrowse by viewModel.githubBrowse.collectAsStateWithLifecycle()
     val skillFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -779,6 +788,14 @@ fun ToolsScreen(
             onBack = viewModel::backGitHubBrowse,
             onOpenRepository = viewModel::openGitHubRepository,
             onOpenFolder = viewModel::openGitHubFolder,
+            onRefresh = viewModel::refreshGitHubBrowse,
+            onOpenFile = { url ->
+                try {
+                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)))
+                } catch (_: android.content.ActivityNotFoundException) {
+                    toast.second("找不到可打开 GitHub 文件的浏览器")
+                }
+            },
             onDismiss = { showGitHubBrowser = false },
         )
     }

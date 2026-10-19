@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.tools
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.uicontract.UiGitHubEntry
 import com.labteto.dshmobile.uicontract.UiGitHubRepo
@@ -19,6 +22,12 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.theme.DsType
 import com.shenyan.designsystem.foundation.LocalSyColors
+
+/** Read-only links: a file always opens on github.com; writes still require Work approval. */
+internal fun githubFileWebUrl(repo: String, branch: String, path: String): String =
+    "https://github.com/" + repo.split('/').joinToString("/") { Uri.encode(it) } +
+        "/blob/" + Uri.encode(branch) + "/" +
+        path.split('/').joinToString("/") { Uri.encode(it) }
 
 /** Read-only repository navigation. GitHub writes still go through the existing approval path. */
 internal data class GitHubBrowseState(
@@ -36,9 +45,13 @@ internal fun GitHubRepositoryBrowserSheet(
     onBack: () -> Unit,
     onOpenRepository: (String) -> Unit,
     onOpenFolder: (String) -> Unit,
+    onRefresh: () -> Unit,
+    onOpenFile: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val colors = LocalSyColors.current
+    val clipboard = LocalClipboardManager.current
+    val selectedRepo = state.repositories.firstOrNull { it.fullName == state.selectedRepository }
     SyResponsiveSheet(
         title = "GitHub 仓库",
         subtitle = state.selectedRepository?.let { repo ->
@@ -46,10 +59,26 @@ internal fun GitHubRepositoryBrowserSheet(
         } ?: "只读查看已连接账户的仓库与目录",
         onDismiss = onDismiss,
     ) {
+        SyButton(
+            text = "刷新仓库",
+            onClick = onRefresh,
+            enabled = !state.loading,
+            variant = SyButtonVariant.Ghost,
+            modifier = Modifier.fillMaxWidth(),
+        )
         if (state.selectedRepository != null) {
             SyButton(
                 text = if (state.currentDirectory.isEmpty()) "返回仓库列表" else "返回上级目录",
                 onClick = onBack,
+                enabled = !state.loading,
+                variant = SyButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (selectedRepo != null) {
+            SyButton(
+                text = "复制仓库地址",
+                onClick = { clipboard.setText(AnnotatedString("https://github.com/${selectedRepo.fullName}")) },
                 variant = SyButtonVariant.Ghost,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -94,10 +123,16 @@ internal fun GitHubRepositoryBrowserSheet(
                             enabled = !state.loading,
                         )
                     } else {
-                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp)) {
-                            Text("文件 · ${entry.name}", style = DsType.small13,
-                                color = colors.textSecondary)
-                        }
+                        SyButton(
+                            text = "文件 · ${entry.name}",
+                            onClick = {
+                                val repo = selectedRepo ?: return@SyButton
+                                onOpenFile(githubFileWebUrl(repo.fullName, repo.defaultBranch, entry.path))
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            variant = SyButtonVariant.Ghost,
+                            enabled = !state.loading && selectedRepo != null,
+                        )
                     }
                 }
             }
