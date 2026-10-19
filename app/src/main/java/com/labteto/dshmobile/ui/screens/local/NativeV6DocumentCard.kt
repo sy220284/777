@@ -56,6 +56,9 @@ internal fun NativeV6DocumentMessage(
     var prompt by remember(messageId) { mutableStateOf("把这条回复整理成可交互的文档") }
     var feedback by remember(messageId) { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        // Show action feedback BEFORE long forms, so a prepared draft or rejected
+        // submission never looks like an inert button at the bottom of the screen.
+        feedback?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         documents.forEach { snapshot ->
             NativeV6DocumentCard(snapshot, controller, readOnly = readOnly, onFeedback = { feedback = it },
                 onPreparedDraft = onPreparedDraft)
@@ -65,7 +68,6 @@ internal fun NativeV6DocumentMessage(
                 Text(if (generating) "正在生成交互文档…" else "生成交互文档")
             }
         }
-        feedback?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
     }
     if (creating && !readOnly) {
         SyDialog(title = "生成交互文档", onDismiss = { creating = false }) {
@@ -135,6 +137,7 @@ private fun NativeV6DocumentCard(
                         node, snapshot.bindings, fields,
                         onFieldChange = { id, value -> if (!readOnly) controller.forms.update(formKey, id, value) },
                         readOnly = readOnly, media = controller.media, sessionId = doc.source.sessionId,
+                        actions = doc.actions,
                     ) { actionId ->
                         val action = doc.actions.firstOrNull { it.id == actionId }
                         if (snapshot.actions[actionId]?.available != true) {
@@ -205,6 +208,7 @@ private fun NativeV6DocumentNode(
     readOnly: Boolean,
     media: MediaUiPort,
     sessionId: String,
+    actions: List<UiDocumentAction>,
     onAction: (String) -> Unit,
 ) {
     when (node) {
@@ -272,11 +276,11 @@ private fun NativeV6DocumentNode(
             Text("${node.label}：$label")
         }
         is UiDocumentNode.Column -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            node.children.forEach { NativeV6DocumentNode(it, bindings, fields, onFieldChange, readOnly, media, sessionId, onAction) }
+            node.children.forEach { NativeV6DocumentNode(it, bindings, fields, onFieldChange, readOnly, media, sessionId, actions, onAction) }
         }
         is UiDocumentNode.Row -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             node.children.forEach { child ->
-                Column(Modifier.weight(1f)) { NativeV6DocumentNode(child, bindings, fields, onFieldChange, readOnly, media, sessionId, onAction) }
+                Column(Modifier.weight(1f)) { NativeV6DocumentNode(child, bindings, fields, onFieldChange, readOnly, media, sessionId, actions, onAction) }
             }
         }
         is UiDocumentNode.Field -> OutlinedTextField(
@@ -308,14 +312,16 @@ private fun NativeV6DocumentNode(
             Text(calculateUiDocumentValue(node, fields) ?: "请输入有效数字",
                 style = MaterialTheme.typography.titleMedium)
         }
-        is UiDocumentNode.Button -> TextButton(onClick = { onAction(node.actionId) }, enabled = !readOnly) { Text(node.label) }
+        is UiDocumentNode.Button -> TextButton(onClick = { onAction(node.actionId) }, enabled = !readOnly) {
+            Text(nativeV6ActionLabel(node.label, actions.firstOrNull { it.id == node.actionId }))
+        }
         is UiDocumentNode.Disclosure -> {
             var expanded by remember(node.id) { mutableStateOf(false) }
             Column {
                 TextButton(onClick = { expanded = !expanded }) {
                     Text(if (expanded) "收起 · ${node.title}" else "展开 · ${node.title}")
                 }
-                if (expanded) node.children.forEach { NativeV6DocumentNode(it, bindings, fields, onFieldChange, readOnly, media, sessionId, onAction) }
+                if (expanded) node.children.forEach { NativeV6DocumentNode(it, bindings, fields, onFieldChange, readOnly, media, sessionId, actions, onAction) }
             }
         }
     }
