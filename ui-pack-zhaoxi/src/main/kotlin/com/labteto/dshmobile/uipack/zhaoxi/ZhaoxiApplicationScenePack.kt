@@ -276,7 +276,7 @@ class ZhaoxiApplicationScenePack(
         val sessionId = identity?.sessionId ?: sec?.sessionId?.invoke().orEmpty()
         when (scene.value) {
             // ---- 壳层 ----
-            "route.home", "shell.new_session" -> ZhaoxiHomeScene(sec?.sessions, scope, sec?.conversationShell)
+            "route.home", "shell.new_session" -> ZhaoxiHomeScene(sec?.sessions, scope, sec?.conversationShell, conv?.drafts)
             "shell.search" -> ZhaoxiSearchScene(
                 sec?.sessions,
                 sec?.gallery ?: conv?.gallery,
