@@ -410,8 +410,8 @@ class LocalWorkRuntime @Inject internal constructor(
     }
     internal fun answerQuestionFromUi(requestId: String, answer: String?): Boolean {
         val binding = workRunRegistry.live(runtimeStateStore.currentSessionId)
-        return if (binding != null) binding.interactions.answerQuestionFromUi(requestId, answer)
-        else runtimeStateStore.foregroundInteractions.answerQuestionFromUi(requestId, answer)
+        if (binding?.interactions?.answerQuestionFromUi(requestId, answer) == true) return true
+        return runtimeStateStore.foregroundInteractions.answerQuestionFromUi(requestId, answer)
     }
     internal fun pendingApprovalForUi(): com.labteto.dshmobile.local.interaction.LocalApproval? {
         val binding = workRunRegistry[runtimeStateStore.currentSessionId]
