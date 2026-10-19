@@ -226,8 +226,8 @@ fun ZxBanner(
 /** 区块小标题（sect）。 */
 @Composable
 fun ZxSection(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier.padding(start = 4.dp, top = 14.dp, bottom = 6.dp),
-        fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2, fontWeight = FontWeight.SemiBold)
+    Text(text, modifier.padding(start = 4.dp, top = 18.dp, bottom = 8.dp),
+        fontSize = 13.sp, color = ZhaoxiTheme.colors.ink, fontWeight = FontWeight.SemiBold)
 }
 
 /** 页面注脚。 */

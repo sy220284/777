@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.uipack.zhaoxi.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,8 +33,14 @@ fun ZxEmpty(
     iconName: String = "sparkle",
 ) {
     val c = ZhaoxiTheme.colors
+    val hasAction = !actionLabel.isNullOrBlank() && onAction != null
+    val shape = RoundedCornerShape(18.dp)
     Column(
-        modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+        modifier
+            .fillMaxWidth()
+            .then(if (hasAction) Modifier.background(c.card, shape)
+                .border(1.dp, c.line, shape) else Modifier)
+            .padding(horizontal = 24.dp, vertical = if (hasAction) 30.dp else 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {

@@ -6,6 +6,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import com.labteto.dshmobile.uipack.zhaoxi.components.zxPressSurface
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -96,7 +97,8 @@ fun ZxSettingsGroup(modifier: Modifier = Modifier, content: @Composable ColumnSc
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(ZhaoxiTheme.shapes.card))
             .background(ZhaoxiTheme.colors.bg2)
-            .padding(horizontal = 14.dp, vertical = 4.dp),
+            .border(1.dp, ZhaoxiTheme.colors.line, RoundedCornerShape(ZhaoxiTheme.shapes.card))
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         content = content,
     )
 }
@@ -218,8 +220,11 @@ fun ZxRow(
     Row(
         modifier
             .fillMaxWidth()
+            .padding(vertical = if (onClick != null) 3.dp else 0.dp)
             .then(if (onClick != null) Modifier.zxPressSurface(interaction) else Modifier)
             .clip(RoundedCornerShape(12.dp))
+            .then(if (onClick != null) Modifier.background(c.card)
+                .border(1.dp, c.line, RoundedCornerShape(12.dp)) else Modifier)
             .then(if (onClick != null) Modifier.clickable(
                 role = Role.Button, onClick = onClick, interactionSource = interaction,
                 indication = androidx.compose.foundation.LocalIndication.current) else Modifier)
