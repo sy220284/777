@@ -28,7 +28,6 @@ import com.labteto.dshmobile.uicontract.UiDocumentFormUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentUiPort
 import com.labteto.dshmobile.uicontract.UiMessageHistoryPort
 import com.labteto.dshmobile.uicontract.WorkConversationUiPort
-import com.labteto.dshmobile.uicontract.WorkEvidenceUiPort
 import com.labteto.dshmobile.uicontract.WorkPolicyUiPort
 import com.labteto.dshmobile.uicontract.WorkReadUiPort
 import com.labteto.dshmobile.uicontract.WorkTeamUiPort
@@ -51,7 +50,6 @@ data class ZhaoxiConversationPorts(
     val documents: UiDocumentUiPort? = null,
     val forms: UiDocumentFormUiPort? = null,
     val media: MediaUiPort? = null,
-    val evidence: WorkEvidenceUiPort? = null,
     val gallery: PersonaGalleryUiPort? = null,
     val selection: PersonaSelectionUiPort? = null,
     val groups: ChatGroupUiPort? = null,
