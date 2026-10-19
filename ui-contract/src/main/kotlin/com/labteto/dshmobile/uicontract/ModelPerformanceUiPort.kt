@@ -30,3 +30,15 @@ interface ModelPerformanceUiPort {
     /** The existing Model Performance Store owns validation and persistence. */
     fun submit(command: ModelPerformanceUiCommand): ModelPerformanceUiReceipt
 }
+
+/** Session-scoped actual model effort; a mode is offered only if the provider supports it. */
+enum class UiConversationReasoningMode { DEFAULT, FAST, LOW, DEEP, MAX }
+data class UiConversationReasoningOptions(
+    val selected: UiConversationReasoningMode,
+    val available: List<UiConversationReasoningMode>,
+)
+interface ConversationReasoningUiPort {
+    fun options(sessionId: String, workMode: Boolean,
+        profile: com.labteto.dshmobile.local.model.LocalModelProfile?): UiConversationReasoningOptions
+    fun select(sessionId: String, mode: UiConversationReasoningMode): Boolean
+}
