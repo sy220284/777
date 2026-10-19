@@ -21,7 +21,7 @@
 | R03 | 用户固定技能不存在或不可读时被过滤，模型会在缺少用户指定规则下执行 | `LocalWorkSkillActivation` 强制失败反馈；所需技能元数据出错不再悄悄略过 | `LocalWorkSkillActivationTest`（缺失固定、超长不可读） |
 | R04 | Work 自动记忆捕获失败不留证据，并吞掉协程取消 | `LocalWorkMemoryRuntime` 区分取消、普通故障、无候选事实，失败记入会话事件 | Work 与 Chat 既有流程的静态调用链复核；故障注入未独立执行 |
 | R05 | 记忆记录已写入后，可选整理失败仍作为保存失败返回 | `MemoryManager` 在记录已提交后把整理故障隔离为可观察维护异常，返回真实已保存结果 | 原记忆持久化测试需以新 SHA CI 验证 |
-| R06 | 模型配置及本机 Runtime 初始化将协程取消错误包装为普通异常 | `LocalModelRuntime`、`LocalRuntimeKernel` 取消原样传播，业务失败仍可诊断 | 模型/启动回归需以新 SHA CI 验证 |
+| R06 | 模型配置及本机 Runtime 初始化将协程取消误作普通异常；模型切换可能已写盘却因新一次点击抑制界面状态更新 | `LocalModelRuntime`、`LocalRuntimeKernel` 保持取消语义，成功提交的选择按串行顺序投影，后续操作再覆盖 | 模型/启动及连续快速切换回归需以新 SHA CI 验证 |
 | R07 | 安装交接标记先删旧文件再替换，崩溃可致新版本 APK 误被清理 | `UpdateCache` 使用完整写入与原子替换；异常标记按有限保留期处理、启动不误删也不崩溃 | `UpdateCacheTest`（重复交接、坏标记、保留期限、主动更新） |
 | R08 | Webhook 历史回执损坏被当作从不存在，隐瞒副作用未知事实 | `WebhookResultStore` 将无法解析的回执显式投影并持久结算为 `INTERRUPTED`，不自动重放 | `WebhookResultStoreInstrumentedTest`（损坏与冷恢复） |
 | R09 | README 声称 V6 已移除且 APK 无 UI，与合并后的真实应用不符 | 更新 README | 文档与当前 V6 源码对账 |
