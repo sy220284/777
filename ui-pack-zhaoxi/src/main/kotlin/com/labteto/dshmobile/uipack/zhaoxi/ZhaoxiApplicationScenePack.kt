@@ -383,7 +383,9 @@ class ZhaoxiApplicationScenePack(
             "work.capabilities" -> sec?.tools?.let { ZhaoxiToolsScene(it, scope, "work.capabilities") }
                 ?: ZxEmpty("能力目录不可用", "工具管理尚未连接",
                     actionLabel = "返回", onAction = { scope.onBack() })
-            "work.steering_choice" -> ZhaoxiSteeringScene(scope)
+            "work.steering_choice" -> conv?.let { ZhaoxiSteeringScene(it.work, it.drafts, scope) }
+                ?: ZxEmpty("工作调整暂不可用", "请先打开 Work 会话",
+                    actionLabel = "返回", onAction = { scope.onBack() })
             "chat.reply_suggestions" -> (conv?.replySuggestions ?: sec?.replySuggestions)?.let {
                 ZxReplySuggestionsScene(it, onPick = { text ->
                     val current = conv?.chat?.snapshot()?.identity
