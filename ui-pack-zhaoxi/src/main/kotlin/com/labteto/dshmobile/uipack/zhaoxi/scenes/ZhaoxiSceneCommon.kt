@@ -135,7 +135,7 @@ fun ZxNavRow(label: String, sub: String = "", value: String = "", onClick: () ->
         if (designIcon != null) ZxIcon(designIcon)
         Column(Modifier.weight(1f)) {
             Text(label, fontSize = 14.sp, color = c.ink, lineHeight = 20.sp)
-            if (sub.isNotEmpty()) Text(sub, fontSize = 12.sp, color = c.ink2, lineHeight = 18.sp)
+            // Function entrances show a title and optional live status, not repeated descriptions.
         }
         if (value.isNotEmpty()) {
             Text(value, modifier = Modifier.weight(.75f), fontSize = 12.sp, color = c.ink2, fontFamily = FontFamily.Monospace,
