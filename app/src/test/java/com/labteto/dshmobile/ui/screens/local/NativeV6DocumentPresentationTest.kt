@@ -1,0 +1,35 @@
+package com.labteto.dshmobile.ui.screens.local
+
+import com.labteto.dshmobile.uicontract.UiDocument
+import com.labteto.dshmobile.uicontract.UiDocumentNode
+import com.labteto.dshmobile.uicontract.UiDocumentSource
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class NativeV6DocumentPresentationTest {
+    private val status = UiDocumentNode.Text("status", "本轮已结束")
+    private val details = UiDocumentNode.Table("events", listOf("工具", "回执"), listOf(listOf("read", "已返回")))
+    private fun document(id: String) = UiDocument(
+        1, id, UiDocumentSource("s", "m", 1L, null, null, true),
+        0L, "进度", listOf(status, details), emptyList(), "历史信息",
+    )
+
+    @Test fun workProgressShowsOnlyTruthfulStatusUntilUserExpandsDetails() {
+        val progress = document("work-live:m")
+        assertEquals(listOf(status), nativeV6InlineVisibleNodes(progress, detailsExpanded = false))
+        assertEquals(listOf(status, details), nativeV6InlineVisibleNodes(progress, detailsExpanded = true))
+        assertEquals(listOf(status, details), progress.nodes)
+    }
+
+    @Test fun regularDocumentsNeverHideTheirFieldsOrActions() {
+        val regular = document("reply-ui:m")
+        assertEquals(listOf(status, details), nativeV6InlineVisibleNodes(regular, detailsExpanded = false))
+    }
+
+    @Test fun singleSelectRendersCurrentChoiceWithoutPretendingToBeMultipleChoice() {
+        val select = UiDocumentNode.Select("city", "目的地", listOf("成都", "上海"), "成都")
+        assertEquals("成都", nativeV6SelectLabel(select, emptyMap()))
+        assertEquals("上海", nativeV6SelectLabel(select, mapOf("city" to "上海")))
+        assertEquals("请选择", nativeV6SelectLabel(select, mapOf("city" to "无效选项")))
+    }
+}
