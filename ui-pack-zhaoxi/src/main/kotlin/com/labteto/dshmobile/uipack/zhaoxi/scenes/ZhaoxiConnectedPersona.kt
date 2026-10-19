@@ -114,7 +114,34 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
     var proposalSource by remember { mutableStateOf<String?>(null) }
     fun leave() { if (draft != original) confirmLeave = true else scope.onBack() }
     BackHandler(enabled = draft != original) { confirmLeave = true }
-    ZxPage(if (galleryId == null) "新建人物" else "人物编辑", onBack = ::leave) {
+    val saveArchive: () -> Unit = { if (!saving) {
+            saving = true
+            jobs.launch {
+                try {
+                    val id = galleryId; val rev = revision
+                    val result = if (id != null && rev != null)
+                        authoring.save(id, rev, zxPersonaCanonicalDraft(draft))
+                    else authoring.create(zxPersonaCanonicalDraft(draft))
+                    when (result) {
+                        is UiPersonaAuthoringReceipt.Saved -> {
+                            galleryId = result.galleryId
+                            revision = result.revision
+                            status = "人物归档已保存"
+                            scope.onBack()
+                        }
+                        else -> status = result.zxAuthoringFeedback()
+                    }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (failure: Exception) { status = failure.message ?: "保存失败；人物草稿已保留" }
+                finally { saving = false }
+            }
+        } }
+    ZxPage(if (galleryId == null) "新建人物" else "人物编辑", onBack = ::leave,
+        footer = {
+            ZxButton("保存归档", saveArchive,
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
+                enabled = draft.name.isNotBlank() && !saving && !aiBusy, loading = saving)
+        }) {
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         ZxSection("人物档案")
         ZxSettingsGroup {
@@ -130,12 +157,6 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
         ZxFooterNote("核心资料已填写 ${coreFields.count(String::isNotBlank)} / 3 项 · 补充设定 ${draft.fields.values.count(String::isNotBlank)} 项 · 独立事实 ${draft.facts.size} 条 · 世界书 ${draft.lore.size} 条")
         }
         ZxTabRow(listOf("核心档案", "独立事实", "世界书", "表达与边界"), selectedTab) { selectedTab = it }
-        ZxFooterNote(when (selectedTab) {
-            0 -> "先完善身份与性格，再补充说话方式；每组内容均可逐步编辑。"
-            1 -> "记录可单独更新的事实，避免将所有细节堆入一个大文本框。"
-            2 -> "管理背景、地点与世界规则；修改完成后统一保存归档。"
-            else -> "调整表达参数与边界设定，留空时沿用全局值。"
-        })
         when (selectedTab) {
             0 -> {
         ZhaoxiPersonaField("姓名", draft.name) { draft = draft.copy(name = it) }
@@ -308,30 +329,6 @@ fun ZhaoxiAuthoringForm(authoring: PersonaAuthoringUiPort, snapshot: UiPersonaAu
         ZxChip("恢复全局采样", false) { draft = draft.copy(samplingTemperaturePosition = null, legacySamplingPosition = null) }
             }
         }
-        Spacer(Modifier.height(12.dp))
-        ZxButton("保存归档", { if (!saving) {
-            saving = true
-            jobs.launch {
-                try {
-                    val id = galleryId; val rev = revision
-                    val result = if (id != null && rev != null)
-                        authoring.save(id, rev, zxPersonaCanonicalDraft(draft))
-                    else authoring.create(zxPersonaCanonicalDraft(draft))
-                    when (result) {
-                        is UiPersonaAuthoringReceipt.Saved -> {
-                            galleryId = result.galleryId
-                            revision = result.revision
-                            status = "人物归档已保存"
-                            scope.onBack()
-                        }
-                        else -> status = result.zxAuthoringFeedback()
-                    }
-                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-                catch (failure: Exception) { status = failure.message ?: "保存失败；人物草稿已保留" }
-                finally { saving = false }
-            }
-        } }, enabled = draft.name.isNotBlank() && !saving && !aiBusy, loading = saving)
-        ZxButton("返回", ::leave, variant = ZxButtonVariant.Outline)
     }
     if (confirmLeave) ZxDialog("放弃未保存的人物修改？",
         "离开将放弃此次尚未归档的编辑内容。", "放弃修改",
