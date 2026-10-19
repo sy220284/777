@@ -155,7 +155,8 @@ internal fun isCurrentWorkGoalContinuation(
 ): Boolean {
     if (continuation?.failureCode != WORK_GOAL_PROGRESS_CONTINUATION) return true
     val goal = work.goal ?: return false
-    return !work.planMode && goal.status == "active" &&
+    return (eventLog == null || !hasOutstandingWorkReplyForm(eventLog, goal)) &&
+        !work.planMode && goal.status == "active" &&
         continuation.goalId?.isNotBlank() == true &&
         continuation.goalId == goal.id &&
         (continuation.goalRevision?.let { it == goal.revision } ?: (
