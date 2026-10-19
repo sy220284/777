@@ -7,6 +7,7 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.StandardCopyOption
+import com.labteto.dshmobile.observability.AppLog
 
 /**
  * Update artifacts are installer staging files, not a persistent download cache.
@@ -103,6 +104,13 @@ internal object UpdateCache {
 
         var handoff = readHandoff(root)
         if (handoff == null) {
+            // No marker means unowned staging data. An existing but unreadable/corrupt marker
+            // cannot prove the APK was never handed to the system installer.
+            val marker = File(root, HANDOFF_MARKER).toPath()
+            if (!Files.notExists(marker, LinkOption.NOFOLLOW_LINKS)) {
+                AppLog.warn("UpdateCache", "安装交接标记损坏或不可读取，暂时保留安装 APK")
+                return INSTALLER_HANDOFF_GRACE_MS
+            }
             root.deleteRecursively()
             return null
         }
@@ -161,10 +169,13 @@ internal object UpdateCache {
         val marker = File(root, HANDOFF_MARKER)
         val path = marker.toPath()
         if (Files.notExists(path, LinkOption.NOFOLLOW_LINKS)) return null
-        require(Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
-            "安装交接标记不可读取，不应删除正在安装的 APK"
+        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) return null
+        val lines = try {
+            marker.readLines()
+        } catch (error: java.io.IOException) {
+            AppLog.warn("UpdateCache", "安装交接标记读取失败，暂不清理 APK", error)
+            return null
         }
-        val lines = marker.readLines()
         if (lines.size < 4 || lines[0] != HANDOFF_SCHEMA) return null
 
         val apkName = lines[1]

@@ -6,7 +6,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -97,9 +96,27 @@ class UpdateCacheTest {
         val apk = File(root, "app-release.apk").apply { writeBytes(ByteArray(12)) }
         File(root, ".installer-handoff").mkdir()
 
-        assertThrows(IllegalArgumentException::class.java) {
-            UpdateCache.cleanupStale(cacheDir, 100L, 1_050_000L)
-        }
+        assertEquals(
+            UpdateCache.INSTALLER_HANDOFF_GRACE_MS,
+            UpdateCache.cleanupStale(cacheDir, 100L, 1_050_000L),
+        )
+        assertTrue(apk.isFile)
+        // A new explicit installation attempt must still be allowed to release old staging.
+        val replacement = prepare(cacheDir, 100L, 1_050_001L)
+        assertTrue(replacement.isDirectory)
+        assertFalse(apk.exists())
+    }
+
+    @Test
+    fun `malformed handoff contents do not erase a possibly owned apk`() {
+        val cacheDir = temporary.newFolder("cache-malformed")
+        val root = prepare(cacheDir)
+        val apk = File(root, "app-release.apk").apply { writeBytes(ByteArray(8)) }
+        File(root, ".installer-handoff").writeText("bad-marker")
+        assertEquals(
+            UpdateCache.INSTALLER_HANDOFF_GRACE_MS,
+            UpdateCache.cleanupStale(cacheDir, 100L, 1_050_000L),
+        )
         assertTrue(apk.isFile)
     }
 
