@@ -523,19 +523,27 @@ fun ZhaoxiPricingScene(port: PricingUiPort, scope: UiSceneRenderScope) {
     val jobs = rememberCoroutineScope()
     var result by remember { mutableStateOf<String?>(null) }
     ZxPage("官方价格", onBack = { scope.onBack() }) {
-        Text(snap.sourceUrl, color = ZhaoxiTheme.colors.ink2)
-        snap.models.forEach { model ->
-            ZxRow(model.displayName, "每百万 Token（元）")
-            ZxValueRow("高峰", value = "缓存 ${model.peak.cacheHitCnyPerMillion} / 输入 ${model.peak.cacheMissCnyPerMillion} / 输出 ${model.peak.outputCnyPerMillion}")
-            ZxValueRow("低峰", value = "缓存 ${model.offPeak.cacheHitCnyPerMillion} / 输入 ${model.offPeak.cacheMissCnyPerMillion} / 输出 ${model.offPeak.outputCnyPerMillion}")
-        }
-        (result ?: snap.error)?.let { ZxBanner(it, ZxTone.Info) }
-        ZxButton("刷新官方价格", { jobs.launch {
+        ZxSection("计价方式")
+        ZxFooterNote("所有金额为人民币元 / 每百万 Token；缓存命中、普通输入、模型输出分开计价。峰谷时段按服务商公布的规则执行。")
+        ZxButton(if (snap.refreshing) "正在刷新价格…" else "刷新官方价格", { jobs.launch {
             result = when (val receipt = port.refreshOfficial()) {
                 PricingUiReceipt.Completed -> "价格已更新"
                 is PricingUiReceipt.Failed -> receipt.message ?: "刷新失败"
             }
-        } }, enabled = !snap.refreshing)
+        } }, Modifier.fillMaxWidth(), enabled = !snap.refreshing, loading = snap.refreshing)
+        (result ?: snap.error)?.let { ZxBanner(it, if (snap.error != null) ZxTone.Warn else ZxTone.Info) }
+        if (snap.models.isEmpty()) ZxEmpty("没有可展示的价格", "可以刷新官方价格；实际计费以服务商账单为准。")
+        snap.models.forEach { model ->
+            ZxSection(model.displayName)
+            ZxSettingsGroup {
+                ZxValueRow("缓存命中", value = "高峰 ¥${model.peak.cacheHitCnyPerMillion} · 低峰 ¥${model.offPeak.cacheHitCnyPerMillion}")
+                ZxValueRow("普通输入", value = "高峰 ¥${model.peak.cacheMissCnyPerMillion} · 低峰 ¥${model.offPeak.cacheMissCnyPerMillion}")
+                ZxValueRow("模型输出", value = "高峰 ¥${model.peak.outputCnyPerMillion} · 低峰 ¥${model.offPeak.outputCnyPerMillion}")
+            }
+        }
+        ZxSection("价格来源")
+        ZxFooterNote(snap.sourceUrl.ifBlank { "当前没有来源地址" })
+        ZxFooterNote("本页仅显示已经获取的官方价格快照，不表示账单金额或实时消耗。")
     }
 }
 

@@ -609,6 +609,43 @@ internal fun zxMcpStdioCommand(value: String): List<String>? {
     return args.takeIf { it.isNotEmpty() && it.first().isNotBlank() }
 }
 
+/** Render capability permissions as user-facing guidance; never alter Owner policy. */
+internal fun zxCapabilityPermissionLabel(access: String, approval: String): String {
+    val effect = if (access.uppercase().contains("MUTATION") || access.uppercase().contains("WRITE")) "可能修改内容" else "只读查询"
+    val consent = when (approval.uppercase()) {
+        "NEVER" -> "无需额外确认"
+        "ALWAYS" -> "操作前须确认"
+        else -> "按实际授权规则确认"
+    }
+    return "$effect · $consent"
+}
+
+internal fun zxCapabilityActionLabel(name: String): String {
+    val id = name.lowercase()
+    return when {
+        id == "android_app_info" -> "查看应用和设备信息"
+        id.contains("github") && (id.contains("get") || id.contains("list")) -> "读取 GitHub 信息"
+        id.contains("github") -> "管理 GitHub 内容"
+        id.contains("browser") -> "浏览网页"
+        id.contains("search") -> "搜索信息"
+        id.contains("shell") || id.contains("terminal") -> "运行命令"
+        id.contains("file") || id.contains("workspace") -> "处理文件"
+        id.contains("android") || id.contains("device") -> "使用设备功能"
+        id.contains("lsp") || id.contains("code") -> "分析代码"
+        id.contains("web") -> "访问网络"
+        else -> name.replace('_', ' ')
+    }
+}
+
+internal fun zxPluginStateLabel(state: String): String = when (state.uppercase()) {
+    "INSTALLING" -> "安装中"
+    "ACTIVE" -> "已启用"
+    "REPLACING" -> "更新中"
+    "UNINSTALLING" -> "正在移除"
+    "FAILED" -> "需要修复"
+    else -> "状态未确认"
+}
+
 /** 按 E8.18 独立场景分派工具中心、MCP、插件和 GitHub；所有状态来自 ToolsUiPort。 */
 @Composable
 fun ZhaoxiToolsScene(
@@ -717,7 +754,7 @@ fun ZhaoxiToolsScene(
                             val registered = catalogue.firstOrNull { it.name == name }
                             ZxRow(name,
                                 registered?.let {
-                                    "权限 ${it.access} · 审批 ${it.approval}" +
+                                    zxCapabilityPermissionLabel(it.access, it.approval) +
                                         if (it.requirements.isEmpty()) "" else " · ${it.requirements.joinToString("、").take(110)}"
                                 } ?: "仅服务端上报名称，应用尚未核实其调用权限",
                                 showChevron = false)
@@ -739,6 +776,7 @@ fun ZhaoxiToolsScene(
             }
             "tools.plugins" -> {
                 ZxSection("已安装插件")
+                ZxFooterNote("状态表示插件是否已启用。发生故障时可在下方尝试恢复。")
                 ZxValueRow("已安装数量", value = installedIds.size.toString())
                 ZxField(pluginQuery, { pluginQuery = it }, Modifier.fillMaxWidth(),
                     placeholder = "搜索插件名称或运行状态")
@@ -757,10 +795,10 @@ fun ZhaoxiToolsScene(
                     ZxEmpty("没有匹配的插件", "尝试搜索其他名称或状态")
                 matchingInstalled.forEach { id ->
                     val lifecycle = plugins.firstOrNull { it.id == id }
-                    ZxRow(id, lifecycle?.state?.name ?: "已安装 · 未提供生命周期状态")
+                    ZxRow(id, lifecycle?.state?.name?.let(::zxPluginStateLabel) ?: "已安装 · 状态未上报")
                 }
                 matchingOthers.forEach { item ->
-                    ZxRow(item.id, item.state.name)
+                    ZxRow(item.id, zxPluginStateLabel(item.state.name))
                 }
                 plugins.filter { it.state == com.labteto.dshmobile.uicontract.UiPluginLifecycleState.FAILED &&
                         (pluginQuery.isBlank() ||
@@ -775,10 +813,10 @@ fun ZhaoxiToolsScene(
             }
             "tools.github" -> {
                 ZxSection("连接状态")
-                ZxValueRow("GitHub", value = if (githubConfigured) "已配置" else "未配置")
+                ZxValueRow("GitHub", value = if (githubConfigured) "已连接" else "尚未连接")
                 ZxSection("可用能力")
                 catalogue.filter { it.family.contains("github", ignoreCase = true) }
-                    .forEach { cap -> ZxRow(cap.name, "${cap.access} · ${cap.approval}") }
+                    .forEach { cap -> ZxRow(zxCapabilityActionLabel(cap.name), zxCapabilityPermissionLabel(cap.access, cap.approval)) }
                 if (githubConfigured) ZhaoxiGitHubBrowser(tools)
                 else ZxFooterNote("先连接 GitHub，再查看真实仓库目录。")
                 if (!githubConfigured) {
@@ -807,23 +845,25 @@ fun ZhaoxiToolsScene(
                 )
             }
             "work.capabilities" -> {
+                ZxFooterNote("按操作类型浏览已登记能力。实际执行仍由工作任务和权限审批决定。")
                 val grouped = catalogue.groupBy { it.family }
                 if (grouped.isEmpty()) ZxEmpty("暂无能力", "已注册的能力会在这里出现")
                 grouped.forEach { (group, items) ->
                     ZxSection(zxToolFamilyLabel(group))
                     items.forEach { cap ->
-                        ZxRow(cap.name, "${cap.access} · ${cap.approval}")
+                        ZxRow(zxCapabilityActionLabel(cap.name), zxCapabilityPermissionLabel(cap.access, cap.approval))
                     }
                 }
             }
             else -> {
-                ZxSection("可用能力")
+                ZxSection("你可以使用的工具")
+                ZxFooterNote("先选择操作类型查看详情；需要连接或授权的服务可在下方管理。")
                 catalogue.groupBy { it.family }.forEach { (family, items) ->
-                    ZxRow(zxToolFamilyLabel(family), "${items.size} 项已登记能力",
+                    ZxRow(zxToolFamilyLabel(family), "查看相关操作 · ${items.size} 项",
                         onClick = { expandedFamily = if (expandedFamily == family) null else family })
                     if (expandedFamily == family) {
                         items.forEach { cap ->
-                            ZxRow(cap.name, "${cap.access} · ${cap.approval}")
+                            ZxRow(zxCapabilityActionLabel(cap.name), zxCapabilityPermissionLabel(cap.access, cap.approval))
                         }
                     }
                 }

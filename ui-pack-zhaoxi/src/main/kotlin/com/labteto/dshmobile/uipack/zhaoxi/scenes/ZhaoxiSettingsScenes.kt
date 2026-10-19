@@ -42,6 +42,8 @@ import com.labteto.dshmobile.uicontract.UiHostPreferencesCommand
 import com.labteto.dshmobile.uicontract.UiHostPreferences
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadge
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBadgeTone
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxDetentSlider
@@ -234,6 +236,18 @@ fun ZhaoxiAppearanceScene(preferences: HostPreferencesUiPort, scope: UiSceneRend
 fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneRenderScope) {
     val snap by preferences.snapshots.collectAsState(initial = UiHostPreferences())
     val jobs = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var permissionRevision by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) permissionRevision++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val systemNotificationGranted = remember(preferences, permissionRevision) {
+        preferences.notificationPermissionGranted()
+    }
     var status by remember { mutableStateOf<String?>(null) }
     var triedQuietSave by remember { mutableStateOf(false) }
     var startTime by remember(snap.quietStartMinute) {
@@ -272,6 +286,12 @@ fun ZhaoxiNotificationsScene(preferences: HostPreferencesUiPort, scope: UiSceneR
     val quietError = if (triedQuietSave) zxQuietHoursError(startTime, endTime) else null
     ZxPage("通知", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
+        if (systemNotificationGranted == false) {
+            ZxBanner("系统通知权限尚未授权。下方偏好可以保存，但目前可能无法投递提醒。", ZxTone.Warn)
+            ZxButton("前往系统通知授权", { preferences.openSystemNotifications() }, Modifier.fillMaxWidth())
+        } else if (systemNotificationGranted == true) {
+            ZxFooterNote("系统通知已授权；具体提醒仍以各类别开关和免打扰设置为准。")
+        }
         ZxSection("提醒类型")
         ZxSwitchRow("任务执行", "定时任务和自动化事件", snap.notifyJobs) { update(jobsEnabled = it) }
         ZxSwitchRow("执行结果", "任务完成后的结果提示", snap.notifyResults) { update(resultsEnabled = it) }
