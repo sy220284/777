@@ -184,6 +184,14 @@ class LocalModelProfilesTest {
         assertFalse(LocalModelCapability.IMAGE in deepSeekPro.capabilities)
         assertEquals(false, deepSeekPro.imageInputSupported)
 
+        val miniMaxLatest = LocalModelPresets.entries.first { it.model == "MiniMax-M3.1-Flash" }
+        assertEquals("MiniMax", miniMaxLatest.provider)
+        assertEquals("https://api.minimaxi.com/v1", miniMaxLatest.baseUrl)
+        assertEquals(1_000_000, miniMaxLatest.contextWindowTokens)
+        assertEquals("https://api.minimaxi.com/v1/models", miniMaxLatest.modelsEndpoint)
+        assertTrue(LocalModelCapability.IMAGE in miniMaxLatest.capabilities)
+        assertTrue(LocalModelCapability.VIDEO in miniMaxLatest.capabilities)
+        assertEquals(true, miniMaxLatest.imageInputSupported)
         val miniMax = LocalModelPresets.find("MiniMax-M3", "https://api.minimaxi.com/v1")!!
         assertTrue(LocalModelCapability.IMAGE in miniMax.capabilities)
         assertTrue(LocalModelCapability.VIDEO in miniMax.capabilities)
@@ -260,7 +268,7 @@ class LocalModelProfilesTest {
             .toSet()
 
         assertEquals(
-            setOf("MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2.7-highspeed"),
+            setOf("MiniMax-M3.1-Flash", "MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2.7-highspeed"),
             models("MiniMax"),
         )
         assertEquals(
