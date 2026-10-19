@@ -28,7 +28,6 @@ internal object LocalUiConnectedCapabilities {
         workReads: com.labteto.dshmobile.uicontract.WorkReadUiPort? = null,
         workPolicy: com.labteto.dshmobile.uicontract.WorkPolicyUiPort? = null,
         shell: com.labteto.dshmobile.uicontract.ConversationShellUiPort? = null,
-        evidence: com.labteto.dshmobile.uicontract.WorkEvidenceUiPort? = null,
         gallery: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort? = null,
         personas: com.labteto.dshmobile.uicontract.PersonaSelectionUiPort? = null,
         personaTransfer: com.labteto.dshmobile.uicontract.PersonaTransferUiPort? = null,
@@ -70,7 +69,6 @@ internal object LocalUiConnectedCapabilities {
         if (workReads != null && workPolicy != null)
             add(UiCapabilityId("work.plan_review"))
         if (shell != null) add(UiCapabilityId("shell.session_preferences"))
-        if (evidence != null) add(UiCapabilityId("work.evidence_reference"))
         if (gallery != null) add(UiCapabilityId("chat.gallery_archive"))
         if (personas != null) add(UiCapabilityId("chat.persona_selection"))
         if (personaTransfer != null) add(UiCapabilityId("chat.persona_transfer"))
