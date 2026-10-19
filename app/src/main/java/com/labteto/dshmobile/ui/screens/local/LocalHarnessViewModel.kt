@@ -107,11 +107,8 @@ class LocalHarnessViewModel @Inject constructor(
     internal fun consumeDocumentRoute(route: String) {
         if (_documentRoute.value == route) _documentRoute.value = null
     }
-    internal fun consumePreparedDocumentDraft(sessionId: String): String? {
-        val text = nativeDocumentDrafts.drafts.value[sessionId]?.takeIf(String::isNotBlank)
-        nativeDocumentDrafts.updateDraft(sessionId, "")
-        return text
-    }
+    internal fun consumePreparedDocumentDraft(sessionId: String): String? =
+        nativeDocuments.consumePreparedDraft(sessionId)
 
     val approvalMode = approvalPreferences.approvalMode
     val networkSearchEnabled = networkSearchSettings.enabled

@@ -2,7 +2,6 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.LocalConversationUiPortComposition
 import com.labteto.dshmobile.uicontract.*
-import kotlinx.coroutines.flow.StateFlow
 
 /**
  * V6 native conversation owner adapter: documents are business records, never a second UI runtime.
@@ -15,7 +14,12 @@ internal class NativeV6Documents(
 ) {
     /** The message cards and V6 document drawer share one durable Owner and draft destination. */
     val snapshots = port.snapshots
-    val preparedDrafts: StateFlow<Map<String, String>> = drafts.drafts
+    /** Single-use handoff: transferring prepared text must never replay on recomposition. */
+    fun consumePreparedDraft(sessionId: String): String? {
+        val text = drafts.drafts.value[sessionId]?.takeIf(String::isNotBlank) ?: return null
+        drafts.updateDraft(sessionId, "")
+        return text
+    }
 
     fun submit(snapshot: UiDocumentSnapshot, actionId: String, fields: Map<String, String>, confirmed: Boolean): UiDocumentReceipt {
         val identity = conversations.identitySnapshot()

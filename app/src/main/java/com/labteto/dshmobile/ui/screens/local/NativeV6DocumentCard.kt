@@ -41,6 +41,7 @@ internal fun NativeV6DocumentMessage(
     messageId: String,
     documents: List<UiDocumentSnapshot>,
     controller: NativeV6Documents,
+    onPreparedDraft: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var creating by remember(messageId) { mutableStateOf(false) }
@@ -49,7 +50,8 @@ internal fun NativeV6DocumentMessage(
     var feedback by remember(messageId) { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         documents.forEach { snapshot ->
-            NativeV6DocumentCard(snapshot, controller, onFeedback = { feedback = it })
+            NativeV6DocumentCard(snapshot, controller, onFeedback = { feedback = it },
+                onPreparedDraft = onPreparedDraft)
         }
         if (documents.isEmpty()) {
             TextButton(onClick = { creating = true }, enabled = !generating) {
@@ -86,6 +88,7 @@ private fun NativeV6DocumentCard(
     snapshot: UiDocumentSnapshot,
     controller: NativeV6Documents,
     onFeedback: (String) -> Unit,
+    onPreparedDraft: () -> Unit,
 ) {
     val doc = snapshot.document
     val scope = rememberCoroutineScope()
@@ -100,6 +103,7 @@ private fun NativeV6DocumentCard(
         scope.launch {
             val receipt = withContext(Dispatchers.IO) { controller.submit(snapshot, actionId, values, confirmed) }
             onFeedback(nativeV6DocumentReceiptMessage(receipt))
+            if (receipt == UiDocumentReceipt.DraftPrepared) onPreparedDraft()
         }
     }
     Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 2.dp,

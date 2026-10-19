@@ -435,12 +435,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             onConsumeComposerHandoff()
         }
     }
-    val documentPreparedDrafts by (nativeDocuments?.preparedDrafts ?: kotlinx.coroutines.flow.flowOf(emptyMap()))
-        .collectAsState(initial = emptyMap())
-    val pendingDocumentDraft = documentPreparedDrafts[state.sessionId]
-    LaunchedEffect(state.sessionId, pendingDocumentDraft) {
-        if (pendingDocumentDraft != null) drafts.putBoundedLocalDraft(state.sessionId, pendingDocumentDraft)
-    }
     val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
@@ -1097,6 +1091,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                         it.document.source.messageId == transcriptItem.message.id
                                     },
                                     controller = nativeDocuments,
+                                    onPreparedDraft = {
+                                        nativeDocuments.consumePreparedDraft(state.sessionId)?.let { prepared ->
+                                            val previous = drafts[state.sessionId].orEmpty()
+                                            drafts.putBoundedLocalDraft(
+                                                state.sessionId,
+                                                listOf(prepared, previous).filter(String::isNotBlank).joinToString("\n\n"),
+                                            )
+                                        }
+                                    },
                                 )
                             }
                             if (state.usageMode == LocalUsageMode.CHAT && transcriptItem.message.role == "user") {
