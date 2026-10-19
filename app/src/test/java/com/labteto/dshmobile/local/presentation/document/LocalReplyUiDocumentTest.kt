@@ -67,6 +67,23 @@ class LocalReplyUiDocumentTest {
         assertEquals("\n```json\n{}", plain.append("\n```json\n{}"))
     }
 
+    @Test fun workFormRequiresExplicitUserInputBeforeGoalAutoContinuation() {
+        assertEquals(WorkReplyFormHandling.WAIT_FOR_SUBMISSION,
+            LocalReplyUiDocumentProtocol.workReplyFormHandling(raw, hasToolCalls = false))
+        assertEquals(WorkReplyFormHandling.DEFER_UNTIL_NO_TOOLS,
+            LocalReplyUiDocumentProtocol.workReplyFormHandling(raw, hasToolCalls = true))
+        assertEquals(WorkReplyFormHandling.WAIT_FOR_SUBMISSION,
+            LocalReplyUiDocumentProtocol.workReplyFormHandling(
+                raw.replace("submit_user_input", "send_user_input"), hasToolCalls = false))
+        assertEquals(WorkReplyFormHandling.NONE,
+            LocalReplyUiDocumentProtocol.workReplyFormHandling(null, hasToolCalls = false))
+        assertEquals(WorkReplyFormHandling.NONE,
+            LocalReplyUiDocumentProtocol.workReplyFormHandling("{invalid", hasToolCalls = false))
+        assertEquals(WorkReplyFormHandling.NONE,
+            LocalReplyUiDocumentProtocol.workReplyFormHandling(
+                raw.replace("submit_user_input", "execute_tool"), hasToolCalls = false))
+    }
+
     @Test fun automaticCardRestoresExactOwnerSourceAndCannotReviveAfterDeletion() {
         val root = Files.createTempDirectory("reply-ui").toFile()
         val logs = LocalSessionEventLogRegistry(root, Json)
