@@ -118,6 +118,7 @@ fun ZhaoxiHomeScene(
     scope: UiSceneRenderScope,
     conversationShell: ConversationShellUiPort? = null,
     draftPort: ConversationDraftUiPort? = null,
+    availableScenes: Set<UiSceneId>,
 ) {
     val snap by (sessions?.snapshots
         ?: kotlinx.coroutines.flow.flowOf(UiSessionsSnapshot(null, LocalUsageMode.CHAT, false, emptyList(), null)))
@@ -142,6 +143,7 @@ fun ZhaoxiHomeScene(
     val drawerScope = rememberCoroutineScope()
     val c = ZhaoxiTheme.colors
     val workMode = snap.usageMode == LocalUsageMode.WORK
+    fun sceneAvailable(id: String) = UiSceneId(id) in availableScenes
     val modeSessions = snap.sessions.filter { it.usageMode == snap.usageMode }
     val matchedSessions = if (drawerQuery.isBlank()) modeSessions else modeSessions.filter { session ->
         renamedTitles.getOrDefault(session.id, session.title)
@@ -203,7 +205,7 @@ fun ZhaoxiHomeScene(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("朝夕", Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
-                        ZxIconButton(
+                        if (sceneAvailable("shell.search")) ZxIconButton(
                             onClick = { navigate("shell.search") },
                             contentDescription = "全局搜索",
                         ) { ZxIcon("search") }
@@ -229,11 +231,11 @@ fun ZhaoxiHomeScene(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                ZxChip("人物图集", false) { navigate("route.persona_gallery") }
-                                ZxChip("日记", false) { navigate("route.diary") }
-                                ZxChip("任务", false) { navigate("route.tasks") }
-                                ZxChip("工作区文件", false) { navigate("route.workspace") }
-                                ZxChip("工具", false) { navigate("route.tools") }
+                                if (sceneAvailable("route.persona_gallery")) ZxChip("人物图集", false) { navigate("route.persona_gallery") }
+                                if (sceneAvailable("route.diary")) ZxChip("日记", false) { navigate("route.diary") }
+                                if (sceneAvailable("route.tasks")) ZxChip("任务", false) { navigate("route.tasks") }
+                                if (sceneAvailable("route.workspace")) ZxChip("工作区文件", false) { navigate("route.workspace") }
+                                if (sceneAvailable("route.tools")) ZxChip("工具", false) { navigate("route.tools") }
                             }
                         }
                         item {
@@ -344,7 +346,7 @@ fun ZhaoxiHomeScene(
                             )
                         }
                     }
-                    ZxHomeDrawerEntry("settings", "设置", onClick = { navigate("route.settings") })
+                    if (sceneAvailable("route.settings")) ZxHomeDrawerEntry("settings", "设置", onClick = { navigate("route.settings") })
                     Spacer(Modifier.height(12.dp))
                 }
             }
