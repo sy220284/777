@@ -488,7 +488,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         mutableStateOf<List<com.labteto.dshmobile.uicontract.UiDocumentSnapshot>>(emptyList())
     }
     LaunchedEffect(state.sessionId, pagedOlderMessages, nativeDocuments) {
-        val ids = pagedOlderMessages.filter { it.role == "assistant" }.map { it.id }.toSet()
+        val ids = pagedOlderMessages.filter { it.role == "assistant" ||
+            state.usageMode == LocalUsageMode.WORK && it.role == "user" }.map { it.id }.toSet()
         olderDocumentSnapshots = if (nativeDocuments == null || ids.isEmpty()) emptyList()
             else nativeDocuments.olderDocuments(state.sessionId, ids)
     }
@@ -1093,14 +1094,20 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 onRegenerate = onRegenerate,
                             )
                             val isHistoricalDocumentSource = state.messages.none { it.id == transcriptItem.message.id }
-                            if (nativeDocuments != null && transcriptItem.message.role == "assistant" &&
-                                (nativeDocumentSnapshot.sessionId == state.sessionId || isHistoricalDocumentSource)) {
+                            val inlineDocuments = (if (isHistoricalDocumentSource) olderDocumentSnapshots
+                                else nativeDocumentSnapshot.documents).filter { snapshot ->
+                                snapshot.document.source.messageId == transcriptItem.message.id &&
+                                    (transcriptItem.message.role == "assistant" ||
+                                        state.usageMode == LocalUsageMode.WORK &&
+                                        transcriptItem.message.role == "user" &&
+                                        snapshot.document.documentId.startsWith("work-live:"))
+                            }
+                            if (nativeDocuments != null &&
+                                (nativeDocumentSnapshot.sessionId == state.sessionId || isHistoricalDocumentSource) &&
+                                (transcriptItem.message.role == "assistant" || inlineDocuments.isNotEmpty())) {
                                 NativeV6DocumentMessage(
                                     messageId = transcriptItem.message.id,
-                                    documents = (if (isHistoricalDocumentSource) olderDocumentSnapshots
-                                        else nativeDocumentSnapshot.documents).filter {
-                                        it.document.source.messageId == transcriptItem.message.id
-                                    },
+                                    documents = inlineDocuments,
                                     readOnly = isHistoricalDocumentSource,
                                     controller = nativeDocuments,
                                     onPreparedDraft = {
