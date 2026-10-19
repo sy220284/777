@@ -146,7 +146,7 @@ internal class LocalWorkAgentTurnExecutor(
             val runEventLog = binding.eventLog
             // Final Goal fence: a user can change Work after inbox consumption but
             // before this lazy coroutine obtains its Session runtime ownership.
-            if (!isCurrentWorkGoalContinuation(continuation, runState.value.work)) {
+            if (!isCurrentWorkGoalContinuation(continuation, runState.value.work, runEventLog)) {
                 runEventLog.append("turn/goal-continuation-stale", buildJsonObject {
                     put("source_run_id", continuation?.sourceRunId ?: "")
                     put("goal_id", continuation?.goalId ?: "")
