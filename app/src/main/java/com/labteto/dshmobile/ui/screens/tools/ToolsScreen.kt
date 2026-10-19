@@ -146,6 +146,62 @@ class ToolsViewModel @Inject constructor(
 
     fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
     private val operationGate = ToolsOperationGate()
+    private val _githubBrowse = MutableStateFlow(GitHubBrowseState())
+    val githubBrowse: StateFlow<GitHubBrowseState> = _githubBrowse.asStateFlow()
+
+    fun loadGitHubRepositories() {
+        launchOperation {
+            _githubBrowse.value = GitHubBrowseState(loading = true)
+            try {
+                _githubBrowse.value = GitHubBrowseState(repositories = localTools.githubRepositories())
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _githubBrowse.value = GitHubBrowseState(error = error.message ?: "仓库读取失败")
+            }
+        }
+    }
+
+    fun openGitHubRepository(fullName: String) {
+        if (_githubBrowse.value.repositories.none { it.fullName == fullName }) return
+        loadGitHubDirectory(fullName, "")
+    }
+
+    fun openGitHubFolder(path: String) {
+        val browse = _githubBrowse.value
+        val repo = browse.selectedRepository ?: return
+        if (browse.entries.none { it.directory && it.path == path }) return
+        loadGitHubDirectory(repo, path)
+    }
+
+    fun backGitHubBrowse() {
+        val browse = _githubBrowse.value
+        val repo = browse.selectedRepository ?: return
+        if (browse.currentDirectory.isEmpty()) {
+            _githubBrowse.value = browse.copy(selectedRepository = null, entries = emptyList(), error = null)
+        } else {
+            loadGitHubDirectory(repo, browse.currentDirectory.substringBeforeLast('/', ""))
+        }
+    }
+
+    private fun loadGitHubDirectory(repo: String, directory: String) {
+        launchOperation {
+            _githubBrowse.value = _githubBrowse.value.copy(loading = true, error = null)
+            try {
+                val entries = localTools.githubEntries(repo, directory)
+                _githubBrowse.value = _githubBrowse.value.copy(
+                    loading = false, selectedRepository = repo, currentDirectory = directory,
+                    entries = entries, error = null,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _githubBrowse.value = _githubBrowse.value.copy(
+                    loading = false, error = error.message ?: "目录读取失败",
+                )
+            }
+        }
+    }
 
     private fun launchOperation(block: suspend () -> Unit) {
         viewModelScope.launch {
@@ -441,6 +497,7 @@ fun ToolsScreen(
     viewModel: ToolsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val githubBrowse by viewModel.githubBrowse.collectAsStateWithLifecycle()
     val skillFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.importSkill(uri)
     }
@@ -463,6 +520,7 @@ fun ToolsScreen(
     var stdioWorkingDirectory by remember { mutableStateOf("") }
     var githubToken by remember { mutableStateOf("") }
     var showGitHubConfig by remember { mutableStateOf(false) }
+    var showGitHubBrowser by remember { mutableStateOf(false) }
     var showExternalConfig by remember { mutableStateOf(false) }
     var expandedMcpServer by remember { mutableStateOf<String?>(null) }
     var showAgentSettings by remember { mutableStateOf(false) }
@@ -490,8 +548,10 @@ fun ToolsScreen(
         )
     }
 
-    BackHandler(enabled = showPluginBrowser || showAgentSettings || !capabilityCatalogueVisible || handleRootSystemBack) {
+    BackHandler(enabled = showGitHubBrowser || showGitHubConfig || showPluginBrowser || showAgentSettings || !capabilityCatalogueVisible || handleRootSystemBack) {
         when {
+            showGitHubBrowser -> showGitHubBrowser = false
+            showGitHubConfig -> showGitHubConfig = false
             showAgentSettings -> showAgentSettings = false
             showPluginBrowser -> showPluginBrowser = false
             !capabilityCatalogueVisible -> capabilityCatalogueVisible = true
@@ -713,6 +773,16 @@ fun ToolsScreen(
     }
     }
 
+    if (showGitHubBrowser) {
+        GitHubRepositoryBrowserSheet(
+            state = githubBrowse,
+            onBack = viewModel::backGitHubBrowse,
+            onOpenRepository = viewModel::openGitHubRepository,
+            onOpenFolder = viewModel::openGitHubFolder,
+            onDismiss = { showGitHubBrowser = false },
+        )
+    }
+
     if (showGitHubConfig) {
         SyResponsiveSheet(
             title = stringResource(R.string.tools_github_connector),
@@ -729,6 +799,18 @@ fun ToolsScreen(
                 style = DsType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
             )
+            if (state.githubConfigured) {
+                SyButton(
+                    text = "浏览 GitHub 仓库",
+                    onClick = {
+                        showGitHubConfig = false
+                        showGitHubBrowser = true
+                        viewModel.loadGitHubRepositories()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = SyButtonVariant.Ghost,
+                )
+            }
             SyTextField(
                 value = githubToken,
                 onValueChange = { githubToken = it.take(4096) },
