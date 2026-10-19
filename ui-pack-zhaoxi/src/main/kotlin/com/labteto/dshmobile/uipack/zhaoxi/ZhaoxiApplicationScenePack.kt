@@ -133,16 +133,22 @@ class ZhaoxiApplicationScenePack(
     private val teamScene = if (conversations?.workTeam != null)
         setOf(UiSceneId("work.team")) else emptySet()
 
-    private val settingsSuite = if (settings == null) emptySet() else setOf(
-        "settings.root", "route.settings",
-        "settings.models", "conversation.model_picker",
-        "settings.account", "settings.minimax_quota",
-        "settings.model_performance", "settings.pricing",
-        "settings.usage", "settings.model_usage", "settings.usage_log",
-        "settings.usage_detail", "settings.memory", "settings.memory_settings",
-        "settings.advanced", "settings.session_storage", "settings.diagnostics",
-        "settings.approval_mode",
-    ).map(::UiSceneId).toSet()
+    private val settingsSuite = buildSet {
+        if (settings != null) addAll(setOf(
+            "settings.root", "route.settings", "settings.models", "conversation.model_picker",
+            "settings.account", "settings.minimax_quota", "settings.memory_settings",
+            "settings.advanced", "settings.session_storage", "settings.diagnostics",
+            "settings.approval_mode",
+        ).map(::UiSceneId))
+        if (secondary?.modelPerformance != null) add(UiSceneId("settings.model_performance"))
+        if (secondary?.pricing != null) add(UiSceneId("settings.pricing"))
+        if (usageOwner != null) addAll(setOf(
+            "settings.usage", "settings.model_usage", "settings.usage_log",
+            "settings.usage_detail",
+        ).map(::UiSceneId))
+        if (secondary?.memory != null && (settings != null || secondary.settings != null))
+            add(UiSceneId("settings.memory"))
+    }
 
     private val updateScene = if (settings != null && checkForUpdate != null &&
         updateStatus != null) setOf(UiSceneId("settings.update")) else emptySet()
@@ -511,7 +517,7 @@ class ZhaoxiApplicationScenePack(
 
             // ---- 设置 ----
             "settings.root", "route.settings" -> ZhaoxiSettingsHomeScene(
-                scope, updateStatus, checkForUpdate, settings ?: sec?.settings)
+                scope, updateStatus, checkForUpdate, settings ?: sec?.settings, manifest.scenes)
             "settings.appearance" -> ZhaoxiAppearanceScene(preferences, scope)
             "settings.notifications" -> ZhaoxiNotificationsScene(preferences, scope)
             "settings.permissions" -> ZhaoxiPermissionsScene(preferences, scope)
