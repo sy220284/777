@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import com.labteto.dshmobile.ui.shenyan.SyDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -181,21 +181,19 @@ internal fun NativeV6DocumentsSheet(
         }
     }
     if (modelConsent && current != null) {
-        AlertDialog(
-            onDismissRequest = { modelConsent = false },
-            title = { Text("确认额外模型调用") },
-            text = { Text("生成交互文档会产生一次新的模型请求和相应消耗，确定继续吗？") },
-            confirmButton = {
-                SyButton("确认生成", onClick = {
+        SyDialog(title = "确认额外模型调用", onDismiss = { modelConsent = false }) {
+    Text("生成交互文档会产生一次新的模型请求和相应消耗，确定继续吗？")
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        SyButton("取消", onClick = { modelConsent = false },
+                variant = SyButtonVariant.Ghost)
+        SyButton("确认生成", onClick = {
                     modelConsent = false
                     val msg = currentMessageId() ?: return@SyButton
                     doCommand { port.generate(GenerateUiDocumentCommand(current, workMode, msg,
                         prompt.trim(), acknowledgedAdditionalModelRequest = true)) }
                 })
-            },
-            dismissButton = { SyButton("取消", onClick = { modelConsent = false },
-                variant = SyButtonVariant.Ghost) },
-        )
+    }
+}
     }
 }
 
@@ -244,33 +242,39 @@ private fun NativeV6DocumentCard(
     }
     if (confirmAction != null) {
         val id = requireNotNull(confirmAction)
-        AlertDialog(onDismissRequest = { confirmAction = null },
-            title = { Text("确认文档操作") },
-            text = { Text("该操作会向当前会话提交输入或处理审批，请确认。") },
-            confirmButton = { SyButton("确认执行", onClick = {
+        SyDialog(title = "确认文档操作", onDismiss = { confirmAction = null }) {
+    Text("该操作会向当前会话提交输入或处理审批，请确认。")
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        SyButton("取消", onClick = { confirmAction = null },
+                variant = SyButtonVariant.Ghost)
+        SyButton("确认执行", onClick = {
                 confirmAction = null
                 onAction(id, fields.toMap(), true)
-            }) },
-            dismissButton = { SyButton("取消", onClick = { confirmAction = null },
-                variant = SyButtonVariant.Ghost) })
+            })
+    }
+}
     }
     if (confirmDelete) {
-        AlertDialog(onDismissRequest = { confirmDelete = false },
-            title = { Text("删除交互文档？") },
-            text = { Text("仅删除这份文档，不会删除原会话消息。") },
-            confirmButton = { SyButton("确认删除", onClick = {
+        SyDialog(title = "删除交互文档？", onDismiss = { confirmDelete = false }) {
+    Text("仅删除这份文档，不会删除原会话消息。")
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        SyButton("取消", onClick = { confirmDelete = false },
+                variant = SyButtonVariant.Ghost)
+        SyButton("确认删除", onClick = {
                 confirmDelete = false
                 onDelete()
-            }) },
-            dismissButton = { SyButton("取消", onClick = { confirmDelete = false },
-                variant = SyButtonVariant.Ghost) })
+            })
+    }
+}
     }
     edit?.let { target ->
-        AlertDialog(onDismissRequest = { edit = null },
-            title = { Text("修改文档显示内容") },
-            text = { OutlinedTextField(value = editValue, onValueChange = { editValue = it },
-                modifier = Modifier.fillMaxWidth(), maxLines = 5) },
-            confirmButton = { SyButton("保存修改", onClick = {
+        SyDialog(title = "修改文档显示内容", onDismiss = { edit = null }) {
+    OutlinedTextField(value = editValue, onValueChange = { editValue = it },
+                modifier = Modifier.fillMaxWidth(), maxLines = 5)
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        SyButton("取消", onClick = { edit = null },
+                variant = SyButtonVariant.Ghost)
+        SyButton("保存修改", onClick = {
                 when (target) {
                     is NativeDocumentEdit.TextNode -> onEditText(target.id, editValue)
                     is NativeDocumentEdit.TableCell -> onEditTableCell(target.id, target.row, target.column, editValue)
@@ -278,9 +282,9 @@ private fun NativeV6DocumentCard(
                         ?.let { onEditChart(target.id, target.index, it) }
                 }
                 edit = null
-            }) },
-            dismissButton = { SyButton("取消", onClick = { edit = null },
-                variant = SyButtonVariant.Ghost) })
+            })
+    }
+}
     }
 }
 
@@ -339,7 +343,7 @@ private fun NativeV6DocumentNode(
                 onCheckedChange = { fields[node.id] = it.toString() }, enabled = enabled)
         }
         is UiDocumentNode.Button -> SyButton(node.label, onClick = { onAction(node.actionId) },
-            enabled = enabled && item.actions[node.actionId]?.enabled == true,
+            enabled = enabled && item.actions[node.actionId]?.available == true,
             variant = SyButtonVariant.Outline, modifier = Modifier.fillMaxWidth())
         is UiDocumentNode.Column -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             node.children.forEach { child -> NativeV6DocumentNode(child, item, fields, enabled, onEdit, onAction) }

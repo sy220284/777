@@ -46,8 +46,6 @@ class LocalHarnessViewModel @Inject constructor(
     private val toolsUi: LocalToolsUiFacade,
     private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
     private val teamUi: com.labteto.dshmobile.uicontract.WorkTeamUiPort,
-    documentFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
-    conversationPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val documentFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
     private val conversationPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val approvalPreferences: LocalApprovalPreferences,

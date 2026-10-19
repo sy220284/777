@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
+import com.labteto.dshmobile.ui.shenyan.SyDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -57,18 +57,15 @@ internal fun NativeV6DocumentMessage(
         feedback?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
     }
     if (creating) {
-        AlertDialog(
-            onDismissRequest = { creating = false },
-            title = { Text("生成交互文档") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SyDialog(title = "生成交互文档", onDismiss = { creating = false }) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("将额外请求一次模型；确认后才会执行。")
                     OutlinedTextField(value = prompt, onValueChange = { prompt = it },
                         label = { Text("文档要求") }, modifier = Modifier.fillMaxWidth())
                 }
-            },
-            confirmButton = {
-                TextButton(enabled = prompt.isNotBlank() && !generating, onClick = {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        TextButton(onClick = { creating = false }) { Text("取消") }
+        TextButton(enabled = prompt.isNotBlank() && !generating, onClick = {
                     creating = false
                     generating = true
                     scope.launch {
@@ -77,9 +74,8 @@ internal fun NativeV6DocumentMessage(
                         } finally { generating = false }
                     }
                 }) { Text("确认生成") }
-            },
-            dismissButton = { TextButton(onClick = { creating = false }) { Text("取消") } },
-        )
+    }
+}
     }
 }
 
@@ -135,14 +131,16 @@ private fun NativeV6DocumentCard(
         }
     }
     confirmation?.let { actionId ->
-        AlertDialog(onDismissRequest = { confirmation = null },
-            title = { Text("确认文档操作") },
-            text = { Text("该操作将提交当前填写内容，或回答待处理的审批。是否继续？") },
-            confirmButton = { TextButton(onClick = {
+        SyDialog(title = "确认文档操作", onDismiss = { confirmation = null }) {
+    Text("该操作将提交当前填写内容，或回答待处理的审批。是否继续？")
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        TextButton(onClick = { confirmation = null }) { Text("取消") }
+        TextButton(onClick = {
                 confirmation = null
                 perform(actionId, true)
-            }) { Text("确认") } },
-            dismissButton = { TextButton(onClick = { confirmation = null }) { Text("取消") } })
+            }) { Text("确认") }
+    }
+}
     }
 }
 
