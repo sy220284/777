@@ -444,6 +444,9 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf<String?>(null) }
+    var showAccountDangerId by remember { mutableStateOf<String?>(null) }
+    var accountModelSearch by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(snap.selectedAccountId) { expanded = snap.selectedAccountId }
     var removeConfirm by remember { mutableStateOf<String?>(null) }
     var disconnectConfirm by remember { mutableStateOf<String?>(null) }
     fun execute(action: suspend () -> String?) {
@@ -458,7 +461,6 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     }
     ZxPage("账户管理", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        ZxSection("连接状态")
         val phaseLabel = when (snap.phase) {
             com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.DISCONNECTED -> "未连接"
             com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.PREPARING -> "准备授权"
@@ -470,38 +472,37 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
             com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.UNVERIFIED -> "账户待验证"
             com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.ERROR -> "连接失败"
         }
-        ZxValueRow("ChatGPT 连接", value = phaseLabel)
-        ZxValueRow("已保存账户", value = "${snap.accounts.size} 个")
-        snap.selectedAccount?.let { ZxValueRow("当前账户", value =
-            it.displayName ?: it.email ?: "已选账户") }
+        ZxSection("账户状态")
+        ZxSettingsGroup {
+            ZxRow("ChatGPT 套餐", "$phaseLabel · 已保存 ${snap.accounts.size} 个账户",
+                showChevron = false)
+            snap.selectedAccount?.let {
+                ZxRow(it.displayName ?: it.email ?: "当前账户",
+                    zxChatGptAccountAuthLabel(it), showChevron = false)
+            }
+        }
         (status ?: snap.error)?.let { ZxBanner(it, ZxTone.Warn) }
-        if (busy) ZxFooterNote("正在请求账户 Owner，完成前不会重复提交")
-        ZxSection("账户操作")
-        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (busy) ZxFooterNote("正在执行账户操作，请以返回后的账户状态为准。")
+        ZxSection("连接与添加")
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ZxButton("添加账户", { execute {
                 settings.connectChatGpt()
-                "授权流程已发起，请在系统浏览器完成操作"
+                "已发起浏览器授权，请完成登录"
             } }, Modifier.weight(1f), enabled = !busy)
-            ZxButton("刷新账户", { execute {
+            ZxButton("刷新状态", { execute {
                 settings.refreshChatGpt()
-                "已重新读取账户状态"
+                "账户状态已刷新"
             } }, Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
-        }
-        ZxButton("查看 ChatGPT 官方套餐额度", {
-            uriHandler.openUri("https://chatgpt.com/#settings/Usage")
-        }, Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline, enabled = !busy)
-        ZxFooterNote("打开 ChatGPT 官方额度页面；本地 Token 用量和 ChatGPT 套餐剩余额度是不同统计。")
-        ZxNavRow("查看本地模型用量",
-            sub = "按已配置模型查询请求记录和费用估算") {
-            scope.onNavigate(UiSceneId("settings.model_usage"))
         }
         if (snap.pendingAccountId != null) ZxButton("取消进行中的授权", {
             execute { settings.cancelChatGptAuthorization(); "取消授权请求已发出" }
         }, variant = ZxButtonVariant.Outline, enabled = !busy)
-        ZxSection("已有账户")
-        if (snap.accounts.isEmpty()) ZxEmpty("还没有账户", "点击添加账户，使用浏览器完成授权")
+        ZxSection("已授权账户 · ${snap.accounts.size}")
+        if (snap.accounts.isEmpty()) ZxEmpty("尚未添加 ChatGPT 账户", "点击“添加账户”，通过浏览器完成登录和套餐授权。")
         snap.accounts.forEach { account ->
             val active = snap.selectedAccountId == account.id
+            ZxSettingsGroup {
             ZxRow(account.displayName ?: account.email ?: account.id,
                 (if (active) "当前使用" else "其他账户") + " · " +
                     zxChatGptAccountAuthLabel(account),
@@ -526,47 +527,73 @@ fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                         "套餐授权已请求，请在浏览器明确确认；完成后刷新账户状态"
                     } }, Modifier.fillMaxWidth(), enabled = !busy)
                 }
-                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ZxButton("使用此账户", { execute {
-                        settings.selectChatGptAccount(account.id)
-                        "已提交账户切换，请以当前账户标记为准"
-                    } }, Modifier.weight(1f), enabled = !busy && !active)
-                    ZxButton("重新连接", { execute {
-                        settings.restartChatGptAuthorization(account.id)
-                        "重新授权流程已发起"
-                    } }, Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
-                }
-                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!active) ZxButton("切换至此账户", { execute {
+                    settings.selectChatGptAccount(account.id)
+                    "账户切换已提交，请核对当前账户状态"
+                } }, Modifier.fillMaxWidth(), enabled = !busy)
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ZxButton("测试连接", { execute { settings.testChatGptAccount(account.id) } },
                         Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
-                    ZxButton("断开连接", { disconnectConfirm = account.id },
-                        Modifier.weight(1f), variant = ZxButtonVariant.Danger, enabled = !busy)
+                    ZxButton("重新连接", { execute {
+                        settings.restartChatGptAuthorization(account.id)
+                        "已发起重新授权，请在浏览器完成操作"
+                    } }, Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
                 }
-                ZxButton("移除本地账户", { removeConfirm = account.id },
-                    Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline, enabled = !busy)
-                ZxFooterNote("重新连接只更新此账户的授权状态，不会自动切换到其他付费模型。")
+                ZxButton(if (showAccountDangerId == account.id) "收起账户管理" else "断开或移除账户", {
+                    showAccountDangerId = if (showAccountDangerId == account.id) null else account.id
+                }, Modifier.fillMaxWidth(), variant = ZxButtonVariant.Ghost, enabled = !busy)
+                if (showAccountDangerId == account.id) {
+                    ZxFooterNote("以下操作不会删除 ChatGPT 官方账号，但可能使已选套餐模型失效。")
+                    FlowRow(Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ZxButton("断开连接", { disconnectConfirm = account.id },
+                            Modifier.weight(1f), variant = ZxButtonVariant.Danger, enabled = !busy)
+                        ZxButton("移除本地账户", { removeConfirm = account.id },
+                            Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
+                    }
+                }
+            }
             }
         }
-        ZxSection("当前账户可用套餐模型 · ${snap.models.size}")
+        ZxSection("当前账户可用模型 · ${snap.models.size}")
         if (!snap.connected) {
             ZxFooterNote("需要先完成登录与套餐授权，才可从当前账户使用套餐模型。")
         } else if (snap.models.isEmpty()) {
             ZxEmpty("模型目录暂无内容", "刷新账户状态以重新读取套餐可用模型")
         } else {
-            snap.models.forEach { option ->
+            if (snap.models.size > 12) ZxField(accountModelSearch,
+                { accountModelSearch = it.take(128) }, Modifier.fillMaxWidth(),
+                placeholder = "搜索套餐模型", fieldLabel = "搜索套餐模型")
+            val visible = snap.models.filter {
+                it.slug.contains(accountModelSearch.trim(), ignoreCase = true) ||
+                    it.displayName.contains(accountModelSearch.trim(), ignoreCase = true)
+            }
+            visible.take(12).forEach { option ->
                 val route = selectedPlanProfiles.firstOrNull { it.model == option.slug }
                 val active = route != null && modelState.modelSelection.isActive(route)
                 ZxRow(option.displayName,
-                    (if (active) "当前使用" else "套餐模型") +
+                    (if (active) "当前使用" else "来自当前套餐") +
                         (if (option.slug == option.displayName) "" else " · ${option.slug}"),
+                    showChevron = false,
                     trailing = {
-                        if (active) ZxChip("已选择", true) {}
-                        else if (route != null) ZxChip("使用此模型", false) {
+                        if (active) Text("使用中", color = ZhaoxiTheme.colors.ink2)
+                        else if (route != null) ZxChip("选用", false) {
                             status = settings.submit(SettingsUiCommand.SelectModel(route.id))
                                 .zxUserMessage("切换套餐模型")
                         }
                     })
             }
+            if (visible.size > 12) ZxFooterNote("仅展示前 12 项，可通过搜索快速定位其他模型。")
+            if (visible.isEmpty()) ZxFooterNote("没有匹配的套餐模型。")
+        }
+        ZxSection("额度与用量")
+        ZxNavRow("查看 ChatGPT 官方套餐额度", sub = "在 ChatGPT 官方页面查询，非本地估算") {
+            uriHandler.openUri("https://chatgpt.com/#settings/Usage")
+        }
+        ZxNavRow("本地模型消耗", sub = "查看 Token、费用估算和请求记录") {
+            scope.onNavigate(UiSceneId("settings.model_usage"))
         }
     }
     disconnectConfirm?.let { id ->
