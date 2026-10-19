@@ -36,6 +36,7 @@ import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.session.projectionReplayCursor
 import com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy
 import com.labteto.dshmobile.local.work.LocalWorkRunBinding
@@ -64,6 +65,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
     private val chatComposition: com.labteto.dshmobile.local.chat.LocalChatComposition,
     private val workTimelineMemoryRecovery: LocalWorkTimelineMemoryRecovery,
     private val approvalPreferences: LocalApprovalPreferences,
+    private val pendingSessions: LocalPendingSessionRegistry,
 ) {
     private val preferences = LocalHarnessPreferences.from(context)
     private val workspace get() = sessionStorage.files.workspace
@@ -115,7 +117,9 @@ internal class LocalForegroundSessionLoader @Inject constructor(
         }
         val repaired = log.repairInterruptedTail()
         chatRestore.repairTimeline(log)
-        val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
+        val stored = loaded?.session ?: LocalHarnessSession(
+            id = sessionId, usageMode = pendingSessions.modeFor(sessionId) ?: LocalUsageMode.WORK,
+        )
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
             log.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: log.append(
                 PROJECTION_BASELINE_EVENT,
