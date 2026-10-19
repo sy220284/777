@@ -219,7 +219,7 @@ fun ZxField(
             },
         ) { inner ->
             Box {
-                if (value.isEmpty()) Text(placeholder, color = c.ink3,
+                if (value.isEmpty() && !focused) Text(placeholder, color = c.ink3,
                     fontSize = textStyle.fontSize)
                 inner()
             }
