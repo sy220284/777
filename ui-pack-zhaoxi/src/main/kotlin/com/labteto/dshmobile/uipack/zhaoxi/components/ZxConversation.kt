@@ -182,6 +182,7 @@ fun ZxComposer(
     running: Boolean = false,
     onStop: () -> Unit = {},
     onConnectModel: (() -> Unit)? = null,
+    onAddClick: (() -> Unit)? = null,
 ) {
     val c = ZhaoxiTheme.colors
     Row(
@@ -194,6 +195,11 @@ fun ZxComposer(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (onAddClick != null) {
+            ZxIconButton(onClick = onAddClick, contentDescription = "添加拍照、图片、文件或创作") {
+                ZxIcon("plus")
+            }
+        }
         ZxField(
             value = draft,
             onValueChange = onDraftChange,
