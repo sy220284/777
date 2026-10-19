@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.documentedContextWindowTokens
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
