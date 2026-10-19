@@ -347,7 +347,11 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.onNodeWithText("＋ 添加 API 模型").performScrollTo().performClick()
         compose.onNodeWithText("保存模型").assertIsDisplayed()
         compose.onNodeWithContentDescription("模型名称").performTextInput("keep-unsaved-model")
+        compose.onNodeWithContentDescription("模型名称").assertTextContains("keep-unsaved-model")
         compose.onNodeWithText("取消编辑").performScrollTo().performClick()
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithText("放弃未保存的模型配置？").fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithText("放弃未保存的模型配置？").assertExists()
         compose.onNodeWithText("取消").performClick()
         compose.onNodeWithContentDescription("模型名称").assertTextContains("keep-unsaved-model")
