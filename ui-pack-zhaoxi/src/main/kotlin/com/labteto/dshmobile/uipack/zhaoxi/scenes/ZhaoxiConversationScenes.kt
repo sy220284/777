@@ -69,6 +69,7 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.ZxCapBar
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxComposer
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButton
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxButtonVariant
+import com.labteto.dshmobile.uipack.zhaoxi.components.ZxChip
 import com.labteto.dshmobile.uipack.zhaoxi.components.ZxFooterNote
 import com.labteto.dshmobile.uihost.rememberUiAttachmentPickerFor
 import com.labteto.dshmobile.uihost.rememberUiAttachmentMultiPickerFor
@@ -95,7 +96,8 @@ import com.labteto.dshmobile.uihost.UiSceneRenderScope
 @Composable
 fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: ConversationReadingUiPort, history: UiMessageHistoryPort?, authorName: String, scope: UiSceneRenderScope, onMessage: (UiSessionIdentity, UiMessageSnapshot) -> Unit, menu: @Composable () -> Unit,
     documents: UiDocumentUiPort? = null, knownScenes: Set<UiSceneId> = emptySet(),
-    media: MediaUiPort? = null, attachments: AttachmentUiPort? = null) {
+    media: MediaUiPort? = null, attachments: AttachmentUiPort? = null,
+    reasoning: ConversationReasoningUiPort? = null, settings: SettingsUiPort? = null) {
     val snap by chat.snapshots.collectAsState(initial = chat.snapshot())
     val storedDrafts by drafts.drafts.collectAsState()
     val sessionId = snap.identity?.sessionId.orEmpty()
@@ -103,6 +105,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
     fun writeDraft(text: String) { if (sessionId.isNotBlank()) drafts.updateDraft(sessionId, text) }
     var receipt by remember(sessionId) { mutableStateOf<UiCommandReceipt?>(null) }
     var showAddMenu by remember(sessionId) { mutableStateOf(false) }
+    var inputFocused by remember(sessionId) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().fillMaxSize().imePadding()) {
         ZxConversationRoutes(scope, menu)
         CommandFeedback(receipt)
@@ -123,6 +126,8 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
             if (snap.queuedInputCount > 0)
                 ZxBanner("⇄ 已排队 ${snap.queuedInputCount} 条 · 队列满时将拒收", ZxTone.Warn)
         }
+        ZhaoxiReasoningStrip(sessionId, false, inputFocused || draft.contains("\n"),
+            reasoning, settings, scope, knownScenes)
         ZhaoxiComposerAddMenu(showAddMenu, snap.identity, { chat.snapshot().identity },
             attachments, drafts, scope, knownScenes, onClose = { showAddMenu = false })
         ZxComposer(
@@ -137,6 +142,7 @@ fun ZhaoxiChatScene(chat: ChatUiPort, drafts: ConversationDraftUiPort, reading: 
             },
             placeholder = "问点什么",
             onAddClick = { showAddMenu = !showAddMenu },
+            onFocusedChange = { inputFocused = it },
             onConnectModel = { scope.onNavigate(UiSceneId("settings.models")) },
         )
     }
@@ -190,6 +196,8 @@ fun ZhaoxiWorkScene(work: WorkConversationUiPort, drafts: ConversationDraftUiPor
             if (snap.queuedInputCount > 0)
                 ZxBanner("⇄ 已排队 ${snap.queuedInputCount} 条 · 队列满时将拒收", ZxTone.Warn)
         }
+        ZhaoxiReasoningStrip(sessionId, true, true,
+            reasoning, settings, scope, knownScenes)
         ZhaoxiComposerAddMenu(showAddMenu, snap.identity, { work.snapshot().identity },
             attachments, drafts, scope, knownScenes, onClose = { showAddMenu = false })
         ZxComposer(
@@ -726,4 +734,45 @@ private fun ZhaoxiComposerAddMenu(
     }
     if (busy) ZxFooterNote("附件导入中…")
     feedback?.let { ZxFooterNote(it) }
+}
+
+/** Session-specific modes are projected and persisted by the existing model Owner. */
+@Composable
+private fun ZhaoxiReasoningStrip(
+    sessionId: String, workMode: Boolean, expanded: Boolean,
+    reasoning: ConversationReasoningUiPort?, settings: SettingsUiPort?,
+    scope: UiSceneRenderScope, knownScenes: Set<UiSceneId>,
+) {
+    if (!expanded || sessionId.isBlank() || reasoning == null || settings == null) return
+    val settingsSnapshot by settings.state.collectAsState(initial = settings.initialState)
+    val profile = settingsSnapshot.modelSelection.activeProfile
+    var revision by remember(sessionId) { mutableStateOf(0) }
+    var hint by remember(sessionId) { mutableStateOf<String?>(null) }
+    val options = remember(sessionId, workMode, profile, revision) {
+        reasoning.options(sessionId, workMode, profile)
+    }
+    if (options.available.isEmpty()) return
+    val titles = mapOf(
+        UiConversationReasoningMode.DEFAULT to "默认",
+        UiConversationReasoningMode.FAST to "快速",
+        UiConversationReasoningMode.LOW to "轻度",
+        UiConversationReasoningMode.DEEP to "深度",
+        UiConversationReasoningMode.MAX to "最大",
+    )
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+        .padding(horizontal = 12.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        options.available.forEach { choice ->
+            ZxChip(titles[choice] ?: choice.name, choice == options.selected) {
+                if (reasoning.select(sessionId, workMode, profile, choice)) {
+                    revision++
+                    hint = null
+                } else hint = "模型或会话已变化，未保存此档位"
+            }
+        }
+        if (workMode && UiSceneId("work.plan_review") in knownScenes)
+            ZxButton("计划", { scope.onNavigate(UiSceneId("work.plan_review")) },
+                variant = ZxButtonVariant.Outline)
+    }
+    hint?.let { ZxFooterNote(it) }
 }
