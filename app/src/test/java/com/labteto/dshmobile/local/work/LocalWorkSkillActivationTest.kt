@@ -53,7 +53,7 @@ class LocalWorkSkillActivationTest {
             val workspace = LocalWorkspace(root)
             val path = root.resolve(".dsh/skills/code-review/SKILL.md")
             path.parentFile.mkdirs()
-            path.mkdir()
+            path.writeText("X".repeat(128 * 1024 + 1))
             val pinned = listOf(LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "code-review"))
             val error = assertThrows(IllegalArgumentException::class.java) {
                 resolveLocalWorkSkillGuidance(workspace, "继续", pinned)

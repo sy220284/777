@@ -121,12 +121,11 @@ class LocalSkillStoreTest {
         store.seedOnce()
         val original = root.resolve(".dsh/skills/code-review/SKILL.md")
         val before = original.readText()
-        original.delete()
-        original.mkdir()
-        assertThrows(IllegalArgumentException::class.java) { store.seedOnce() }
-        assertTrue(original.isDirectory)
-        original.delete()
-        original.writeText(before)
+        val baseline = root.resolve(".dsh/skills/code-review/.bundled-baseline-sha256")
+        baseline.delete()
+        baseline.mkdir()
+        assertThrows(IllegalStateException::class.java) { store.seedOnce() }
+        assertTrue(baseline.isDirectory)
         assertEquals(before, original.readText())
     }
 
