@@ -32,7 +32,7 @@ class ChatGptSettingsController @Inject constructor(
     val state: StateFlow<ChatGptUiState> = auth.state
     // Browser authorization must survive the Settings scene leaving composition.
     // The singleton Account owner, not a composable, owns its full authorization lifecycle.
-    private val authorizationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val authorizationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val accountMutationMutex = Mutex()
     @Volatile private var latestSelectedAccountId: String? = null
 
