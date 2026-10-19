@@ -6,7 +6,7 @@
 ## 1. 全场景入口覆盖
 
 - `ZhaoxiUiPackManifest.fullSceneIds` 包含 **75 个非宿主 Scene**，`ZhaoxiApplicationScenePack.RenderScene` 对每个 ID 都存在静态分支；这只证明分发完整，**不代表业务运行和所有按钮已验收**。
-- `ZhaoxiUiPackManifest.fullCapabilityIds` 共 **37 个能力 ID**；运行时按真实注入端口裁剪，**不能把常量声明视为成功连接**。
+- `ZhaoxiUiPackManifest.fullCapabilityIds` 共 **36 个能力 ID**；运行时按真实注入端口裁剪，**不能把常量声明视为成功连接**。
 - `conversation.attachments`、`shell.notifications`、`system.permissions` 属于 Host 负责的 3 个系统场景，不应在 UI Pack 再渲染一份。
 - 扫描应用场景分发与主要 scenes 文件内的显式 `UiSceneId("...")` 后，未发现指向 fullSceneIds 外部的字符串导航目标。动态菜单、宿主提案以及运行时动作仍须设备验证。
 - 七个顶级路由：`route.home`、`route.persona_gallery`、`route.diary`、`route.workspace`、`route.tasks`、`route.tools`、`route.settings`；四类能力共用外壳时允许别名，但**独立设计目的地不得复用同屏空态充数**。
@@ -24,7 +24,7 @@
 | 7 | 日记 | route.diary、chat.diary | DiaryUiPort 的日记场景 | 公开/私人、纠错、来源与删除状态的证据 |
 | 8 | 工作区 | route.workspace | FilesUiPort.workspaceFiles/conversationFiles，工作区与会话产物分域 | 搜索、长文件名、分享/导出（当前 FilesUiPort 能力约束） |
 | 9 | 文件预览 | workspace.preview | FilesUiPort.previewWorkspaceFile，大小、正文、截断状态 | 大文件滚动、二进制与文件分享 |
-| 10 | 运行详情/证据 | work.requirement_evidence、work.plan_review | Work Owner 真实需求/文件证据/版本状态，不再直出 data class toString | 设计进度环、事件时间线、逐步审批及实际运行夹具 |
+| 10 | Work 计划与事件 | work.plan_review | Work Owner 真实计划、工具执行事件和状态 | 计划审阅、事件时间线与真实运行夹具 |
 | 11 | 定时任务 | route.tasks、automation.tasks | AutomationUiPort：状态筛选、真实暂停/继续/立即运行，任务操作行独立避免拥挤 | 各状态与调度策略设备验收 |
 | 12 | 任务编辑 | automation.editor、automation.persona_interaction | Create/Update、generation fence、当前聊天身份；单次、固定间隔、日、周、月、沉默、时段及原自然语言规划，非真实支持项不伪造 | 失败策略设计、编辑旧调度、后台实际执行 |
 | 13 | 工具中心 | route.tools、work.capabilities | ToolsUiPort：按能力家族、技能、连接分区，跳独立功能页 | 高数量/长名称、错误态、权限样本 |
@@ -57,7 +57,7 @@
 
 ## 4. 文案清理原则与已改项
 
-已移除测试演示入口、硬编码旧版号、API/Owner/route 术语和常见 `toString()` 文本泄漏，覆盖诊断、工作证据、媒体、设置、自动化、记忆、文件与人物空态；只保留有用户决策价值的费用、系统授权、历史用量偏差和失败说明。不得移除真正的错误回执或危险操作提示。
+已移除测试演示入口、硬编码旧版号、API/Owner/route 术语和常见 `toString()` 文本泄漏，覆盖诊断、工作计划、媒体、设置、自动化、记忆、文件与人物空态；只保留有用户决策价值的费用、系统授权、历史用量偏差和失败说明。不得移除真正的错误回执或危险操作提示。
 
 ## 5. 验收硬门槛和遗留项
 
@@ -66,3 +66,148 @@
 3. 需要针对真实后台工作/审批、群聊、日记、媒体和文件，按 owner 的具体写入及错误回执分别签收。
 4. **仍未闭环**：十张 E8.18 opt-in 壁纸导入和启用状态、完整人物视觉、工作进度环/事件时间线、媒体结果跨设备截图、用户关闭动画的全路径、Figma 设计节点逐层比对；Figma Starter MCP 已遇额度限制。
 5. 以上明确的缺口不是“已经完成”，本 PR 仍应保持 Draft；达到所有签收条件之后再考虑合并与发版。
+
+
+## 2026-10-19 · 3.0 接口与全部 75 场景逐项源码核对
+
+本轮从 #759 的 `455d2ac22` 组合基线继续实现。以下 75 行分别核对宿主登记、Pack 分发、实际场景函数及接口消费；**记录的是源码事实，不是逐动作验收通过**。三份既有需求文档中的“待逐动作验收”不改为已完成。新增入口复用既有场景，不恢复已撤销的需求与证据页面。
+
+### 本轮明确修复
+
+- 文档详情、计划审查、回复版本、媒体结果、工作调整由不可导航的 SLOT 修正为 OVERLAY；菜单不再把完整页面塞进 340dp 小窗口。保留 header/timeline/composer/update 等真正的嵌入槽。新增生产宿主导航进入、返回、恢复测试。
+- 接回人物故事归档、固定技能与连接器、人物修正提示/撤销；原 Owner 保持唯一，未另建业务状态或执行器。
+- 补回消息覆盖确认、Work 外部副作用提示、编辑草稿保护、助手重生成/回复版本入口；审批本轮设备授权、撤销与全局自动审批均走真实策略端口。
+- 自动化确认删除；图片理解方式；媒体存储恢复、失败记录清理、视频仅重试本地保存与历史继续加载。
+- MCP stdio 使用原样 JSON argv；GitHub 技能安装与刷新。交互文档增加动作回执/发送确认、生成反馈、正文/表格/图表编辑、单个/批量删除。
+- 当前会话消息正文搜索使用 Owner 游标继续检索，命中打开精确正文；不把标题搜索冒充全历史消息搜索。
+
+### 逐项映射
+
+下表所有行状态均为“源码已核；编译、设备动作及逐屏视觉待验”。`/` 分隔的是同一场景消费的原有端口，不代表新增接口。
+
+| Scene | 场景实现 | 接口或宿主边界 | 入口与动作核对 |
+|---|---|---|---|
+| `conversation.chat` | `ZhaoxiChatScene` | ChatUiPort / Draft / Reading / History / Reasoning / PersonaCorrection | 发送、停止、历史、草稿、推理档位、人物修正撤销 |
+| `conversation.work` | `ZhaoxiWorkScene` | WorkConversationUiPort / Draft / Reading / Reasoning | 发送、排队、停止、审批、问答、计划与团队入口 |
+| `conversation.header` | `ZhaoxiConversationMenu` | Session / ComposerInvocation / PersonaGallerySave / WorkPolicy | 模式、附件、归档、固定调用、完整详情入口、撤销本轮设备授权 |
+| `conversation.timeline` | `ZhaoxiTimelineScene` | Chat / Reading / History / UiDocument | 有界历史、版本切换、阅读锚点、文档回执 |
+| `conversation.composer` | `ZhaoxiComposerSlotScene` | Chat / ConversationDraft | 发送、停止与拒收保留草稿；生产 Chat/Work 使用完整输入区 |
+| `conversation.ui_document` | `ZhaoxiUiDocumentScene` | UiDocumentUiPort | 表单动作回执、发送确认、正文/表格/图表编辑、单个/多选删除 |
+| `conversation.ui_document_generate` | `ZhaoxiUiDocumentGenerateScene` | UiDocumentUiPort | 模型/离线生成、加载反馈、失败回执、成功进入详情 |
+| `conversation.reply_status` | `ZhaoxiReplyStatusScene` | ChatUiPort | 执行阶段与排队数量展示 |
+| `conversation.message_actions` | `ZhaoxiMessageActionsScene` | Chat / WorkConversation | 复制、阅读、修改、助手重生成、回复版本入口 |
+| `conversation.edit` | `ZhaoxiEditScene` | Chat / WorkConversation | 加密编辑草稿、覆盖后续确认、外部副作用说明、放弃确认 |
+| `conversation.reader` | `ZhaoxiReaderScene` | message target / preview | 精确正文阅读及返回；搜索命中沿此入口打开 |
+| `conversation.model_picker` | `ZhaoxiModelPickerScene` | SettingsUiPort | 选择模型、等待实际选中投影、管理模型 |
+| `chat.persona_picker` | `ZhaoxiPersonaGalleryScene` | PersonaGallery / Authoring / Transfer / Portrait | 搜索、预设连续安装、创建、导入、详情 |
+| `chat.persona_editor` | `ZhaoxiPersonaEditorScene` | PersonaAuthoringUiPort | 四页签、13项字段、事实/世界书增删改、AI建议采纳、保存与离开确认 |
+| `chat.character_tuning` | `ZhaoxiCurrentPersonaTuning` | CurrentPersonaUiPort | 当前人物采样与恢复全局采样；不恢复旧行为滑杆 |
+| `chat.group_members` | `ZxGroupMembersScene` | ChatGroupUiPort | 选人、保存成员、创建群聊 |
+| `chat.group_announcement` | `ZxGroupAnnouncementScene` | ChatGroupUiPort | 公告保存与原始回执；无退役的独立AI入口 |
+| `chat.reply_suggestions` | `ZxReplySuggestionsScene` | ReplySuggestions / Draft | 生成已有建议、选择填入草稿 |
+| `chat.branches` | `ZhaoxiBranchesScene` | ChatUiPort | 独立打开已保存回复版本、SelectVariant、返回 |
+| `work.approval` | `ZhaoxiApprovalScene` | WorkConversation / WorkPolicy | 批准/拒绝、过期状态、本轮设备授权、全局自动审批二次确认 |
+| `work.steering_choice` | `ZhaoxiSteeringScene` | WorkConversation / Draft | 菜单独立进入、调整指令、真实受理/排队、失败留草稿 |
+| `work.question` | `ZhaoxiQuestionScene` | WorkConversationUiPort | 选项/自由回答、提交、拒收保留答案 |
+| `work.plan_review` | `ZhaoxiPlanReviewScene` | WorkRead / WorkConversation | 独立进入计划/待办/事件/工具状态、历史分页、审批问答跳转 |
+| `work.team` | `ZhaoxiWorkTeamScene` | WorkTeamUiPort | 成员/任务/输出/发消息/停止/重派与真实回执 |
+| `work.capabilities` | `ZhaoxiToolsScene` | Tools / ComposerInvocation | 能力目录；HTTP/stdio连接、健康检查；GitHub授权/目录；技能本地/GitHub安装、编辑、启停、删除 |
+| `workspace.preview` | `ZhaoxiWorkspacePreviewScene` | FilesUiPort / Host exporter | 文件正文/截断、保存、分享、外部打开 |
+| `chat.gallery` | `ZhaoxiPersonaGalleryScene` | PersonaGallery / Authoring / Transfer / Portrait | 搜索、预设连续安装、创建、导入、详情 |
+| `chat.gallery_profile` | `ZhaoxiPersonaProfileScene` | Gallery / Selection / Story / Transfer / Authoring | 选择人物、续接/新故事、历史分页、设定检查、编辑/删除故事、导出与更多管理 |
+| `chat.world_book` | `ZhaoxiPersonaEditorScene` | PersonaAuthoringUiPort | 四页签、13项字段、事实/世界书增删改、AI建议采纳、保存与离开确认 |
+| `chat.gallery_delete` | `ZxGalleryDeleteScene` | PersonaGalleryDeletionUiPort | 确认删除人物、缺失/失败回执与返回图集 |
+| `chat.gallery_portrait` | `ZhaoxiPortraitEditor` | PersonaPortraitUiPort / Host picker | 选择、预览、范围裁切、确认保存、取消、确认移除；裁切效果待最终设备核对 |
+| `chat.diary` | `ZhaoxiDiaryScene` | DiaryUiPort | 公开日记阅读、版本勘误、停用 |
+| `automation.tasks` | `ZhaoxiAutomationTasksScene` | AutomationUiPort | 搜索、模式/状态筛选、编辑、暂停/恢复/立即运行、确认删除 |
+| `automation.editor` | `ZhaoxiAutomationEditorScene` | AutomationUiPort | 时间选择、周期/时段/沉默、创建/编辑、自然语言规划、保存回执 |
+| `automation.persona_interaction` | `ZhaoxiPersonaInteractionScene` | AutomationUiPort | 当前人物会话任务与编辑入口；进入不自动生成建议 |
+| `tools.mcp` | `ZhaoxiToolsScene` | Tools / ComposerInvocation | 能力目录；HTTP/stdio连接、健康检查；GitHub授权/目录；技能本地/GitHub安装、编辑、启停、删除 |
+| `tools.github` | `ZhaoxiToolsScene` | Tools / ComposerInvocation | 能力目录；HTTP/stdio连接、健康检查；GitHub授权/目录；技能本地/GitHub安装、编辑、启停、删除 |
+| `tools.plugins` | `ZhaoxiToolsScene` | Tools / ComposerInvocation | 能力目录；HTTP/stdio连接、健康检查；GitHub授权/目录；技能本地/GitHub安装、编辑、启停、删除 |
+| `media.creation` | `ZhaoxiConnectedMediaScene` | MediaUiPort / Settings / Portrait / Host exporter | 多模型创作、结果预览/分享/保存、再生成确认、存储恢复、视频保存重试、历史继续加载 |
+| `media.result` | `ZhaoxiConnectedMediaScene` | MediaUiPort / Settings / Portrait / Host exporter | 多模型创作、结果预览/分享/保存、再生成确认、存储恢复、视频保存重试、历史继续加载 |
+| `shell.new_session` | `ZhaoxiHomeScene` | SessionUiPort / ConversationShell | 新建/续接、侧栏、会话模式/标题/固定、路由打开 |
+| `shell.search` | `ZhaoxiSearchScene` | Session / Gallery / Automation / Files / MessageHistory | 四域过滤、当前会话正文搜索/游标续查、精确命中阅读 |
+| `shell.onboarding` | `ZhaoxiOnboardingScene` | Host navigation | 引导、跳过、连接模型、进入主页 |
+| `shell.empty` | `ZhaoxiEmptyDemoScene` | Host navigation | 真实空态与返回主页 |
+| `shell.error` | `ZhaoxiErrorDemoScene` | Host navigation | 返回和本地诊断；不伪造报错/重试 |
+| `settings.root` | `ZhaoxiSettingsHomeScene` | Settings / Host navigation | 分类设置、所有二级入口、直接检查更新 |
+| `settings.session` | `ZhaoxiRuntimeSettingsScene` | SettingsUiPort | 个人规则/运行限制分开；高级设置增加图片理解方式 |
+| `settings.appearance` | `ZhaoxiAppearanceScene` | HostPreferencesUiPort | 主题/壁纸/字体/对比/透明/动效保存 |
+| `settings.chat` | `ZhaoxiChatGuardScene` | SettingsUiPort | 过滤开关、词条增删、命中记录、清空确认 |
+| `settings.models` | `ZhaoxiModelsScene` | SettingsUiPort | 添加、目录发现、测试、保存、切换、删除确认 |
+| `settings.model_performance` | `ZhaoxiPerformanceScene` | ModelPerformanceUiPort | 推理/温度读取与保存 |
+| `settings.account` | `ZhaoxiAccountScene` | SettingsUiPort | 多账户连接/选择/测试/授权/撤销/移除及套餐状态 |
+| `settings.model_usage` | `ZhaoxiUsageOverviewScene` | UsageUiPort / Settings | 已配置/历史模型切换、统计、精确模型日志跳转 |
+| `settings.minimax_quota` | `ZhaoxiQuotaScene` | SettingsUiPort | 真实套餐窗口、剩余与查询状态 |
+| `settings.pricing` | `ZhaoxiPricingScene` | PricingUiPort | 定价来源/时间与模型价格 |
+| `settings.usage` | `ZhaoxiUsageOverviewScene` | UsageUiPort / Settings | 已配置/历史模型切换、统计、精确模型日志跳转 |
+| `settings.usage_log` | `ZhaoxiUsageLogScene` | UsageUiPort | 模型/时间筛选、Owner历史分页/失败重试、请求详情 |
+| `settings.usage_detail` | `ZhaoxiUsageDetailScene` | UsageUiPort | 按requestId读取单次消耗 |
+| `settings.memory` | `ZhaoxiMemoryOverviewScene` | Memory / Settings | 有效统计、自动记忆/召回状态、管理入口 |
+| `settings.memory_settings` | `ZhaoxiMemorySettingsScene` | SettingsUiPort | 记忆/召回策略保存 |
+| `settings.memory_management` | `ZhaoxiMemoryManagementScene` | Memory / Settings | 可见作用域、全库搜索/分页、编辑、置顶、遗忘确认 |
+| `settings.permissions` | `ZhaoxiPermissionsScene` | HostPreferences / Android permission bridge | 系统授权真实状态、跳系统设置和回跳 |
+| `settings.approval_mode` | `ZhaoxiApprovalModeScene` | SettingsUiPort | 默认/手动/自动审批真实持久状态与确认 |
+| `settings.notifications` | `ZhaoxiNotificationsScene` | HostPreferencesUiPort | 分类通知开关、免打扰时间与保存 |
+| `settings.advanced` | `ZhaoxiRuntimeSettingsScene` | SettingsUiPort | 个人规则/运行限制分开；高级设置增加图片理解方式 |
+| `settings.session_storage` | `ZhaoxiStorageScene` | SettingsUiPort / SAF | 容量、压缩、导出、恢复暂存与重启说明 |
+| `settings.diagnostics` | `ZhaoxiDiagnosticsSettingsScene` | SettingsUiPort / SAF | 环境、网络、报告与安全导出 |
+| `settings.update` | `ZhaoxiDiagnosticsScene` | App update callback | 仅状态槽；设置页直接发起检查更新 |
+| `route.home` | `ZhaoxiHomeScene` | SessionUiPort / ConversationShell | 新建/续接、侧栏、会话模式/标题/固定、路由打开 |
+| `route.persona_gallery` | `ZhaoxiPersonaGalleryScene` | PersonaGallery / Authoring / Transfer / Portrait | 搜索、预设连续安装、创建、导入、详情 |
+| `route.diary` | `ZhaoxiDiaryHubScene` | Gallery / Diary | 先选人物，再打开对应公开日记 |
+| `route.workspace` | `ZhaoxiWorkspaceScene` | FilesUiPort / Host exporter | 文件/会话产物分域、搜索、刷新、预览、多选打包保存分享 |
+| `route.tasks` | `ZhaoxiAutomationTasksScene` | AutomationUiPort | 搜索、模式/状态筛选、编辑、暂停/恢复/立即运行、确认删除 |
+| `route.tools` | `ZhaoxiToolsScene` | Tools / ComposerInvocation | 能力目录；HTTP/stdio连接、健康检查；GitHub授权/目录；技能本地/GitHub安装、编辑、启停、删除 |
+| `route.settings` | `ZhaoxiSettingsHomeScene` | Settings / Host navigation | 分类设置、所有二级入口、直接检查更新 |
+
+### 宿主场景与边界
+
+| 系统场景 | 核对内容 | 当前状态 |
+|---|---|---|
+| conversation.attachments | 系统选择器→AttachmentUiPort→会话附件草稿→发送与失败保留 | 既有源码链；设备授权/取消/冷恢复待验 |
+| shell.notifications | 通知抵达→Host 目标解析→Session 接单→精确会话 | 既有宿主链；系统送达与过期目标待验 |
+| system.permissions | 用户主动触发→系统授权→回跳刷新 | 既有宿主链；Android 16/17 待验 |
+
+`PersonaArchiveMutationUiPort` 是原领域归档事务协作边界，由 Gallery/Story/Deletion 的公开端口调用，不增加第二个直接写入 UI；`WorkReadUiPort` 的需求证据读取不作为恢复已撤销页面的理由；`UiDocumentFormUiPort`/Reading/Draft 属于宿主恢复和表单生命周期，不按每个辅助方法新增按钮。
+
+### 验证边界与尚未签收
+
+- 本轮实际执行并通过：UI 模块边界、3.0 架构边界、执行/性能不变量、Kotlin 风险模式、测试质量、构建版本基线、功能树同步及二次独立复核、git diff 空白检查。对全部显式 onNavigate 目标核对 Host kind，未发现 SYSTEM/SLOT/未知路由。
+- 新增 Kotlin 单测包括详情导航进入/返回/恢复、修正撤销原始身份投影、stdio 参数原样解析、显示编辑不触及绑定/表单/审批节点。仅提交测试源码，未执行不得记为通过。
+- 本机工具链 plan 显示缺少 JDK 27、Android SDK、Gradle 及离线依赖/Runtime 组件，不能在本机完成 Kotlin 编译、APK 或 Android 16/17 实测。源码未经编译的风险尚未消除。
+- Figma `oHivuQziUC5AbWET9tJXX9` 读取被 Starter MCP 调用限额拒绝，whoami 确认为 Starter/View；没有在线画板修改和设计对拍证据。沿用仓库 E8.18 设计基线。
+- 全面屏/系统栏、130%/200% 字体、肖像裁切、外部账户与真实付费媒体、后台运行及跨页恢复仍待最新组合的设备验收。不能用本表或已有 CI 代替。
+- 首轮推送曾被自动审批拦截；用户明确授权后，已提交 #759 的 `8e928a2a`。该 SHA 的静态与架构检查通过，构建定位到消息编辑页 `heightIn` 导入缺失，后续提交已修正；最终编译/设备结果须按最终 SHA 重新确认。
+
+
+## 2026-10-19 · 整份 PR 的第二轮接线与视觉复查
+
+- 原始 E8.18 设计 ZIP 已在当前环境找到，读取设计规范、Compose 实施规格与 prototype.html；Figma 在线配额限制不影响读取原始设计包，但仍不宣称已完成在线画板同步。
+- **表单保存是真缺口**：UiDocumentFormUiPort 原先只有注入，界面未消费。现已串联 Chat/Work/历史槽/文档详情的字段读取、按 revision 绑定保存策略、输入回写、离开清理仅内存字段和删除清除草稿。复用 Host 原有加密存储；新增设备用例核对持久备注与临时内容关闭重开行为。
+- **团队发送入口**：Work 输入区增加“下次发送使用团队协作”与团队详情，实际调用 SendWithTeam，带原附件；受理后取消本次选择，拒收保留草稿。
+- **自动化策略**：表单现在显示通知、免打扰、最短互动间隔及连续未回复上限，完整传递调度规则，防止编辑时间时将隐藏策略重置；自然语言模式明确仅规划内容/时间，策略通过创建后的表单编辑。
+- **设计布局**：设置首页按 E8.18 四域分组；添加模型提升至页面顶部，编辑表单置于配置列表之前；模型协议及文件/工具/日志动作适应窄屏换行；长说明采用左对齐和可读字级/对比，导航值限制在文字区域内，保留完整功能入口。
+- **构建闭环**：实际 Actions 编译发现 ZhaoxiSlotScenes 缺少 heightIn 导入，已修正；不能以先前静态通过取代该修复后的编译。
+
+当前仍需最终 SHA 的完整 CI 和 Android16/17 动作验收。肖像裁切、所有真实外部账户和付费媒体、全量视觉逐屏对拍若无运行证据，继续保留待验，不依据本段签收。
+
+
+## 2026-10-19 · 第三轮动作与恢复复查
+
+- 修复 Actions 编译暴露的自动化最短间隔字段与默认值同名遮蔽。
+- 会话更多操作使用原生底部弹层、82%屏高和可滚动内容；媒体支持确认删除全部版本。
+- 人物故事改为真实游标逐页查看较早/较新记录，不再截断到最新80条；支持展开全文和确认删除单条归档消息。
+- 人物画像接通临时预览与范围裁切，确认前不修改原画像；使用原 Owner 保存原分辨率裁切结果，保留大小校验和取消/返回放弃确认。新增像素边界单测与真实 Owner 的预览不写入、裁切保存设备用例。
+- UpdatePolicy、SetApprovalMode 等语义由现有完整更新/设置入口调用同一 Owner；归档内部事务边界不另造 UI 写入口。不会为了覆盖方法名重复添加入口。
+- 本轮源码与设备用例仍须最终提交 CI 执行后确认，不能提前视为设备通过。
+
+
+## 2026-10-19 · 实际 Actions 与截图复核
+
+- `b7dc948a` 的 scope、静态、3.0 架构、单测/Harness、ARM64 Lint/优化打包、x86 APK 构建通过；Android16/17 各执行86项测试，3项失败分别是Python版本旧断言、退役场景移除后截图数量旧断言、临时输入值被占位文字影响的断言。后续提交精确修正版本3.14.8、106行索引和EditableText；未跳过用例或放松真实状态断言。画像预览不写入及原像素裁切用例在该轮双设备通过。
+- 已下载并查看Android17的75张浅色概览、15张深色、15张130%字号概览，以及设置、人物、聊天、回复和200%长表样本。发现顶栏SLOT直接展开菜单造成叠字，已改为复用真实导航栏；模型性能的枚举原名和浮点尾数已整理为中文上限与可读数值。
+- 删除人物确认框在独立窗口，已补充对该确认框的截图采集。200%长表夹具增加明确主题背景，避免透明夹具误叠Activity底色。减弱动效模式直接以可见内容绘制，避免场景首帧闪空。
+- 以上修复后的最终SHA仍以PR当前CI为准。截图主要是本地Owner空态/离线夹具；不签收真实外部模型、付费媒体、所有有数据状态及全部逐动作业务链。

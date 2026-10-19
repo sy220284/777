@@ -41,6 +41,11 @@ sealed interface UiToolDraftValidation {
 data class UiSkillSnapshot(val name: String, val description: String, val modelInvocable: Boolean,
     val displayName: String = name)
 data class UiPresetSkillSnapshot(val id: String, val title: String, val description: String, val installed: Boolean)
+/** Read-only repository metadata; writable operations remain in the GitHub plugin approval path. */
+data class UiGitHubRepo(val fullName: String, val description: String, val privateRepo: Boolean,
+    val defaultBranch: String)
+data class UiGitHubEntry(val name: String, val path: String, val directory: Boolean, val size: Long)
+
 data class UiSkillEditorSnapshot(val id: String, val document: String)
 
 /** Metadata is not an invocation grant. Actual tool execution remains outside this management port. */
@@ -68,6 +73,9 @@ interface ToolsUiPort {
     suspend fun presetSkills(): List<UiPresetSkillSnapshot>
     suspend fun readSkillDocument(id: String): String
     suspend fun curatedGitHubSkills(): List<String>
+    suspend fun githubRepositories(): List<UiGitHubRepo> = emptyList()
+    suspend fun githubEntries(repoFullName: String, directory: String): List<UiGitHubEntry> = emptyList()
+
     suspend fun installGitHubSkill(link: String): String
     suspend fun installPreset(id: String)
     suspend fun createSkill(id: String, displayName: String, description: String, instructions: String)

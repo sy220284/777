@@ -30,7 +30,6 @@ internal class LocalApplicationFeaturePortsOwner @Inject constructor(
     private val businessSessions: SessionUiPort,
     private val toolsFacade: LocalToolsUiFacade,
     @ApplicationContext private val context: Context,
-    val workEvidenceUiPort: com.labteto.dshmobile.uicontract.WorkEvidenceUiPort,
     val workTeamUiPort: com.labteto.dshmobile.uicontract.WorkTeamUiPort,
     val workReadUiPort: com.labteto.dshmobile.uicontract.WorkReadUiPort,
     val filesUiPort: com.labteto.dshmobile.uicontract.FilesUiPort,
@@ -55,6 +54,8 @@ internal class LocalApplicationFeaturePortsOwner @Inject constructor(
     val messageHistoryUiPort: com.labteto.dshmobile.uicontract.UiMessageHistoryPort,
     val usageUiPort: com.labteto.dshmobile.uicontract.UsageUiPort,
     val workPolicyUiPort: com.labteto.dshmobile.uicontract.WorkPolicyUiPort,
+    val composerInvocationUiPort: com.labteto.dshmobile.uicontract.ComposerInvocationUiPort,
+    val personaCorrectionUiPort: com.labteto.dshmobile.uicontract.PersonaCorrectionUiPort,
 ) : ViewModel() {
     private val secureDrafts = LocalEncryptedUiDraftStore(context)
     val privateTextCipher: com.labteto.dshmobile.uihost.UiPrivateTextCipher get() = secureDrafts
@@ -82,6 +83,7 @@ internal class LocalApplicationFeaturePortsOwner @Inject constructor(
         secureDrafts.read("ui_document_forms"),
     ) { secureDrafts.write("ui_document_forms", it) }
     private val shellPreferences = LocalConversationUiStateStore(context, businessSessions)
+    val conversationShellUiPort: com.labteto.dshmobile.uicontract.ConversationShellUiPort = shellPreferences
     val conversationNavigation = kotlinx.coroutines.flow.MutableStateFlow<SessionUiCommand?>(null)
     val sessions: SessionUiPort = HostConversationSessionUiPort(
         businessSessions, drafts, shellPreferences, readingState, formState,
@@ -108,6 +110,35 @@ internal class LocalApplicationFeaturePortsOwner @Inject constructor(
     val forms: UiDocumentFormUiPort = formState
     val shell: ConversationShellUiPort = shellPreferences
     val modelPerformance = LocalModelPerformanceUiOwner
+    val reasoningUiPort: ConversationReasoningUiPort = object : ConversationReasoningUiPort {
+        override fun options(sessionId: String, workMode: Boolean,
+            profile: com.labteto.dshmobile.local.model.LocalModelProfile?,
+        ): UiConversationReasoningOptions {
+            val usage = if (workMode) LocalUsageMode.WORK else LocalUsageMode.CHAT
+            val controls = com.labteto.dshmobile.local.presentation.LocalReasoningControls
+            val available = controls.availableModes(profile, usage)
+            val saved = controls.mode(sessionId, usage)
+            val selected = controls.effectiveMode(saved, available,
+                controls.requiresBasicReasoning(profile, usage))
+            return UiConversationReasoningOptions(
+                UiConversationReasoningMode.valueOf(selected.name),
+                available.map { UiConversationReasoningMode.valueOf(it.name) })
+        }
+        override fun select(sessionId: String, workMode: Boolean,
+            profile: com.labteto.dshmobile.local.model.LocalModelProfile?,
+            mode: UiConversationReasoningMode,
+        ): Boolean {
+            val snap = sessions.snapshot()
+            val usage = if (workMode) LocalUsageMode.WORK else LocalUsageMode.CHAT
+            if (sessionId.isBlank() || snap.identity?.sessionId != sessionId ||
+                snap.usageMode != usage) return false
+            val controls = com.labteto.dshmobile.local.presentation.LocalReasoningControls
+            val chosen = com.labteto.dshmobile.local.presentation.LocalReasoningUiMode.valueOf(mode.name)
+            if (chosen !in controls.availableModes(profile, usage)) return false
+            controls.setMode(sessionId, chosen)
+            return true
+        }
+    }
     val pricing: PricingUiPort? = memoryUiPort as? PricingUiPort
     fun currentSessionId(): String = sessions.snapshot().identity?.sessionId.orEmpty()
     fun isWorkMode(): Boolean = sessions.snapshot().usageMode == LocalUsageMode.WORK
@@ -119,7 +150,7 @@ internal class LocalApplicationFeaturePortsOwner @Inject constructor(
         attachments = attachmentUiPort, transcript = messageHistoryUiPort,
         groups = chatGroupUiPort, team = workTeamUiPort,
         workReads = workReadUiPort, workPolicy = workPolicyUiPort,
-        shell = shellPreferences, evidence = workEvidenceUiPort,
+        shell = shellPreferences,
         gallery = personaGalleryUiPort, personas = personaSelectionUiPort,
         personaTransfer = personaTransferUiPort, stories = personaStoryUiPort,
         galleryDeletion = personaGalleryDeletionUiPort,

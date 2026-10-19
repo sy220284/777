@@ -29,7 +29,6 @@ class ZhaoxiFullPackAdmissionTest {
         val documents = unreachablePort<UiDocumentUiPort>()
         val forms = unreachablePort<UiDocumentFormUiPort>()
         val media = unreachablePort<MediaUiPort>()
-        val evidence = unreachablePort<WorkEvidenceUiPort>()
         val gallery = unreachablePort<PersonaGalleryUiPort>()
         val selection = unreachablePort<PersonaSelectionUiPort>()
         val groups = unreachablePort<ChatGroupUiPort>()
@@ -58,7 +57,7 @@ class ZhaoxiFullPackAdmissionTest {
             conversations = ZhaoxiConversationPorts(
                 chat = chat, work = work, drafts = drafts, reading = reading,
                 attachments = attachments, history = history, documents = documents,
-                forms = forms, media = media, evidence = evidence,
+                forms = forms, media = media,
                 gallery = gallery, selection = selection, groups = groups,
                 stories = stories, galleryDeletion = galleryDeletion,
                 personaAuthoring = authoring, workReads = workReads,
@@ -85,7 +84,7 @@ class ZhaoxiFullPackAdmissionTest {
         val capabilities = LocalUiConnectedCapabilities.from(
             chat = chat, work = work, drafts = drafts, documents = documents, forms = forms,
             attachments = attachments, transcript = history, groups = groups, team = team,
-            workReads = workReads, workPolicy = policy, shell = shell, evidence = evidence,
+            workReads = workReads, workPolicy = policy, shell = shell,
             gallery = gallery, personas = selection, personaTransfer = transfer,
             stories = stories, galleryDeletion = galleryDeletion, gallerySave = gallerySave,
             portraits = portraits, authoring = authoring, currentPersona = currentPersona,
@@ -105,5 +104,11 @@ class ZhaoxiFullPackAdmissionTest {
         )
         assertTrue("All 75 scenes with connected owners must be admitted: $admission",
             admission is UiApplicationPackAdmission.Admitted)
+        assertTrue("Retired evidence route must be absent from Host catalog",
+            LocalUiSceneCatalog.requirements.none { it.id == UiSceneId("work.requirement_evidence") })
+        assertTrue("Retired evidence scene must never render",
+            UiSceneId("work.requirement_evidence") !in pack.manifest.scenes)
+        assertTrue("Retired evidence capability must never be required",
+            UiCapabilityId("work.evidence_reference") !in pack.manifest.requiredCapabilities)
     }
 }

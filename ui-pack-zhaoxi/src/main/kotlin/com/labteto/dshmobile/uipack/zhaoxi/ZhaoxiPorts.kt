@@ -5,6 +5,7 @@ import com.labteto.dshmobile.uicontract.AutomationUiPort
 import com.labteto.dshmobile.uicontract.ChatGroupUiPort
 import com.labteto.dshmobile.uicontract.ChatUiPort
 import com.labteto.dshmobile.uicontract.ConversationDraftUiPort
+import com.labteto.dshmobile.uicontract.ConversationShellUiPort
 import com.labteto.dshmobile.uicontract.ConversationReadingUiPort
 import com.labteto.dshmobile.uicontract.CurrentPersonaUiPort
 import com.labteto.dshmobile.uicontract.DiaryUiPort
@@ -27,7 +28,6 @@ import com.labteto.dshmobile.uicontract.UiDocumentFormUiPort
 import com.labteto.dshmobile.uicontract.UiDocumentUiPort
 import com.labteto.dshmobile.uicontract.UiMessageHistoryPort
 import com.labteto.dshmobile.uicontract.WorkConversationUiPort
-import com.labteto.dshmobile.uicontract.WorkEvidenceUiPort
 import com.labteto.dshmobile.uicontract.WorkPolicyUiPort
 import com.labteto.dshmobile.uicontract.WorkReadUiPort
 import com.labteto.dshmobile.uicontract.WorkTeamUiPort
@@ -50,7 +50,6 @@ data class ZhaoxiConversationPorts(
     val documents: UiDocumentUiPort? = null,
     val forms: UiDocumentFormUiPort? = null,
     val media: MediaUiPort? = null,
-    val evidence: WorkEvidenceUiPort? = null,
     val gallery: PersonaGalleryUiPort? = null,
     val selection: PersonaSelectionUiPort? = null,
     val groups: ChatGroupUiPort? = null,
@@ -62,6 +61,8 @@ data class ZhaoxiConversationPorts(
     val workTeam: WorkTeamUiPort? = null,
     val replySuggestions: ReplySuggestionsUiPort? = null,
     val files: FilesUiPort? = null,
+    val reasoning: com.labteto.dshmobile.uicontract.ConversationReasoningUiPort? = null,
+    val corrections: com.labteto.dshmobile.uicontract.PersonaCorrectionUiPort? = null,
     val workMode: () -> Boolean,
     val workModeUpdates: Flow<Boolean>? = null,
 )
@@ -79,6 +80,7 @@ data class ZhaoxiSecondaryPorts(
     val sessionId: () -> String? = { null },
     val automation: AutomationUiPort? = null,
     val sessions: SessionUiPort? = null,
+    val conversationShell: ConversationShellUiPort? = null,
     val transcript: UiMessageHistoryPort? = null,
     val memory: MemoryUiPort? = null,
     val diary: DiaryUiPort? = null,
@@ -91,4 +93,6 @@ data class ZhaoxiSecondaryPorts(
     val modelPerformance: ModelPerformanceUiPort? = null,
     val pricing: PricingUiPort? = null,
     val transfer: com.labteto.dshmobile.uicontract.PersonaTransferUiPort? = null,
+    val gallerySave: com.labteto.dshmobile.uicontract.PersonaGallerySaveUiPort? = null,
+    val invocations: com.labteto.dshmobile.uicontract.ComposerInvocationUiPort? = null,
 )

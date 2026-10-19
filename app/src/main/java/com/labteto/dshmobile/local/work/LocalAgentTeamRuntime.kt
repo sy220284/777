@@ -400,6 +400,7 @@ internal class LocalAgentTeamRuntime(
                 },
                 ready = isReady(task, state.tasks),
                 writeConflict = writeScopeWarnings(task, state.tasks).isNotEmpty(),
+                revision = task.revision,
             )
         }
         return LocalAgentTeamUiState(
@@ -408,6 +409,23 @@ internal class LocalAgentTeamRuntime(
             pendingMessageCount = members.sumOf(LocalAgentTeamMemberUiState::pendingMessageCount),
             failure = state.failure,
             activities = state.activities,
+        )
+    }
+
+    /** Preserve the existing event-sourced reassign transition and revision check. */
+    internal fun reassignUiTask(
+        sessionId: String, taskId: String, expectedRevision: Int, newMemberId: String?,
+    ): String = synchronized(commandLock) {
+        synchronizeTeamRuntime(sessionId)
+        val assigneeName = newMemberId?.let { memberId ->
+            project(sessionId).members.singleOrNull {
+                it.id == memberId && it.phase == LocalTeamMemberPhase.ACTIVE
+            }?.name ?: error("TEAM_MEMBER_NOT_FOUND：目标负责人已退出或不可用")
+        }
+        updateTask(
+            sessionId = sessionId, id = taskId, expectedRevision = expectedRevision,
+            action = "reassign", resultId = null, ownerName = assigneeName,
+            subject = null, description = null, blockedBy = null, writeScopes = null,
         )
     }
 

@@ -7,6 +7,13 @@ import com.labteto.dshmobile.local.TokenUsageGroupKind
 import com.labteto.dshmobile.local.TokenUsageRecord
 import kotlinx.coroutines.flow.StateFlow
 
+/** Only durable records still held by the Owner's retention policy are paginable. */
+data class UiUsageHistoryPage(
+    val records: List<TokenUsageRecord>,
+    val nextCursor: String?,
+    val totalMatching: Int,
+)
+
 /** Read-only projections of the existing request ledger; a renderer cannot write usage facts. */
 interface UsageUiPort {
     val revision: StateFlow<Long>
@@ -17,4 +24,5 @@ interface UsageUiPort {
     fun turnSummaries(sessionId: String): Map<String, TokenUsageAggregate>
     fun turnDetail(sessionId: String, turnId: String): TokenUsageGroupDetail?
     fun requestDetail(requestId: String): TokenUsageRecord?
+    fun historyPage(model: String?, sinceMillis: Long?, cursor: String?, limit: Int): UiUsageHistoryPage
 }

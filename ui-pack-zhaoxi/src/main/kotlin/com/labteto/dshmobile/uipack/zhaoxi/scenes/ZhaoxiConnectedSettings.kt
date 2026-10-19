@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
@@ -40,6 +42,8 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.state.collectAsState(initial = settings.initialState)
     val jobs = rememberCoroutineScope()
     var profileId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showModelForm by rememberSaveable { mutableStateOf(false) }
+    var expandedModelId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingRemoveModel by remember { mutableStateOf<String?>(null) }
     var model by rememberSaveable { mutableStateOf("") }
     var baseUrl by rememberSaveable { mutableStateOf("https://api.deepseek.com") }
@@ -47,9 +51,13 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     var apiKey by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var discoveredModels by remember { mutableStateOf<List<String>?>(null) }
+    var catalogFilter by remember { mutableStateOf("") }
+    var catalogFailure by remember { mutableStateOf<String?>(null) }
     fun execute(action: suspend () -> String) {
+        if (busy) return
+        busy = true
         jobs.launch {
-            busy = true
             try { status = action() }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { status = failure.message ?: "操作失败" }
@@ -59,22 +67,115 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     ZxPage("模型", onBack = { scope.onBack() }) {
         snap.error?.let { ZxBanner(it, ZxTone.Err) }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
+        ZxButton("添加模型", {
+            profileId = null; model = ""; apiKey = ""; status = null
+            discoveredModels = null; catalogFailure = null; catalogFilter = ""
+            showModelForm = true
+        }, Modifier.fillMaxWidth(), enabled = !busy)
+        if (showModelForm || snap.modelProfiles.isEmpty()) {
+            ZxSettingsGroup {
+        ZxSection(if (profileId == null) "添加模型" else "编辑模型")
+        ZxSection("模型名称")
+        ZxField(model, { model = it }, Modifier.fillMaxWidth(), placeholder = "模型名称（支持手动输入）",
+            fieldLabel = "模型名称")
+        ZxFooterNote("可使用供应商目录选择模型，也可手动填写目录里没有的自定义模型。")
+        ZxSection("接口地址")
+        ZxField(baseUrl, { baseUrl = it }, Modifier.fillMaxWidth(), placeholder = "接口地址")
+        ZxSection("访问凭据")
+        ZxField(apiKey, { apiKey = it }, Modifier.fillMaxWidth(), placeholder = "API Key（编辑时留空保留原凭据）",
+            visualTransformation = PasswordVisualTransformation())
+        ZxFooterNote(if (profileId == null) "凭据仅用于连接该模型" else
+            "不填写密钥时保留原凭据；不会在界面中回显已有密钥")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LocalModelProtocol.entries.forEach { p -> ZxChip(p.name, p == protocol) {
+                protocol = p
+                discoveredModels = null
+                catalogFailure = null
+            } }
+        }
+        ZxSection("从提供商读取可用模型")
+        ZxButton("读取 /models 目录", {
+            if (!busy) {
+                val oldAddress = baseUrl.trim()
+                val oldProtocol = protocol
+                val oldProfile = profileId
+                val oldKey = apiKey
+                busy = true
+                catalogFailure = null
+                discoveredModels = null
+                jobs.launch {
+                    try {
+                        val names = settings.discoverApiModels(oldKey, oldAddress, oldProtocol, oldProfile)
+                            .map(String::trim).filter(String::isNotBlank).distinct().sorted()
+                        if (oldAddress != baseUrl.trim() || oldProtocol != protocol ||
+                            oldProfile != profileId || oldKey != apiKey) {
+                            catalogFailure = "连接配置已变化，请重新查询模型列表"
+                        } else {
+                            discoveredModels = names
+                            status = if (names.isEmpty()) "目录没有返回模型，可以继续手动填写" else
+                                "已读取 ${names.size} 个可用模型，请选择后保存"
+                        }
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Exception) {
+                        catalogFailure = failure.message ?: "读取模型目录失败"
+                        status = "目录不可用，不影响手动填写模型"
+                    } finally { busy = false }
+                }
+            }
+        }, enabled = !busy && baseUrl.isNotBlank() && (apiKey.isNotBlank() || profileId != null),
+            variant = ZxButtonVariant.Outline, loading = busy)
+        catalogFailure?.let { ZxFooterNote("目录读取失败：$it。可手动填写模型名称并测试。") }
+        discoveredModels?.let { names ->
+            if (names.isEmpty()) ZxFooterNote("当前目录为空，手动配置仍然可用")
+            else {
+                ZxField(catalogFilter, { catalogFilter = it }, Modifier.fillMaxWidth(),
+                    placeholder = "筛选可用模型")
+                names.filter { it.contains(catalogFilter.trim(), ignoreCase = true) }
+                    .take(60).forEach { available ->
+                        ZxRow(available, "选用此模型标识", onClick = {
+                            model = available
+                            status = "已选择模型标识，还需要点击保存模型"
+                        }, trailing = {
+                            ZxChip(if (model == available) "已选择" else "选择", model == available) {
+                                model = available
+                            }
+                        })
+                    }
+                if (names.size > 60) ZxFooterNote("列表较长，使用上方搜索框快速定位模型")
+            }
+        }
+        ZxButton("测试连接", { execute { settings.testModel(apiKey, model, baseUrl, protocol, profileId) } }, enabled = !busy && model.isNotBlank())
+        ZxButton("保存模型", { execute {
+            when (val result = settings.save(SettingsUiCommand.SaveModel(apiKey, model, baseUrl, protocol, profileId))) {
+                SettingsUiReceipt.Applied -> { apiKey = ""; profileId = null; showModelForm = false; "模型已保存" }
+                SettingsUiReceipt.Submitted -> "保存已提交"
+                SettingsUiReceipt.Rejected -> "无法保存模型"
+                is SettingsUiReceipt.Failed -> result.message ?: "保存失败"
+            }
+        } }, enabled = !busy && model.isNotBlank())
+        ZxButton("收起表单", { showModelForm = false }, variant = ZxButtonVariant.Outline, enabled = !busy)
+            }
+        }
         ZxSection("已配置模型 · ${snap.modelProfiles.size}")
-        if (snap.modelProfiles.isEmpty()) ZxEmpty("还没有模型", "填写下方表单添加可用模型")
+        if (snap.modelProfiles.isEmpty()) ZxEmpty("还没有模型", "在上方添加第一个可用模型")
         snap.modelProfiles.sortedByDescending { snap.modelSelection.isActive(it) }.forEach { p ->
+            val active = snap.modelSelection.isActive(p)
             ZxRow(p.displayName ?: p.model,
-                if (snap.modelSelection.isActive(p)) "当前使用 · ${p.model}" else p.model,
-                onClick = { status = when (val receipt = settings.submit(SettingsUiCommand.SelectModel(p.id))) {
-                    SettingsUiReceipt.Applied -> "已切换模型"
-                    SettingsUiReceipt.Submitted -> "切换已提交"
-                    SettingsUiReceipt.Rejected -> "当前无法切换"
-                    is SettingsUiReceipt.Failed -> receipt.message ?: "切换失败"
-                } })
-            ZxValueRow("接口", value = p.baseUrl)
-            ZxValueRow("协议", value = p.protocol.name)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ZxChip("编辑", false) { profileId = p.id; model = p.model; baseUrl = p.baseUrl; protocol = p.protocol; apiKey = "" }
-                ZxChip("移除", false) { pendingRemoveModel = p.id }
+                if (active) "当前使用 · ${p.model}" else p.model,
+                onClick = { expandedModelId = if (expandedModelId == p.id) null else p.id })
+            if (expandedModelId == p.id) {
+                ZxValueRow("接口", value = p.baseUrl)
+                ZxValueRow("协议", value = p.protocol.name)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!active) ZxChip("使用此模型", false) {
+                        status = settings.submit(SettingsUiCommand.SelectModel(p.id)).zxUserMessage("切换模型")
+                    }
+                    ZxChip("编辑", false) {
+                        profileId = p.id; model = p.model; baseUrl = p.baseUrl
+                        protocol = p.protocol; apiKey = ""; showModelForm = true
+                    }
+                    ZxChip("移除", false) { pendingRemoveModel = p.id }
+                }
             }
         }
         pendingRemoveModel?.let { id ->
@@ -87,30 +188,8 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
                     is SettingsUiReceipt.Failed -> receipt.message ?: "移除失败"
                 }
                 if (profileId == id) profileId = null
+                if (expandedModelId == id) expandedModelId = null
             }, { pendingRemoveModel = null })
-        }
-        ZxSection(if (profileId == null) "添加模型" else "编辑模型")
-        ZxSection("模型标识")
-        ZxField(model, { model = it }, Modifier.fillMaxWidth(), placeholder = "模型名称")
-        ZxSection("接口地址")
-        ZxField(baseUrl, { baseUrl = it }, Modifier.fillMaxWidth(), placeholder = "接口地址")
-        ZxSection("访问凭据")
-        ZxField(apiKey, { apiKey = it }, Modifier.fillMaxWidth(), placeholder = "API Key（编辑时留空保留原凭据）",
-            visualTransformation = PasswordVisualTransformation())
-        ZxFooterNote(if (profileId == null) "凭据仅用于连接该模型" else
-            "不填写密钥时保留原凭据；不会在界面中回显已有密钥")
-        LocalModelProtocol.entries.forEach { p -> ZxChip(p.name, p == protocol) { protocol = p } }
-        ZxButton("测试连接", { execute { settings.testModel(apiKey, model, baseUrl, protocol, profileId) } }, enabled = !busy && model.isNotBlank())
-        ZxButton("保存模型", { execute {
-            when (val result = settings.save(SettingsUiCommand.SaveModel(apiKey, model, baseUrl, protocol, profileId))) {
-                SettingsUiReceipt.Applied -> { apiKey = ""; profileId = null; "模型已保存" }
-                SettingsUiReceipt.Submitted -> "保存已提交"
-                SettingsUiReceipt.Rejected -> "无法保存模型"
-                is SettingsUiReceipt.Failed -> result.message ?: "保存失败"
-            }
-        } }, enabled = !busy && model.isNotBlank())
-        ZxChip("新建配置", false) {
-            profileId = null; model = ""; apiKey = ""; status = null
         }
         ZxNavRow("查看模型用量", sub = "按模型对照 Token 与估算费用") {
             scope.onNavigate(UiSceneId("settings.model_usage"))
@@ -122,36 +201,135 @@ fun ZhaoxiModelsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     }
 }
 
+/** Dedicated account management, separate from API model configuration. */
+internal fun zxChatGptAccountAuthLabel(account: com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountSummary): String = when {
+    !account.signedIn -> "登录凭据已失效"
+    !account.sharingEnabled -> "已登录 · 套餐尚未授权"
+    else -> "已登录 · 套餐授权已启用"
+}
+
 @Composable
 fun ZhaoxiAccountScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     val snap by settings.chatGptState.collectAsState()
     val jobs = rememberCoroutineScope()
     var status by remember { mutableStateOf<String?>(null) }
-    var pendingRemoveAccount by remember { mutableStateOf<String?>(null) }
-    fun execute(action: suspend () -> Unit) { jobs.launch {
-        try { action() } catch (cancelled: CancellationException) { throw cancelled }
-        catch (failure: Exception) { status = failure.message ?: "账户操作失败" }
-    } }
-    ZxPage("ChatGPT 账户", onBack = { scope.onBack() }) {
-        Text(snap.phase.name, color = ZhaoxiTheme.colors.ink)
+    var busy by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf<String?>(null) }
+    var removeConfirm by remember { mutableStateOf<String?>(null) }
+    var disconnectConfirm by remember { mutableStateOf<String?>(null) }
+    fun execute(action: suspend () -> String?) {
+        if (busy) return
+        busy = true
+        jobs.launch {
+            try { status = action() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { status = failure.message ?: "账户操作未完成，请核对状态后重试" }
+            finally { busy = false }
+        }
+    }
+    ZxPage("账户管理", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        ZxSection("连接状态")
+        val phaseLabel = when (snap.phase) {
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.DISCONNECTED -> "未连接"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.PREPARING -> "准备授权"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.WAITING_FOR_BROWSER -> "等待浏览器授权"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.EXCHANGING_CODE -> "正在验证登录"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.VALIDATING_IDENTITY -> "正在核实账户"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.LOADING_MODELS -> "正在读取可用模型"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.CONNECTED -> "已连接"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.UNVERIFIED -> "账户待验证"
+            com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.ERROR -> "连接失败"
+        }
+        ZxValueRow("ChatGPT 连接", value = phaseLabel)
+        ZxValueRow("已保存账户", value = "${snap.accounts.size} 个")
+        snap.selectedAccount?.let { ZxValueRow("当前账户", value =
+            it.displayName ?: it.email ?: "已选账户") }
         (status ?: snap.error)?.let { ZxBanner(it, ZxTone.Warn) }
+        if (busy) ZxFooterNote("正在请求账户 Owner，完成前不会重复提交")
+        ZxSection("账户操作")
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ZxButton("添加账户", { execute {
+                settings.connectChatGpt()
+                "授权流程已发起，请在系统浏览器完成操作"
+            } }, Modifier.weight(1f), enabled = !busy)
+            ZxButton("刷新账户", { execute {
+                settings.refreshChatGpt()
+                "已重新读取账户状态"
+            } }, Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
+        }
+        ZxNavRow("查看本地模型用量",
+            sub = "查看已记录的 Token 和估算费用；此处不代表 ChatGPT 平台套餐剩余额度") {
+            scope.onNavigate(UiSceneId("settings.model_usage"))
+        }
+        if (snap.pendingAccountId != null) ZxButton("取消进行中的授权", {
+            execute { settings.cancelChatGptAuthorization(); "取消授权请求已发出" }
+        }, variant = ZxButtonVariant.Outline, enabled = !busy)
+        ZxSection("已有账户")
+        if (snap.accounts.isEmpty()) ZxEmpty("还没有账户", "点击添加账户，使用浏览器完成授权")
         snap.accounts.forEach { account ->
+            val active = snap.selectedAccountId == account.id
             ZxRow(account.displayName ?: account.email ?: account.id,
-                if (snap.selectedAccountId == account.id) "当前账户" else "",
-                onClick = { execute { settings.selectChatGptAccount(account.id) } })
-            ZxButton("测试连接", { execute { status = settings.testChatGptAccount(account.id) } })
-            ZxButton("断开连接", { execute { status = settings.disconnectChatGptAccount(account.id) } })
-            ZxButton("移除账户", { pendingRemoveAccount = account.id }, variant = ZxButtonVariant.Danger)
+                (if (active) "当前使用" else "其他账户") + " · " +
+                    zxChatGptAccountAuthLabel(account),
+                onClick = { expanded = if (expanded == account.id) null else account.id },
+                trailing = {
+                    ZxChip(if (expanded == account.id) "收起" else "管理",
+                        expanded == account.id) {
+                        expanded = if (expanded == account.id) null else account.id
+                    }
+                })
+            if (expanded == account.id) {
+                ZxValueRow("登录", value = if (account.signedIn) "已登录" else "需要重新授权")
+                ZxValueRow("ChatGPT 套餐访问", value = when {
+                    !account.signedIn -> "账户需重新登录"
+                    account.sharingEnabled -> "已取得套餐授权"
+                    else -> "尚未取得套餐授权"
+                })
+                if (account.signedIn && !account.sharingEnabled) {
+                    ZxFooterNote("此账户已登录，但尚未授权套餐模型访问。可单独进行套餐授权；不会自动转为 API Key 计费。")
+                    ZxButton("启用套餐访问", { execute {
+                        settings.connectChatGpt(account.id, requestPlanConsent = true)
+                        "套餐授权已请求，请在浏览器明确确认；完成后刷新账户状态"
+                    } }, Modifier.fillMaxWidth(), enabled = !busy)
+                }
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZxButton("使用此账户", { execute {
+                        settings.selectChatGptAccount(account.id)
+                        "已提交账户切换，请以当前账户标记为准"
+                    } }, Modifier.weight(1f), enabled = !busy && !active)
+                    ZxButton("重新连接", { execute {
+                        settings.restartChatGptAuthorization(account.id)
+                        "重新授权流程已发起"
+                    } }, Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
+                }
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZxButton("测试连接", { execute { settings.testChatGptAccount(account.id) } },
+                        Modifier.weight(1f), variant = ZxButtonVariant.Outline, enabled = !busy)
+                    ZxButton("断开连接", { disconnectConfirm = account.id },
+                        Modifier.weight(1f), variant = ZxButtonVariant.Danger, enabled = !busy)
+                }
+                ZxButton("移除本地账户", { removeConfirm = account.id },
+                    Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline, enabled = !busy)
+                ZxFooterNote("重新连接只更新此账户的授权状态，不会自动切换到其他付费模型。")
+            }
         }
-        pendingRemoveAccount?.let { id ->
-            ZxDialog("移除账户？", "将解除此账户的本地连接。", "移除", {
-                pendingRemoveAccount = null
-                execute { status = settings.removeChatGptAccount(id) }
-            }, { pendingRemoveAccount = null })
-        }
-        ZxButton("连接 ChatGPT", { execute { settings.connectChatGpt() } })
-        ZxButton("刷新账户与模型", { execute { settings.refreshChatGpt() } })
-        if (snap.pendingAccountId != null) ZxButton("取消授权", { execute { settings.cancelChatGptAuthorization() } })
+    }
+    disconnectConfirm?.let { id ->
+        ZxDialog("断开账户连接？",
+            "此账户将失去当前的可用授权，其他本地账户仍然保留。",
+            "断开", {
+                disconnectConfirm = null
+                execute { settings.disconnectChatGptAccount(id) ?: "已提交断开请求" }
+            }, { disconnectConfirm = null })
+    }
+    removeConfirm?.let { id ->
+        ZxDialog("移除本地账户？",
+            "移除后需要再次添加和授权；不会删除 ChatGPT 平台上的账户。",
+            "移除", {
+                removeConfirm = null
+                execute { settings.removeChatGptAccount(id) ?: "已提交移除请求" }
+            }, { removeConfirm = null })
     }
 }
 
@@ -251,15 +429,34 @@ fun ZhaoxiRuntimeSettingsScene(
                     rules, snap.autoRecall, snap.autoMemory)).zxUserMessage("保存规则")
             }, Modifier.fillMaxWidth())
         } else {
+            ZxSection("图片理解方式")
+            ZxFooterNote("自动按当前模型能力选择；原生将图片交给模型，工具模式通过已配置的视觉工具处理。")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LocalImageInputMode.entries.forEach { mode ->
+                    val label = when (mode) {
+                        LocalImageInputMode.AUTO -> "自动选择"
+                        LocalImageInputMode.NATIVE -> "模型原生"
+                        LocalImageInputMode.TOOL -> "视觉工具"
+                    }
+                    ZxChip(label, snap.imageInputMode == mode) {
+                        status = settings.submit(SettingsUiCommand.ImageInputMode(mode)).zxUserMessage("图片理解设置")
+                    }
+                }
+            }
             ZxSection("执行限制")
+            ZxFooterNote("限制单次运行的步骤与尝试次数，不修改历史工作记录。")
+            ZxSection("主任务最大步数（4–512）")
             ZxField(main, { main = it }, Modifier.fillMaxWidth(), placeholder = "主任务步数",
                 error = mainError != null, errorMessage = mainError,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             mainError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
+            ZxSection("子任务最大步数（1–512）")
             ZxField(sub, { sub = it }, Modifier.fillMaxWidth(), placeholder = "子任务步数",
                 error = subError != null, errorMessage = subError,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             subError?.let { Text(it, color = ZhaoxiTheme.colors.err, fontSize = 12.sp) }
+            ZxSection("模型尝试次数（1–5）")
             ZxField(attempts, { attempts = it }, Modifier.fillMaxWidth(), placeholder = "模型尝试次数",
                 error = attemptError != null, errorMessage = attemptError,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
@@ -283,15 +480,25 @@ fun ZhaoxiRuntimeSettingsScene(
 @Composable
 fun ZhaoxiPerformanceScene(port: ModelPerformanceUiPort, scope: UiSceneRenderScope) {
     val snap by port.snapshots.collectAsState(initial = port.snapshot())
-    var temperature by rememberSaveable(snap.temperatureCeiling) { mutableStateOf(snap.temperatureCeiling.toString()) }
+    var temperature by rememberSaveable(snap.temperatureCeiling) { mutableStateOf(snap.temperatureCeiling.toFloat().toString()) }
     var status by remember { mutableStateOf<String?>(null) }
     var showTemperatureError by remember { mutableStateOf(false) }
     val temperatureError = if (showTemperatureError) zxTemperatureCeilingError(temperature) else null
     ZxPage("模型性能", onBack = { scope.onBack() }) {
-        ZxSection("推理强度")
-        UiModelReasoningCeiling.entries.forEach { ceiling ->
-            ZxChip(ceiling.name, ceiling == snap.reasoning) {
-                status = port.submit(ModelPerformanceUiCommand.SetReasoning(ceiling)).zxPerformanceMessage()
+        ZxSection("推理强度上限")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            UiModelReasoningCeiling.entries.forEach { ceiling ->
+                val label = when (ceiling) {
+                    UiModelReasoningCeiling.CUSTOM -> "跟随会话"
+                    UiModelReasoningCeiling.DEFAULT -> "默认"
+                    UiModelReasoningCeiling.FAST -> "快速"
+                    UiModelReasoningCeiling.LOW -> "轻量推理"
+                    UiModelReasoningCeiling.DEEP -> "深入推理"
+                    UiModelReasoningCeiling.MAX -> "最大上限"
+                }
+                ZxChip(label, ceiling == snap.reasoning) {
+                    status = port.submit(ModelPerformanceUiCommand.SetReasoning(ceiling)).zxPerformanceMessage()
+                }
             }
         }
         ZxSection("温度上限")
@@ -339,16 +546,46 @@ fun ZhaoxiStorageScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     var storage by remember { mutableStateOf<com.labteto.dshmobile.local.session.LocalSessionStorageStatus?>(null) }
     var busy by remember { mutableStateOf(false) }
     var confirmCompact by remember { mutableStateOf(false) }
+    var confirmRestore by remember { mutableStateOf(false) }
     LaunchedEffect(settings) { storage = settings.sessionStorageStatus() }
+    val importBackup = rememberUiDocumentImporter(64 * 1024 * 1024) { result ->
+        when (result) {
+            UiDocumentPickReceipt.Reading -> { busy = true; status = "正在读取并验证备份…" }
+            is UiDocumentPickReceipt.Picked -> jobs.launch {
+                try {
+                    val staged = settings.stageRestoreSessionStorage(result.document.bytes)
+                    status = "已安全暂存 ${staged} 个缺失会话。原有会话保持不变；完全退出并重新启动应用后加载。"
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (failure: Exception) { status = failure.message ?: "备份校验失败，没有覆盖原有会话" }
+                finally { busy = false }
+            }
+            UiDocumentPickReceipt.Cancelled -> { busy = false; status = "已取消备份恢复" }
+            is UiDocumentPickReceipt.Failed -> { busy = false; status = result.message ?: "无法读取所选备份" }
+        }
+    }
     val export = rememberUiStreamDocumentSaver<Unit>("application/zip", { "777-sessions.zip" }, { _, output ->
         settings.exportSessionStorage(output); UiDocumentWriteReceipt.Saved
     }, { _, r -> status = if (r == UiDocumentWriteReceipt.Saved) "备份已保存" else "备份失败" }, { status = it.message })
     ZxPage("会话存储", onBack = { scope.onBack() }) {
-        storage?.let { ZxValueRow("${it.sessionCount} 个会话", value = "${it.totalBytes} 字节", sub = "剩余空间 ${it.freeBytes} 字节") }
+        ZxSection("存储概览")
+        storage?.let {
+            ZxValueRow("已保存会话", value = "${it.sessionCount} 个")
+            ZxValueRow("会话占用", value = zxHumanFileSize(it.totalBytes.toLong()))
+            ZxValueRow("设备剩余空间", value = zxHumanFileSize(it.freeBytes.toLong()))
+        }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         ZxSection("维护与备份")
         ZxFooterNote("压缩会整理本地会话文件。建议先导出备份，维护期间不要退出应用。")
         ZxButton("导出会话备份", { export(Unit) }, enabled = !busy)
+        ZxButton("恢复缺失的会话", { confirmRestore = true }, enabled = !busy,
+            variant = ZxButtonVariant.Outline)
+        if (confirmRestore) ZxDialog(
+            "从备份恢复会话？",
+            "仅导入本机缺失的历史会话，绝不覆盖或合并已有会话。ZIP 不能超过 64 MiB；恢复内容会先安全校验并隔离暂存，下次完全重启应用后才生效。请仅选择信任来源的备份。",
+            "选择备份 ZIP", {
+                confirmRestore = false
+                importBackup()
+            }, { confirmRestore = false })
         ZxButton("压缩会话存储", { confirmCompact = true }, enabled = !busy,
             variant = ZxButtonVariant.Outline)
         if (confirmCompact) ZxDialog(
@@ -367,15 +604,55 @@ fun ZhaoxiStorageScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
     }
 }
 
+/** Scope-qualified search is resolved by the Memory Owner before any UI pagination. */
+internal fun zxScopedMemoryQuery(
+    scope: MemoryScope,
+    context: com.labteto.dshmobile.local.presentation.LocalSettingsMemoryContext?,
+    text: String,
+    kind: MemoryKind?,
+    cursor: MemoryManagementCursor?,
+): MemoryManagementQuery {
+    require(scope != MemoryScope.LINEAGE || !context?.lineageId.isNullOrBlank()) {
+        "当前没有可访问的会话线记忆"
+    }
+    require(scope != MemoryScope.PROJECT || !context?.projectId.isNullOrBlank()) {
+        "当前没有可访问的项目记忆"
+    }
+    return MemoryManagementQuery(
+        scopes = setOf(scope), text = text,
+        lineageId = if (scope == MemoryScope.LINEAGE) context?.lineageId else null,
+        projectId = if (scope == MemoryScope.PROJECT) context?.projectId else null,
+        kinds = kind?.let(::setOf) ?: MemoryKind.entries.toSet(),
+        cursor = cursor,
+    )
+}
+
 @Composable
-fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope) {
+fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope,
+    settings: SettingsUiPort? = null) {
     var query by rememberSaveable { mutableStateOf("") }
     var revision by remember { mutableStateOf(0) }
-    var cursor by remember(query) { mutableStateOf<MemoryManagementCursor?>(null) }
-    val page = remember(memory, query, revision, cursor) {
-        memory.memoryPage(MemoryManagementQuery(setOf(MemoryScope.GLOBAL), text = query, cursor = cursor))
+    var kindFilter by rememberSaveable { mutableStateOf<MemoryKind?>(null) }
+    var scopeFilter by rememberSaveable { mutableStateOf(MemoryScope.GLOBAL) }
+    val context = remember(settings, revision) { settings?.memoryContext() }
+    val available = listOfNotNull(
+        MemoryScope.GLOBAL,
+        MemoryScope.LINEAGE.takeIf { !context?.lineageId.isNullOrBlank() },
+        MemoryScope.PROJECT.takeIf { !context?.projectId.isNullOrBlank() },
+    )
+    val selectedScope = scopeFilter.takeIf { it in available } ?: MemoryScope.GLOBAL
+    var cursor by remember(query, kindFilter, selectedScope) { mutableStateOf<MemoryManagementCursor?>(null) }
+    val page = remember(memory, query, selectedScope, kindFilter, revision, cursor, context) {
+        memory.memoryPage(zxScopedMemoryQuery(
+            selectedScope, context, query, kindFilter, cursor))
     }
+    var selectedRecordId by remember { mutableStateOf<String?>(null) }
+    var editingDirty by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
+    fun changeFilter(change: () -> Unit) {
+        if (editingDirty) status = "请先保存或关闭正在编辑的记忆"
+        else { change(); cursor = null; selectedRecordId = null }
+    }
     var pendingForget by remember { mutableStateOf<MemoryRecord?>(null) }
     fun applyReceipt(receipt: MemoryUiReceipt) {
         status = when (receipt) {
@@ -387,34 +664,184 @@ fun ZhaoxiMemoryManagementScene(memory: MemoryUiPort, scope: UiSceneRenderScope)
         }
         if (receipt is MemoryUiReceipt.Updated ||
             receipt == MemoryUiReceipt.Forgotten ||
-            receipt is MemoryUiReceipt.CommittedWithWarning) revision++
+            receipt is MemoryUiReceipt.CommittedWithWarning) {
+            revision++; cursor = null; selectedRecordId = null; editingDirty = false
+        }
     }
-    ZxPage("记忆管理", onBack = { scope.onBack() }) {
+    BackHandler(enabled = editingDirty) { status = "请先保存或关闭正在编辑的记忆" }
+    ZxPage("记忆管理", onBack = {
+        if (editingDirty) status = "请先保存或关闭正在编辑的记忆"
+        else scope.onBack()
+    }) {
         Spacer(Modifier.height(8.dp))
-        ZxField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = "搜索全局记忆")
+        ZxSection("可见范围")
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            available.forEach { target ->
+                ZxChip(when (target) {
+                    MemoryScope.GLOBAL -> "全局"
+                    MemoryScope.LINEAGE -> "当前会话线"
+                    MemoryScope.PROJECT -> "当前项目"
+                }, selectedScope == target) { changeFilter { scopeFilter = target } }
+            }
+        }
+        ZxField(query, { value -> changeFilter { query = value } },
+            Modifier.fillMaxWidth(), placeholder = "搜索所有当前可见记忆")
+        ZxSection("按类型")
+        androidx.compose.foundation.layout.Row(
+            Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ZxChip("全部", kindFilter == null) { changeFilter { kindFilter = null } }
+            MemoryKind.entries.forEach { kind ->
+                ZxChip(zxMemoryKindTitle(kind), kindFilter == kind) { changeFilter { kindFilter = kind } }
+            }
+        }
+        ZxValueRow("符合条件", value = "${page.totalMatching} 条")
+        if (kindFilter == null) page.kindCounts.filterValues { it > 0 }.forEach { (kind, count) ->
+            ZxValueRow(zxMemoryKindTitle(kind), value = count.toString())
+        }
         status?.let { Text(it, color = ZhaoxiTheme.colors.ink2) }
         if (page.records.isEmpty()) ZxEmpty("没有匹配的记忆", "可以调整搜索条件")
         page.records.forEach { record ->
-            var text by rememberUiPrivateText("zhaoxi.memory.${record.id}", record.updatedAt) { record.content }
-            ZxSettingsGroup {
-                ZxValueRow("记忆类型", value = record.kind.name)
-                ZxField(text, { text = it }, Modifier.fillMaxWidth())
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ZxButton("保存", { applyReceipt(memory.submit(
-                        MemoryUiCommand.Update(record, text, record.pinned))) },
-                        Modifier.weight(1f))
-                    ZxButton("遗忘", { pendingForget = record }, Modifier.weight(1f),
-                        ZxButtonVariant.Danger)
+            val opened = selectedRecordId == record.id
+            ZxRow(zxMemoryKindTitle(record.kind), record.content.take(95) +
+                if (record.pinned) " · 已置顶" else "", onClick = {
+                    if (editingDirty && !opened) status = "请先保存当前编辑"
+                    else { selectedRecordId = if (opened) null else record.id; editingDirty = false }
+                }, trailing = {
+                    ZxChip(if (opened) "收起" else "详情", opened) {
+                        if (editingDirty && !opened) status = "请先保存当前编辑"
+                        else { selectedRecordId = if (opened) null else record.id; editingDirty = false }
+                    }
+                })
+            if (opened) {
+                var text by rememberUiPrivateText("zhaoxi.memory.${record.id}", record.updatedAt) { record.content }
+                ZxSettingsGroup {
+                    ZxValueRow("记忆类型", value = zxMemoryKindTitle(record.kind))
+                    ZxValueRow("披露范围", value = record.disclosure.name)
+                    ZxField(text, { text = it; editingDirty = it != record.content },
+                        Modifier.fillMaxWidth().heightIn(min = 112.dp))
+                    ZxSwitchRow("置顶", "只改变这条记忆的置顶状态", record.pinned) { checked ->
+                        if (editingDirty) status = "请先保存正在编辑的正文"
+                        else applyReceipt(memory.submit(
+                            MemoryUiCommand.Update(record, record.content, checked)))
+                    }
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ZxButton("保存修改", {
+                            if (text.isBlank()) status = "请填写正文；删除请使用遗忘"
+                            else applyReceipt(memory.submit(
+                                MemoryUiCommand.Update(record, text, record.pinned)))
+                        }, Modifier.weight(1f), enabled = editingDirty && text.isNotBlank())
+                        ZxButton("遗忘", { pendingForget = record }, Modifier.weight(1f),
+                            ZxButtonVariant.Danger)
+                    }
+                    ZxButton("关闭编辑", { selectedRecordId = null; editingDirty = false },
+                        variant = ZxButtonVariant.Outline)
                 }
             }
         }
-        page.next?.let { next -> ZxButton("下一页", { cursor = next }) }
-        if (cursor != null) ZxButton("回到首页", { cursor = null })
+        page.next?.let { next -> ZxButton("下一页", {
+            if (editingDirty) status = "请先保存当前编辑"
+            else { cursor = next; selectedRecordId = null }
+        }) }
+        if (cursor != null) ZxButton("回到首页", {
+            if (editingDirty) status = "请先保存当前编辑"
+            else { cursor = null; selectedRecordId = null }
+        })
+        ZxFooterNote("先检索全部有权查看的活跃记录，再分页；已遗忘的记录不会在当前页面恢复。")
     }
     pendingForget?.let { record ->
         ZxDialog("遗忘这条记忆？", "删除后无法直接恢复。", "遗忘", {
             pendingForget = null
             applyReceipt(memory.submit(MemoryUiCommand.Forget(record)))
         }, { pendingForget = null })
+    }
+}
+
+/** Diagnostics is a distinct E8.18 page, backed by Settings Owner's real read operations.
+ * Reports are not generated in the background or posted to external services. */
+@Composable
+fun ZhaoxiDiagnosticsSettingsScene(settings: SettingsUiPort, scope: UiSceneRenderScope) {
+    val co = rememberCoroutineScope()
+    var loading by remember { mutableStateOf(false) }
+    var reportKind by remember { mutableStateOf<String?>(null) }
+    var report by remember { mutableStateOf<String?>(null) }
+    var feedback by remember { mutableStateOf<String?>(null) }
+    var networkTarget by rememberSaveable { mutableStateOf("") }
+    var confirmExport by remember { mutableStateOf(false) }
+    val saveDiagnostic = rememberUiStreamDocumentSaver<Unit>(
+        "text/plain", { "777-diagnostic.txt" },
+        { _, output ->
+            // Generate the full report from the owner only after the user picks a destination.
+            val content = settings.diagnosticReport()
+            output.write(content.toByteArray(Charsets.UTF_8))
+            UiDocumentWriteReceipt.Saved
+        },
+        { _, result ->
+            feedback = when (result) {
+                UiDocumentWriteReceipt.Saved -> "诊断报告已保存到用户选择的位置"
+                UiDocumentWriteReceipt.Cancelled -> "已取消报告导出"
+                is UiDocumentWriteReceipt.Failed -> result.message ?: "诊断报告导出失败"
+            }
+        },
+        { failure -> feedback = failure.message }
+    )
+    fun read(label: String, action: suspend () -> String) {
+        if (loading) return
+        loading = true
+        feedback = null
+        co.launch {
+            try {
+                val result = action()
+                reportKind = label
+                report = result.take(40000)
+                feedback = if (result.length > 40000)
+                    "原始报告较长，页面仅展示前 40000 字；诊断未上传" else "读取完成 · 诊断未上传"
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { feedback = failure.message ?: "诊断失败，请核实当前状态" }
+            finally { loading = false }
+        }
+    }
+    ZxPage("诊断与网络", onBack = { scope.onBack() }) {
+        Spacer(Modifier.height(8.dp))
+        ZxSection("设备与运行环境")
+        ZxFooterNote("按需读取真实设备和应用环境；结果只在当前页面显示，请注意其中可能包含本地路径等信息。")
+        ZxButton("读取环境信息", { read("环境信息") { settings.environmentInfo() } },
+            Modifier.fillMaxWidth(), enabled = !loading)
+        ZxSection("诊断报告")
+        ZxFooterNote("报告可能包含模型与应用状态，请自行核对后再决定是否分享。")
+        ZxButton("生成本地诊断报告", { read("诊断报告") { settings.diagnosticReport() } },
+            Modifier.fillMaxWidth(), enabled = !loading, variant = ZxButtonVariant.Outline)
+        ZxButton("导出诊断报告", { confirmExport = true },
+            Modifier.fillMaxWidth(), enabled = !loading, variant = ZxButtonVariant.Outline)
+        if (confirmExport) ZxDialog(
+            "导出诊断报告？",
+            "报告可能包含本机路径、配置及运行信息。确认后需要你在 Android 文件选择器手动选择保存位置；应用不会自动发送给第三方。",
+            "选择保存位置", {
+                confirmExport = false
+                saveDiagnostic(Unit)
+            }, { confirmExport = false })
+        ZxSection("网络诊断")
+        ZxField(networkTarget, { networkTarget = it }, Modifier.fillMaxWidth(),
+            placeholder = "目标地址（例如 api.example.com）")
+        ZxButton("检查目标连接", {
+            val target = networkTarget.trim()
+            read("网络诊断 · $target") { settings.diagnoseNetwork(target) }
+        }, Modifier.fillMaxWidth(), enabled = !loading && networkTarget.isNotBlank(),
+            variant = ZxButtonVariant.Outline)
+        if (loading) ZxFooterNote("正在读取 Owner 诊断状态…")
+        feedback?.let { ZxFooterNote(it) }
+        if (report != null) {
+            ZxSection(reportKind ?: "诊断结果")
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(report.orEmpty(), color = ZhaoxiTheme.colors.ink,
+                    fontSize = 12.sp, lineHeight = 19.sp)
+            }
+            ZxButton("清除屏幕上的诊断结果", {
+                report = null
+                reportKind = null
+                feedback = null
+            }, variant = ZxButtonVariant.Outline)
+        }
+        ZxFooterNote("网络检查会向你输入的目标发起连接诊断。诊断不会自动提交故障单。")
     }
 }

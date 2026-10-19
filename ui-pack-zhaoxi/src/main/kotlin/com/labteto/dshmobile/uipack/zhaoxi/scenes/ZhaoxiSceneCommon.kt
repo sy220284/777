@@ -136,7 +136,7 @@ fun ZxNavRow(label: String, sub: String = "", value: String = "", onClick: () ->
             if (sub.isNotEmpty()) Text(sub, fontSize = 12.sp, color = c.ink2, lineHeight = 18.sp)
         }
         if (value.isNotEmpty()) {
-            Text(value, fontSize = 12.sp, color = c.ink2, fontFamily = FontFamily.Monospace,
+            Text(value, modifier = Modifier.weight(.75f), fontSize = 12.sp, color = c.ink2, fontFamily = FontFamily.Monospace,
                 textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         ZxIcon("chevron-right", modifier = Modifier.width(18.dp), description = null)

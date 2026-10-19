@@ -84,6 +84,7 @@ data class LocalAgentTeamTaskUiState(
     val blockedByTitles: List<String> = emptyList(),
     val ready: Boolean = false,
     val writeConflict: Boolean = false,
+    val revision: Int = 0,
 )
 
 /** Work-owned runtime state. Session persistence remains a separate projection boundary. */

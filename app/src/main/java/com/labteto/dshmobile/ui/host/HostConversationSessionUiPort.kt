@@ -5,6 +5,20 @@ import com.labteto.dshmobile.uicontract.ConversationDraftUiPort
 import com.labteto.dshmobile.uicontract.SessionUiPort
 import com.labteto.dshmobile.uicontract.UiSessionDeletionReceipt
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.onEach
+
+/** A new Work must be issued by the Session Owner and match the exact accepted handoff. */
+internal fun matchesAcceptedWorkHandoff(
+    command: SessionUiCommand.Create, snapshot: UiSessionsSnapshot, storedSummary: String?,
+): Boolean {
+    val identity = snapshot.identity ?: return false
+    return !snapshot.loading && identity.sessionId != command.identity?.sessionId &&
+    snapshot.usageMode == com.labteto.dshmobile.local.LocalUsageMode.WORK &&
+    snapshot.usageMode == command.usageMode &&
+    command.handoffSummary != null && command.handoffSummary == storedSummary &&
+    command.handoffAttachments.isNotEmpty()
+}
 
 /** Session owns deletion; Host removes only presentation state for Owner-confirmed IDs. */
 internal class HostConversationSessionUiPort(
@@ -15,9 +29,51 @@ internal class HostConversationSessionUiPort(
     private val forms: LocalUiDocumentFormState,
     private val onConversationRequested: (SessionUiCommand) -> Unit = {},
 ) : SessionUiPort by business {
+    // The new Work identity is issued asynchronously. Never guess its ID from
+    // the source chat or copy selected attachments into an arbitrary session.
+    private data class PendingHandoff(
+        val command: SessionUiCommand.Create,
+        val acceptedAt: Long,
+    )
+    private var pendingHandoff: PendingHandoff? = null
+
+    override val snapshots: Flow<UiSessionsSnapshot> =
+        business.snapshots.onEach { applyAcceptedHandoff(it) }
+
+    override fun snapshot(): UiSessionsSnapshot =
+        business.snapshot().also { applyAcceptedHandoff(it) }
+
+    private fun applyAcceptedHandoff(snapshot: UiSessionsSnapshot) {
+        val pending = synchronized(this) { pendingHandoff } ?: return
+        if (System.currentTimeMillis() - pending.acceptedAt > 120_000) {
+            synchronized(this) { if (pendingHandoff === pending) pendingHandoff = null }
+            return
+        }
+        val id = snapshot.identity ?: return
+        val request = pending.command
+        if (!matchesAcceptedWorkHandoff(request, snapshot, business.handoffSummary(id))) return
+        val claimed = synchronized(this) {
+            if (pendingHandoff === pending) { pendingHandoff = null; true } else false
+        }
+        if (!claimed) return
+        // All attachments were explicitly selected and were already admitted
+        // into the source workspace. Only the newly activated Work draft gets them.
+        request.handoffAttachments.distinctBy { it.relativePath }.forEach { attachment ->
+            drafts.addAttachment(id.sessionId, attachment)
+        }
+    }
+
     override fun submit(command: SessionUiCommand): UiCommandReceipt {
         val result = business.submit(command)
-        if (result == UiCommandReceipt.Accepted || result == UiCommandReceipt.Queued)
+        if (command is SessionUiCommand.Create &&
+            command.handoffAttachments.isNotEmpty() &&
+            command.handoffSummary != null &&
+            (result == UiCommandReceipt.Accepted || result == UiCommandReceipt.Queued)) {
+            synchronized(this) { pendingHandoff = PendingHandoff(command, System.currentTimeMillis()) }
+            applyAcceptedHandoff(business.snapshot())
+        }
+        if ((result == UiCommandReceipt.Accepted || result == UiCommandReceipt.Queued) &&
+            (command !is SessionUiCommand.SelectMode || command.openConversation))
             onConversationRequested(command)
         return result
     }
@@ -39,6 +95,7 @@ internal class HostConversationSessionUiPort(
 internal fun activatedConversationScene(command: SessionUiCommand?, snapshot: UiSessionsSnapshot): String? {
     val identity = snapshot.identity ?: return null
     if (snapshot.loading || command == null) return null
+    if (command is SessionUiCommand.SelectMode && !command.openConversation) return null
     val matches = when (command) {
         is SessionUiCommand.Open -> identity.sessionId == command.sessionId
         is SessionUiCommand.Create -> identity.sessionId != command.identity?.sessionId && snapshot.usageMode == command.usageMode

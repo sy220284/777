@@ -10,6 +10,7 @@ import javax.inject.Singleton
 class LocalToolsUiFacade @Inject internal constructor(
     private val tools: LocalToolsRuntime,
     private val gitHubSkillImporter: com.labteto.dshmobile.local.tools.LocalGitHubSkillImporter,
+    private val gitHubBrowser: com.labteto.dshmobile.local.tools.LocalGitHubCredentialManager,
 ) : com.labteto.dshmobile.uicontract.ToolsUiPort {
     override fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit> = tools.serverChanges()
 
@@ -85,6 +86,10 @@ class LocalToolsUiFacade @Inject internal constructor(
                 com.labteto.dshmobile.uicontract.UiMcpHealth.UNCONFIRMED
         }
     override suspend fun githubConfigured() = tools.githubConfigured()
+    override suspend fun githubRepositories() = gitHubBrowser.repositories()
+    override suspend fun githubEntries(repoFullName: String, directory: String) =
+        gitHubBrowser.entries(repoFullName, directory)
+
     /** Work handoff UI projection; capability hints do not grant execution permissions. */
     internal fun workHandoffCapabilityReadiness(
         task: String,

@@ -70,8 +70,11 @@ class ZhaoxiAcceptanceAndroidTest {
         val screenshot = if (sceneId == null) {
             requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
         } else {
-            compose.onNodeWithTag("zx-acceptance-$sceneId")
-                .assertIsDisplayed().captureToImage().asAndroidBitmap()
+            val scene = compose.onNodeWithTag("zx-acceptance-$sceneId").assertIsDisplayed()
+            if (sceneId == "chat.gallery_delete") {
+                compose.onNodeWithText("确认删除").assertIsDisplayed()
+                requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+            } else scene.captureToImage().asAndroidBitmap()
         }
         File(directory, "$name.png").outputStream().use {
             check(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)) { "Screenshot failed: $name" }
@@ -79,13 +82,90 @@ class ZhaoxiAcceptanceAndroidTest {
         screenshot.recycle()
     }
 
-    @Test fun all76RenderersAndThreeAppearanceMatrixUseProductionOwners() {
+    @Test fun portraitSelectionDoesNotCommitAndCropKeepsOriginalPixels() {
+        val ports = ready()
+        val context = compose.activity
+        val source = File(context.cacheDir, "camera/portrait-crop-test.png").apply { parentFile?.mkdirs() }
+        val bitmap = Bitmap.createBitmap(200, 100, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(android.graphics.Color.RED)
+        android.graphics.Canvas(bitmap).drawRect(100f, 0f, 200f, 100f,
+            android.graphics.Paint().apply { color = android.graphics.Color.BLUE })
+        source.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        bitmap.recycle()
+        val saved = runBlocking { ports.personaAuthoringUiPort.create(UiPersonaDraft(name = "画像裁切测试", coreIdentity = "测试夹具")) }
+        val galleryId = (saved as UiPersonaAuthoringReceipt.Saved).galleryId
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", source).toString()
+        try {
+            val preview = runBlocking { ports.personaPortraitUiPort.previewImport(uri) }
+            assertTrue(preview is UiPersonaPortraitPreviewReceipt.Ready)
+            assertEquals(UiPersonaPortraitPreviewReceipt.Missing,
+                runBlocking { ports.personaPortraitUiPort.preview(galleryId) })
+            val result = runBlocking { ports.personaPortraitUiPort.submit(
+                PersonaPortraitUiCommand.Import(galleryId, uri, UiPortraitCrop(.5f, 0f, 1f, 1f))) }
+            assertTrue(result is UiPersonaPortraitReceipt.Updated)
+            val current = runBlocking { ports.personaPortraitUiPort.preview(galleryId) } as UiPersonaPortraitPreviewReceipt.Ready
+            val decoded = android.graphics.BitmapFactory.decodeByteArray(current.bytes, 0, current.bytes.size)
+            try {
+                assertEquals(100, decoded.width)
+                assertEquals(100, decoded.height)
+                assertEquals(android.graphics.Color.BLUE, decoded.getPixel(50, 50))
+            } finally { decoded.recycle() }
+        } finally {
+            source.delete()
+            runBlocking { ports.personaGalleryDeletionUiPort.delete(DeletePersonaGalleryCommand(ports.sessions.snapshot().identity, galleryId)) }
+        }
+    }
+
+    @Test fun documentFieldsUseHostDraftsAndReleaseMemoryOnlyValuesWhenClosed() {
+        ready()
+        var saved: List<String> = emptyList()
+        val forms = LocalUiDocumentFormState(emptyList()) { saved = it }
+        val document = UiDocument(1, "form-lifecycle",
+            UiDocumentSource("form-session", "form-message", 1L, null, null), 1L,
+            "表单保存与关闭", listOf(
+                UiDocumentNode.Field("notes", "普通备注", "", false, true),
+                UiDocumentNode.Field("transient_notes", "本次输入", "", false, true, UiFieldRetention.MEMORY_ONLY),
+            ), emptyList(), "表单")
+        val key = UiDocumentFormKey("form-session", "form-lifecycle", 1L)
+        var visible by mutableStateOf(true)
+        compose.activityRule.scenario.onActivity { activity -> activity.setContent {
+            ZhaoxiTheme {
+                if (visible) com.labteto.dshmobile.uipack.zhaoxi.scenes.ZxDocumentCard(
+                    document, knownScenes = emptySet(), pendingApprovalId = null,
+                    onAction = { _, _, _ -> UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED) },
+                    forms = forms,
+                )
+            }
+        } }
+        compose.onNodeWithContentDescription("普通备注").performTextInput("保留到重开")
+        compose.onNodeWithContentDescription("本次输入").performTextInput("仅本次可见")
+        compose.runOnIdle {
+            assertEquals("保留到重开", forms.values.value[key]?.get("notes"))
+            assertEquals("仅本次可见", forms.values.value[key]?.get("transient_notes"))
+            assertTrue(saved.contains("保留到重开"))
+            assertFalse(saved.contains("仅本次可见"))
+            visible = false
+        }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertEquals("保留到重开", forms.values.value[key]?.get("notes"))
+            assertFalse(forms.values.value[key].orEmpty().containsKey("transient_notes"))
+            visible = true
+        }
+        compose.onNodeWithContentDescription("普通备注").assertTextEquals("保留到重开")
+        compose.onNodeWithContentDescription("本次输入").assert(
+            SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.EditableText,
+                androidx.compose.ui.text.AnnotatedString("")))
+        capture("document-form-retention")
+    }
+
+    @Test fun all75RenderersAndThreeAppearanceMatrixUseProductionOwners() {
         val ports = ready()
         val saved = runBlocking { ports.personaAuthoringUiPort.create(UiPersonaDraft(name = "本地验收人物", coreIdentity = "验收夹具")) }
         assertTrue(saved is UiPersonaAuthoringReceipt.Saved)
         val targets = ZhaoxiSceneTargets().apply { galleryId = (saved as UiPersonaAuthoringReceipt.Saved).galleryId }
         val pack = createZhaoxiApplicationPack(ports, ports.hostPreferencesUiPort, targets, MutableStateFlow(null)) { error("Renderer must not check updates implicitly") }
-        assertEquals(76, pack.manifest.scenes.size)
+        assertEquals(75, pack.manifest.scenes.size)
         val requirements = LocalUiSceneCatalog.requirements.filter { it.id in pack.manifest.scenes }
         var current by mutableStateOf(requirements.first())
         val root = UiSceneId("route.home")
@@ -94,7 +174,7 @@ class ZhaoxiAcceptanceAndroidTest {
         compose.activityRule.scenario.onActivity { activity -> activity.setContent {
             CompositionLocalProvider(LocalUiPrivateTextCipher provides ports.privateTextCipher,
                 LocalUiHostSystemOperationOwner provides systemOperations) {
-                Box(Modifier.fillMaxSize().systemBarsPadding().testTag("zx-acceptance-${current.id.value}")) {
+                Box(Modifier.fillMaxSize().testTag("zx-acceptance-${current.id.value}")) {
                     // SLOT renderers are embedded here; never proposed as navigation targets.
                     key(current.id) {
                         pack.SceneFrame(UiSceneNavigationState(pack.manifest.id, listOf(root, current.id))) {
@@ -124,7 +204,7 @@ class ZhaoxiAcceptanceAndroidTest {
                 }
             }
         } finally { appearance(ports, "system", 1f) }
-        assertEquals(107, index.readLines().size) // 76 light + 15 dark + 15 at 130% + header.
+        assertEquals(106, index.readLines().size) // 75 light + 15 dark + 15 at 130% + header.
     }
 
 
@@ -344,12 +424,12 @@ class ZhaoxiAcceptanceAndroidTest {
                 CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale * 2f)) {
                     ZhaoxiTheme(hue = ZhaoxiHue.STONE, dark = false, reducedMotion = true) {
                         Column(
-                            Modifier.fillMaxSize().testTag("zx-acceptance-longtable")
+                            Modifier.fillMaxSize().background(ZhaoxiTheme.colors.bg).testTag("zx-acceptance-longtable")
                                 .verticalScroll(rememberScrollState()).padding(16.dp),
                         ) {
                             ZxRichReply(table)
                             Spacer(Modifier.height(24.dp))
-                            androidx.compose.material3.Text("滚动终点锚点")
+                            androidx.compose.material3.Text("滚动终点锚点", color = ZhaoxiTheme.colors.ink)
                         }
                     }
                 }

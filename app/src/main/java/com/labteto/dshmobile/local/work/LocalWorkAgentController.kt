@@ -25,7 +25,12 @@ internal class LocalWorkAgentController(
             if (active) team.members.map { member -> com.labteto.dshmobile.uicontract.UiWorkTeamMember(
                 member.id, member.jobId, member.friendlyName, member.phase, member.activity,
                 member.currentTask, member.pendingMessageCount, member.error) } else emptyList(),
-            active && team.rebuilding, team.failure.takeIf { active })
+            active && team.rebuilding, team.failure.takeIf { active },
+            if (active) team.tasks.map { task ->
+                com.labteto.dshmobile.uicontract.UiWorkTeamTask(
+                    task.id, task.revision, task.subject, task.status,
+                    task.ownerName, task.blockedByTitles, task.ready)
+            } else emptyList())
     }
     override fun readOutput(identity: com.labteto.dshmobile.uicontract.UiSessionIdentity, memberId: String, expectedJobId: String): com.labteto.dshmobile.uicontract.UiWorkTeamResult = try {
         synchronized(runtimeStateStore.foregroundRunHandle.lock) {
@@ -52,6 +57,8 @@ internal class LocalWorkAgentController(
                     is com.labteto.dshmobile.uicontract.WorkTeamUiCommand.SendMessage -> agentTeams.sendUiMessage(sessionId, command.memberId, command.text, command.expectedJobId)
                     is com.labteto.dshmobile.uicontract.WorkTeamUiCommand.StopMember -> agentTeams.interruptUiMember(sessionId, command.memberId, command.expectedJobId)
                     is com.labteto.dshmobile.uicontract.WorkTeamUiCommand.StopTeam -> agentTeams.interruptAllUi(sessionId, command.expectedJobIds)
+                    is com.labteto.dshmobile.uicontract.WorkTeamUiCommand.ReassignTask ->
+                        agentTeams.reassignUiTask(sessionId, command.taskId, command.expectedRevision, command.newMemberId)
                 }
                 val projectionWarning = try { teamProjection.publish(sessionId); "" }
                 catch (cancelled: CancellationException) { throw cancelled }

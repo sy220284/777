@@ -57,8 +57,15 @@ fun ZhaoxiUiDocumentScene(
     knownScenes: Set<UiSceneId>,
     pendingApprovalId: () -> String?,
     media: MediaUiPort? = null,
+    forms: UiDocumentFormUiPort? = null,
 ) {
     val snap by port.snapshots.collectAsState(initial = port.snapshot())
+    var selecting by remember(snap.sessionId) { mutableStateOf(false) }
+    var selectedDocuments by remember(snap.sessionId) { mutableStateOf(emptyMap<String, UiDocument>()) }
+    var pendingBatch by remember(snap.sessionId) { mutableStateOf<List<DeleteUiDocumentCommand>?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var batchFeedback by remember(snap.sessionId) { mutableStateOf<String?>(null) }
+    val jobs = rememberCoroutineScope()
     ZxPage("文档", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         snap.error?.let { ZxBanner("生成失败 · $it", ZxTone.Err) }
@@ -67,15 +74,58 @@ fun ZhaoxiUiDocumentScene(
             Spacer(Modifier.height(8.dp))
         }
         if (snap.documents.isEmpty() && !snap.generating) ZxEmpty("还没有文档", "文档由模型或工具生成")
+        batchFeedback?.let { ZxFooterNote(it) }
+        ZxChip(if (selecting) "退出多选" else "多选管理文档", selecting) {
+            selecting = !selecting
+            selectedDocuments = emptyMap()
+        }
+        if (selecting && selectedDocuments.isNotEmpty()) {
+            ZxFooterNote("已选 ${selectedDocuments.size} 项；单次批量删除支持 2–32 项。")
+            ZxButton("删除所选文档", {
+                val id = context()?.identity
+                if (id == null) batchFeedback = "会话已失效，请返回原会话"
+                else pendingBatch = selectedDocuments.values.map { doc ->
+                    DeleteUiDocumentCommand(id, doc.documentId, doc.revision, doc.source)
+                }
+            }, enabled = !busy && selectedDocuments.size <= 32, variant = ZxButtonVariant.Danger)
+        }
+        pendingBatch?.let { commands ->
+            ZxDialog("删除 ${commands.size} 个文档？", "仅删除明确选中的文档显示记录，原会话消息保留。", "确认删除", {
+                pendingBatch = null
+                busy = true
+                jobs.launch {
+                    try {
+                        val result = if (commands.size == 1) port.delete(commands.single()) else port.deleteBatch(commands)
+                        batchFeedback = result.zxDocumentFeedback()
+                        if (result == UiDocumentReceipt.Deleted) {
+                            commands.forEach { forms?.forgetDocument(UiDocumentFormKey(it.source.sessionId, it.documentId, it.revision)) }
+                            selectedDocuments = emptyMap()
+                            selecting = false
+                        }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (failure: Exception) { batchFeedback = failure.message ?: "删除失败，已选文档仍保留" }
+                    finally { busy = false }
+                }
+            }, { pendingBatch = null })
+        }
         snap.documents.forEach { item ->
             val document = item.document
+            val readOnlyProgress = document.source.workMode && document.documentId == "work-live:${document.source.messageId}"
+            if (selecting && !readOnlyProgress) ZxChip(
+                if (document.documentId in selectedDocuments) "已选文档" else "选择此文档",
+                document.documentId in selectedDocuments,
+            ) {
+                selectedDocuments = if (document.documentId in selectedDocuments) selectedDocuments - document.documentId
+                    else selectedDocuments + (document.documentId to document)
+            }
             ZxDocumentCard(
                 document = document,
                 bindings = item.bindings,
                 knownScenes = knownScenes,
                 pendingApprovalId = pendingApprovalId(),
                 media = media,
-                onAction = { actionId, fields ->
+                forms = forms,
+                onAction = { actionId, fields, confirmed ->
                     // Commands are admitted again by the original Feature Owner.
                     val live = context()
                     if (live == null || live.identity.sessionId != document.source.sessionId)
@@ -86,9 +136,12 @@ fun ZhaoxiUiDocumentScene(
                         source = document.source,
                         actionId = actionId,
                         fields = fields,
+                        confirmed = confirmed,
                     ))
                 },
             )
+            if (!readOnlyProgress && !selecting)
+                ZhaoxiDocumentDisplayEditor(port, document, context, forms)
             Spacer(Modifier.height(10.dp))
         }
     }
@@ -102,52 +155,39 @@ fun ZhaoxiUiDocumentGenerateScene(
     context: () -> ZhaoxiDocumentContext?,
 ) {
     val co = rememberCoroutineScope()
+    val snapshot by port.snapshots.collectAsState(initial = port.snapshot())
+    var busy by remember { mutableStateOf(false) }
+    var feedback by remember { mutableStateOf<String?>(null) }
+    fun generate(local: Boolean) {
+        val live = context()
+        if (live == null) { feedback = "请先进入包含消息的会话"; return }
+        if (busy) return
+        busy = true
+        co.launch {
+            try {
+                val result = if (local) port.generateLocal(GenerateLocalUiDocumentCommand(
+                    live.identity, live.workMode, live.messageId, UiLocalDocumentTemplate.STATUS))
+                else port.generate(GenerateUiDocumentCommand(live.identity, live.workMode,
+                    live.messageId, "请根据当前会话生成结构化交互文档", true))
+                feedback = result.zxDocumentFeedback()
+                if (result is UiDocumentReceipt.Published) scope.onNavigate(UiSceneId("conversation.ui_document"))
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (failure: Exception) { feedback = failure.message ?: "生成失败，请检查会话与模型状态" }
+            finally { busy = false }
+        }
+    }
     ZxPage("生成文档", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         Text("从当前对话生成交互文档", fontSize = 14.sp, color = ZhaoxiTheme.colors.ink)
         Spacer(Modifier.height(10.dp))
-        ZxButton("确认生成（调用模型）", {
-            val live = context()
-            if (live != null) co.launch {
-                port.generate(GenerateUiDocumentCommand(
-                    identity = live.identity,
-                    workMode = live.workMode,
-                    messageId = live.messageId,
-                    prompt = "请根据当前会话生成结构化交互文档",
-                    acknowledgedAdditionalModelRequest = true,
-                ))
-            }
-        }, Modifier.fillMaxWidth())
-        ZxButton("本地生成（离线模板）", {
-            val live = context()
-            if (live != null) co.launch {
-                port.generateLocal(GenerateLocalUiDocumentCommand(
-                    identity = live.identity,
-                    workMode = live.workMode,
-                    messageId = live.messageId,
-                    template = UiLocalDocumentTemplate.STATUS,
-                ))
-            }
-        }, Modifier.fillMaxWidth(), variant = ZxButtonVariant.Outline)
-    }
-}
+        feedback?.let { ZxFooterNote(it) }
+        snapshot.error?.let { ZxBanner(it, ZxTone.Err) }
+        ZxButton("确认生成（调用模型）", { generate(false) }, Modifier.fillMaxWidth(),
+            enabled = !busy && !snapshot.generating, loading = busy || snapshot.generating)
+        ZxButton("本地生成（离线模板）", { generate(true) }, Modifier.fillMaxWidth(),
+            enabled = !busy && !snapshot.generating, variant = ZxButtonVariant.Outline)
 
-/** Form text lives in transient Compose presentation state, not a parallel business state store. */
-private fun documentDefaults(nodes: List<UiDocumentNode>): Map<String, String> {
-    val fields = mutableMapOf<String, String>()
-    fun visit(node: UiDocumentNode) {
-        when (node) {
-            is UiDocumentNode.Field -> fields[node.id] = node.initial
-            is UiDocumentNode.Select -> fields[node.id] = node.initial
-            is UiDocumentNode.Switch -> fields[node.id] = node.initial.toString()
-            is UiDocumentNode.Column -> node.children.forEach(::visit)
-            is UiDocumentNode.Row -> node.children.forEach(::visit)
-            is UiDocumentNode.Disclosure -> node.children.forEach(::visit)
-            else -> Unit
-        }
     }
-    nodes.forEach(::visit)
-    return fields
 }
 
 @Composable
@@ -156,27 +196,64 @@ fun ZxDocumentCard(
     bindings: Map<UiDocumentBinding, UiDocumentBoundValue> = emptyMap(),
     knownScenes: Set<UiSceneId>,
     pendingApprovalId: String?,
-    onAction: (String, Map<String, String>) -> UiDocumentReceipt,
+    onAction: (String, Map<String, String>, Boolean) -> UiDocumentReceipt,
     media: MediaUiPort? = null,
+    forms: UiDocumentFormUiPort? = null,
 ) {
-    val defaults = remember(document) { documentDefaults(document.nodes) }
-    // A new revision must never erase the user's unfinished form entry.
-    val fields = remember(document.source.sessionId, document.source.messageId, document.documentId) {
-        mutableStateMapOf<String, String>().apply { putAll(defaults) }
+    var actionFeedback by remember(document.documentId, document.source) { mutableStateOf<String?>(null) }
+    var pendingSend by remember(document.documentId, document.revision, document.source) {
+        mutableStateOf<Pair<String, Map<String, String>>?>(null)
     }
-    LaunchedEffect(document.revision) { defaults.forEach { (id, initial) -> if (id !in fields) fields[id] = initial } }
+    fun dispatch(actionId: String, fields: Map<String, String>, confirmed: Boolean = false) {
+        val action = document.actions.firstOrNull { it.id == actionId }
+        if (!confirmed && action is UiDocumentAction.SendUserInput && action.submit) pendingSend = actionId to fields
+        else actionFeedback = onAction(actionId, fields, confirmed).zxDocumentFeedback()
+    }
     val validation = remember(document, knownScenes, pendingApprovalId) {
         document.validate(UiDocumentBudget(512, 16, 262_144), knownScenes, pendingApprovalId)
+    }
+    if (!validation.valid) {
+        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+            Text(document.title.ifBlank { "文档" }, color = ZhaoxiTheme.colors.ink)
+            ZxBanner("文档无法完整显示，以下为原始文本", ZxTone.Warn)
+            Text(document.fallbackText.take(400), color = ZhaoxiTheme.colors.ink2)
+        }
+        return
+    }
+    val defaults = remember(document) { document.initialFields() }
+    val formKey = remember(document.source, document.documentId, document.revision) {
+        UiDocumentFormKey(document.source.sessionId, document.documentId, document.revision)
+    }
+    val retention = remember(document) { document.fieldRetention() }
+    var bindingReady by remember(forms, formKey, retention) { mutableStateOf(false) }
+    androidx.compose.runtime.DisposableEffect(forms, formKey, retention) {
+        forms?.bindRetention(formKey, retention)
+        bindingReady = true
+        onDispose { forms?.releaseRetention(formKey) }
+    }
+    val stored by (forms?.values ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap<UiDocumentFormKey, Map<String, String>>()) }).collectAsState()
+    val local = remember(formKey) { mutableStateMapOf<String, String>() }
+    val fields = defaults + if (forms == null) local else if (bindingReady) stored[formKey].orEmpty() else emptyMap()
+    fun changeField(id: String, value: String) {
+        if (forms == null) local[id] = value
+        else {
+            forms.update(formKey, id, value)
+            if (forms.values.value[formKey]?.get(id) != value)
+                actionFeedback = "本次输入未保存，内容超过表单支持范围；请缩短后重试"
+        }
     }
     val isWorkProgress = document.documentId == "work-live:${document.source.messageId}" &&
         document.source.workMode
     Column(Modifier.fillMaxWidth().padding(12.dp)) {
         Text(if (isWorkProgress) "执行状态" else document.title.ifBlank { "文档" },
             fontSize = 14.sp, color = ZhaoxiTheme.colors.ink)
-        if (!validation.valid) {
-            ZxBanner("文档超出安全显示限制 · 已降级", ZxTone.Warn)
-            Text(document.fallbackText.take(400), fontSize = 12.sp, color = ZhaoxiTheme.colors.ink2)
-        } else {
+        pendingSend?.let { (actionId, values) ->
+            ZxDialog("发送文档内容？", "将按当前表单提交到会话，可能启动模型或工作执行。", "确认发送", {
+                pendingSend = null
+                dispatch(actionId, values, confirmed = true)
+            }, { pendingSend = null })
+        }
+        actionFeedback?.let { ZxFooterNote(it) }
             if (isWorkProgress) {
                 val status = document.nodes.filterIsInstance<UiDocumentNode.Text>()
                     .firstOrNull { it.id == "work_turn_status" }?.text
@@ -198,16 +275,15 @@ fun ZxDocumentCard(
                         document.nodes.filterNot {
                             it.id == "work_turn_status" || it.id == "work_scope"
                         }.forEach { node ->
-                            ZxDocumentNodeView(node, bindings, fields,
-                                { actionId -> onAction(actionId, fields.toMap()) },
+                            ZxDocumentNodeView(node, bindings, fields, ::changeField,
+                                { actionId -> dispatch(actionId, fields.toMap()) },
                                 media, document.source.sessionId)
                         }
                     }
                 }
             } else document.nodes.forEach { node ->
-                ZxDocumentNodeView(node, bindings, fields, { actionId -> onAction(actionId, fields.toMap()) }, media, document.source.sessionId)
+                ZxDocumentNodeView(node, bindings, fields, ::changeField, { actionId -> dispatch(actionId, fields.toMap()) }, media, document.source.sessionId)
             }
-        }
     }
 }
 
@@ -215,7 +291,8 @@ fun ZxDocumentCard(
 private fun ZxDocumentNodeView(
     node: UiDocumentNode,
     bindings: Map<UiDocumentBinding, UiDocumentBoundValue>,
-    fields: MutableMap<String, String>,
+    fields: Map<String, String>,
+    onFieldChange: (String, String) -> Unit,
     onAction: (String) -> Unit,
     media: MediaUiPort?,
     sessionId: String,
@@ -231,16 +308,17 @@ private fun ZxDocumentNodeView(
             }
             ZxRow(node.label, value)
         }
-        is UiDocumentNode.Field -> ZxField(fields[node.id].orEmpty(), { fields[node.id] = it },
+        is UiDocumentNode.Field -> ZxField(fields[node.id].orEmpty(), { onFieldChange(node.id, it) },
             Modifier.fillMaxWidth(), placeholder = node.label)
         is UiDocumentNode.Switch -> ZxRow(node.label, "") {
-            ZxSwitch(fields[node.id].toBoolean(), { fields[node.id] = it.toString() })
+            ZxSwitch(fields[node.id].toBoolean(), { onFieldChange(node.id, it.toString()) })
         }
         is UiDocumentNode.Select -> Column {
             ZxRow(node.label, fields[node.id].orEmpty())
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 node.options.forEach { option ->
-                    ZxChip(option, fields[node.id] == option, onClick = { fields[node.id] = option })
+                    ZxChip(option, fields[node.id] == option, onClick = { onFieldChange(node.id, option) })
                 }
             }
         }
@@ -251,7 +329,7 @@ private fun ZxDocumentNodeView(
                 ZxRow(node.title, if (expanded) "收起" else "展开",
                     onClick = { expanded = !expanded })
                 if (expanded) node.children.forEach {
-                    ZxDocumentNodeView(it, bindings, fields, onAction, media, sessionId)
+                    ZxDocumentNodeView(it, bindings, fields, onFieldChange, onAction, media, sessionId)
                 }
             }
         }
@@ -314,10 +392,10 @@ private fun ZxDocumentNodeView(
             }
         }
         is UiDocumentNode.Column -> Column {
-            node.children.forEach { ZxDocumentNodeView(it, bindings, fields, onAction, media, sessionId) }
+            node.children.forEach { ZxDocumentNodeView(it, bindings, fields, onFieldChange, onAction, media, sessionId) }
         }
         is UiDocumentNode.Row -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            node.children.forEach { ZxDocumentNodeView(it, bindings, fields, onAction, media, sessionId) }
+            node.children.forEach { ZxDocumentNodeView(it, bindings, fields, onFieldChange, onAction, media, sessionId) }
         }
     }
 }

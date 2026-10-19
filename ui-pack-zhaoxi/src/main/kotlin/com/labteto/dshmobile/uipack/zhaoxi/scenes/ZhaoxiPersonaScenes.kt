@@ -84,9 +84,37 @@ fun ZhaoxiPersonaGalleryScene(
     var busy by remember { mutableStateOf(false) }
     var search by rememberSaveable { mutableStateOf("") }
     var showPresets by rememberSaveable { mutableStateOf(false) }
+    var installedThisVisit by remember { mutableStateOf(emptySet<String>()) }
+    var presetCheckFailed by remember { mutableStateOf(false) }
     val jobs = androidx.compose.runtime.rememberCoroutineScope()
     val portraitTargetPx = (180f * LocalDensity.current.density).toInt()
     val state by produceState<UiPersonaGalleryReadReceipt?>(null, revision) { value = gallery.read() }
+    // Gallery projections contain names only; read the actual profile's stable presetId rather
+    // than wrongly treating same-named user characters as already-installed presets.
+    val installedPresetIds by produceState<Set<String>?>(null, showPresets, authoring, state, revision) {
+        presetCheckFailed = false
+        val entries = (state as? UiPersonaGalleryReadReceipt.Available)?.entries
+        if (!showPresets || authoring == null || entries == null) {
+            value = null
+        } else {
+            try {
+                val ids = mutableSetOf<String>()
+                for (entry in entries) {
+                    val result = authoring.read(entry.id)
+                    if (result !is UiPersonaAuthoringReceipt.Loaded) {
+                        throw IllegalStateException("不能确认预设身份")
+                    }
+                    result.snapshot.draft.presetId.takeIf(String::isNotBlank)?.let(ids::add)
+                }
+                value = ids
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                presetCheckFailed = true
+                value = null
+            }
+        }
+    }
     val importer = transfer?.let { owner ->
         com.labteto.dshmobile.uihost.rememberUiDocumentImporter(owner.maxImportBytes) { result ->
             if (result is com.labteto.dshmobile.uihost.UiDocumentPickReceipt.Picked && !busy) jobs.launch {
@@ -119,21 +147,31 @@ fun ZhaoxiPersonaGalleryScene(
         }
         if (showPresets && authoring != null) {
             ZxSection("人物预设")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (installedPresetIds == null) {
+                ZxFooterNote(if (presetCheckFailed) "人物预设状态核对失败，请重试" else "正在检查已经添加的人物…")
+                ZxChip("重新检查", false) { if (!busy) revision++ }
+            } else {
                 authoring.presets().forEach { preset ->
-                    ZxChip(preset.name, false) { if (!busy) jobs.launch {
-                        busy = true
-                        try {
-                            val receipt = authoring.installPreset(preset.id)
-                            feedback = receipt.zxAuthoringFeedback()
-                            if (receipt is UiPersonaAuthoringReceipt.Saved) revision++
-                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                            throw cancelled
-                        } catch (failure: Exception) {
-                            feedback = failure.message ?: "预设安装失败"
-                        } finally { busy = false }
-                    } }
+                    val installed = preset.id in installedPresetIds.orEmpty() || preset.id in installedThisVisit
+                    ZxRow(preset.name, preset.franchise.ifBlank { preset.summary }, trailing = {
+                        ZxButton(if (installed) "已抱走" else "快到碗里来", {
+                            if (!installed && !busy) jobs.launch {
+                                busy = true
+                                try {
+                                    val receipt = authoring.installPreset(preset.id)
+                                    feedback = receipt.zxAuthoringFeedback()
+                                    if (receipt is UiPersonaAuthoringReceipt.Saved) {
+                                        installedThisVisit = installedThisVisit + preset.id
+                                        revision++
+                                    }
+                                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                    throw cancelled
+                                } catch (failure: Exception) {
+                                    feedback = failure.message ?: "预设安装失败"
+                                } finally { busy = false }
+                            }
+                        }, enabled = !installed && !busy, loading = busy && !installed)
+                    })
                 }
             }
         }
@@ -200,13 +238,14 @@ fun ZhaoxiPersonaEditorScene(
     galleryId: String,
     scope: UiSceneRenderScope,
     initialTab: Int = 0,
+    identity: UiSessionIdentity? = null,
 ) {
     val state by produceState<UiPersonaAuthoringReceipt?>(null, galleryId) {
         value = if (galleryId == "new") null else authoring.read(galleryId)
     }
     when (val result = state) {
-        is UiPersonaAuthoringReceipt.Loaded -> ZhaoxiAuthoringForm(authoring, result.snapshot, scope, initialTab)
-        null -> if (galleryId == "new") ZhaoxiAuthoringForm(authoring, null, scope, initialTab) else ZxEmpty("加载中", "正在读取人物")
+        is UiPersonaAuthoringReceipt.Loaded -> ZhaoxiAuthoringForm(authoring, result.snapshot, scope, initialTab, identity)
+        null -> if (galleryId == "new") ZhaoxiAuthoringForm(authoring, null, scope, initialTab, identity) else ZxEmpty("加载中", "正在读取人物")
         else -> ZxEmpty("人物暂不可编辑", "请返回图集重试")
     }
 }
@@ -326,10 +365,20 @@ fun ZxGroupMembersScene(groups: ChatGroupUiPort, scope: UiSceneRenderScope) {
         }
         Text("${selected.size} / ${snap.maximumMembers} 位成员", color = ZhaoxiTheme.colors.ink2)
         selectionError?.let { Text(it, color = ZhaoxiTheme.colors.err) }
-        ZxButton("保存成员", {
-            snap.identity?.let { receipt = groups.submit(ChatGroupUiCommand.ConfigureMembers(it, selected.toList())) }
-        }, enabled = !snap.busy && snap.identity != null &&
-            selectionError == null && selected != snap.memberIds)
+        if (snap.active) {
+            ZxButton("保存成员", {
+                snap.identity?.let { receipt = groups.submit(ChatGroupUiCommand.ConfigureMembers(it, selected.toList())) }
+            }, enabled = !snap.busy && snap.identity != null &&
+                selectionError == null && selected != snap.memberIds)
+        } else {
+            ZxFooterNote("从当前已选人物创建独立的新群聊；原单聊历史会保留。")
+            ZxButton("创建新群聊", {
+                snap.identity?.let { id ->
+                    receipt = groups.submit(ChatGroupUiCommand.CreateGroupSession(id, selected.toList()))
+                    if (receipt?.admitted() == true) scope.onBack()
+                }
+            }, enabled = !snap.busy && snap.identity != null && selectionError == null)
+        }
     }
 }
 

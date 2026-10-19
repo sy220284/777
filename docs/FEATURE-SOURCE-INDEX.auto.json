@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1453,
-  "production_source_count": 861,
-  "test_code_file_count": 470,
+  "repository_code_file_count": 1491,
+  "production_source_count": 871,
+  "test_code_file_count": 492,
   "workflow_files": [
     ".github/workflows/ci.yml",
     ".github/workflows/cleanup-old-releases.yml",
@@ -33,7 +33,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/MainActivity.kt",
-      "sha256": "09009e038bf76122"
+      "sha256": "6f130a26e48578fb"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/automation/AutomationDocumentStore.kt",
@@ -105,11 +105,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/connection/AppSettings.kt",
-      "sha256": "1df9cdf257fabea1"
+      "sha256": "e1e57bd23047cda1"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/connection/HostsStore.kt",
-      "sha256": "06b50a99afbdb1d1"
+      "sha256": "a7c7e9b07ba239cb"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/di/AppModule.kt",
@@ -145,7 +145,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
-      "sha256": "16eb2fa75b27c732"
+      "sha256": "7150d8f487c53bbd"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalCurrentSessionSnapshotComposition.kt",
@@ -185,7 +185,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
-      "sha256": "57d60af30cce6af8"
+      "sha256": "7152e1c504cb87ac"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestOptions.kt",
@@ -240,10 +240,6 @@
       "sha256": "d6056d854d67e55d"
     },
     {
-      "path": "app/src/main/java/com/labteto/dshmobile/local/LocalWorkEvidenceUiAdapter.kt",
-      "sha256": "d14c8e44a0ec7db4"
-    },
-    {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalWorkPolicyUiPortComposition.kt",
       "sha256": "8d4189962e42b185"
     },
@@ -253,7 +249,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
-      "sha256": "ac391970981838c8"
+      "sha256": "5601f266e5b53bf4"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentContinuationPolicy.kt",
@@ -665,7 +661,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt",
-      "sha256": "4811780773aecfec"
+      "sha256": "07f47a54f68f35a1"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDomainStateEvent.kt",
@@ -837,7 +833,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt",
-      "sha256": "a763568a8ab93896"
+      "sha256": "cfbaa29be04f9420"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupExecutionModels.kt",
@@ -865,7 +861,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalPersonaPortraitOwner.kt",
-      "sha256": "24f79524ccbefa0a"
+      "sha256": "24a6c727e999b303"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalPersonaPresetInstaller.kt",
@@ -1085,7 +1081,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/DeepSeekBilling.kt",
-      "sha256": "961c97851d227fda"
+      "sha256": "df1f036610a59be7"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalAgentModelRequestRuntime.kt",
@@ -1605,7 +1601,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSessionUiFacade.kt",
-      "sha256": "edcdfb6d3695c7b3"
+      "sha256": "f8ead9776eca0348"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsDataFacade.kt",
@@ -1613,7 +1609,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
-      "sha256": "90d9fc5045c2a7a4"
+      "sha256": "84071533fb57c1b2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTaskRuntime.kt",
@@ -1621,7 +1617,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
-      "sha256": "b200c93977393c98"
+      "sha256": "c39e469097b14f67"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTranscriptHistoryLoader.kt",
@@ -1629,7 +1625,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
-      "sha256": "2c76838113481c14"
+      "sha256": "f1080b2bacbbef26"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiRuntime.kt",
@@ -1637,7 +1633,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUsageUiFacade.kt",
-      "sha256": "66789bc4ac8db92c"
+      "sha256": "2ac2fd85de66843c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkUiState.kt",
@@ -1801,7 +1797,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionStorageRuntime.kt",
-      "sha256": "7b7af89a9d505195"
+      "sha256": "aed60dc98fec17f0"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalWorkDiagnosticsProvider.kt",
@@ -1901,7 +1897,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionStorageManager.kt",
-      "sha256": "6356002901cd8409"
+      "sha256": "a5fe2daa0a92f851"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionSummaryIndex.kt",
@@ -1953,7 +1949,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubCredentialManager.kt",
-      "sha256": "13b6ebd305f2ad57"
+      "sha256": "b7a6e1d569239bd9"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubCredentialStore.kt",
@@ -2193,7 +2189,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
-      "sha256": "423f0826734e247b"
+      "sha256": "f946585bba3e8356"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalForegroundRecoveryCoordinator.kt",
@@ -2253,7 +2249,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentController.kt",
-      "sha256": "1c95b75f14df8d16"
+      "sha256": "c36f48d1400be60d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
@@ -2477,7 +2473,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkState.kt",
-      "sha256": "f5b2a7589d73c1fa"
+      "sha256": "d38c0a64d735e341"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkStateCueExtractor.kt",
@@ -2533,7 +2529,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkUiDocumentPublisher.kt",
-      "sha256": "519e3dac9d04c471"
+      "sha256": "ec965ca8debf0af7"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkUiDocumentSource.kt",
@@ -2593,11 +2589,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/HostConversationSessionUiPort.kt",
-      "sha256": "3f2d89edccfc8e2f"
+      "sha256": "507cd78d9930cef9"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalApplicationFeaturePortsOwner.kt",
-      "sha256": "9e7bd8ca8a26d973"
+      "sha256": "4bbc2678cbf891ee"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalConversationDraftCache.kt",
@@ -2621,7 +2617,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalHostPreferencesUiAdapter.kt",
-      "sha256": "ea4974c00b601686"
+      "sha256": "9cca6e5ae8af05c9"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalModelPerformanceUiOwner.kt",
@@ -2629,7 +2625,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiConnectedCapabilities.kt",
-      "sha256": "c7584ef51eaf0639"
+      "sha256": "6689d08d46ac37df"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiDocumentFormState.kt",
@@ -2637,11 +2633,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/LocalUiSceneCatalog.kt",
-      "sha256": "1ea722b13788f689"
+      "sha256": "181b2aa8dcb31fdf"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/host/ZhaoxiApplicationRoot.kt",
-      "sha256": "4bf7e8548a6d900c"
+      "sha256": "4c6749c8353d806f"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/sidebar/SidebarAvatarSource.kt",
@@ -3141,7 +3137,7 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ConversationUiPort.kt",
-      "sha256": "a666092fb978f804"
+      "sha256": "604fe00c92418fbe"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/CurrentPersonaUiPort.kt",
@@ -3157,7 +3153,7 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/HostPreferencesUiPort.kt",
-      "sha256": "c670261cc8d78aee"
+      "sha256": "85dbccbcb5518238"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/LocalStructuredUiDataAdapter.kt",
@@ -3177,7 +3173,7 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ModelPerformanceUiPort.kt",
-      "sha256": "17defd0d4956c9b8"
+      "sha256": "a2764f52e547b7b6"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/PersonaAuthoringUiPort.kt",
@@ -3197,7 +3193,7 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/PersonaPortraitUiPort.kt",
-      "sha256": "10c8449c7fefc318"
+      "sha256": "a499a4a31655bfb0"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/PersonaSelectionUiPort.kt",
@@ -3221,15 +3217,15 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/SessionUiPort.kt",
-      "sha256": "360863ed8a4428a9"
+      "sha256": "fee7b26e58c3ecf4"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/SettingsUiPort.kt",
-      "sha256": "254784a1367a5b9b"
+      "sha256": "26a310efc7db8ba5"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/ToolsUiPort.kt",
-      "sha256": "dc520170e35e3bf7"
+      "sha256": "6d6d5b7d09f479b8"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/TranscriptUiPort.kt",
@@ -3249,7 +3245,7 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiDocumentUiPort.kt",
-      "sha256": "b3e626c1f5bb4237"
+      "sha256": "ea617ce6d54104e1"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UiMarkdown.kt",
@@ -3265,11 +3261,11 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/UsageUiPort.kt",
-      "sha256": "fdfbc671b9ac3024"
+      "sha256": "9e16371ed4b0c4a2"
     },
     {
-      "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/WorkEvidenceUiPort.kt",
-      "sha256": "af7bb45faee3891e"
+      "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/WorkMachineVerificationModels.kt",
+      "sha256": "7ae9339a32df4ee1"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/WorkPolicyUiPort.kt",
@@ -3281,7 +3277,7 @@
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/WorkTeamUiPort.kt",
-      "sha256": "e978bab4bd27ffd5"
+      "sha256": "b8de02aa02e9a48f"
     },
     {
       "path": "ui-contract/src/main/kotlin/com/labteto/dshmobile/uicontract/model/LocalModelValues.kt",
@@ -3305,7 +3301,7 @@
     },
     {
       "path": "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiAttachmentPicker.kt",
-      "sha256": "d01e493ad4800919"
+      "sha256": "92fea08c0984a762"
     },
     {
       "path": "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiDocumentTransfer.kt",
@@ -3348,6 +3344,10 @@
       "sha256": "d3ae89a7a63bd972"
     },
     {
+      "path": "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiWorkspaceBatchExporter.kt",
+      "sha256": "6aa86eb2fad3e7af"
+    },
+    {
       "path": "ui-host/src/main/kotlin/com/labteto/dshmobile/uihost/UiWorkspaceExporter.kt",
       "sha256": "91cccaeae93d0825"
     },
@@ -3357,7 +3357,7 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/ZhaoxiApplicationScenePack.kt",
-      "sha256": "851b8da93cd8af6b"
+      "sha256": "26d95ff64f1f914e"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/ZhaoxiDraftCommands.kt",
@@ -3365,15 +3365,15 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/ZhaoxiPorts.kt",
-      "sha256": "d9f60b7bf96a12bc"
+      "sha256": "9578d6b0510a30da"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/ZhaoxiSceneTargets.kt",
-      "sha256": "7fe7fd981f721c38"
+      "sha256": "bee3dcff99631452"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/ZhaoxiUiPackManifest.kt",
-      "sha256": "5b3789997ae022a7"
+      "sha256": "555f8c5b89fa3708"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZhaoxiIconResources.kt",
@@ -3381,15 +3381,19 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxConversation.kt",
-      "sha256": "42eb2a0fd98dfc9a"
+      "sha256": "9828f498d0f927ad"
+    },
+    {
+      "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxDataTable.kt",
+      "sha256": "1adac66385e808e5"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxEmpty.kt",
-      "sha256": "46d469db0c6262ec"
+      "sha256": "5b6cffc393b28bb6"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxFeedback.kt",
-      "sha256": "1583e7c6c9634a18"
+      "sha256": "b0e8a90f299fa2cf"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxIcon.kt",
@@ -3397,84 +3401,122 @@
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxPrimitives.kt",
-      "sha256": "d54139c1415599e4"
+      "sha256": "ff6fd177da39b71a"
+    },
+    {
+      "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxRichReply.kt",
+      "sha256": "d968965f727a7d06"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/components/ZxShell.kt",
-      "sha256": "4d378568cde1d961"
+      "sha256": "1d334d64f3626aaa"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiAutomationScenes.kt",
-      "sha256": "1c82366cb001a057"
+      "sha256": "9ec44319ee062700"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiCommandFeedback.kt",
-      "sha256": "3e596c9149f6b6a5"
+      "sha256": "215a7512780024d1"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedMedia.kt",
-      "sha256": "f2bcf806dfd4d287"
+      "sha256": "6b9b4bf7fdccd40e"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedPersona.kt",
-      "sha256": "a3594ece4842ea02"
+      "sha256": "f4aaa2c4ae729ba7"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConnectedSettings.kt",
-      "sha256": "0676d5b649d28b1e"
+      "sha256": "4df8eb57ff3a8019"
+    },
+    {
+      "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConversationLibraryActions.kt",
+      "sha256": "034dc6fec4f368e2"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConversationMenu.kt",
-      "sha256": "640a14a1a5184007"
+      "sha256": "500e0443de50435f"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiConversationScenes.kt",
-      "sha256": "f3efebbaddb3eef0"
+      "sha256": "19d08f2edeeaa715"
+    },
+    {
+      "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiDocumentDisplayEditor.kt",
+      "sha256": "6bbbb94734806da7"
+    },
+    {
+      "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiE818SettingsScenes.kt",
+      "sha256": "ec95ac1ca220d50a"
+    },
+    {
+      "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiFormValidation.kt",
+      "sha256": "7a22697398c14db2"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiPersonaScenes.kt",
-      "sha256": "3c24d97faa83f104"
+      "sha256": "18b560d3ba1a6c56"
+    },
+    {
+      "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiReplyTimeline.kt",
+      "sha256": "d619e16a0e3817b2"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSceneCommon.kt",
-      "sha256": "12257dc3ed68fe7b"
+      "sha256": "6e9afcd91f0b914c"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSettingsScenes.kt",
-      "sha256": "0f8db11865349578"
+      "sha256": "7aca051ff395cfd0"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiShellScenes.kt",
-      "sha256": "6f1e902bdfa11d90"
+      "sha256": "d0399968474e1d15"
+    },
+    {
+      "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSkillManager.kt",
+      "sha256": "8b15846389ef976f"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiSlotScenes.kt",
-      "sha256": "f4332dc89dd733b7"
+      "sha256": "931dc3e1336bc122"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiUiDocumentScenes.kt",
-      "sha256": "44258ad3f935c514"
+      "sha256": "01a70d0fc42b6f40"
+    },
+    {
+      "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiWallpaperPicker.kt",
+      "sha256": "71dd56014f751052"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/scenes/ZhaoxiWorkScenes.kt",
-      "sha256": "45dbeb16d50ad7a5"
+      "sha256": "0c92a7403954de31"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/theme/ZhaoxiTheme.kt",
-      "sha256": "5a063c94f1fe8942"
+      "sha256": "209a1f13b55a2ec7"
     },
     {
       "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/theme/ZhaoxiTokens.kt",
       "sha256": "04f95d4c02259e6c"
+    },
+    {
+      "path": "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/theme/ZhaoxiWallpaperPresets.kt",
+      "sha256": "3c9580d4be533d14"
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "cdac1a7c80be",
+  "source_snapshot": "eebe2c3dabde",
   "observed_delta": {
-    "baseline": "b57142d9b10f",
+    "baseline": "e32962aaec15",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "ui-pack-zhaoxi/src/main/kotlin/com/labteto/dshmobile/uipack/zhaoxi/ZhaoxiApplicationScenePack.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],

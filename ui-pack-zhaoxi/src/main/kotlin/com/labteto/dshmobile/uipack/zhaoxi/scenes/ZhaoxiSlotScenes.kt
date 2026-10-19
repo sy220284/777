@@ -1,12 +1,15 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Text
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -61,6 +64,7 @@ fun ZhaoxiTimelineScene(
     documents: UiDocumentUiPort? = null,
     knownScenes: Set<UiSceneId> = emptySet(),
     media: MediaUiPort? = null,
+    forms: com.labteto.dshmobile.uicontract.UiDocumentFormUiPort? = null,
 ) {
     val snap by chat.snapshots.collectAsState(initial = chat.snapshot())
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
@@ -79,7 +83,7 @@ fun ZhaoxiTimelineScene(
                 branchFailure = response.takeUnless { it.admitted() }
             }, preview = snap.livePreview,
             running = snap.phase == UiExecutionPhase.RUNNING,
-            documents = documents, knownScenes = knownScenes, media = media)
+            documents = documents, knownScenes = knownScenes, media = media, forms = forms)
     }
 }
 
@@ -90,6 +94,7 @@ fun ZhaoxiMessageActionsScene(
     scope: UiSceneRenderScope,
     onEdit: () -> Unit = {},
     onRegenerate: () -> UiCommandReceipt = { UiCommandReceipt.NotAdmitted },
+    allowBranchSwitch: Boolean = true,
 ) {
     var regenerateReceipt by remember(message.id) { mutableStateOf<UiCommandReceipt?>(null) }
     var copied by remember(message.id) { mutableStateOf(false) }
@@ -98,14 +103,19 @@ fun ZhaoxiMessageActionsScene(
         Spacer(Modifier.height(8.dp))
         Text(message.text.take(200), fontSize = 13.sp, color = ZhaoxiTheme.colors.ink2)
         Spacer(Modifier.height(10.dp))
-        if (message.editableText != null) ZxNavRow("修改并重发", sub = "编辑后作为新分支提交") { onEdit() }
-        ZxNavRow("重新生成", sub = "从这条重试回复") {
+        if (message.editableText != null) ZxNavRow("修改并重发", sub = "覆盖这条消息之后的活动记录，提交前可确认") { onEdit() }
+        if (message.role == com.labteto.dshmobile.uicontract.UiMessageRole.ASSISTANT)
+        ZxNavRow("重新生成", sub = "重新请求这条回复，可能产生模型消耗") {
             val result = onRegenerate()
             when (result) {
                 UiCommandReceipt.Accepted, UiCommandReceipt.Queued -> scope.onBack()
                 else -> regenerateReceipt = result
             }
         }
+        if (allowBranchSwitch && (message.branch?.count ?: 0) > 1)
+            ZxNavRow("切换回复版本", sub = "查看这条回复已保存的其他版本") {
+                scope.onNavigate(UiSceneId("chat.branches"))
+            }
         ZxNavRow("阅读文本") { scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("conversation.reader")) }
         val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
         ZxNavRow("复制文本") {
@@ -125,27 +135,51 @@ fun ZhaoxiEditScene(
     scope: UiSceneRenderScope,
     work: WorkConversationUiPort? = null,
 ) {
-    var text by remember(message.id) { mutableStateOf(message.editableText ?: message.text) }
+    val sourceIdentity = remember(message.id) {
+        if (work != null) work.snapshot().identity else chat.snapshot().identity
+    }
+    val original = message.editableText ?: message.text
+    var text by com.labteto.dshmobile.uihost.rememberUiPrivateText(
+        "zhaoxi.edit.${sourceIdentity?.sessionId}.${message.id}", original) { original }
     var receipt by remember(message.id) { mutableStateOf<UiCommandReceipt?>(null) }
-    ZxPage("修改并重发", onBack = { scope.onBack() }) {
+    var confirmSend by remember(message.id) { mutableStateOf(false) }
+    var confirmDiscard by remember(message.id) { mutableStateOf(false) }
+    val dirty = text != original
+    fun leave() { if (dirty) confirmDiscard = true else scope.onBack() }
+    BackHandler(enabled = dirty && !confirmSend && !confirmDiscard) { leave() }
+    ZxPage("修改并重发", onBack = { leave() }) {
         Spacer(Modifier.height(8.dp))
         CommandFeedback(receipt)
-        ZxField(text, { text = it }, Modifier.fillMaxWidth().height(120.dp))
+        ZxFooterNote(if (work == null) "重发会覆盖此消息之后的活动记录，请先核对修改内容。"
+            else "重发会覆盖后续活动记录；此前已执行的文件修改、发送等外部操作无法随之撤销。")
+        ZxField(text, { text = it }, Modifier.fillMaxWidth().heightIn(min = 160.dp),
+            fieldLabel = "修改消息正文")
         Spacer(Modifier.height(10.dp))
-        ZxButton("重发", {
-            // Never submit a Work edit under a Chat activation identity.
-            val id = if (work != null) work.snapshot().identity else chat.snapshot().identity
-            val response = if (id == null) {
-                UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
-            } else if (work != null) {
-                work.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.EditUserMessage(
-                    id, message.id, text))
-            } else {
-                chat.submit(ChatUiCommand.EditUserMessage(id, message.id, text))
-            }
-            if (response.exitsMessageEditor()) scope.onBack()
-            else receipt = response // Never discard an unaccepted edit draft.
-        }, Modifier.fillMaxWidth(), enabled = text.isNotBlank())
+        ZxButton("核对并重发", { confirmSend = true }, Modifier.fillMaxWidth(),
+            enabled = text.isNotBlank() && dirty && sourceIdentity != null)
+        if (confirmSend) com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog(
+            "确认覆盖后续记录？",
+            if (work == null) "确认后覆盖这条消息之后的活动记录，并重新请求回复。"
+            else "确认后覆盖后续活动记录并重发。此前已发生的外部操作仍保留，请勿重复执行。",
+            "确认重发", {
+                confirmSend = false
+                val response = if (sourceIdentity == null) {
+                    UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                } else if (work != null) {
+                    work.submit(com.labteto.dshmobile.uicontract.WorkConversationUiCommand.EditUserMessage(
+                        sourceIdentity, message.id, text))
+                } else {
+                    chat.submit(ChatUiCommand.EditUserMessage(sourceIdentity, message.id, text))
+                }
+                if (response.exitsMessageEditor()) scope.onBack()
+                else receipt = response
+            }, { confirmSend = false },
+        )
+        if (confirmDiscard) com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog(
+            "放弃本次修改？", "尚未重发的编辑内容将被丢弃。", "放弃修改",
+            { confirmDiscard = false; text = original; scope.onBack() },
+            { confirmDiscard = false },
+        )
     }
 }
 
@@ -175,12 +209,14 @@ fun ZhaoxiBranchesScene(
 
 /** work.approval — 审批独立场景。 */
 @Composable
-fun ZhaoxiApprovalScene(work: WorkConversationUiPort, scope: UiSceneRenderScope) {
+fun ZhaoxiApprovalScene(work: WorkConversationUiPort, scope: UiSceneRenderScope,
+    policy: com.labteto.dshmobile.uicontract.WorkPolicyUiPort? = null) {
     val snap by work.snapshots.collectAsState(initial = work.snapshot())
     var receipt by remember(snap.approval?.pendingId, snap.identity) {
         mutableStateOf<UiCommandReceipt?>(null)
     }
     var expiredPendingId by remember(snap.identity) { mutableStateOf<String?>(null) }
+    var confirmPolicy by remember(snap.identity, snap.approval?.pendingId) { mutableStateOf<String?>(null) }
     ZxPage("审批", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         CommandFeedback(receipt)
@@ -197,6 +233,33 @@ fun ZhaoxiApprovalScene(work: WorkConversationUiPort, scope: UiSceneRenderScope)
                 if (result is UiCommandReceipt.Rejected &&
                     result.reason == UiCommandRejection.APPROVAL_EXPIRED) expiredPendingId = approval.pendingId
                 if (result.admitted()) scope.onBack()
+            }
+        }
+        if (policy != null && approval != null && snap.identity != null &&
+            snap.phase == UiExecutionPhase.WAITING_FOR_USER && expiredPendingId != approval.pendingId) {
+            ZxSection("更多授权方式")
+            ZxFooterNote("仅批准一次可使用上方按钮；扩大授权范围前请核对以下说明。")
+            if (approval.canApproveDeviceTurn) ZxButton("批准本轮设备操作", {
+                confirmPolicy = "device"
+            }, variant = ZxButtonVariant.Outline)
+            ZxButton("批准并启用全局自动审批", { confirmPolicy = "auto" },
+                variant = ZxButtonVariant.Outline)
+            confirmPolicy?.let { choice ->
+                com.labteto.dshmobile.uipack.zhaoxi.components.ZxDialog(
+                    if (choice == "device") "授权本轮设备操作？" else "启用全局自动审批？",
+                    if (choice == "device") "本轮符合条件的设备操作可连续执行。可在工作会话菜单撤销；仍受系统权限与工具校验约束。"
+                    else "批准当前请求，并自动通过之后进入审批链的操作，包括文件修改、Shell 和设备高权限操作。此设置对全局生效，可在设置→审批模式改回。",
+                    "确认授权", {
+                        confirmPolicy = null
+                        val id = snap.identity
+                        val result = if (id == null) UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                        else policy.submit(if (choice == "device")
+                            com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.ApproveDeviceTurn(id, approval.pendingId)
+                        else com.labteto.dshmobile.uicontract.WorkPolicyUiCommand.ApproveWithAutoMode(id, approval.pendingId))
+                        receipt = result
+                        if (result.admitted()) scope.onBack()
+                    }, { confirmPolicy = null },
+                )
             }
         }
     }
@@ -278,7 +341,7 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
             feedback = null
             revision++
         }, Modifier.fillMaxWidth())
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ZxChip("有效", filter == "有效") {
                 filter = "有效"; editing = false; stale = false; feedback = null
             }
@@ -393,6 +456,48 @@ fun ZhaoxiDiaryScene(diary: DiaryUiPort, galleryId: String, scope: UiSceneRender
                 },
                 { pendingDisable = null },
             )
+        }
+    }
+}
+
+/** route.diary: choose the actual persona before reading its diary. */
+@Composable
+fun ZhaoxiDiaryHubScene(
+    gallery: com.labteto.dshmobile.uicontract.PersonaGalleryUiPort,
+    scope: UiSceneRenderScope,
+    onOpenDiary: (String) -> Unit,
+) {
+    var refresh by remember { mutableStateOf(0) }
+    var query by remember { mutableStateOf("") }
+    val response by produceState<com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt?>(
+        null, gallery, refresh) {
+        value = try { gallery.read() }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt.Failed(failure.message)
+        }
+    }
+    ZxPage("人物手记", onBack = { scope.onBack() }) {
+        ZxFooterNote("选择人物，打开其公开日记。")
+        ZxField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = "搜索人物")
+        when (val result = response) {
+            null -> ZxFooterNote("正在读取人物目录")
+            is com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt.Failed -> {
+                ZxFooterNote(result.message ?: "人物目录读取失败")
+                ZxButton("重试", { refresh++ })
+            }
+            is com.labteto.dshmobile.uicontract.UiPersonaGalleryReadReceipt.Available -> {
+                val visible = result.entries.filter {
+                    query.isBlank() || it.name.contains(query.trim(), ignoreCase = true)
+                }
+                if (visible.isEmpty()) ZxEmpty("没有匹配的人物", "可从人物图集添加人物")
+                visible.forEach { item ->
+                    ZxRow(item.name, "查看公开日记", onClick = { onOpenDiary(item.id) })
+                }
+                ZxButton("前往人物图集", {
+                    scope.onNavigate(UiSceneId("route.persona_gallery"))
+                }, variant = ZxButtonVariant.Outline)
+            }
         }
     }
 }

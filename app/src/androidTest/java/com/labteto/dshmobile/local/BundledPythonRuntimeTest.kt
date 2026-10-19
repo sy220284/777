@@ -50,7 +50,7 @@ class BundledPythonRuntimeTest {
         assertEquals("bundled Python failed: $diagnostic", 0, process.exitValue())
         val parts = output.split("|")
         assertEquals("unexpected Python output: $output", 3, parts.size)
-        assertEquals("3.14.6", parts[0])
+        assertEquals("3.14.8", parts[0])
         assertTrue("Python CA store is empty: $output", parts[1].toIntOrNull()?.let { it > 0 } == true)
         assertEquals("shell-ok", parts[2])
     }

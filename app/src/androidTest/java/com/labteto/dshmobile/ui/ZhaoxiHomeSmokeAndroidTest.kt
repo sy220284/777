@@ -9,8 +9,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertTopPositionInRootIsEqualTo
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import com.labteto.dshmobile.MainActivity
+import androidx.compose.ui.unit.dp
 import org.junit.Rule
 import org.junit.Test
 
@@ -23,9 +27,19 @@ class ZhaoxiHomeSmokeAndroidTest {
         compose.onNodeWithTag("zhaoxi.home.create_chat").assertExists()
         compose.onNodeWithText("人物").assertExists()
         compose.onNodeWithContentDescription("打开侧栏").performClick()
-        compose.onNodeWithText("搜索会话、人物、任务、文件").assertExists()
+        val drawer = compose.onNodeWithTag("zhaoxi.drawer.surface", useUnmergedTree = true)
+            .assertTopPositionInRootIsEqualTo(0.dp)
+        val drawerBottom = drawer.getUnclippedBoundsInRoot().bottom
+        val viewportBottom = compose.onRoot(useUnmergedTree = true).getUnclippedBoundsInRoot().bottom
+        org.junit.Assert.assertEquals("侧栏背景必须延伸至导航栏底部",
+            viewportBottom.value, drawerBottom.value, 1f)
+        compose.onNodeWithContentDescription("全局搜索").assertExists()
+        compose.onNodeWithContentDescription("新建会话").assertExists()
         compose.onNodeWithText("人物图集").assertExists()
-        compose.onNodeWithContentDescription("关闭侧栏").performClick()
+        // #758: search is a real global page, and the drawer no longer needs a redundant close icon.
+        compose.onNodeWithContentDescription("全局搜索").performClick()
+        compose.onNodeWithText("搜索").assertExists()
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntil(10_000) {
             compose.onAllNodesWithText("人物图集").fetchSemanticsNodes().isEmpty()
         }

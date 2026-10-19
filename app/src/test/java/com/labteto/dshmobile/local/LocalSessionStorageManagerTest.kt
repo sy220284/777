@@ -11,6 +11,8 @@ import java.io.File
 import java.io.IOException
 import java.io.OutputStream
 import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
+import java.util.zip.ZipEntry
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -129,6 +131,74 @@ class LocalSessionStorageManagerTest {
         assertTrue(first.closed)
         assertTrue(second.closed)
         assertTrue(third.closed)
+    }
+
+    @Test
+    fun stagedZipRestoreOnlyBecomesVisibleOnNextBoot() {
+        val source = temporary.newFolder("restore-source")
+        File(source, "a.json").writeText("{\"v\":1}")
+        File(source, "a.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
+        val output = ByteArrayOutputStream()
+        manager(source).exportAll(output)
+
+        val target = temporary.newFolder("restore-target")
+        val incoming = manager(target)
+        assertEquals(1, incoming.stageRestore(output.toByteArray()))
+        assertFalse(File(target, "a.events.jsonl").exists())
+        assertEquals(2, manager(target).applyPendingRestore())
+        assertEquals("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n", File(target, "a.events.jsonl").readText())
+        assertEquals("{\"v\":1}", File(target, "a.json").readText())
+        assertEquals(0, manager(target).applyPendingRestore())
+    }
+
+    @Test
+    fun restoreSkipsExistingSessionWithoutOverwritingItsEvents() {
+        val source = temporary.newFolder("restore-multi-source")
+        File(source, "a.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
+        File(source, "b.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
+        val output = ByteArrayOutputStream()
+        manager(source).exportAll(output)
+
+        val target = temporary.newFolder("restore-existing-target")
+        File(target, "a.events.jsonl").writeText("live-events")
+        val store = manager(target)
+        assertEquals(1, store.stageRestore(output.toByteArray()))
+        assertEquals(1, store.applyPendingRestore())
+        assertEquals("live-events", File(target, "a.events.jsonl").readText())
+        assertEquals("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n", File(target, "b.events.jsonl").readText())
+    }
+
+    @Test
+    fun recoveryCanResumeAfterOneFileWasAlreadyCopied() {
+        val source = temporary.newFolder("restore-resume-source")
+        File(source, "c.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
+        File(source, "c.json").writeText("{\"id\":\"c\"}")
+        val output = ByteArrayOutputStream()
+        manager(source).exportAll(output)
+        val target = temporary.newFolder("restore-resume-target")
+        val store = manager(target)
+        assertEquals(1, store.stageRestore(output.toByteArray()))
+        // Simulate a crash after the first completed copy and before deleting the staging area.
+        File(target, "c.events.jsonl").writeText("{\"sequence\":1,\"type\":\"user/message\",\"createdAt\":123,\"data\":{}}\n")
+        assertEquals(2, store.applyPendingRestore())
+        assertEquals("{\"id\":\"c\"}", File(target, "c.json").readText())
+    }
+
+    @Test
+    fun stagedRestoreRejectsZipSlipAndDoesNotModifyCurrentFiles() {
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            zip.putNextEntry(ZipEntry("../escape.events.jsonl"))
+            zip.write("attack".toByteArray())
+            zip.closeEntry()
+        }
+        val target = temporary.newFolder("restore-invalid-target")
+        File(target, "live.events.jsonl").writeText("keep")
+        assertThrows(IllegalArgumentException::class.java) {
+            manager(target).stageRestore(output.toByteArray())
+        }
+        assertEquals("keep", File(target, "live.events.jsonl").readText())
+        assertFalse(File(target.parentFile, "escape.events.jsonl").exists())
     }
 
     private fun manager(root: File) = LocalSessionStorageManager(

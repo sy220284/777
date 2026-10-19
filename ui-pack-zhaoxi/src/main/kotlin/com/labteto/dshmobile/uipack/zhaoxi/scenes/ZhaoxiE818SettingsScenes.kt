@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.uipack.zhaoxi.scenes
 
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.TokenUsageGroupKind
+import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryManagementQuery
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
@@ -27,13 +29,30 @@ import com.labteto.dshmobile.uipack.zhaoxi.components.*
 import com.labteto.dshmobile.uipack.zhaoxi.theme.ZhaoxiTheme
 import com.labteto.dshmobile.uihost.UiSceneRenderScope
 
+/** 先列出真实保存的配置，再补齐曾有请求记录但现在未保存的历史模型。 */
+internal fun zxUsageModelNames(configured: List<String>, recorded: Set<String>): List<String> =
+    (configured + recorded).distinct().sorted()
+
 /** All totals here are rendered from the existing Usage Owner; no locally computed billing facts. */
 @Composable
-fun ZhaoxiUsageOverviewScene(usage: UsageUiPort, scope: UiSceneRenderScope, modelOnly: Boolean = false) {
+fun ZhaoxiUsageOverviewScene(
+    usage: UsageUiPort, scope: UiSceneRenderScope, modelOnly: Boolean = false,
+    settings: SettingsUiPort? = null,
+    onOpenLog: ((String?) -> Unit)? = null,
+) {
     val revision by usage.revision.collectAsState()
     val source = remember(revision, usage) { usage.snapshot() }
+    val configured = settings?.let { owner ->
+        owner.state.collectAsState(initial = owner.initialState).value.modelProfiles
+    }.orEmpty()
+    val modelNames = zxUsageModelNames(configured.map { it.model }, source.byModel.keys)
+    val modelLabels = configured.associate { it.model to (it.displayName ?: it.model) }
     var selectedModel by rememberSaveable { mutableStateOf<String?>(null) }
-    val snapshot = selectedModel?.let { source.byModel[it] } ?: source
+    LaunchedEffect(modelNames) {
+        if (selectedModel != null && selectedModel !in modelNames) selectedModel = null
+    }
+    val selectedHasRecords = selectedModel == null || selectedModel in source.byModel
+    val snapshot = selectedModel?.let { source.byModel[it] ?: TokenUsageAnalyticsSnapshot() } ?: source
     var selectedGroup by remember { mutableStateOf<String?>(null) }
     ZxPage(if (modelOnly) "模型用量" else "用量统计", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
@@ -43,9 +62,15 @@ fun ZhaoxiUsageOverviewScene(usage: UsageUiPort, scope: UiSceneRenderScope, mode
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ZxChip("全部", selectedModel == null) { selectedModel = null; selectedGroup = null }
-            source.byModel.keys.sorted().forEach { id ->
-                ZxChip(id, selectedModel == id) { selectedModel = id; selectedGroup = null }
+            modelNames.forEach { model ->
+                ZxChip(modelLabels[model] ?: model, selectedModel == model) {
+                    selectedModel = model
+                    selectedGroup = null
+                }
             }
+        }
+        if (!selectedHasRecords) {
+            ZxFooterNote("该模型尚无保留的请求用量记录，下面显示的是零记录统计，并非所有模型总和。")
         }
         ZxSection("用量总览")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -66,6 +91,9 @@ fun ZhaoxiUsageOverviewScene(usage: UsageUiPort, scope: UiSceneRenderScope, mode
             }
         }
         ZxValueRow("输入 / 输出", value = "${snapshot.tracked.inputTokens} / ${snapshot.tracked.outputTokens}", mono = true)
+        if (snapshot.tracked.requestCount.toLong() == 0L) {
+            ZxFooterNote("这里只统计已记录的模型请求；已有会话不一定保留旧请求的用量明细。")
+        }
         if (snapshot.tracked.unreportedRequestCount > 0) {
             ZxFooterNote("${snapshot.tracked.unreportedRequestCount} 次请求未上报精确用量，统计仅反映可追踪事实")
         }
@@ -90,10 +118,22 @@ fun ZhaoxiUsageOverviewScene(usage: UsageUiPort, scope: UiSceneRenderScope, mode
                 ZxValueRow("请求", value = detail.aggregate.requestCount.toString())
             }
         }
-        ZxNavRow("用量日志", sub = "逐次请求记录与用量明细") {
-            scope.onNavigate(UiSceneId("settings.usage_log"))
+        ZxNavRow("用量日志", sub = "逐次请求记录与用量明细，保留当前模型筛选") {
+            if (onOpenLog != null) onOpenLog(selectedModel)
+            else scope.onNavigate(UiSceneId("settings.usage_log"))
         }
     }
+}
+
+/** Time filtering only affects locally retained records; never implies backend pagination. */
+internal fun zxUsageWindowRecords(
+    records: List<com.labteto.dshmobile.local.TokenUsageRecord>,
+    nowMillis: Long, days: Int,
+): List<com.labteto.dshmobile.local.TokenUsageRecord> {
+    require(days >= 0)
+    val cutoff = if (days == 0) Long.MIN_VALUE else
+        nowMillis - days.toLong() * 24L * 60L * 60L * 1000L
+    return records.filter { it.timestamp >= cutoff }.sortedByDescending { it.timestamp }
 }
 
 /** Distinct request ledger page, rather than rendering the overview again. */
@@ -102,32 +142,87 @@ fun ZhaoxiUsageLogScene(
     usage: UsageUiPort,
     scope: UiSceneRenderScope,
     openRequest: (String) -> Unit,
+    initialModel: String? = null,
 ) {
     val revision by usage.revision.collectAsState()
     val source = remember(usage, revision) { usage.snapshot() }
-    var selectedModel by rememberSaveable { mutableStateOf<String?>(null) }
-    val current = selectedModel?.let { source.byModel[it] } ?: source
+    var selectedModel by rememberSaveable(initialModel) { mutableStateOf(initialModel) }
+    var timeWindowDays by rememberSaveable { mutableIntStateOf(0) }
+    var pageCursors by remember(selectedModel, timeWindowDays) {
+        mutableStateOf(listOf<String?>(null))
+    }
+    val currentCursor = pageCursors.last()
+    val since = remember(timeWindowDays, revision) {
+        if (timeWindowDays == 0) null else
+            System.currentTimeMillis() - timeWindowDays * 86_400_000L
+    }
+    var pageFailure by remember(selectedModel, timeWindowDays, currentCursor) {
+        mutableStateOf<String?>(null)
+    }
+    var retryPage by remember { mutableIntStateOf(0) }
+    val page by produceState<UiUsageHistoryPage?>(
+        initialValue = null, usage, revision, selectedModel, since, currentCursor, retryPage) {
+        value = null
+        pageFailure = null
+        try {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                usage.historyPage(selectedModel, since, currentCursor, 25)
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            pageFailure = failure.message ?: "用量历史读取失败，请重试"
+        }
+    }
     ZxPage("用量日志", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
         ZxSection("模型筛选")
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ZxChip("全部", selectedModel == null) { selectedModel = null }
             source.byModel.keys.sorted().forEach { model ->
                 ZxChip(model, selectedModel == model) { selectedModel = model }
             }
         }
-        ZxSection("最近请求")
-        if (current.recentRecords.isEmpty()) ZxEmpty("暂无请求记录", "完成模型请求后可查看明细")
-        current.recentRecords.forEach { record ->
-            ZxRow(record.model, "${record.context.action.name} · ${record.totalTokens} Token · ¥${"%.4f".format(record.estimatedCostCny)}",
+        ZxSection("时间范围")
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(0 to "所有已保留", 1 to "近 24 小时", 7 to "近 7 天", 30 to "近 30 天")
+                .forEach { (days, label) ->
+                    ZxChip(label, days == timeWindowDays) { timeWindowDays = days }
+                }
+        }
+        val records = page?.records.orEmpty()
+        ZxSection("请求记录 · 共 ${page?.totalMatching ?: 0} 条")
+        ZxFooterNote("从本地 SQLite 已保留的请求记录逐页读取。超过数据库留存期限的明细无法恢复，累计统计不受影响。")
+        pageFailure?.let { error ->
+            ZxFooterNote(error)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ZxButton("重新读取", { retryPage++ }, variant = ZxButtonVariant.Outline)
+                if (pageCursors.size > 1) ZxButton("回到第一页", {
+                    pageCursors = listOf(null)
+                }, variant = ZxButtonVariant.Outline)
+            }
+        }
+        if (page == null && pageFailure == null) ZxFooterNote("正在读取历史用量…")
+        else if (page != null && records.isEmpty()) ZxEmpty("所选条件没有请求记录", "可以调整模型或时间范围")
+        records.forEach { record ->
+            ZxRow(record.model,
+                "${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(record.timestamp))} · ${record.context.action.name} · ${record.totalTokens} Token · ¥${"%.4f".format(record.estimatedCostCny)}" +
+                    if (record.reported) "" else " · 用量未完整上报",
                 onClick = { openRequest(record.requestId) })
         }
-        if (current.tracked.unreportedRequestCount > 0) {
-            ZxFooterNote("部分请求未上报准确用量")
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (pageCursors.size > 1) ZxButton("上一页", {
+                pageCursors = pageCursors.dropLast(1)
+            }, variant = ZxButtonVariant.Outline)
+            page?.nextCursor?.let { next ->
+                ZxButton("查看更早记录", { pageCursors = pageCursors + next },
+                    variant = ZxButtonVariant.Outline)
+            }
         }
+        if (page != null) ZxFooterNote("第 ${pageCursors.size} 页 · 每页最多 25 条")
+        if (source.tracked.unreportedRequestCount > 0)
+            ZxFooterNote("部分请求未上报准确用量，费用仅是估算值。")
     }
 }
 
@@ -159,27 +254,58 @@ fun ZhaoxiUsageDetailScene(usage: UsageUiPort, requestId: String?, scope: UiScen
 }
 
 /** Memory overview deliberately says global scope; other scopes require their own authorized context. */
+internal fun zxMemoryKindTitle(kind: MemoryKind): String = when (kind) {
+    MemoryKind.RULE -> "规则"
+    MemoryKind.PREFERENCE -> "偏好"
+    MemoryKind.FACT -> "人物与事实"
+    MemoryKind.DECISION -> "决定"
+    MemoryKind.CONSTRAINT -> "约束"
+    MemoryKind.STATE -> "状态"
+    MemoryKind.SUMMARY -> "摘要"
+    MemoryKind.RELATIONSHIP_FACT -> "关系事实"
+    MemoryKind.RELATIONSHIP_STATE -> "关系进展"
+    MemoryKind.RELATIONSHIP_PREFERENCE -> "关系偏好"
+}
+
 @Composable
 fun ZhaoxiMemoryOverviewScene(memory: MemoryUiPort, settings: SettingsUiPort?, scope: UiSceneRenderScope) {
-    val page = remember(memory) { memory.memoryPage(MemoryManagementQuery(setOf(MemoryScope.GLOBAL))) }
+    var refresh by remember { mutableIntStateOf(0) }
+    val snap = settings?.let { it.state.collectAsState(initial = it.initialState).value }
+    val current = settings?.memoryContext()
+    val page = remember(memory, refresh) {
+        memory.memoryPage(MemoryManagementQuery(setOf(MemoryScope.GLOBAL)))
+    }
+    val lineage = remember(memory, refresh, current?.lineageId) {
+        current?.lineageId?.takeIf(String::isNotBlank)?.let { lineageId ->
+            memory.memoryPage(MemoryManagementQuery(
+                scopes = setOf(MemoryScope.LINEAGE), lineageId = lineageId))
+        }
+    }
     ZxPage("记忆", onBack = { scope.onBack() }) {
         Spacer(Modifier.height(8.dp))
-        ZxSection("全局记忆概览")
-        ZxValueRow("有效记忆", value = page.totalMatching.toString(), mono = true)
-        ZxValueRow("记忆分类", value = page.kindCounts.count { it.value > 0 }.toString())
+        ZxSection("当前记忆策略")
+        if (snap != null) {
+            ZxValueRow("自动召回", value = if (snap.autoRecall) "已开启" else "已关闭")
+            ZxValueRow("自动记忆", value = if (snap.autoMemory) "已开启" else "已关闭")
+        } else ZxFooterNote("当前设置服务未接入，无法确认自动记忆策略")
+        ZxSection("有效记忆概览")
+        ZxValueRow("全局有效记忆", value = page.totalMatching.toString(), mono = true)
+        lineage?.let { ZxValueRow("当前会话线有效记忆", value = it.totalMatching.toString(), mono = true) }
+        ZxValueRow("全局记忆分类", value = page.kindCounts.count { it.value > 0 }.toString())
         page.kindCounts.filterValues { it > 0 }.forEach { (kind, count) ->
-            ZxValueRow(kind.name, value = count.toString())
+            ZxValueRow(zxMemoryKindTitle(kind), value = count.toString())
         }
-        ZxSection("记忆管理")
+        ZxButton("刷新记忆统计", { refresh++ }, variant = ZxButtonVariant.Outline)
+        ZxSection("管理与策略")
         if (settings != null) {
-            ZxNavRow("记忆设置", sub = "自动召回 · 自动记忆") {
+            ZxNavRow("记忆设置", sub = "自动召回与自动记忆 · 读取当前保存状态") {
                 scope.onNavigate(UiSceneId("settings.memory_settings"))
             }
         }
-        ZxNavRow("记忆管理", sub = "搜索 · 修改 · 遗忘") {
+        ZxNavRow("打开记忆管理", sub = "按可见范围及类型搜索 · 查看 · 修改 · 置顶 · 遗忘") {
             scope.onNavigate(UiSceneId("settings.memory_management"))
         }
-
+        ZxFooterNote("本页显示有效记忆数量；遗忘的记忆不计入统计，不凭空推断可恢复数量。")
     }
 }
 

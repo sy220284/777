@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.uicontract.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -114,9 +115,6 @@ class ZhaoxiApplicationScenePack(
         conversations.forms != null) setOf(UiSceneId("conversation.ui_document"),
         UiSceneId("conversation.ui_document_generate")) else emptySet()
 
-    private val evidenceScene = if (conversations?.evidence != null)
-        setOf(UiSceneId("work.requirement_evidence")) else emptySet()
-
     private val personaScene = if (conversations?.gallery != null &&
         conversations.selection != null) setOf(UiSceneId("chat.persona_picker")) else emptySet()
 
@@ -202,7 +200,7 @@ class ZhaoxiApplicationScenePack(
     /** 全部端口注入时恰好 75 场景；未注入的域整体不声明。 */
     private val declaredScenes: Set<UiSceneId> =
         pages + sessionSettings + conversationScenes + documentScenes +
-            evidenceScene + personaScene + groupScenes + archiveScenes +
+            personaScene + groupScenes + archiveScenes +
             planScene + teamScene + settingsSuite + updateScene +
             messageActionScenes + suggestionsScenes + steeringScene +
             secondaryTools + secondaryWorkspace + secondaryMedia +
@@ -228,7 +226,6 @@ class ZhaoxiApplicationScenePack(
                 if (conversations.documents != null && conversations.forms != null)
                     addAll(setOf("ui_document.generate", "ui_document.generate_local",
                         "ui_document.prepare_input"))
-                if (conversations.evidence != null) add("work.evidence_reference")
                 if (conversations.gallery != null) {
                     add("chat.gallery_archive")
                     if (conversations.selection != null) add("chat.persona_selection")
@@ -247,6 +244,7 @@ class ZhaoxiApplicationScenePack(
                 if (owners.memory != null && owners.settings != null) add("memory.manage")
                 if (owners.automation != null) add("automation.manage")
                 if (owners.media != null) add("media.create")
+                if (owners.gallerySave != null) add("chat.gallery_save")
                 if (owners.authoring != null) add("chat.persona_authoring")
                 if (owners.currentPersona != null) add("chat.current_persona")
                 if (owners.diary != null) add("chat.diary_manage")
@@ -278,7 +276,7 @@ class ZhaoxiApplicationScenePack(
         val sessionId = identity?.sessionId ?: sec?.sessionId?.invoke().orEmpty()
         when (scene.value) {
             // ---- 壳层 ----
-            "route.home", "shell.new_session" -> ZhaoxiHomeScene(sec?.sessions, scope)
+            "route.home", "shell.new_session" -> ZhaoxiHomeScene(sec?.sessions, scope, sec?.conversationShell)
             "shell.search" -> ZhaoxiSearchScene(
                 sec?.sessions,
                 sec?.gallery ?: conv?.gallery,
@@ -297,6 +295,12 @@ class ZhaoxiApplicationScenePack(
                     targets.workspacePath = path
                     scope.onNavigate(UiSceneId("workspace.preview"))
                 },
+                transcript = conv?.history ?: sec?.transcript,
+                onMessageOpen = { source, message ->
+                    targets.message = source to message.id
+                    messagePreview = source to message
+                    scope.onNavigate(UiSceneId("conversation.reader"))
+                },
             )
             "shell.onboarding" -> ZhaoxiOnboardingScene(scope)
             "shell.empty" -> ZhaoxiEmptyDemoScene(scope)
@@ -307,18 +311,22 @@ class ZhaoxiApplicationScenePack(
                 ZhaoxiChatScene(it.chat, it.drafts, it.reading, it.history, authorName = "助手", scope,
                     onMessage = { identity, message -> targets.message = identity to message.id; messagePreview = identity to message; scope.onNavigate(UiSceneId("conversation.message_actions")) },
                     menu = { ZhaoxiConversationMenu(conversations, secondary, scope,
-                        hasSettings = settings != null, renderSlot = { RenderScene(it, scope) }) },
-                    documents = conv.documents, knownScenes = manifest.scenes, media = conv.media)
+                        hasSettings = settings != null) },
+                    documents = conv.documents, knownScenes = manifest.scenes, media = conv.media,
+                    attachments = conv.attachments, reasoning = conv.reasoning, settings = settings, corrections = conv.corrections, forms = conv.forms)
             }
             "conversation.work" -> conv?.let { ZhaoxiWorkScene(it.work, it.drafts, it.reading, it.history, scope,
                 onMessage = { identity, message -> targets.message = identity to message.id; messagePreview = identity to message; scope.onNavigate(UiSceneId("conversation.message_actions")) },
-                menu = { ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) }) },
-                    documents = conv.documents, knownScenes = manifest.scenes, media = conv.media) }
+                menu = { ZhaoxiConversationMenu(conversations, secondary, scope) },
+                    documents = conv.documents, knownScenes = manifest.scenes, media = conv.media,
+                    attachments = conv.attachments, reasoning = conv.reasoning, settings = settings, forms = conv.forms) }
             "conversation.header" -> conv?.let {
-                ZhaoxiConversationMenu(conversations, secondary, scope, renderSlot = { RenderScene(it, scope) })
+                ZxConversationRoutes(scope) {
+                    ZhaoxiConversationMenu(conversations, secondary, scope, hasSettings = settings != null)
+                }
             }
             "conversation.timeline" -> conv?.let {
-                ZhaoxiTimelineScene(it.chat, it.reading, it.history, it.documents, manifest.scenes, it.media)
+                ZhaoxiTimelineScene(it.chat, it.reading, it.history, it.documents, manifest.scenes, it.media, it.forms)
             }
             "conversation.composer" -> conv?.let {
                 val s = it.chat.snapshot()
@@ -355,6 +363,7 @@ class ZhaoxiApplicationScenePack(
                     "chat.branches" -> if (workMode) ZxEmpty("暂不支持工作分支切换", "返回工作会话继续") else ZhaoxiBranchesScene(msg, conv!!.chat, scope)
                     "conversation.reader" -> ZhaoxiReaderScene("阅读", msg.text, scope)
                     else -> ZhaoxiMessageActionsScene(msg, scope,
+                        allowBranchSwitch = !workMode,
                         onEdit = { scope.onNavigate(UiSceneId("conversation.edit")) },
                         onRegenerate = {
                             when {
@@ -372,24 +381,23 @@ class ZhaoxiApplicationScenePack(
                 }, { modelOwner.submit(SettingsUiCommand.SelectModel(it)) },
                     { scope.onNavigate(UiSceneId("settings.models")) }, scope)
             }
-            "conversation.ui_document" -> conv?.documents?.let { ZhaoxiUiDocumentScene(it, scope, ::currentDocumentContext, manifest.scenes, { conversations?.work?.snapshot()?.approval?.pendingId }, conv?.media) }
+            "conversation.ui_document" -> conv?.documents?.let { ZhaoxiUiDocumentScene(it, scope, ::currentDocumentContext, manifest.scenes, { conversations?.work?.snapshot()?.approval?.pendingId }, conv?.media, conv?.forms) }
             "conversation.ui_document_generate" -> conv?.documents?.let { ZhaoxiUiDocumentGenerateScene(it, scope, ::currentDocumentContext) }
-            "work.approval" -> conv?.let { ZhaoxiApprovalScene(it.work, scope) }
+            "work.approval" -> conv?.let { ZhaoxiApprovalScene(it.work, scope, it.workPolicy) }
             "work.question" -> conv?.let { ZhaoxiQuestionScene(it.work, scope) }
             "work.plan_review" -> conv?.workReads?.let {
-                ZhaoxiPlanReviewScene(it, conv.work, sessionId, scope, canOpenEvidence = conv.evidence != null)
+                ZhaoxiPlanReviewScene(it, conv.work, sessionId, scope)
             } ?: ZxEmpty("工作计划不可用", "当前会话尚未接入计划读取能力",
                 actionLabel = "返回", onAction = { scope.onBack() })
-            "work.requirement_evidence" -> if (conv?.evidence != null && identity != null)
-                ZhaoxiRequirementEvidenceScene(conv.evidence, identity, scope)
-            else ZxEmpty("证据不可用", "缺少会话身份")
             "work.team" -> conv?.workTeam?.let { ZhaoxiWorkTeamScene(it, scope) }
                 ?: ZxEmpty("团队信息不可用", "当前会话没有团队运行信息",
                     actionLabel = "返回", onAction = { scope.onBack() })
             "work.capabilities" -> sec?.tools?.let { ZhaoxiToolsScene(it, scope, "work.capabilities") }
                 ?: ZxEmpty("能力目录不可用", "工具管理尚未连接",
                     actionLabel = "返回", onAction = { scope.onBack() })
-            "work.steering_choice" -> ZhaoxiSteeringScene(scope)
+            "work.steering_choice" -> conv?.let { ZhaoxiSteeringScene(it.work, it.drafts, scope) }
+                ?: ZxEmpty("工作调整暂不可用", "请先打开 Work 会话",
+                    actionLabel = "返回", onAction = { scope.onBack() })
             "chat.reply_suggestions" -> (conv?.replySuggestions ?: sec?.replySuggestions)?.let {
                 ZxReplySuggestionsScene(it, onPick = { text ->
                     val current = conv?.chat?.snapshot()?.identity
@@ -409,8 +417,15 @@ class ZhaoxiApplicationScenePack(
                 }
             // 人物子页的图集 id 合法来源 = CurrentPersonaUiPort.read() 的 target.personaId；
             // 端口未注入或无当前人物时显式空态，不伪造目标。
+            "route.diary" -> (sec?.gallery ?: conv?.gallery)?.let { gallery ->
+                ZhaoxiDiaryHubScene(gallery, scope, onOpenDiary = { galleryId ->
+                    targets.galleryId = galleryId
+                    scope.onNavigate(UiSceneId("chat.diary"))
+                })
+            } ?: ZxEmpty("人物目录暂不可用", "请从人物图集重新进入",
+                actionLabel = "返回", onAction = { scope.onBack() })
             "chat.gallery_profile", "chat.persona_editor", "chat.world_book",
-            "chat.gallery_portrait", "chat.gallery_delete", "chat.diary", "route.diary" -> {
+            "chat.gallery_portrait", "chat.gallery_delete", "chat.diary" -> {
                 val personaTarget = (sec?.currentPersona?.read() as?
                     com.labteto.dshmobile.uicontract.UiCurrentPersonaReceipt.Loaded)
                     ?.snapshot?.target
@@ -418,9 +433,9 @@ class ZhaoxiApplicationScenePack(
                 if (gid == null) ZxEmpty("未指定人物", "请从人物图集进入 · 目标由宿主导航提案携带")
                 else when (scene.value) {
                     "chat.gallery_profile" -> ZhaoxiPersonaProfileScene(gid, sec?.gallery ?: conv?.gallery,
-                        conv?.selection ?: sec?.selection, conv?.stories, sec?.transfer, scope)
+                        conv?.selection ?: sec?.selection, conv?.stories, sec?.transfer, scope, sec?.authoring)
                     "chat.persona_editor", "chat.world_book" ->
-                        if (sec?.authoring != null) ZhaoxiPersonaEditorScene(sec.authoring, gid, scope, initialTab = if (scene.value == "chat.world_book") 2 else 0)
+                        if (sec?.authoring != null) ZhaoxiPersonaEditorScene(sec.authoring, gid, scope, initialTab = if (scene.value == "chat.world_book") 2 else 0, identity = identity)
                         else ZxEmpty("人物编辑暂不可用", "请返回人物图集",
                             actionLabel = "返回", onAction = { scope.onBack() })
                     "chat.gallery_portrait" ->
@@ -509,22 +524,35 @@ class ZhaoxiApplicationScenePack(
             "settings.memory_settings" -> settings?.let { ZhaoxiMemorySettingsScene(it, scope) }
             "settings.account" -> settings?.let { ZhaoxiAccountScene(it, scope) }
             "settings.minimax_quota" -> settings?.let { ZhaoxiQuotaScene(it, scope) }
-            "settings.usage" -> usageOwner?.let { ZhaoxiUsageOverviewScene(it, scope) }
-            "settings.model_usage" -> usageOwner?.let { ZhaoxiUsageOverviewScene(it, scope, modelOnly = true) }
+            "settings.usage" -> usageOwner?.let {
+                ZhaoxiUsageOverviewScene(it, scope, settings = settings, onOpenLog = { model ->
+                    targets.usageModelFilter = model
+                    scope.onNavigate(UiSceneId("settings.usage_log"))
+                })
+            }
+            "settings.model_usage" -> usageOwner?.let {
+                ZhaoxiUsageOverviewScene(it, scope, modelOnly = true, settings = settings, onOpenLog = { model ->
+                    targets.usageModelFilter = model
+                    scope.onNavigate(UiSceneId("settings.usage_log"))
+                })
+            }
             "settings.usage_log" -> usageOwner?.let { usage ->
-                ZhaoxiUsageLogScene(usage, scope) { requestId ->
+                ZhaoxiUsageLogScene(usage, scope, openRequest = { requestId ->
                     targets.usageRequestId = requestId
                     scope.onNavigate(UiSceneId("settings.usage_detail"))
-                }
+                }, initialModel = targets.usageModelFilter)
             }
             "settings.usage_detail" -> usageOwner?.let { ZhaoxiUsageDetailScene(it, targets.usageRequestId, scope) }
             "settings.model_performance" -> sec?.modelPerformance?.let { ZhaoxiPerformanceScene(it, scope) }
             "settings.pricing" -> sec?.pricing?.let { ZhaoxiPricingScene(it, scope) }
             "settings.memory" -> sec?.memory?.let { ZhaoxiMemoryOverviewScene(it, settings ?: sec.settings, scope) }
-            "settings.memory_management" -> sec?.memory?.let { ZhaoxiMemoryManagementScene(it, scope) }
+            "settings.memory_management" -> sec?.memory?.let { ZhaoxiMemoryManagementScene(it, scope, settings ?: sec.settings) }
             "settings.session_storage" -> settings?.let { ZhaoxiStorageScene(it, scope) }
-            "settings.diagnostics", "settings.update" ->
-                ZhaoxiDiagnosticsScene(updateStatus, checkForUpdate, scope)
+            "settings.diagnostics" -> (settings ?: sec?.settings)?.let {
+                ZhaoxiDiagnosticsSettingsScene(it, scope)
+            } ?: ZxEmpty("诊断暂不可用", "设置 Owner 未接入",
+                actionLabel = "返回", onAction = { scope.onBack() })
+            "settings.update" -> ZhaoxiDiagnosticsScene(updateStatus, checkForUpdate, scope)
 
             else -> ZxEmpty("页面暂不可用", "请返回重试")
         }
@@ -573,13 +601,21 @@ class ZhaoxiApplicationScenePack(
                     workMode = state.stack.lastOrNull()?.value == "conversation.work",
                 )
                 // Only the incoming content is live; do not retain an outgoing command tree.
-                val progress = remember { Animatable(0f) }
+                val instant = reduced || appearance.motionScale == 0f
+                val progress = remember { Animatable(if (instant) 1f else 0f) }
                 val motion = ZhaoxiMotion.spec<Float>(ZhaoxiDuration.NORMAL)
-                LaunchedEffect(state.stack.lastOrNull()) {
-                    progress.snapTo(0f)
-                    progress.animateTo(1f, motion)
+                LaunchedEffect(state.stack.lastOrNull(), instant) {
+                    if (instant) progress.snapTo(1f)
+                    else {
+                        progress.snapTo(0f)
+                        progress.animateTo(1f, motion)
+                    }
                 }
-                Box(Modifier.fillMaxSize().graphicsLayer {
+                // Modal drawer paints under status/navigation bars; ordinary scenes inset their controls.
+                // Never inset the drawer surface itself, or a black strip appears above it.
+                val drawerScene = state.stack.lastOrNull()?.value in setOf("route.home", "shell.new_session")
+                val insetContent = if (drawerScene) Modifier else Modifier.systemBarsPadding()
+                Box(Modifier.fillMaxSize().then(insetContent).graphicsLayer {
                     alpha = progress.value
                     translationY = (1f - progress.value) * 16f * density
                 }) { content() }

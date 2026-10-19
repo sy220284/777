@@ -16,6 +16,7 @@ android {
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21) } }
 dependencies {
     api(project(":ui-contract"))
+    testImplementation(libs.junit)
     implementation(platform(libs.androidx.compose.bom))
     implementation("androidx.compose.runtime:runtime")
     implementation(libs.androidx.activity.compose)
