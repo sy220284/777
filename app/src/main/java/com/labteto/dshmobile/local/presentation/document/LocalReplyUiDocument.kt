@@ -44,7 +44,7 @@ internal object LocalReplyUiDocumentProtocol {
         nodes, actions, fallbackText. Each node needs a unique id and type.
         Example of an editable choice:
         ```ui_document
-        {"schemaVersion":1,"documentId":"reply","revision":0,"title":"选择下一步","nodes":[{"id":"choice","type":"select","label":"处理方式","options":["核对","修改"],"initial":"核对"},{"id":"go","type":"button","label":"继续","actionId":"draft"}],"actions":[{"id":"draft","type":"send_user_input","text":"按所选方式继续：","fieldIds":["choice"]}],"fallbackText":"请选择核对或修改。"}
+        {"schemaVersion":1,"documentId":"reply","revision":0,"title":"选择下一步","nodes":[{"id":"choice","type":"select","label":"处理方式","options":["核对","修改"],"initial":"核对"},{"id":"go","type":"button","label":"确认并发送表单","actionId":"submit"}],"actions":[{"id":"submit","type":"submit_user_input","text":"按所选方式继续：","fieldIds":["choice"]}],"fallbackText":"请选择核对或修改。"}
         ```
         Supported nodes: text(text), table(headers,rows), bar_chart(title,unit,points),
         line_chart(title,unit,points), field(label,initial,required), textarea(label,initial,required),
