@@ -15,6 +15,8 @@ RETIRED = (
     "ui-pack-zhaoxi",
     "ui-host",
     "ui-contract",
+    "app/src/main/java/com/labteto/dshmobile/uicontract/UiPackManifest.kt",
+    "app/src/main/java/com/labteto/dshmobile/uicontract/UiDesignTokens.kt",
     "ui-pack-v6",
     "app/src/main/java/com/labteto/dshmobile/ui/host",
     "docs/design/zhaoxi",
