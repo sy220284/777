@@ -92,7 +92,11 @@ class LocalModelGateway @Inject constructor(
             .build()
         return withContext(Dispatchers.IO) {
             withCancellableHttpResponse(http.newCall(request)) { response ->
-                check(response.isSuccessful) { "服务商模型目录查询失败（HTTP ${response.code}）" }
+                check(response.isSuccessful) {
+                    if (response.code == 401 && LocalMiniMaxPolicy.isOfficial(profile.baseUrl)) {
+                        LocalMiniMaxPolicy.authenticationFailureHint(profile.baseUrl)
+                    } else "服务商模型目录查询失败（HTTP ${response.code}）"
+                }
                 val body = response.body ?: error("服务商模型目录没有响应体")
                 check(body.contentLength() <= 524288) { "服务商模型目录响应超过 512 KiB" }
                 val raw = response.peekBody(524289).string()
