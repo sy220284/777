@@ -581,9 +581,13 @@ internal class LocalWorkAgentTurnExecutor(
                                 formHandling == com.labteto.dshmobile.local.presentation.document.WorkReplyFormHandling.WAIT_FOR_SUBMISSION
                             ) {
                                 waitingForReplyFormSubmission = true
-                                runEventLog.append("work/reply-form-awaiting-submission", buildJsonObject {
+                                runEventLog.append(WORK_REPLY_FORM_WAIT_EVENT, buildJsonObject {
                                     put("source_message_id", uiSourceMessageId)
                                     put("step", event.step)
+                                    binding.workState.snapshot().goal?.let { goal ->
+                                        put("goal_id", goal.id)
+                                        put("goal_revision", goal.revision)
+                                    }
                                 })
                             }
                             runHistory.append(reply.message)
