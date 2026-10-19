@@ -166,6 +166,7 @@ class LocalModelApiKeyDraftTest {
                     contextWindowTokensOverride = 900_000, newProfileId = { "invalid" })
             }
         }
+        Unit
     }
 
     @Test fun customContextOverrideIsValidatedAndOfficialPresetIgnoresIt() = runBlocking {
