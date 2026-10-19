@@ -14,11 +14,10 @@ internal const val WORK_REPLY_FORM_WAIT_EVENT = "work/reply-form-awaiting-submis
  * automated follow-through until a later user-owned send enters this session. Tool
  * receipts, model replies and autonomous goal continuations never release the block.
  */
-internal fun hasOutstandingWorkReplyForm(log: LocalSessionEventLog, goal: LocalGoal): Boolean {
-    if (goal.id.isBlank()) return false
-    val waiting = log.latestMatching(setOf(WORK_REPLY_FORM_WAIT_EVENT)) { data ->
-        (data["goal_id"] as? JsonPrimitive)?.contentOrNull == goal.id
-    } ?: return false
+internal fun hasOutstandingWorkReplyForm(log: LocalSessionEventLog): Boolean {
+    // The user decision belongs to this Session, not to whichever Goal happens
+    // to be active after a recovery, replacement or tool-authored state update.
+    val waiting = log.latest(WORK_REPLY_FORM_WAIT_EVENT) ?: return false
     val submitted = log.latestMatching(setOf("user/message", LOCAL_AGENT_INBOX_EVENT_TYPE)) { data ->
         if ("action" !in data) return@latestMatching true // real user/message event
         val action = (data["action"] as? JsonPrimitive)?.contentOrNull
