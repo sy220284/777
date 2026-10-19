@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -52,12 +53,13 @@ fun ZxPage(
     onBack: (() -> Unit)? = null,
     menu: Boolean = false,
     topRight: @Composable () -> Unit = {},
+    scrollState: ScrollState = rememberScrollState(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(modifier.fillMaxSize().imePadding()) {
         // Keep the scene surface transparent so E8.17 ambient light remains visible.
         ZxTopBar(title, onNav = { onBack?.invoke() }, canBack = !menu, showNav = onBack != null) { topRight() }
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 24.dp)) {
+        Column(Modifier.fillMaxSize().verticalScroll(scrollState).padding(start = 18.dp, end = 18.dp, bottom = 24.dp)) {
             content()
         }
     }
