@@ -132,7 +132,7 @@ class DeepSeekClient @Inject constructor(
                     throw LocalModelException(
                         code = "MODEL_HTTP_${response.code}",
                         message = if (response.code == 401 && LocalMiniMaxPolicy.isOfficial(baseUrl)) {
-                            LocalMiniMaxPolicy.authenticationFailureHint(baseUrl)
+                            LocalMiniMaxPolicy.authenticationFailureHint()
                         } else "模型请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
                         retryable = response.code == 408 || response.code == 429 || response.code >= 500,
                         status = response.code,
@@ -249,7 +249,7 @@ class DeepSeekClient @Inject constructor(
                     throw LocalModelException(
                         code = "MODEL_HTTP_${response.code}",
                         message = if (response.code == 401 && LocalMiniMaxPolicy.isOfficial(baseUrl)) {
-                            LocalMiniMaxPolicy.authenticationFailureHint(baseUrl)
+                            LocalMiniMaxPolicy.authenticationFailureHint()
                         } else "模型请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
                         retryable = response.code == 408 || response.code == 429 || response.code >= 500,
                         status = response.code,
