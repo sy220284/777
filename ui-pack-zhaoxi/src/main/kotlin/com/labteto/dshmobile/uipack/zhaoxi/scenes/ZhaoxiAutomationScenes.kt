@@ -938,10 +938,11 @@ fun ZhaoxiToolsScene(
                                 ZxSection("使用条件")
                                 cap.requirements.forEach { ZxFooterNote(it) }
                             }
-                            val properties = cap.parameterSchema?.get("properties") as? kotlinx.serialization.json.JsonObject
-                            if (properties != null) {
+                            val schema = cap.parameterSchema
+                            val properties = schema?.get("properties") as? kotlinx.serialization.json.JsonObject
+                            if (properties != null && schema != null) {
                                 ZxSection("参数结构")
-                                val required = cap.parameterSchema["required"] as? kotlinx.serialization.json.JsonArray
+                                val required = schema["required"] as? kotlinx.serialization.json.JsonArray
                                 properties.forEach { (name, definition) ->
                                     val attrs = definition as? kotlinx.serialization.json.JsonObject
                                     val description = (attrs?.get("description") as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty()
@@ -955,7 +956,7 @@ fun ZhaoxiToolsScene(
                                 ZxField(draft, { draft = it; check = null }, Modifier.fillMaxWidth().height(100.dp),
                                     placeholder = "JSON 参数草稿（仅校验）")
                                 ZxButton("检查参数", {
-                                    check = when (val result = tools.validateCapabilityDraft(cap.name, cap.parameterSchema, draft)) {
+                                    check = when (val result = tools.validateCapabilityDraft(cap.name, schema, draft)) {
                                         com.labteto.dshmobile.uicontract.UiToolDraftValidation.Valid -> "参数符合当前已注册能力的结构要求"
                                         is com.labteto.dshmobile.uicontract.UiToolDraftValidation.Rejected -> result.reason
                                     }
