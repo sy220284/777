@@ -22,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -30,10 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.labteto.dshmobile.uicontract.UiSessionIdentity
-import com.labteto.dshmobile.uicontract.UiWorkEvidenceReadReceipt
 import com.labteto.dshmobile.uicontract.UiWorkPlanSnapshot
-import com.labteto.dshmobile.uicontract.WorkEvidenceUiPort
 import com.labteto.dshmobile.uicontract.WorkReadUiPort
 import com.labteto.dshmobile.uicontract.WorkTeamUiCommand
 import com.labteto.dshmobile.uicontract.WorkTeamUiPort
@@ -54,15 +50,14 @@ import com.labteto.dshmobile.uihost.UiSceneRenderScope
 import kotlinx.coroutines.launch
 
 /**
- * 工作域场景（E8.14 实装）：work.plan_review / requirement_evidence / team /
- * capabilities / steering_choice / workspace.preview。
- * 证据与团队数据全部来自 Work Owner 端口投影；不做任何完成性断言的改写。
+ * 工作域场景：计划审查、团队、工具能力与工作区预览。
+ * 执行状态通过 Work Owner 读取；已按用户要求撤销独立需求证据验收页。
  */
 
 /** work.plan_review — 计划审查（方案呈现 + 逐步确认 + 批准执行）。 */
 @Composable
 fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile.uicontract.WorkConversationUiPort,
-    sessionId: String, scope: UiSceneRenderScope, canOpenEvidence: Boolean = false) {
+    sessionId: String, scope: UiSceneRenderScope) {
     val snapshot by work.snapshots.collectAsState(initial = work.snapshot())
     val plan = snapshot.let { workReads.planForUi(sessionId) }
     var historyRefresh by remember(sessionId) { mutableStateOf(0) }
@@ -200,9 +195,6 @@ fun ZhaoxiPlanReviewScene(workReads: WorkReadUiPort, work: com.labteto.dshmobile
                         (item.resultPreview?.let { " · ${it.take(90)}" } ?: ""))
                 }
             }
-            if (canOpenEvidence) ZxNavRow("需求与证据") {
-                scope.onNavigate(com.labteto.dshmobile.uicontract.UiSceneId("work.requirement_evidence"))
-            }
         }
     }
 }
@@ -248,239 +240,6 @@ private fun ZhaoxiWorkEventTimelineItem(
             }
             Text("事件 #${event.sequence}", color = c.ink3, fontSize = 11.sp)
         }
-    }
-}
-
-/** work.requirement_evidence — 需求证据关联。 */
-/** True only if the content hash still matches the exact file selected by the user. */
-internal fun zxEvidenceLinkCurrent(link: com.labteto.dshmobile.local.work.LocalRequirementEvidenceLink): Boolean =
-    link.versionNow != null && link.versionNow == link.versionAtLink
-
-@Composable
-fun ZhaoxiRequirementEvidenceScene(
-    evidence: WorkEvidenceUiPort,
-    identity: UiSessionIdentity,
-    scope: UiSceneRenderScope,
-) {
-    var refresh by remember(identity) { mutableStateOf(0) }
-    val snap by produceState<UiWorkEvidenceReadReceipt?>(null, identity, refresh) {
-        value = try { evidence.read(identity) } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            throw cancelled
-        } catch (failure: Exception) { UiWorkEvidenceReadReceipt.Failed(failure.message) }
-        evidence.changes(identity).collect {
-            value = try { evidence.read(identity) }
-            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (failure: Exception) { UiWorkEvidenceReadReceipt.Failed(failure.message) }
-        }
-    }
-    val co = rememberCoroutineScope()
-    var busy by remember(identity) { mutableStateOf(false) }
-    var feedback by remember(identity) { mutableStateOf<String?>(null) }
-    var selectedRequirement by remember(identity) { mutableStateOf<Int?>(null) }
-    var selectedArtifact by remember(identity) { mutableStateOf<String?>(null) }
-    var selectedLinkSequence by remember(identity) { mutableStateOf<Long?>(null) }
-    var requiredText by remember(identity) { mutableStateOf("") }
-    var reviewConfirmation by remember(identity) {
-        mutableStateOf<Pair<com.labteto.dshmobile.local.work.LocalRequirementEvidenceLink, Boolean>?>(null)
-    }
-    fun execute(action: suspend () -> com.labteto.dshmobile.uicontract.UiCommandReceipt, label: String) {
-        if (busy) return
-        busy = true
-        co.launch {
-            try {
-                val response = action()
-                feedback = "$label：${response.userHint()}"
-                if (response.admitted()) refresh++
-            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (failure: Exception) { feedback = "$label：${failure.message ?: "失败，请重试"}" }
-            finally { busy = false }
-        }
-    }
-    ZxPage("需求与证据", onBack = { scope.onBack() }) {
-        Spacer(Modifier.height(8.dp))
-        feedback?.let { ZxFooterNote(it) }
-        if (busy) ZxFooterNote("正在提交，等待真实 Work Owner 的回执")
-        when (val r = snap) {
-            null -> repeat(3) {
-                com.labteto.dshmobile.uipack.zhaoxi.components.ZxSkeleton(
-                    com.labteto.dshmobile.uipack.zhaoxi.components.ZxSkeletonVariant.Row,
-                    Modifier.padding(vertical = 6.dp))
-            }
-            is UiWorkEvidenceReadReceipt.Available -> {
-                val info = r.snapshot
-                val target = info.requirements.firstOrNull { it.index == selectedRequirement }
-                val chosen = info.artifacts.firstOrNull { it.reference == selectedArtifact }
-                ZxSection("Work 需求 · ${info.requirements.size}")
-                ZxValueRow("已关联文件", value = "${info.references.size} 条")
-                ZxFooterNote("需求报告状态、文件哈希、人工审核、文字条件独立呈现。关联文件不会自动使整个任务通过。")
-                if (info.requirements.isEmpty()) ZxEmpty("暂无可核验需求", "运行时生成需求清单后才能关联证据")
-                info.requirements.forEach { req ->
-                    val active = target?.index == req.index
-                    val links = info.references.count { it.requirementIndex == req.index }
-                    ZxRow("需求 #${req.index} · ${req.text.take(130)}",
-                        "Owner 报告：${req.reportedStatus} · 已关联 $links 份证据",
-                        onClick = {
-                            selectedRequirement = if (active) null else req.index
-                            selectedArtifact = null
-                            selectedLinkSequence = null
-                        }, trailing = { ZxChip(if (active) "收起" else "检查", active) {
-                            selectedRequirement = if (active) null else req.index
-                            selectedArtifact = null
-                            selectedLinkSequence = null
-                        } })
-                }
-                if (target != null) {
-                    ZxSection("当前需求 #${target.index}")
-                    ZxRow("目标原文", target.text, showChevron = false)
-                    ZxSection("关联产物")
-                    if (info.artifacts.isEmpty()) ZxFooterNote("尚无可关联的真实运行产物")
-                    info.artifacts.forEach { artifact ->
-                        val selected = chosen?.reference == artifact.reference
-                        val label = when (artifact.currentlyAvailable) {
-                            true -> "当前可访问"
-                            false -> "已不可访问"
-                            null -> "尚未确认当前可访问性"
-                        }
-                        ZxRow(artifact.reference.substringAfterLast('/').ifBlank { artifact.reference },
-                            "${artifact.category} · $label",
-                            onClick = { selectedArtifact = if (selected) null else artifact.reference },
-                            trailing = { ZxChip(if (selected) "已选" else "选择", selected) {
-                                selectedArtifact = if (selected) null else artifact.reference
-                            } })
-                    }
-                    if (chosen != null) {
-                        ZxButton("将选中产物关联此需求", {
-                            execute({
-                                when (val checked = evidence.inspect(identity, chosen)) {
-                                    is com.labteto.dshmobile.uicontract.UiWorkArtifactInspectionReceipt.Ready ->
-                                        evidence.submit(com.labteto.dshmobile.uicontract.LinkWorkEvidenceReferenceCommand(
-                                            identity, target.index, target.text, checked.artifact,
-                                            info.goalId, verifyGoalId = info.goalId != null))
-                                    is com.labteto.dshmobile.uicontract.UiWorkArtifactInspectionReceipt.Rejected ->
-                                        com.labteto.dshmobile.uicontract.UiCommandReceipt.Rejected(checked.reason)
-                                    is com.labteto.dshmobile.uicontract.UiWorkArtifactInspectionReceipt.Failed ->
-                                        com.labteto.dshmobile.uicontract.UiCommandReceipt.Failed(checked.message ?: "文件不可核验")
-                                }
-                            }, "关联文件")
-                        }, enabled = !busy && chosen.currentlyAvailable != false,
-                            variant = ZxButtonVariant.Outline)
-                    }
-                    val relevant = info.references.filter { it.requirementIndex == target.index }
-                    ZxSection("这项需求的证据 · ${relevant.size}")
-                    relevant.forEach { link ->
-                        val current = zxEvidenceLinkCurrent(link)
-                        val chosenLink = selectedLinkSequence == link.eventSequence
-                        ZxRow(link.artifactPath.substringAfterLast('/'),
-                            if (current) "文件版本一致 · 等待明确审核" else
-                                if (link.versionNow == null) "文件已不可访问" else "文件版本已变化",
-                            onClick = { selectedLinkSequence = if (chosenLink) null else link.eventSequence },
-                            trailing = { ZxChip(if (chosenLink) "收起" else "核验", chosenLink) {
-                                selectedLinkSequence = if (chosenLink) null else link.eventSequence
-                            } })
-                        if (chosenLink) {
-                            ZxValueRow("关联时 SHA-256", value = link.versionAtLink.take(20) + "…", mono = true)
-                            val review = info.reviews.lastOrNull { item ->
-                                item.linkSequence == link.eventSequence &&
-                                    item.artifactPath == link.artifactPath &&
-                                    item.requirementIndex == target.index
-                            }
-                            if (review != null) ZxValueRow("最近人工审查",
-                                value = if (review.approvedByUser) "用户已确认此文件的内容" else "用户未认可此文件的内容")
-                            val checks = info.textChecks.filter { item ->
-                                item.linkSequence == link.eventSequence && item.artifactPath == link.artifactPath
-                            }
-                            if (checks.isNotEmpty()) {
-                                ZxSection("已执行文字检查 · ${checks.size}")
-                                checks.takeLast(8).forEach { check ->
-                                    ZxRow(if (check.containsRequiredText) "要求文字存在" else "要求文字未找到",
-                                        "仅这一项明确文字条件的检测结果", showChevron = false)
-                                }
-                            }
-                            if (!current) ZxFooterNote("文件失效或已修改，旧审核与检查不能证明当前版本")
-                            val verifiedGoalId = info.goalId
-                            if (current && verifiedGoalId != null) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    ZxButton("确认内容", { reviewConfirmation = link to true },
-                                        Modifier.weight(1f), enabled = !busy)
-                                    ZxButton("不认可", { reviewConfirmation = link to false },
-                                        Modifier.weight(1f), enabled = !busy, variant = ZxButtonVariant.Outline)
-                                }
-                                ZxSection("逐字条件")
-                                ZxField(requiredText, { requiredText = it }, Modifier.fillMaxWidth(),
-                                    placeholder = "输入文件中必须包含的确切文字")
-                                ZxButton("执行文字存在性检查", {
-                                    execute({
-                                        evidence.checkText(com.labteto.dshmobile.uicontract.CheckWorkEvidenceTextCommand(
-                                            identity, verifiedGoalId, target.index, target.text,
-                                            link.artifactPath, link.eventSequence, link.versionAtLink,
-                                            requiredText))
-                                    }, "文字检查")
-                                }, enabled = !busy && requiredText.isNotBlank(),
-                                    variant = ZxButtonVariant.Outline)
-                            } else if (current) ZxFooterNote("本次需求缺少稳定 Goal ID，不能提交人工审核")
-                        }
-                    }
-                }
-                if (info.artifacts.isNotEmpty()) {
-                    ZxSection("全部运行产物 · ${info.artifacts.size}")
-                    info.artifacts.take(24).forEach { artifact ->
-                        ZxRow(artifact.reference.substringAfterLast('/').ifBlank { artifact.reference },
-                            "${artifact.category} · " + when (artifact.currentlyAvailable) {
-                                true -> "可访问"
-                                false -> "已不可访问"
-                                null -> "当前可用性未确认"
-                            }, showChevron = false)
-                    }
-                }
-                info.machine?.let { m ->
-                    ZxSection("机器条件核验")
-                    val label = when (m.status) {
-                        com.labteto.dshmobile.uicontract.UiWorkMachineVerificationStatus.NO_MACHINE_CONDITIONS ->
-                            "没有可自动核验的条件"
-                        com.labteto.dshmobile.uicontract.UiWorkMachineVerificationStatus.UNSATISFIED ->
-                            "仍有未满足的条件"
-                        com.labteto.dshmobile.uicontract.UiWorkMachineVerificationStatus.VERIFIED_CONDITIONS ->
-                            "仅已定义的机检条件满足"
-                    }
-                    ZxValueRow("检测范围", value = "文件 ${m.artifactConditionCount} 项 · 命令 ${m.commandConditionCount} 项")
-                    ZxValueRow("条件状态", value = label)
-                    if (m.missing.isNotEmpty()) {
-                        ZxSection("仍缺少的条件")
-                        m.missing.forEach { item -> ZxRow(item, "", showChevron = false) }
-                        if (m.hiddenMissingCount > 0)
-                            ZxFooterNote("另外还有 ${m.hiddenMissingCount} 项条件未在当前页面展开")
-                    }
-                    ZxFooterNote("机器条件通过仍需结合需求原文、人工审核与 Lead 验收。")
-                }
-            }
-            is UiWorkEvidenceReadReceipt.Rejected ->
-                com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
-                    "读取被拒 · ${r.reason}", com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
-            is UiWorkEvidenceReadReceipt.Failed ->
-                com.labteto.dshmobile.uipack.zhaoxi.components.ZxBanner(
-                    "读取失败 · ${r.message ?: "未知"}", com.labteto.dshmobile.uipack.zhaoxi.components.ZxTone.Err)
-        }
-        ZxButton("刷新证据", { refresh++ }, enabled = !busy, variant = ZxButtonVariant.Outline)
-    }
-    reviewConfirmation?.let { (link, approved) ->
-        val current = (snap as? UiWorkEvidenceReadReceipt.Available)?.snapshot
-        ZxDialog(if (approved) "确认已审阅文件？" else "标记文件内容未通过？",
-            "这里只记录你对这份文件的人工审查结论，整个工作任务仍需独立验收。",
-            if (approved) "确认内容" else "确认不认可", {
-                reviewConfirmation = null
-                val goal = current?.goalId
-                val req = current?.requirements?.firstOrNull { it.index == link.requirementIndex }
-                val upToDate = current?.references?.any {
-                    it.eventSequence == link.eventSequence && zxEvidenceLinkCurrent(it)
-                } == true
-                if (goal != null && req != null && upToDate && !busy) {
-                    execute({
-                        evidence.review(com.labteto.dshmobile.uicontract.ReviewWorkEvidenceCommand(
-                            identity, goal, req.index, req.text,
-                            link.artifactPath, link.eventSequence, link.versionAtLink, approved))
-                    }, "人工内容审核")
-                } else feedback = "需求或文件已变化，请刷新重新选择"
-            }, { reviewConfirmation = null })
     }
 }
 
