@@ -210,64 +210,6 @@ internal fun PluginInventoryBrowser(
                     .testTag("plugin-inventory-search"),
                 placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
             )
-            if (skillsOnly) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection),
-                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                    ) {
-                        if (onImportSkill != null) {
-                            SyButton(
-                                text = stringResource(R.string.skills_import_file),
-                                onClick = onImportSkill,
-                                enabled = !loading,
-                                modifier = Modifier.weight(1f).testTag("skill-import-file"),
-                            )
-                        }
-                        if (onUseCapability != null) {
-                            SyButton(
-                                text = stringResource(R.string.skills_create_in_chat),
-                                onClick = { onUseCapability(skillCreationPrompt) },
-                                enabled = !loading,
-                                variant = SyButtonVariant.Info,
-                                modifier = Modifier.weight(1f).testTag("skill-create-in-chat"),
-                            )
-                        }
-                    }
-                    Text(
-                        stringResource(R.string.skills_import_hint),
-                        modifier = Modifier.fillMaxWidth(),
-                        style = DsType.small13.withReadingWeight(),
-                        color = colors.textSecondary,
-                        maxLines = 2,
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            stringResource(R.string.skills_catalog_overview, skills.size, availablePresets.size),
-                            style = DsType.small13Strong.withReadingWeight(),
-                            color = colors.textSecondary,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (onCreateSkill != null) {
-                            SyButton(
-                                text = stringResource(R.string.skills_create_manual),
-                                variant = SyButtonVariant.Ghost,
-                                onClick = { showCreateSkill = true },
-                                enabled = !loading,
-                                size = SyButtonSize.Small,
-                                modifier = Modifier.testTag("skill-create-manual"),
-                            )
-                        }
-                    }
-                }
-            }
             if (!skillsOnly) LazyRow(
                 modifier = Modifier.testTag("plugin-category-list"),
                 contentPadding = PaddingValues(horizontal = SyMetric.gapSection),
@@ -334,7 +276,79 @@ internal fun PluginInventoryBrowser(
                         .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapSm),
                 )
             }
-            if (error != null || list.isEmpty()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    horizontal = SyMetric.gapSection,
+                    vertical = SyMetric.gapMd,
+                ),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+            ) {
+                if (skillsOnly && query.isBlank()) {
+                    item(key = "skill-creation-actions") {
+            if (skillsOnly) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                    ) {
+                        if (onImportSkill != null) {
+                            SyButton(
+                                text = stringResource(R.string.skills_import_file),
+                                onClick = onImportSkill,
+                                enabled = !loading,
+                                modifier = Modifier.weight(1f).testTag("skill-import-file"),
+                            )
+                        }
+                        if (onUseCapability != null) {
+                            SyButton(
+                                text = stringResource(R.string.skills_create_in_chat),
+                                onClick = { onUseCapability(skillCreationPrompt) },
+                                enabled = !loading,
+                                variant = SyButtonVariant.Info,
+                                modifier = Modifier.weight(1f).testTag("skill-create-in-chat"),
+                            )
+                        }
+                    }
+                    Text(
+                        stringResource(R.string.skills_import_hint),
+                        modifier = Modifier.fillMaxWidth(),
+                        style = DsType.small13.withReadingWeight(),
+                        color = colors.textSecondary,
+                        maxLines = 2,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            stringResource(R.string.skills_catalog_overview, skills.size, availablePresets.size),
+                            style = DsType.small13Strong.withReadingWeight(),
+                            color = colors.textSecondary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (onCreateSkill != null) {
+                            SyButton(
+                                text = stringResource(R.string.skills_create_manual),
+                                variant = SyButtonVariant.Ghost,
+                                onClick = { showCreateSkill = true },
+                                enabled = !loading,
+                                size = SyButtonSize.Small,
+                                modifier = Modifier.testTag("skill-create-manual"),
+                            )
+                        }
+                    }
+                }
+            }
+
+                    }
+                }
+                if (error != null || list.isEmpty()) {
+                    item(key = "inventory-empty") {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
@@ -351,15 +365,8 @@ internal fun PluginInventoryBrowser(
                     // The existing V5 service-nav action above remains available here.
                     // Do not render a second visually identical external-service button.
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        horizontal = SyMetric.gapSection,
-                        vertical = SyMetric.gapMd,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-                ) {
+                    }
+                } else {
                     items(list, key = { it.id }) { item ->
                         Surface(
                             modifier = Modifier.fillMaxWidth().testTag("plugin-inventory-card-${item.id}"),
