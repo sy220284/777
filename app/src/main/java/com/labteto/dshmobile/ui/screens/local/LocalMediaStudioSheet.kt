@@ -297,6 +297,17 @@ internal fun LocalMediaStudioSheetContent(
                 )
             }
 
+            if (matchingRevision == null && sourceMessageId != null && prompt.isBlank() &&
+                (kind == LocalMediaKind.IMAGE || kind == LocalMediaKind.VIDEO)
+            ) {
+                Text(
+                    text = stringResource(R.string.media_reply_requires_visual_scene),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.textSecondary,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
             when (kind) {
                 LocalMediaKind.IMAGE -> {
                     val ratios = listOf("1:1", "16:9", "9:16")
