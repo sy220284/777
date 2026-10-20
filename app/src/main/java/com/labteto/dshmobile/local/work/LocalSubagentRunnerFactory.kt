@@ -28,6 +28,7 @@ import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
 import com.labteto.dshmobile.local.record
 import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+import com.labteto.dshmobile.local.runtime.localEffectiveHistoryPressure
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -161,7 +162,10 @@ internal class LocalSubagentRunnerFactory(
         historyBudget = { profile ->
             localHistoryBudgetFor(
                 memoryClassMb = memoryClassMb,
-                pressure = resourceScheduler.snapshot().pressure,
+                pressure = localEffectiveHistoryPressure(
+                    resourceScheduler.snapshot(),
+                    resourceScheduler.startupBudget,
+                ),
                 model = profile.model,
                 baseUrl = profile.baseUrl,
                 contextWindowTokensOverride = profile.contextWindowTokensOverride,
