@@ -547,7 +547,7 @@ private fun LocalTranscriptImage(
     workspacePath: String,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val context = LocalContext.current
+    var showingImage by remember(workspacePath, image.relativePath) { mutableStateOf(false) }
     val file = remember(workspacePath, image.relativePath) {
         resolveLocalTranscriptFile(workspacePath, image.relativePath)
     }
@@ -583,13 +583,7 @@ private fun LocalTranscriptImage(
         .clip(DsShapes.block)
         .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))
         .border(1.dp, colors.border, DsShapes.block)
-        .clickable(enabled = file != null) {
-            file?.let { localFile ->
-                viewMediaFile(context, localFile, image.mediaType) { error ->
-                    Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
+        .clickable(enabled = file != null) { showingImage = true }
     val loaded = bitmap
     if (loaded != null) {
         Image(
@@ -621,6 +615,13 @@ private fun LocalTranscriptImage(
                 )
             }
         }
+    }
+    if (showingImage && file != null) {
+        MediaImageDetailDialog(
+            file = file,
+            remoteUrl = null,
+            onDismiss = { showingImage = false },
+        )
     }
 }
 
