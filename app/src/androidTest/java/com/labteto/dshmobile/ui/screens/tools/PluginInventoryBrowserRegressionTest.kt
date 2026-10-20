@@ -29,7 +29,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.setContent {
             DshTheme {
                 PluginInventoryBrowser(
-                    localIds = listOf("android-local-builtins"),
+                    localIds = listOf("android-runtime"),
 
                     onBack = {},
                     onManageConnections = {},
@@ -37,7 +37,7 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithText("技能").assertIsDisplayed().performClick()
+        compose.onNodeWithText("终端与运行环境").assertIsDisplayed().performClick()
         compose.onNodeWithText("返回对话").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, returned) }
     }
@@ -347,6 +347,75 @@ class PluginInventoryBrowserRegressionTest {
         }
         compose.onNodeWithTag("plugin-inventory-card-skill:research-check").assertIsDisplayed()
         compose.onNodeWithText("使用").assertIsNotEnabled()
+    }
+
+    @Test
+    fun embeddedInventoryOmitsNestedPageHeader() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = listOf("android-runtime"), embedded = true,
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-search").assertIsDisplayed()
+        compose.onNodeWithText("插件").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertIsDisplayed()
+    }
+
+    @Test
+    fun pluginTabDoesNotDuplicateSkillsRuntime() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = listOf("android-local-builtins", "android-runtime"),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithText("技能").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-card-local:android-local-builtins").assertDoesNotExist()
+    }
+
+    @Test
+    fun failedRefreshKeepsLoadedPluginRowsAndOffersRetry() {
+        var retried = 0
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = listOf("android-runtime"),
+                    error = "加载失败，请重试",
+                    onRetry = { retried++ },
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithText("加载失败，请重试").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertIsDisplayed()
+        compose.onNodeWithText("重试").performClick()
+        compose.runOnIdle { assertEquals(1, retried) }
+    }
+
+    @Test
+    fun capabilityTabsSwitchSectionsWithoutNavigating() {
+        compose.setContent {
+            DshTheme {
+                val current = androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                androidx.compose.foundation.layout.Column {
+                    CapabilityCenterTabs(current.intValue) { current.intValue = it }
+                    androidx.compose.material3.Text("当前标签:${current.intValue}")
+                }
+            }
+        }
+        compose.onNodeWithText("当前标签:0").assertIsDisplayed()
+        compose.onNodeWithText("技能").performClick()
+        compose.onNodeWithText("当前标签:1").assertIsDisplayed()
+        compose.onNodeWithText("连接与权限").performClick()
+        compose.onNodeWithText("当前标签:2").assertIsDisplayed()
+        compose.onNodeWithText("插件").performClick()
+        compose.onNodeWithText("当前标签:0").assertIsDisplayed()
     }
 
 }

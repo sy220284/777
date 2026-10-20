@@ -91,6 +91,7 @@ internal fun PluginInventoryBrowser(
     skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
     savedSkillId: String? = null,
     skillsOnly: Boolean = false,
+    embedded: Boolean = false,
     loading: Boolean = false,
     error: String? = null,
     onRetry: (() -> Unit)? = null,
@@ -138,7 +139,8 @@ internal fun PluginInventoryBrowser(
     }
     val installedStatus = stringResource(R.string.tools_catalog_installed)
     val connectionStatus = stringResource(R.string.tools_catalog_connections)
-    val local = localIds.sorted().map { id ->
+    // Built-in skill runtime is exposed by the 技能 tab, not a duplicate plugin card.
+    val local = localIds.filterNot { it == "android-local-builtins" }.sorted().map { id ->
         val label = when (id) {
             "android-local-builtins" -> stringResource(R.string.skills_title)
             "android-runtime" -> stringResource(R.string.tools_capability_terminal)
@@ -197,8 +199,8 @@ internal fun PluginInventoryBrowser(
         }
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
-        Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-            SyTopBar(
+        Column(if (embedded) Modifier.fillMaxSize() else Modifier.fillMaxSize().safeDrawingPadding()) {
+            if (!embedded) SyTopBar(
                 title = stringResource(if (skillsOnly) R.string.skills_title else R.string.tools_catalog_title),
                 onBack = onBack,
                 backContentDescription = stringResource(R.string.common_back),
@@ -344,7 +346,21 @@ internal fun PluginInventoryBrowser(
                         }
                     }
                 }
-                if (error != null || list.isEmpty()) {
+                if (error != null) {
+                    item(key = "inventory-error") {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
+                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(error, style = DsType.std14.withReadingWeight(), color = colors.dangerInk)
+                            if (onRetry != null) {
+                                SyButton(text = stringResource(R.string.common_retry), onClick = onRetry)
+                            }
+                        }
+                    }
+                }
+                if (list.isEmpty() && error == null) {
                     item(key = "inventory-empty") {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
@@ -352,13 +368,10 @@ internal fun PluginInventoryBrowser(
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(
-                                error ?: stringResource(if (loading) R.string.common_loading else if (query.isNotBlank()) R.string.tools_catalog_no_matches else if (skillsOnly) R.string.skills_catalog_empty else R.string.tools_catalog_empty),
+                                stringResource(if (loading) R.string.common_loading else if (query.isNotBlank()) R.string.tools_catalog_no_matches else if (skillsOnly) R.string.skills_catalog_empty else R.string.tools_catalog_empty),
                                 style = DsType.std14.withReadingWeight(),
                                 color = colors.textSecondary,
                             )
-                            if (error != null && onRetry != null) {
-                                SyButton(text = stringResource(R.string.common_retry), onClick = onRetry)
-                            }
                             // The existing V5 service-nav action above remains available here.
                             // Do not render a second visually identical external-service button.
                         }
