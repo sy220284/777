@@ -15,6 +15,27 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class LocalRuntimeStateStoreTest {
+    @Test
+    fun backgroundJobSlotsMatchDeviceAgentBudgetInsteadOfFixedFour() {
+        val twelve = LocalRuntimeStateStore(
+            memoryClassMb = 384,
+            deviceMemory = LocalDeviceMemorySnapshot(totalRamMb = 11_200, availableRamMb = 4_096),
+        )
+        val sixteen = LocalRuntimeStateStore(
+            memoryClassMb = 512,
+            deviceMemory = LocalDeviceMemorySnapshot(totalRamMb = 15_200, availableRamMb = 4_096),
+        )
+        val underPressure = LocalRuntimeStateStore(
+            memoryClassMb = 512,
+            deviceMemory = LocalDeviceMemorySnapshot(totalRamMb = 15_200, availableRamMb = 800),
+        )
+        assertEquals(10, twelve.jobManager.availableSlots())
+        assertEquals(twelve.resourceBudget.maxAgents, twelve.jobManager.availableSlots())
+        assertEquals(12, sixteen.jobManager.availableSlots())
+        assertEquals(sixteen.resourceBudget.maxAgents, sixteen.jobManager.availableSlots())
+        assertEquals(3, underPressure.jobManager.availableSlots())
+    }
+
     @Test fun activatingSessionReattachesItsLivePreviewWithoutNewOutput() {
         val runtime = LocalRuntimeStateStore()
         runtime.initialize(LocalHarnessState(sessionId = "a"))
