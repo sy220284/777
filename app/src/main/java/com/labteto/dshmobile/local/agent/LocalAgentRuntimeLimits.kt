@@ -9,7 +9,7 @@ package com.labteto.dshmobile.local.agent
 internal object LocalAgentRuntimeLimits {
     const val MAIN_MIN_STEPS = 4
     const val SUBAGENT_MIN_STEPS = 1
-    const val MAX_CONFIGURED_STEPS = 512
+    const val MAX_CONFIGURED_STEPS = 1_024
 
     fun normalizeMainSteps(value: Int): Int =
         value.coerceIn(MAIN_MIN_STEPS, MAX_CONFIGURED_STEPS)
