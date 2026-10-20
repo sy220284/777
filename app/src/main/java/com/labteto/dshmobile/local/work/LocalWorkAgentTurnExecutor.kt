@@ -204,7 +204,7 @@ internal class LocalWorkAgentTurnExecutor(
                     error = null,
                 )
             }
-            val declaredToolTimes = mutableMapOf<String, Long>()
+            val declaredToolEvents = mutableMapOf<String, Pair<Long, Long>>()
             val repliesByStep = mutableMapOf<Int, LocalModelReply>()
             val uiDefinitionsByStep = mutableMapOf<Int, String?>()
             val replyFormHandlingByStep = mutableMapOf<Int,
@@ -607,7 +607,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 put("arguments", event.call.arguments)
                                 put("execution_started", false)
                             })
-                            declaredToolTimes[event.call.id] = declared.createdAt
+                            declaredToolEvents[event.call.id] = declared.createdAt to declared.sequence
                             // Pending tool status is durable before the Work card observes it.
                             workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_tool_started")
                         }
@@ -627,6 +627,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 sideEffect = event.sideEffect,
                                 recoveryHint = event.recoveryHint,
                             ).modelVisibleContent()
+                            val declaredToolEvent = declaredToolEvents.remove(event.call.id)
                             val transcriptMessage = runTranscript.newMessage(
                                 role = "tool",
                                 content = durableToolResultContent(boundedContent, event.retention),
@@ -635,7 +636,8 @@ internal class LocalWorkAgentTurnExecutor(
                                 toolIsError = event.isError,
                                 toolErrorCode = event.errorCode,
                                 toolCallId = event.call.id,
-                                toolDeclaredAt = declaredToolTimes.remove(event.call.id),
+                                toolDeclaredAt = declaredToolEvent?.first,
+                                toolDeclaredSequence = declaredToolEvent?.second,
                             )
                             val artifactVersion = if (!event.isError) localWorkArtifactFileVersion(
                                 java.io.File(sessionStorage.files.workspace.path), event.call.name, event.output,
