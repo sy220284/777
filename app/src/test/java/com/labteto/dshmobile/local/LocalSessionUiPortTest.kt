@@ -33,6 +33,27 @@ class LocalSessionUiPortTest {
         assertNull(port.handoffSummary(identity.copy(activationId = "old")))
         assertEquals("owner summary", port.handoffSummary(identity))
     }
+    @Test fun deletingOneSessionFailsWithoutClearingItsEventLogOrSwitchingVisibleSession() {
+        val cleared = mutableListOf<String>()
+        val durable = mutableListOf<String>()
+        val diskError = IllegalStateException("disk is read-only")
+        val error = assertThrows(IllegalStateException::class.java) {
+            commitOrderedSessionDeletions(
+                ids = linkedSetOf("current", "background"),
+                currentSessionId = "current",
+                deleteDurably = { id ->
+                    if (id == "current") throw diskError
+                    durable += id
+                },
+                cleanupCommitted = { cleared += it },
+            )
+        }
+        assertSame(diskError, error)
+        assertEquals(listOf("background"), durable)
+        assertEquals(listOf("background"), cleared)
+        assertFalse("failed current deletion must retain its event log", "current" in cleared)
+    }
+
     @Test fun partialBatchDeletionAlwaysKeepsCurrentSessionForLast() {
         val targets = linkedSetOf("current", "background-1", "background-2")
         assertEquals(

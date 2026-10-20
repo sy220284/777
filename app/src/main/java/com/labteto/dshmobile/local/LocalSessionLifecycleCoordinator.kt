@@ -54,6 +54,19 @@ internal fun localDeletedCurrentSessionMode(
 internal fun localSessionDeletionOrder(ids: Set<String>, currentSessionId: String): List<String> =
     ids.sortedBy { it == currentSessionId }
 
+/** The log cleanup callback must never fire for an identity whose disk deletion failed. */
+internal fun commitOrderedSessionDeletions(
+    ids: Set<String>,
+    currentSessionId: String,
+    deleteDurably: (String) -> Unit,
+    cleanupCommitted: (String) -> Unit,
+) {
+    localSessionDeletionOrder(ids, currentSessionId).forEach { id ->
+        deleteDurably(id)
+        cleanupCommitted(id)
+    }
+}
+
 internal class LocalSessionLifecycleCoordinator(
     private val scope: CoroutineScope,
     private val state: com.labteto.dshmobile.local.runtime.LocalAggregateProjectionPort,
@@ -445,21 +458,27 @@ internal class LocalSessionLifecycleCoordinator(
                         withContext(Dispatchers.IO) {
                             // Delete background sessions first; current session last.
                             // On a partial deletion failure the visible conversation remains intact.
-                            localSessionDeletionOrder(ids, sourceId).forEach { id ->
-                                sessionCoordinator.delete(id)
-                                durableDeletedIds += id
-                                // Do not clear event-log bytes before primary/backup deletion
-                                // succeeds: a failed deletion must remain recoverable with history.
-                                beforeEventLogsDeleted(setOf(id))
-                                toolOutputStore.deleteSession(id)
-                                sessionsRoot.listFiles().orEmpty()
-                                    .filter {
-                                        it.name == "$id.events.jsonl" ||
-                                            it.name.startsWith("$id.events.jsonl.part-") ||
-                                            it.name.startsWith("$id.events.jsonl.projection-")
-                                    }
-                                    .forEach(File::delete)
-                            }
+                            commitOrderedSessionDeletions(
+                                ids = ids,
+                                currentSessionId = sourceId,
+                                deleteDurably = { id ->
+                                    sessionCoordinator.delete(id)
+                                    durableDeletedIds += id
+                                },
+                                cleanupCommitted = { id ->
+                                    // Event logs are cleared ONLY AFTER primary/backup deletion
+                                    // succeeded. Failure preserves the remaining history.
+                                    beforeEventLogsDeleted(setOf(id))
+                                    toolOutputStore.deleteSession(id)
+                                    sessionsRoot.listFiles().orEmpty()
+                                        .filter {
+                                            it.name == "$id.events.jsonl" ||
+                                                it.name.startsWith("$id.events.jsonl.part-") ||
+                                                it.name.startsWith("$id.events.jsonl.projection-")
+                                        }
+                                        .forEach(File::delete)
+                                },
+                            )
                         }
                         activateReplacementIfNeeded()
                         conversationFilesCoordinator.invalidate(ids)
