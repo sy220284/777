@@ -300,7 +300,7 @@ class LocalWorkReplyPresentationTest {
         val progress = message("p", "progress", "继续核查").copy(createdAt = 140L)
         val completed = message("t", "tool", "完成", "mcp__GitHub__fetch_file", false)
             .copy(createdAt = 170L, toolCallId = "read-1", toolDeclaredAt = 120L)
-        val transcript = 
+        val transcript =
             buildLocalTranscript(listOf(user, progress, completed))
         val media = com.labteto.dshmobile.local.model.LocalMediaResult(
             id = "image-1", model = "test", provider = "OPENAI", kind = "IMAGE",
