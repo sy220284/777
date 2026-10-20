@@ -2,7 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.uicontract.UiDocumentSnapshot
 
-/** Work progress belongs to its originating user turn; reply cards belong to assistant rows. */
+/** Legacy Work progress is hidden; reply cards remain attached to the source turn. */
 internal fun nativeV6DocumentsForMessage(
     messageId: String,
     role: String,
@@ -10,7 +10,8 @@ internal fun nativeV6DocumentsForMessage(
     snapshots: List<UiDocumentSnapshot>,
 ): List<UiDocumentSnapshot> = snapshots.filter { item ->
     item.document.source.messageId == messageId &&
+        !item.document.documentId.startsWith("work-live:") &&
         (role == "assistant" || workMode && role == "user" &&
             item.document.source.workMode &&
-            item.document.documentId in setOf("work-live:${messageId}", "reply-ui:${messageId}"))
+            item.document.documentId == "reply-ui:${messageId}")
 }
