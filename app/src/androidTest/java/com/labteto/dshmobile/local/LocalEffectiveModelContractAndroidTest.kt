@@ -44,7 +44,7 @@ class LocalEffectiveModelContractAndroidTest {
         val proxy = LocalEffectiveModelContracts.forProfile(
             profile.copy(baseUrl = "https://proxy.example/v1"),
         )
-        assertEquals(64, proxy.executionBudget.workRequestsPerSlice)
+        assertEquals(128, proxy.executionBudget.workRequestsPerSlice)
         assertTrue(proxy.mediaOffers.isEmpty())
     }
 }
