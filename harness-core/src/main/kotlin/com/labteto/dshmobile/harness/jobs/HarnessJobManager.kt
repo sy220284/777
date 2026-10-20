@@ -584,14 +584,22 @@ class HarnessJobManager(
                 }
             }
             try {
+                val executionOwner = currentCoroutineContext()[Job]
                 val report: (String) -> Unit = { output ->
-                    synchronized(lock) {
-                        record.output = output.takeLast(MAX_OUTPUT)
-                        record.updatedAt = nextActivityTimestamp(record.updatedAt)
+                    val accepted = synchronized(lock) {
+                        // A cancelled/completed activation (or an older activation after
+                        // recovery) cannot rewrite the terminal result or the new owner's output.
+                        if (record.status != "running" || record.job !== executionOwner) {
+                            false
+                        } else {
+                            record.output = output.takeLast(MAX_OUTPUT)
+                            record.updatedAt = nextActivityTimestamp(record.updatedAt)
+                            true
+                        }
                     }
                     // Progress is a volatile UI signal. Heartbeats persist a bounded running
                     // snapshot; writing the whole durable store for every output chunk amplifies IO.
-                    notifyChanged()
+                    if (accepted) notifyChanged()
                 }
                 val result = block(record.id, report).takeLast(MAX_OUTPUT)
                 currentCoroutineContext().ensureActive()

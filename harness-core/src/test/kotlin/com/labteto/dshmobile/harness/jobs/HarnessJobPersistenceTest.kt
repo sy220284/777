@@ -72,6 +72,42 @@ class HarnessJobPersistenceTest {
     }
 
     @Test
+    fun completedTaskIgnoresProgressFromItsCapturedCallback() = runTest {
+        var late: ((String) -> Unit)? = null
+        val manager = HarnessJobManager(backgroundScope, {})
+        val id = manager.start("finished", ownerId = "owner") { _, progress ->
+            late = progress
+            "durable completed output"
+        }.substringAfterLast('：')
+        runCurrent()
+        val before = manager.snapshots().single()
+        assertEquals("completed", before.status)
+        late!!.invoke("LATE progress must not overwrite result")
+        assertEquals(before, manager.snapshots().single())
+        assertTrue(manager.output(id).contains("durable completed output"))
+    }
+
+    @Test
+    fun cancelledTaskIgnoresProgressFromItsCapturedCallback() = runTest {
+        var late: ((String) -> Unit)? = null
+        val never = CompletableDeferred<Unit>()
+        val manager = HarnessJobManager(backgroundScope, {})
+        val id = manager.start("running", ownerId = "owner") { _, progress ->
+            late = progress
+            never.await()
+            "unexpected"
+        }.substringAfterLast('：')
+        runCurrent()
+        assertEquals("running", manager.snapshots().single().status)
+        manager.kill(id, "owner")
+        runCurrent()
+        val before = manager.snapshots().single()
+        assertEquals("cancelled", before.status)
+        late!!.invoke("LATE output from a cancelled executor")
+        assertEquals(before, manager.snapshots().single())
+    }
+
+    @Test
     fun cancelledJobKeepsCancellationWhenBlockingWorkThrowsLate() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val entered = CountDownLatch(1)
