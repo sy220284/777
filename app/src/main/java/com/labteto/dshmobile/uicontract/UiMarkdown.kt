@@ -155,13 +155,22 @@ fun splitUiMarkdownTableRow(line: String): List<String> {
     val current = StringBuilder()
     var escaped = false
     var inCode = false
-    source.forEach { char ->
+    source.forEachIndexed { index, char ->
         when {
             escaped -> {
                 current.append(char)
                 escaped = false
             }
-            char == '\\' -> escaped = true
+            // CommonMark only escapes ASCII punctuation. Ordinary technical paths such as
+            // C:\Users\name must retain their literal backslash characters.
+            char == '\\' -> {
+                val next = source.getOrNull(index + 1)
+                if (next != null && next.code in 33..126 && !next.isLetterOrDigit()) {
+                    escaped = true
+                } else {
+                    current.append(char)
+                }
+            }
             char == '`' -> {
                 inCode = !inCode
                 current.append(char)
