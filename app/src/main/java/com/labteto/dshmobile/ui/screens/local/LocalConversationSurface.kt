@@ -618,14 +618,21 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     showTranscriptPagingRow, false, false, false).count { it }
                 // Empty-state rows and the plan review card cannot coexist with found messages.
                 listState.scrollToItem(leading + messageIndex)
+                transcriptInitialPositionReady = true
                 onTranscriptJumpConsumed(target)
             }
             loadingOlderTranscript -> Unit
             hasOlderTranscript && transcriptHistoryError == null -> {
                 val result = onLoadOlderTranscript(state.sessionId)
-                if (result.isFailure || result.getOrNull() == 0) onTranscriptJumpConsumed(target)
+                if (result.isFailure || result.getOrNull() == 0) {
+                    transcriptInitialPositionReady = true
+                    onTranscriptJumpConsumed(target)
+                }
             }
-            else -> onTranscriptJumpConsumed(target)
+            else -> {
+                transcriptInitialPositionReady = true
+                onTranscriptJumpConsumed(target)
+            }
         }
     }
     val showEmptyWorkbench = transcriptItems.isEmpty() &&
@@ -782,11 +789,18 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         // Keep the session-scoped cached attachment draft across navigation.
         attachmentError = null
         showReplySuggestions = false
-        if (transcriptItems.isNotEmpty()) {
-            listState.scrollToItem(transcriptLastListIndex)
-        }
-        transcriptInitialPositionReady = true
     }
+    LocalTranscriptInitialPositioner(
+        sessionId = state.sessionId,
+        tailIndex = transcriptLastListIndex,
+        tailKey = transcriptItems.lastOrNull()?.key.orEmpty(),
+        enabled = !transcriptInitialPositionReady && !locatingDiarySource && !workReaderPaused.value,
+        onPosition = { index ->
+            listState.scrollToItem(index)
+            if (state.usageMode == LocalUsageMode.WORK) listState.alignWorkTimelineTailAfterScroll(index)
+        },
+        onReady = { transcriptInitialPositionReady = true },
+    )
 
     LocalTranscriptAutoPager(
         sessionId = state.sessionId,
@@ -1333,6 +1347,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 onClick = { target ->
                     scrollHint.hide()
                     if (state.usageMode == LocalUsageMode.WORK) workReaderPaused.value = true
+                    transcriptInitialPositionReady = true
                     scope.launch {
                         val targetIndex = if (target == ConversationScrollTarget.START) 0
                             else listState.layoutInfo.totalItemsCount.dec().coerceAtLeast(0)

@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.MutableState
@@ -34,6 +35,25 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.flow.distinctUntilChanged
+
+/** Retarget an unfinished initial scroll when a resumed subscription replaces its cached tail. */
+@Composable
+internal fun LocalTranscriptInitialPositioner(
+    sessionId: String,
+    tailIndex: Int,
+    tailKey: String,
+    enabled: Boolean,
+    onPosition: suspend (Int) -> Unit,
+    onReady: () -> Unit,
+) {
+    val position by rememberUpdatedState(onPosition)
+    val ready by rememberUpdatedState(onReady)
+    LaunchedEffect(sessionId, tailIndex, tailKey, enabled) {
+        if (!enabled) return@LaunchedEffect
+        if (tailIndex >= 0) position(tailIndex)
+        ready()
+    }
+}
 
 /**
  * Owns the foreground transcript paging interaction.
@@ -165,7 +185,7 @@ internal fun LocalWorkTimelineAutoScroller(
         val oldKey = previousTailKey
         previousTailIndex = tailIndex
         previousTailKey = tailKey
-        if (!isReady || oldTail < 0 || tailIndex < 0 ||
+        if (!isReady || tailIndex < 0 ||
             (tailIndex <= oldTail && tailKey == oldKey)
         ) return@LaunchedEffect
         // Following is reader intent, not a measurement of the old tail AFTER new rows arrived.

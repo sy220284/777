@@ -28,6 +28,30 @@ import org.junit.Test
 class WorkBackgroundReplyAndroidTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun freshSnapshotRetargetsUnfinishedInitialPositionWithoutAnotherReply() {
+        var tail by mutableIntStateOf(5)
+        var ready by mutableStateOf(false)
+        val firstStarted = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val releaseOldPosition = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val positioned = mutableListOf<Int>()
+        compose.setContent {
+            DshTheme {
+                LocalTranscriptInitialPositioner("work", tail, "row:$tail", !ready,
+                    onPosition = { index ->
+                        if (index == 5) { firstStarted.complete(Unit); releaseOldPosition.await() }
+                        positioned += index
+                    }, onReady = { ready = true })
+                Text(if (ready) "已就绪" else "正在定位")
+            }
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { assertTrue(firstStarted.isCompleted); assertFalse(ready); tail = 99 }
+        compose.waitForIdle()
+        compose.runOnIdle { assertTrue(ready); assertEquals(listOf(99), positioned); releaseOldPosition.complete(Unit) }
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(listOf(99), positioned) }
+    }
+
     private class Owner : LifecycleOwner {
         override val lifecycle = LifecycleRegistry(this)
     }
