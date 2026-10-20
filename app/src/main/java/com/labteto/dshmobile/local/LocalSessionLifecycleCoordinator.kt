@@ -489,8 +489,19 @@ internal class LocalSessionLifecycleCoordinator(
                         persist()
                         ids.toSet()
                     } catch (failure: Exception) {
-                        // Some background sessions may have been deleted successfully.
-                        // Never restore an old snapshot that would resurrect these identities.
+                        // Some background sessions may already be deleted. Reconcile ONLY these
+                        // committed identities; otherwise stale caches/pending objects may still
+                        // expose a deleted conversation in this process.
+                        if (durableDeletedIds.isNotEmpty()) {
+                            try {
+                                conversationFilesCoordinator.invalidate(durableDeletedIds)
+                                pendingSessions.forget(durableDeletedIds)
+                                memoryStore.detachSourceSessions(durableDeletedIds)
+                                diaryStore.detachSourceSessions(durableDeletedIds)
+                            } catch (cleanupFailure: Exception) {
+                                failure.addSuppressed(cleanupFailure)
+                            }
+                        }
                         if (sourceId in durableDeletedIds) activateReplacementIfNeeded()
                         state.update {
                             it.copy(
