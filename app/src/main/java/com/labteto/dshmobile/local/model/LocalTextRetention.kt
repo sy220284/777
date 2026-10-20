@@ -140,11 +140,12 @@ internal fun retainWorkToolResultForModel(value: String): LocalRetainedText {
 internal const val WORK_TOOL_INLINE_BYTES = 8 * 1024
 
 /**
- * Preserve a UTF-8 safety margin for the truncation marker so a fresh oversized preview
- * fits in the same 8 KiB request allowance as a recovered page.
+ * Preserve UTF-8 margins for the omission marker AND the recoverable-output annotation
+ * appended later by LocalRecoverableToolResultProjection. Without this headroom a fresh
+ * oversized result would itself exceed WORK_TOOL_INLINE_BYTES and be immediately compacted.
  */
 internal const val WORK_TOOL_PREVIEW_CHARS = WORK_TOOL_INLINE_BYTES
-internal const val WORK_TOOL_PREVIEW_TOKENS = 2_700
+internal const val WORK_TOOL_PREVIEW_TOKENS = 2_400
 
 /**
  * Recovery page ceiling in Work mode. One page plus its header must stay inside
