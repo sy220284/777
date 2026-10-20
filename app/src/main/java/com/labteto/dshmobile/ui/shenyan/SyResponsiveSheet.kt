@@ -61,6 +61,7 @@ fun SyResponsiveSheet(
     subtitle: String? = null,
     trailing: (@Composable () -> Unit)? = null,
     scrollable: Boolean = false,
+    scrollBodyHeightFraction: Float = .67f,
     dismissEnabled: Boolean = true,
     showDragHandle: Boolean = true,
     floating: Boolean = false,
@@ -73,7 +74,7 @@ fun SyResponsiveSheet(
     val p = LocalSyPalette.current
     val cfg = LocalConfiguration.current
     val wide = cfg.screenWidthDp >= 600
-    val maxBodyHeight = cfg.screenHeightDp.dp * .67f
+    val maxBodyHeight = cfg.screenHeightDp.dp * scrollBodyHeightFraction
     val dismissal = rememberUpdatedState(dismissEnabled)
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,

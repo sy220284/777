@@ -12,6 +12,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.shenyan.designsystem.components.SyTextField
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -78,6 +80,43 @@ class MediaStudioCompactLayoutTest {
         compose.onNodeWithTag("disabledMediaMode:1").assertIsNotEnabled()
         compose.runOnIdle { assertEquals(0, selected.intValue) }
     }
+    @Test fun expandedPromptShowsMoreRowsAndStillAllowsSubmission() {
+        var submitted = 0
+        compose.setContent {
+            DshTheme {
+                SyResponsiveSheet(
+                    title = "多模态创作",
+                    onDismiss = {},
+                    modifier = Modifier.heightIn(max = 520.dp),
+                    scrollable = true,
+                    scrollBodyHeightFraction = .85f,
+                    seamlessBackground = true,
+                ) {
+                    MediaStudioFlatTabs(
+                        labels = listOf("图片", "视频", "配音", "转写"),
+                        selected = 0, onSelect = {}, tag = "mediaDesignSection",
+                    )
+                    SyTextField(
+                        value = "女孩站在窗前，晨光照在书桌上。".repeat(25),
+                        onValueChange = {},
+                        label = { Text("描述想生成的内容") },
+                        minLines = 12,
+                        maxLines = 20,
+                        modifier = Modifier.fillMaxWidth().testTag("mediaStudioPromptField"),
+                    )
+                    SyButton(
+                        text = "生成图片",
+                        onClick = { submitted++ },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("mediaStudioPromptField").assertHeightIsAtLeast(200.dp)
+        compose.onNodeWithText("生成图片").performScrollTo().assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, submitted) }
+    }
+
     @Test fun shortViewportKeepsCreationActionReachableWithoutMaterialPlate() {
         var submitted = 0
         compose.setContent {

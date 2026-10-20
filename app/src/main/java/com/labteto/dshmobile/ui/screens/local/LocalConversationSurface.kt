@@ -1836,6 +1836,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             title = stringResource(R.string.media_studio_title),
             onDismiss = { showMediaStudio = false },
             scrollable = true,
+            // More room for the editable prompt; other sheets keep their compact height.
+            scrollBodyHeightFraction = .85f,
             seamlessBackground = true,
             dimScrimWhenSeamless = true,
         ) {
