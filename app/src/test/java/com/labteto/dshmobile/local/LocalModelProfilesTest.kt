@@ -164,7 +164,16 @@ class LocalModelProfilesTest {
         assertTrue(
             LocalModelPresets.entries
                 .filter { it.provider == "MiniMax" }
-                .all { it.baseUrl == "https://api.minimaxi.com/v1" },
+                .all {
+                    if (it.model.startsWith("MiniMax-M3")) {
+                        it.baseUrl == "https://api.minimaxi.com/anthropic/v1" &&
+                            it.protocol == LocalModelProtocol.ANTHROPIC_MESSAGES &&
+                            !it.temperatureSupported
+                    } else {
+                        it.baseUrl == "https://api.minimaxi.com/v1" &&
+                            it.protocol == LocalModelProtocol.CHAT_COMPLETIONS
+                    }
+                },
         )
         assertTrue(
             LocalModelPresets.entries
@@ -186,7 +195,9 @@ class LocalModelProfilesTest {
 
         val miniMaxLatest = LocalModelPresets.entries.first { it.model == "MiniMax-M3.1-Flash" }
         assertEquals("MiniMax", miniMaxLatest.provider)
-        assertEquals("https://api.minimaxi.com/v1", miniMaxLatest.baseUrl)
+        assertEquals("https://api.minimaxi.com/anthropic/v1", miniMaxLatest.baseUrl)
+        assertEquals(LocalModelProtocol.ANTHROPIC_MESSAGES, miniMaxLatest.protocol)
+        assertFalse(miniMaxLatest.temperatureSupported)
         assertEquals(1_000_000, miniMaxLatest.contextWindowTokens)
         assertEquals("https://api.minimaxi.com/v1/models", miniMaxLatest.modelsEndpoint)
         assertTrue(LocalModelCapability.IMAGE in miniMaxLatest.capabilities)
@@ -197,6 +208,15 @@ class LocalModelProfilesTest {
         assertTrue(LocalModelCapability.VIDEO in miniMax.capabilities)
         assertEquals(true, miniMax.imageInputSupported)
         assertEquals("https://api.minimaxi.com/v1/chat/completions", miniMax.chatEndpoint)
+        // The old OpenAI-compatible route retains its matching request protocol.
+        assertEquals(LocalModelProtocol.CHAT_COMPLETIONS, miniMax.protocol)
+        assertFalse(miniMax.temperatureSupported)
+        assertNull(LocalModelPresets.chatTemperatureRangeFor("MiniMax-M3", "https://api.minimaxi.com/v1"))
+        assertNull(LocalModelPresets.samplingTemperatureFor("MiniMax-M3", "https://api.minimaxi.com/v1", 0.7))
+        assertEquals(
+            LocalModelProtocol.ANTHROPIC_MESSAGES,
+            LocalModelPresets.protocolFor("MiniMax-M3.1-Flash-Preview", "https://api.minimaxi.com/anthropic/v1"),
+        )
 
         val miniMaxText = LocalModelPresets.find("MiniMax-M2.7", "https://api.minimaxi.com/v1")!!
         assertEquals(setOf(LocalModelCapability.TEXT), miniMaxText.capabilities)
