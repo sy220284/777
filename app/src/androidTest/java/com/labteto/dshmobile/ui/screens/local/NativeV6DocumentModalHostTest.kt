@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -69,6 +72,32 @@ class NativeV6DocumentModalHostTest {
         compose.onNodeWithText("当前内容：第一份").assertExists()
         compose.onNodeWithText("关闭").performClick()
         compose.onNodeWithText("当前内容：第一份").assertDoesNotExist()
+    }
+
+    @Test fun deletingSelectedDocumentNeverSilentlyOpensAnother() {
+        fun snapshot(id: String) = UiDocumentSnapshot(
+            UiDocument(1, id,
+                UiDocumentSource("session", "msg", 0L, null, null, false),
+                0L, id, emptyList(), emptyList(), ""),
+            UiDocumentProvenance(null, "", false, UiDocumentOrigin.LOCAL),
+            emptyMap(),
+        )
+        val first = snapshot("reply-ui:first")
+        val second = snapshot("reply-ui:second")
+        var documents by mutableStateOf(listOf(first, second))
+        compose.setContent {
+            DshTheme {
+                NativeV6DocumentModalHost("msg", documents) { selected, _ ->
+                    Text("正在查看：${selected.document.documentId}")
+                }
+            }
+        }
+        compose.onNodeWithTag("reply_document_open:msg").performClick()
+        compose.onNodeWithText("正在查看：reply-ui:second").assertExists()
+        compose.runOnIdle { documents = listOf(first) }
+        compose.onNodeWithText("正在查看：reply-ui:first").assertDoesNotExist()
+        compose.onNodeWithText("正在查看：reply-ui:second").assertDoesNotExist()
+        compose.onNodeWithTag("reply_document_open:msg").assertExists()
     }
 
 }
