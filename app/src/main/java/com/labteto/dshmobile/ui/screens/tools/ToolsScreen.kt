@@ -746,7 +746,7 @@ fun ToolsScreen(
                                     )
                                     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
                                         ToolCapabilityRow(
-                                            icon = SyEntryIcons.Projects,
+                                            icon = SyEntryIcons.Connections,
                                             title = stringResource(R.string.tools_github_connector),
                                             status = stringResource(
                                                 if (state.githubConfigured) R.string.tools_github_configured
@@ -948,7 +948,7 @@ fun ToolsScreen(
                 enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
                 variant = SyButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
-                icon = SyEntryIcons.Search,
+                icon = SyEntryIcons.Connections,
             )
             Text(
                 stringResource(R.string.tools_stdio_title),
@@ -1121,21 +1121,14 @@ private fun ToolCapabilityRow(
                 modifier = Modifier.size(40.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    when {
-                        iconPainter != null -> Icon(
-                            painter = iconPainter,
-                            contentDescription = null,
-                            tint = colors.textSecondary,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        icon != null -> Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = colors.textSecondary,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
+                when {
+                    iconPainter != null -> Icon(
+                        painter = iconPainter,
+                        contentDescription = null,
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    icon != null -> com.shenyan.designsystem.components.SyIconBox(icon = icon)
                 }
             }
             BoxWithConstraints(Modifier.weight(1f)) {
