@@ -101,7 +101,20 @@ internal fun buildLocalDisplayTranscript(items: List<LocalTranscriptItem>): List
             // Do not fold distinct tool results into one semantic summary: each persisted
             // event must keep its own chronological row and error status.
             var visible = false
-            item.messages.forEach { message ->
+            // Only tools with an explicit declaration timestamp move to that original
+            // location. Legacy rows keep their durable historical order unchanged.
+            val ordered = item.messages.toMutableList()
+            val completedAtStart = ordered.filter {
+                it.role == "tool" && it.toolDeclaredAt != null
+            }.sortedBy { it.toolDeclaredAt }
+            ordered.removeAll { it.role == "tool" && it.toolDeclaredAt != null }
+            completedAtStart.forEach { tool ->
+                val target = ordered.indexOfFirst {
+                    it.createdAt > (tool.toolDeclaredAt ?: Long.MAX_VALUE)
+                }
+                ordered.add(if (target < 0) ordered.size else target, tool)
+            }
+            ordered.forEach { message ->
                 when (message.role) {
                     "tool" -> {
                         add(LocalTranscriptItem.WorkStep(message))
