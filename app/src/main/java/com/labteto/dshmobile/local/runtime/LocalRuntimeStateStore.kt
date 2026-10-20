@@ -47,6 +47,7 @@ import kotlinx.serialization.json.Json
 class LocalRuntimeStateStore internal constructor(
     internal val memoryClassMb: Int = 256,
     internal val deviceMemory: LocalDeviceMemorySnapshot = LocalDeviceMemorySnapshot(),
+    private val capacityMonitor: LocalDeviceCapacityMonitor? = null,
     private val jobOwner: LocalRuntimeJobOwner = LocalRuntimeJobOwner.inMemory(
         maxConcurrentJobs = localResourceBudgetForMemoryClass(memoryClassMb, deviceMemory).maxAgents,
     ),
@@ -66,6 +67,9 @@ class LocalRuntimeStateStore internal constructor(
     ) : this(
         memoryClassMb = memoryProfile.memoryClassMb,
         deviceMemory = memoryProfile.deviceMemory,
+        capacityMonitor = LocalDeviceCapacityMonitor(
+            context, memoryProfile.memoryClassMb, memoryProfile.deviceMemory,
+        ),
         jobOwner = LocalRuntimeJobOwner.persistent(
             context,
             json,
@@ -98,6 +102,7 @@ class LocalRuntimeStateStore internal constructor(
     internal val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb, deviceMemory)
     internal val resourceScheduler = HarnessResourceScheduler(
         budget = resourceBudget,
+        beforeAcquire = { capacityMonitor?.refresh() },
         onChanged = ::publishResourceSnapshot,
     )
 
@@ -385,6 +390,7 @@ class LocalRuntimeStateStore internal constructor(
             contextBudgetChars = contextBudgetCharsFor(state, snapshot),
         ),
     )
+    init { capacityMonitor?.bind(resourceScheduler) }
 }
 
 /** Reuse one OS snapshot for resource scheduling and background job admission. */
