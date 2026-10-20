@@ -160,6 +160,31 @@ class LocalSubagentContinuationTest {
     }
 
     @Test
+    fun resumedSubagentCanGrowPastConfiguredStepBaselineWithoutOverflow() {
+        assertEquals(
+            632,
+            resolveSubagentTotalBudgetLimit(
+                adaptiveStepLimit = 32,
+                recoveredStep = 600,
+                recoveredSoftStepLimit = 600,
+                resumeAfterCompletion = true,
+                maxDynamicSteps = Int.MAX_VALUE,
+            ),
+        )
+        assertEquals(Int.MAX_VALUE, addSubagentSteps(Int.MAX_VALUE - 8, 64))
+        assertEquals(
+            Int.MAX_VALUE,
+            resolveSubagentTotalBudgetLimit(
+                adaptiveStepLimit = 64,
+                recoveredStep = Int.MAX_VALUE - 8,
+                recoveredSoftStepLimit = Int.MAX_VALUE - 8,
+                resumeAfterCompletion = true,
+                maxDynamicSteps = Int.MAX_VALUE,
+            ),
+        )
+    }
+
+    @Test
     fun recoveryBudgetPreservesCrashCeilingAndGrantsNewBudgetOnlyForColdActivation() {
         assertEquals(
             8,
