@@ -91,6 +91,7 @@ internal fun PluginInventoryBrowser(
     skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
     savedSkillId: String? = null,
     skillsOnly: Boolean = false,
+    embedded: Boolean = false,
     loading: Boolean = false,
     error: String? = null,
     onRetry: (() -> Unit)? = null,
@@ -197,8 +198,8 @@ internal fun PluginInventoryBrowser(
         }
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
-        Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-            SyTopBar(
+        Column(if (embedded) Modifier.fillMaxSize() else Modifier.fillMaxSize().safeDrawingPadding()) {
+            if (!embedded) SyTopBar(
                 title = stringResource(if (skillsOnly) R.string.skills_title else R.string.tools_catalog_title),
                 onBack = onBack,
                 backContentDescription = stringResource(R.string.common_back),
