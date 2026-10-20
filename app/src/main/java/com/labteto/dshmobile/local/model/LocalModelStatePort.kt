@@ -14,6 +14,7 @@ internal interface LocalModelStatePort {
     val value: LocalModelProjectionSnapshot
     suspend fun awaitReady()
     fun commit(modelState: LocalModelState, error: String?)
+    fun selectForSession(sessionId: String, profile: LocalModelProfile)
     fun publishError(message: String)
 }
 
@@ -35,6 +36,10 @@ internal fun localModelStatePort(
 
     override fun commit(modelState: LocalModelState, error: String?) {
         runtimeStateStore.projection.projectModelState(modelState, error)
+    }
+
+    override fun selectForSession(sessionId: String, profile: LocalModelProfile) {
+        runtimeStateStore.projection.projectSessionModelSelection(sessionId, profile)
     }
 
     override fun publishError(message: String) {
