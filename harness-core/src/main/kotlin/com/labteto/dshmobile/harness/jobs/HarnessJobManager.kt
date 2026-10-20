@@ -425,31 +425,26 @@ class HarnessJobManager(
      * Keep the original kind/metadata for manual inspection without replaying the action.
      */
     fun markRecoveryUnverifiable(id: String, detail: String): String {
-        val before: String
-        val beforeAt: Long
-        val record = synchronized(lock) {
+        val (record, previous) = synchronized(lock) {
             val found = records[id] ?: return "后台任务不存在：$id"
             if (found.status != "interrupted") {
                 return "后台任务当前不需要人工核实：$id [${found.status}]"
             }
             if (detail in found.output) return "后台任务已标记待核实：$id"
-            found
-        }
-        synchronized(lock) {
-            before = record.output
-            beforeAt = record.updatedAt
-            record.output = (record.output.takeLast(MAX_OUTPUT / 2) +
+            val original = found.output to found.updatedAt
+            found.output = (found.output.takeLast(MAX_OUTPUT / 2) +
                 "\n恢复不可用，原操作副作用可能已发生，结果未知；请人工核实：" +
                 detail.take(800)).takeLast(MAX_OUTPUT)
-            record.updatedAt = nextActivityTimestamp(record.updatedAt)
+            found.updatedAt = nextActivityTimestamp(found.updatedAt)
+            found to original
         }
         try {
             persistCurrentSnapshots()
         } catch (failure: Exception) {
             synchronized(lock) {
                 if (record.status == "interrupted") {
-                    record.output = before
-                    record.updatedAt = beforeAt
+                    record.output = previous.first
+                    record.updatedAt = previous.second
                 }
             }
             notifyChanged()
