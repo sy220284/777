@@ -12,8 +12,8 @@ import kotlinx.coroutines.CoroutineScope
 internal class LocalJobManager(
     scope: CoroutineScope,
     store: LocalPersistentJobStore? = null,
-    onChanged: (List<LocalJobInfo>) -> Unit,
     maxConcurrentJobs: Int = 4,
+    onChanged: (List<LocalJobInfo>) -> Unit,
 ) {
     private val delegate = HarnessJobManager(
         scope = scope,
