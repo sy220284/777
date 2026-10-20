@@ -119,6 +119,16 @@ class LocalToolOutputStoreTest {
     }
 
     @Test
+    fun longAuditRetainsMoreThanTheOldSixtyFourResultFiles() {
+        val store = LocalToolOutputStore(File(temporary.root, "long-audit-results"))
+        repeat(72) { index ->
+            assertTrue(store.store("audit-session", "call-$index", "evidence-$index") != null)
+        }
+        assertTrue(store.read("audit-session", "call-0").contains("evidence-0"))
+        assertTrue(store.read("audit-session", "call-71").contains("evidence-71"))
+    }
+
+    @Test
     fun evictionNeverReportsStaleResultAsRecoverable() {
         val store = LocalToolOutputStore(
             root = File(temporary.root, "tool-output"),
