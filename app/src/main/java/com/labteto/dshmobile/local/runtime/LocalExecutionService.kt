@@ -142,6 +142,10 @@ class LocalExecutionService : Service() {
         return true
     }
 
+    private fun setTurnCpuActive(key: String, active: Boolean) {
+        if (turns.setCpuActive(key, active)) refreshNotification()
+    }
+
     private fun releaseTurn(key: String, outcome: String?, notify: Boolean) {
         val released = turns.release(key)
         if (released != null && notify && outcome != null) {
@@ -153,7 +157,7 @@ class LocalExecutionService : Service() {
 
     private fun refreshNotification() {
         if (!foregroundReady || (turns.isEmpty() && jobs.isEmpty())) return
-        cpuWakeLock.setActive(true)
+        cpuWakeLock.setActive(turns.needsCpu() || jobs.isNotEmpty())
         try {
             val manager = getSystemService(android.app.NotificationManager::class.java)
             manager.notify(NOTIFICATION_ID, buildNotification(null))
@@ -290,6 +294,10 @@ class LocalExecutionService : Service() {
 
             suspend fun updateStep(step: Int): Boolean = withContext(Dispatchers.Main.immediate) {
                 if (released) false else runningService?.updateTurn(key, step) == true
+            }
+
+            suspend fun setCpuActive(active: Boolean) = withContext(Dispatchers.Main.immediate) {
+                if (!released) runningService?.setTurnCpuActive(key, active)
             }
 
             suspend fun release(outcome: String) {

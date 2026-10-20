@@ -5,7 +5,7 @@ package com.labteto.dshmobile.local.runtime
  * Work steps update the same entry instead of starting another Android foreground service.
  */
 internal class LocalExecutionTurnLedger {
-    data class Hold(val key: String, val sessionId: String, val label: String, val step: Int)
+    data class Hold(val key: String, val sessionId: String, val label: String, val step: Int, val needsCpu: Boolean = true)
 
     private val entries = linkedMapOf<String, Hold>()
 
@@ -21,6 +21,13 @@ internal class LocalExecutionTurnLedger {
         return true
     }
 
+    fun setCpuActive(key: String, active: Boolean): Boolean {
+        val current = entries[key] ?: return false
+        entries[key] = current.copy(needsCpu = active)
+        return true
+    }
+
+    fun needsCpu(): Boolean = entries.values.any { it.needsCpu }
     fun release(key: String): Hold? = entries.remove(key)
     fun contains(key: String): Boolean = entries.containsKey(key)
     fun isEmpty(): Boolean = entries.isEmpty()

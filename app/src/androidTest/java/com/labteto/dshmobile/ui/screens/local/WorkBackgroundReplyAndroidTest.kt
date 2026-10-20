@@ -20,6 +20,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.ui.theme.DshTheme
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -34,6 +35,8 @@ class WorkBackgroundReplyAndroidTest {
     @Test fun returningAfterBatchedOutputReachesLatestWithoutSendingContinue() {
         lateinit var owner: Owner
         lateinit var list: LazyListState
+        lateinit var paused: MutableState<Boolean>
+        lateinit var scope: kotlinx.coroutines.CoroutineScope
         val output = MutableStateFlow((0..5).toList())
         compose.runOnIdle { owner = Owner().also { it.lifecycle.currentState = Lifecycle.State.RESUMED } }
         compose.setContent {
@@ -41,7 +44,8 @@ class WorkBackgroundReplyAndroidTest {
                 val rows by output.collectAsStateWithLifecycle(lifecycleOwner = owner)
                 list = rememberLazyListState(initialFirstVisibleItemIndex = 5)
                 val catching = remember { mutableStateOf(false) }
-                val paused = remember { mutableStateOf(false) }
+                paused = remember { mutableStateOf(false) }
+                scope = rememberCoroutineScope()
                 LocalWorkTimelineAutoScroller(list, "work", rows.lastIndex, "row:${rows.last()}", true, catching, paused)
                 LazyColumn(Modifier.height(240.dp).fillMaxWidth().testTag("timeline"), state = list) {
                     items(rows, key = { it }) { Text("步骤 $it", Modifier.height(64.dp)) }
@@ -66,6 +70,11 @@ class WorkBackgroundReplyAndroidTest {
         compose.runOnIdle { readingIndex = list.firstVisibleItemIndex; output.value = (100..189).toList() }
         compose.waitForIdle()
         compose.runOnIdle { assertEquals(readingIndex, list.firstVisibleItemIndex) }
+        compose.runOnIdle { paused.value = true; scope.launch { list.scrollToItem(10) } }
+        compose.waitForIdle()
+        compose.runOnIdle { output.value = (100..199).toList() }
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(10, list.firstVisibleItemIndex) }
     }
 
     @Test fun backgroundRetryAndOutputAppearOnReturnWithNoNewDelta() {

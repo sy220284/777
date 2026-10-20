@@ -115,6 +115,7 @@ internal fun LocalStreamingWorkPreview(
     sessionId: String,
     streamingState: StateFlow<LocalHarnessStreamingState>,
     lastDurableNarrative: String? = null,
+    waitingForUser: Boolean = false,
 ) {
     // Lifecycle-aware StateFlow collection supplies its own safe initial state.
     // Avoid accessing StateFlow.value during composition (Compose lint violation).
@@ -134,7 +135,8 @@ internal fun LocalStreamingWorkPreview(
             CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
             Text(
                 stringResource(
-                    if (stream.phase == com.labteto.dshmobile.local.model.LocalModelPreviewPhase.RETRYING)
+                    if (waitingForUser) R.string.local_work_waiting_for_user
+                    else if (stream.phase == com.labteto.dshmobile.local.model.LocalModelPreviewPhase.RETRYING)
                         R.string.local_work_request_retrying
                     else if (visiblePreview) R.string.local_streaming_status
                     else if (stream.phase == com.labteto.dshmobile.local.model.LocalModelPreviewPhase.WAITING)

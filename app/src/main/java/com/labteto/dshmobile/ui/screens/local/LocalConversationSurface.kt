@@ -484,6 +484,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     ) { LocalSessionAttachmentDraftCache() }
     val attachments = attachmentDrafts.forSession(state.sessionId)
     val listState = rememberLazyListState()
+    val workTailFollowing = remember(state.sessionId) { mutableStateOf(false) }
+    val workReaderPaused = remember(state.sessionId) { mutableStateOf(false) }
     var composerTailViewportAnchor by remember(state.sessionId) { mutableStateOf<Int?>(null) }
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
     var transcriptInitialPositionReady by rememberSaveable(state.sessionId) { mutableStateOf(false) }
@@ -606,6 +608,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         loadingOlderTranscript, transcriptHistoryError) {
         val target = transcriptJumpTarget?.takeIf { it.sessionId == state.sessionId }
             ?: return@LaunchedEffect
+        if (state.usageMode == LocalUsageMode.WORK) workReaderPaused.value = true
         val messageIndex = transcriptItems.indexOfFirst { item ->
             item is LocalTranscriptItem.Message && item.message.id == target.messageId
         }
@@ -798,8 +801,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         listState = listState,
         anchoredViewportExtent = composerTailViewportAnchor,
     )
-    val workTailFollowing = remember(state.sessionId) { mutableStateOf(false) }
-    val workReaderPaused = remember(state.sessionId) { mutableStateOf(false) }
     LocalWorkStreamingTailFollower(
         listState = listState,
         enabled = showStreamingTail && !workTailFollowing.value &&
@@ -1312,6 +1313,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             LocalStreamingWorkPreview(
                                 sessionId = state.sessionId,
                                 streamingState = streamingState,
+                                waitingForUser = state.pendingApproval != null || state.pendingQuestion != null,
                                 lastDurableNarrative = latestDurableWorkNarrativeInCurrentTurn(transcriptMessages),
                             )
                         }
@@ -1330,6 +1332,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     .padding(end = SyMetric.gapLg, bottom = SyMetric.gapMd),
                 onClick = { target ->
                     scrollHint.hide()
+                    if (state.usageMode == LocalUsageMode.WORK) workReaderPaused.value = true
                     scope.launch {
                         val targetIndex = if (target == ConversationScrollTarget.START) 0
                             else listState.layoutInfo.totalItemsCount.dec().coerceAtLeast(0)
@@ -1340,6 +1343,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             state.usageMode == LocalUsageMode.WORK
                         ) {
                             listState.alignWorkTimelineTailAfterScroll(targetIndex)
+                            workReaderPaused.value = false
                         }
                     }
                 },
