@@ -1,9 +1,11 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
+import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.local.runtime.LocalDeviceMemorySnapshot
 import com.labteto.dshmobile.local.runtime.localResourceBudgetForMemoryClass
 import com.labteto.dshmobile.local.runtime.localAdaptiveResourceBudget
+import com.labteto.dshmobile.local.runtime.localEffectiveHistoryPressure
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -75,6 +77,25 @@ class LocalExecutionKernelTest {
         assertTrue(highMemory.maxTerminals > lowMemory.maxTerminals)
         assertTrue(highMemory.maxLanguageServers > lowMemory.maxLanguageServers)
     }
+    @Test
+    fun idleDeviceWithReducedCapacityStillTriggersHistoryProtection() {
+        val initial = localResourceBudgetForMemoryClass(
+            512, LocalDeviceMemorySnapshot(15_100, 4_096),
+        )
+        val scheduler = HarnessResourceScheduler(initial)
+        assertEquals(HarnessResourcePressure.LOW,
+            localEffectiveHistoryPressure(scheduler.snapshot(), scheduler.startupBudget))
+        scheduler.updateBudget(initial.copy(maxModelRequests = 3, maxAgents = 3, maxTerminals = 2))
+        val idle = scheduler.snapshot()
+        assertEquals(0, idle.activeAgents)
+        assertEquals(HarnessResourcePressure.LOW, idle.pressure)
+        assertEquals(HarnessResourcePressure.HIGH,
+            localEffectiveHistoryPressure(idle, scheduler.startupBudget))
+        scheduler.updateBudget(initial)
+        assertEquals(HarnessResourcePressure.LOW,
+            localEffectiveHistoryPressure(scheduler.snapshot(), scheduler.startupBudget))
+    }
+
     @Test
     fun cloudModelConcurrencyIsIndependentOfCpuHeadroomButLocalWorkScales() {
         val startup = LocalDeviceMemorySnapshot(15_100, 4_096)
