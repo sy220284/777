@@ -244,6 +244,51 @@ internal fun WorkTimelineStepRow(
     }
 }
 
+/** An in-flight call reads its status from the Tool-owned event projection. */
+@Composable
+internal fun WorkPendingToolRow(
+    activity: com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem,
+) {
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    val provider = userFacingWorkToolProvider(activity.name)
+    val kind = com.labteto.dshmobile.ui.agentOperationKind(activity.name)
+    val action = userFacingWorkToolAction(activity.name) ?:
+        stringResource(userFacingWorkToolActionRes(activity.name) ?: agentOperationLabelRes(kind))
+    val label = if (provider != null) "$provider · $action" else action
+    val status = when (activity.phase) {
+        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.DECLARED -> "等待执行"
+        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING -> "执行中"
+        else -> return
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+    ) {
+        Icon(
+            imageVector = when (provider) {
+                "GitHub" -> FeatherIcons.GitBranch
+                "Figma" -> FeatherIcons.Palette
+                else -> FeatherIcons.Clock
+            },
+            contentDescription = null,
+            tint = colors.primary,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            style = DsType.small13.withReadingWeight(),
+            color = colors.textSecondary,
+        )
+        Text(
+            text = status,
+            style = DsType.caption11.withReadingWeight(),
+            color = colors.primary,
+        )
+    }
+}
+
 /** Explicit narrated findings are foregrounded; prose alone never proves a tool succeeded. */
 internal fun isWorkTimelineMilestone(text: String): Boolean =
     WORK_TIMELINE_MILESTONE.containsMatchIn(text.trimStart())
