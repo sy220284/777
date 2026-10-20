@@ -104,20 +104,8 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
         )
         // Android SharedPreferences may update its in-memory map even when commit()
         // reports disk failure. Capture all four original keys before staging.
-        val keys = listOf(
-            LocalAgentRuntimeSettings.KEY_MAIN_MAX_STEPS,
-            LocalAgentRuntimeSettings.KEY_SUBAGENT_MAX_STEPS,
-            com.labteto.dshmobile.local.model.LocalModelConfigContract.KEY_MODEL_ATTEMPTS,
-            com.labteto.dshmobile.local.model.LocalModelConfigContract.KEY_WORKER_PROFILE_ID,
-        )
-        val previous = keys.associateWith { key ->
-            when {
-                !preferences.contains(key) -> null
-                key == com.labteto.dshmobile.local.model.LocalModelConfigContract.KEY_WORKER_PROFILE_ID ->
-                    preferences.getString(key, null)
-                else -> preferences.getInt(key, 0)
-            }
-        }
+        val previousAgent = LocalAgentRuntimeSettings.snapshotForRollback(preferences)
+        val previousModel = LocalModelExecutionSettings.snapshotForRollback(preferences)
         // Settings UI submits all four values as one decision and one disk commit.
         val committed = preferences.edit().also { editor ->
             LocalAgentRuntimeSettings.stage(editor, agent)
@@ -127,13 +115,8 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
             val failure = IllegalStateException("运行参数写入持久存储失败，状态保持原值")
             try {
                 val rollback = preferences.edit()
-                previous.forEach { (key, value) ->
-                    when (value) {
-                        is Int -> rollback.putInt(key, value)
-                        is String -> rollback.putString(key, value)
-                        null -> rollback.remove(key)
-                    }
-                }
+                LocalAgentRuntimeSettings.stageRollback(rollback, previousAgent)
+                LocalModelExecutionSettings.stageRollback(rollback, previousModel)
                 if (!rollback.commit()) {
                     failure.addSuppressed(IllegalStateException("运行参数内存回滚尚未持久完成"))
                 }

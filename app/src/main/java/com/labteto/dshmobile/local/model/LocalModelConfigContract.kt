@@ -30,6 +30,12 @@ internal data class LocalModelExecutionSettingsSnapshot(
     val workerProfileId: String?,
 )
 
+/** Raw key values for rollback; distinct from normalized runtime configuration. */
+internal data class LocalModelExecutionRollbackSnapshot(
+    val modelAttempts: Int?,
+    val workerProfileId: String?,
+)
+
 /** Model-owned persistence for execution settings that SettingsFeature exposes to the user. */
 internal object LocalModelExecutionSettings {
     fun read(
@@ -73,6 +79,24 @@ internal object LocalModelExecutionSettings {
         } else {
             editor.putString(LocalModelConfigContract.KEY_WORKER_PROFILE_ID, snapshot.workerProfileId)
         }
+    }
+
+    /** Keep the original absent/present semantics when a shared commit fails. */
+    fun snapshotForRollback(preferences: SharedPreferences): LocalModelExecutionRollbackSnapshot =
+        LocalModelExecutionRollbackSnapshot(
+            modelAttempts = if (preferences.contains(LocalModelConfigContract.KEY_MODEL_ATTEMPTS)) {
+                preferences.getInt(LocalModelConfigContract.KEY_MODEL_ATTEMPTS, 0)
+            } else null,
+            workerProfileId = if (preferences.contains(LocalModelConfigContract.KEY_WORKER_PROFILE_ID)) {
+                preferences.getString(LocalModelConfigContract.KEY_WORKER_PROFILE_ID, null)
+            } else null,
+        )
+
+    fun stageRollback(editor: SharedPreferences.Editor, before: LocalModelExecutionRollbackSnapshot) {
+        if (before.modelAttempts == null) editor.remove(LocalModelConfigContract.KEY_MODEL_ATTEMPTS)
+        else editor.putInt(LocalModelConfigContract.KEY_MODEL_ATTEMPTS, before.modelAttempts)
+        if (before.workerProfileId == null) editor.remove(LocalModelConfigContract.KEY_WORKER_PROFILE_ID)
+        else editor.putString(LocalModelConfigContract.KEY_WORKER_PROFILE_ID, before.workerProfileId)
     }
 
     fun write(
