@@ -56,8 +56,8 @@ class LocalModelBudgetPolicyTest {
         val stable = LocalModelBudgetPolicies.forRoute("MiniMax-M3.1-Flash", "https://api.minimaxi.com/v1")
         assertEquals(m3, stable)
         assertEquals(1_000_000L, stable.pendingWorkTokens)
-        assertEquals(64, thirdParty.workRequestsPerSlice)
-        assertEquals(256_000L, thirdParty.pendingWorkTokens)
+        assertEquals(128, thirdParty.workRequestsPerSlice)
+        assertEquals(512_000L, thirdParty.pendingWorkTokens)
         assertEquals(160, LocalModelBudgetPolicies.forRoute("MiniMax-M2.5", "https://api.minimax.io/v1").workRequestsPerSlice)
         val high = localHistoryBudgetFor(
             512, HarnessResourcePressure.HIGH, "MiniMax-M3", "https://api.minimax.io/v1",
@@ -77,9 +77,9 @@ class LocalModelBudgetPolicyTest {
         repeat(65) { budget.reserve(1).commit(reportedInputTokens = 1) }
         assertEquals(65L, budget.snapshot().reportedExposureTokens)
         budget.beginExecutionSlice(LocalModelBudgetPolicies.forRoute("gpt-test", "https://example.com/v1"))
-        assertEquals(64, budget.snapshot().maxRequests)
+        assertEquals(128, budget.snapshot().maxRequests)
         assertEquals(65L, budget.snapshot().reportedExposureTokens)
-        repeat(64) { budget.reserve(1).commit() }
+        repeat(128) { budget.reserve(1).commit() }
         val exhausted = runCatching { budget.reserve(1) }.exceptionOrNull() as LocalModelException
         assertEquals("WORK_BUDGET_EXHAUSTED", exhausted.code)
     }
