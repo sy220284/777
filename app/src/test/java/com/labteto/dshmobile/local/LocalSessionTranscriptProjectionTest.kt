@@ -54,6 +54,28 @@ class LocalSessionTranscriptProjectionTest {
     }
 
     @Test
+    fun regeneratingChatAnswerReplacesAssociatedReasoningInDurableTranscript() {
+        val oldThinking = message("reasoning:old", "reasoning", "旧思考", 1L)
+        val oldAnswer = message("old", "assistant", "旧回答", 1L)
+        val newThinking = message("reasoning:new", "reasoning", "新思考", 2L)
+        val newAnswer = message("new", "assistant", "新回答", 2L)
+        val replacement = LocalSessionEventLog.Event(
+            sequence = 12L, type = "assistant/message", createdAt = 2L,
+            data = buildJsonObject {
+                put("role", "assistant")
+                put("content", "新回答")
+                put("replaces", "old")
+                put("transcript", encodeTranscriptMessages(listOf(newThinking, newAnswer)))
+            },
+        )
+        val projected = projectSessionTranscriptTail(
+            listOf(oldThinking, oldAnswer), listOf(replacement), 11L,
+        )
+        assertEquals(listOf(newThinking, newAnswer), projected.messages)
+        assertEquals(12L, projected.projectedThroughSequence)
+    }
+
+    @Test
     fun replaysTranscriptTailInSequenceOrderAndDeduplicatesByStableId() {
         val existing = message("m-old", "user", "旧消息", 10L)
         val duplicate = existing.copy(content = "不应覆盖")
