@@ -62,6 +62,28 @@ class LocalContextBudgetTest {
     }
 
     @Test
+    fun modernPhoneHistoryRetentionIsRamAwareButModelWindowRemainsAuthoritative() {
+        fun budget(ram: Int, heap: Int = 512, pressure: HarnessResourcePressure = HarnessResourcePressure.LOW) =
+            localHistoryBudgetFor(
+                memoryClassMb = heap,
+                pressure = pressure,
+                model = "custom-model",
+                baseUrl = "https://proxy.example/v1",
+                deviceRamMb = ram,
+            )
+
+        assertEquals(700_000, budget(0).maxHistoryChars) // Unknown RAM: legacy heap guard.
+        val twelve = budget(11_200, heap = 384)
+        val sixteen = budget(15_200)
+        assertEquals(900_000, twelve.maxHistoryChars)
+        assertEquals(1_100_000, sixteen.maxHistoryChars)
+        assertEquals(320_000, budget(15_200, heap = 192).maxHistoryChars)
+        assertTrue(budget(15_200, pressure = HarnessResourcePressure.HIGH).maxHistoryChars < sixteen.maxHistoryChars)
+        assertEquals(twelve.maxHistoryTokens, sixteen.maxHistoryTokens)
+        assertEquals(192_000, sixteen.maxHistoryTokens)
+    }
+
+    @Test
     fun toolResultBudgetIsSharedByEveryProductSurface() {
         val budget = localHistoryBudgetFor(
             memoryClassMb = 512,
