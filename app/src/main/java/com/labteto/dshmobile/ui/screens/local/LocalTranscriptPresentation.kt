@@ -71,6 +71,7 @@ internal sealed interface LocalTranscriptItem {
         val message: LocalHarnessMessage,
         val repeatCount: Int = 1,
         val activity: LocalToolActivityUiItem? = null,
+        val groupedMessages: List<LocalHarnessMessage> = emptyList(),
     ) : LocalTranscriptItem {
         override val key: String =
             message.toolCallId?.takeIf { message.role == "tool" }?.let { "work-tool:$it" }
@@ -151,9 +152,11 @@ internal fun appendPendingWorkToolActivities(
             item.copy(activity = item.message.toolCallId?.let(byCallId::get) ?: item.activity)
         } else item
     }
-    if (!running) return enriched
+    if (!running) return compactRepeatedWorkStatusChecks(enriched)
     val completedIds = enriched.filterIsInstance<LocalTranscriptItem.WorkStep>()
-        .mapNotNull { it.message.toolCallId }.toSet()
+        .flatMap { step ->
+            (listOf(step.message) + step.groupedMessages).mapNotNull { it.toolCallId }
+        }.toSet()
     val lastUserAt = transcript.filterIsInstance<LocalTranscriptItem.Message>()
         .lastOrNull { it.message.role == "user" }?.message?.createdAt ?: Long.MIN_VALUE
     val pending = activities.filter {
@@ -163,7 +166,7 @@ internal fun appendPendingWorkToolActivities(
             compareBy<LocalToolActivityUiItem> { it.declaredAt ?: Long.MAX_VALUE }
                 .thenBy { it.declaredSequence ?: Long.MAX_VALUE }
         )
-    if (pending.isEmpty()) return enriched
+    if (pending.isEmpty()) return compactRepeatedWorkStatusChecks(enriched)
     // Insert at the call's original time instead of appending below newer narration,
     // completed replies or deliverables. Never reorder existing durable messages.
     val result = enriched.toMutableList()
@@ -196,7 +199,39 @@ internal fun appendPendingWorkToolActivities(
         }
         result.add(if (index < 0) result.size else index, LocalTranscriptItem.WorkPendingTool(activity))
     }
-    return result
+    return compactRepeatedWorkStatusChecks(result)
+}
+
+/**
+ * Compact only consecutive, successful status checks of the same tool AND arguments.
+ * Every result is retained in groupedMessages and the expandable receipt. Other tool
+ * calls (and any uncertain/failed/cancelled result) always keep their own row.
+ */
+internal fun compactRepeatedWorkStatusChecks(
+    items: List<LocalTranscriptItem>,
+): List<LocalTranscriptItem> {
+    val compact = mutableListOf<LocalTranscriptItem>()
+    items.forEach { item ->
+        val current = item as? LocalTranscriptItem.WorkStep
+        val previous = compact.lastOrNull() as? LocalTranscriptItem.WorkStep
+        val canGroup = current != null && previous != null &&
+            current.message.role == "tool" && previous.message.role == "tool" &&
+            isRepeatedWorkPollingTool(current.message.toolName) &&
+            current.message.toolName == previous.message.toolName &&
+            current.message.toolIsError == false && previous.message.toolIsError == false &&
+            current.message.toolErrorCode == null && previous.message.toolErrorCode == null &&
+            current.activity?.argumentsPreview != null &&
+            current.activity.argumentsPreview == previous.activity?.argumentsPreview
+        if (canGroup) {
+            compact[compact.lastIndex] = previous!!.copy(
+                repeatCount = previous.repeatCount + 1,
+                groupedMessages = previous.groupedMessages + current!!.message,
+            )
+        } else {
+            compact += item
+        }
+    }
+    return compact
 }
 
 internal fun userVisibleDialogueMessageCount(
