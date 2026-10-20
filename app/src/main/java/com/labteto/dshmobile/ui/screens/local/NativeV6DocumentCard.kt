@@ -55,7 +55,6 @@ internal fun NativeV6DocumentModalHost(
     if (documents.isEmpty()) return
 
     val selected = documents.firstOrNull { it.document.documentId == selectedId }
-        ?: documents.last()
     SyButton(
         text = if (documents.size == 1) "查看回复卡片" else "查看回复卡片 · ${documents.size} 份",
         onClick = { selectedId = documents.last().document.documentId; open = true },
@@ -64,7 +63,7 @@ internal fun NativeV6DocumentModalHost(
         variant = SyButtonVariant.Ghost,
         modifier = Modifier.testTag("reply_document_open:${messageId}"),
     )
-    if (open) {
+    if (open && selected != null) {
         val close = { open = false }
         SyResponsiveSheet(
             title = selected.document.title,
