@@ -655,106 +655,106 @@ fun ToolsScreen(
                                 )
                             }
                             else -> Column(Modifier.fillMaxSize()) {
-                val initialLoading = state.loading &&
-                    state.localPlugins.isEmpty() &&
-                    state.servers.isEmpty() &&
-                    !state.githubConfigured
-                if (initialLoading) {
-                    SyLoadingState(
-                        icon = SyEntryIcons.Tools,
-                        label = stringResource(R.string.tools_loading),
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                    )
-                } else Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
-                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
-                        Text(
-                            stringResource(R.string.cap_center_settings_group),
-                            style = DsType.std14Strong.withReadingWeight(),
-                            color = colors.textSecondary,
-                        )
-                        Text(
-                            stringResource(R.string.cap_center_settings_group_hint),
-                            style = DsType.small13.withReadingWeight(),
-                            color = colors.textSecondary,
-                        )
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
-                        ToolCapabilityRow(
-                            icon = SyEntryIcons.Search,
-                            title = stringResource(R.string.tools_network_search),
-                            status = stringResource(
-                                if (networkSearchEnabled) R.string.common_enabled else R.string.common_disabled,
-                            ),
-                            state = if (networkSearchEnabled) StateDotState.Done else StateDotState.Idle,
-                            onClick = { pulse(); viewModel.setNetworkSearchEnabled(!networkSearchEnabled) },
-                            trailing = {
-                                SySwitchControl(
-                                    checked = networkSearchEnabled,
-                                    onCheckedChange = { pulse(); viewModel.setNetworkSearchEnabled(it) },
-                                )
-                            },
-                        )
-                        ToolCapabilityRow(
-                            icon = SyEntryIcons.Permissions,
-                            title = stringResource(R.string.cap_center_auto_approval),
-                            status = stringResource(
-                                when (approvalMode) {
-                                    LocalApprovalMode.AUTO -> R.string.common_enabled
-                                    LocalApprovalMode.MANUAL -> R.string.settings_approval_mode_manual
-                                    LocalApprovalMode.DEFAULT -> R.string.common_disabled
-                                },
-                            ),
-                            state = if (autoApprovalEnabled) StateDotState.Done else StateDotState.Idle,
-                            onClick = { toggleAutoApproval(!autoApprovalEnabled) },
-                            trailing = {
-                                SySwitchControl(
-                                    checked = autoApprovalEnabled,
-                                    onCheckedChange = toggleAutoApproval,
-                                )
-                            },
-                        )
-                        ToolCapabilityRow(
-                            icon = SyEntryIcons.Advanced,
-                            title = stringResource(R.string.advanced_agent_settings),
-                            status = stringResource(R.string.tools_capability_available),
-                            state = StateDotState.Done,
-                            onClick = { showAgentSettings = true },
-                        )
+                                val initialLoading = state.loading &&
+                                    state.localPlugins.isEmpty() &&
+                                    state.servers.isEmpty() &&
+                                    !state.githubConfigured
+                                if (initialLoading) {
+                                    SyLoadingState(
+                                        icon = SyEntryIcons.Tools,
+                                        label = stringResource(R.string.tools_loading),
+                                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                                    )
+                                } else Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
+                                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
+                                        Text(
+                                            stringResource(R.string.cap_center_settings_group),
+                                            style = DsType.std14Strong.withReadingWeight(),
+                                            color = colors.textSecondary,
+                                        )
+                                        Text(
+                                            stringResource(R.string.cap_center_settings_group_hint),
+                                            style = DsType.small13.withReadingWeight(),
+                                            color = colors.textSecondary,
+                                        )
+                                    }
+                                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+                                        ToolCapabilityRow(
+                                            icon = SyEntryIcons.Search,
+                                            title = stringResource(R.string.tools_network_search),
+                                            status = stringResource(
+                                                if (networkSearchEnabled) R.string.common_enabled else R.string.common_disabled,
+                                            ),
+                                            state = if (networkSearchEnabled) StateDotState.Done else StateDotState.Idle,
+                                            onClick = { pulse(); viewModel.setNetworkSearchEnabled(!networkSearchEnabled) },
+                                            trailing = {
+                                                SySwitchControl(
+                                                    checked = networkSearchEnabled,
+                                                    onCheckedChange = { pulse(); viewModel.setNetworkSearchEnabled(it) },
+                                                )
+                                            },
+                                        )
+                                        ToolCapabilityRow(
+                                            icon = SyEntryIcons.Permissions,
+                                            title = stringResource(R.string.cap_center_auto_approval),
+                                            status = stringResource(
+                                                when (approvalMode) {
+                                                    LocalApprovalMode.AUTO -> R.string.common_enabled
+                                                    LocalApprovalMode.MANUAL -> R.string.settings_approval_mode_manual
+                                                    LocalApprovalMode.DEFAULT -> R.string.common_disabled
+                                                },
+                                            ),
+                                            state = if (autoApprovalEnabled) StateDotState.Done else StateDotState.Idle,
+                                            onClick = { toggleAutoApproval(!autoApprovalEnabled) },
+                                            trailing = {
+                                                SySwitchControl(
+                                                    checked = autoApprovalEnabled,
+                                                    onCheckedChange = toggleAutoApproval,
+                                                )
+                                            },
+                                        )
+                                        ToolCapabilityRow(
+                                            icon = SyEntryIcons.Advanced,
+                                            title = stringResource(R.string.advanced_agent_settings),
+                                            status = stringResource(R.string.tools_capability_available),
+                                            state = StateDotState.Done,
+                                            onClick = { showAgentSettings = true },
+                                        )
 
-                    }
+                                    }
 
-                    Text(
-                        stringResource(R.string.cap_center_extensions_group),
-                        style = DsType.std14Strong.withReadingWeight(),
-                        color = colors.textSecondary,
-                    )
-                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
-                        ToolCapabilityRow(
-                            icon = SyEntryIcons.Projects,
-                            title = stringResource(R.string.tools_github_connector),
-                            status = stringResource(
-                                if (state.githubConfigured) R.string.tools_github_configured
-                                else R.string.tools_github_unconfigured,
-                            ),
-                            state = if (state.githubConfigured) StateDotState.Done else StateDotState.Idle,
-                            onClick = { showGitHubConfig = true },
-                        )
-                        ToolCapabilityRow(
-                            iconPainter = painterResource(R.drawable.ic_ui_plugin),
-                            title = stringResource(R.string.tools_external_services),
-                            status = state.servers.size.toString(),
-                            state = if (state.servers.isNotEmpty()) StateDotState.Done else StateDotState.Idle,
-                            onClick = { showExternalConfig = true },
-                        )
-                    }
-                }
-            }
+                                    Text(
+                                        stringResource(R.string.cap_center_extensions_group),
+                                        style = DsType.std14Strong.withReadingWeight(),
+                                        color = colors.textSecondary,
+                                    )
+                                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+                                        ToolCapabilityRow(
+                                            icon = SyEntryIcons.Projects,
+                                            title = stringResource(R.string.tools_github_connector),
+                                            status = stringResource(
+                                                if (state.githubConfigured) R.string.tools_github_configured
+                                                else R.string.tools_github_unconfigured,
+                                            ),
+                                            state = if (state.githubConfigured) StateDotState.Done else StateDotState.Idle,
+                                            onClick = { showGitHubConfig = true },
+                                        )
+                                        ToolCapabilityRow(
+                                            iconPainter = painterResource(R.drawable.ic_ui_plugin),
+                                            title = stringResource(R.string.tools_external_services),
+                                            status = state.servers.size.toString(),
+                                            state = if (state.servers.isNotEmpty()) StateDotState.Done else StateDotState.Idle,
+                                            onClick = { showExternalConfig = true },
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
