@@ -388,7 +388,9 @@ internal class LocalSessionLifecycleCoordinator(
                     cancelActiveRunAndJoin()
                 }
                 cancelWorkRunsAndJoin(ids)
-                jobs.removeOwnedAndJoin(ids)
+                // First stop execution, but retain its receipts until a session is durably deleted.
+                // A failed unlink must not irreversibly erase the surviving session's job history.
+                jobs.stopOwnedAndJoin(ids)
                 // Hold the same per-session ownership used by foreground and Automation runs.
                 // This waits for an in-flight Automation owner and prevents a queued one from
                 // entering until durable deletion and the repository tombstone handoff finish.
@@ -476,10 +478,16 @@ internal class LocalSessionLifecycleCoordinator(
                                                 it.name.startsWith("$id.events.jsonl.part-") ||
                                                 it.name.startsWith("$id.events.jsonl.projection-")
                                         }
-                                        .forEach(File::delete)
+                                        .forEach { eventFile ->
+                                            check(eventFile.delete() || !eventFile.exists()) {
+                                                "会话事件文件删除失败：${eventFile.name}"
+                                            }
+                                        }
                                 },
                             )
                         }
+                        // Forget jobs only for identities confirmed deleted on disk.
+                        jobs.removeOwnedAndJoin(durableDeletedIds)
                         activateReplacementIfNeeded()
                         conversationFilesCoordinator.invalidate(ids)
                         memoryStore.detachSourceSessions(ids)
@@ -493,6 +501,11 @@ internal class LocalSessionLifecycleCoordinator(
                         // committed identities; otherwise stale caches/pending objects may still
                         // expose a deleted conversation in this process.
                         if (durableDeletedIds.isNotEmpty()) {
+                            try {
+                                jobs.removeOwnedAndJoin(durableDeletedIds)
+                            } catch (cleanupFailure: Exception) {
+                                failure.addSuppressed(cleanupFailure)
+                            }
                             try {
                                 conversationFilesCoordinator.invalidate(durableDeletedIds)
                                 pendingSessions.forget(durableDeletedIds)

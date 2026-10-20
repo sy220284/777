@@ -155,6 +155,8 @@ internal class LocalJobManager(
     suspend fun stopOwnedNonPersistentAndJoin(sessionIds: Set<String>) =
         delegate.stopOwnedNonPersistentAndJoin(sessionIds)
 
+    suspend fun stopOwnedAndJoin(sessionIds: Set<String>) = delegate.stopOwnedAndJoin(sessionIds)
+
     suspend fun removeOwnedAndJoin(sessionIds: Set<String>) = delegate.removeOwnedAndJoin(sessionIds)
 }
 

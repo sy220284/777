@@ -1064,6 +1064,18 @@ class HarnessJobManager(
         publish()
     }
 
+    /**
+     * Quiesce owned jobs before deleting a session without forgetting their receipts yet.
+     * If durable session deletion fails, cancelled/finished job evidence must remain inspectable.
+     */
+    suspend fun stopOwnedAndJoin(ownerIds: Set<String>) {
+        if (ownerIds.isEmpty()) return
+        val jobs = markRunningJobsCancelled { it.ownerId in ownerIds }
+        jobs.forEach { it.cancel() }
+        jobs.joinAll()
+        publish()
+    }
+
     suspend fun stopOwnedNonPersistentAndJoin(ownerIds: Set<String>) {
         if (ownerIds.isEmpty()) return
         val jobs = markRunningJobsCancelled {
