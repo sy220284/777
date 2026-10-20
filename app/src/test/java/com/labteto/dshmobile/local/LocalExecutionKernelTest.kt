@@ -17,18 +17,19 @@ class LocalExecutionKernelTest {
     }
 
     @Test
-    fun physicalRamAndAppHeapJointlyControlMainstreamPhoneConcurrency() {
+    fun target12And16GbPhonesRespectHeapLimitsAndConservativeFallback() {
         fun capacity(heap: Int, total: Int, available: Int = 4_096) =
             localResourceBudgetForMemoryClass(
                 heap,
                 LocalDeviceMemorySnapshot(totalRamMb = total, availableRamMb = available),
             )
 
-        assertEquals(3, capacity(256, 3_700).maxModelRequests) // 4GB
-        assertEquals(5, capacity(256, 5_500).maxModelRequests) // 6GB
-        assertEquals(6, capacity(256, 7_500).maxModelRequests) // 8GB
-        assertEquals(8, capacity(384, 11_200).maxModelRequests) // 12GB
-        assertEquals(10, capacity(512, 15_100).maxModelRequests) // 16GB
+        assertEquals(8, capacity(256, 11_200).maxModelRequests) // 12 GB target
+        assertEquals(8, capacity(384, 11_200).maxModelRequests)
+        assertEquals(10, capacity(512, 15_100).maxModelRequests) // 16 GB target
+        assertEquals(8, capacity(256, 15_100).maxModelRequests) // Java heap remains a safety cap
+        // There are no dedicated low-RAM tuning profiles below the target class.
+        assertEquals(3, capacity(384, 9_000).maxModelRequests)
         assertEquals(12, capacity(512, 15_100).maxAgents)
         assertEquals(6, capacity(512, 15_100).maxTerminals)
         assertEquals(3, capacity(512, 15_100).maxVirtualDisplays)
