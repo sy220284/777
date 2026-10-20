@@ -6,6 +6,7 @@ import android.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -45,7 +46,7 @@ class MediaImageDetailInteractionTest {
             compose.onNodeWithTag("mediaImageActions").assertIsDisplayed().performClick()
             compose.onNodeWithText("保存").assertIsDisplayed()
             compose.onNodeWithText("分享").assertIsDisplayed()
-         } finally {
+        } finally {
             file.delete()
         }
     }
@@ -76,6 +77,42 @@ class MediaImageDetailInteractionTest {
         } finally {
             file.delete()
         }
+    }
+
+    @Test fun messageOverflowContainsOnlySecondaryActions() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        var createdDocuments = 0
+        compose.setContent {
+            DshTheme {
+                LocalMessageRow(
+                    message = com.labteto.dshmobile.local.session.LocalHarnessMessage(
+                        id = "reply", role = "assistant", content = "测试回复", createdAt = 1L,
+                    ),
+                    chatMode = false,
+                    groupMode = false,
+                    canEdit = false,
+                    canRegenerate = true,
+                    canSelectVariant = false,
+                    branchInfo = null,
+                    onEdit = {},
+                    onSelectVariant = { _, _ -> true },
+                    onRegenerate = { true },
+                    onCreateDocument = { createdDocuments++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("messageActionToolbar:reply").assertIsDisplayed()
+        compose.onNodeWithContentDescription(
+            context.getString(com.labteto.dshmobile.R.string.local_regenerate_reply),
+        ).assertIsDisplayed()
+        compose.onNodeWithContentDescription(
+            context.getString(com.labteto.dshmobile.R.string.fluid_message_actions),
+        ).performClick()
+        compose.onNodeWithText("为此回复生成交互文档").assertIsDisplayed()
+        compose.onNodeWithText("重新生成回复").assertDoesNotExist()
+        compose.onNodeWithText("复制").assertDoesNotExist()
+        compose.onNodeWithText("为此回复生成交互文档").performClick()
+        compose.runOnIdle { assertTrue(createdDocuments == 1) }
     }
 
     @Test fun remoteOnlyImageShowsShareWithoutPretendingLocalSave() {
