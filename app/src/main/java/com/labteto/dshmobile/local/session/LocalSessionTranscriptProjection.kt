@@ -10,6 +10,9 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
 
+/** Stable reasoning row identity tied to its visible Chat assistant answer. */
+internal fun chatReasoningTranscriptId(assistantId: String): String = "reasoning:$assistantId"
+
 internal data class LocalSessionTranscriptProjection(
     val messages: List<LocalHarnessMessage>,
     val projectedThroughSequence: Long,
@@ -181,8 +184,10 @@ internal fun projectSessionTranscriptTail(
             if (event.type == "assistant/message") {
                 val replacedId = (event.data["replaces"] as? JsonPrimitive)?.contentOrNull
                 if (replacedId != null) {
-                    messages.removeAll { it.id == replacedId }
+                    val replacedThinkingId = chatReasoningTranscriptId(replacedId)
+                    messages.removeAll { it.id == replacedId || it.id == replacedThinkingId }
                     knownIds.remove(replacedId)
+                    knownIds.remove(replacedThinkingId)
                 }
             }
             if (decoded != null) {
