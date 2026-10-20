@@ -128,10 +128,36 @@ internal fun appendPendingWorkToolActivities(
     if (!running) return transcript
     val completedIds = transcript.filterIsInstance<LocalTranscriptItem.WorkStep>()
         .mapNotNull { it.message.toolCallId }.toSet()
+    val lastUserAt = transcript.filterIsInstance<LocalTranscriptItem.Message>()
+        .lastOrNull { it.message.role == "user" }?.message?.createdAt ?: Long.MIN_VALUE
     val pending = activities.filter {
         it.phase == LocalToolUiPhase.DECLARED || it.phase == LocalToolUiPhase.RUNNING
-    }.filter { it.callId !in completedIds }.distinctBy { it.callId }
-    return transcript + pending.map(LocalTranscriptItem::WorkPendingTool)
+    }.filter { it.callId !in completedIds && (it.declaredAt ?: Long.MIN_VALUE) >= lastUserAt }
+        .distinctBy { it.callId }.sortedWith(
+            compareBy<LocalToolActivityUiItem> { it.declaredAt ?: Long.MAX_VALUE }
+                .thenBy { it.declaredSequence ?: Long.MAX_VALUE }
+        )
+    if (pending.isEmpty()) return transcript
+    // Insert at the call's original time instead of appending below newer narration,
+    // completed replies or deliverables. Never reorder existing durable messages.
+    val result = transcript.toMutableList()
+    pending.forEach { activity ->
+        val timestamp = activity.declaredAt ?: Long.MAX_VALUE
+        val index = result.indexOfFirst { item ->
+            when (item) {
+                is LocalTranscriptItem.Message -> item.message.createdAt > timestamp
+                is LocalTranscriptItem.WorkStep -> item.message.createdAt > timestamp
+                is LocalTranscriptItem.WorkProcess -> item.messages.first().createdAt > timestamp
+                is LocalTranscriptItem.Thinking -> item.messages.first().createdAt > timestamp
+                is LocalTranscriptItem.WorkPendingTool -> (item.activity.declaredAt ?: Long.MAX_VALUE) > timestamp
+                is LocalTranscriptItem.WorkNode -> item.node.createdAt > timestamp
+                is LocalTranscriptItem.WorkArtifact -> true
+                else -> false
+            }
+        }
+        result.add(if (index < 0) result.size else index, LocalTranscriptItem.WorkPendingTool(activity))
+    }
+    return result
 }
 
 internal fun userVisibleDialogueMessageCount(
