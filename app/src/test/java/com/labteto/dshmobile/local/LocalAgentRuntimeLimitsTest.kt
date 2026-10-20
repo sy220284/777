@@ -9,8 +9,8 @@ import org.junit.Test
 class LocalAgentRuntimeLimitsTest {
     @Test
     fun modernPhoneDefaultsGiveAgentsLargerStartingBudget() {
-        assertEquals(256, LocalAgentRuntimeSettings.DEFAULT_MAIN_MAX_STEPS)
-        assertEquals(192, LocalAgentRuntimeSettings.DEFAULT_SUBAGENT_MAX_STEPS)
+        assertEquals(512, LocalAgentRuntimeSettings.DEFAULT_MAIN_MAX_STEPS)
+        assertEquals(512, LocalAgentRuntimeSettings.DEFAULT_SUBAGENT_MAX_STEPS)
     }
 
     @Test
