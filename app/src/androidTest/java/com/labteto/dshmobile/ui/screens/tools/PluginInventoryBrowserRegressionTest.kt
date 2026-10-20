@@ -349,4 +349,39 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithText("使用").assertIsNotEnabled()
     }
 
+    @Test
+    fun embeddedInventoryOmitsNestedPageHeader() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = listOf("android-runtime"), embedded = true,
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-search").assertIsDisplayed()
+        compose.onNodeWithText("插件").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertIsDisplayed()
+    }
+
+    @Test
+    fun capabilityTabsSwitchSectionsWithoutNavigating() {
+        compose.setContent {
+            DshTheme {
+                val current = androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                androidx.compose.foundation.layout.Column {
+                    CapabilityCenterTabs(current.intValue) { current.intValue = it }
+                    androidx.compose.material3.Text("当前标签:${current.intValue}")
+                }
+            }
+        }
+        compose.onNodeWithText("当前标签:0").assertIsDisplayed()
+        compose.onNodeWithText("技能").performClick()
+        compose.onNodeWithText("当前标签:1").assertIsDisplayed()
+        compose.onNodeWithText("连接与权限").performClick()
+        compose.onNodeWithText("当前标签:2").assertIsDisplayed()
+        compose.onNodeWithText("插件").performClick()
+        compose.onNodeWithText("当前标签:0").assertIsDisplayed()
+    }
+
 }
