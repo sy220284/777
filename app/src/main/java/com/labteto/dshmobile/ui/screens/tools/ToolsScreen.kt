@@ -32,7 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -541,6 +541,8 @@ fun ToolsScreen(
     var selectedTab by rememberSaveable(startAtPlugins, startAtSkills) {
         mutableIntStateOf(if (startAtSkills) 1 else 0)
     }
+    // Switching tabs must not discard the plugin/skill search and filter context.
+    val inventoryTabStates = rememberSaveableStateHolder()
 
     val noticeMessage = state.notice?.let { notice ->
         stringResource(
@@ -633,7 +635,7 @@ fun ToolsScreen(
                     }
                     Box(Modifier.weight(1f)) {
                         when (selectedTab) {
-                            0, 1 -> key(selectedTab) {
+                            0, 1 -> inventoryTabStates.SaveableStateProvider(selectedTab) {
                                 PluginInventoryBrowser(
                                     localIds = state.localPlugins,
                                     connectedServices = state.servers,
