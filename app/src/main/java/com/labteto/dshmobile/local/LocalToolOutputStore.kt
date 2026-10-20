@@ -403,11 +403,14 @@ internal class LocalToolOutputStore(
         private const val MAX_SEARCH_QUERY_BYTES = 512
         private const val MAX_SEARCH_MATCHES = 10
         private const val ACTIVE_REFERENCES_FILE = ".active-tool-refs"
-        private const val MAX_ACTIVE_REFERENCES = 16
+        // Long audits can legitimately reference hundreds of distinct tool results.
+        // Quotas still bound storage; this only expands which live results survive LRU eviction.
+        private const val MAX_ACTIVE_REFERENCES = 256
         private const val MIN_READ_BYTES = 1_024
         // One output may use the existing session quota, rather than an obsolete 16 MiB cap.
         private const val DEFAULT_MAX_OUTPUT_BYTES = 64 * 1024 * 1024
-        private const val DEFAULT_MAX_FILES_PER_SESSION = 64
+        // Retain longer tool histories while keeping a separate file-count guard against tiny-file storms.
+        private const val DEFAULT_MAX_FILES_PER_SESSION = 512
         private const val DEFAULT_MAX_SESSION_BYTES = 64L * 1024L * 1024L
         private const val DEFAULT_MAX_GLOBAL_BYTES = 256L * 1024L * 1024L
     }
