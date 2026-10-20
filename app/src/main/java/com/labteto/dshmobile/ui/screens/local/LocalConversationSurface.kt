@@ -527,13 +527,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         val items = if (current != lastRevision) workActions.artifactsForUi(state.sessionId) else workArtifacts
                         current to workActions.refreshArtifactFiles(state.sessionId, items)
                     }
-                    // The Tool projection also observes execution-started transitions that
-                    // do not necessarily republish a document snapshot.
-                    if (state.running && revision != lastRevision) {
-                        workToolActivities = withContext(Dispatchers.IO) {
-                            workActions.toolActivities(state.sessionId)
-                        }
-                    }
                     workArtifacts = next
                     lastRevision = revision
                 } catch (cancelled: CancellationException) {
@@ -545,13 +538,27 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             }
         }
     }
-    // Reuse the existing Tool-owned event projection. Document updates publish the
-    // start event, while transcript changes publish the completed tool result.
-    LaunchedEffect(state.sessionId, state.usageMode, workActions, nativeDocumentSnapshot,
-        state.messages.size, state.running) {
-        workToolActivities = if (state.usageMode == LocalUsageMode.WORK && workActions != null) {
-            withContext(Dispatchers.IO) { workActions.toolActivities(state.sessionId) }
-        } else emptyList()
+    // Work's authoritative EventLog sequence changes on call, execution-started and result.
+    // One lifecycle-bound observer replaces the competing document/response refresh paths.
+    LaunchedEffect(state.sessionId, state.usageMode, workActions, state.running) {
+        if (state.usageMode != LocalUsageMode.WORK || workActions == null) {
+            workToolActivities = emptyList()
+        } else {
+            var lastSequence = Long.MIN_VALUE
+            do {
+                val sequence = withContext(Dispatchers.IO) {
+                    workActions.eventSequenceForUi(state.sessionId)
+                }
+                if (sequence != lastSequence) {
+                    workToolActivities = withContext(Dispatchers.IO) {
+                        workActions.toolActivities(state.sessionId)
+                    }
+                    lastSequence = sequence
+                }
+                if (!state.running) break
+                delay(600)
+            } while (true)
+        }
     }
     val transcriptItems = remember(transcriptMessages, state.usageMode, state.sessionId,
         generatedMedia, videoMediaTasks, pendingMediaJobs, workArtifacts, workToolActivities, state.running) {
