@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.runtime
 
-import android.app.ActivityManager
 import android.content.Context
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.LocalJobManager
@@ -55,16 +54,12 @@ internal class LocalRuntimeJobOwner internal constructor(
                 maxConcurrentJobs = maxConcurrentJobs,
             )
 
-        internal fun persistent(context: Context, json: Json): LocalRuntimeJobOwner {
-            // Use the same device-capacity policy as the foreground resource scheduler.
-            // The core job manager still checks its own admission atomically; agents also
-            // acquire AGENT leases so background jobs cannot bypass runtime scheduling.
-            val memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256
-            val maxConcurrentJobs = localResourceBudgetForMemoryClass(
-                memoryClassMb,
-                readLocalDeviceMemorySnapshot(context),
-            ).maxAgents
-            return LocalRuntimeJobOwner(
+        internal fun persistent(
+            context: Context,
+            json: Json,
+            maxConcurrentJobs: Int,
+        ): LocalRuntimeJobOwner =
+            LocalRuntimeJobOwner(
                 scope = processScope(),
                 store = LocalPersistentJobStore(
                     file = File(context.filesDir, "local-harness/jobs.json"),
@@ -72,7 +67,6 @@ internal class LocalRuntimeJobOwner internal constructor(
                 ),
                 maxConcurrentJobs = maxConcurrentJobs,
             )
-        }
 
         private fun processScope(): CoroutineScope =
             CoroutineScope(
