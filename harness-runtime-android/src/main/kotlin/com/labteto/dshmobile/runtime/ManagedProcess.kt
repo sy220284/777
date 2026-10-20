@@ -4,6 +4,7 @@ import com.labteto.dshmobile.harness.capability.ProcessResult
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -78,6 +79,7 @@ suspend fun executeManagedProcess(
     val managed = ManagedProcess.start(builder)
     val process = managed.process
     val lastOutputNanos = AtomicLong(System.nanoTime())
+    val teardownStarted = AtomicBoolean(false)
     val processPollMillis = 250L
     try {
         coroutineScope {
@@ -90,7 +92,15 @@ suspend fun executeManagedProcess(
                     // Drain both pipes until their writers actually close; otherwise fast
                     // failing commands can lose their final permission/path diagnostics.
                     // Process-group teardown closes the writers on timeout/cancellation.
-                    val count = runInterruptible { input.read(buffer) }
+                    val count = try {
+                        runInterruptible { input.read(buffer) }
+                    } catch (readFailure: java.io.IOException) {
+                        // Terminating a process group can close a pipe from another thread on
+                        // Android. That expected teardown must not turn a timed-out command into
+                        // an IO failure, but genuine read failures before teardown still surface.
+                        if (!teardownStarted.get()) throw readFailure
+                        break
+                    }
                     if (count < 0) break
                     if (count > 0) lastOutputNanos.set(System.nanoTime())
                     val keep = minOf(count, (maxChars * 4 - output.size()).coerceAtLeast(0))
@@ -139,10 +149,12 @@ suspend fun executeManagedProcess(
                         runInterruptible { process.waitFor() }
                     }
                 }
+                teardownStarted.set(true)
                 managed.terminate()
                 ProcessResult(code ?: -1, stdout.await(), stderr.await(), timedOut = code == null)
             } finally {
                 // Must run BEFORE coroutineScope waits for blocked child IO on cancellation.
+                teardownStarted.set(true)
                 managed.terminate()
             }
         }
