@@ -116,6 +116,21 @@ class MediaImageDetailInteractionTest {
         compose.runOnIdle { assertTrue(createdDocuments == 1) }
     }
 
+    @Test fun zoomedOverlayDoesNotDismissOnBackgroundTap() {
+        var dismissed = false
+        compose.setContent {
+            DshTheme {
+                com.labteto.dshmobile.ui.shenyan.SyFullscreenMediaOverlay(
+                    onDismiss = { dismissed = true },
+                    dismissOnBackgroundTap = false,
+                ) {}
+            }
+        }
+        compose.onNodeWithTag("syFullscreenMediaOverlay")
+            .performTouchInput { click(Offset(4f, 4f)) }
+        compose.runOnIdle { assertTrue(!dismissed) }
+    }
+
     @Test fun remoteOnlyImageShowsShareWithoutPretendingLocalSave() {
         compose.setContent {
             DshTheme {
