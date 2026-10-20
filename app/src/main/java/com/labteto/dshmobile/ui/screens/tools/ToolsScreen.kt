@@ -624,7 +624,13 @@ fun ToolsScreen(
                         actionEnabled = !state.loading,
                         onAction = viewModel::refresh,
                     )
-                    CapabilityCenterTabs(selectedTab) { selectedTab = it }
+                    CapabilityCenterTabs(selectedTab) { next ->
+                        if (next != selectedTab) {
+                            selectedTab = next
+                            // Re-read disk-installed skills when returning to this tab.
+                            if (next == 1) viewModel.refresh()
+                        }
+                    }
                     Box(Modifier.weight(1f)) {
                         when (selectedTab) {
                             0, 1 -> key(selectedTab) {
