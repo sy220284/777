@@ -186,9 +186,16 @@ internal fun reduceLocalToolActivity(
         }
         else -> return state
     }
+    val updated = state.activities.filterNot { it.callId == callId } + next
+    // Retain all unresolved calls even if a large batch completes other tools.
+    val unfinished = updated.filter {
+        it.phase == LocalToolActivityPhase.DECLARED || it.phase == LocalToolActivityPhase.RUNNING
+    }
+    val finished = updated.filter {
+        it.phase != LocalToolActivityPhase.DECLARED && it.phase != LocalToolActivityPhase.RUNNING
+    }.takeLast(LOCAL_TOOL_ACTIVITY_LIMIT)
     return state.copy(
-        activities = (state.activities.filterNot { it.callId == callId } + next)
-            .takeLast(LOCAL_TOOL_ACTIVITY_LIMIT),
+        activities = (unfinished + finished).sortedBy { it.declaredSequence ?: Long.MAX_VALUE },
     )
 }
 
