@@ -203,7 +203,7 @@ fun <T> SyHierarchyPage(
     pageKey: (T) -> String,
     depth: (T) -> Int,
     modifier: Modifier = Modifier,
-    content: @Composable (T) -> Unit,
+    content: @Composable AnimatedVisibilityScope.(T) -> Unit,
 ) {
     val holder = rememberSaveableStateHolder()
     val reduceMotion = LocalSyReduceMotion.current
@@ -221,18 +221,11 @@ fun <T> SyHierarchyPage(
                 depth(targetState) < depth(initialState) -> -1
                 else -> 0
             }
-            // Appearance settles upward; model and usage pages focus gently.
-            // Remaining settings keep directional hierarchy for predictable Back.
-            val enter = when (pageKey(targetState)) {
-                "APPEARANCE", "MEMORY", "MEMORY_SETTINGS", "MEMORY_MANAGEMENT" ->
-                    slideInVertically(tween(shortMs, easing = SyMotion.ease)) { 12 * direction } +
-                        fadeIn(tween(enterMs))
-                "MODELS", "MODEL_USAGE", "USAGE", "USAGE_DETAIL", "USAGE_LOG", "MINIMAX_QUOTA" ->
-                    scaleIn(initialScale = if (reduceMotion) 1f else .99f, animationSpec = tween(ms)) +
-                        fadeIn(tween(enterMs))
-                else -> slideInHorizontally(tween(ms, easing = SyMotion.ease)) { 20 * direction } +
-                    fadeIn(tween(enterMs))
-            }
+            // Use the same focus-and-fade entrance as Models across settings and features.
+            val enter = scaleIn(
+                initialScale = if (reduceMotion) 1f else .99f,
+                animationSpec = tween(ms),
+            ) + fadeIn(tween(enterMs))
             (enter togetherWith
                 (slideOutHorizontally(tween(shortMs)) { -10 * direction } + fadeOut(tween(exitMs))))
                 .using(SizeTransform(clip = false))
