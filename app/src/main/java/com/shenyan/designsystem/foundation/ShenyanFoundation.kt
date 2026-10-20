@@ -161,7 +161,7 @@ object SyMotion {
     const val toolExpandMs = 170
     const val toolDetailDelayMs = 55
     const val toastMs = 170
-    const val sidebarMs = 240
+    const val sidebarMs = 180
     const val sidebarContentDelayMs = 0
     const val progressMs = 280
     const val composerRevealMs = 155
