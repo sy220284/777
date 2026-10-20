@@ -579,10 +579,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val transcriptItems = remember(transcriptMessages, state.usageMode, state.sessionId,
         generatedMedia, videoMediaTasks, pendingMediaJobs, workArtifacts, workToolActivities, state.running) {
         val mediaTimeline = mergeLocalMediaTimeline(
-            buildLocalDisplayTranscript(buildLocalTranscript(
+            buildLocalTranscript(
                 transcriptMessages,
                 includeWorkProcess = state.usageMode == LocalUsageMode.WORK,
-            )),
+            ),
             state.sessionId,
             generatedMedia,
             videoMediaTasks,
@@ -1269,17 +1269,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             sessionId = state.sessionId,
                         )
                         is LocalTranscriptItem.Thinking -> ChatThinkingRow(transcriptItem.messages)
-                        is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
-                        is LocalTranscriptItem.WorkNode -> Box(
-                            modifier = Modifier.fillMaxWidth().animateItem(),
-                        ) {
-                            WorkContentBlock(
-                                node = transcriptItem.node,
-                                running = state.running && !transcriptItem.node.failed &&
-                                    transcriptItem.node.count == 0 &&
-                                    transcriptItem.key == transcriptItems.lastOrNull()?.key,
-                            )
-                        }
                         is LocalTranscriptItem.WorkPendingTool -> Box(
                             modifier = Modifier.fillMaxWidth().animateItem(),
                         ) {
