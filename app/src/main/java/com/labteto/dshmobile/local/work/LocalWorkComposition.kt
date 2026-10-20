@@ -93,9 +93,11 @@ internal class LocalWorkComposition @Inject constructor(
             modelHistory = runtimeStateStore.foregroundRunHandle.modelHistory,
             toolOutputStore = tools.toolOutputStore,
             workspacePath = sessionStorage.files.workspace.path,
-            imageRequestBudget = localImageRequestBudgetForModelConcurrency(
-                runtimeStateStore.resourceBudget.maxModelRequests,
-            ),
+            imageRequestBudget = {
+                localImageRequestBudgetForModelConcurrency(
+                    runtimeStateStore.resourceScheduler.snapshot().budget.maxModelRequests,
+                )
+            },
             imageCapabilities = runtimeStateStore.imageCapabilities,
             usageTracker = usageTracker,
             resourceScheduler = runtimeStateStore.resourceScheduler,
