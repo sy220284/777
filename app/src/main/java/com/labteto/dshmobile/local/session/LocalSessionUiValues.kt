@@ -24,6 +24,7 @@ data class LocalHarnessMessage(
     val toolCallId: String? = null,
     /** Original declaration time keeps the tool row in place after it finishes. */
     val toolDeclaredAt: Long? = null,
+    val toolDeclaredSequence: Long? = null,
 )
 
 data class LocalSessionSummary(
