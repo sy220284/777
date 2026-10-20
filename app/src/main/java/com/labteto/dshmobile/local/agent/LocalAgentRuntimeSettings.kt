@@ -8,6 +8,11 @@ internal data class LocalAgentRuntimeSettingsSnapshot(
 )
 
 /** Agent-owned durable runtime-limit configuration. SettingsFeature only invokes this contract. */
+internal data class LocalAgentRuntimeRollbackSnapshot(
+    val mainMaxSteps: Int?,
+    val subagentMaxSteps: Int?,
+)
+
 internal object LocalAgentRuntimeSettings {
     const val KEY_MAIN_MAX_STEPS = "main_max_steps"
     const val KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
@@ -34,6 +39,20 @@ internal object LocalAgentRuntimeSettings {
     fun stage(editor: SharedPreferences.Editor, snapshot: LocalAgentRuntimeSettingsSnapshot) {
         editor.putInt(KEY_MAIN_MAX_STEPS, snapshot.mainMaxSteps)
         editor.putInt(KEY_SUBAGENT_MAX_STEPS, snapshot.subagentMaxSteps)
+    }
+
+    /** Agent owns raw-key absence as well as values for failed cross-feature commits. */
+    fun snapshotForRollback(preferences: SharedPreferences): LocalAgentRuntimeRollbackSnapshot =
+        LocalAgentRuntimeRollbackSnapshot(
+            mainMaxSteps = if (preferences.contains(KEY_MAIN_MAX_STEPS)) preferences.getInt(KEY_MAIN_MAX_STEPS, 0) else null,
+            subagentMaxSteps = if (preferences.contains(KEY_SUBAGENT_MAX_STEPS)) preferences.getInt(KEY_SUBAGENT_MAX_STEPS, 0) else null,
+        )
+
+    fun stageRollback(editor: SharedPreferences.Editor, before: LocalAgentRuntimeRollbackSnapshot) {
+        if (before.mainMaxSteps == null) editor.remove(KEY_MAIN_MAX_STEPS)
+        else editor.putInt(KEY_MAIN_MAX_STEPS, before.mainMaxSteps)
+        if (before.subagentMaxSteps == null) editor.remove(KEY_SUBAGENT_MAX_STEPS)
+        else editor.putInt(KEY_SUBAGENT_MAX_STEPS, before.subagentMaxSteps)
     }
 
     fun write(

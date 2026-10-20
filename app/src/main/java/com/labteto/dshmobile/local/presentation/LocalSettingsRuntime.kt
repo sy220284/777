@@ -73,9 +73,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     override suspend fun discoverApiModels(apiKey: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol, credentialSourceProfileId: String?): List<String> = modelRuntime.discoverApiModels(apiKey, baseUrl, protocol, credentialSourceProfileId)
     override fun configureImageInputMode(mode: LocalImageInputMode) = modelSettings.configureImageInputMode(mode)
     override fun configureRuntimeLimits(main: Int, subagent: Int, attempts: Int, workerProfileId: String?) =
-        settingsCoordinator.configureRuntimeLimits(main, subagent, attempts).also {
-            settingsCoordinator.configureWorkerProfile(workerProfileId)
-        }
+        settingsCoordinator.configureRuntimeLimits(main, subagent, attempts, workerProfileId)
     override fun configurePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean) =
         settingsCoordinator.configurePersonalization(rules, autoRecall, autoMemory)
     override fun configureChatStyleGuard(enabled: Boolean) = chatStyleGuardSettings.configureEnabled(enabled)

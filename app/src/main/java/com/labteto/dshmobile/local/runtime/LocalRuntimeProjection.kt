@@ -199,21 +199,15 @@ internal class LocalRuntimeProjection(
         mainMaxSteps: Int,
         subagentMaxSteps: Int,
         modelAttempts: Int,
+        workerProfileId: String?,
     ) {
         state.update { current ->
             current.copy(
                 mainMaxSteps = mainMaxSteps,
                 subagentMaxSteps = subagentMaxSteps,
-                modelState = current.modelState.copy(modelAttempts = modelAttempts),
-            )
-        }
-    }
-
-    internal fun updateSettingsWorkerProfile(profileId: String?) {
-        state.update { current ->
-            current.copy(
                 modelState = current.modelState.copy(
-                    modelSelection = current.modelState.modelSelection.copy(workerProfileId = profileId),
+                    modelAttempts = modelAttempts,
+                    modelSelection = current.modelState.modelSelection.copy(workerProfileId = workerProfileId),
                 ),
             )
         }

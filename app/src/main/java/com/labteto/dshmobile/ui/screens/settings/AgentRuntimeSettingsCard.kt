@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
@@ -55,6 +56,15 @@ internal fun LocalAgentSettingsCard(
     val maximumLabel = stringResource(R.string.common_maximum)
     val reportSaved = { report(agentSavedMessage) }
 
+    fun saveParameters(main: Int, subagent: Int, attempts: Int, worker: String?): Boolean = try {
+        viewModel.configureLocalAgent(main, subagent, attempts, worker)
+        true
+    } catch (failure: Exception) {
+        AppLog.warn("AgentRuntimeSettings", "保存运行参数失败，未发布新状态", failure)
+        report(failure.message ?: "运行参数保存失败，请检查存储空间后重试")
+        false
+    }
+
     SettingsCard(stringResource(R.string.advanced_agent_settings)) {
         StepperRow(
             label = stringResource(R.string.advanced_main_steps),
@@ -63,7 +73,7 @@ internal fun LocalAgentSettingsCard(
             range = LocalAgentRuntimeLimits.MAIN_MIN_STEPS..LocalAgentRuntimeLimits.MAX_CONFIGURED_STEPS,
             maximumLabel = maximumLabel,
             onValueChange = {
-                viewModel.configureLocalAgent(
+                saveParameters(
                     it,
                     local.subagentMaxSteps,
                     local.modelAttempts,
@@ -79,7 +89,7 @@ internal fun LocalAgentSettingsCard(
             range = LocalAgentRuntimeLimits.SUBAGENT_MIN_STEPS..LocalAgentRuntimeLimits.MAX_CONFIGURED_STEPS,
             maximumLabel = maximumLabel,
             onValueChange = {
-                viewModel.configureLocalAgent(
+                saveParameters(
                     local.mainMaxSteps,
                     it,
                     local.modelAttempts,
@@ -94,7 +104,7 @@ internal fun LocalAgentSettingsCard(
             value = local.modelAttempts,
             range = LocalModelConfigContract.MODEL_ATTEMPTS_MIN..LocalModelConfigContract.MODEL_ATTEMPTS_MAX,
             onValueChange = {
-                viewModel.configureLocalAgent(
+                saveParameters(
                     local.mainMaxSteps,
                     local.subagentMaxSteps,
                     it,
@@ -105,7 +115,7 @@ internal fun LocalAgentSettingsCard(
         )
 
         AgentWorkerModelSettingRow(local) {
-            viewModel.configureLocalAgent(
+            saveParameters(
                 local.mainMaxSteps,
                 local.subagentMaxSteps,
                 local.modelAttempts,
@@ -123,7 +133,7 @@ private fun StepperRow(
     value: Int,
     range: IntRange,
     maximumLabel: String? = null,
-    onValueChange: (Int) -> Unit,
+    onValueChange: (Int) -> Boolean,
     onCommitted: () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
@@ -135,7 +145,11 @@ private fun StepperRow(
         val next = candidate.coerceIn(range.first, range.last)
         draft = next.toString()
         if (next == value) return
-        onValueChange(next)
+        if (!onValueChange(next)) {
+            // Keep the screen's durable value and never show a false "saved" toast.
+            draft = value.toString()
+            return
+        }
         if (announce) onCommitted()
     }
 
