@@ -374,6 +374,7 @@ class LocalRuntimeStateStore internal constructor(
             // Scheduler callbacks and initial replay may arrive out of order. Re-read the
             // authority under the projection lock instead of publishing a captured snapshot.
             val latest = resourceScheduler.snapshot()
+            jobOwner.updateConcurrentLimit(latest.budget.maxAgents)
             mutable.update { current -> projectResourceSnapshot(current, latest) }
             resourceObservers.forEach { observer ->
                 runCatching { observer(resourceScheduler.snapshot()) }
