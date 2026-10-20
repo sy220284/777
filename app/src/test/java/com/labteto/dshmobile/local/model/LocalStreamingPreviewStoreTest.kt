@@ -80,6 +80,29 @@ class LocalStreamingPreviewStoreTest {
     }
 
     @Test
+    fun reasoningAndAnswerRemainSeparatedAndRequestOwnedAcrossAllProtocolStreams() {
+        val store = LocalStreamingPreviewStore()
+        store.selectSession("chat")
+        val active = store.newOwner("chat", "openai-anthropic-compatible", LocalUsageMode.CHAT)
+        store.begin(active)
+        store.publishReasoning(active, "先分析")
+        assertEquals("先分析", store.state.value.reasoning)
+        assertEquals("", store.state.value.assistant)
+        assertEquals(LocalModelPreviewPhase.STREAMING, store.state.value.phase)
+        store.publishAssistant(active, "最后答复")
+        assertEquals("先分析", store.state.value.reasoning)
+        assertEquals("最后答复", store.state.value.assistant)
+        val next = store.newOwner("chat", "next", LocalUsageMode.CHAT)
+        store.begin(next)
+        store.publishReasoning(active, "迟到的推理")
+        store.publishReasoning(next, "新推理")
+        assertEquals("新推理", store.state.value.reasoning)
+        assertEquals("", store.state.value.assistant)
+        store.clear(active)
+        assertEquals("新推理", store.state.value.reasoning)
+    }
+
+    @Test
     fun exactOwnerClearRetiresPreview() {
         val store = LocalStreamingPreviewStore()
         store.selectSession("session-a")
