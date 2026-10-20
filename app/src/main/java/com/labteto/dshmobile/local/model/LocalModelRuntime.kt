@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.ConcurrentHashMap
 
 /** ModelFeature capability boundary used by UI and Settings. */
 @Singleton
@@ -29,6 +30,7 @@ class LocalModelRuntime @Inject constructor(
     private val state = localModelStatePort(runtimeStateStore)
     private val modelSelectionMutex = Mutex()
     private val latestModelSelection = AtomicLong()
+    private val pendingSelections = ConcurrentHashMap<String, Long>()
     private val accounts = LocalModelAccountStateCoordinator(
         configuration = configuration,
         gateway = gateway,
@@ -74,9 +76,10 @@ class LocalModelRuntime @Inject constructor(
     internal fun selectModel(id: String) {
         val originSessionId = runtimeStateStore.state.value.sessionId
         val request = latestModelSelection.incrementAndGet()
+        pendingSelections[originSessionId] = request
         scope.launch {
             modelSelectionMutex.withLock {
-                if (request != latestModelSelection.get()) return@withLock
+                if (pendingSelections[originSessionId] != request) return@withLock
                 val snapshot = runtimeStateStore.state.value
                 if (snapshot.loading || runtimeStateStore.sessionTransitioning ||
                     snapshot.sessionId != originSessionId) return@withLock
@@ -107,6 +110,7 @@ class LocalModelRuntime @Inject constructor(
                     }
                 }
             }
+            pendingSelections.remove(originSessionId, request)
         }
     }
 
