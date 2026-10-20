@@ -510,6 +510,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val generatedMedia = mediaPage.results
     val videoMediaTasks = mediaPage.videos
     val pendingMediaJobs = mediaPage.jobs
+    var workToolActivities by remember(state.sessionId) {
+        mutableStateOf<List<com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem>>(emptyList())
+    }
     var workArtifacts by remember(state.sessionId) {
         mutableStateOf<List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>>(emptyList())
     }
@@ -524,6 +527,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         val items = if (current != lastRevision) workActions.artifactsForUi(state.sessionId) else workArtifacts
                         current to workActions.refreshArtifactFiles(state.sessionId, items)
                     }
+                    // The Tool projection also observes execution-started transitions that
+                    // do not necessarily republish a document snapshot.
+                    if (state.running && revision != lastRevision) {
+                        workToolActivities = withContext(Dispatchers.IO) {
+                            workActions.toolActivities(state.sessionId)
+                        }
+                    }
                     workArtifacts = next
                     lastRevision = revision
                 } catch (cancelled: CancellationException) {
@@ -537,9 +547,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
     // Reuse the existing Tool-owned event projection. Document updates publish the
     // start event, while transcript changes publish the completed tool result.
-    var workToolActivities by remember(state.sessionId) {
-        mutableStateOf<List<com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem>>(emptyList())
-    }
     LaunchedEffect(state.sessionId, state.usageMode, workActions, nativeDocumentSnapshot,
         state.messages.size, state.running) {
         workToolActivities = if (state.usageMode == LocalUsageMode.WORK && workActions != null) {
