@@ -512,13 +512,14 @@ object LocalModelPresets {
                 )
             }
             if (normalizedModel.equals("MiniMax-M3.1-Flash-Preview", true)) {
-                return entries.first { it.model == "MiniMax-M3.1-Flash" }.copy(
+                val preset = entries.first { it.model == "MiniMax-M3.1-Flash" }
+                val protocol = LocalMiniMaxPolicy.protocolForEndpoint(normalizedBaseUrl)
+                return preset.copy(
                     model = normalizedModel,
                     baseUrl = normalizedBaseUrl,
-                    protocol = LocalMiniMaxPolicy.protocolForEndpoint(normalizedBaseUrl),
-                    defaultMaxOutputTokens = if (LocalMiniMaxPolicy.protocolForEndpoint(normalizedBaseUrl) ==
-                        LocalModelProtocol.ANTHROPIC_MESSAGES
-                    ) 65_536 else null,
+                    protocol = protocol,
+                    defaultMaxOutputTokens = preset.defaultMaxOutputTokens
+                        .takeIf { protocol == LocalModelProtocol.ANTHROPIC_MESSAGES },
                 )
             }
             if (normalizedModel.lowercase() in setOf("minimax-m2", "minimax-m2.1", "minimax-m2.1-highspeed", "minimax-m2.5", "minimax-m2.5-highspeed")) {
