@@ -51,6 +51,32 @@ class LocalMiniMaxCompatibilityTest {
         )
     }
 
+    @Test fun miniMaxAnthropicUsesBearerWhileClaudeKeepsNativeApiKey() = runBlocking {
+        val captured = mutableListOf<okhttp3.Request>()
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            captured += chain.request()
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(401)
+                .message("Unauthorized")
+                .body("invalid key".toResponseBody("text/plain".toMediaType()))
+                .build()
+        }.build()
+        val client = AnthropicMessagesClient(http, json)
+        val miniMax = route("MiniMax-M3.1-Flash", "https://api.minimaxi.com/anthropic/v1")
+        runCatching { client.complete(miniMax, emptyList(), emptyList(), null, streaming = true) }
+        assertEquals("Bearer test", captured.single().header("Authorization"))
+        assertNull(captured.single().header("x-api-key"))
+        captured.clear()
+
+        val claude = miniMax.copy(
+            provider = "Claude",
+            model = "claude-sonnet-5-5",
+            baseUrl = "https://api.anthropic.com/v1",
+        )
+        runCatching { client.complete(claude, emptyList(), emptyList(), null, streaming = true) }
+        assertEquals("test", captured.single().header("x-api-key"))
+        assertNull(captured.single().header("Authorization"))
+    }
+
     @Test fun providerQuotaErrorIsReportedInsteadOfMissingChoices() {
         val failure = assertThrows(com.labteto.dshmobile.local.LocalModelException::class.java) {
             DeepSeekClient(OkHttpClient(), json).parse("""{"base_resp":{"status_code":1008,"status_msg":"余额不足"}}""")
