@@ -101,7 +101,7 @@ class WorkReplyTimelineVisualTest {
                         "mcp__GitHub__search", createdAt = 2L,
                         toolCallId = "find-skill", toolIsError = false), activity = search)
                     WorkTimelineStepRow(LocalHarnessMessage(
-                        "detail", "progress", "## 核查结果\\n\\n已经定位需要调整的步骤区域。",
+                        "detail", "progress", "## 核查结果\n\n已经定位需要调整的步骤区域。",
                         createdAt = 3L))
                     WorkPendingToolRow(change)
                 }
