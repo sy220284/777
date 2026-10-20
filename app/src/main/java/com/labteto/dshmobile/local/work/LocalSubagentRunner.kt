@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.model.forSessionModel
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentEventSink
 import com.labteto.dshmobile.harness.agent.AgentTurnEngine
@@ -252,7 +253,7 @@ internal class LocalSubagentRunner(
         }
         val runSurface = runProfile.toRunModelSurface()
         val snapshot = current.copy(
-            modelState = current.modelState.copy(model = runSurface.model, baseUrl = runSurface.baseUrl),
+            modelState = current.modelState.forSessionModel(runProfile),
         )
         val routeModel = runSurface.model
         val runHistoryBudget = historyBudget?.invoke(runProfile)
