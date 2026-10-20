@@ -53,6 +53,28 @@ class LocalAgentProgressTrackerTest {
     }
 
     @Test
+    fun longResultsWithSameHeadButNewTailStillCountAsProgress() {
+        val tracker = LocalAgentProgressTracker()
+        val call = AgentToolCall(
+            id = "first",
+            name = "grep",
+            arguments = buildJsonObject { put("query", "error") },
+        )
+        val fixedHead = "scan-result-".repeat(300)
+        tracker.recordToolResult(call, fixedHead + "file-1", isError = false)
+        assertTrue(tracker.claimExtensionProgress())
+        tracker.recordToolResult(call.copy(id = "second"), fixedHead + "file-2", isError = false)
+        assertTrue(tracker.claimExtensionProgress())
+        tracker.recordToolResult(call.copy(id = "third"), fixedHead + "file-2", isError = false)
+        assertFalse(tracker.claimExtensionProgress())
+
+        tracker.recordAssistant(fixedHead + "阶段一", toolCallCount = 0)
+        assertTrue(tracker.claimExtensionProgress())
+        tracker.recordAssistant(fixedHead + "阶段二", toolCallCount = 0)
+        assertTrue(tracker.claimExtensionProgress())
+    }
+
+    @Test
     fun repeatedTextOnlyReplyCountsOnceAndToolCallingReplyDoesNotCount() {
         val tracker = LocalAgentProgressTracker()
 
