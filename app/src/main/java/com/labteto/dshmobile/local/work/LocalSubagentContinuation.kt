@@ -142,6 +142,12 @@ internal fun shouldColdResumeCompletedSubagent(
             messageId !in checkpoint?.claimedMessageIds.orEmpty()
         }
 
+/** Saturating arithmetic keeps resumed long-running subagents from wrapping step counters. */
+internal fun addSubagentSteps(first: Int, second: Int): Int =
+    (first.coerceAtLeast(0).toLong() + second.coerceAtLeast(0).toLong())
+        .coerceAtMost(Int.MAX_VALUE.toLong())
+        .toInt()
+
 internal fun resolveSubagentTotalBudgetLimit(
     adaptiveStepLimit: Int,
     recoveredStep: Int,
@@ -153,7 +159,7 @@ internal fun resolveSubagentTotalBudgetLimit(
     val safeAdaptiveLimit = adaptiveStepLimit.coerceAtLeast(1)
     val safeMax = maxDynamicSteps.coerceAtLeast(1)
     return if (resumeAfterCompletion) {
-        (safeRecoveredStep + safeAdaptiveLimit).coerceAtMost(safeMax)
+        addSubagentSteps(safeRecoveredStep, safeAdaptiveLimit).coerceAtMost(safeMax)
     } else {
         maxOf(safeAdaptiveLimit, recoveredSoftStepLimit ?: 0).coerceAtMost(safeMax)
     }
