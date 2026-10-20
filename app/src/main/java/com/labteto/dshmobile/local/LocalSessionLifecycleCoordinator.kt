@@ -50,6 +50,10 @@ internal fun localDeletedCurrentSessionMode(
     usageMode: LocalUsageMode,
 ): LocalUsageMode? = usageMode.takeIf { currentSessionId in deletedIds }
 
+/** Delete background identities first: a partial failure must not delete the visible session. */
+internal fun localSessionDeletionOrder(ids: Set<String>, currentSessionId: String): List<String> =
+    ids.sortedBy { it == currentSessionId }
+
 internal class LocalSessionLifecycleCoordinator(
     private val scope: CoroutineScope,
     private val state: com.labteto.dshmobile.local.runtime.LocalAggregateProjectionPort,
@@ -442,7 +446,7 @@ internal class LocalSessionLifecycleCoordinator(
                         withContext(Dispatchers.IO) {
                             // Delete background sessions first; current session last.
                             // On a partial deletion failure the visible conversation remains intact.
-                            ids.sortedBy { it == sourceId }.forEach { id ->
+                            localSessionDeletionOrder(ids, sourceId).forEach { id ->
                                 sessionCoordinator.delete(id)
                                 durableDeletedIds += id
                                 toolOutputStore.deleteSession(id)

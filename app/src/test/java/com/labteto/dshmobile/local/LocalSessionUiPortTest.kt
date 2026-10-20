@@ -33,6 +33,19 @@ class LocalSessionUiPortTest {
         assertNull(port.handoffSummary(identity.copy(activationId = "old")))
         assertEquals("owner summary", port.handoffSummary(identity))
     }
+    @Test fun partialBatchDeletionAlwaysKeepsCurrentSessionForLast() {
+        val targets = linkedSetOf("current", "background-1", "background-2")
+        assertEquals(
+            listOf("background-1", "background-2", "current"),
+            localSessionDeletionOrder(targets, "current"),
+        )
+        assertEquals(
+            listOf("background-1", "background-2"),
+            localSessionDeletionOrder(setOf("background-1", "background-2"), "current"),
+        )
+        assertEquals(listOf("current"), localSessionDeletionOrder(setOf("current"), "current"))
+    }
+
     @Test fun navigationReportsAdmissionAndDeletionReportsActualIds() = runTest {
         val state = LocalRuntimeStateStore()
         val owner = Owner()
