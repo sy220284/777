@@ -974,7 +974,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     top = SyMetric.gapSection,
                     bottom = SyMetric.gapPage,
                 ),
-                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSection),
+                verticalArrangement = Arrangement.spacedBy(
+                    if (state.usageMode == LocalUsageMode.WORK) SyMetric.gapXs else SyMetric.gapSection,
+                ),
             ) {
                 if (mediaPage.unavailable) {
                     item(key = "media-storage-error") {
@@ -1054,7 +1056,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 }
                 items(transcriptItems, key = { it.key }) { transcriptItem ->
                     when (transcriptItem) {
-                        is LocalTranscriptItem.Message -> Column {
+                        is LocalTranscriptItem.Message -> Column(
+                            modifier = Modifier.padding(vertical =
+                                if (state.usageMode == LocalUsageMode.WORK) SyMetric.gapMd else 0.dp),
+                        ) {
                             LocalMessageRow(
                                 message = if (transcriptItem.message.role == "assistant")
                                     transcriptItem.message.copy(content = visibleAssistantText(transcriptItem.message.content))
