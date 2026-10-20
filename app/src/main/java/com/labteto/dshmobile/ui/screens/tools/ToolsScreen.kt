@@ -105,6 +105,7 @@ enum class ToolsNotice {
 
 data class ToolsUiState(
     val loading: Boolean = false,
+    val loadFailed: Boolean = false,
     val servers: List<McpServerSnapshot> = emptyList(),
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
@@ -239,7 +240,7 @@ class ToolsViewModel @Inject constructor(
 
     fun refresh() {
         launchOperation {
-            _state.value = _state.value.copy(loading = true, notice = null)
+            _state.value = _state.value.copy(loading = true, loadFailed = false, notice = null)
             try {
                 val skills = localTools.installedSkills()
                 val presets = localTools.presetSkills()
@@ -258,6 +259,7 @@ class ToolsViewModel @Inject constructor(
             } catch (_: Exception) {
                 _state.value = _state.value.copy(
                     loading = false,
+                    loadFailed = true,
                     notice = ToolsNotice.LOAD_FAILED,
                 )
             }
@@ -637,7 +639,7 @@ fun ToolsScreen(
                                     skillsOnly = selectedTab == 1,
                                     embedded = true,
                                     loading = state.loading,
-                                    error = if (selectedTab == 0 && state.notice == ToolsNotice.LOAD_FAILED)
+                                    error = if (selectedTab == 0 && state.loadFailed)
                                         stringResource(R.string.tools_load_failed) else null,
                                     onRetry = viewModel::refresh,
                                     onBack = onClose,
