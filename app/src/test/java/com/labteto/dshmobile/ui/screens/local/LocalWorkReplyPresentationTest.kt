@@ -183,6 +183,22 @@ class LocalWorkReplyPresentationTest {
         assertEquals(items.map { it.key }, beforeFinish.map { it.key })
     }
 
+    @Test fun mediaTimelineKeepsRunningToolBeforeLaterMediaResult() {
+        val user = LocalTranscriptItem.Message(message("u", "user", "开始检查").copy(createdAt = 100L))
+        val media = LocalTranscriptItem.MediaResult(
+            com.labteto.dshmobile.local.model.LocalMediaResult(
+                id = "image-2", model = "test", provider = "OPENAI", kind = "IMAGE",
+                createdAtMillis = 150L, textOutput = "结果", sessionId = "session"))
+        val pending = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
+            callId = "read-2", name = "mcp__GitHub__fetch_file",
+            phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING,
+            declaredAt = 120L, declaredSequence = 2L)
+        val visible = appendPendingWorkToolActivities(listOf(user, media), listOf(pending), true)
+        assertEquals(
+            listOf("message:u", "work-tool:read-2", "media-result:image-2"),
+            visible.map { it.key })
+    }
+
     @Test fun mediaTimelineKeepsCompletedToolAtDeclarationPosition() {
         val user = message("u", "user", "开始检查").copy(createdAt = 100L)
         val progress = message("p", "progress", "继续核查").copy(createdAt = 140L)
