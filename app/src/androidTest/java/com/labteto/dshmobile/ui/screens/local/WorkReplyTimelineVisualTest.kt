@@ -21,6 +21,15 @@ import org.junit.Rule
 import org.junit.Test
 
 class WorkReplyTimelineVisualTest {
+    @Test fun waitingForNextModelStepRemainsVisibleAfterToolProgress() {
+        compose.setContent { DshTheme { LocalStreamingWorkPreview(
+            sessionId = "work",
+            streamingState = kotlinx.coroutines.flow.MutableStateFlow(
+                com.labteto.dshmobile.local.model.LocalHarnessStreamingState()),
+            hasDurableProgress = true,
+        ) } }
+        compose.onNodeWithText("正在准备下一步…").assertIsDisplayed()
+    }
     @get:Rule val compose = createComposeRule()
 
     private val result = LocalHarnessMessage("result", "tool", "文件内容已读取：发现两处配置差异。",

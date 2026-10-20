@@ -7,6 +7,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalWorkReplyPresentationTest {
+    @Test fun workFailureAndStopRemainVisibleAfterReopeningHistory() {
+        val failure = LocalHarnessMessage("failure", "system", "执行失败：网络连接中断", createdAt = 2L)
+        val stopped = failure.copy(id = "stop", content = "本轮已停止。")
+        val items = buildLocalDisplayTranscript(buildLocalTranscript(listOf(failure, stopped)))
+        assertEquals(listOf("message:failure", "message:stop"), items.map { it.key })
+        assertTrue(buildLocalTranscript(listOf(failure), includeWorkProcess = false).isEmpty())
+    }
     private fun message(id: String, role: String, content: String = "", toolName: String? = null,
         error: Boolean? = null): LocalHarnessMessage =
         LocalHarnessMessage(id = id, role = role, content = content,
