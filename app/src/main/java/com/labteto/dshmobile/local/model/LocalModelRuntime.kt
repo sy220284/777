@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.LocalModelConfigurationResult
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +23,7 @@ class LocalModelRuntime @Inject constructor(
     private val configuration: LocalModelConfigurationCoordinator,
     private val settings: LocalModelSettingsCoordinator,
     private val runtimeStateStore: LocalRuntimeStateStore,
+    private val sessionStorage: LocalSessionStorageRuntime,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val state = localModelStatePort(runtimeStateStore)
@@ -65,28 +67,42 @@ class LocalModelRuntime @Inject constructor(
         commit(result)
     }
 
+    /**
+     * Change only the originating conversation's NEXT model. In-flight requests retain their
+     * frozen route, and other live Work sessions never acquire this model selection.
+     */
     internal fun selectModel(id: String) {
+        val originSessionId = runtimeStateStore.state.value.sessionId
         val request = latestModelSelection.incrementAndGet()
         scope.launch {
             modelSelectionMutex.withLock {
                 if (request != latestModelSelection.get()) return@withLock
-                if (identityMutationLocked()) {
-                    state.publishError("当前任务正在执行，请结束后再切换模型")
+                val snapshot = runtimeStateStore.state.value
+                if (snapshot.loading || runtimeStateStore.sessionTransitioning ||
+                    snapshot.sessionId != originSessionId) return@withLock
+                val selected = snapshot.modelState.modelSelection.profiles.firstOrNull { it.id == id }
+                if (selected == null) {
+                    state.publishError("所选模型已不存在，请重新选择")
                     return@withLock
                 }
-                val before = state.value.modelState
-                if (before.modelSelection.activeProfileId == id) return@withLock
                 try {
-                    val result = configuration.select(id, before.modelSelection.profiles)
-                    // Selection is already durably committed by the configuration owner.
-                    // Project it even when a newer click is queued: the mutex orders the next
-                    // selection, and suppressing this projection can leave disk and UI divergent
-                    // when that next selection is rejected.
-                    result?.let(::commit)
+                    check(gateway.hasCredential(selected)) { "所选模型凭据不可用，请检查模型账户" }
+                    sessionStorage.eventLogs.get(originSessionId).recordLocalModelSelection(id)
+                    runtimeStateStore.projection.update { current ->
+                        if (current.sessionId == originSessionId && !current.loading) {
+                            current.copy(modelState = current.modelState.forSessionModel(selected), error = null)
+                        } else current
+                    }
+                    // Compatibility for foreground features that query the active credential.
+                    // Each model request still freezes its own explicit route.
+                    if (runtimeStateStore.currentSessionId == originSessionId &&
+                        runtimeStateStore.state.value.sessionId == originSessionId) {
+                        gateway.activate(selected)
+                    }
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
-                    if (request == latestModelSelection.get()) {
+                    if (runtimeStateStore.state.value.sessionId == originSessionId) {
                         state.publishError(error.message ?: "模型切换失败")
                     }
                 }
@@ -168,6 +184,12 @@ class LocalModelRuntime @Inject constructor(
     }
 
     private fun commit(result: LocalModelConfigurationResult) {
+        val visibleSessionId = runtimeStateStore.state.value.sessionId
+        result.activeProfileId?.let { id ->
+            if (visibleSessionId.isNotBlank() && !runtimeStateStore.sessionTransitioning) {
+                sessionStorage.eventLogs.get(visibleSessionId).recordLocalModelSelection(id)
+            }
+        }
         val before = state.value.modelState
         state.commit(
             before.copy(
