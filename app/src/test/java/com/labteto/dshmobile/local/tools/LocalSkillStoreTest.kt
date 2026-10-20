@@ -212,6 +212,17 @@ class LocalSkillStoreTest {
         assertEquals(edited.trimEnd() + "\n", store.readDocument("code-review"))
     }
 
+    @Test fun locallyCustomizedOfficialSkillBeyondUiEditLimitIsNotOverwritten() = inWorkspace { store, workspace, _ ->
+        store.seedOnce()
+        val original = store.readDocument("code-review")
+        val edited = original + "\\n" + "这是用户手动维护的规则。".repeat(2500)
+        assertTrue(edited.toByteArray(Charsets.UTF_8).size > 24_000)
+        assertTrue(edited.toByteArray(Charsets.UTF_8).size < 128 * 1024)
+        workspace.write(".dsh/skills/code-review/SKILL.md", edited)
+        store.seedOnce()
+        assertEquals(edited, workspace.readSkill("code-review"))
+    }
+
     @Test fun oversizedOfficialSkillIsRepairedFromBundledVersion() = inWorkspace { store, workspace, root ->
         store.seedOnce()
         val bad = root.resolve(".dsh/skills/writing-polish/SKILL.md")
