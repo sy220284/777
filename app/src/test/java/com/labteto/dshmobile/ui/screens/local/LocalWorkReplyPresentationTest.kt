@@ -109,6 +109,18 @@ class LocalWorkReplyPresentationTest {
             "work-step:explain", "work-step:check"), displayed.map { it.key })
     }
 
+    @Test fun concisePublicActionsUseQuietTimelineWhileExplanationsStayMarkdown() {
+        assertEquals("审查工具操作描述语义映射",
+            localWorkPublicActionLabel("审查工具操作描述语义映射"))
+        assertEquals("完善工作步骤自然语言展示",
+            localWorkPublicActionLabel("完善工作步骤自然语言展示"))
+        assertEquals(null, localWorkPublicActionLabel("我先核对现有界面与设计规范。"))
+        assertEquals(null, localWorkPublicActionLabel("## 核查结果\\n\\n已经定位出两处需要修复的问题。"))
+        assertEquals(null, localWorkPublicActionLabel("修改文件\\n继续检查测试"))
+        assertEquals(null, localWorkPublicActionLabel("执行命令"))
+        assertEquals(null, localWorkPublicActionLabel("运行 `bash -c test`"))
+    }
+
     @Test fun publicProgressKeepsMarkdownAndLongContent() {
         val content = "## 核查结果\n\n- 第一处\n- 第二处\n\n```kotlin\nval count = 2\n```\n\n" +
             "这是需要完整展示的公开说明。".repeat(150)
