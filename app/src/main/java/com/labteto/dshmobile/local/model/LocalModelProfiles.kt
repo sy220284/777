@@ -498,17 +498,27 @@ object LocalModelPresets {
             ?: return null
         if (LocalMiniMaxPolicy.isOfficial(normalizedBaseUrl)) {
             val native = entries.firstOrNull { it.provider == "MiniMax" && it.model.equals(normalizedModel, true) }
-            if (native != null) return native.copy(
-                baseUrl = normalizedBaseUrl,
-                protocol = if (native.model in setOf("MiniMax-M3.1-Flash", "MiniMax-M3")) {
+            if (native != null) {
+                val protocol = if (native.model in setOf("MiniMax-M3.1-Flash", "MiniMax-M3")) {
                     LocalMiniMaxPolicy.protocolForEndpoint(normalizedBaseUrl)
-                } else native.protocol,
-            )
+                } else native.protocol
+                return native.copy(
+                    baseUrl = normalizedBaseUrl,
+                    protocol = protocol,
+                    // Do not change legacy OpenAI-compatible route budgeting when switching new presets.
+                    defaultMaxOutputTokens = if (protocol == LocalModelProtocol.ANTHROPIC_MESSAGES) {
+                        native.defaultMaxOutputTokens
+                    } else null,
+                )
+            }
             if (normalizedModel.equals("MiniMax-M3.1-Flash-Preview", true)) {
                 return entries.first { it.model == "MiniMax-M3.1-Flash" }.copy(
                     model = normalizedModel,
                     baseUrl = normalizedBaseUrl,
                     protocol = LocalMiniMaxPolicy.protocolForEndpoint(normalizedBaseUrl),
+                    defaultMaxOutputTokens = if (LocalMiniMaxPolicy.protocolForEndpoint(normalizedBaseUrl) ==
+                        LocalModelProtocol.ANTHROPIC_MESSAGES
+                    ) 65_536 else null,
                 )
             }
             if (normalizedModel.lowercase() in setOf("minimax-m2", "minimax-m2.1", "minimax-m2.1-highspeed", "minimax-m2.5", "minimax-m2.5-highspeed")) {
