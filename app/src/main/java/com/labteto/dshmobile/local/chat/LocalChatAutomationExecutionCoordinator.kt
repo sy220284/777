@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.model.forSessionModel
 import com.labteto.dshmobile.local.model.selectedLocalModelProfileId
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.observability.AppLog
@@ -335,7 +336,7 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                 val sessionTranscriptIndex = localTranscriptIndexForSession(session)
                 val boundState = runtime.copy(
                     sessionId = session.id,
-                    modelState = runtime.modelState.copy(model = runProfile.model, baseUrl = runProfile.baseUrl),
+                    modelState = runtime.modelState.forSessionModel(runProfile),
                     usageMode = LocalUsageMode.CHAT,
                     chat = LocalChatState(
                         personaId = session.personaId,
