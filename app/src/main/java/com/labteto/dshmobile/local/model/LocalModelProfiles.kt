@@ -161,6 +161,8 @@ object LocalModelPresets {
             temperatureSupported = false,
             modelsEndpoint = "https://api.minimaxi.com/v1/models",
             contextWindowTokens = 1_000_000,
+            // Anthropic max_tokens counts both thinking and answer; 8K truncates long model tasks.
+            defaultMaxOutputTokens = 65_536,
         ),
         LocalModelPreset(
             provider = "MiniMax",
@@ -176,6 +178,8 @@ object LocalModelPresets {
             temperatureSupported = false,
             modelsEndpoint = "https://api.minimaxi.com/v1/models",
             contextWindowTokens = 1_000_000,
+            // Anthropic max_tokens counts both thinking and answer; 8K truncates long model tasks.
+            defaultMaxOutputTokens = 65_536,
         ),
         LocalModelPreset(
             provider = "MiniMax",
