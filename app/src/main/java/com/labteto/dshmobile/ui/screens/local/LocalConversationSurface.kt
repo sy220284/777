@@ -1312,10 +1312,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             LocalStreamingWorkPreview(
                                 sessionId = state.sessionId,
                                 streamingState = streamingState,
-                                hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkStep ||
-                                    transcriptItems.lastOrNull() is LocalTranscriptItem.WorkPendingTool ||
-                                    transcriptItems.lastOrNull() is LocalTranscriptItem.WorkNode ||
-                                    transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
                                 lastDurableNarrative = latestDurableWorkNarrativeInCurrentTurn(transcriptMessages),
                             )
                         }
@@ -1327,7 +1323,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             transcriptBody()
 
             ConversationScrollShortcut(
-                target = scrollHint.target,
+                target = scrollHint.target ?: ConversationScrollTarget.LATEST.takeIf {
+                    state.usageMode == LocalUsageMode.WORK && workReaderPaused.value && listState.canScrollForward
+                },
                 modifier = Modifier.align(Alignment.BottomEnd)
                     .padding(end = SyMetric.gapLg, bottom = SyMetric.gapMd),
                 onClick = { target ->

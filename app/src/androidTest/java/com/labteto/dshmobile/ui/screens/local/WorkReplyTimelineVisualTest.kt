@@ -26,7 +26,6 @@ class WorkReplyTimelineVisualTest {
             sessionId = "work",
             streamingState = kotlinx.coroutines.flow.MutableStateFlow(
                 com.labteto.dshmobile.local.model.LocalHarnessStreamingState()),
-            hasDurableProgress = true,
         ) } }
         compose.onNodeWithText("正在准备下一步…").assertIsDisplayed()
     }

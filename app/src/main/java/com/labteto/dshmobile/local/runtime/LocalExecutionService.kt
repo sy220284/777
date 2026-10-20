@@ -36,8 +36,8 @@ import kotlinx.coroutines.launch
  * Pins user-initiated on-device work while a work turn or background job is still alive.
  *
  * The service owns no execution itself; Feature/Shared runtime owners remain authoritative while the process service only pins lifecycle.
- * Keeping the process in foreground is enough to stop Android from freezing a long local turn when
- * the screen locks or the app moves behind another activity.
+ * The foreground notification pins process priority; a task-scoped partial wake lock keeps CPU
+ * execution available with the screen off. Neither bypasses Doze network restrictions.
  */
 @AndroidEntryPoint
 class LocalExecutionService : Service() {
@@ -52,6 +52,9 @@ class LocalExecutionService : Service() {
         val step: Int,
     )
 
+    private val cpuWakeLock by lazy {
+        LocalExecutionWakeLock(getSystemService(POWER_SERVICE) as android.os.PowerManager)
+    }
     private val turns = LocalExecutionTurnLedger()
     private var foregroundReady = false
     private val jobs = linkedMapOf<String, Hold>()
@@ -80,6 +83,7 @@ class LocalExecutionService : Service() {
         }
         if (!promoted) {
             foregroundReady = false
+            cpuWakeLock.setActive(false)
             pendingTurns.clear()
             startupGate?.complete(false)
             startupGate = null
@@ -105,6 +109,7 @@ class LocalExecutionService : Service() {
         startupGate?.complete(active)
         startupGate = null
         if (!active) {
+            cpuWakeLock.setActive(false)
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf(startId)
             return START_NOT_STICKY
@@ -148,6 +153,7 @@ class LocalExecutionService : Service() {
 
     private fun refreshNotification() {
         if (!foregroundReady || (turns.isEmpty() && jobs.isEmpty())) return
+        cpuWakeLock.setActive(true)
         try {
             val manager = getSystemService(android.app.NotificationManager::class.java)
             manager.notify(NOTIFICATION_ID, buildNotification(null))
@@ -160,11 +166,13 @@ class LocalExecutionService : Service() {
     private fun stopIfIdle() {
         if (!turns.isEmpty() || jobs.isNotEmpty()) return
         foregroundReady = false
+        cpuWakeLock.setActive(false)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
     override fun onDestroy() {
+        cpuWakeLock.setActive(false)
         foregroundReady = false
         if (runningService === this) runningService = null
         startupGate?.complete(false)

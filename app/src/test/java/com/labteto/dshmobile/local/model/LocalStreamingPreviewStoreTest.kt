@@ -8,6 +8,7 @@ class LocalStreamingPreviewStoreTest {
     @Test
     fun staleRequestCannotOverwriteOrClearNewerPreviewInSameSession() {
         val store = LocalStreamingPreviewStore()
+        store.selectSession("session-a")
         val old = store.newOwner("session-a", "request-old", LocalUsageMode.WORK)
         val fresh = store.newOwner("session-a", "request-new", LocalUsageMode.WORK)
 
@@ -49,6 +50,7 @@ class LocalStreamingPreviewStoreTest {
     @Test
     fun olderSameSessionRetryCannotReclaimPreviewAfterNewerRequestStarts() {
         val store = LocalStreamingPreviewStore()
+        store.selectSession("session-a")
         val old = store.newOwner("session-a", "request-old", LocalUsageMode.WORK)
         val fresh = store.newOwner("session-a", "request-new", LocalUsageMode.WORK)
 
@@ -65,6 +67,7 @@ class LocalStreamingPreviewStoreTest {
     @Test
     fun sameOwnerBeginClearsPartialPreviewBeforeRetry() {
         val store = LocalStreamingPreviewStore()
+        store.selectSession("session-a")
         val owner = store.newOwner("session-a", "request-1", LocalUsageMode.WORK)
 
         store.begin(owner)
@@ -79,6 +82,7 @@ class LocalStreamingPreviewStoreTest {
     @Test
     fun exactOwnerClearRetiresPreview() {
         val store = LocalStreamingPreviewStore()
+        store.selectSession("session-a")
         val owner = store.newOwner("session-a", "request-1", LocalUsageMode.WORK)
 
         store.begin(owner)
@@ -91,12 +95,15 @@ class LocalStreamingPreviewStoreTest {
     @Test
     fun olderRequestFromAnotherSessionCanClaimWhenThatSessionBecomesVisible() {
         val store = LocalStreamingPreviewStore()
+        store.selectSession("session-a")
         val background = store.newOwner("session-b", "request-b", LocalUsageMode.WORK)
         val later = store.newOwner("session-a", "request-a", LocalUsageMode.WORK)
 
         store.begin(later)
         store.publishAssistant(later, "A")
         store.publishAssistant(background, "B 恢复可见")
+        assertEquals("A", store.state.value.assistant)
+        store.selectSession("session-b")
 
         assertEquals("session-b", store.state.value.sessionId)
         assertEquals("request-b", store.state.value.requestId)
@@ -106,6 +113,7 @@ class LocalStreamingPreviewStoreTest {
     @Test
     fun visibleSessionCanClaimPreviewWithoutLettingPreviousSessionClearIt() {
         val store = LocalStreamingPreviewStore()
+        store.selectSession("session-a")
         val first = store.newOwner("session-a", "request-a", LocalUsageMode.WORK)
         val second = store.newOwner("session-b", "request-b", LocalUsageMode.WORK)
 
@@ -113,10 +121,54 @@ class LocalStreamingPreviewStoreTest {
         store.publishAssistant(first, "A")
         store.begin(second)
         store.publishAssistant(second, "B")
+        store.selectSession("session-b")
         store.clear(first)
 
         assertEquals("session-b", store.state.value.sessionId)
         assertEquals("request-b", store.state.value.requestId)
         assertEquals("B", store.state.value.assistant)
     }
+    @Test fun returnToSessionRestoresItsPreviewWithoutAnotherDeltaOrUserInput() {
+        val store = LocalStreamingPreviewStore()
+        store.selectSession("a")
+        val a = store.newOwner("a", "a-1", LocalUsageMode.WORK)
+        store.begin(a)
+        store.publishAssistant(a, "已核查前半部分")
+        store.selectSession("b")
+        val b = store.newOwner("b", "b-1", LocalUsageMode.WORK)
+        store.begin(b)
+        store.publishAssistant(b, "B 的回复")
+        store.publishAssistant(a, "后台新增的完整回复")
+        assertEquals("B 的回复", store.state.value.assistant)
+        store.selectSession("a")
+        assertEquals("后台新增的完整回复", store.state.value.assistant)
+        store.clear(b)
+        assertEquals("后台新增的完整回复", store.state.value.assistant)
+        store.clear(a)
+        assertEquals(LocalHarnessStreamingState(), store.state.value)
+        store.publishAssistant(a, "结束后迟到的内容")
+        assertEquals(LocalHarnessStreamingState(), store.state.value)
+    }
+
+    @Test fun retryStatusSurvivesOffscreenAndRetiredOwnerCannotReplaceIt() {
+        val store = LocalStreamingPreviewStore()
+        store.selectSession("a")
+        val old = store.newOwner("a", "old", LocalUsageMode.WORK)
+        val current = store.newOwner("a", "current", LocalUsageMode.WORK)
+        store.begin(current)
+        store.selectSession("b")
+        store.retry(current, 2)
+        store.selectSession("a")
+        assertEquals(LocalModelPreviewPhase.RETRYING, store.state.value.phase)
+        assertEquals(2, store.state.value.attempt)
+        store.clear(old)
+        store.begin(old)
+        store.publishAssistant(old, "旧请求")
+        assertEquals("current", store.state.value.requestId)
+        store.begin(current, 2)
+        assertEquals(LocalModelPreviewPhase.WAITING, store.state.value.phase)
+        store.publishAssistant(current, "新内容")
+        assertEquals(LocalModelPreviewPhase.STREAMING, store.state.value.phase)
+    }
+
 }

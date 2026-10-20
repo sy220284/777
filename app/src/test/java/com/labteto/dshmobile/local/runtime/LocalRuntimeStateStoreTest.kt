@@ -15,6 +15,19 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class LocalRuntimeStateStoreTest {
+    @Test fun activatingSessionReattachesItsLivePreviewWithoutNewOutput() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(sessionId = "a"))
+        val previews = runtime.streamingPreviewStore
+        val owner = previews.newOwner("a", "request", com.labteto.dshmobile.local.LocalUsageMode.WORK)
+        previews.begin(owner)
+        runtime.activateSession("b")
+        previews.publishAssistant(owner, "后台结果")
+        assertEquals("", previews.state.value.assistant)
+        runtime.activateSession("a")
+        assertEquals("后台结果", previews.state.value.assistant)
+    }
+
     @get:Rule
     val temporary = TemporaryFolder()
 

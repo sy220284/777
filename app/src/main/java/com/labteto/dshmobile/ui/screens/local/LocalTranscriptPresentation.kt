@@ -234,6 +234,11 @@ internal fun buildLocalTranscript(
     var index = 0
     while (index < messages.size) {
         if (messages[index].role == "system") {
+            if (includeWorkProcess && (messages[index].content.startsWith("执行失败：") ||
+                    messages[index].content == "本轮已停止。" ||
+                    messages[index].content.startsWith("当前任务已无法继续扩展执行预算，"))) {
+                result += LocalTranscriptItem.Message(messages[index])
+            }
             index += 1
             continue
         }

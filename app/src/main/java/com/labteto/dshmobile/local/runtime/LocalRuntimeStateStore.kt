@@ -225,6 +225,7 @@ class LocalRuntimeStateStore internal constructor(
         require(initialState.sessionId.isNotBlank()) { "初始会话编号不能为空" }
         foregroundRunHandle.rebindSession(initialState.sessionId)
         foregroundSessionId = initialState.sessionId
+        streamingPreviewStore.selectSession(initialState.sessionId)
         mutable.value = projectResourceSnapshot(
             initialState.copy(safeAutoApprovalEnabled =
                 approvalPreferences?.enabled?.value ?: initialState.safeAutoApprovalEnabled),
@@ -340,6 +341,7 @@ class LocalRuntimeStateStore internal constructor(
             foregroundRunHandle.rebindSession(sessionId)
         }
         foregroundSessionId = sessionId
+        streamingPreviewStore.selectSession(sessionId)
     }
 
     private fun publishResourceSnapshot(@Suppress("UNUSED_PARAMETER") snapshot: HarnessResourceSnapshot) {

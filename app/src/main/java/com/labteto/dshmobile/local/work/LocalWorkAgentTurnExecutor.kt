@@ -395,10 +395,6 @@ internal class LocalWorkAgentTurnExecutor(
                                 },
                                 persistOverflowHistory = true,
                                 requestLog = runEventLog,
-                                previewGuard = {
-                                runtimeStateStore.currentSessionId == binding.sessionId &&
-                                    runtimeStateStore.state.value.sessionId == binding.sessionId
-                            },
                                 overflowPersister = { overflowSnapshot, mode ->
                                 workModelHistoryRuntime.persistOverflowCompaction(
                                     overflowSnapshot,

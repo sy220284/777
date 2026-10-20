@@ -160,7 +160,7 @@ internal fun LocalWorkTimelineAutoScroller(
                 if (atBottom && !readerDragging) isReaderPaused.value = false
             }
     }
-    LaunchedEffect(sessionId, listState, tailIndex, tailKey, isReady) {
+    LaunchedEffect(sessionId, listState, tailIndex, tailKey, isReady, readerDragging) {
         val oldTail = previousTailIndex
         val oldKey = previousTailKey
         previousTailIndex = tailIndex
@@ -168,23 +168,9 @@ internal fun LocalWorkTimelineAutoScroller(
         if (!isReady || oldTail < 0 || tailIndex < 0 ||
             (tailIndex <= oldTail && tailKey == oldKey)
         ) return@LaunchedEffect
-        val viewport = listState.layoutInfo
-        val lastVisible = viewport.visibleItemsInfo.lastOrNull()
-        // A streaming preview can be replaced by a much taller final answer at the
-        // same index. Its NEW height is not the old tail's distance from the bottom.
-        val replacingTail = tailIndex == oldTail && tailKey != oldKey
-        // An empty streaming placeholder may not appear in visibleItemsInfo.
-        // In that case trust the previous row only if its measured bottom is close.
-        val previousTailGap = when {
-            replacingTail && lastVisible?.index == oldTail -> 0
-            else -> lastVisible?.takeIf { it.index in (oldTail - 1)..oldTail }
-                ?.let { it.offset + it.size - viewport.viewportEndOffset }
-        }
-        if (!shouldFollowNewWorkStep(
-                oldTail, lastVisible?.index ?: -1, previousTailGap,
-                isReaderPaused.value, readerDragging,
-            )
-        ) return@LaunchedEffect
+        // Following is reader intent, not a measurement of the old tail AFTER new rows arrived.
+        // Batched background output and hot-window eviction can remove that old row entirely.
+        if (isReaderPaused.value || readerDragging) return@LaunchedEffect
         isCatchingUp.value = true
         try {
             listState.animateScrollToItem(tailIndex)
@@ -196,17 +182,6 @@ internal fun LocalWorkTimelineAutoScroller(
         }
     }
 }
-
-internal fun shouldFollowNewWorkStep(
-    previousTailIndex: Int,
-    lastVisibleIndex: Int,
-    previousTailGapPx: Int?,
-    readerPaused: Boolean,
-    readerDragging: Boolean,
-): Boolean =
-    previousTailIndex >= 0 && !readerPaused && !readerDragging &&
-        lastVisibleIndex >= previousTailIndex - 1 &&
-        previousTailGapPx != null && previousTailGapPx <= 72
 
 /**
  * animateScrollToItem brings a tall final answer to its START, not its bottom.

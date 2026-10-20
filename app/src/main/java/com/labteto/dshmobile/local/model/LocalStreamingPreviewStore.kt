@@ -5,7 +5,6 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 
 /** Identity of one model request allowed to own the transient visible preview. */
 internal data class LocalStreamingPreviewOwner(
@@ -18,7 +17,7 @@ internal data class LocalStreamingPreviewOwner(
 /**
  * Owns transient streaming preview independently from the durable transcript.
  *
- * The preview is process-wide for rendering efficiency, but every mutation is identity-scoped.
+ * Each live request retains its bounded preview independently of the visible conversation.
  * A stale request can never overwrite or clear a newer request from the same session, and UI can
  * reject previews that belong to another session or product mode.
  */
@@ -36,52 +35,63 @@ internal class LocalStreamingPreviewStore {
     private val generation = AtomicLong(0L)
     private val mutableState = MutableStateFlow(LocalHarnessStreamingState())
     val state: StateFlow<LocalHarnessStreamingState> = mutableState.asStateFlow()
+    // Only live requests retain previews. Completion removes its slot; no historical cache.
+    private val previews = mutableMapOf<String, LocalHarnessStreamingState>()
+    private var visibleSessionId: String? = null
 
-    fun newOwner(
-        sessionId: String,
-        requestId: String,
-        usageMode: LocalUsageMode,
-    ): LocalStreamingPreviewOwner = LocalStreamingPreviewOwner(
-        sessionId = sessionId,
-        requestId = requestId,
-        usageMode = usageMode,
-        generation = generation.incrementAndGet(),
-    )
-
-    fun begin(owner: LocalStreamingPreviewOwner) {
-        mutableState.update { current ->
-            if (current.accepts(owner)) owner.emptyState() else current
-        }
+    @Synchronized
+    fun selectSession(sessionId: String) {
+        visibleSessionId = sessionId
+        projectVisible()
     }
 
+    @Synchronized
+    fun newOwner(sessionId: String, requestId: String, usageMode: LocalUsageMode): LocalStreamingPreviewOwner {
+        val owner = LocalStreamingPreviewOwner(sessionId, requestId, usageMode, generation.incrementAndGet())
+        previews[sessionId] = owner.emptyState()
+        projectVisible()
+        return owner
+    }
+
+    @Synchronized
+    fun begin(owner: LocalStreamingPreviewOwner, attempt: Int = 1) {
+        updateOwned(owner) { owner.emptyState().copy(phase = LocalModelPreviewPhase.WAITING, attempt = attempt) }
+    }
+
+    @Synchronized
+    fun retry(owner: LocalStreamingPreviewOwner, nextAttempt: Int) {
+        updateOwned(owner) { owner.emptyState().copy(phase = LocalModelPreviewPhase.RETRYING, attempt = nextAttempt) }
+    }
+
+    @Synchronized
     fun publishAssistant(owner: LocalStreamingPreviewOwner, text: String) {
         if (text.isEmpty()) return
-        mutableState.update { current ->
-            when {
-                current.requestId == owner.requestId -> current.copy(assistant = text)
-                current.accepts(owner) -> owner.emptyState().copy(assistant = text)
-                else -> current
-            }
-        }
+        updateOwned(owner) { it.copy(assistant = text, phase = LocalModelPreviewPhase.STREAMING) }
     }
 
+    @Synchronized
     fun clear(owner: LocalStreamingPreviewOwner) {
-        mutableState.update { current ->
-            if (current.sessionId == owner.sessionId && current.requestId == owner.requestId) {
-                LocalHarnessStreamingState()
-            } else {
-                current
-            }
+        if (previews[owner.sessionId]?.owns(owner) == true) {
+            previews.remove(owner.sessionId)
+            projectVisible()
         }
     }
 
-    private fun LocalHarnessStreamingState.accepts(owner: LocalStreamingPreviewOwner): Boolean =
-        sessionId != owner.sessionId || owner.generation >= generation
+    private fun updateOwned(owner: LocalStreamingPreviewOwner, transform: (LocalHarnessStreamingState) -> LocalHarnessStreamingState) {
+        val current = previews[owner.sessionId] ?: return
+        if (!current.owns(owner)) return
+        previews[owner.sessionId] = transform(current)
+        projectVisible()
+    }
+
+    private fun projectVisible() {
+        mutableState.value = previews[visibleSessionId] ?: LocalHarnessStreamingState()
+    }
+
+    private fun LocalHarnessStreamingState.owns(owner: LocalStreamingPreviewOwner) =
+        requestId == owner.requestId && generation == owner.generation && usageMode == owner.usageMode
 
     private fun LocalStreamingPreviewOwner.emptyState() = LocalHarnessStreamingState(
-        sessionId = sessionId,
-        requestId = requestId,
-        usageMode = usageMode,
-        generation = generation,
+        sessionId = sessionId, requestId = requestId, usageMode = usageMode, generation = generation,
     )
 }

@@ -92,7 +92,7 @@ internal fun LocalStreamingChatTurn(
 /**
  * Inline response preview for the current model step. The durable Session EventLog remains
  * authoritative: suppress text already committed as a progress/final row and do not repeat
- * empty loading cards when a work timeline exists.
+ * committed text. A waiting indicator remains visible between model steps.
  */
 internal fun inlineWorkPreviewText(draft: String, lastDurableNarrative: String?): String {
     // A previous session or a nonconforming provider may embed tagged thinking in content.
@@ -114,7 +114,6 @@ internal fun shouldShowInlineWorkPreview(draft: String, lastDurableNarrative: St
 internal fun LocalStreamingWorkPreview(
     sessionId: String,
     streamingState: StateFlow<LocalHarnessStreamingState>,
-    hasDurableProgress: Boolean,
     lastDurableNarrative: String? = null,
 ) {
     // Lifecycle-aware StateFlow collection supplies its own safe initial state.
@@ -123,7 +122,6 @@ internal fun LocalStreamingWorkPreview(
     val stream = rawStream.forSurface(sessionId, LocalUsageMode.WORK)
     val text = inlineWorkPreviewText(stream.assistant, lastDurableNarrative)
     val visiblePreview = text.isNotBlank()
-    if (!visiblePreview && hasDurableProgress) return
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd),
@@ -136,9 +134,14 @@ internal fun LocalStreamingWorkPreview(
             CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
             Text(
                 stringResource(
-                    if (visiblePreview) R.string.local_streaming_status
+                    if (stream.phase == com.labteto.dshmobile.local.model.LocalModelPreviewPhase.RETRYING)
+                        R.string.local_work_request_retrying
+                    else if (visiblePreview) R.string.local_streaming_status
+                    else if (stream.phase == com.labteto.dshmobile.local.model.LocalModelPreviewPhase.WAITING)
+                        R.string.local_work_request_waiting
                     else if (stream.reasoning.isNotBlank()) R.string.local_work_thinking
                     else R.string.local_work_process_preparing,
+                    stream.attempt,
                 ),
                 style = DsType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,

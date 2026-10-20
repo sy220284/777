@@ -1361,6 +1361,8 @@
     <string name="local_work_process">工作过程</string>
     <string name="local_work_process_running">工作进行中</string>
     <string name="local_work_process_warning">工作过程中有失败步骤</string>
+    <string name="local_work_request_waiting">正在等待模型回复…</string>
+    <string name="local_work_request_retrying">正在等待重试（第 %1$d 次请求）…</string>
     <string name="local_work_process_preparing">正在准备下一步…</string>
     <string name="local_process_thinking">思考</string>
     <string name="local_work_process_steps">%1$d 步</string>

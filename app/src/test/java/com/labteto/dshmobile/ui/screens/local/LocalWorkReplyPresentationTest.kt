@@ -10,8 +10,9 @@ class LocalWorkReplyPresentationTest {
     @Test fun workFailureAndStopRemainVisibleAfterReopeningHistory() {
         val failure = LocalHarnessMessage("failure", "system", "执行失败：网络连接中断", createdAt = 2L)
         val stopped = failure.copy(id = "stop", content = "本轮已停止。")
-        val items = buildLocalDisplayTranscript(buildLocalTranscript(listOf(failure, stopped)))
-        assertEquals(listOf("message:failure", "message:stop"), items.map { it.key })
+        val paused = failure.copy(id = "pause", content = "当前任务已无法继续扩展执行预算，已在第 64 步暂停；已有进度已保留。")
+        val items = buildLocalDisplayTranscript(buildLocalTranscript(listOf(failure, stopped, paused)))
+        assertEquals(listOf("message:failure", "message:stop", "message:pause"), items.map { it.key })
         assertTrue(buildLocalTranscript(listOf(failure), includeWorkProcess = false).isEmpty())
     }
     private fun message(id: String, role: String, content: String = "", toolName: String? = null,

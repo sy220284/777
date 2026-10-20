@@ -18,6 +18,24 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class LocalTurnForegroundLeaseAndroidTest {
+    @Test fun executionWakeLockCoversActiveWorkAndReleasesOnIdle() {
+        val power = InstrumentationRegistry.getInstrumentation().targetContext
+            .getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        val lease = com.labteto.dshmobile.local.runtime.LocalExecutionWakeLock(power)
+        assertFalse(lease.isHeld)
+        try {
+            lease.setActive(true)
+            assertTrue(lease.isHeld)
+            // More steps/another task share the same service hold, not another reference.
+            lease.setActive(true)
+            lease.setActive(false)
+            assertFalse(lease.isHeld)
+            lease.setActive(true)
+            assertTrue(lease.isHeld)
+        } finally { lease.setActive(false) }
+        assertFalse(lease.isHeld)
+    }
+
     @Test
     fun rejectedForegroundStartDoesNotExecuteProtectedTurn() = runBlocking {
         val rejected = object : ContextWrapper(InstrumentationRegistry.getInstrumentation().targetContext) {
