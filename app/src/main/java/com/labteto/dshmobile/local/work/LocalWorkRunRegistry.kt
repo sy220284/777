@@ -204,6 +204,10 @@ class LocalWorkRunRegistry internal constructor(
             // while the model is running; the opportunistic follow-up must not jump over them.
             if (binding.runHandle.pendingInputs.size() == 0) onIdle()
             if (binding.runHandle.cancellationRequested) return@synchronized null
+            // A queued input accepted before the form was presented is not the user's
+            // answer to that form. Preserve the durable inbox, but do not consume any
+            // pending turn until a new real user send has crossed this decision point.
+            if (hasOutstandingWorkReplyForm(binding.eventLog)) return@synchronized null
 
             // Re-validate persisted Goal follow-ups immediately before consuming them.
             // A goal may have changed after admission (or while the device was suspended).
@@ -213,7 +217,7 @@ class LocalWorkRunRegistry internal constructor(
                     var staleGoal = false
                     val polled = binding.runHandle.pendingInputs.pollCommitted { input, remaining ->
                         staleGoal = shouldDiscardWorkGoalContinuation(
-                            input, remaining, binding.workState.snapshot())
+                            input, remaining, binding.workState.snapshot(), binding.eventLog)
                         val message = input.modelMessage ?: buildJsonObject {
                             put("role", "user")
                             put("content", input.content)

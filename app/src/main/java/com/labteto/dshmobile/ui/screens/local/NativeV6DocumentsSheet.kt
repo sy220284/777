@@ -100,7 +100,7 @@ internal fun NativeV6DocumentsSheet(
                     is UiDocumentReceipt.Rejected -> "操作被拒绝：${receipt.reason}"
                     is UiDocumentReceipt.InvalidFields -> "请检查输入：${receipt.fieldIds.joinToString()}"
                     is UiDocumentReceipt.Fallback -> receipt.text
-                    is UiDocumentReceipt.OwnerReceipt -> "已收到业务执行回执：${receipt.receipt}"
+                    is UiDocumentReceipt.OwnerReceipt -> nativeV6DocumentReceiptMessage(receipt)
                     UiDocumentReceipt.NavigationRequested -> "已请求打开原生页面"
                     UiDocumentReceipt.AdditionalRequestConsentRequired -> "需要确认额外模型请求"
                 }
@@ -361,15 +361,9 @@ private fun NativeV6DocumentNode(
             label = { Text(node.label) }, modifier = Modifier.fillMaxWidth(),
             maxLines = if (node.multiline) 5 else 1, enabled = enabled,
         )
-        is UiDocumentNode.Select -> {
-            Text(node.label, color = colors.textSecondary)
-            node.options.forEach { option ->
-                SyButton((if (fields[node.id] == option) "✓ " else "") + option,
-                    onClick = { onFieldChange(node.id, option) },
-                    size = SyButtonSize.Small, enabled = enabled,
-                    variant = SyButtonVariant.Ghost)
-            }
-        }
+        is UiDocumentNode.Select -> NativeV6CompactSelect(
+            node = node, fields = fields, enabled = enabled, onFieldChange = onFieldChange,
+        )
         is UiDocumentNode.Switch -> Row {
             Text(node.label, modifier = Modifier.weight(1f), color = colors.textSecondary)
             Switch(checked = (fields[node.id] ?: node.initial.toString()) == "true",
@@ -394,7 +388,7 @@ private fun NativeV6DocumentNode(
             Text(calculateUiDocumentValue(node, fields) ?: "请输入有效数字",
                 style = MaterialTheme.typography.titleMedium)
         }
-        is UiDocumentNode.Button -> SyButton(node.label, onClick = { onAction(node.actionId) },
+        is UiDocumentNode.Button -> SyButton(nativeV6ActionLabel(node.label, item.document.actions.firstOrNull { it.id == node.actionId }), onClick = { onAction(node.actionId) },
             enabled = enabled && item.actions[node.actionId]?.available == true,
             variant = SyButtonVariant.Outline, modifier = Modifier.fillMaxWidth())
         is UiDocumentNode.Column -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

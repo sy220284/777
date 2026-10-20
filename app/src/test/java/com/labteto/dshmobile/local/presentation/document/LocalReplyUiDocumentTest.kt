@@ -33,6 +33,35 @@ class LocalReplyUiDocumentTest {
         assertEquals(raw, LocalReplyUiDocumentProtocol.split(windows).definition)
     }
 
+    @Test fun workNeverShowsAnUnansweredFormWhileThatModelStepStillRunsTools() {
+        assertFalse(LocalReplyUiDocumentProtocol.workFormMayBePublished(raw, modelToolCallCount = 1))
+        assertFalse(LocalReplyUiDocumentProtocol.workFormMayBePublished(raw, modelToolCallCount = 2))
+        assertTrue(LocalReplyUiDocumentProtocol.workFormMayBePublished(raw, modelToolCallCount = 0))
+        assertFalse(LocalReplyUiDocumentProtocol.workFormMayBePublished(null, modelToolCallCount = 0))
+        // Ordinary read-only result cards must still render during ongoing Work tools.
+        val nonForm = """{"schemaVersion":1,"documentId":"reply","revision":0,"title":"状态",
+            "nodes":[{"id":"status","type":"text","text":"本轮已有进展"}],
+            "actions":[],"fallbackText":"进展"}""".trimIndent()
+        assertEquals(WorkReplyFormHandling.NONE,
+            LocalReplyUiDocumentProtocol.workReplyFormHandling(nonForm, hasToolCalls = true))
+        assertTrue(LocalReplyUiDocumentProtocol.workFormMayBePublished(nonForm, modelToolCallCount = 1))
+    }
+
+    @Test fun protocolDistinguishesConfirmAndSendFromPreparingUnsentDraft() {
+        assertTrue(LocalReplyUiDocumentProtocol.instruction.contains(
+            "submit_user_input for confirmation or submission buttons",
+        ))
+        assertTrue(LocalReplyUiDocumentProtocol.instruction.contains(
+            "Do not call send_user_input a confirmation or submission",
+        ))
+        assertTrue(LocalReplyUiDocumentProtocol.instruction.contains(
+            """"label":"确认并发送表单","actionId":"submit"""",
+        ))
+        assertTrue(LocalReplyUiDocumentProtocol.instruction.contains(
+            """"type":"submit_user_input","text":"按所选方式继续："""",
+        ))
+    }
+
     @Test fun streamingHidesProtocolEvenWhenMarkerIsSplitAtEveryPossibleBoundary() {
         val output = "Progress 😀\n```ui_document\n$raw\n```"
         for (width in 1..30) {
@@ -49,6 +78,23 @@ class LocalReplyUiDocumentTest {
         val plain = LocalReplyUiDocumentPreview()
         assertEquals("Normal code", plain.append("Normal code"))
         assertEquals("\n```json\n{}", plain.append("\n```json\n{}"))
+    }
+
+    @Test fun workFormRequiresExplicitUserInputBeforeGoalAutoContinuation() {
+        assertEquals(WorkReplyFormHandling.WAIT_FOR_SUBMISSION,
+            LocalReplyUiDocumentProtocol.workReplyFormHandling(raw, hasToolCalls = false))
+        assertEquals(WorkReplyFormHandling.DEFER_UNTIL_NO_TOOLS,
+            LocalReplyUiDocumentProtocol.workReplyFormHandling(raw, hasToolCalls = true))
+        assertEquals(WorkReplyFormHandling.WAIT_FOR_SUBMISSION,
+            LocalReplyUiDocumentProtocol.workReplyFormHandling(
+                raw.replace("submit_user_input", "send_user_input"), hasToolCalls = false))
+        assertEquals(WorkReplyFormHandling.NONE,
+            LocalReplyUiDocumentProtocol.workReplyFormHandling(null, hasToolCalls = false))
+        assertEquals(WorkReplyFormHandling.NONE,
+            LocalReplyUiDocumentProtocol.workReplyFormHandling("{invalid", hasToolCalls = false))
+        assertEquals(WorkReplyFormHandling.NONE,
+            LocalReplyUiDocumentProtocol.workReplyFormHandling(
+                raw.replace("submit_user_input", "execute_tool"), hasToolCalls = false))
     }
 
     @Test fun automaticCardRestoresExactOwnerSourceAndCannotReviveAfterDeletion() {

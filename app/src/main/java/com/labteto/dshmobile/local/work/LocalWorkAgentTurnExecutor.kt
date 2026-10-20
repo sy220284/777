@@ -146,7 +146,7 @@ internal class LocalWorkAgentTurnExecutor(
             val runEventLog = binding.eventLog
             // Final Goal fence: a user can change Work after inbox consumption but
             // before this lazy coroutine obtains its Session runtime ownership.
-            if (!isCurrentWorkGoalContinuation(continuation, runState.value.work)) {
+            if (!isCurrentWorkGoalContinuation(continuation, runState.value.work, runEventLog)) {
                 runEventLog.append("turn/goal-continuation-stale", buildJsonObject {
                     put("source_run_id", continuation?.sourceRunId ?: "")
                     put("goal_id", continuation?.goalId ?: "")
@@ -206,6 +206,9 @@ internal class LocalWorkAgentTurnExecutor(
             }
             val repliesByStep = mutableMapOf<Int, LocalModelReply>()
             val uiDefinitionsByStep = mutableMapOf<Int, String?>()
+            val replyFormHandlingByStep = mutableMapOf<Int,
+                com.labteto.dshmobile.local.presentation.document.WorkReplyFormHandling>()
+            var waitingForReplyFormSubmission = false
             var modelStep = 0
             var latestAcceptedSamplingRevision = binding.steeringRevision.value
             val modelToolStepSurface = LocalModelToolStepSurface()
@@ -460,7 +463,17 @@ internal class LocalWorkAgentTurnExecutor(
                     val deliveryReply = guardWorkCompletionDelivery(cleanReply, runState.value, runEventLog, File(workspacePath))
                     modelStep += 1
                     repliesByStep[modelStep] = deliveryReply
-                    uiDefinitionsByStep[modelStep] = parts.definition.takeIf { deliveryReply.content == cleanReply.content }
+                    replyFormHandlingByStep[modelStep] =
+                        com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol
+                            .workReplyFormHandling(parts.definition, deliveryReply.toolCalls.isNotEmpty())
+                    // A form with outstanding tools is not a user-input checkpoint: this
+                    // Work turn will keep executing. Publish it only on a tool-free final reply
+                    // so users never see a form while the agent is already moving ahead.
+                    uiDefinitionsByStep[modelStep] = parts.definition.takeIf {
+                        deliveryReply.content == cleanReply.content &&
+                            com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol
+                                .workFormMayBePublished(parts.definition, deliveryReply.toolCalls.size)
+                    }
                     return@AgentModel AgentModelReply(
                         content = deliveryReply.content.orEmpty(),
                         toolCalls = if (runPolicy.allowToolExecution) {
@@ -555,12 +568,27 @@ internal class LocalWorkAgentTurnExecutor(
                                     kotlinx.serialization.json.JsonObject(reply.message + ("source_message_id" to JsonPrimitive(uiSourceMessageId))), transcriptMessages)
                                     .withModelToolCallEventData(reply.toolCalls),
                             )
-                            uiSourceMessageId?.let { source ->
-                                replyDocuments.publish(uiDefinitionsByStep.remove(event.step),
+                            val formHandling = replyFormHandlingByStep.remove(event.step)
+                            val definition = uiDefinitionsByStep.remove(event.step)
+                            val formPublished = uiSourceMessageId?.let { source ->
+                                replyDocuments.publish(definition,
                                     com.labteto.dshmobile.uicontract.UiDocumentSource(binding.sessionId, source, 0L,
                                         beforeAssistant.modelState.modelSelection.activeProfileId,
                                         beforeAssistant.projectId, true), reply.requestId,
                                     beforeAssistant.modelState.model, reply.usage.reported)
+                            } ?: false
+                            if (formPublished &&
+                                formHandling == com.labteto.dshmobile.local.presentation.document.WorkReplyFormHandling.WAIT_FOR_SUBMISSION
+                            ) {
+                                waitingForReplyFormSubmission = true
+                                runEventLog.append(WORK_REPLY_FORM_WAIT_EVENT, buildJsonObject {
+                                    put("source_message_id", uiSourceMessageId)
+                                    put("step", event.step)
+                                    binding.workState.snapshot().goal?.let { goal ->
+                                        put("goal_id", goal.id)
+                                        put("goal_revision", goal.revision)
+                                    }
+                                })
                             }
                             runHistory.append(reply.message)
                             workModelHistoryRuntime.updateContextMetrics(binding)
@@ -708,7 +736,7 @@ internal class LocalWorkAgentTurnExecutor(
                             settlePendingTools("failed")
                             val detail = event.reason.take(2_000)
                             val continuationEligible =
-                                shouldAutoContinueWorkFailure(
+                                !waitingForReplyFormSubmission && shouldAutoContinueWorkFailure(
                                     error = lastModelError,
                                     automaticContinuationCount = binding.automaticContinuationCount,
                                     pendingInputs = binding.runHandle.pendingInputs.size(),
@@ -793,7 +821,7 @@ internal class LocalWorkAgentTurnExecutor(
             } catch (error: Exception) {
                 foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
                 val modelError = error as? LocalModelException
-                val queued = if (modelError != null) {
+                val queued = if (modelError != null && !waitingForReplyFormSubmission) {
                     queueAutomaticWorkContinuation(binding, runContext.runId, modelError, uiSourceMessageId)
                 } else {
                     false
@@ -827,8 +855,8 @@ internal class LocalWorkAgentTurnExecutor(
                         finally { serviceReleased = true }
                     } finally {
                         workRunRegistry.finishTurn(binding, ownerJob, onIdle = {
-                            if (completedGoalDisposition == LocalWorkGoalDisposition.NEEDS_EXECUTION ||
-                                completedGoalDisposition == LocalWorkGoalDisposition.READY_FOR_SETTLEMENT) {
+                            if (shouldAutoContinueWorkGoalAfterForm(
+                                    completedGoalDisposition, waitingForReplyFormSubmission)) {
                                 driveLocalWorkGoalAfterTurn(
                                     binding = binding,
                                     originalGoal = goalAtTurnStart,
