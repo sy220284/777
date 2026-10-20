@@ -41,7 +41,9 @@ internal class LocalSessionDeletionCleanup(
         sessionsRoot.listFiles().orEmpty()
             .filter { entry ->
                 entry.name.startsWith("$id.checkpoint-v") ||
-                    entry.name.startsWith("$id.corrupt-")
+                    entry.name.startsWith("$id.corrupt-") ||
+                    entry.name == "$id.json.tmp" ||
+                    entry.name == "$id.backup.json.tmp"
             }
             .forEach { entry ->
                 check(entry.delete() || !entry.exists()) { "会话历史副本删除失败：${entry.name}" }

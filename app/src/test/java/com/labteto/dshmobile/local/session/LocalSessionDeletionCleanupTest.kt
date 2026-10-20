@@ -18,6 +18,7 @@ class LocalSessionDeletionCleanupTest {
         val event = File(sessions, "deleted.events.jsonl").apply { writeText("old events") }
         val writer = File(sessions, "deleted.events.jsonl.writer.lock").apply { writeText("") }
         val checkpoint = File(sessions, "deleted.checkpoint-v1.json").apply { writeText("old checkpoint") }
+        val abandonedWrite = File(sessions, "deleted.json.tmp").apply { writeText("partially written") }
         val summaryDir = File(sessions, ".summaries").apply { mkdirs() }
         val summary = File(summaryDir, "deleted.summary").apply { writeText("old summary") }
         val unrelated = File(sessions, "other.events.jsonl").apply { writeText("untouched") }
@@ -54,6 +55,7 @@ class LocalSessionDeletionCleanupTest {
         assertFalse(event.exists())
         assertFalse(writer.exists())
         assertFalse(checkpoint.exists())
+        assertFalse(abandonedWrite.exists())
         assertFalse(summary.exists())
         assertFalse(File(sessions, ".pending-deletions/deleted.pending").exists())
         assertTrue(unrelated.exists())
