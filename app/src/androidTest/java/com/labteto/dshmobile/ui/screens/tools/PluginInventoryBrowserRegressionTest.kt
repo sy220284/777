@@ -29,7 +29,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.setContent {
             DshTheme {
                 PluginInventoryBrowser(
-                    localIds = listOf("android-local-builtins"),
+                    localIds = listOf("android-runtime"),
 
                     onBack = {},
                     onManageConnections = {},
@@ -37,7 +37,7 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithText("技能").assertIsDisplayed().performClick()
+        compose.onNodeWithText("终端与运行环境").assertIsDisplayed().performClick()
         compose.onNodeWithText("返回对话").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, returned) }
     }
@@ -362,6 +362,21 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithTag("plugin-inventory-search").assertIsDisplayed()
         compose.onNodeWithText("插件").assertDoesNotExist()
         compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertIsDisplayed()
+    }
+
+    @Test
+    fun pluginTabDoesNotDuplicateSkillsRuntime() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = listOf("android-local-builtins", "android-runtime"),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithText("技能").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-card-local:android-local-builtins").assertDoesNotExist()
     }
 
     @Test
