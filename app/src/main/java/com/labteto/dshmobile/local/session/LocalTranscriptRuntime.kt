@@ -31,6 +31,7 @@ internal class LocalTranscriptRuntime(
         toolErrorCode: String? = null,
         blocks: List<LocalMessageBlock> = emptyList(),
         toolCallId: String? = null,
+        toolDeclaredAt: Long? = null,
     ): LocalHarnessMessage = LocalHarnessMessage(
         id = UUID.randomUUID().toString(),
         role = role,
@@ -39,6 +40,7 @@ internal class LocalTranscriptRuntime(
         toolIsError = toolIsError,
         toolErrorCode = toolErrorCode,
         toolCallId = toolCallId,
+        toolDeclaredAt = toolDeclaredAt,
         speakerId = speakerId,
         speakerName = speakerName,
         createdAt = System.currentTimeMillis(),
