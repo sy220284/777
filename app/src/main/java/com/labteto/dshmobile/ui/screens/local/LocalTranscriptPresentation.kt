@@ -454,7 +454,7 @@ internal fun composeLocalReplyAttachments(
     return buildList(timeline.size) {
         unowned.forEach { item ->
             add(item)
-            attachments[item.key]?.let(::addAll)
+            attachments[item.key]?.let { addAll(it) }
         }
     }
 }
