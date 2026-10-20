@@ -58,3 +58,69 @@ internal fun naturalWorkCommandAction(argumentsPreview: String?): String? {
         else -> "运行本地任务"
     }
 }
+
+
+/**
+ * Build a concise activity title from verified tool identity and bounded argument categories.
+ * Never show free-form queries, file paths, shell commands, or results on the timeline.
+ * The verb identifies the operation being attempted, not a claim that it succeeded.
+ */
+internal fun naturalWorkToolAction(toolName: String?, argumentsPreview: String?): String? {
+    val name = toolName?.lowercase().orEmpty()
+    if (name.isBlank()) return null
+    if (com.labteto.dshmobile.ui.agentOperationKind(name) ==
+        com.labteto.dshmobile.ui.AgentOperationKind.Execute
+    ) return naturalWorkCommandAction(argumentsPreview)
+
+    val data = argumentsPreview?.let { preview ->
+        runCatching { Json.parseToJsonElement(preview) }.getOrNull() as? JsonObject
+    }
+    val hint = listOf("query", "q", "search", "search_query", "path", "file_path", "filename")
+        .mapNotNull { key -> data?.get(key)?.toString() }
+        .joinToString(" ").lowercase()
+    // Broad categories only: no user-authored query or private path is echoed.
+    val subject = when {
+        Regex("""(?:timeline|transcript|workstep|workreply|工作步骤|时间线|回复显示)""")
+            .containsMatchIn(hint) -> "工作回复时间线"
+        Regex("""(?:aesthetic|设计技能|ui.design|ui设计|visual.skill)""")
+            .containsMatchIn(hint) -> "视觉与 UI 设计技能"
+        Regex("""(?:skill|技能)""").containsMatchIn(hint) -> "技能配置"
+        Regex("""(?:androidtest|regression|test\.kt|测试|回归)""")
+            .containsMatchIn(hint) -> "相关测试"
+        Regex("""(?:视觉|ui/|/ui|design|界面|layout)""")
+            .containsMatchIn(hint) -> "界面设计"
+        Regex("""(?:log|diagnostic|日志)""").containsMatchIn(hint) -> "诊断日志"
+        else -> null
+    }
+
+    return when {
+        name.contains("github") && name.contains("search") ->
+            "检索" + (subject ?: "仓库代码与资料")
+        name.contains("github") && (name.contains("fetch_pr_patch") ||
+            name.contains("get_pr_diff") || name.contains("fetch_pr_file_patch")) ->
+            "审查拉取请求的代码改动"
+        name.contains("github") && name.contains("list_pr_changed_filenames") ->
+            "核对拉取请求涉及的文件"
+        name.contains("github") && (name.contains("fetch_workflow") ||
+            name.contains("check_run") || name.contains("workflow_run")) ->
+            "检查构建和自动化测试进度"
+        name.contains("github") && name.contains("get_pr_info") ->
+            "查看拉取请求状态与改动"
+        name.contains("github") && name.contains("fetch_file") ->
+            "查看" + (subject ?: "仓库代码文件")
+        name.contains("github") && (name.contains("update_file") ||
+            name.contains("create_file")) ->
+            (if (name.contains("create_file")) "新增" else "修改") + (subject ?: "仓库文件")
+        name.contains("figma") && (name.contains("get") || name.contains("read") ||
+            name.contains("search")) -> "查看视觉设计稿"
+        name == "web_search" -> "检索" + (subject ?: "网络资料")
+        name in setOf("web_fetch", "http_request") -> "读取网页内容"
+        name in setOf("read", "read_file", "file_inspect") ->
+            "读取" + (subject ?: "文件内容")
+        name in setOf("grep", "search", "glob", "find", "list_files") ->
+            "查找" + (subject ?: "文件内容")
+        name in setOf("edit", "edit_file", "apply_patch", "patch") ->
+            "修改" + (subject ?: "文件内容")
+        else -> null
+    }
+}
