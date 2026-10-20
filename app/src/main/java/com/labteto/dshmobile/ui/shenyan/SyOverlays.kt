@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -15,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
@@ -347,5 +349,39 @@ fun SyContextActionMenu(
                 }
             }
         }
+    }
+}
+
+/**
+ * Neutral, edge-to-edge photo inspection surface. Only image-specific controls are provided
+ * by callers; this shared primitive owns back navigation and tap-outside dismissal.
+ */
+@Composable
+fun SyFullscreenMediaOverlay(
+    onDismiss: () -> Unit,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val colors = LocalSyColors.current
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+        ),
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize()
+                .background(colors.canvas)
+                .testTag("syFullscreenMediaOverlay")
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss,
+                ),
+            contentAlignment = Alignment.Center,
+            content = content,
+        )
     }
 }
