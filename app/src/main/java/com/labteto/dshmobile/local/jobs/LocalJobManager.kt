@@ -75,6 +75,8 @@ internal class LocalJobManager(
     fun pendingContinuableAgentMessageSnapshots(): List<JobSnapshot> =
         delegate.pendingContinuableAgentMessageSnapshots()
 
+    fun updateConcurrentLimit(limit: Int) = delegate.updateConcurrentLimit(limit)
+
     fun availableSlots(): Int = delegate.availableSlots()
 
     fun failInterrupted(id: String, detail: String): String = delegate.failInterrupted(id, detail)
