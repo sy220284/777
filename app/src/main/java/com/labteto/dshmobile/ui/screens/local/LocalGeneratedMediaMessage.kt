@@ -384,7 +384,7 @@ internal fun LocalGeneratedVideoTaskRow(
 }
 
 @Composable
-private fun MediaMessageCard(
+internal fun MediaMessageCard(
     title: String, subtitle: String, modifier: Modifier = Modifier,
     inline: Boolean = false,
     content: @Composable () -> Unit,
