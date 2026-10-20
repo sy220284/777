@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.model.selectedLocalModelProfileId
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.LocalModelRequestCoordinator
@@ -255,9 +256,9 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                 val sessionContext = session.chatContext
                 val sessionCharacterState = session.chatState
                 val runtime = state.value
-                val runProfile = modelGateway.profileForRun()
-                val persona = chatPersonaStore.get(session.personaId)
                 val boundEventLog = eventLogFor(session.id)
+                val runProfile = modelGateway.profileForRun(boundEventLog.selectedLocalModelProfileId())
+                val persona = chatPersonaStore.get(session.personaId)
                 val recentTranscript = LocalSessionTranscriptPager(boundEventLog)
                     .page(limit = AUTOMATION_CHAT_HISTORY_MESSAGES)
                     .messages
