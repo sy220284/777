@@ -56,7 +56,7 @@ internal object LocalAgentTeamContract {
         const val TEAM_MEMBER_ID_PREFIX = "member-"
         const val TEAM_JOB_ID_PREFIX = "job-team-"
         const val LOCAL_SUBAGENT_PROVIDER = "local-subagent"
-        const val MAX_TEAMMATES = 16
+        const val MAX_TEAMMATES = 24
         const val MAX_TEAM_MEMBER_HISTORY = 256
         const val MAX_NAME_CHARS = 48
         const val MAX_SUBJECT_CHARS = 240
@@ -64,7 +64,7 @@ internal object LocalAgentTeamContract {
         const val MAX_TASK_CHARS = 16_000
         const val MAX_MESSAGE_BYTES = 65_536
         const val MAX_PENDING_MESSAGES_PER_MEMBER = 64
-        const val MAX_TASKS = 256
+        const val MAX_TASKS = 512
         const val MAX_TEAM_TASK_HISTORY = 2_048
         const val MAX_ERROR_CHARS = 1_000
         const val MAX_BLOCKERS = 32
