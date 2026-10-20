@@ -18,6 +18,7 @@ import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalSessionDomainCreateSpec
 import com.labteto.dshmobile.local.session.LocalSessionDomainModeCommand
 import com.labteto.dshmobile.local.session.LocalSessionCoordinator
+import com.labteto.dshmobile.local.session.LocalSessionDeletionCleanup
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.work.LocalWorkSessionLifecyclePlanner
@@ -455,6 +456,11 @@ internal class LocalSessionLifecycleCoordinator(
                             )
                         }
                     }
+                    val deletionCleanup = LocalSessionDeletionCleanup(
+                        sessionsRoot = sessionsRoot,
+                        clearEvents = beforeEventLogsDeleted,
+                        clearToolOutputs = toolOutputStore::deleteSession,
+                    )
                     val durableDeletedIds = linkedSetOf<String>()
                     try {
                         withContext(Dispatchers.IO) {
@@ -464,26 +470,11 @@ internal class LocalSessionLifecycleCoordinator(
                                 ids = ids,
                                 currentSessionId = sourceId,
                                 deleteDurably = { id ->
+                                    deletionCleanup.markIntent(id)
                                     sessionCoordinator.delete(id)
                                     durableDeletedIds += id
                                 },
-                                cleanupCommitted = { id ->
-                                    // Event logs are cleared ONLY AFTER primary/backup deletion
-                                    // succeeded. Failure preserves the remaining history.
-                                    beforeEventLogsDeleted(setOf(id))
-                                    toolOutputStore.deleteSession(id)
-                                    sessionsRoot.listFiles().orEmpty()
-                                        .filter {
-                                            it.name == "$id.events.jsonl" ||
-                                                it.name.startsWith("$id.events.jsonl.part-") ||
-                                                it.name.startsWith("$id.events.jsonl.projection-")
-                                        }
-                                        .forEach { eventFile ->
-                                            check(eventFile.delete() || !eventFile.exists()) {
-                                                "会话事件文件删除失败：${eventFile.name}"
-                                            }
-                                        }
-                                },
+                                cleanupCommitted = deletionCleanup::cleanupCommitted,
                             )
                         }
                         // Forget jobs only for identities confirmed deleted on disk.

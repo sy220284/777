@@ -14,6 +14,7 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.prepareLocalHarnessStartup
 import com.labteto.dshmobile.local.session.LocalSessionArchiveMaintenance
+import com.labteto.dshmobile.local.session.LocalSessionDeletionCleanup
 import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.migrateLegacySessionFiles
@@ -93,6 +94,21 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
         )
         runtimeStateStore.projection.update { current ->
             if (current.loading) current.copy(loading = false) else current
+        }
+        // Complete sidecar deletions interrupted by process death. A surviving snapshot blocks
+        // cleanup, so a failed delete cannot erase a still-existing user's conversation.
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            LocalSessionDeletionCleanup(
+                sessionsRoot,
+                sessionStorage.eventLogs::clearAndEvict,
+                tools.toolOutputStore::deleteSession,
+            ).recoverPending().forEach { (id, failure) ->
+                com.labteto.dshmobile.observability.AppLog.warn(
+                    "SessionDeletion",
+                    "会话关联数据清理待重试 session=$id",
+                    failure,
+                )
+            }
         }
         foregroundWake.startNextIfIdle()?.start()
         work.schedulePersistentRecovery()
