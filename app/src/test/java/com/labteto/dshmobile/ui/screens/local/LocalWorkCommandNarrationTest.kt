@@ -9,7 +9,7 @@ class LocalWorkCommandNarrationTest {
         assertEquals("检查 curl、wget 是否可用",
             naturalWorkCommandAction("""{"command":"command -v curl; command -v wget"}"""))
         assertEquals("检查系统工具是否可用",
-            naturalWorkCommandAction("""{"command":"for tool in curl wget; do command -v \"$tool\"; done"}"""))
+            naturalWorkCommandAction("""{"command":"for tool in curl wget; do command -v; done"}"""))
         assertEquals("核对工具版本",
             naturalWorkCommandAction("""{"command":"ffmpeg -version"}"""))
     }
