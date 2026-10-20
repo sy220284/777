@@ -292,8 +292,13 @@ internal fun LocalMediaStudioSheetContent(
                         if (kind == LocalMediaKind.SPEECH) R.string.minimax_media_speech_input
                         else R.string.minimax_media_prompt
                     )) },
-                    minLines = 4, maxLines = 8,
-                    modifier = Modifier.fillMaxWidth(), enabled = !busy,
+                    // Keep long prompts readable without requiring constant inner scrolling.
+                    // On short devices the sheet itself scrolls to the generate action.
+                    minLines = if (kind == LocalMediaKind.SPEECH) 8 else 12,
+                    maxLines = if (kind == LocalMediaKind.SPEECH) 14 else 20,
+                    modifier = Modifier.fillMaxWidth()
+                        .testTag("mediaStudioPromptField"),
+                    enabled = !busy,
                 )
             }
 
