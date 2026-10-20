@@ -9,6 +9,17 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class LocalToolOutputStoreTest {
+    @Test
+    fun successfulSessionCleanupRemovesReceiptsBeforeReportingSuccess() {
+        val root = temporary.newFolder("tool-cleanup")
+        val store = LocalToolOutputStore(root)
+        assertTrue(store.store("session", "receipt", "important evidence") != null)
+        val sessionDirectory = root.listFiles().orEmpty().single { it.isDirectory }
+        assertTrue(sessionDirectory.exists())
+        store.deleteSession("session")
+        assertFalse(sessionDirectory.exists())
+    }
+
     @get:Rule
     val temporary = TemporaryFolder()
 

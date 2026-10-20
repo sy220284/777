@@ -35,6 +35,31 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class HarnessJobPersistenceTest {
     @Test
+    fun deletionFailureRetainsOwnedJobReceiptsUntilDurableCommit() = runTest {
+        val manager = HarnessJobManager(backgroundScope, {})
+        val never = CompletableDeferred<Unit>()
+        manager.start("unfinished", ownerId = "session-a") { _, _ ->
+            never.await()
+            "should-not-complete"
+        }
+        manager.start("finished", ownerId = "session-a") { _, _ -> "completed-result" }
+        manager.start("other", ownerId = "session-b") { _, _ -> "other-result" }
+        runCurrent()
+        manager.stopOwnedAndJoin(setOf("session-a"))
+
+        val retained = manager.snapshots().filter { it.ownerId == "session-a" }
+        assertEquals(2, retained.size)
+        assertEquals("cancelled", retained.single { it.label == "unfinished" }.status)
+        assertEquals("completed", retained.single { it.label == "finished" }.status)
+        assertTrue(retained.any { it.output.contains("completed-result") })
+        assertTrue(manager.snapshots().any { it.ownerId == "session-b" })
+
+        manager.removeOwnedAndJoin(setOf("session-a"))
+        assertTrue(manager.snapshots().none { it.ownerId == "session-a" })
+        assertTrue(manager.snapshots().any { it.ownerId == "session-b" })
+    }
+
+    @Test
     fun recoveryProtocolMismatchPreservesUnknownOutcomeAcrossProcessRestart() = runTest {
         val durable = mutableListOf<List<JobSnapshot>>()
         val original = JobSnapshot(
