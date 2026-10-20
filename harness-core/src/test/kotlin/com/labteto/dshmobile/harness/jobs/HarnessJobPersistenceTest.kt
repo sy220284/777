@@ -21,6 +21,8 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -32,6 +34,107 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HarnessJobPersistenceTest {
+    @Test
+    fun deletionFailureRetainsOwnedJobReceiptsUntilDurableCommit() = runTest {
+        val manager = HarnessJobManager(backgroundScope, {})
+        val never = CompletableDeferred<Unit>()
+        manager.start("unfinished", ownerId = "session-a") { _, progress ->
+            progress("工作已完成一半：重要证据")
+            never.await()
+            "should-not-complete"
+        }
+        manager.start("finished", ownerId = "session-a") { _, _ -> "completed-result" }
+        manager.start("other", ownerId = "session-b") { _, _ -> "other-result" }
+        runCurrent()
+        manager.stopOwnedAndJoin(setOf("session-a"))
+
+        val retained = manager.snapshots().filter { it.ownerId == "session-a" }
+        assertEquals(2, retained.size)
+        assertEquals("cancelled", retained.single { it.label == "unfinished" }.status)
+        assertTrue(retained.single { it.label == "unfinished" }.output.contains("工作已完成一半：重要证据"))
+        assertTrue(retained.single { it.label == "unfinished" }.output.contains("任务已取消"))
+        assertEquals("completed", retained.single { it.label == "finished" }.status)
+        assertTrue(retained.any { it.output.contains("completed-result") })
+        assertTrue(manager.snapshots().any { it.ownerId == "session-b" })
+
+        manager.removeOwnedAndJoin(setOf("session-a"))
+        assertTrue(manager.snapshots().none { it.ownerId == "session-a" })
+        assertTrue(manager.snapshots().any { it.ownerId == "session-b" })
+    }
+
+    @Test
+    fun recoveryProtocolMismatchPreservesUnknownOutcomeAcrossProcessRestart() = runTest {
+        val durable = mutableListOf<List<JobSnapshot>>()
+        val original = JobSnapshot(
+            id = "side-effect-unknown",
+            label = "有副作用的外部请求",
+            status = "running",
+            output = "请求已经发送到外部系统",
+            resumeKind = "future_external_tool",
+            resumePayload = "{}",
+            ownerId = "owner-a",
+        )
+        val manager = HarnessJobManager(
+            scope = backgroundScope,
+            onChanged = {},
+            initialSnapshots = listOf(original),
+            onSnapshotsChanged = { durable += it },
+        )
+        assertEquals("interrupted", manager.snapshots().single().status)
+        val outcome = manager.markRecoveryUnverifiable(
+            "side-effect-unknown", "不支持的恢复类型 future_external_tool",
+        )
+        assertTrue(outcome.contains("人工核实"))
+        assertEquals("interrupted", manager.snapshots().single().status)
+        assertTrue(manager.snapshots().single().output.contains("结果未知"))
+        assertTrue(manager.snapshots().single().output.contains("请求已经发送"))
+        assertEquals("future_external_tool", manager.snapshots().single().resumeKind)
+        assertTrue(durable.last().single().status != "failed")
+        val recovered = HarnessJobManager(
+            scope = backgroundScope,
+            onChanged = {},
+            initialSnapshots = durable.last(),
+        )
+        assertEquals("interrupted", recovered.snapshots().single().status)
+        assertTrue(recovered.snapshots().single().output.contains("人工核实"))
+    }
+
+    @Test
+    fun completedTaskIgnoresProgressFromItsCapturedCallback() = runTest {
+        var late: ((String) -> Unit)? = null
+        val manager = HarnessJobManager(backgroundScope, {})
+        val id = manager.start("finished", ownerId = "owner") { _, progress ->
+            late = progress
+            "durable completed output"
+        }.substringAfterLast('：')
+        runCurrent()
+        val before = manager.snapshots().single()
+        assertEquals("completed", before.status)
+        late!!.invoke("LATE progress must not overwrite result")
+        assertEquals(before, manager.snapshots().single())
+        assertTrue(manager.output(id).contains("durable completed output"))
+    }
+
+    @Test
+    fun cancelledTaskIgnoresProgressFromItsCapturedCallback() = runTest {
+        var late: ((String) -> Unit)? = null
+        val never = CompletableDeferred<Unit>()
+        val manager = HarnessJobManager(backgroundScope, {})
+        val id = manager.start("running", ownerId = "owner") { _, progress ->
+            late = progress
+            never.await()
+            "unexpected"
+        }.substringAfterLast('：')
+        runCurrent()
+        assertEquals("running", manager.snapshots().single().status)
+        manager.kill(id, "owner")
+        runCurrent()
+        val before = manager.snapshots().single()
+        assertEquals("cancelled", before.status)
+        late!!.invoke("LATE output from a cancelled executor")
+        assertEquals(before, manager.snapshots().single())
+    }
+
     @Test
     fun cancelledJobKeepsCancellationWhenBlockingWorkThrowsLate() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -1422,6 +1525,52 @@ class HarnessJobPersistenceTest {
         assertTrue(id.startsWith("job-"))
         assertTrue(manager.output(id).contains("[completed]"))
         assertTrue(manager.output("job-duplicate").contains("[completed]"))
+    }
+
+    @Test
+    fun successfulExternalWorkMustNotBeLabelledFailedWhenOnlyTerminalReceiptCannotPersist() = runTest {
+        var externalExecutionCount = 0
+        var asyncFailure: Throwable? = null
+        var durable = emptyList<JobSnapshot>()
+        val workerScope = CoroutineScope(
+            SupervisorJob() + StandardTestDispatcher(testScheduler) +
+                CoroutineExceptionHandler { _, error -> asyncFailure = error },
+        )
+        try {
+            val manager = HarnessJobManager(
+                scope = workerScope,
+                onChanged = {},
+                idFactory = { "successful-but-receipt-failed" },
+                onSnapshotsChanged = { snapshots ->
+                    // Start is durably recorded. Only the terminal receipt fails.
+                    if (snapshots.singleOrNull()?.status == "running") {
+                        durable = snapshots
+                    } else {
+                        error("disk full")
+                    }
+                },
+            )
+            manager.startPersistent(
+                label = "用户的有副作用外部操作",
+                resumeKind = "external_tool",
+                resumePayload = "{}",
+            ) { _, _ ->
+                externalExecutionCount++
+                "外部操作已执行成功"
+            }
+            advanceUntilIdle()
+            assertEquals(1, externalExecutionCount)
+            assertEquals("running", durable.single().status)
+            assertTrue("终态无法持久化的故障必须显式暴露", asyncFailure != null)
+            // Failed business work and failed receipt persistence are not the same fact.
+            assertFalse("不能把已成功执行的外部操作误判为业务失败",
+                manager.snapshots().single().status == "failed")
+            assertTrue("终态结果必须标示无法核实",
+                manager.snapshots().single().output.contains("未知"))
+            assertTrue("即使回执故障也必须释放并发名额", manager.availableSlots() > 0)
+        } finally {
+            workerScope.cancel()
+        }
     }
 
     @Test

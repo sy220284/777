@@ -173,6 +173,21 @@ class VersionedSessionStore(
         return changed
     }
 
+    /** Verify recoverability without repairing or rewriting snapshots in a read-only directory. */
+    @Synchronized
+    fun hasRecoverableSnapshot(id: String): Boolean =
+        sequenceOf(fileFor(id), backupFor(id)).filter(File::isFile).any { candidate ->
+            try {
+                readFromFile(id, candidate)
+                true
+            } catch (_: FutureSessionVersionException) {
+                // A newer-version document belongs to its user, not to deletion cleanup.
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
+
     @Synchronized
     fun ids(): List<String> = catalog.ids()
         .filter { id -> fileFor(id).isFile || backupFor(id).isFile }

@@ -44,6 +44,24 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+/**
+ * Identify the authoritative session before interpreting potentially corrupted recovery payloads.
+ * Older ownerless records may still be resumed when the payload explicitly names the session.
+ * An undecodable ownerless payload is left intact for manual inspection, not reassigned.
+ */
+internal fun isJobRecoveryOwnedBySession(snapshot: JobSnapshot, targetSession: String, json: Json): Boolean {
+    snapshot.ownerId?.let { return it == targetSession }
+    val serialized = snapshot.resumePayload ?: return false
+    return runCatching {
+        json.parseToJsonElement(serialized).jsonObject["session_id"]?.jsonPrimitive?.contentOrNull ==
+            targetSession
+    }.getOrDefault(false)
+}
+
+/** An interrupted action may already have performed irreversible work. */
+internal fun mustPreserveUnknownRecoveryOutcome(snapshot: JobSnapshot): Boolean =
+    snapshot.status == "interrupted"
+
 internal class LocalPersistentJobRecoveryCoordinator(
     private val scope: CoroutineScope,
     private val jobs: LocalJobManager,
@@ -264,8 +282,18 @@ internal class LocalPersistentJobRecoveryCoordinator(
 
     private fun resumePass(targetSession: String, resumeSlicePaused: Boolean = false) {
         jobs.resumableSnapshots().forEach { snapshot ->
+            // Verify identity before decoding, failing, or reclassifying a recovery record.
+            if (!isJobRecoveryOwnedBySession(snapshot, targetSession, json)) return@forEach
             // Startup/UI rehydration cannot grant new model request slots.
             if (!canResumeSubagentAtRootSlice(snapshot.status, resumeSlicePaused)) return@forEach
+            // A newer/unknown recovery protocol must not reinterpret a potentially
+            // completed external action as business failure or replay it automatically.
+            if (snapshot.resumeKind !in setOf("web_fetch", "subagent_readonly")) {
+                markRecoveryUnavailable(
+                    snapshot, "不支持的恢复类型 ${snapshot.resumeKind.orEmpty()}",
+                )
+                return@forEach
+            }
             val payload = decodePayload(snapshot, targetSession) ?: return@forEach
             val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull ?: targetSession
             if (sessionId != targetSession || jobs.availableSlots() <= 0) return@forEach
@@ -273,15 +301,14 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 when (snapshot.resumeKind) {
                     "web_fetch" -> resumeWebFetch(snapshot, sessionId, payload)
                     "subagent_readonly" -> resumeSubagent(snapshot, sessionId, payload)
-                    else -> jobs.failResumable(
-                        snapshot.id,
-                        "任务恢复失败：不支持的恢复类型 ${snapshot.resumeKind.orEmpty()}",
-                    )
+                    else -> error("恢复类型预校验与执行分支不一致")
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                jobs.failResumable(snapshot.id, "任务无法恢复：${error.message.orEmpty().take(500)}")
+                markRecoveryUnavailable(
+                    snapshot, "任务无法恢复：${error.message.orEmpty().take(500)}",
+                )
                 recordError(snapshot, sessionId, error)
             }
         }
@@ -297,10 +324,18 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
     }
 
+    private fun markRecoveryUnavailable(snapshot: JobSnapshot, detail: String) {
+        if (mustPreserveUnknownRecoveryOutcome(snapshot)) {
+            jobs.markRecoveryUnverifiable(snapshot.id, detail)
+        } else {
+            jobs.failResumable(snapshot.id, detail)
+        }
+    }
+
     private fun decodePayload(snapshot: JobSnapshot, fallbackSessionId: String): JsonObject? {
         val text = snapshot.resumePayload
         if (text.isNullOrBlank()) {
-            jobs.failResumable(snapshot.id, "任务恢复失败：缺少恢复元数据")
+            markRecoveryUnavailable(snapshot, "任务恢复失败：缺少恢复元数据")
             return null
         }
         return try {
@@ -308,7 +343,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            jobs.failResumable(snapshot.id, "任务恢复失败：恢复元数据损坏")
+            markRecoveryUnavailable(snapshot, "任务恢复失败：恢复元数据损坏")
             recordError(snapshot, fallbackSessionId, error)
             null
         }
@@ -382,8 +417,8 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 capabilities.teamManaged, capabilities.allowMutation, snapshot.status,
             )
         ) {
-            jobs.failResumable(
-                snapshot.id,
+            markRecoveryUnavailable(
+                snapshot,
                 "可写团队成员在应用中断后停止自动续跑；请由主代理先核验文件和任务状态，再重新分配。",
             )
             return

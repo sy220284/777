@@ -58,6 +58,28 @@ class OnDemandLanguageServerManagerTest {
         assertEquals(resolved, manager().installedCommand("src/App.ts"))
     }
 
+    @Test fun failedDownloadOfNewComponentNeverDeletesPreviousVersion() {
+        val previous = File(temp.root, "private/components/typescript-5.9.0")
+        val entry = File(previous, "node_modules/typescript-language-server/lib/cli.mjs")
+        entry.parentFile!!.mkdirs()
+        entry.writeText("previous installed component")
+        File(previous, "package-lock.json").writeText("{}")
+        File(previous, ".ready").writeText("typescript@5.9.0")
+
+        var attempted = 0
+        val failed = runCatching {
+            kotlinx.coroutines.runBlocking {
+                manager(onDownload = { attempted++; error("offline registry") })
+                    .ensureInstalled("app.ts")
+            }
+        }.exceptionOrNull()
+        assertTrue("离线下载安装必须明确失败", failed != null)
+        assertTrue("下载失败应走受控的有限重试", attempted in 1..3)
+        assertEquals("previous installed component", entry.readText())
+        assertTrue(previous.isDirectory)
+        assertFalse(File(temp.root, "private/components/typescript-6.0.1").exists())
+    }
+
     @Test fun invalidAndIncompleteInstallationsAreNeverExposed() {
         val root = File(temp.root, "private")
         val folder = File(root, "components/pyright-1.1.410")

@@ -419,6 +419,41 @@ class HarnessJobManager(
         return "后台任务恢复失败：$id"
     }
 
+    /**
+     * An interrupted task can have executed an irreversible external action. Unsupported
+     * resume formats describe a recovery limitation, not proof that its action failed.
+     * Keep the original kind/metadata for manual inspection without replaying the action.
+     */
+    fun markRecoveryUnverifiable(id: String, detail: String): String {
+        val (record, previous) = synchronized(lock) {
+            val found = records[id] ?: return "后台任务不存在：$id"
+            if (found.status != "interrupted") {
+                return "后台任务当前不需要人工核实：$id [${found.status}]"
+            }
+            if (detail in found.output) return "后台任务已标记待核实：$id"
+            val original = found.output to found.updatedAt
+            found.output = (found.output.takeLast(MAX_OUTPUT / 2) +
+                "\n恢复不可用，原操作副作用可能已发生，结果未知；请人工核实：" +
+                detail.take(800)).takeLast(MAX_OUTPUT)
+            found.updatedAt = nextActivityTimestamp(found.updatedAt)
+            found to original
+        }
+        try {
+            persistCurrentSnapshots()
+        } catch (failure: Exception) {
+            synchronized(lock) {
+                if (record.status == "interrupted") {
+                    record.output = previous.first
+                    record.updatedAt = previous.second
+                }
+            }
+            notifyChanged()
+            throw IllegalStateException("后台任务未知结果标记写入失败，仍需人工核实", failure)
+        }
+        notifyChanged()
+        return "后台任务恢复不可用，需人工核实：$id"
+    }
+
     fun failResumable(id: String, detail: String): String {
         var previousStatus = ""
         var previousOutput = ""
@@ -549,14 +584,22 @@ class HarnessJobManager(
                 }
             }
             try {
+                val executionOwner = currentCoroutineContext()[Job]
                 val report: (String) -> Unit = { output ->
-                    synchronized(lock) {
-                        record.output = output.takeLast(MAX_OUTPUT)
-                        record.updatedAt = nextActivityTimestamp(record.updatedAt)
+                    val accepted = synchronized(lock) {
+                        // A cancelled/completed activation (or an older activation after
+                        // recovery) cannot rewrite the terminal result or the new owner's output.
+                        if (record.status != "running" || record.job !== executionOwner) {
+                            false
+                        } else {
+                            record.output = output.takeLast(MAX_OUTPUT)
+                            record.updatedAt = nextActivityTimestamp(record.updatedAt)
+                            true
+                        }
                     }
                     // Progress is a volatile UI signal. Heartbeats persist a bounded running
                     // snapshot; writing the whole durable store for every output chunk amplifies IO.
-                    notifyChanged()
+                    if (accepted) notifyChanged()
                 }
                 val result = block(record.id, report).takeLast(MAX_OUTPUT)
                 currentCoroutineContext().ensureActive()
@@ -1021,6 +1064,27 @@ class HarnessJobManager(
         publish()
     }
 
+    /**
+     * Quiesce owned jobs before deleting a session without forgetting their receipts yet.
+     * If durable session deletion fails, cancelled/finished job evidence must remain inspectable.
+     */
+    suspend fun stopOwnedAndJoin(ownerIds: Set<String>) {
+        if (ownerIds.isEmpty()) return
+        val jobs = synchronized(lock) {
+            records.values.filter { it.ownerId in ownerIds && it.occupiesSlot() }.onEach { record ->
+                if (record.status == "running") {
+                    record.status = "cancelled"
+                    record.output = if (record.output.isBlank()) "任务已取消" else
+                        (record.output + "\n任务已取消").takeLast(MAX_OUTPUT)
+                    record.updatedAt = nextActivityTimestamp(record.updatedAt)
+                }
+            }.mapNotNull { it.job }
+        }
+        jobs.forEach { it.cancel() }
+        jobs.joinAll()
+        publish()
+    }
+
     suspend fun stopOwnedNonPersistentAndJoin(ownerIds: Set<String>) {
         if (ownerIds.isEmpty()) return
         val jobs = markRunningJobsCancelled {
@@ -1159,16 +1223,19 @@ class HarnessJobManager(
             }
         }
         synchronized(lock) {
-            record.status = "failed"
+            // The external action may already have completed. Disk failure proves only
+            // that its terminal receipt is missing, not that the action itself failed.
+            // Preserve an explicit unknown outcome; never advertise a safe retry.
+            record.status = "interrupted"
             record.output = (
                 record.output.takeLast(MAX_OUTPUT / 2) +
-                    "\n任务终态持久化失败：" +
+                    "\n任务终态无法持久确认，外部副作用可能已发生，结果未知；请核实后再重试：" +
                     (lastFailure?.message ?: lastFailure?.javaClass?.simpleName ?: "unknown")
                 ).takeLast(MAX_OUTPUT)
             record.updatedAt = System.currentTimeMillis()
         }
         notifyChanged()
-        throw IllegalStateException("后台任务终态持久化失败", lastFailure)
+        throw IllegalStateException("后台任务终态持久化失败，实际结果未知", lastFailure)
     }
 
     private fun publish() = synchronized(publicationLock) {

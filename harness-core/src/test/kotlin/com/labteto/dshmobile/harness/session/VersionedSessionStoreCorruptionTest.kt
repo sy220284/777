@@ -6,10 +6,27 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VersionedSessionStoreCorruptionTest {
+    @Test
+    fun recoverabilityProbeInspectsReadableSnapshotsInsteadOfFilePresence() {
+        val root = Files.createTempDirectory("session-recovery-probe").toFile()
+        try {
+            val store = VersionedSessionStore(root, Json)
+            store.write("candidate", buildJsonObject { put("title", "retained") })
+            assertTrue(store.hasRecoverableSnapshot("candidate"))
+            File(root, "candidate.json").writeText("{invalid-primary")
+            assertTrue(store.hasRecoverableSnapshot("candidate"))
+            File(root, "candidate.backup.json").writeText("{invalid-backup")
+            assertFalse(store.hasRecoverableSnapshot("candidate"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test
     fun legacyAndWrappedPayloadIdentitiesCannotOpenAnotherSession() {
         val root = Files.createTempDirectory("session-payload-identity").toFile()

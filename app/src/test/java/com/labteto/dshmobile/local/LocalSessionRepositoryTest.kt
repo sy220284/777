@@ -42,6 +42,60 @@ class LocalSessionRepositoryTest {
         repository.writeNow(repository.read("legacy-missing")!!)
         assertEquals("legacy-missing", repository.read("legacy-missing")!!.id)
     }
+    @Test fun failedDiskDeletionMustNotHideRecoverableSessionInSameProcess() = runTest {
+        val directory = temporary.newFolder("delete-io-failure")
+        val repository = LocalSessionRepository(directory, Json, backgroundScope, {}, {})
+        repository.writeNow(LocalHarnessSession(id = "recoverable", title = "保留的会话"))
+        assertEquals("保留的会话", repository.read("recoverable")?.title)
+        assertTrue(repository.summaries().any { it.id == "recoverable" })
+        val root = directory.toPath()
+        val originalPermissions = java.nio.file.Files.getPosixFilePermissions(root)
+        try {
+            // Reject unlink on Linux without corrupting the durable primary/backup bytes.
+            java.nio.file.Files.setPosixFilePermissions(
+                root,
+                setOf(
+                    java.nio.file.attribute.PosixFilePermission.OWNER_READ,
+                    java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE,
+                ),
+            )
+            assertFalse("故障注入必须确实阻止写入目录", java.nio.file.Files.isWritable(root))
+            assertThrows(IllegalStateException::class.java) { repository.delete("recoverable") }
+            assertTrue(java.io.File(directory, "recoverable.json").isFile)
+            // A failed delete must not keep its tombstone and hide surviving user data.
+            assertEquals("保留的会话", repository.read("recoverable")?.title)
+            assertTrue(repository.summaries().any { it.id == "recoverable" })
+        } finally {
+            java.nio.file.Files.setPosixFilePermissions(root, originalPermissions)
+        }
+    }
+
+    @Test fun failedDeletionRestoresNewestAcceptedPendingSnapshot() = runTest {
+        val directory = temporary.newFolder("failed-delete-queued")
+        val repository = LocalSessionRepository(directory, Json, backgroundScope, {}, {})
+        repository.writeNow(LocalHarnessSession(id = "retained", title = "磁盘旧版本"))
+        repository.enqueue(LocalHarnessSession(id = "retained", title = "已经接收的新版本"))
+        val root = directory.toPath()
+        val permissions = java.nio.file.Files.getPosixFilePermissions(root)
+        try {
+            java.nio.file.Files.setPosixFilePermissions(
+                root,
+                setOf(
+                    java.nio.file.attribute.PosixFilePermission.OWNER_READ,
+                    java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE,
+                ),
+            )
+            assertFalse(java.nio.file.Files.isWritable(root))
+            assertThrows(IllegalStateException::class.java) { repository.delete("retained") }
+            assertEquals("已经接收的新版本", repository.read("retained")?.title)
+        } finally {
+            java.nio.file.Files.setPosixFilePermissions(root, permissions)
+        }
+        runCurrent()
+        val reopened = LocalSessionRepository(directory, Json, backgroundScope, {}, {})
+        assertEquals("已经接收的新版本", reopened.read("retained")?.title)
+    }
+
     @Test fun deletionCannotBeUndoneByQueuedSnapshots() = runTest {
         val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
         repository.enqueue(LocalHarnessSession(id = "gone", title = "old"))

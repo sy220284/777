@@ -289,7 +289,12 @@ internal class LocalToolOutputStore(
     fun deleteSession(sessionId: String) {
         val dir = sessionDir(sessionId)
         val removedBytes = if (knownGlobalBytes != null) storedBytes(dir) else 0L
-        dir.deleteRecursively()
+        if (dir.exists()) {
+            check(dir.deleteRecursively() && !dir.exists()) {
+                "会话工具结果未完全删除：$sessionId"
+            }
+        }
+        // Never report reclaimed storage for bytes which still physically exist.
         knownGlobalBytes = knownGlobalBytes?.let { (it - removedBytes).coerceAtLeast(0L) }
     }
 
