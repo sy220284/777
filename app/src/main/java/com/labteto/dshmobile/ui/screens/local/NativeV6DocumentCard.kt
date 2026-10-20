@@ -59,6 +59,7 @@ internal fun NativeV6DocumentModalHost(
     SyButton(
         text = if (documents.size == 1) "查看回复卡片" else "查看回复卡片 · ${documents.size} 份",
         onClick = { selectedId = documents.last().document.documentId; open = true },
+        enabled = dismissEnabled,
         size = SyButtonSize.Small,
         variant = SyButtonVariant.Ghost,
         modifier = Modifier.testTag("reply_document_open:${messageId}"),
@@ -109,6 +110,7 @@ internal fun NativeV6DocumentMessage(
         NativeV6DocumentCard(snapshot, controller, readOnly,
             onFeedback = { feedback = it },
             onPreparedDraft = { close(); onPreparedDraft() },
+            onDeleted = close,
             onBusyChange = { busy = it },
         )
     }
@@ -121,6 +123,7 @@ private fun NativeV6DocumentCard(
     readOnly: Boolean,
     onFeedback: (String) -> Unit,
     onPreparedDraft: () -> Unit,
+    onDeleted: () -> Unit,
     onBusyChange: (Boolean) -> Unit,
 ) {
     val doc = snapshot.document
@@ -166,6 +169,7 @@ private fun NativeV6DocumentCard(
         }
     }
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (submitting || deleting) Text("正在处理，请稍候…", style = MaterialTheme.typography.bodySmall)
             if (snapshot.recoveryNotice != null) {
                 Text(doc.fallbackText, style = MaterialTheme.typography.bodyMedium)
                 Text("该文档仅提供历史内容，不能执行操作。")
@@ -224,8 +228,10 @@ private fun NativeV6DocumentCard(
                     scope.launch {
                         try {
                             val receipt = withContext(Dispatchers.IO) { controller.delete(snapshot) }
-                            if (receipt == UiDocumentReceipt.Deleted) controller.forms.forgetDocument(formKey)
-                            onFeedback(nativeV6DocumentReceiptMessage(receipt))
+                            if (receipt == UiDocumentReceipt.Deleted) {
+                                controller.forms.forgetDocument(formKey)
+                                onDeleted()
+                            } else onFeedback(nativeV6DocumentReceiptMessage(receipt))
                         } finally { deleting = false; onBusyChange(false) }
                     }
                 }, variant = SyButtonVariant.Danger)
