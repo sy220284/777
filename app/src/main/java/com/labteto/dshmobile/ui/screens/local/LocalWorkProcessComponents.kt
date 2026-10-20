@@ -277,6 +277,10 @@ internal fun localWorkTimelineText(content: String): String? {
     return visible
 }
 
+private val LOCAL_WORK_PUBLIC_ACTION_START = Regex(
+    "^(?:检索|搜索|查找|检查|核对|审查|阅读|读取|浏览|更新|修改|优化|完善|补充|补齐|验证|测试|编写|制定|规划|调整|排查|处理|提交|合并|运行|同步|创建|新增|增强)"
+)
+
 /**
  * A short, standalone model-authored public action is a quiet timeline entry.
  * Longer explanations, Markdown, findings and conclusions remain full reading text.
@@ -285,10 +289,7 @@ internal fun localWorkPublicActionLabel(content: String): String? {
     val text = localWorkTimelineText(content)?.trim() ?: return null
     if (text.length !in 4..44 || text.lineSequence().count() != 1 ||
         text.any { it in "。！？，；：:!?;#*|`" }) return null
-    val startsWithAction = Regex(
-        "^(?:检索|搜索|查找|检查|核对|审查|阅读|读取|浏览|更新|修改|优化|完善|补充|补齐|验证|测试|编写|制定|规划|调整|排查|处理|提交|合并|运行|同步|创建|新增|增强)"
-    ).containsMatchIn(text)
-    return text.takeIf { startsWithAction }
+    return text.takeIf(LOCAL_WORK_PUBLIC_ACTION_START::containsMatchIn)
 }
 
 /** Prefer durable structured tool status; legacy text errors are fallback only. */
