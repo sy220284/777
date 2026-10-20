@@ -381,18 +381,18 @@ internal class LocalSessionLifecycleCoordinator(
                 )
                 try {
                     val previous = state.value
+                    val sourceId = currentSessionId()
                     val freshUsageMode = localDeletedCurrentSessionMode(
-                        currentSessionId(), ids, previous.usageMode,
+                        sourceId, ids, previous.usageMode,
                     )
-                    if (freshUsageMode != null) {
-                        // Deletion must not auto-select previous history or switch Chat/Work.
-                        val sourceId = currentSessionId()
+                    // A replacement may be prepared, but must not become visible
+                    // before the durable deletion of its predecessor has completed.
+                    val preparedReplacement = freshUsageMode?.let { usageMode ->
                         val nextSessionId = UUID.randomUUID().toString()
-                        pendingSessions.remember(nextSessionId, freshUsageMode)
                         val chatPlan = chatSessionLifecycle.prepareCreate(
                             mode = LocalConversationMode.INDEPENDENT,
-                            usageMode = freshUsageMode,
-                            domainSpec = if (freshUsageMode == LocalUsageMode.CHAT) {
+                            usageMode = usageMode,
+                            domainSpec = if (usageMode == LocalUsageMode.CHAT) {
                                 chatSessionLifecycle.singleCreateSpec()
                             } else null,
                             sourceSessionId = sourceId,
@@ -401,12 +401,19 @@ internal class LocalSessionLifecycleCoordinator(
                             sourceChat = previous.chat,
                             sessionsRoot = sessionsRoot,
                         )
+                        nextSessionId to chatPlan
+                    }
+                    fun activateReplacementIfNeeded() {
+                        val (nextSessionId, chatPlan) = preparedReplacement ?: return
+                        if (currentSessionId() != sourceId) return
+                        val mode = requireNotNull(freshUsageMode)
+                        pendingSessions.remember(nextSessionId, mode)
                         activateSession(nextSessionId, -1L)
                         resetModelHistory()
                         state.update {
                             it.copy(
                                 sessionId = nextSessionId,
-                                usageMode = freshUsageMode,
+                                usageMode = mode,
                                 chat = chatPlan.chat,
                                 conversationMode = LocalConversationMode.INDEPENDENT,
                                 parentSessionId = null,
@@ -416,14 +423,14 @@ internal class LocalSessionLifecycleCoordinator(
                                 messages = emptyList(),
                                 transcriptIndex = LocalTranscriptRuntimeIndex(),
                                 work = LocalWorkSessionLifecyclePlanner.initialState(
-                                    usageMode = freshUsageMode,
+                                    usageMode = mode,
                                     sessionId = nextSessionId,
                                     jobs = jobs.snapshotInfos(),
                                 ),
                                 safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
                                 kernel = LocalKernelState(
                                     resources = resourceScheduler.snapshot()
-                                        .toLocalHarnessResourceState(freshUsageMode),
+                                        .toLocalHarnessResourceState(mode),
                                 ),
                                 error = null,
                             )
@@ -443,16 +450,48 @@ internal class LocalSessionLifecycleCoordinator(
                                 .forEach(File::delete)
                         }
                     }
-                    conversationFilesCoordinator.invalidate(ids)
-                    memoryStore.detachSourceSessions(ids)
-                    diaryStore.detachSourceSessions(ids)
-                    // Every old producer is now outside the deletion barrier; once the tombstone is
-                    // released, future Automation runs must re-resolve the session from storage.
-                    sessionCoordinator.releaseDeletionBarrier(ids)
-                    pendingSessions.forget(ids)
-                    state.update { it.copy(sessions = sessionSummaries()) }
-                    persist()
-                    ids.toSet()
+                    val durableDeletedIds = linkedSetOf<String>()
+                    try {
+                        beforeEventLogsDeleted(ids)
+                        withContext(Dispatchers.IO) {
+                            // Delete background sessions first; current session last.
+                            // On a partial deletion failure the visible conversation remains intact.
+                            ids.sortedBy { it == sourceId }.forEach { id ->
+                                sessionCoordinator.delete(id)
+                                durableDeletedIds += id
+                                toolOutputStore.deleteSession(id)
+                                sessionsRoot.listFiles().orEmpty()
+                                    .filter {
+                                        it.name == "$id.events.jsonl" ||
+                                            it.name.startsWith("$id.events.jsonl.part-") ||
+                                            it.name.startsWith("$id.events.jsonl.projection-")
+                                    }
+                                    .forEach(File::delete)
+                            }
+                        }
+                        activateReplacementIfNeeded()
+                        conversationFilesCoordinator.invalidate(ids)
+                        memoryStore.detachSourceSessions(ids)
+                        diaryStore.detachSourceSessions(ids)
+                        pendingSessions.forget(ids)
+                        state.update { it.copy(sessions = sessionSummaries()) }
+                        persist()
+                        ids.toSet()
+                    } catch (failure: Exception) {
+                        // Some background sessions may have been deleted successfully.
+                        // Never restore an old snapshot that would resurrect these identities.
+                        if (sourceId in durableDeletedIds) activateReplacementIfNeeded()
+                        state.update {
+                            it.copy(
+                                sessions = sessionSummaries(),
+                                error = "会话删除未完成；部分后台任务可能已停止，请核实后重试",
+                            )
+                        }
+                        throw failure
+                    } finally {
+                        // Release fences only for identities whose disk deletion succeeded.
+                        sessionCoordinator.releaseDeletionBarrier(durableDeletedIds)
+                    }
                 } finally {
                     deletionLeases.asReversed().forEach(LocalSessionRuntimeLease::close)
                 }
