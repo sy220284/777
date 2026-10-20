@@ -13,8 +13,8 @@ class LocalReplyTimelineBoundaryTest {
     private val artifact = LocalTranscriptItem.WorkArtifact(
         LocalArtifactUiItem(reference = "out/report.md", category = "file",
             sourceCallId = null, asOfSequence = 2L))
-    private val step = LocalTranscriptItem.WorkNode(
-        LocalWorkProcessNode(summary = "正在执行新的工具步骤", eventId = "new-progress"))
+    private val step = LocalTranscriptItem.WorkStep(
+        LocalHarnessMessage("new-progress", "progress", "正在执行新的工具步骤", createdAt = 3L))
 
     @Test fun trailingWorkArtifactMustNotReviveCompletedAssistantStreamingPreview() {
         val timeline = listOf(answer, artifact)
