@@ -3,7 +3,6 @@ package com.labteto.dshmobile.ui.screens.local
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
