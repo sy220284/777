@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.runtime
 
+import android.app.ActivityManager
 import android.content.Context
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.LocalJobManager
@@ -22,12 +23,14 @@ import kotlinx.serialization.json.Json
 internal class LocalRuntimeJobOwner internal constructor(
     scope: CoroutineScope,
     store: LocalPersistentJobStore?,
+    maxConcurrentJobs: Int = 4,
 ) {
     private val observers = CopyOnWriteArrayList<(List<LocalJobInfo>) -> Unit>()
 
     internal val manager = LocalJobManager(
         scope = scope,
         store = store,
+        maxConcurrentJobs = maxConcurrentJobs,
         onChanged = ::publish,
     )
 
@@ -45,20 +48,31 @@ internal class LocalRuntimeJobOwner internal constructor(
     }
 
     companion object {
-        internal fun inMemory(): LocalRuntimeJobOwner =
+        internal fun inMemory(maxConcurrentJobs: Int = 4): LocalRuntimeJobOwner =
             LocalRuntimeJobOwner(
                 scope = processScope(),
                 store = null,
+                maxConcurrentJobs = maxConcurrentJobs,
             )
 
-        internal fun persistent(context: Context, json: Json): LocalRuntimeJobOwner =
-            LocalRuntimeJobOwner(
+        internal fun persistent(context: Context, json: Json): LocalRuntimeJobOwner {
+            // Use the same device-capacity policy as the foreground resource scheduler.
+            // The core job manager still checks its own admission atomically; agents also
+            // acquire AGENT leases so background jobs cannot bypass runtime scheduling.
+            val memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256
+            val maxConcurrentJobs = localResourceBudgetForMemoryClass(
+                memoryClassMb,
+                readLocalDeviceMemorySnapshot(context),
+            ).maxAgents
+            return LocalRuntimeJobOwner(
                 scope = processScope(),
                 store = LocalPersistentJobStore(
                     file = File(context.filesDir, "local-harness/jobs.json"),
                     json = json,
                 ),
+                maxConcurrentJobs = maxConcurrentJobs,
             )
+        }
 
         private fun processScope(): CoroutineScope =
             CoroutineScope(
