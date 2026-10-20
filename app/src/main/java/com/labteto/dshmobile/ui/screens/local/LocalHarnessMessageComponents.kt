@@ -297,7 +297,8 @@ internal fun LocalMessageRow(
             modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd),
         )
 
-        "reasoning", "tool", "progress" -> WorkProcessRow(listOf(message))
+        "reasoning" -> ChatThinkingRow(listOf(message), streaming = streaming)
+        "tool", "progress" -> WorkTimelineStepRow(message)
 
         else -> {
             var actionsOpen by remember(message.id) { mutableStateOf(false) }
