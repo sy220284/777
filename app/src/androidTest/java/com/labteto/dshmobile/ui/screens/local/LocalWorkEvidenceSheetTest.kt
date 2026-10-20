@@ -42,7 +42,9 @@ class LocalWorkEvidenceSheetTest {
         )
         openFromMenu(actions)
         compose.onNodeWithTag("work_evidence_records").assertExists()
-        compose.onNodeWithText("reports/result.md").assertExists()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("reports/result.md").fetchSemanticsNodes().isNotEmpty()
+        }
         compose.runOnIdle { assertEquals(0, previewReads.get()) }
     }
 
@@ -56,7 +58,10 @@ class LocalWorkEvidenceSheetTest {
         assertEquals("active:call-a", workEvidenceActivityKey(activities[0]))
         assertEquals("active:call-b", workEvidenceActivityKey(activities[1]))
         openFromMenu(actions(activities = activities))
-        compose.onNodeWithTag("work_evidence_records").assertExists()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithTag("work_evidence_active_call-a").fetchSemanticsNodes().isNotEmpty() &&
+                compose.onAllNodesWithTag("work_evidence_active_call-b").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     private fun openFromMenu(actions: LocalWorkFeatureUiActions) {
