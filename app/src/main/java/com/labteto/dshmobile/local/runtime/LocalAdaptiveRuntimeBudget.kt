@@ -18,7 +18,7 @@ internal fun adaptiveAgentStepLimit(
     pressure: HarnessResourcePressure,
     kind: LocalAgentRunKind,
 ): Int {
-    val base = configuredBase.coerceIn(1, 512)
+    val base = configuredBase.coerceIn(1, 1_024)
     if (base == 1) return 1
 
     val normalized = task.lowercase()
@@ -40,7 +40,7 @@ internal fun adaptiveAgentStepLimit(
         HarnessResourcePressure.HIGH -> 0.78
     }
 
-    return ceil(base * multiplier).toInt().coerceIn(base, 512)
+    return ceil(base * multiplier).toInt().coerceIn(base, 1_024)
 }
 
 /**
