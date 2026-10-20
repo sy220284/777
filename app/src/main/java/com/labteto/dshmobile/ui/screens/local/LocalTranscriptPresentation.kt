@@ -37,19 +37,32 @@ internal sealed interface LocalTranscriptItem {
 
     /** One event per lazy-list row; the persisted transcript remains unchanged. */
     /** Sidecar media timeline rows are visible but never replayed as model/persona dialogue. */
-    data class MediaResult(val result: LocalMediaResult) : LocalTranscriptItem {
+    data class MediaResult(
+        val result: LocalMediaResult,
+        /** Visual attachment identity; null keeps independent historical/media-studio rows. */
+        val attachedTo: String? = null,
+    ) : LocalTranscriptItem {
         override val key: String = "media-result:${result.id}"
     }
 
-    data class CreationJob(val job: LocalMediaCreationJob) : LocalTranscriptItem {
+    data class CreationJob(
+        val job: LocalMediaCreationJob,
+        val attachedTo: String? = null,
+    ) : LocalTranscriptItem {
         override val key: String = "media-result:${job.id}"
     }
 
-    data class VideoTask(val task: LocalMediaVideoTask) : LocalTranscriptItem {
+    data class VideoTask(
+        val task: LocalMediaVideoTask,
+        val attachedTo: String? = null,
+    ) : LocalTranscriptItem {
         override val key: String = "media-video:${task.id}"
     }
 
-    data class WorkArtifact(val artifact: LocalArtifactUiItem) : LocalTranscriptItem {
+    data class WorkArtifact(
+        val artifact: LocalArtifactUiItem,
+        val attachedTo: String? = null,
+    ) : LocalTranscriptItem {
         override val key: String = "work-artifact:${artifact.category}:${artifact.reference}"
     }
 
@@ -394,4 +407,54 @@ internal fun appendWorkArtifactsToTranscript(
     val unique = artifacts.filter { it.reference.isNotBlank() }.asReversed()
         .distinctBy { it.category to it.reference }.asReversed()
     return transcript + unique.map(LocalTranscriptItem::WorkArtifact)
+}
+
+/**
+ * A single reply can own text, generated media and verified work artifacts.
+ *
+ * Keep every attachment as its own LazyColumn item for virtualization and stable save/player
+ * state; attachedTo is its presentation owner, not a second persisted message or media copy.
+ * Do not infer owners from timestamps: legacy/unassigned media and artifacts remain visible.
+ */
+internal fun composeLocalReplyAttachments(
+    timeline: List<LocalTranscriptItem>,
+): List<LocalTranscriptItem> {
+    val messageOwners = timeline.filterIsInstance<LocalTranscriptItem.Message>()
+        .filter { it.message.role == "assistant" || it.message.role == "user" }
+        .associate { it.message.id to it.key }
+    val toolOwners = timeline.filterIsInstance<LocalTranscriptItem.WorkStep>()
+        .filter { it.message.role == "tool" && it.message.toolCallId != null }
+        .associate { it.message.toolCallId!! to it.key }
+    if (messageOwners.isEmpty() && toolOwners.isEmpty()) return timeline
+
+    val attachments = linkedMapOf<String, MutableList<LocalTranscriptItem>>()
+    val unowned = ArrayList<LocalTranscriptItem>(timeline.size)
+    timeline.forEach { item ->
+        val ownerKey = when (item) {
+            is LocalTranscriptItem.MediaResult -> item.result.sourceMessageId?.let(messageOwners::get)
+            is LocalTranscriptItem.CreationJob -> item.job.sourceMessageId?.let(messageOwners::get)
+            is LocalTranscriptItem.VideoTask -> item.task.sourceMessageId?.let(messageOwners::get)
+            is LocalTranscriptItem.WorkArtifact -> item.artifact.sourceCallId?.let(toolOwners::get)
+            else -> null
+        }
+        if (ownerKey == null) {
+            unowned += item
+        } else {
+            val attached = when (item) {
+                is LocalTranscriptItem.MediaResult -> item.copy(attachedTo = ownerKey)
+                is LocalTranscriptItem.CreationJob -> item.copy(attachedTo = ownerKey)
+                is LocalTranscriptItem.VideoTask -> item.copy(attachedTo = ownerKey)
+                is LocalTranscriptItem.WorkArtifact -> item.copy(attachedTo = ownerKey)
+                else -> item
+            }
+            attachments.getOrPut(ownerKey) { mutableListOf() } += attached
+        }
+    }
+    if (attachments.isEmpty()) return timeline
+    return buildList(timeline.size) {
+        unowned.forEach { item ->
+            add(item)
+            attachments[item.key]?.let(::addAll)
+        }
+    }
 }
