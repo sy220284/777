@@ -183,6 +183,19 @@ class LocalWorkReplyPresentationTest {
         assertEquals(items.map { it.key }, beforeFinish.map { it.key })
     }
 
+    @Test fun concurrentCallsWithSameTimestampKeepDeclarationOrderAfterReverseCompletion() {
+        val user = message("u", "user", "审计").copy(createdAt = 100L)
+        val progress = message("n", "progress", "继续检查").copy(createdAt = 160L)
+        val completedLater = message("second", "tool", "ok", "mcp__GitHub__fetch_file", false)
+            .copy(createdAt = 170L, toolCallId = "second", toolDeclaredAt = 120L, toolDeclaredSequence = 6L)
+        val completedFirst = message("first", "tool", "ok", "mcp__GitHub__fetch_file", false)
+            .copy(createdAt = 190L, toolCallId = "first", toolDeclaredAt = 120L, toolDeclaredSequence = 5L)
+        val items = buildLocalDisplayTranscript(buildLocalTranscript(
+            listOf(user, progress, completedLater, completedFirst)))
+        assertEquals(listOf("message:u", "work-tool:first", "work-tool:second", "work-step:n"),
+            items.map { it.key })
+    }
+
     @Test fun thinkingOnlyStaysPrivateAndEventIdentityRemainsStable() {
         val reasoning = message("reasoning", "reasoning", "secret")
         val items = buildLocalDisplayTranscript(listOf(LocalTranscriptItem.WorkProcess(listOf(reasoning))))
