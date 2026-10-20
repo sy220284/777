@@ -165,6 +165,24 @@ class LocalWorkReplyPresentationTest {
             completedWorkToolPhase(broken))
     }
 
+    @Test fun toolCompletionStaysAtOriginalStartPositionAfterLaterNarration() {
+        val user = message("user", "user", "检查").copy(createdAt = 100L)
+        val narration = message("progress", "progress", "正在检查文件").copy(createdAt = 140L)
+        val tool = message("completed", "tool", "ok", "mcp__GitHub__fetch_file", false)
+            .copy(createdAt = 170L, toolCallId = "call-5", toolDeclaredAt = 120L)
+        val items = buildLocalDisplayTranscript(buildLocalTranscript(listOf(user, narration, tool)))
+        assertEquals(listOf("message:user", "work-tool:call-5", "work-step:progress"),
+            items.map { it.key })
+        val inFlight = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
+            callId = "call-5", name = "mcp__GitHub__fetch_file",
+            phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING,
+            declaredAt = 120L, declaredSequence = 3L)
+        val beforeFinish = appendPendingWorkToolActivities(
+            buildLocalDisplayTranscript(buildLocalTranscript(listOf(user, narration))),
+            listOf(inFlight), running = true)
+        assertEquals(items.map { it.key }, beforeFinish.map { it.key })
+    }
+
     @Test fun thinkingOnlyStaysPrivateAndEventIdentityRemainsStable() {
         val reasoning = message("reasoning", "reasoning", "secret")
         val items = buildLocalDisplayTranscript(listOf(LocalTranscriptItem.WorkProcess(listOf(reasoning))))
