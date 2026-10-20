@@ -153,8 +153,10 @@ class LocalWorkReplyPresentationTest {
                 .copy(toolCallId = "call-1"),
         )
         assertEquals(pending.single().key, completed.key)
-        assertEquals(listOf(completed), appendPendingWorkToolActivities(
-            listOf(completed), listOf(activity), running = true))
+        val settled = appendPendingWorkToolActivities(
+            listOf(completed), listOf(activity), running = true)
+        assertEquals(listOf(completed.key), settled.map { it.key })
+        assertEquals(activity, (settled.single() as LocalTranscriptItem.WorkStep).activity)
         assertEquals(emptyList<LocalTranscriptItem>(),
             appendPendingWorkToolActivities(emptyList(), listOf(activity), running = false))
     }
