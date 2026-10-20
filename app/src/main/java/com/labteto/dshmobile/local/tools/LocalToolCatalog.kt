@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.harness.tools.functionToolSchema
+import com.labteto.dshmobile.local.model.WORK_TOOL_RECOVERY_PAGE_BYTES
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -19,8 +20,8 @@ object LocalToolCatalog {
         add(tool("tool_output_read", "读取本机会话仍保留的完整工具结果，或按原文字面量搜索匹配的 UTF-8 偏移", properties(
             "call_id" to string("原工具调用编号"),
             "query" to string("可选；非空时按 UTF-8 字面量搜索原文并返回偏移，不必先全量读取"),
-            "start_byte" to integer("起始 UTF-8 字节偏移，默认 0；优先使用上次结果给出的下一偏移"),
-            "max_bytes" to integer("单次读取字节数，默认 4096，允许 1024–49152；单页实际交付不超过当前可见额度，请按返回的下一偏移继续读取"),
+            "start_byte" to integerRange("起始 UTF-8 字节偏移，默认 0；优先使用上次结果给出的下一偏移", min = 0),
+            "max_bytes" to integerRange("单次可见读取字节数，默认 ${WORK_TOOL_RECOVERY_PAGE_BYTES}，允许 1024–${WORK_TOOL_RECOVERY_PAGE_BYTES}；请按结果返回的下一偏移分页读取", min = 1_024, max = WORK_TOOL_RECOVERY_PAGE_BYTES),
         ), listOf("call_id")))
         add(tool("write", "创建或完整替换工作区文件", properties(
             "path" to string("相对工作区的路径"),
@@ -450,6 +451,13 @@ object LocalToolCatalog {
     private fun integer(description: String) = buildJsonObject {
         put("type", "integer")
         put("description", description)
+    }
+
+    private fun integerRange(description: String, min: Int, max: Int? = null) = buildJsonObject {
+        put("type", "integer")
+        put("description", description)
+        put("minimum", min)
+        max?.let { put("maximum", it) }
     }
 
     private fun boolean(description: String) = buildJsonObject {
