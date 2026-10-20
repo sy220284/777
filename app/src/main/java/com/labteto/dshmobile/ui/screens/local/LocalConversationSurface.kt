@@ -1304,6 +1304,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 message = transcriptItem.message,
                                 repeatCount = transcriptItem.repeatCount,
                                 activity = transcriptItem.activity,
+                                groupedMessages = transcriptItem.groupedMessages,
                                 active = state.running && transcriptItem.message.role != "tool" &&
                                     transcriptItem.key == transcriptItems.lastOrNull()?.key,
                             )
