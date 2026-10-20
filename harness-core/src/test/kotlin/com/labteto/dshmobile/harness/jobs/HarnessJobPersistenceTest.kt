@@ -21,6 +21,8 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -1422,6 +1424,52 @@ class HarnessJobPersistenceTest {
         assertTrue(id.startsWith("job-"))
         assertTrue(manager.output(id).contains("[completed]"))
         assertTrue(manager.output("job-duplicate").contains("[completed]"))
+    }
+
+    @Test
+    fun successfulExternalWorkMustNotBeLabelledFailedWhenOnlyTerminalReceiptCannotPersist() = runTest {
+        var externalExecutionCount = 0
+        var asyncFailure: Throwable? = null
+        var durable = emptyList<JobSnapshot>()
+        val workerScope = CoroutineScope(
+            SupervisorJob() + StandardTestDispatcher(testScheduler) +
+                CoroutineExceptionHandler { _, error -> asyncFailure = error },
+        )
+        try {
+            val manager = HarnessJobManager(
+                scope = workerScope,
+                onChanged = {},
+                idFactory = { "successful-but-receipt-failed" },
+                onSnapshotsChanged = { snapshots ->
+                    // Start is durably recorded. Only the terminal receipt fails.
+                    if (snapshots.singleOrNull()?.status == "running") {
+                        durable = snapshots
+                    } else {
+                        error("disk full")
+                    }
+                },
+            )
+            manager.startPersistent(
+                label = "用户的有副作用外部操作",
+                resumeKind = "external_tool",
+                resumePayload = "{}",
+            ) { _, _ ->
+                externalExecutionCount++
+                "外部操作已执行成功"
+            }
+            advanceUntilIdle()
+            assertEquals(1, externalExecutionCount)
+            assertEquals("running", durable.single().status)
+            assertTrue("终态无法持久化的故障必须显式暴露", asyncFailure != null)
+            // Failed business work and failed receipt persistence are not the same fact.
+            assertFalse("不能把已成功执行的外部操作误判为业务失败",
+                manager.snapshots().single().status == "failed")
+            assertTrue("终态结果必须标示无法核实",
+                manager.snapshots().single().output.contains("未知"))
+            assertTrue("即使回执故障也必须释放并发名额", manager.availableSlots() > 0)
+        } finally {
+            workerScope.cancel()
+        }
     }
 
     @Test
