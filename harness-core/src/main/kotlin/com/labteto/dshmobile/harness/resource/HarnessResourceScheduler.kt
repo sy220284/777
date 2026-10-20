@@ -107,6 +107,10 @@ class HarnessResourceScheduler(
     private var currentBudget = budget
     val budget: HarnessResourceBudget get() = synchronized(leaseStateLock) { currentBudget }
     private val capacityRevision = MutableStateFlow(0L)
+    // FIFO tickets retain the fairness of the old semaphore when capacity changes.
+    private val admissionQueues = HarnessResourceKind.values()
+        .associateWith { java.util.ArrayDeque<Long>() }
+    private var nextTicket = 0L
     private val activeModels = AtomicInteger()
     private val activeAgents = AtomicInteger()
     private val activeTerminals = AtomicInteger()
@@ -139,35 +143,53 @@ class HarnessResourceScheduler(
     ): HarnessResourceLease {
         // Refresh the device budget at the admission boundary, not on a polling timer.
         beforeAcquire()
-        while (true) {
-            var admitted: HarnessResourceLeaseInfo? = null
-            val observedRevision = synchronized(leaseStateLock) {
-                if (counter(kind).get() < currentBudget.limit(kind)) {
-                    admitted = HarnessResourceLeaseInfo(
-                        id = "lease-" + UUID.randomUUID().toString().replace("-", "").take(16),
-                        kind = kind,
-                        owner = owner.take(160),
-                        acquiredAt = System.currentTimeMillis(),
-                    )
-                    increment(kind)
-                    leases[admitted!!.id] = admitted!!
-                }
-                capacityRevision.value
-            }
-            val info = admitted
-            if (info != null) {
-                publish()
-                return HarnessResourceLease(info) {
-                    synchronized(leaseStateLock) {
-                        leases.remove(info.id)
-                        decrement(kind)
+        val ticket = synchronized(leaseStateLock) {
+            val id = ++nextTicket
+            admissionQueues.getValue(kind).addLast(id)
+            id
+        }
+        try {
+            while (true) {
+                var admitted: HarnessResourceLeaseInfo? = null
+                val observedRevision = synchronized(leaseStateLock) {
+                    val queue = admissionQueues.getValue(kind)
+                    if (queue.peekFirst() == ticket &&
+                        counter(kind).get() < currentBudget.limit(kind)) {
+                        queue.removeFirst()
+                        admitted = HarnessResourceLeaseInfo(
+                            id = "lease-" + UUID.randomUUID().toString().replace("-", "").take(16),
+                            kind = kind,
+                            owner = owner.take(160),
+                            acquiredAt = System.currentTimeMillis(),
+                        )
+                        increment(kind)
+                        leases[admitted!!.id] = admitted!!
+                        // The next FIFO waiter may also fit the enlarged capacity.
                         capacityRevision.value += 1
                     }
+                    capacityRevision.value
+                }
+                val info = admitted
+                if (info != null) {
                     publish()
+                    return HarnessResourceLease(info) {
+                        synchronized(leaseStateLock) {
+                            leases.remove(info.id)
+                            decrement(kind)
+                            capacityRevision.value += 1
+                        }
+                        publish()
+                    }
+                }
+                // StateFlow retains the latest revision: no release/update wake-up can be lost.
+                capacityRevision.first { it != observedRevision }
+            }
+        } finally {
+            synchronized(leaseStateLock) {
+                if (admissionQueues.getValue(kind).remove(ticket)) {
+                    capacityRevision.value += 1
                 }
             }
-            // StateFlow retains the latest revision: no release/update wake-up can be lost.
-            capacityRevision.first { it != observedRevision }
         }
     }
 
