@@ -82,6 +82,7 @@ import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.ui.shenyan.SyContextActionMenu
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
@@ -425,7 +426,7 @@ internal fun LocalMessageRow(
                                 contentDescription = stringResource(R.string.fluid_message_actions),
                                 onClick = { actionsOpen = true },
                             )
-                            SyContextActionMenu(
+                            SyPopupMenu(
                                 expanded = actionsOpen,
                                 onDismiss = { actionsOpen = false },
                                 items = secondaryActions,
