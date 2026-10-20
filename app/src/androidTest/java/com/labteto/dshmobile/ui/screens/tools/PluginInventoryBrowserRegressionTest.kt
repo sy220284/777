@@ -380,6 +380,25 @@ class PluginInventoryBrowserRegressionTest {
     }
 
     @Test
+    fun failedRefreshKeepsLoadedPluginRowsAndOffersRetry() {
+        var retried = 0
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = listOf("android-runtime"),
+                    error = "加载失败，请重试",
+                    onRetry = { retried++ },
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithText("加载失败，请重试").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertIsDisplayed()
+        compose.onNodeWithText("重试").performClick()
+        compose.runOnIdle { assertEquals(1, retried) }
+    }
+
+    @Test
     fun capabilityTabsSwitchSectionsWithoutNavigating() {
         compose.setContent {
             DshTheme {
