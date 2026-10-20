@@ -133,6 +133,9 @@ class LocalModelGatewayRoutingTest {
         val expected = listOf(
             Triple("deepseek-flash", "https://api.deepseek.com", LocalModelProtocol.CHAT_COMPLETIONS),
             Triple("MiniMax-M3", "https://api.minimaxi.com/v1", LocalModelProtocol.CHAT_COMPLETIONS),
+            Triple("MiniMax-M3.1-Flash", "https://api.minimaxi.com/anthropic/v1", LocalModelProtocol.ANTHROPIC_MESSAGES),
+            Triple("MiniMax-M3", "https://api.minimaxi.com/anthropic/v1", LocalModelProtocol.ANTHROPIC_MESSAGES),
+            Triple("MiniMax-M2.7", "https://api.minimaxi.com/v1", LocalModelProtocol.CHAT_COMPLETIONS),
             Triple("k3", "https://api.kimi.com/coding/v1", LocalModelProtocol.CHAT_COMPLETIONS),
             Triple("glm-5.3-flash", "https://open.bigmodel.cn/api/paas/v4", LocalModelProtocol.CHAT_COMPLETIONS),
             Triple(

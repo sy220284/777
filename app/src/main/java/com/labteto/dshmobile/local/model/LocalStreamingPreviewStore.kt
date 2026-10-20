@@ -70,6 +70,12 @@ internal class LocalStreamingPreviewStore {
     }
 
     @Synchronized
+    fun publishReasoning(owner: LocalStreamingPreviewOwner, text: String) {
+        if (text.isEmpty()) return
+        updateOwned(owner) { it.copy(reasoning = text, phase = LocalModelPreviewPhase.STREAMING) }
+    }
+
+    @Synchronized
     fun clear(owner: LocalStreamingPreviewOwner) {
         if (previews[owner.sessionId]?.owns(owner) == true) {
             previews.remove(owner.sessionId)

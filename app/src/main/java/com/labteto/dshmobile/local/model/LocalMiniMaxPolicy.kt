@@ -17,6 +17,14 @@ internal object LocalMiniMaxPolicy {
             setOf("api.minimaxi.com", "api.minimax.cn", "api.minimax.io")
     }.getOrDefault(false)
 
+    /** Keep existing OpenAI-compatible profiles on /v1; default Anthropic profiles use /anthropic/v1. */
+    fun protocolForEndpoint(baseUrl: String): LocalModelProtocol =
+        if (URI(normalizeModelBaseUrl(baseUrl)).path.orEmpty().split('/').contains("anthropic")) {
+            LocalModelProtocol.ANTHROPIC_MESSAGES
+        } else {
+            LocalModelProtocol.CHAT_COMPLETIONS
+        }
+
     /** M3.1 already separates reasoning_content natively; older models use the legacy flag. */
     fun needsLegacyReasoningSplit(model: String): Boolean =
         !model.equals("MiniMax-M3.1-Flash", ignoreCase = true)

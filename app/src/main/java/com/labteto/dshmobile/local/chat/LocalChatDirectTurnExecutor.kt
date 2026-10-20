@@ -28,6 +28,7 @@ import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.chatReasoningTranscriptId
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -347,7 +348,17 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                         blocks = blocks,
                     )
                 }
-            val transcriptMessages = listOfNotNull(assistantTranscript)
+            val reasoningTranscript = assistantTranscript?.let { assistant ->
+                durableReply.reasoning?.takeIf(String::isNotBlank)?.let { reasoning ->
+                    LocalHarnessMessage(
+                        id = chatReasoningTranscriptId(assistant.id),
+                        role = "reasoning",
+                        content = reasoning,
+                        createdAt = assistant.createdAt,
+                    )
+                }
+            }
+            val transcriptMessages = listOfNotNull(reasoningTranscript, assistantTranscript)
             val assistantData = if (transcriptMessages.isEmpty()) {
                 durableReply.message
             } else {
@@ -384,6 +395,10 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 runtimeStateStore.projection.removeForegroundTranscriptMessage(
                     sessionId,
                     replacingMessageId,
+                )
+                runtimeStateStore.projection.removeForegroundTranscriptMessage(
+                    sessionId,
+                    chatReasoningTranscriptId(replacingMessageId),
                 )
             }
             modelHistory.history.append(durableReply.message)

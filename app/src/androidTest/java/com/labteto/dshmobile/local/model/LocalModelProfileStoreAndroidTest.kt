@@ -82,6 +82,28 @@ class LocalModelProfileStoreAndroidTest {
     }
 
     @Test
+    fun explicitMiniMaxRouteProtocolSurvivesReloadOnBothOfficialEndpoints() {
+        val preferences = context.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
+        val store = LocalModelProfileStore(preferences, Json { ignoreUnknownKeys = true })
+        val old = LocalModelProfile(
+            id = "minimax-legacy-chat",
+            model = "MiniMax-M3.1-Flash",
+            baseUrl = "https://api.minimaxi.com/v1",
+            provider = "MiniMax",
+            protocol = LocalModelProtocol.CHAT_COMPLETIONS,
+        )
+        val selected = old.copy(
+            id = "minimax-explicit-custom",
+            baseUrl = "https://api.minimaxi.com/anthropic/v1",
+            protocol = LocalModelProtocol.CHAT_COMPLETIONS,
+        )
+        store.write(listOf(old, selected))
+        val loaded = LocalModelProfileStore(preferences, Json { ignoreUnknownKeys = true }).read()
+        assertEquals(old, loaded.first { it.id == old.id })
+        assertEquals(selected, loaded.first { it.id == selected.id })
+    }
+
+    @Test
     fun officialClaudeLegacyProfileMigratesToNativeMessagesButCustomRoutesDoNot() {
         val preferences = context.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
         val json = Json { ignoreUnknownKeys = true }

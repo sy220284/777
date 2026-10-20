@@ -321,8 +321,32 @@ class AnthropicMessagesClientTest {
         val image = LocalCanonicalMessage(LocalCanonicalRole.USER, listOf(LocalCanonicalContent.Image(exact)))
         assertEquals(7_500_000L, com.labteto.dshmobile.local.model.LocalModelPresets.maxNativeImageBytesFor("claude-sonnet-5-5", "https://api.anthropic.com/v1"))
         assertTrue(client.buildPayload(route(), listOf(image), emptyList(), null).isNotEmpty())
+        val claudeRoute = route().copy(capabilities = LocalModelRuntimeCapabilities(
+            imageInput = true, maxImageBytes = 7_500_000L,
+        ))
+        assertTrue(client.buildPayload(claudeRoute, listOf(image), emptyList(), null).isNotEmpty())
         val tooLargeImage = image.copy(content = listOf(LocalCanonicalContent.Image(exact + "AAAA")))
-        assertTrue(runCatching { client.buildPayload(route(), listOf(tooLargeImage), emptyList(), null) }.isFailure)
+        assertTrue(runCatching { client.buildPayload(claudeRoute, listOf(tooLargeImage), emptyList(), null) }.isFailure)
+        // Base64 inflates binary data by 4/3. The same 10 MB binary image must work on MiniMax.
+        val miniMaxRoute = claudeRoute.copy(
+            provider = "MiniMax",
+            model = "MiniMax-M3.1-Flash",
+            baseUrl = "https://api.minimaxi.com/anthropic/v1",
+            capabilities = LocalModelRuntimeCapabilities(imageInput = true, maxImageBytes = 10_000_000L),
+        )
+        val maxMiniMaxImage = "data:image/png;base64," + "A".repeat(13_333_332)
+        assertTrue(client.buildPayload(
+            miniMaxRoute,
+            listOf(LocalCanonicalMessage(LocalCanonicalRole.USER, listOf(LocalCanonicalContent.Image(maxMiniMaxImage)))),
+            emptyList(), null,
+        ).isNotEmpty())
+        assertTrue(runCatching {
+            client.buildPayload(
+                miniMaxRoute,
+                listOf(LocalCanonicalMessage(LocalCanonicalRole.USER, listOf(LocalCanonicalContent.Image(maxMiniMaxImage + "AAAA")))),
+                emptyList(), null,
+            )
+        }.isFailure)
         val totalError = runCatching { fixture(emptyList()).complete(route(), listOf(image, image, image, image), emptyList(), null, true) }.exceptionOrNull()
         assertEquals("MODEL_REQUEST_TOO_LARGE", (totalError as? com.labteto.dshmobile.local.LocalModelException)?.code)
     }

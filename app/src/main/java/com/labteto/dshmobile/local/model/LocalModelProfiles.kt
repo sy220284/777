@@ -150,28 +150,36 @@ object LocalModelPresets {
         LocalModelPreset(
             provider = "MiniMax",
             model = "MiniMax-M3.1-Flash",
-            baseUrl = "https://api.minimaxi.com/v1",
+            baseUrl = "https://api.minimaxi.com/anthropic/v1",
             capabilities = setOf(
                 LocalModelCapability.TEXT,
                 LocalModelCapability.IMAGE,
                 LocalModelCapability.VIDEO,
             ),
             imageInputSupported = true,
+            protocol = LocalModelProtocol.ANTHROPIC_MESSAGES,
+            temperatureSupported = false,
             modelsEndpoint = "https://api.minimaxi.com/v1/models",
             contextWindowTokens = 1_000_000,
+            // Anthropic max_tokens counts both thinking and answer; 8K truncates long model tasks.
+            defaultMaxOutputTokens = 65_536,
         ),
         LocalModelPreset(
             provider = "MiniMax",
             model = "MiniMax-M3",
-            baseUrl = "https://api.minimaxi.com/v1",
+            baseUrl = "https://api.minimaxi.com/anthropic/v1",
             capabilities = setOf(
                 LocalModelCapability.TEXT,
                 LocalModelCapability.IMAGE,
                 LocalModelCapability.VIDEO,
             ),
             imageInputSupported = true,
+            protocol = LocalModelProtocol.ANTHROPIC_MESSAGES,
+            temperatureSupported = false,
             modelsEndpoint = "https://api.minimaxi.com/v1/models",
             contextWindowTokens = 1_000_000,
+            // Anthropic max_tokens counts both thinking and answer; 8K truncates long model tasks.
+            defaultMaxOutputTokens = 65_536,
         ),
         LocalModelPreset(
             provider = "MiniMax",
@@ -490,9 +498,29 @@ object LocalModelPresets {
             ?: return null
         if (LocalMiniMaxPolicy.isOfficial(normalizedBaseUrl)) {
             val native = entries.firstOrNull { it.provider == "MiniMax" && it.model.equals(normalizedModel, true) }
-            if (native != null) return native.copy(baseUrl = normalizedBaseUrl)
+            if (native != null) {
+                val protocol = if (native.model in setOf("MiniMax-M3.1-Flash", "MiniMax-M3")) {
+                    LocalMiniMaxPolicy.protocolForEndpoint(normalizedBaseUrl)
+                } else native.protocol
+                return native.copy(
+                    baseUrl = normalizedBaseUrl,
+                    protocol = protocol,
+                    // Do not change legacy OpenAI-compatible route budgeting when switching new presets.
+                    defaultMaxOutputTokens = if (protocol == LocalModelProtocol.ANTHROPIC_MESSAGES) {
+                        native.defaultMaxOutputTokens
+                    } else null,
+                )
+            }
             if (normalizedModel.equals("MiniMax-M3.1-Flash-Preview", true)) {
-                return entries.first { it.model == "MiniMax-M3.1-Flash" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
+                val preset = entries.first { it.model == "MiniMax-M3.1-Flash" }
+                val protocol = LocalMiniMaxPolicy.protocolForEndpoint(normalizedBaseUrl)
+                return preset.copy(
+                    model = normalizedModel,
+                    baseUrl = normalizedBaseUrl,
+                    protocol = protocol,
+                    defaultMaxOutputTokens = preset.defaultMaxOutputTokens
+                        .takeIf { protocol == LocalModelProtocol.ANTHROPIC_MESSAGES },
+                )
             }
             if (normalizedModel.lowercase() in setOf("minimax-m2", "minimax-m2.1", "minimax-m2.1-highspeed", "minimax-m2.5", "minimax-m2.5-highspeed")) {
                 return entries.first { it.model == "MiniMax-M2.7" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
@@ -572,7 +600,9 @@ object LocalModelPresets {
             "Google Gemini" -> LocalModelTemperatureRange(
                 0.0, 2.0, 1.0, omitAtChatDefault = true,
             )
-            "MiniMax" -> LocalModelTemperatureRange(0.0, 2.0, 1.0)
+            "MiniMax" -> if (preset.model.startsWith("MiniMax-M2", ignoreCase = true)) {
+                LocalModelTemperatureRange(0.0, 2.0, 1.0)
+            } else null
             // Others require a model-specific confirmed range or a fixed-value/unsupported rule.
             else -> null
         }

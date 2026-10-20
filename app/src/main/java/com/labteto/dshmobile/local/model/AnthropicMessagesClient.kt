@@ -80,7 +80,13 @@ internal class AnthropicMessagesClient @Inject constructor(
         val admissionTracker = LocalModelAdmissionTracker()
         val request = Request.Builder()
             .url(endpoint(route.baseUrl))
-            .header("x-api-key", route.bearerToken)
+            .apply {
+                if (LocalMiniMaxPolicy.isOfficial(route.baseUrl)) {
+                    header("Authorization", "Bearer ${route.bearerToken}")
+                } else {
+                    header("x-api-key", route.bearerToken)
+                }
+            }
             .header("anthropic-version", ANTHROPIC_VERSION)
             .header("accept", "text/event-stream")
             .header("content-type", "application/json")
@@ -180,7 +186,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                     val converted = when (message.role) {
                         LocalCanonicalRole.ASSISTANT -> assistantContent(message, route)
                         LocalCanonicalRole.TOOL -> toolResultContent(message)
-                        else -> userContent(message)
+                        else -> userContent(message, route)
                     }
                     if (converted.isEmpty()) return@forEach
                     add(buildJsonObject {
@@ -252,7 +258,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         }
     }
 
-    private fun userContent(message: LocalCanonicalMessage): JsonArray = buildJsonArray {
+    private fun userContent(message: LocalCanonicalMessage, route: LocalResolvedModelRoute): JsonArray = buildJsonArray {
         message.content.forEach { block ->
             when (block) {
                 is LocalCanonicalContent.Text -> if (block.text.isNotEmpty()) {
@@ -262,7 +268,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                     })
                 }
                 is LocalCanonicalContent.Image -> {
-                    parseDataImage(block.dataUrl).let { image ->
+                    parseDataImage(block.dataUrl, route.capabilities.maxImageBytes).let { image ->
                         add(buildJsonObject {
                             put("type", "image")
                             put("source", buildJsonObject {
@@ -574,15 +580,22 @@ internal class AnthropicMessagesClient @Inject constructor(
         }
     }
 
-    private fun parseDataImage(value: String): Pair<String, String> {
+    private fun parseDataImage(value: String, maxImageBytes: Long): Pair<String, String> {
         if (value.startsWith("https://")) return "url" to value
         val split = value.indexOf(";base64,")
         if (!value.startsWith("data:image/") || split <= 5) throw protocolError("图片必须为 data URL 或 HTTPS URL", null)
         val mediaType = value.substring(5, split)
         val data = value.substring(split + 8)
+        // Limits from the effective model route describe binary bytes, not encoded characters.
+        val padding = when {
+            data.endsWith("==") -> 2
+            data.endsWith("=") -> 1
+            else -> 0
+        }
+        val decodedBytes = data.length.toLong() / 4 * 3 - padding
         if (mediaType !in SUPPORTED_IMAGE_MEDIA_TYPES || data.isEmpty() || data.length % 4 != 0 ||
-            data.length > 10_000_000) {
-            throw protocolError("图片格式无效或超过 Anthropic 10 MB base64 限制", null)
+            decodedBytes > maxImageBytes) {
+            throw protocolError("图片格式无效或超过当前模型图片大小上限", null)
         }
         return mediaType to data
     }

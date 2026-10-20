@@ -32,6 +32,97 @@ class LocalMiniMaxCompatibilityTest {
         assertFalse(LocalMiniMaxPolicy.isOfficial("https://api.minimax.io.evil.example/v1"))
     }
 
+    @Test fun miniMaxM3UsesNativeAnthropicProtocolWithoutIgnoredTemperature() {
+        for (host in listOf("api.minimaxi.com", "api.minimax.io", "api.minimax.cn")) {
+            val base = "https://$host/anthropic/v1"
+            val preset = LocalModelPresets.find("MiniMax-M3.1-Flash", base)!!
+            assertEquals(LocalModelProtocol.ANTHROPIC_MESSAGES, preset.protocol)
+            assertFalse(preset.temperatureSupported)
+            val rt = route("MiniMax-M3.1-Flash", base)
+            val payload = AnthropicMessagesClient(OkHttpClient(), json).buildPayload(
+                rt, emptyList(), emptyList(), temperature = 0.3, reasoningEffort = "max",
+            )
+            assertFalse(payload.containsKey("temperature"))
+            assertEquals("max", payload["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+        }
+        assertEquals(
+            LocalModelProtocol.CHAT_COMPLETIONS,
+            LocalModelPresets.protocolFor("MiniMax-M3.1-Flash", "https://api.minimaxi.com/v1"),
+        )
+    }
+
+    @Test fun miniMaxAnthropicUsesBearerWhileClaudeKeepsNativeApiKey() = runBlocking {
+        val captured = mutableListOf<okhttp3.Request>()
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            captured += chain.request()
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(401)
+                .message("Unauthorized")
+                .body("invalid key".toResponseBody("text/plain".toMediaType()))
+                .build()
+        }.build()
+        val client = AnthropicMessagesClient(http, json)
+        val miniMax = route("MiniMax-M3.1-Flash", "https://api.minimaxi.com/anthropic/v1")
+        runCatching { client.complete(miniMax, emptyList(), emptyList(), null, streaming = true) }
+        assertEquals("Bearer test", captured.single().header("Authorization"))
+        assertNull(captured.single().header("x-api-key"))
+        captured.clear()
+
+        val claude = miniMax.copy(
+            provider = "Claude",
+            model = "claude-sonnet-5-5",
+            baseUrl = "https://api.anthropic.com/v1",
+        )
+        runCatching { client.complete(claude, emptyList(), emptyList(), null, streaming = true) }
+        assertEquals("test", captured.single().header("x-api-key"))
+        assertNull(captured.single().header("Authorization"))
+    }
+
+    @Test fun nativeMiniMaxStreamKeepsThinkingReplyToolAndSameRouteReplay() = runBlocking {
+        val stream = listOf(
+            """data: {"type":"message_start","message":{"id":"mm-stream","usage":{"input_tokens":8,"output_tokens":0}}}""",
+            """data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}""",
+            """data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"先检查仓库"}}""",
+            """data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"mm-signature"}}""",
+            """data: {"type":"content_block_stop","index":0}""",
+            """data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}""",
+            """data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"正在核查"}}""",
+            """data: {"type":"content_block_stop","index":1}""",
+            """data: {"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"call-1","name":"read","input":{}}}""",
+            """data: {"type":"content_block_stop","index":2}""",
+            """data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":21}}""",
+            """data: {"type":"message_stop"}""",
+        ).joinToString("\n", postfix = "\n")
+        var capturedUrl: String? = null
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            capturedUrl = chain.request().url.toString()
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200)
+                .message("OK").body(stream.toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val client = AnthropicMessagesClient(http, json)
+        val selected = route("MiniMax-M3.1-Flash", "https://api.minimaxi.com/anthropic/v1")
+        val deltas = mutableListOf<LocalModelDelta>()
+        val reply = client.complete(selected, emptyList(), emptyList(), null, true, deltas::add, "high")
+        assertEquals("https://api.minimaxi.com/anthropic/v1/messages", capturedUrl)
+        assertEquals("先检查仓库", reply.reasoning)
+        assertEquals("正在核查", reply.content)
+        assertEquals("read", reply.toolCalls.single().name)
+        assertEquals("call-1", reply.toolCalls.single().id)
+        assertEquals("先检查仓库", deltas.joinToString("") { it.reasoning })
+        assertEquals("正在核查", deltas.joinToString("") { it.content })
+        val history = LocalCanonicalModelCodec.toHistoryMessage(reply.canonicalMessage!!)
+        val restored = LocalCanonicalModelCodec.message(history)
+        val same = client.buildPayload(selected, listOf(restored), emptyList(), null)
+            .getValue("messages").jsonArray.single().jsonObject.getValue("content").jsonArray
+        assertEquals("mm-signature", same[0].jsonObject["signature"]!!.jsonPrimitive.content)
+        assertEquals("read", same[2].jsonObject["name"]!!.jsonPrimitive.content)
+        val changed = client.buildPayload(
+            selected.copy(baseUrl = "https://api.minimax.io/anthropic/v1"),
+            listOf(restored), emptyList(), null,
+        ).getValue("messages").jsonArray.single().jsonObject.getValue("content").jsonArray
+        assertFalse(changed.toString().contains("mm-signature"))
+        assertTrue(changed.any { it.jsonObject["type"]?.jsonPrimitive?.content == "tool_use" })
+    }
+
     @Test fun providerQuotaErrorIsReportedInsteadOfMissingChoices() {
         val failure = assertThrows(com.labteto.dshmobile.local.LocalModelException::class.java) {
             DeepSeekClient(OkHttpClient(), json).parse("""{"base_resp":{"status_code":1008,"status_msg":"余额不足"}}""")

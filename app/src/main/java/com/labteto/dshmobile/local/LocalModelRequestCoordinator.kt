@@ -798,6 +798,18 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 ?.let { streamingPreviewStore.publishAssistant(it, preview) }
                         },
                     )
+                    // Every protocol already emits normalized content/reasoning deltas.
+                    // Publish both through the same request-owned, bounded preview pipeline.
+                    val reasoningPreview = LocalStreamPreview(
+                        maxChars = maxStreamPreviewChars,
+                        minIntervalMs = streamPreviewIntervalMs,
+                        clockMs = { System.nanoTime() / 1_000_000 },
+                        publish = { preview ->
+                            previewOwner
+                                ?.takeIf { previewGuard() }
+                                ?.let { streamingPreviewStore.publishReasoning(it, preview) }
+                        },
+                    )
                     val activePressure = LocalPromptPressureMeter.measure(
                         messages = activeMessages,
                         tools = tools,
@@ -830,6 +842,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                     val visible = delta.content
                                     attemptEvidence.observe(delta)
                                     streamPreview.append(previewDeltaTransform?.invoke(visible) ?: visible)
+                                    reasoningPreview.append(delta.reasoning)
                                 },
                             )
                         } catch (cancelled: CancellationException) {
@@ -882,6 +895,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             throw error
                         }
                             streamPreview.flush()
+                            reasoningPreview.flush()
                             activePrefixAssessment?.let { cache ->
                                 promptCacheContinuity.recordSuccess(
                                     snapshot.sessionId,
