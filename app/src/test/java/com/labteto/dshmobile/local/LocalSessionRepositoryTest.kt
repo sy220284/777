@@ -70,6 +70,32 @@ class LocalSessionRepositoryTest {
         }
     }
 
+    @Test fun failedDeletionRestoresNewestAcceptedPendingSnapshot() = runTest {
+        val directory = temporary.newFolder("failed-delete-queued")
+        val repository = LocalSessionRepository(directory, Json, backgroundScope, {}, {})
+        repository.writeNow(LocalHarnessSession(id = "retained", title = "磁盘旧版本"))
+        repository.enqueue(LocalHarnessSession(id = "retained", title = "已经接收的新版本"))
+        val root = directory.toPath()
+        val permissions = java.nio.file.Files.getPosixFilePermissions(root)
+        try {
+            java.nio.file.Files.setPosixFilePermissions(
+                root,
+                setOf(
+                    java.nio.file.attribute.PosixFilePermission.OWNER_READ,
+                    java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE,
+                ),
+            )
+            assertFalse(java.nio.file.Files.isWritable(root))
+            assertThrows(IllegalStateException::class.java) { repository.delete("retained") }
+            assertEquals("已经接收的新版本", repository.read("retained")?.title)
+        } finally {
+            java.nio.file.Files.setPosixFilePermissions(root, permissions)
+        }
+        runCurrent()
+        val reopened = LocalSessionRepository(directory, Json, backgroundScope, {}, {})
+        assertEquals("已经接收的新版本", reopened.read("retained")?.title)
+    }
+
     @Test fun deletionCannotBeUndoneByQueuedSnapshots() = runTest {
         val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
         repository.enqueue(LocalHarnessSession(id = "gone", title = "old"))

@@ -192,8 +192,8 @@ internal class LocalSessionRepository(
     fun delete(id: String): Boolean = synchronized(sessionLock(id)) {
         // Fence all previous writers BEFORE the durable deletion. If it fails while
         // recoverable bytes remain, the fence must not hide those bytes indefinitely.
-        val (wasDeleted, cachedSummary) = synchronized(lock) {
-            val old = (id in deletedIds) to summaryCache[id]
+        val (wasDeleted, cachedSummary, acceptedBeforeDelete) = synchronized(lock) {
+            val old = Triple(id in deletedIds, summaryCache[id], latestSnapshots[id] ?: pending[id])
             deletedIds += id
             pending.remove(id)
             latestSnapshots.remove(id)
@@ -215,8 +215,17 @@ internal class LocalSessionRepository(
             }
             if (recoverable) {
                 synchronized(lock) {
-                    if (!wasDeleted) deletedIds.remove(id)
-                    cachedSummary?.let(::cacheSummaryLocked)
+                    if (!wasDeleted) {
+                        deletedIds.remove(id)
+                        // A failed deletion must not silently drop an already accepted,
+                        // newer write which was still pending when deletion began.
+                        acceptedBeforeDelete?.let { accepted ->
+                            latestSnapshots[id] = accepted
+                            pending[id] = accepted
+                            wakeups.trySend(Unit)
+                        }
+                        cachedSummary?.let(::cacheSummaryLocked)
+                    }
                     // Even if this session wasn't in cache, the next list must rescan
                     // authoritative durable data, not expose an incomplete deletion.
                     summariesLoaded = false
