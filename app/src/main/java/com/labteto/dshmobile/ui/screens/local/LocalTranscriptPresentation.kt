@@ -338,7 +338,9 @@ internal fun mergeLocalMediaTimeline(
         is LocalTranscriptItem.Message -> item.message.createdAt
         is LocalTranscriptItem.Thinking -> item.messages.first().createdAt
         is LocalTranscriptItem.WorkProcess -> item.messages.first().createdAt
-        is LocalTranscriptItem.WorkStep -> item.message.createdAt
+        is LocalTranscriptItem.WorkStep ->
+            if (item.message.role == "tool") item.message.toolDeclaredAt ?: item.message.createdAt
+            else item.message.createdAt
         is LocalTranscriptItem.WorkNode -> item.node.createdAt
         is LocalTranscriptItem.MediaResult ->
             operationTimestamps[item.result.id] ?: item.result.createdAtMillis
