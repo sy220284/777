@@ -24,6 +24,8 @@ class LocalWorkReplyPresentationTest {
         assertEquals("读取文件", userFacingWorkToolAction("read"))
         assertEquals("搜索文件内容", userFacingWorkToolAction("grep"))
         assertEquals("运行本地任务", userFacingWorkToolAction("bash"))
+        assertEquals("运行本地任务", userFacingWorkToolAction("cordis_run"))
+        assertEquals("运行本地任务", userFacingWorkToolAction("process_exec"))
         assertEquals("修改文件", userFacingWorkToolAction("edit"))
     }
 
