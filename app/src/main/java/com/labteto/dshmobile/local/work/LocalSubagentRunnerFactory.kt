@@ -49,6 +49,7 @@ internal class LocalSubagentRunnerFactory(
     private val resourceScheduler: HarnessResourceScheduler,
     private val virtualDisplayProvider: HarnessVirtualDisplayProvider,
     private val memoryClassMb: Int,
+    private val deviceRamMb: Int = 0,
     private val agentRunCoordinator: LocalAgentRunCoordinator,
     private val contextComposer: ContextComposer,
     private val memoryStore: MemoryStore,
@@ -158,7 +159,14 @@ internal class LocalSubagentRunnerFactory(
         acquireVirtualScreen = { owner -> virtualDisplayProvider.acquireAgentVirtualDisplay(owner) },
         releaseVirtualScreen = virtualDisplayProvider::releaseAgentVirtualDisplay,
         historyBudget = { profile ->
-            localHistoryBudgetFor(memoryClassMb, resourceScheduler.snapshot().pressure, profile.model, profile.baseUrl, profile.contextWindowTokensOverride)
+            localHistoryBudgetFor(
+                memoryClassMb = memoryClassMb,
+                pressure = resourceScheduler.snapshot().pressure,
+                model = profile.model,
+                baseUrl = profile.baseUrl,
+                contextWindowTokensOverride = profile.contextWindowTokensOverride,
+                deviceRamMb = deviceRamMb,
+            )
         },
         runCoordinator = agentRunCoordinator,
         runSessionId = runSessionId,
