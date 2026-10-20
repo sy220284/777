@@ -85,7 +85,7 @@ internal fun userFacingWorkToolAction(toolName: String?): String? {
         "web_search" -> return "搜索网页"
         "web_fetch", "http_request" -> return "读取网页内容"
     }
-    if (com.labteto.dshmobile.ui.isCommandExecutionTool(name) || name in setOf("exec", "run_code", "execute"))
+    if (com.labteto.dshmobile.ui.agentOperationKind(name) == com.labteto.dshmobile.ui.AgentOperationKind.Execute)
         return "运行本地任务"
     if (!name.contains("github")) return null
     return when {
@@ -257,10 +257,8 @@ internal fun completedWorkToolPhase(
 
 @Composable
 private fun workToolActionLabel(name: String?, argumentsPreview: String? = null): String {
-    val isCommand = name?.let {
-        com.labteto.dshmobile.ui.isCommandExecutionTool(it.lowercase()) ||
-            it.lowercase() in setOf("exec", "run_code", "execute")
-    } == true
+    val isCommand = com.labteto.dshmobile.ui.agentOperationKind(name) ==
+        com.labteto.dshmobile.ui.AgentOperationKind.Execute
     if (isCommand) naturalWorkCommandAction(argumentsPreview)?.let { return it }
     return userFacingWorkToolAction(name) ?: stringResource(userFacingWorkToolActionRes(name)
         ?: agentOperationLabelRes(com.labteto.dshmobile.ui.agentOperationKind(name)))
