@@ -1144,7 +1144,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             )
                             if (nativeDocuments != null &&
                                 (nativeDocumentSnapshot.sessionId == state.sessionId || isHistoricalDocumentSource) &&
-                                (transcriptItem.message.role == "assistant" || inlineDocuments.isNotEmpty())) {
+                                inlineDocuments.isNotEmpty()) {
                                 NativeV6DocumentMessage(
                                     messageId = transcriptItem.message.id,
                                     documents = inlineDocuments,
