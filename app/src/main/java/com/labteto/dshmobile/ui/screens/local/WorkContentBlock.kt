@@ -53,6 +53,35 @@ internal fun userFacingWorkToolActionRes(toolName: String?): Int? {
     }
 }
 
+/** Specific actions take precedence over broad provider categories, without exposing tool IDs. */
+internal fun userFacingWorkToolAction(toolName: String?): String? {
+    val name = toolName?.lowercase().orEmpty()
+    if (!name.contains("github")) return null
+    return when {
+        "list_pr_changed_filenames" in name -> "扫描 PR 改动文件"
+        "fetch_pr_file_patch" in name || "fetch_pr_patch" in name || "get_pr_diff" in name ->
+            "读取 PR 代码差异"
+        "fetch_pr_comments" in name || "list_pull_request_review_threads" in name ->
+            "查看 PR 审查记录"
+        "fetch_pr" in name || "get_pr_info" in name -> "查看 PR 详情"
+        "search_prs" in name -> "查找拉取请求"
+        "search_commits" in name -> "搜索提交记录"
+        "search" in name -> "搜索仓库代码"
+        "fetch_blob" in name -> "获取 GitHub Blob 内容"
+        "fetch_file" in name -> "读取代码文件"
+        "fetch_workflow_job_logs" in name -> "读取流水线日志"
+        "workflow" in name || "check_run" in name || "get_commit_combined_status" in name ->
+            "检查流水线状态"
+        "merge_pull_request" in name -> "合并拉取请求"
+        "update_file" in name -> "更新代码文件"
+        "create_file" in name -> "创建代码文件"
+        "create_commit" in name -> "提交代码变更"
+        "list_pr" in name || "list_pull_request" in name -> "检查 PR 文件与状态"
+        "list_" in name -> "扫描仓库文件"
+        else -> null
+    }
+}
+
 /** A readable chronological step, with optional explanation instead of a hidden disclosure. */
 @Composable
 internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
@@ -177,7 +206,8 @@ internal fun WorkTimelineStepRow(
     val failed = message.toolIsError ?: localWorkToolFailed(message.content)
     val provider = userFacingWorkToolProvider(message.toolName)
     val kind = com.labteto.dshmobile.ui.agentOperationKind(message.toolName)
-    val action = stringResource(userFacingWorkToolActionRes(message.toolName) ?: agentOperationLabelRes(kind))
+    val action = userFacingWorkToolAction(message.toolName) ?:
+        stringResource(userFacingWorkToolActionRes(message.toolName) ?: agentOperationLabelRes(kind))
     val label = if (provider != null) "$provider · $action" else action
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
