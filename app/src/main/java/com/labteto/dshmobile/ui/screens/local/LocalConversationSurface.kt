@@ -1031,7 +1031,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     bottom = SyMetric.gapPage,
                 ),
                 verticalArrangement = Arrangement.spacedBy(
-                    if (state.usageMode == LocalUsageMode.WORK) SyMetric.gapXs else SyMetric.gapSection,
+                    if (state.usageMode == LocalUsageMode.WORK) 0.dp else SyMetric.gapSection,
                 ),
             ) {
                 if (mediaPage.unavailable) {
@@ -1303,6 +1303,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             WorkTimelineStepRow(
                                 message = transcriptItem.message,
                                 repeatCount = transcriptItem.repeatCount,
+                                activity = transcriptItem.activity,
                                 active = state.running && transcriptItem.message.role != "tool" &&
                                     transcriptItem.key == transcriptItems.lastOrNull()?.key,
                             )
