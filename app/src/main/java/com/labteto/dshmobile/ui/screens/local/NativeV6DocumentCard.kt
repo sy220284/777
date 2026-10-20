@@ -50,20 +50,23 @@ internal fun NativeV6DocumentModalHost(
     dismissEnabled: Boolean = true,
     content: @Composable (UiDocumentSnapshot, () -> Unit) -> Unit,
 ) {
-    var openDocumentId by remember(messageId) { mutableStateOf<String?>(null) }
-    documents.forEach { snapshot ->
-        SyButton(
-            text = "查看卡片 · ${snapshot.document.title.take(24)}",
-            onClick = { openDocumentId = snapshot.document.documentId },
-            size = SyButtonSize.Small,
-            variant = SyButtonVariant.Ghost,
-            modifier = Modifier.testTag("reply_document_open:${snapshot.document.documentId}"),
-        )
-    }
-    documents.firstOrNull { it.document.documentId == openDocumentId }?.let { snapshot ->
-        val close = { openDocumentId = null }
+    var open by remember(messageId) { mutableStateOf(false) }
+    var selectedId by remember(messageId) { mutableStateOf<String?>(null) }
+    if (documents.isEmpty()) return
+
+    val selected = documents.firstOrNull { it.document.documentId == selectedId }
+        ?: documents.last()
+    SyButton(
+        text = if (documents.size == 1) "查看回复卡片" else "查看回复卡片 · ${documents.size} 份",
+        onClick = { selectedId = documents.last().document.documentId; open = true },
+        size = SyButtonSize.Small,
+        variant = SyButtonVariant.Ghost,
+        modifier = Modifier.testTag("reply_document_open:${messageId}"),
+    )
+    if (open) {
+        val close = { open = false }
         SyResponsiveSheet(
-            title = snapshot.document.title,
+            title = selected.document.title,
             onDismiss = close,
             scrollable = true,
             seamlessBackground = false,
@@ -73,7 +76,20 @@ internal fun NativeV6DocumentModalHost(
                     size = SyButtonSize.Small, variant = SyButtonVariant.Ghost)
             },
         ) {
-            content(snapshot, close)
+            if (documents.size > 1) {
+                Text("选择要查看的文档", style = MaterialTheme.typography.labelMedium)
+                documents.forEach { snapshot ->
+                    SyButton(
+                        text = snapshot.document.title,
+                        onClick = { selectedId = snapshot.document.documentId },
+                        enabled = dismissEnabled,
+                        size = SyButtonSize.Small,
+                        variant = if (snapshot.document.documentId == selected.document.documentId)
+                            SyButtonVariant.Primary else SyButtonVariant.Ghost,
+                    )
+                }
+            }
+            content(selected, close)
         }
     }
 }
@@ -88,15 +104,13 @@ internal fun NativeV6DocumentMessage(
 ) {
     var feedback by remember(messageId) { mutableStateOf<String?>(null) }
     var busy by remember(messageId) { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+    NativeV6DocumentModalHost(messageId, documents, dismissEnabled = !busy) { snapshot, close ->
         feedback?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-        NativeV6DocumentModalHost(messageId, documents, dismissEnabled = !busy) { snapshot, close ->
-            NativeV6DocumentCard(snapshot, controller, readOnly,
-                onFeedback = { feedback = it },
-                onPreparedDraft = { close(); onPreparedDraft() },
-                onBusyChange = { busy = it },
-            )
-        }
+        NativeV6DocumentCard(snapshot, controller, readOnly,
+            onFeedback = { feedback = it },
+            onPreparedDraft = { close(); onPreparedDraft() },
+            onBusyChange = { busy = it },
+        )
     }
 }
 
