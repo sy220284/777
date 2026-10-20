@@ -90,6 +90,29 @@ class LocalAdaptiveRuntimeBudgetTest {
     }
 
     @Test
+    fun initialBudgetAccepts1024ConfiguredStepsWithoutBlockingFurtherProgress() {
+        val initial = adaptiveAgentStepLimit(
+            configuredBase = 1_024,
+            task = "全量审计并逐项测试",
+            contextChars = 10_000,
+            contextBudgetChars = 200_000,
+            pressure = HarnessResourcePressure.LOW,
+            kind = LocalAgentRunKind.FOREGROUND,
+        )
+        assertEquals(1_024, initial)
+        val next = nextAdaptiveAgentStepLimit(
+            currentLimit = initial,
+            configuredBase = 1_024,
+            task = "继续测试",
+            contextChars = 10_000,
+            contextBudgetChars = 200_000,
+            pressure = HarnessResourcePressure.LOW,
+            kind = LocalAgentRunKind.FOREGROUND,
+        )
+        assertTrue(requireNotNull(next) > initial)
+    }
+
+    @Test
     fun exhaustedSoftBudgetAlwaysGrowsSoLongTaskCanContinue() {
         val next = nextAdaptiveAgentStepLimit(
             currentLimit = 128,
