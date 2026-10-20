@@ -82,7 +82,7 @@ class LocalWorkReplyPresentationTest {
     }
 
     @Test fun legacyIntermediateAssistantNarrationIsPreservedAsMarkdownBeforeTool() {
-        val content = "## 审计发现\\n\\n- 风险项\\n\\n\\u0060\\u0060\\u0060kotlin\\nval ok = true\\n\\u0060\\u0060\\u0060"
+        val content = "## 审计发现\n\n- 风险项\n\n```kotlin\nval ok = true\n```"
         val items = buildLocalDisplayTranscript(buildLocalTranscript(listOf(
             message("u", "user", "检查代码"),
             message("n", "assistant", content),
