@@ -94,6 +94,26 @@ class LocalWorkReplyPresentationTest {
         assertEquals(content, (items[1] as LocalTranscriptItem.WorkStep).message.content)
     }
 
+    @Test fun pendingToolIsReplacedByItsMatchingDurableCompletion() {
+        val activity = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
+            callId = "call-1", name = "mcp__GitHub__fetch_file",
+            phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.DECLARED,
+        )
+        val pending = appendPendingWorkToolActivities(emptyList(), listOf(activity), running = true)
+        assertEquals(listOf("work-tool:call-1"), pending.map { it.key })
+        assertTrue(pending.single() is LocalTranscriptItem.WorkPendingTool)
+
+        val completed = LocalTranscriptItem.WorkStep(
+            message("result", "tool", "ok", "mcp__GitHub__fetch_file", false)
+                .copy(toolCallId = "call-1"),
+        )
+        assertEquals(pending.single().key, completed.key)
+        assertEquals(listOf(completed), appendPendingWorkToolActivities(
+            listOf(completed), listOf(activity), running = true))
+        assertEquals(emptyList<LocalTranscriptItem>(),
+            appendPendingWorkToolActivities(emptyList(), listOf(activity), running = false))
+    }
+
     @Test fun thinkingOnlyStaysPrivateAndEventIdentityRemainsStable() {
         val reasoning = message("reasoning", "reasoning", "secret")
         val items = buildLocalDisplayTranscript(listOf(LocalTranscriptItem.WorkProcess(listOf(reasoning))))
