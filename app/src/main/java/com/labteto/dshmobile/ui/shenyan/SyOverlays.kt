@@ -141,7 +141,7 @@ fun SyFullScreenDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             dismissOnBackPress = true,
-            dismissOnClickOutside = dismissOnBackgroundTap,
+            dismissOnClickOutside = true,
         ),
         content = content,
     )
@@ -369,7 +369,7 @@ fun SyFullscreenMediaOverlay(
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = false,
             dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnClickOutside = dismissOnBackgroundTap,
         ),
     ) {
         Box(
