@@ -312,7 +312,7 @@ internal class LocalWorkAgentTurnExecutor(
                             workspacePath = workspacePath,
                             skillGuidance = resolveLocalWorkSkillGuidance(
                                 sessionStorage.files.workspace, input,
-                                selectedInvocations = pinnedInvocations.selected.value,
+                                selectedInvocations = pinnedInvocations.current(),
                             ),
                         )
                         workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
@@ -333,7 +333,7 @@ internal class LocalWorkAgentTurnExecutor(
                             workspacePath = workspacePath,
                             skillGuidance = resolveLocalWorkSkillGuidance(
                                 sessionStorage.files.workspace, effectiveInput,
-                                selectedInvocations = pinnedInvocations.selected.value,
+                                selectedInvocations = pinnedInvocations.current(),
                             ),
                         )
                         projectedSteeringRevision = observedSteer
