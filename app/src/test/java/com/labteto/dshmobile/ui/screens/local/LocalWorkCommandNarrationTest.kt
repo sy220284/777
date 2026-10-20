@@ -25,6 +25,35 @@ class LocalWorkCommandNarrationTest {
         assertEquals("解析与核对数据", naturalWorkCommandAction("""{"command":"python3 -c 'import json'"}"""))
     }
 
+    @Test fun toolStepsDescribeActualTaskObjectsInNaturalChinese() {
+        assertEquals("检索视觉与 UI 设计技能",
+            naturalWorkToolAction("mcp__GitHub__search",
+                """{"query":"aesthetic-ui design skill resources"}"""))
+        assertEquals("查看工作回复时间线代码",
+            naturalWorkToolAction("mcp__GitHub__fetch_file",
+                """{"path":"src/WorkTimelineStepRow.kt"}"""))
+        assertEquals("修改界面代码",
+            naturalWorkToolAction("mcp__GitHub__update_file",
+                """{"path":"app/src/ui/components/Actions.kt"}"""))
+        assertEquals("查看相关测试文件",
+            naturalWorkToolAction("mcp__GitHub__fetch_file",
+                """{"path":"app/src/androidTest/WorkReplyVisualTest.kt"}"""))
+        assertEquals("审查拉取请求的代码改动",
+            naturalWorkToolAction("mcp__GitHub__fetch_pr_file_patch", null))
+        assertEquals("检查构建和自动化测试进度",
+            naturalWorkToolAction("mcp__GitHub__fetch_workflow_run_jobs", null))
+        assertEquals("核对代码改动",
+            naturalWorkToolAction("process_exec", """{"command":"git diff --stat"}"""))
+    }
+
+    @Test fun stepTitleNeverEchoesSensitiveOrLongRawArguments() {
+        val raw = """{"query":"aesthetic-ui secret-token-abcdef hidden-user-data"}"""
+        val label = naturalWorkToolAction("mcp__GitHub__search", raw)!!
+        assertEquals("检索视觉与 UI 设计技能", label)
+        org.junit.Assert.assertFalse(label.contains("secret-token"))
+        assertEquals("查看仓库代码文件", naturalWorkToolAction("mcp__GitHub__fetch_file", null))
+    }
+
     @Test fun unrecognizedOrMissingArgumentsStayNeutralAndNeverInventPurpose() {
         assertEquals("运行本地任务", naturalWorkCommandAction("""{"command":"echo hello"}"""))
         assertNull(naturalWorkCommandAction("""{"other":"no command"}"""))
