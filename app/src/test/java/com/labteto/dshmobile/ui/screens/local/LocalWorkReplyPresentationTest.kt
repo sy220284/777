@@ -12,6 +12,23 @@ class LocalWorkReplyPresentationTest {
         LocalHarnessMessage(id = id, role = role, content = content,
             toolName = toolName, createdAt = id.length.toLong(), toolIsError = error)
 
+    @Test fun independentToolCallsKeepSeparateChronologicalRows() {
+        val events = listOf(
+            message("read-one", "tool", "ok", "mcp_github_fetch_file", false),
+            message("read-two", "tool", "ok", "mcp_github_fetch_file", false),
+            message("explain", "progress", "发现两处需要核对的实现。"),
+            message("check", "tool", "ok", "mcp_github_get_pr_info", false),
+        )
+        val displayed = buildLocalDisplayTranscript(buildLocalTranscript(events))
+        assertEquals(4, displayed.size)
+    }
+
+    @Test fun publicProgressKeepsMarkdownAndLongContent() {
+        val content = "## 核查结果\n\n- 第一处\n- 第二处\n\n```kotlin\nval count = 2\n```\n\n" +
+            "这是需要完整展示的公开说明。".repeat(150)
+        assertEquals(content, localWorkTimelineText(content))
+    }
+
     @Test fun consecutiveToolRowsBecomeOneSemanticStepWithoutLosingTheAnswer() {
         val timeline = listOf(
             message("one", "tool", "ok", "first_tool"),
