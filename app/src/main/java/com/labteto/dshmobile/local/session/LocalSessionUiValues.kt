@@ -18,6 +18,8 @@ data class LocalHarnessMessage(
     /** Null only for legacy tool rows without structured execution facts. */
     val toolIsError: Boolean? = null,
     val toolErrorCode: String? = null,
+    /** Stable Tool-owned call identity, used only to reconcile an in-flight UI row. */
+    val toolCallId: String? = null,
     /** Ordered visible content. Empty means legacy text-only data and falls back to [content]. */
     val blocks: List<LocalMessageBlock> = emptyList(),
 )
