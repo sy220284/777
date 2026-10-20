@@ -121,7 +121,8 @@ internal fun LocalWorkEvidenceSheet(
                 // Running/declared calls have no completed transcript row. Preserve their real phases.
                 items(state.activities.filter { it.phase in setOf(LocalToolUiPhase.DECLARED, LocalToolUiPhase.RUNNING) },
                     key = ::workEvidenceActivityKey) { activity ->
-                    Text(stringResource(agentOperationLabelRes(agentOperationKind(activity.name))), color = colors.text)
+                    Text(stringResource(agentOperationLabelRes(agentOperationKind(activity.name))),
+                        modifier = Modifier.testTag("work_evidence_active_${activity.callId}"), color = colors.text)
                     Text(stringResource(workToolPhaseLabel(activity.phase)), color = colors.textSecondary)
                 }
                 if (state.records.isEmpty() && !state.loading && !state.failed && !state.invalidated) item {
