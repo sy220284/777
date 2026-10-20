@@ -419,6 +419,46 @@ class HarnessJobManager(
         return "后台任务恢复失败：$id"
     }
 
+    /**
+     * An interrupted task can have executed an irreversible external action. Unsupported
+     * resume formats describe a recovery limitation, not proof that its action failed.
+     * Keep the original kind/metadata for manual inspection without replaying the action.
+     */
+    fun markRecoveryUnverifiable(id: String, detail: String): String {
+        val before: String
+        val beforeAt: Long
+        val record = synchronized(lock) {
+            val found = records[id] ?: return "后台任务不存在：$id"
+            if (found.status != "interrupted") {
+                return "后台任务当前不需要人工核实：$id [${found.status}]"
+            }
+            if (detail in found.output) return "后台任务已标记待核实：$id"
+            found
+        }
+        synchronized(lock) {
+            before = record.output
+            beforeAt = record.updatedAt
+            record.output = (record.output.takeLast(MAX_OUTPUT / 2) +
+                "\n恢复不可用，原操作副作用可能已发生，结果未知；请人工核实：" +
+                detail.take(800)).takeLast(MAX_OUTPUT)
+            record.updatedAt = nextActivityTimestamp(record.updatedAt)
+        }
+        try {
+            persistCurrentSnapshots()
+        } catch (failure: Exception) {
+            synchronized(lock) {
+                if (record.status == "interrupted") {
+                    record.output = before
+                    record.updatedAt = beforeAt
+                }
+            }
+            notifyChanged()
+            throw IllegalStateException("后台任务未知结果标记写入失败，仍需人工核实", failure)
+        }
+        notifyChanged()
+        return "后台任务恢复不可用，需人工核实：$id"
+    }
+
     fun failResumable(id: String, detail: String): String {
         var previousStatus = ""
         var previousOutput = ""

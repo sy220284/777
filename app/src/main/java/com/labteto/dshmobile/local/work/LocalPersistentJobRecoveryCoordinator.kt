@@ -266,6 +266,17 @@ internal class LocalPersistentJobRecoveryCoordinator(
         jobs.resumableSnapshots().forEach { snapshot ->
             // Startup/UI rehydration cannot grant new model request slots.
             if (!canResumeSubagentAtRootSlice(snapshot.status, resumeSlicePaused)) return@forEach
+            // A newer/unknown recovery protocol must not reinterpret a potentially
+            // completed external action as business failure or replay it automatically.
+            if (snapshot.resumeKind !in setOf("web_fetch", "subagent_readonly")) {
+                if (snapshot.ownerId == targetSession) {
+                    jobs.markRecoveryUnverifiable(
+                        snapshot.id,
+                        "不支持的恢复类型 ${snapshot.resumeKind.orEmpty()}",
+                    )
+                }
+                return@forEach
+            }
             val payload = decodePayload(snapshot, targetSession) ?: return@forEach
             val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull ?: targetSession
             if (sessionId != targetSession || jobs.availableSlots() <= 0) return@forEach
@@ -273,10 +284,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 when (snapshot.resumeKind) {
                     "web_fetch" -> resumeWebFetch(snapshot, sessionId, payload)
                     "subagent_readonly" -> resumeSubagent(snapshot, sessionId, payload)
-                    else -> jobs.failResumable(
-                        snapshot.id,
-                        "任务恢复失败：不支持的恢复类型 ${snapshot.resumeKind.orEmpty()}",
-                    )
+                    else -> error("恢复类型预校验与执行分支不一致")
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled

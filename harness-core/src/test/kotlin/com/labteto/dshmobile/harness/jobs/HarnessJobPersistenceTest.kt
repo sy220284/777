@@ -35,6 +35,43 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class HarnessJobPersistenceTest {
     @Test
+    fun recoveryProtocolMismatchPreservesUnknownOutcomeAcrossProcessRestart() = runTest {
+        val durable = mutableListOf<List<JobSnapshot>>()
+        val original = JobSnapshot(
+            id = "side-effect-unknown",
+            label = "有副作用的外部请求",
+            status = "running",
+            output = "请求已经发送到外部系统",
+            resumeKind = "future_external_tool",
+            resumePayload = "{}",
+            ownerId = "owner-a",
+        )
+        val manager = HarnessJobManager(
+            scope = backgroundScope,
+            onChanged = {},
+            initialSnapshots = listOf(original),
+            onSnapshotsChanged = { durable += it },
+        )
+        assertEquals("interrupted", manager.snapshots().single().status)
+        val outcome = manager.markRecoveryUnverifiable(
+            "side-effect-unknown", "不支持的恢复类型 future_external_tool",
+        )
+        assertTrue(outcome.contains("人工核实"))
+        assertEquals("interrupted", manager.snapshots().single().status)
+        assertTrue(manager.snapshots().single().output.contains("结果未知"))
+        assertTrue(manager.snapshots().single().output.contains("请求已经发送"))
+        assertEquals("future_external_tool", manager.snapshots().single().resumeKind)
+        assertTrue(durable.last().single().status != "failed")
+        val recovered = HarnessJobManager(
+            scope = backgroundScope,
+            onChanged = {},
+            initialSnapshots = durable.last(),
+        )
+        assertEquals("interrupted", recovered.snapshots().single().status)
+        assertTrue(recovered.snapshots().single().output.contains("人工核实"))
+    }
+
+    @Test
     fun cancelledJobKeepsCancellationWhenBlockingWorkThrowsLate() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val entered = CountDownLatch(1)

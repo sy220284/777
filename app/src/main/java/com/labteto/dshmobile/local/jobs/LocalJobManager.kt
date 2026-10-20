@@ -79,6 +79,9 @@ internal class LocalJobManager(
 
     fun failResumable(id: String, detail: String): String = delegate.failResumable(id, detail)
 
+    fun markRecoveryUnverifiable(id: String, detail: String): String =
+        delegate.markRecoveryUnverifiable(id, detail)
+
     fun completeInterrupted(
         id: String,
         output: String,
