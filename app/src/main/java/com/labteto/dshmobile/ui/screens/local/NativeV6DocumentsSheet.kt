@@ -78,6 +78,7 @@ internal fun NativeV6DocumentsSheet(
     val scope = rememberCoroutineScope()
     val colors = LocalSyColors.current
     val current = identity()
+    val sourceMessageId = if (current != null) currentMessageId() else null
     val items = snapshot.documents.filter { it.document.source.sessionId == current?.sessionId &&
         !it.document.documentId.startsWith("work-live:") }
     var prompt by remember(current?.sessionId) { mutableStateOf("") }
@@ -124,8 +125,8 @@ internal fun NativeV6DocumentsSheet(
             snapshot.error?.let { Text("文档读取失败：$it", color = colors.dangerInk) }
             notice?.let { Text(it, color = colors.textSecondary) }
 
-            if (current != null && currentMessageId() != null) {
-                val msg = requireNotNull(currentMessageId())
+            if (current != null && sourceMessageId != null) {
+                val msg = sourceMessageId
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SyButton("本地状态卡", onClick = {
                         doCommand { port.generateLocal(GenerateLocalUiDocumentCommand(
