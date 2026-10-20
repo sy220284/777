@@ -139,7 +139,8 @@ internal fun PluginInventoryBrowser(
     }
     val installedStatus = stringResource(R.string.tools_catalog_installed)
     val connectionStatus = stringResource(R.string.tools_catalog_connections)
-    val local = localIds.sorted().map { id ->
+    // Built-in skill runtime is exposed by the 技能 tab, not a duplicate plugin card.
+    val local = localIds.filterNot { it == "android-local-builtins" }.sorted().map { id ->
         val label = when (id) {
             "android-local-builtins" -> stringResource(R.string.skills_title)
             "android-runtime" -> stringResource(R.string.tools_capability_terminal)
