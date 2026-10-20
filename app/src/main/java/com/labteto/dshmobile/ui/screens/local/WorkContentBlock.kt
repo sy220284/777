@@ -256,13 +256,11 @@ internal fun completedWorkToolPhase(
 }
 
 @Composable
-private fun workToolActionLabel(name: String?, argumentsPreview: String? = null): String {
-    val isCommand = com.labteto.dshmobile.ui.agentOperationKind(name) ==
-        com.labteto.dshmobile.ui.AgentOperationKind.Execute
-    if (isCommand) naturalWorkCommandAction(argumentsPreview)?.let { return it }
-    return userFacingWorkToolAction(name) ?: stringResource(userFacingWorkToolActionRes(name)
-        ?: agentOperationLabelRes(com.labteto.dshmobile.ui.agentOperationKind(name)))
-}
+private fun workToolActionLabel(name: String?, argumentsPreview: String? = null): String =
+    naturalWorkToolAction(name, argumentsPreview)
+        ?: userFacingWorkToolAction(name)
+        ?: stringResource(userFacingWorkToolActionRes(name)
+            ?: agentOperationLabelRes(com.labteto.dshmobile.ui.agentOperationKind(name)))
 
 internal fun workToolPhaseText(phase: LocalToolUiPhase): String = when (phase) {
     LocalToolUiPhase.DECLARED -> "等待执行"
@@ -287,8 +285,8 @@ private fun WorkToolStatusRow(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val provider = userFacingWorkToolProvider(name)
     val action = workToolActionLabel(name, argumentsPreview)
-    val title = if (provider == null) action else "$provider · $action"
-    val label = if (repeatCount > 1) "$title · 已检查 " + repeatCount + " 次" else title
+    // Provider is already visible via the icon. Repeating it in every title adds noise.
+    val label = if (repeatCount > 1) "$action · 已检查 " + repeatCount + " 次" else action
     val status = workToolPhaseText(phase)
     val tint = when (phase) {
         LocalToolUiPhase.FAILED -> colors.dangerInk
@@ -303,7 +301,7 @@ private fun WorkToolStatusRow(
             .heightIn(min = if (onClick == null) 30.dp else 48.dp)
             .semantics(mergeDescendants = true) { stateDescription = status },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
         Icon(imageVector = when {
             phase == LocalToolUiPhase.FAILED || phase == LocalToolUiPhase.OUTCOME_UNKNOWN -> FeatherIcons.AlertTriangle
@@ -318,8 +316,8 @@ private fun WorkToolStatusRow(
             }
         }, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
         FlowRow(modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-            verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+            verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(label, style = DsType.small13.withReadingWeight(),
                 color = if (phase == LocalToolUiPhase.FAILED) tint else colors.textSecondary)
             if (phase != LocalToolUiPhase.COMPLETED) {
