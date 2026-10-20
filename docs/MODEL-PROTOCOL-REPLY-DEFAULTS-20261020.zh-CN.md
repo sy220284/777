@@ -17,6 +17,7 @@
 
 - **已有用户配置不迁移**：`/v1` 的 MiniMax M3 仍使用 Chat Completions；新建 `/anthropic/v1` 才使用 Anthropic Messages。模型查找匹配地区官方域名时也按地址反推对应协议。自定义代理不继承官方能力。
 - **无效温度控制**：MiniMax M3.1/M3 在官方协议的 temperature 被忽略，所以能力表禁用温度、设置页隐藏滑块、请求组装不发这个参数；M2 现有参数行为保留。
+- **长任务输出**：Anthropic Messages 必须携带 `max_tokens`，思考也计入此值；MiniMax M3.1/M3 的预设默认请求上限设置为 65536，避免落入通用适配器 8192 的短回复默认值。实际可用上限仍取决于厂商账户。
 - **鉴权匹配**：MiniMax Anthropic 兼容地址请求使用 `Authorization: Bearer`，Claude 官方继续 `x-api-key`。
 
 ## 回复显示统一契约
