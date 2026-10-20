@@ -47,7 +47,9 @@ import kotlinx.serialization.json.Json
 class LocalRuntimeStateStore internal constructor(
     internal val memoryClassMb: Int = 256,
     internal val deviceMemory: LocalDeviceMemorySnapshot = LocalDeviceMemorySnapshot(),
-    private val jobOwner: LocalRuntimeJobOwner = LocalRuntimeJobOwner.inMemory(),
+    private val jobOwner: LocalRuntimeJobOwner = LocalRuntimeJobOwner.inMemory(
+        maxConcurrentJobs = localResourceBudgetForMemoryClass(memoryClassMb, deviceMemory).maxAgents,
+    ),
 ) {
     @Inject
     internal constructor(
@@ -192,6 +194,7 @@ class LocalRuntimeStateStore internal constructor(
         baseUrl = state.modelState.baseUrl,
         contextWindowTokensOverride =
             state.modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
+        deviceRamMb = deviceMemory.totalRamMb,
     )
 
     internal fun contextBudgetCharsFor(
@@ -209,6 +212,7 @@ class LocalRuntimeStateStore internal constructor(
         baseUrl = modelState.baseUrl,
         contextWindowTokensOverride =
             modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
+        deviceRamMb = deviceMemory.totalRamMb,
     ).maxHistoryChars
 
     internal suspend fun <T> withModelRequestResource(block: suspend () -> T): T =
