@@ -349,7 +349,12 @@ internal fun LocalMessageRow(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Column(
-                    readingModifier.testTag("messageActionSurface:${message.id}").combinedClickable(onClick = {}, onLongClick = { pulse(); actionsOpen = true }),
+                    readingModifier.testTag("messageActionSurface:${message.id}").combinedClickable(
+                        onClick = {},
+                        onLongClick = if (secondaryActions.isNotEmpty()) {
+                            { pulse(); actionsOpen = true }
+                        } else null,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 ) {
                 if (groupMode) {
