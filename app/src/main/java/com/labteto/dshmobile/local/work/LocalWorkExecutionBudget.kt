@@ -227,8 +227,8 @@ internal class LocalWorkExecutionBudget(
     }
 
     private companion object {
-        const val DEFAULT_PENDING_LIMIT_TOKENS = 256_000L
-        const val DEFAULT_MAX_REQUESTS = 64
+        const val DEFAULT_PENDING_LIMIT_TOKENS = 512_000L
+        const val DEFAULT_MAX_REQUESTS = 128
         const val PENDING_RECHECK_MILLIS = 100L
         const val MIN_ESTIMATE_SCALE = 0.35
         const val MAX_ESTIMATE_SCALE = 1.25
