@@ -77,7 +77,7 @@ class LocalModelProfileStoreRecoveryTest {
         val fixture = fakePreferences()
         val store = LocalModelProfileStore(fixture.preferences, Json { ignoreUnknownKeys = true })
         val previous = LocalModelProfile("plan", "gpt", "https://api.openai.com/v1",
-            authKind = LocalModelAuthKind.CHATGPT_PLAN)
+            authKind = LocalModelAuthKind.CHATGPT_PLAN, protocol = LocalModelProtocol.RESPONSES)
         store.write(listOf(previous))
         val malformed = listOf(
             """{"id":"valid","model":"safe","baseUrl":"https://safe.example/v1"}""",
@@ -97,7 +97,7 @@ class LocalModelProfileStoreRecoveryTest {
         val fixture = fakePreferences()
         val store = LocalModelProfileStore(fixture.preferences, Json { ignoreUnknownKeys = true })
         val original = LocalModelProfile("plan", "gpt", "https://api.openai.com/v1",
-            authKind = LocalModelAuthKind.CHATGPT_PLAN)
+            authKind = LocalModelAuthKind.CHATGPT_PLAN, protocol = LocalModelProtocol.RESPONSES)
         store.write(listOf(original))
         val brokenAuth = """[{"id":"plan","model":"gpt","baseUrl":"https://api.openai.com/v1",
             "authKind":"UNRECOGNIZED_FUTURE_AUTH"}]""".replace("\n", "")
