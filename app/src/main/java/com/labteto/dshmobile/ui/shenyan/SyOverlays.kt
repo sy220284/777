@@ -141,7 +141,7 @@ fun SyFullScreenDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnClickOutside = dismissOnBackgroundTap,
         ),
         content = content,
     )
@@ -359,6 +359,7 @@ fun SyContextActionMenu(
 @Composable
 fun SyFullscreenMediaOverlay(
     onDismiss: () -> Unit,
+    dismissOnBackgroundTap: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colors = LocalSyColors.current
@@ -376,6 +377,7 @@ fun SyFullscreenMediaOverlay(
                 .background(colors.canvas)
                 .testTag("syFullscreenMediaOverlay")
                 .clickable(
+                    enabled = dismissOnBackgroundTap,
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = onDismiss,
