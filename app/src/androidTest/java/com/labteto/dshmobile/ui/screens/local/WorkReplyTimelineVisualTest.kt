@@ -80,6 +80,38 @@ class WorkReplyTimelineVisualTest {
         compose.onNodeWithText("curl 可用").assertIsDisplayed()
     }
 
+    @Test fun chatStyleTimelineSeparatesNarrationAndSemanticActions() {
+        val search = LocalToolActivityUiItem(
+            "find-skill", "mcp__GitHub__search", LocalToolUiPhase.COMPLETED,
+            argumentsPreview = """{"query":"aesthetic-ui design skills"}""",
+        )
+        val change = LocalToolActivityUiItem(
+            "edit-ui", "mcp__GitHub__update_file", LocalToolUiPhase.RUNNING,
+            argumentsPreview = """{"path":"app/src/ui/screens/Message.kt"}""",
+        )
+        compose.setContent {
+            DshTheme(preference = ThemePreference.LIGHT) {
+                Column(Modifier.width(320.dp)
+                    .background(LocalSyColors.current.canvas).padding(16.dp)) {
+                    WorkTimelineStepRow(LocalHarnessMessage(
+                        "intro", "progress", "我先核对现有界面与设计规范。", createdAt = 1L))
+                    WorkTimelineStepRow(LocalHarnessMessage("step1", "tool", "搜索完成",
+                        "mcp__GitHub__search", createdAt = 2L,
+                        toolCallId = "find-skill", toolIsError = false), activity = search)
+                    WorkTimelineStepRow(LocalHarnessMessage(
+                        "detail", "progress", "## 核查结果\\n\\n已经定位需要调整的步骤区域。",
+                        createdAt = 3L))
+                    WorkPendingToolRow(change)
+                }
+            }
+        }
+        compose.onNodeWithText("检索视觉与 UI 设计技能").assertIsDisplayed()
+        compose.onNodeWithText("修改界面代码", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("核查结果").assertIsDisplayed()
+        compose.onNodeWithText("mcp__GitHub__search", substring = true).assertDoesNotExist()
+        saveScreenshot("chat-style-semantic-work-320dp")
+    }
+
     @Test fun darkLargeTextKeepsFailureAndRunningStatusReadable() {
         compose.setContent { DshTheme(preference = ThemePreference.DARK, textScale = 1.3f) { Timeline() } }
         compose.onNodeWithText("结果待确认").assertIsDisplayed()
