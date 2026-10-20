@@ -208,7 +208,7 @@ class LocalRuntimeStateStore internal constructor(
         snapshot: HarnessResourceSnapshot = resourceScheduler.snapshot(),
     ): LocalHistoryBudget = localHistoryBudgetFor(
         memoryClassMb = memoryClassMb,
-        pressure = snapshot.pressure,
+        pressure = localEffectiveHistoryPressure(snapshot, resourceScheduler.startupBudget),
         model = state.modelState.model,
         baseUrl = state.modelState.baseUrl,
         contextWindowTokensOverride =
@@ -226,7 +226,7 @@ class LocalRuntimeStateStore internal constructor(
         snapshot: HarnessResourceSnapshot,
     ): Int = localHistoryBudgetFor(
         memoryClassMb = memoryClassMb,
-        pressure = snapshot.pressure,
+        pressure = localEffectiveHistoryPressure(snapshot, resourceScheduler.startupBudget),
         model = modelState.model,
         baseUrl = modelState.baseUrl,
         contextWindowTokensOverride =
