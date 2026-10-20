@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -119,4 +120,27 @@ class V6SeamlessNavigationInteractionTest {
         compose.onNodeWithText("完成构建", substring = true).performTouchInput { longClick() }
         compose.onNodeWithText("转为任务").assertDoesNotExist()
     }
+    @Test fun assistantMessageContextMenuKeepsGenerationWithoutInlineCard() {
+        val message = LocalHarnessMessage(
+            id = "assistant-doc-1", role = "assistant",
+            content = "这是一条等待整理的回复", createdAt = 1L,
+        )
+        var selectedId: String? = null
+        compose.setContent {
+            DshTheme {
+                LocalMessageRow(
+                    message = message, chatMode = true, groupMode = false,
+                    canEdit = false, canRegenerate = false, canSelectVariant = false,
+                    branchInfo = null, onEdit = {}, onSelectVariant = { _, _ -> false },
+                    onRegenerate = { false },
+                    onCreateDocument = { selectedId = it.id },
+                )
+            }
+        }
+        compose.onNodeWithTag("messageActionSurface:assistant-doc-1")
+            .performTouchInput { longClick() }
+        compose.onNodeWithText("为此回复生成交互文档").performClick()
+        compose.runOnIdle { assertEquals("assistant-doc-1", selectedId) }
+    }
+
 }
