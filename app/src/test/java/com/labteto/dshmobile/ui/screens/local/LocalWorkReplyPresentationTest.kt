@@ -114,6 +114,57 @@ class LocalWorkReplyPresentationTest {
             appendPendingWorkToolActivities(emptyList(), listOf(activity), running = false))
     }
 
+    @Test fun concurrentPendingToolsAppearAtOriginalTimesBeforeLaterNarration() {
+        val user = LocalTranscriptItem.Message(message("u", "user", "核查").copy(createdAt = 100L))
+        val narrative = LocalTranscriptItem.WorkStep(
+            message("n", "progress", "已发现风险点").copy(createdAt = 140L))
+        val result = LocalTranscriptItem.WorkStep(
+            message("r", "tool", "ok", "mcp__GitHub__fetch_file", false)
+                .copy(createdAt = 155L, toolCallId = "finished"))
+        val answer = LocalTranscriptItem.Message(message("a", "assistant", "最终结论").copy(createdAt = 190L))
+        val one = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
+            callId = "one", name = "mcp__GitHub__fetch_file",
+            phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING,
+            declaredAt = 120L, declaredSequence = 5L)
+        val two = one.copy(callId = "two", declaredAt = 130L, declaredSequence = 6L)
+        val done = one.copy(callId = "finished", declaredAt = 145L, declaredSequence = 7L)
+        val visible = appendPendingWorkToolActivities(
+            listOf(user, narrative, result, answer),
+            listOf(two, done, one), running = true)
+        assertEquals(
+            listOf("message:u", "work-tool:one", "work-tool:two", "work-step:n",
+                "work-tool:finished", "message:a"),
+            visible.map { it.key })
+    }
+
+    @Test fun unfinishedCallsRemainDistinctEvenAfterThirtyTwoEntries() {
+        val activities = (1..48).map { index ->
+            com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
+                callId = "c$index", name = "mcp__GitHub__fetch_file",
+                phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING,
+                declaredAt = 1_000L + index, declaredSequence = index.toLong())
+        }
+        val entries = appendPendingWorkToolActivities(emptyList(), activities.reversed(), running = true)
+        assertEquals(48, entries.size)
+        assertEquals("work-tool:c1", entries.first().key)
+        assertEquals("work-tool:c48", entries.last().key)
+    }
+
+    @Test fun toolOutcomeDoesNotMislabelCancellationOrUnknownAsSuccess() {
+        val normal = message("done", "tool", "ok", "first_tool", false)
+        val cancelled = normal.copy(toolIsError = true, toolErrorCode = "TOOL_CANCELLED")
+        val uncertain = normal.copy(toolIsError = true, toolErrorCode = "TOOL_OUTCOME_UNKNOWN")
+        val broken = normal.copy(toolIsError = true, toolErrorCode = "NETWORK_ERROR")
+        assertEquals(com.labteto.dshmobile.local.presentation.LocalToolUiPhase.COMPLETED,
+            completedWorkToolPhase(normal))
+        assertEquals(com.labteto.dshmobile.local.presentation.LocalToolUiPhase.CANCELLED,
+            completedWorkToolPhase(cancelled))
+        assertEquals(com.labteto.dshmobile.local.presentation.LocalToolUiPhase.OUTCOME_UNKNOWN,
+            completedWorkToolPhase(uncertain))
+        assertEquals(com.labteto.dshmobile.local.presentation.LocalToolUiPhase.FAILED,
+            completedWorkToolPhase(broken))
+    }
+
     @Test fun thinkingOnlyStaysPrivateAndEventIdentityRemainsStable() {
         val reasoning = message("reasoning", "reasoning", "secret")
         val items = buildLocalDisplayTranscript(listOf(LocalTranscriptItem.WorkProcess(listOf(reasoning))))
