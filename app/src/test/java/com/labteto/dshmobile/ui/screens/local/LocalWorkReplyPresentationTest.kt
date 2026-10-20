@@ -23,8 +23,26 @@ class LocalWorkReplyPresentationTest {
     @Test fun builtInToolActionsDescribeTheActualCapability() {
         assertEquals("读取文件", userFacingWorkToolAction("read"))
         assertEquals("搜索文件内容", userFacingWorkToolAction("grep"))
-        assertEquals("执行命令", userFacingWorkToolAction("bash"))
+        assertEquals("运行本地任务", userFacingWorkToolAction("bash"))
         assertEquals("修改文件", userFacingWorkToolAction("edit"))
+    }
+
+    @Test fun completedStepUsesItsOriginalDeclaredActionEvenWhenNotRunning() {
+        val command = """{"command":"command -v curl && command -v wget"}"""
+        val activity = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
+            callId = "call-1", name = "bash",
+            phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.COMPLETED,
+            argumentsPreview = command,
+        )
+        val row = LocalTranscriptItem.WorkStep(
+            message("result", "tool", "ok", "bash", false).copy(toolCallId = "call-1")
+        )
+        val visible = appendPendingWorkToolActivities(listOf(row), listOf(activity), running = false)
+            .single() as LocalTranscriptItem.WorkStep
+        assertEquals("work-tool:call-1", visible.key)
+        assertEquals(command, visible.activity?.argumentsPreview)
+        assertEquals("检查 curl、wget 是否可用",
+            naturalWorkCommandAction(visible.activity?.argumentsPreview))
     }
 
     @Test fun sameMillisecondPendingCallStaysBeforeLaterCompletedCall() {
