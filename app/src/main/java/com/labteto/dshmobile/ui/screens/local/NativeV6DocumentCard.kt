@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +9,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import com.labteto.dshmobile.ui.shenyan.SyDialog
@@ -42,6 +45,38 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * The reply shows a bounded, read-only preview. Inputs, selections and authoritative
+ * bindings are intentionally excluded; real interactions remain in the guarded sheet.
+ */
+internal fun localReplyDocumentPreview(doc: UiDocument): String? {
+    val pending = ArrayDeque<UiDocumentNode>()
+    doc.nodes.forEach(pending::addLast)
+    var inspected = 0
+    var containsInputs = false
+    while (pending.isNotEmpty() && inspected++ < 128) {
+        when (val node = pending.removeFirst()) {
+            is UiDocumentNode.Text -> node.text.trim().takeIf(String::isNotBlank)
+                ?.let { return it.take(220) }
+            is UiDocumentNode.Table ->
+                return "表格 · ${node.rows.size} 行 · ${node.headers.size} 列"
+            is UiDocumentNode.BarChart ->
+                return "${node.title.take(90)} · ${node.points.size} 项"
+            is UiDocumentNode.LineChart ->
+                return "${node.title.take(90)} · ${node.points.size} 项"
+            is UiDocumentNode.Media -> return node.label.take(160)
+            is UiDocumentNode.Column -> node.children.asReversed().forEach(pending::addFirst)
+            is UiDocumentNode.Row -> node.children.asReversed().forEach(pending::addFirst)
+            is UiDocumentNode.Disclosure -> node.children.asReversed().forEach(pending::addFirst)
+            is UiDocumentNode.Field, is UiDocumentNode.Select, is UiDocumentNode.Switch,
+            is UiDocumentNode.Slider, is UiDocumentNode.Calculated, is UiDocumentNode.Button ->
+                containsInputs = true
+            is UiDocumentNode.BoundText -> Unit
+        }
+    }
+    return "交互表单 · 请展开填写".takeIf { containsInputs }
+}
+
 /** The message timeline shows only a small entry; documents open on demand. */
 @Composable
 internal fun NativeV6DocumentModalHost(
@@ -55,14 +90,57 @@ internal fun NativeV6DocumentModalHost(
     if (documents.isEmpty()) return
 
     val selected = documents.firstOrNull { it.document.documentId == selectedId }
-    SyButton(
-        text = if (documents.size == 1) "查看回复卡片" else "查看回复卡片 · ${documents.size} 份",
-        onClick = { selectedId = documents.last().document.documentId; open = true },
-        enabled = dismissEnabled,
-        size = SyButtonSize.Small,
-        variant = SyButtonVariant.Ghost,
-        modifier = Modifier.testTag("reply_document_open:${messageId}"),
-    )
+    val latest = documents.last()
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    val summary = if (latest.recoveryNotice != null)
+        "历史内容，仅支持查看"
+    else localReplyDocumentPreview(latest.document)
+    // A reply-owned document reads as content, not an unrelated modal-launch button.
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .testTag("reply_document_open:${messageId}")
+            .clickable(enabled = dismissEnabled) {
+                selectedId = latest.document.documentId
+                open = true
+            }
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.material3.Icon(
+                com.labteto.dshmobile.ui.components.FeatherIcons.FileText,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = colors.textSecondary,
+            )
+            Text(latest.document.title,
+                style = com.labteto.dshmobile.ui.theme.DsType.small13Strong,
+                color = colors.text,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+            )
+            androidx.compose.material3.Icon(
+                com.labteto.dshmobile.ui.components.FeatherIcons.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = colors.textSecondary,
+            )
+        }
+        summary?.let { text ->
+            Text(text, style = com.labteto.dshmobile.ui.theme.DsType.small13,
+                color = colors.textSecondary,
+                modifier = Modifier.padding(start = 26.dp),
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        }
+        if (documents.size > 1) {
+            Text("关联文档 ${documents.size} 份",
+                style = com.labteto.dshmobile.ui.theme.DsType.caption11,
+                color = colors.textTertiary, modifier = Modifier.padding(start = 26.dp))
+        }
+    }
     if (open && selected != null) {
         val close = { open = false }
         SyResponsiveSheet(
