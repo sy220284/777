@@ -111,15 +111,16 @@ class LocalMiniMaxCompatibilityTest {
         assertEquals("正在核查", deltas.joinToString("") { it.content })
         val history = LocalCanonicalModelCodec.toHistoryMessage(reply.canonicalMessage!!)
         val restored = LocalCanonicalModelCodec.message(history)
-        val same = LocalCanonicalModelCodec.toLegacyMessages(
-            listOf(restored), LocalModelAdapterIds.ANTHROPIC_MESSAGES, selected.fingerprint,
-        ).single()
-        assertEquals("mm-signature", same["content"]!!.jsonArray[0].jsonObject["signature"]!!.jsonPrimitive.content)
-        assertEquals("read", same["content"]!!.jsonArray[2].jsonObject["name"]!!.jsonPrimitive.content)
-        val changed = LocalCanonicalModelCodec.toLegacyMessages(
-            listOf(restored), LocalModelAdapterIds.ANTHROPIC_MESSAGES, "different-route",
-        ).single()
+        val same = client.buildPayload(selected, listOf(restored), emptyList(), null)
+            .getValue("messages").jsonArray.single().jsonObject.getValue("content").jsonArray
+        assertEquals("mm-signature", same[0].jsonObject["signature"]!!.jsonPrimitive.content)
+        assertEquals("read", same[2].jsonObject["name"]!!.jsonPrimitive.content)
+        val changed = client.buildPayload(
+            selected.copy(baseUrl = "https://api.minimax.io/anthropic/v1"),
+            listOf(restored), emptyList(), null,
+        ).getValue("messages").jsonArray.single().jsonObject.getValue("content").jsonArray
         assertFalse(changed.toString().contains("mm-signature"))
+        assertTrue(changed.any { it.jsonObject["type"]?.jsonPrimitive?.content == "tool_use" })
     }
 
     @Test fun providerQuotaErrorIsReportedInsteadOfMissingChoices() {
