@@ -192,6 +192,20 @@ private fun isWorkProcessMessage(messages: List<LocalHarnessMessage>, index: Int
 }
 
 /**
+ * Read the last dialogue / Work-process item, never trailing sidecars (artifacts, paid media,
+ * background creation cards). Those sidecars may be appended after an already-durable final
+ * answer, but they cannot reactivate a transient reply preview.
+ */
+internal fun localReplyStreamingBoundary(items: List<LocalTranscriptItem>): LocalTranscriptItem? =
+    items.lastOrNull { item ->
+        item is LocalTranscriptItem.Message ||
+            item is LocalTranscriptItem.Thinking ||
+            item is LocalTranscriptItem.WorkProcess ||
+            item is LocalTranscriptItem.WorkNode ||
+            item is LocalTranscriptItem.WorkStep
+    }
+
+/**
  * A durable final assistant answer already owns the tail. It must not be duplicated by the
  * transient streaming preview while the execution coordinator is closing the turn.
  */
