@@ -83,14 +83,17 @@ internal fun naturalWorkToolAction(toolName: String?, argumentsPreview: String?)
         .joinToString(" ").lowercase()
     val hint = "$pathHint $queryHint"
     // Broad categories only: no user-authored query or private path is echoed.
+    val isTest = Regex("""(?:androidtest|regression|test\.kt|测试|回归)""")
+        .containsMatchIn(hint)
+    val isWorkTimeline = Regex("""(?:timeline|transcript|workstep|workreply|工作步骤|时间线|回复显示)""")
+        .containsMatchIn(hint)
     val subject = when {
-        Regex("""(?:timeline|transcript|workstep|workreply|工作步骤|时间线|回复显示)""")
-            .containsMatchIn(hint) -> "工作回复时间线"
+        isTest && isWorkTimeline -> "工作回复显示测试"
+        isTest -> "相关测试"
+        isWorkTimeline -> "工作回复时间线"
         Regex("""(?:aesthetic|设计技能|ui.design|ui设计|visual.skill)""")
             .containsMatchIn(hint) -> "视觉与 UI 设计技能"
         Regex("""(?:skill|技能)""").containsMatchIn(hint) -> "技能配置"
-        Regex("""(?:androidtest|regression|test\.kt|测试|回归)""")
-            .containsMatchIn(hint) -> "相关测试"
         Regex("""(?:视觉|ui/|/ui|design|界面|layout)""")
             .containsMatchIn(hint) ->
             if (pathHint.contains(".kt")) "界面代码"
