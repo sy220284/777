@@ -64,10 +64,15 @@ internal class LocalModelProfileStore(
                 protocol = when (auth) {
                     LocalModelAuthKind.CHATGPT_PLAN -> LocalModelProtocol.RESPONSES
                     LocalModelAuthKind.API_KEY ->
-                        preset?.protocol?.takeIf { it == LocalModelProtocol.ANTHROPIC_MESSAGES }
-                            ?: recordedProtocol
-                            ?: preset?.protocol
-                            ?: LocalModelProtocol.CHAT_COMPLETIONS
+                        if (preset?.provider == "Claude" &&
+                            preset.protocol == LocalModelProtocol.ANTHROPIC_MESSAGES
+                        ) {
+                            // Migrate retired official Claude profiles to the native Messages API.
+                            LocalModelProtocol.ANTHROPIC_MESSAGES
+                        } else {
+                            // A user-selected MiniMax/custom transport must survive an app upgrade.
+                            recordedProtocol ?: preset?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS
+                        }
                 },
                 credentialRef = credentialRef,
                 displayName = obj["displayName"]?.jsonPrimitive?.contentOrNull,
