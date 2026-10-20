@@ -448,6 +448,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
     var showMediaStudio by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var documentGenerationMessageId by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var mediaRevision by rememberSaveable(state.sessionId) { mutableStateOf<LocalMediaRevisionDraft?>(null) }
     var mediaInitialPrompt by rememberSaveable(state.sessionId) { mutableStateOf("") }
     var mediaSourceMessageId by rememberSaveable(state.sessionId) { mutableStateOf<String?>(null) }
@@ -1157,7 +1158,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 onConvertToWork = if (state.usageMode == LocalUsageMode.CHAT &&
                                     onUseWorkCapability != null && !state.loading && !state.running
                                 ) { message -> onUseWorkCapability(message.content) } else null,
-                                 onLocateSourceMemory = { message -> onLocateMemoryForMessage(message.id) },
+                                 onCreateDocument = if (nativeDocuments != null && messageActionsEnabled &&
+                                    transcriptItem.message.role == "assistant" &&
+                                    state.messages.any { it.id == transcriptItem.message.id }
+                                ) { message -> documentGenerationMessageId = message.id } else null,
+                                onLocateSourceMemory = { message -> onLocateMemoryForMessage(message.id) },
                                 onSelectVariant = onSelectMessageVariant,
                                 onRegenerate = onRegenerate,
                             )
@@ -1171,7 +1176,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             )
                             if (nativeDocuments != null &&
                                 (nativeDocumentSnapshot.sessionId == state.sessionId || isHistoricalDocumentSource) &&
-                                (transcriptItem.message.role == "assistant" || inlineDocuments.isNotEmpty())) {
+                                inlineDocuments.isNotEmpty()) {
                                 NativeV6DocumentMessage(
                                     messageId = transcriptItem.message.id,
                                     documents = inlineDocuments,
@@ -1513,6 +1518,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
 
     }
 
+    documentGenerationMessageId?.let { sourceId ->
+        nativeDocuments?.let { documents ->
+            NativeV6DocumentGenerationDialog(
+                messageId = sourceId,
+                onDismiss = { documentGenerationMessageId = null },
+                onGenerate = documents::generate,
+            )
+        }
+    }
     V6LoadedConversationSearchHost(
         controller = loadedSearchState,
         transcript = transcriptItems,

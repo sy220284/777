@@ -95,7 +95,6 @@ internal class LocalWorkAgentTurnExecutor(
     private val workSessionProjection: LocalWorkSessionProjectionRuntime,
     private val workToolResultRuntime: LocalWorkToolResultRuntime,
     private val workTurnToolRuntime: LocalWorkTurnToolRuntime,
-    private val workUiDocumentPublisher: LocalWorkUiDocumentPublisher,
     private val replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
     private val onRootExecutionSliceStarted: (String) -> Unit = {},
 ) {
@@ -533,7 +532,6 @@ internal class LocalWorkAgentTurnExecutor(
                                 put("model", runState.value.modelState.model)
                             })
                             onRootExecutionSliceStarted(runSessionId)
-                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_progress")
                         }
                         is AgentEvent.StepStarted -> {
                             activeStep = event.step
@@ -595,7 +593,6 @@ internal class LocalWorkAgentTurnExecutor(
                             workModelHistoryRuntime.updateContextMetrics(binding)
                             runTranscript.applyMessages(transcriptMessages, assistantEvent.sequence)
                             workModelHistoryRuntime.persist(binding)
-                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_progress")
                         }
                         is AgentEvent.ToolStarted -> {
                             val declared = runEventLog.append("tool/call", buildJsonObject {
@@ -608,8 +605,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 put("execution_started", false)
                             })
                             declaredToolEvents[event.call.id] = declared.createdAt to declared.sequence
-                            // Pending tool status is durable before the Work card observes it.
-                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_tool_started")
+                            // Tool progress is projected from durable EventLog events, not a work-live card.
                         }
                         is AgentEvent.ToolFinished -> {
                             progressTracker.recordToolResult(event.call, event.output, event.isError)
@@ -690,9 +686,6 @@ internal class LocalWorkAgentTurnExecutor(
                             workModelHistoryRuntime.updateContextMetrics(binding)
                             runTranscript.applyMessages(listOf(transcriptMessage), toolEvent.sequence)
                             workModelHistoryRuntime.persist(binding)
-                            // Event is durable before exposing a UI snapshot. A broken card must
-                            // never abort a completed tool or alter its execution result.
-                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_tool_progress")
                         }
                         is AgentEvent.StepFinished -> {
                             runEventLog.append("step/end", buildJsonObject {
@@ -717,7 +710,6 @@ internal class LocalWorkAgentTurnExecutor(
                                 }
                             })
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/completed")
-                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_completed_turn")
                             completedGoalDisposition = goalAssessment?.disposition
                         }
                         is AgentEvent.TurnStepLimit -> {
@@ -735,7 +727,6 @@ internal class LocalWorkAgentTurnExecutor(
                             runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/step-limit")
                             workModelHistoryRuntime.persist(binding)
-                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_step_limit")
                         }
                         is AgentEvent.TurnFailed -> {
                             settlePendingTools("failed")
@@ -773,7 +764,6 @@ internal class LocalWorkAgentTurnExecutor(
                                 workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/failed")
                             }
                             workModelHistoryRuntime.persist(binding)
-                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_failed_turn")
                         }
                         is AgentEvent.TurnCancelled -> {
                             settlePendingTools("cancelled")
@@ -787,7 +777,6 @@ internal class LocalWorkAgentTurnExecutor(
                             runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
                             workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/cancelled")
                             workModelHistoryRuntime.persist(binding)
-                            workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_cancelled_turn")
                         }
                     }
                     agentRunCoordinator.recordEvent(runContext, event)

@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import com.labteto.dshmobile.ui.shenyan.SyDialog
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import androidx.compose.ui.platform.testTag
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import androidx.compose.material3.Checkbox
@@ -39,10 +42,58 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * Real V6 conversation cards. Rendered nodes are presentation only; every command passes
- * through the existing document Owner for revision, session, approval and input validation.
- */
+/** The message timeline shows only a small entry; documents open on demand. */
+@Composable
+internal fun NativeV6DocumentModalHost(
+    messageId: String,
+    documents: List<UiDocumentSnapshot>,
+    dismissEnabled: Boolean = true,
+    content: @Composable (UiDocumentSnapshot, () -> Unit) -> Unit,
+) {
+    var open by remember(messageId) { mutableStateOf(false) }
+    var selectedId by remember(messageId) { mutableStateOf<String?>(null) }
+    if (documents.isEmpty()) return
+
+    val selected = documents.firstOrNull { it.document.documentId == selectedId }
+    SyButton(
+        text = if (documents.size == 1) "查看回复卡片" else "查看回复卡片 · ${documents.size} 份",
+        onClick = { selectedId = documents.last().document.documentId; open = true },
+        enabled = dismissEnabled,
+        size = SyButtonSize.Small,
+        variant = SyButtonVariant.Ghost,
+        modifier = Modifier.testTag("reply_document_open:${messageId}"),
+    )
+    if (open && selected != null) {
+        val close = { open = false }
+        SyResponsiveSheet(
+            title = selected.document.title,
+            onDismiss = close,
+            scrollable = true,
+            seamlessBackground = false,
+            dismissEnabled = dismissEnabled,
+            trailing = {
+                SyButton("关闭", onClick = close, enabled = dismissEnabled,
+                    size = SyButtonSize.Small, variant = SyButtonVariant.Ghost)
+            },
+        ) {
+            if (documents.size > 1) {
+                Text("选择要查看的文档", style = MaterialTheme.typography.labelMedium)
+                documents.forEach { snapshot ->
+                    SyButton(
+                        text = snapshot.document.title,
+                        onClick = { selectedId = snapshot.document.documentId },
+                        enabled = dismissEnabled,
+                        size = SyButtonSize.Small,
+                        variant = if (snapshot.document.documentId == selected.document.documentId)
+                            SyButtonVariant.Primary else SyButtonVariant.Ghost,
+                    )
+                }
+            }
+            content(selected, close)
+        }
+    }
+}
+
 @Composable
 internal fun NativeV6DocumentMessage(
     messageId: String,
@@ -51,45 +102,16 @@ internal fun NativeV6DocumentMessage(
     readOnly: Boolean = false,
     onPreparedDraft: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
-    var creating by remember(messageId) { mutableStateOf(false) }
-    var generating by remember(messageId) { mutableStateOf(false) }
-    var prompt by remember(messageId) { mutableStateOf("把这条回复整理成可交互的文档") }
     var feedback by remember(messageId) { mutableStateOf<String?>(null) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        // Show action feedback BEFORE long forms, so a prepared draft or rejected
-        // submission never looks like an inert button at the bottom of the screen.
+    var busy by remember(messageId) { mutableStateOf(false) }
+    NativeV6DocumentModalHost(messageId, documents, dismissEnabled = !busy) { snapshot, close ->
         feedback?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-        documents.forEach { snapshot ->
-            NativeV6DocumentCard(snapshot, controller, readOnly = readOnly, onFeedback = { feedback = it },
-                onPreparedDraft = onPreparedDraft)
-        }
-        if (documents.isEmpty() && !readOnly) {
-            TextButton(onClick = { creating = true }, enabled = !generating) {
-                Text(if (generating) "正在生成交互文档…" else "生成交互文档")
-            }
-        }
-    }
-    if (creating && !readOnly) {
-        SyDialog(title = "生成交互文档", onDismiss = { creating = false }) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("将额外请求一次模型；确认后才会执行。")
-                    OutlinedTextField(value = prompt, onValueChange = { prompt = it },
-                        label = { Text("文档要求") }, modifier = Modifier.fillMaxWidth())
-                }
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        TextButton(onClick = { creating = false }) { Text("取消") }
-        TextButton(enabled = prompt.isNotBlank() && !generating, onClick = {
-                    creating = false
-                    generating = true
-                    scope.launch {
-                        try {
-                            feedback = nativeV6DocumentReceiptMessage(controller.generate(messageId, prompt))
-                        } finally { generating = false }
-                    }
-                }) { Text("确认生成") }
-    }
-}
+        NativeV6DocumentCard(snapshot, controller, readOnly,
+            onFeedback = { feedback = it },
+            onPreparedDraft = { close(); onPreparedDraft() },
+            onDeleted = close,
+            onBusyChange = { busy = it },
+        )
     }
 }
 
@@ -100,6 +122,8 @@ private fun NativeV6DocumentCard(
     readOnly: Boolean,
     onFeedback: (String) -> Unit,
     onPreparedDraft: () -> Unit,
+    onDeleted: () -> Unit,
+    onBusyChange: (Boolean) -> Unit,
 ) {
     val doc = snapshot.document
     val scope = rememberCoroutineScope()
@@ -117,10 +141,10 @@ private fun NativeV6DocumentCard(
     var submitting by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
     var submitted by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
     var confirmDelete by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
-    var progressDetailsExpanded by remember(doc.documentId) { mutableStateOf(false) }
     fun perform(actionId: String, confirmed: Boolean) {
         if (submitting || submitted) return
         submitting = true
+        onBusyChange(true)
         val values = fields
         scope.launch {
             try {
@@ -139,19 +163,18 @@ private fun NativeV6DocumentCard(
                 onFeedback("表单提交失败：${failure.message.orEmpty().ifBlank { failure.javaClass.simpleName }}")
             } finally {
                 submitting = false
+                onBusyChange(false)
             }
         }
     }
-    Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 2.dp,
-        modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(doc.title, style = MaterialTheme.typography.titleMedium)
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (submitting || deleting) Text("正在处理，请稍候…", style = MaterialTheme.typography.bodySmall)
             if (snapshot.recoveryNotice != null) {
                 Text(doc.fallbackText, style = MaterialTheme.typography.bodyMedium)
                 Text("该文档仅提供历史内容，不能执行操作。")
             } else {
                 if (readOnly) Text("历史文档只读，操作已禁用。")
-                nativeV6InlineVisibleNodes(doc, progressDetailsExpanded).forEach { node ->
+                doc.nodes.forEach { node ->
                     NativeV6DocumentNode(
                         node, snapshot.bindings, fields,
                         onFieldChange = { id, value -> if (!readOnly && !submitting && !submitted) controller.forms.update(formKey, id, value) },
@@ -171,11 +194,6 @@ private fun NativeV6DocumentCard(
                         }
                     }
                 }
-                if (doc.documentId.startsWith("work-live:") && doc.nodes.size > 1) {
-                    TextButton(onClick = { progressDetailsExpanded = !progressDetailsExpanded }) {
-                        Text(if (progressDetailsExpanded) "收起执行明细" else "查看工具记录与阶段输出")
-                    }
-                }
             }
             if (!readOnly && snapshot.recoveryNotice == null && !doc.documentId.startsWith("work-live:")) {
                 SyButton(
@@ -183,7 +201,6 @@ private fun NativeV6DocumentCard(
                     enabled = !deleting, variant = SyButtonVariant.Ghost,
                 )
             }
-        }
     }
     confirmation?.let { actionId ->
         SyDialog(title = "确认文档操作", onDismiss = { confirmation = null }) {
@@ -206,12 +223,15 @@ private fun NativeV6DocumentCard(
                 SyButton("确认删除", onClick = {
                     confirmDelete = false
                     deleting = true
+                    onBusyChange(true)
                     scope.launch {
                         try {
                             val receipt = withContext(Dispatchers.IO) { controller.delete(snapshot) }
-                            if (receipt == UiDocumentReceipt.Deleted) controller.forms.forgetDocument(formKey)
-                            onFeedback(nativeV6DocumentReceiptMessage(receipt))
-                        } finally { deleting = false }
+                            if (receipt == UiDocumentReceipt.Deleted) {
+                                controller.forms.forgetDocument(formKey)
+                                onDeleted()
+                            } else onFeedback(nativeV6DocumentReceiptMessage(receipt))
+                        } finally { deleting = false; onBusyChange(false) }
                     }
                 }, variant = SyButtonVariant.Danger)
             }

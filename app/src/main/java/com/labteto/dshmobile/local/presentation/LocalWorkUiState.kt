@@ -48,7 +48,6 @@ data class LocalWorkUiState(
     val contextBudgetChars: Int = 0,
     val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,
     val handoffSummary: String? = null,
-    val workProjectionOutOfSync: Boolean = false,
 )
 
 internal fun LocalHarnessState.toWorkUiState(): LocalWorkUiState =
@@ -77,7 +76,6 @@ internal fun LocalHarnessState.toWorkUiState(): LocalWorkUiState =
         contextBudgetChars = kernel.contextBudgetChars,
         conversationMode = conversationMode,
         handoffSummary = handoffSummary,
-        workProjectionOutOfSync = work.workProjectionOutOfSync,
     )
 
 internal fun StateFlow<LocalHarnessState>.projectWorkState(

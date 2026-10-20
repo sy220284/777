@@ -79,7 +79,8 @@ internal fun NativeV6DocumentsSheet(
     val colors = LocalSyColors.current
     val current = identity()
     val sourceMessageId = if (current != null) currentMessageId() else null
-    val items = snapshot.documents.filter { it.document.source.sessionId == current?.sessionId }
+    val items = snapshot.documents.filter { it.document.source.sessionId == current?.sessionId &&
+        !it.document.documentId.startsWith("work-live:") }
     var prompt by remember(current?.sessionId) { mutableStateOf("") }
     var modelConsent by remember(current?.sessionId) { mutableStateOf(false) }
     var notice by remember(current?.sessionId) { mutableStateOf<String?>(null) }
