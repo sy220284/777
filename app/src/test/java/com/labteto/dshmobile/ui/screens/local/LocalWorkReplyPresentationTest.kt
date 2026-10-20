@@ -21,6 +21,8 @@ class LocalWorkReplyPresentationTest {
         )
         val displayed = buildLocalDisplayTranscript(buildLocalTranscript(events))
         assertEquals(4, displayed.size)
+        assertEquals(listOf("work-step:read-one", "work-step:read-two",
+            "work-step:explain", "work-step:check"), displayed.map { it.key })
     }
 
     @Test fun publicProgressKeepsMarkdownAndLongContent() {
@@ -29,7 +31,7 @@ class LocalWorkReplyPresentationTest {
         assertEquals(content, localWorkTimelineText(content))
     }
 
-    @Test fun consecutiveToolRowsBecomeOneSemanticStepWithoutLosingTheAnswer() {
+    @Test fun toolRowsAndNarrationKeepSeparateOrderBeforeFinalAnswer() {
         val timeline = listOf(
             message("one", "tool", "ok", "first_tool"),
             message("two", "tool", "ok", "second_tool"),
@@ -40,14 +42,15 @@ class LocalWorkReplyPresentationTest {
         val projection = buildLocalDisplayTranscript(
             listOf(LocalTranscriptItem.WorkProcess(timeline), LocalTranscriptItem.Message(answer))
         )
-        val steps = projection.filterIsInstance<LocalTranscriptItem.WorkNode>()
-        assertEquals(1, steps.size)
-        assertEquals("已完成资料核对", steps.single().node.summary)
-        assertEquals(3, steps.single().node.count)
+        val steps = projection.filterIsInstance<LocalTranscriptItem.WorkStep>()
+        assertEquals(4, steps.size)
+        assertEquals(listOf("one", "two", "narration", "three"),
+            steps.map { it.message.id })
+        assertEquals("已完成资料核对", steps[2].message.content)
         assertEquals("message:answer", projection.last().key)
     }
 
-    @Test fun failuresRemainVisibleAndNeverMergeWithSuccessfulToolResults() {
+    @Test fun failuresKeepTheirOriginalEventStatusWithoutMerging() {
         val timeline = listOf(
             message("1", "tool", "ok", "first_tool", false),
             message("2", "tool", "ok", "second_tool", false),
@@ -55,12 +58,13 @@ class LocalWorkReplyPresentationTest {
             message("4", "tool", "failed", "fourth_tool", true),
         )
         val steps = buildLocalDisplayTranscript(listOf(LocalTranscriptItem.WorkProcess(timeline)))
-            .filterIsInstance<LocalTranscriptItem.WorkNode>()
-        assertEquals(2, steps.size)
-        assertEquals(2, steps[0].node.count)
-        assertFalse(steps[0].node.failed)
-        assertEquals(2, steps[1].node.count)
-        assertTrue(steps[1].node.failed)
+            .filterIsInstance<LocalTranscriptItem.WorkStep>()
+        assertEquals(4, steps.size)
+        assertEquals(listOf("1", "2", "3", "4"), steps.map { it.message.id })
+        assertFalse(steps[0].message.toolIsError ?: true)
+        assertFalse(steps[1].message.toolIsError ?: true)
+        assertTrue(steps[2].message.toolIsError ?: false)
+        assertTrue(steps[3].message.toolIsError ?: false)
     }
 
     @Test fun thinkingOnlyStaysPrivateAndEventIdentityRemainsStable() {
@@ -69,6 +73,6 @@ class LocalWorkReplyPresentationTest {
         assertTrue(items.single() is LocalTranscriptItem.WorkProcess)
         val narration = message("narration", "progress", "正在核对数据")
         val output = buildLocalDisplayTranscript(listOf(LocalTranscriptItem.WorkProcess(listOf(narration))))
-        assertEquals("work-node:narration", output.single().key)
+        assertEquals("work-step:narration", output.single().key)
     }
 }

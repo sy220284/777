@@ -89,10 +89,23 @@ internal fun buildLocalDisplayTranscript(items: List<LocalTranscriptItem>): List
                 add(item)
                 return@forEach
             }
-            val nodes = conversationWorkProcessNodes(buildWorkProcessNodes(item.messages))
-            nodes.forEach { add(LocalTranscriptItem.WorkNode(it)) }
-            if (nodes.isEmpty() && item.messages.any { it.role == "reasoning" }) {
-                add(item) // Only a generic thinking indicator; never display reasoning body.
+            // Do not fold distinct tool results into one semantic summary: each persisted
+            // event must keep its own chronological row and error status.
+            var visible = false
+            item.messages.forEach { message ->
+                when (message.role) {
+                    "tool" -> {
+                        add(LocalTranscriptItem.WorkStep(message))
+                        visible = true
+                    }
+                    "progress", "assistant" -> if (localWorkTimelineText(message.content) != null) {
+                        add(LocalTranscriptItem.WorkStep(message))
+                        visible = true
+                    }
+                }
+            }
+            if (!visible && item.messages.any { it.role == "reasoning" }) {
+                add(item) // Reasoning text remains private; expose only the thinking state.
             }
         }
     }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +21,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -152,11 +154,17 @@ internal fun WorkTimelineStepRow(
             if (!milestone) {
                 WorkOperationIcon(com.labteto.dshmobile.ui.AgentOperationKind.Generic, active)
             }
-            Text(
-                text = content, modifier = Modifier.weight(1f),
-                style = (if (milestone) DsType.mdSmall else DsType.small13).withReadingWeight(),
-                color = if (milestone) colors.text else colors.textSecondary,
-            )
+            // Public progress is real reply content, not a truncated status label.
+            // Reuse the same Markdown renderer as the final assistant answer.
+            SelectionContainer {
+                MarkdownText(
+                    text = content,
+                    modifier = Modifier.weight(1f),
+                    bodyStyle = (if (milestone) DsType.mdBody else DsType.small13)
+                        .withReadingWeight().copy(color = colors.text),
+                    preserveSoftLineBreaks = true,
+                )
+            }
             if (active) {
                 Text(
                     stringResource(agentOperationStatusRes(running = true, failed = false)),
@@ -198,9 +206,9 @@ internal fun WorkTimelineStepRow(
                 stringResource(agentOperationStatusRes(running = false, failed = true)),
                 style = DsType.caption11.withReadingWeight(), color = colors.dangerInk,
             )
-        } else if (repeatCount > 1) {
+        } else {
             Text(
-                stringResource(R.string.local_work_process_operation_count, repeatCount),
+                stringResource(agentOperationStatusRes(running = false, failed = false)),
                 style = DsType.caption11.withReadingWeight(), color = colors.textTertiary,
             )
         }

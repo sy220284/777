@@ -268,15 +268,13 @@ internal fun WorkOperationIcon(
     )
 }
 
-/** Public step narration only: preserve useful paragraphs, hide paths and shell logs. */
+/** Public progress is authored Markdown; neither structure nor length may be rewritten. */
 internal fun localWorkTimelineText(content: String): String? {
-    val visible = visibleAssistantText(content).trim()
-    if (visible.isBlank() || WORK_PROCESS_PRIVATE_NARRATION.containsMatchIn(visible)) return null
-    val readable = visible.lineSequence().map(String::trim)
-        .filter { it.isNotEmpty() && !WORK_PROCESS_TECHNICAL_LINE.containsMatchIn(it) }
-        .joinToString("\n") { WORK_PROCESS_PATH.replace(it, "…") }
-    return readable.takeIf(String::isNotBlank)
-        ?.let { truncateWithoutSplittingSurrogatePair(it, LOCAL_WORK_PROCESS_NOTE_LIMIT) }
+    val visible = visibleAssistantText(content)
+    if (visible.isBlank() ||
+        WORK_PROCESS_PRIVATE_NARRATION.containsMatchIn(visible.trimStart())
+    ) return null
+    return visible
 }
 
 /** Prefer durable structured tool status; legacy text errors are fallback only. */
