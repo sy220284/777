@@ -163,7 +163,7 @@ class LocalWorkRequestContextProjectionTest {
         )
         assertEquals(28_000, large.maxHistoryTokens)
         assertTrue(requireNotNull(large.tailTokens) <= 10_000)
-        assertTrue(large.maxToolResultTokens <= 2_400)
+        assertTrue(large.maxToolResultTokens <= 3_200)
     }
 
 

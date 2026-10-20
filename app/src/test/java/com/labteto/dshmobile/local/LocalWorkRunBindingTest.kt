@@ -109,11 +109,13 @@ class LocalWorkRunBindingTest {
         ))
         val registry = LocalWorkRunRegistry(runtime).apply { attach(binding) }
         val initialBudget = binding.state.value.kernel.contextBudgetChars
-        val leases = List(3) { runtime.resourceScheduler.acquire(HarnessResourceKind.AGENT) } +
-            runtime.resourceScheduler.acquire(HarnessResourceKind.MODEL_REQUEST)
+        val agentLeases = List((runtime.resourceBudget.maxAgents * 0.6).toInt() + 1) {
+            runtime.resourceScheduler.acquire(HarnessResourceKind.AGENT)
+        }
+        val leases = agentLeases + runtime.resourceScheduler.acquire(HarnessResourceKind.MODEL_REQUEST)
         try {
         assertEquals(0, visible.value.kernel.resources.activeAgents)
-        assertEquals(3, binding.state.value.kernel.resources.activeAgents)
+        assertEquals(agentLeases.size, binding.state.value.kernel.resources.activeAgents)
         assertTrue(binding.state.value.kernel.contextBudgetChars < initialBudget)
         assertEquals(binding.state.value.kernel.contextBudgetChars, visible.value.kernel.contextBudgetChars)
         assertTrue(binding.state.value.kernel.running)
