@@ -5,6 +5,8 @@ import com.labteto.dshmobile.local.model.LocalMediaResult
 import com.labteto.dshmobile.local.model.LocalMediaVideoTask
 import com.labteto.dshmobile.local.model.LocalMediaCreationJob
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
+import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
+import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 
 /**
  * User-facing transcript projection.
@@ -69,7 +71,14 @@ internal sealed interface LocalTranscriptItem {
         val message: LocalHarnessMessage,
         val repeatCount: Int = 1,
     ) : LocalTranscriptItem {
-        override val key: String = "work-step:${message.id}"
+        override val key: String =
+            message.toolCallId?.takeIf { message.role == "tool" }?.let { "work-tool:$it" }
+                ?: "work-step:${message.id}"
+    }
+
+    /** In-flight Tool-owned event. Replaced by the completion row with the same stable key. */
+    data class WorkPendingTool(val activity: LocalToolActivityUiItem) : LocalTranscriptItem {
+        override val key: String = "work-tool:${activity.callId}"
     }
 }
 
@@ -109,6 +118,21 @@ internal fun buildLocalDisplayTranscript(items: List<LocalTranscriptItem>): List
             }
         }
     }
+
+/** Only genuinely unfinished calls may appear as transient live rows. */
+internal fun appendPendingWorkToolActivities(
+    transcript: List<LocalTranscriptItem>,
+    activities: List<LocalToolActivityUiItem>,
+    running: Boolean,
+): List<LocalTranscriptItem> {
+    if (!running) return transcript
+    val completedIds = transcript.filterIsInstance<LocalTranscriptItem.WorkStep>()
+        .mapNotNull { it.message.toolCallId }.toSet()
+    val pending = activities.filter {
+        it.phase == LocalToolUiPhase.DECLARED || it.phase == LocalToolUiPhase.RUNNING
+    }.filter { it.callId !in completedIds }.distinctBy { it.callId }
+    return transcript + pending.map(LocalTranscriptItem::WorkPendingTool)
+}
 
 internal fun userVisibleDialogueMessageCount(
     messages: List<LocalHarnessMessage>,
@@ -231,6 +255,7 @@ internal fun localReplyStreamingBoundary(items: List<LocalTranscriptItem>): Loca
             item is LocalTranscriptItem.Thinking ||
             item is LocalTranscriptItem.WorkProcess ||
             item is LocalTranscriptItem.WorkNode ||
+            item is LocalTranscriptItem.WorkPendingTool ||
             item is LocalTranscriptItem.WorkStep
     }
 
@@ -276,6 +301,7 @@ internal fun mergeLocalMediaTimeline(
             operationTimestamps[item.result.id] ?: item.result.createdAtMillis
         is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis
         is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis
+        is LocalTranscriptItem.WorkPendingTool -> Long.MAX_VALUE
         is LocalTranscriptItem.WorkArtifact -> Long.MAX_VALUE
     }
     // Stable sort preserves original transcript order when event timestamps tie.
