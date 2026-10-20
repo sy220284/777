@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
 import com.labteto.dshmobile.local.runtime.LocalDeviceMemorySnapshot
 import com.labteto.dshmobile.local.runtime.localResourceBudgetForMemoryClass
+import com.labteto.dshmobile.local.runtime.localAdaptiveResourceBudget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -74,4 +75,47 @@ class LocalExecutionKernelTest {
         assertTrue(highMemory.maxTerminals > lowMemory.maxTerminals)
         assertTrue(highMemory.maxLanguageServers > lowMemory.maxLanguageServers)
     }
+    @Test
+    fun cloudModelConcurrencyIsIndependentOfCpuHeadroomButLocalWorkScales() {
+        val startup = LocalDeviceMemorySnapshot(15_100, 4_096)
+        val initial = localResourceBudgetForMemoryClass(512, startup)
+        val busy = localAdaptiveResourceBudget(
+            512, initial, startup, cpuHeadroomPercent = 10f,
+            thermalStatus = 0, powerSave = false,
+        )
+        assertEquals(10, busy.maxModelRequests)
+        assertTrue(busy.maxAgents < initial.maxAgents)
+        assertTrue(busy.maxTerminals < initial.maxTerminals)
+        val recovered = localAdaptiveResourceBudget(
+            512, initial, startup, cpuHeadroomPercent = 95f,
+            thermalStatus = 0, powerSave = false,
+        )
+        assertEquals(initial, recovered)
+    }
+
+    @Test
+    fun thermalMemoryAndBatterySignalsChangeAdmissionsWithoutChangingStartupCeilings() {
+        val initial = localResourceBudgetForMemoryClass(
+            512, LocalDeviceMemorySnapshot(15_100, 4_096),
+        )
+        fun live(
+            available: Int = 4_096, thermal: Int = 0,
+            saver: Boolean = false,
+        ) = localAdaptiveResourceBudget(
+            memoryClassMb = 512,
+            initial = initial,
+            liveMemory = LocalDeviceMemorySnapshot(15_100, available),
+            cpuHeadroomPercent = 90f,
+            thermalStatus = thermal,
+            powerSave = saver,
+        )
+        assertEquals(10, live().maxModelRequests)
+        assertEquals(3, live(available = 800).maxModelRequests)
+        assertEquals(4, live(thermal = 3).maxModelRequests)
+        assertEquals(2, live(thermal = 4).maxModelRequests)
+        assertEquals(10, live(saver = true).maxModelRequests)
+        assertTrue(live(saver = true).maxAgents < initial.maxAgents)
+        assertEquals(initial, live())
+    }
+
 }
