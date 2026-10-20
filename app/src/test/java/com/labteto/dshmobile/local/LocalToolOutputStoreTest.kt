@@ -10,6 +10,32 @@ import org.junit.rules.TemporaryFolder
 
 class LocalToolOutputStoreTest {
     @Test
+    fun unsuccessfulDirectoryDeletionMustRemainAnError() {
+        val root = temporary.newFolder("delete-error")
+        val store = LocalToolOutputStore(root)
+        assertTrue(store.store("retained", "receipt", "important evidence") != null)
+        val directory = root.listFiles().orEmpty().single { it.isDirectory }
+        val path = directory.toPath()
+        val permissions = java.nio.file.Files.getPosixFilePermissions(path)
+        try {
+            java.nio.file.Files.setPosixFilePermissions(path, setOf(
+                java.nio.file.attribute.PosixFilePermission.OWNER_READ,
+                java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE,
+            ))
+            assertFalse(java.nio.file.Files.isWritable(path))
+            org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+                store.deleteSession("retained")
+            }
+            assertTrue(directory.exists())
+        } finally {
+            java.nio.file.Files.setPosixFilePermissions(path, permissions)
+        }
+        assertTrue(store.read("retained", "receipt").contains("important evidence"))
+        store.deleteSession("retained")
+        assertFalse(directory.exists())
+    }
+
+    @Test
     fun successfulSessionCleanupRemovesReceiptsBeforeReportingSuccess() {
         val root = temporary.newFolder("tool-cleanup")
         val store = LocalToolOutputStore(root)
