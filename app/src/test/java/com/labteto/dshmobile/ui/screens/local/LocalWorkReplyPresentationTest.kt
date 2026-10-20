@@ -67,6 +67,33 @@ class LocalWorkReplyPresentationTest {
         assertTrue(steps[3].message.toolIsError ?: false)
     }
 
+    @Test fun descriptiveGitHubOperationsAreDistinctAndNotRawToolNames() {
+        assertEquals("扫描 PR 改动文件",
+            userFacingWorkToolAction("mcp__GitHub__list_pr_changed_filenames"))
+        assertEquals("获取 GitHub Blob 内容",
+            userFacingWorkToolAction("mcp__GitHub__fetch_blob"))
+        assertEquals("查看 PR 详情",
+            userFacingWorkToolAction("mcp__GitHub__get_pr_info"))
+        assertEquals("读取代码文件",
+            userFacingWorkToolAction("mcp__GitHub__fetch_file"))
+        assertEquals("检查流水线状态",
+            userFacingWorkToolAction("mcp__GitHub__get_commit_combined_status"))
+        assertEquals(null, userFacingWorkToolAction("mcp__Figma__get_file"))
+    }
+
+    @Test fun legacyIntermediateAssistantNarrationIsPreservedAsMarkdownBeforeTool() {
+        val content = "## 审计发现\\n\\n- 风险项\\n\\n\\u0060\\u0060\\u0060kotlin\\nval ok = true\\n\\u0060\\u0060\\u0060"
+        val items = buildLocalDisplayTranscript(buildLocalTranscript(listOf(
+            message("u", "user", "检查代码"),
+            message("n", "assistant", content),
+            message("t", "tool", "ok", "mcp_github_fetch_file", false),
+            message("a", "assistant", "最终结论"),
+        )))
+        assertEquals(listOf("message:u", "work-step:n", "work-step:t", "message:a"),
+            items.map { it.key })
+        assertEquals(content, (items[1] as LocalTranscriptItem.WorkStep).message.content)
+    }
+
     @Test fun thinkingOnlyStaysPrivateAndEventIdentityRemainsStable() {
         val reasoning = message("reasoning", "reasoning", "secret")
         val items = buildLocalDisplayTranscript(listOf(LocalTranscriptItem.WorkProcess(listOf(reasoning))))
