@@ -279,6 +279,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         } else {
             null
         }
+        try {
         if (contextProjection.projected) {
             log.append("request/history-projection", buildJsonObject {
                 put("step", step)
@@ -501,14 +502,9 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                         providerStartedNanos = null
                         lastProviderError = null
                         attemptEvidence.beginAttempt()
-                        previewOwner?.takeIf { previewGuard() }?.let(streamingPreviewStore::begin)
+                        previewOwner?.takeIf { previewGuard() }?.let { streamingPreviewStore.begin(it, event.attempt) }
                     }
                     is AgentRequestEvent.AttemptFailed -> {
-                        if (event.willRetry) {
-                            previewOwner
-                                ?.takeIf { previewGuard() }
-                                ?.let(streamingPreviewStore::begin)
-                        }
                         val durationMs = (System.nanoTime() - attemptStartedNanos) / 1_000_000
                         // Step time includes scheduling; provider time starts after resource grant.
                         val preProviderMs = providerStartedNanos?.let { (it - attemptStartedNanos).coerceAtLeast(0L) / 1_000_000 }
@@ -612,6 +608,9 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                         })
                     }
                     is AgentRequestEvent.RetryScheduled -> {
+                        previewOwner?.takeIf { previewGuard() }?.let {
+                            streamingPreviewStore.retry(it, event.nextAttempt)
+                        }
                         log.append("llm/retry", buildJsonObject {
                             put("request_uid", requestUid)
                             put("step", step)
@@ -697,7 +696,6 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             } else {
                 null
             }
-            try {
                 executor.execute { providerAttempt ->
                     val activeLogMessages = redactModelImages(activeMessages)
                     val activeEvidence = buildLocalRequestEvidence(activeMessages, tools, nativeTools)
@@ -957,9 +955,9 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             }
                             reply
                 }
-            } finally {
-                previewOwner?.let(streamingPreviewStore::clear)
-            }
+        }
+        } finally {
+            previewOwner?.let(streamingPreviewStore::clear)
         }
     }
 

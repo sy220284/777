@@ -289,7 +289,12 @@ internal fun LocalMessageRow(
             }
         }
 
-        "system" -> Unit
+        "system" -> if (!chatMode) Text(
+            text = message.content,
+            style = DsType.workBody.withReadingWeight(),
+            color = if (message.content.startsWith("执行失败：")) colors.dangerInk else colors.textSecondary,
+            modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd),
+        )
 
         "reasoning", "tool", "progress" -> WorkProcessRow(listOf(message))
 
@@ -518,7 +523,7 @@ private fun LocalAssistantMessageContent(
                     SelectionContainer {
                         MarkdownText(
                             body,
-                            bodyStyle = if (chatMode) DsType.chatBody else DsType.mdBody,
+                            bodyStyle = if (chatMode) DsType.chatBody else DsType.workBody,
                             preserveSoftLineBreaks = chatMode,
                         )
                     }

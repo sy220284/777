@@ -45,6 +45,8 @@ internal class LocalWorkRunBinding(
     }
 
     val state = MutableStateFlow(initialState)
+    /** Exact live tool bodies, including question waits; settled by the shared execution boundary. */
+    val executingToolCallIds = MutableStateFlow<Set<String>>(emptySet())
     val workState: LocalWorkStatePort = localWorkRunStatePort(state)
     val enabledOptionalTools = linkedSetOf<String>()
     /** Not an extra queue: monotonic signal for committed, explicitly steered Work inputs. */

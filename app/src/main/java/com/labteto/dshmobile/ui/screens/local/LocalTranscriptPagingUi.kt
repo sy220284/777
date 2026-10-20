@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.MutableState
@@ -34,6 +35,25 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.flow.distinctUntilChanged
+
+/** Retarget an unfinished initial scroll when a resumed subscription replaces its cached tail. */
+@Composable
+internal fun LocalTranscriptInitialPositioner(
+    sessionId: String,
+    tailIndex: Int,
+    tailKey: String,
+    enabled: Boolean,
+    onPosition: suspend (Int) -> Unit,
+    onReady: () -> Unit,
+) {
+    val position by rememberUpdatedState(onPosition)
+    val ready by rememberUpdatedState(onReady)
+    LaunchedEffect(sessionId, tailIndex, tailKey, enabled) {
+        if (!enabled) return@LaunchedEffect
+        if (tailIndex >= 0) position(tailIndex)
+        ready()
+    }
+}
 
 /**
  * Owns the foreground transcript paging interaction.
@@ -160,31 +180,17 @@ internal fun LocalWorkTimelineAutoScroller(
                 if (atBottom && !readerDragging) isReaderPaused.value = false
             }
     }
-    LaunchedEffect(sessionId, listState, tailIndex, tailKey, isReady) {
+    LaunchedEffect(sessionId, listState, tailIndex, tailKey, isReady, readerDragging) {
         val oldTail = previousTailIndex
         val oldKey = previousTailKey
         previousTailIndex = tailIndex
         previousTailKey = tailKey
-        if (!isReady || oldTail < 0 || tailIndex < 0 ||
+        if (!isReady || tailIndex < 0 ||
             (tailIndex <= oldTail && tailKey == oldKey)
         ) return@LaunchedEffect
-        val viewport = listState.layoutInfo
-        val lastVisible = viewport.visibleItemsInfo.lastOrNull()
-        // A streaming preview can be replaced by a much taller final answer at the
-        // same index. Its NEW height is not the old tail's distance from the bottom.
-        val replacingTail = tailIndex == oldTail && tailKey != oldKey
-        // An empty streaming placeholder may not appear in visibleItemsInfo.
-        // In that case trust the previous row only if its measured bottom is close.
-        val previousTailGap = when {
-            replacingTail && lastVisible?.index == oldTail -> 0
-            else -> lastVisible?.takeIf { it.index in (oldTail - 1)..oldTail }
-                ?.let { it.offset + it.size - viewport.viewportEndOffset }
-        }
-        if (!shouldFollowNewWorkStep(
-                oldTail, lastVisible?.index ?: -1, previousTailGap,
-                isReaderPaused.value, readerDragging,
-            )
-        ) return@LaunchedEffect
+        // Following is reader intent, not a measurement of the old tail AFTER new rows arrived.
+        // Batched background output and hot-window eviction can remove that old row entirely.
+        if (isReaderPaused.value || readerDragging) return@LaunchedEffect
         isCatchingUp.value = true
         try {
             listState.animateScrollToItem(tailIndex)
@@ -196,17 +202,6 @@ internal fun LocalWorkTimelineAutoScroller(
         }
     }
 }
-
-internal fun shouldFollowNewWorkStep(
-    previousTailIndex: Int,
-    lastVisibleIndex: Int,
-    previousTailGapPx: Int?,
-    readerPaused: Boolean,
-    readerDragging: Boolean,
-): Boolean =
-    previousTailIndex >= 0 && !readerPaused && !readerDragging &&
-        lastVisibleIndex >= previousTailIndex - 1 &&
-        previousTailGapPx != null && previousTailGapPx <= 72
 
 /**
  * animateScrollToItem brings a tall final answer to its START, not its bottom.

@@ -72,6 +72,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.labteto.dshmobile.local.presentation.mediaCreativeDraft
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -481,6 +484,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     ) { LocalSessionAttachmentDraftCache() }
     val attachments = attachmentDrafts.forSession(state.sessionId)
     val listState = rememberLazyListState()
+    val workTailFollowing = remember(state.sessionId) { mutableStateOf(false) }
+    val workReaderPaused = remember(state.sessionId) { mutableStateOf(false) }
     var composerTailViewportAnchor by remember(state.sessionId) { mutableStateOf<Int?>(null) }
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
     var transcriptInitialPositionReady by rememberSaveable(state.sessionId) { mutableStateOf(false) }
@@ -539,22 +544,32 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             }
         }
     }
-    // Work's authoritative EventLog sequence changes on call, execution-started and result.
-    // One lifecycle-bound observer replaces the competing document/response refresh paths.
-    LaunchedEffect(state.sessionId, state.usageMode, workActions, state.running) {
+    var workToolReadFailed by remember(state.sessionId, state.usageMode) { mutableStateOf(false) }
+    var workToolRetry by remember(state.sessionId) { mutableStateOf(0) }
+    val timelineLifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(state.sessionId, state.usageMode, workActions, state.running, workToolRetry, timelineLifecycle) {
+        workToolReadFailed = false
         if (state.usageMode != LocalUsageMode.WORK || workActions == null) {
             workToolActivities = emptyList()
-        } else {
-            var lastSequence = Long.MIN_VALUE
+        } else timelineLifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            val reader = LocalWorkToolActivityReader(
+                sequence = { workActions.eventSequenceForUi(state.sessionId) },
+                activities = { workActions.toolActivities(state.sessionId) },
+            )
             do {
-                val sequence = withContext(Dispatchers.IO) {
-                    workActions.eventSequenceForUi(state.sessionId)
-                }
-                if (sequence != lastSequence) {
-                    workToolActivities = withContext(Dispatchers.IO) {
-                        workActions.toolActivities(state.sessionId)
+                when (val read = withContext(Dispatchers.IO) { reader.read() }) {
+                    is LocalWorkToolActivityRead.Available -> {
+                        workToolActivities = read.activities
+                        workToolReadFailed = false
                     }
-                    lastSequence = sequence
+                    is LocalWorkToolActivityRead.Failed -> {
+                        workToolActivities = emptyList()
+                        workToolReadFailed = true
+                        com.labteto.dshmobile.observability.AppLog.failure(
+                            "WorkTimeline", "read_tool_activity", read.cause, sessionId = state.sessionId)
+                        break // Retry is explicit; never replay tools or present stale live state.
+                    }
+                    null -> Unit
                 }
                 if (!state.running) break
                 delay(600)
@@ -593,6 +608,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         loadingOlderTranscript, transcriptHistoryError) {
         val target = transcriptJumpTarget?.takeIf { it.sessionId == state.sessionId }
             ?: return@LaunchedEffect
+        if (state.usageMode == LocalUsageMode.WORK) workReaderPaused.value = true
         val messageIndex = transcriptItems.indexOfFirst { item ->
             item is LocalTranscriptItem.Message && item.message.id == target.messageId
         }
@@ -602,14 +618,21 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     showTranscriptPagingRow, false, false, false).count { it }
                 // Empty-state rows and the plan review card cannot coexist with found messages.
                 listState.scrollToItem(leading + messageIndex)
+                transcriptInitialPositionReady = true
                 onTranscriptJumpConsumed(target)
             }
             loadingOlderTranscript -> Unit
             hasOlderTranscript && transcriptHistoryError == null -> {
                 val result = onLoadOlderTranscript(state.sessionId)
-                if (result.isFailure || result.getOrNull() == 0) onTranscriptJumpConsumed(target)
+                if (result.isFailure || result.getOrNull() == 0) {
+                    transcriptInitialPositionReady = true
+                    onTranscriptJumpConsumed(target)
+                }
             }
-            else -> onTranscriptJumpConsumed(target)
+            else -> {
+                transcriptInitialPositionReady = true
+                onTranscriptJumpConsumed(target)
+            }
         }
     }
     val showEmptyWorkbench = transcriptItems.isEmpty() &&
@@ -766,11 +789,18 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         // Keep the session-scoped cached attachment draft across navigation.
         attachmentError = null
         showReplySuggestions = false
-        if (transcriptItems.isNotEmpty()) {
-            listState.scrollToItem(transcriptLastListIndex)
-        }
-        transcriptInitialPositionReady = true
     }
+    LocalTranscriptInitialPositioner(
+        sessionId = state.sessionId,
+        tailIndex = transcriptLastListIndex,
+        tailKey = transcriptItems.lastOrNull()?.key.orEmpty(),
+        enabled = !transcriptInitialPositionReady && !locatingDiarySource && !workReaderPaused.value,
+        onPosition = { index ->
+            listState.scrollToItem(index)
+            if (state.usageMode == LocalUsageMode.WORK) listState.alignWorkTimelineTailAfterScroll(index)
+        },
+        onReady = { transcriptInitialPositionReady = true },
+    )
 
     LocalTranscriptAutoPager(
         sessionId = state.sessionId,
@@ -785,8 +815,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         listState = listState,
         anchoredViewportExtent = composerTailViewportAnchor,
     )
-    val workTailFollowing = remember(state.sessionId) { mutableStateOf(false) }
-    val workReaderPaused = remember(state.sessionId) { mutableStateOf(false) }
     LocalWorkStreamingTailFollower(
         listState = listState,
         enabled = showStreamingTail && !workTailFollowing.value &&
@@ -1281,6 +1309,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         }
                     }
                 }
+                if (workToolReadFailed) {
+                    item(key = "work-tool-read-error:${state.sessionId}") {
+                        WorkToolStatusNotice(onRetry = { workToolRetry += 1 })
+                    }
+                }
                 if (showStreamingTail) {
                     if (state.usageMode == LocalUsageMode.CHAT) {
                         item(key = "streaming:${state.sessionId}") {
@@ -1294,10 +1327,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             LocalStreamingWorkPreview(
                                 sessionId = state.sessionId,
                                 streamingState = streamingState,
-                                hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkStep ||
-                                    transcriptItems.lastOrNull() is LocalTranscriptItem.WorkPendingTool ||
-                                    transcriptItems.lastOrNull() is LocalTranscriptItem.WorkNode ||
-                                    transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
+                                waitingForUser = state.pendingApproval != null || state.pendingQuestion != null,
                                 lastDurableNarrative = latestDurableWorkNarrativeInCurrentTurn(transcriptMessages),
                             )
                         }
@@ -1309,11 +1339,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             transcriptBody()
 
             ConversationScrollShortcut(
-                target = scrollHint.target,
+                target = scrollHint.target ?: ConversationScrollTarget.LATEST.takeIf {
+                    state.usageMode == LocalUsageMode.WORK && workReaderPaused.value && listState.canScrollForward
+                },
                 modifier = Modifier.align(Alignment.BottomEnd)
                     .padding(end = SyMetric.gapLg, bottom = SyMetric.gapMd),
                 onClick = { target ->
                     scrollHint.hide()
+                    if (state.usageMode == LocalUsageMode.WORK) workReaderPaused.value = true
+                    transcriptInitialPositionReady = true
                     scope.launch {
                         val targetIndex = if (target == ConversationScrollTarget.START) 0
                             else listState.layoutInfo.totalItemsCount.dec().coerceAtLeast(0)
@@ -1324,6 +1358,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             state.usageMode == LocalUsageMode.WORK
                         ) {
                             listState.alignWorkTimelineTailAfterScroll(targetIndex)
+                            workReaderPaused.value = false
                         }
                     }
                 },

@@ -382,6 +382,15 @@ jobs:
             adb install -r .ci/device-apks/app-optimized.apk
             bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
 
+      - name: Upload Work timeline screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: work-timeline-android-16
+          path: .ci/work-timeline-review/
+          if-no-files-found: warn
+          retention-days: 2
+
   android-17-instrumented:
     # Prewarm emulator and SDK in parallel with shared APK compilation.
     needs: [scope, static-gates, architecture-3-gates]
@@ -442,6 +451,15 @@ jobs:
           adb shell am force-stop com.sy220284.dshmobile.debug || true
           adb install -r .ci/device-apks/app-optimized.apk
           bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
+
+      - name: Upload Work timeline screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: work-timeline-android-17
+          path: .ci/work-timeline-review/
+          if-no-files-found: warn
+          retention-days: 2
 
   merge-gate:
     if: always()

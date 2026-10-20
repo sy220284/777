@@ -44,6 +44,8 @@ data class LocalModelReply(
     val providerContentForReplay: JsonElement? = null,
 )
 
+enum class LocalModelPreviewPhase { IDLE, WAITING, STREAMING, RETRYING }
+
 /** High-frequency model preview kept outside the aggregate runtime state. */
 data class LocalHarnessStreamingState(
     val sessionId: String = "",
@@ -52,4 +54,6 @@ data class LocalHarnessStreamingState(
     val generation: Long = 0L,
     val assistant: String = "",
     val reasoning: String = "",
+    val phase: LocalModelPreviewPhase = LocalModelPreviewPhase.IDLE,
+    val attempt: Int = 1,
 )

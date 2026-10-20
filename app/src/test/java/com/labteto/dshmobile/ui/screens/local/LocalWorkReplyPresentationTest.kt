@@ -7,10 +7,37 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalWorkReplyPresentationTest {
+    @Test fun workFailureAndStopRemainVisibleAfterReopeningHistory() {
+        val failure = LocalHarnessMessage("failure", "system", "执行失败：网络连接中断", createdAt = 2L)
+        val stopped = failure.copy(id = "stop", content = "本轮已停止。")
+        val paused = failure.copy(id = "pause", content = "当前任务已无法继续扩展执行预算，已在第 64 步暂停；已有进度已保留。")
+        val items = buildLocalDisplayTranscript(buildLocalTranscript(listOf(failure, stopped, paused)))
+        assertEquals(listOf("message:failure", "message:stop", "message:pause"), items.map { it.key })
+        assertTrue(buildLocalTranscript(listOf(failure), includeWorkProcess = false).isEmpty())
+    }
     private fun message(id: String, role: String, content: String = "", toolName: String? = null,
         error: Boolean? = null): LocalHarnessMessage =
         LocalHarnessMessage(id = id, role = role, content = content,
             toolName = toolName, createdAt = id.length.toLong(), toolIsError = error)
+
+    @Test fun builtInToolActionsDescribeTheActualCapability() {
+        assertEquals("读取文件", userFacingWorkToolAction("read"))
+        assertEquals("搜索文件内容", userFacingWorkToolAction("grep"))
+        assertEquals("执行命令", userFacingWorkToolAction("bash"))
+        assertEquals("修改文件", userFacingWorkToolAction("edit"))
+    }
+
+    @Test fun sameMillisecondPendingCallStaysBeforeLaterCompletedCall() {
+        val user = LocalTranscriptItem.Message(message("u", "user", "检查").copy(createdAt = 100L))
+        val completed = LocalTranscriptItem.WorkStep(message("r", "tool", "ok", "read", false)
+            .copy(createdAt = 180L, toolCallId = "second", toolDeclaredAt = 120L, toolDeclaredSequence = 6L))
+        val first = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
+            callId = "first", name = "read",
+            phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING,
+            declaredAt = 120L, declaredSequence = 5L)
+        val output = appendPendingWorkToolActivities(listOf(user, completed), listOf(first), true)
+        assertEquals(listOf("message:u", "work-tool:first", "work-tool:second"), output.map { it.key })
+    }
 
     @Test fun independentToolCallsKeepSeparateChronologicalRows() {
         val events = listOf(

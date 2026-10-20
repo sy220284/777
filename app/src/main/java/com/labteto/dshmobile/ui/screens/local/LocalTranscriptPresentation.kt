@@ -163,10 +163,20 @@ internal fun appendPendingWorkToolActivities(
         val index = result.indexOfFirst { item ->
             when (item) {
                 is LocalTranscriptItem.Message -> item.message.createdAt > timestamp
-                is LocalTranscriptItem.WorkStep -> (item.message.toolDeclaredAt ?: item.message.createdAt) > timestamp
+                is LocalTranscriptItem.WorkStep -> {
+                    val at = item.message.toolDeclaredAt ?: item.message.createdAt
+                    at > timestamp || (at == timestamp && item.message.role == "tool" &&
+                        (item.message.toolDeclaredSequence ?: Long.MAX_VALUE) >
+                        (activity.declaredSequence ?: Long.MAX_VALUE))
+                }
                 is LocalTranscriptItem.WorkProcess -> item.messages.first().createdAt > timestamp
                 is LocalTranscriptItem.Thinking -> item.messages.first().createdAt > timestamp
-                is LocalTranscriptItem.WorkPendingTool -> (item.activity.declaredAt ?: Long.MAX_VALUE) > timestamp
+                is LocalTranscriptItem.WorkPendingTool -> {
+                    val at = item.activity.declaredAt ?: Long.MAX_VALUE
+                    at > timestamp || (at == timestamp &&
+                        (item.activity.declaredSequence ?: Long.MAX_VALUE) >
+                        (activity.declaredSequence ?: Long.MAX_VALUE))
+                }
                 is LocalTranscriptItem.WorkNode -> item.node.createdAt > timestamp
                 is LocalTranscriptItem.MediaResult -> item.result.createdAtMillis > timestamp
                 is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis > timestamp
@@ -224,6 +234,11 @@ internal fun buildLocalTranscript(
     var index = 0
     while (index < messages.size) {
         if (messages[index].role == "system") {
+            if (includeWorkProcess && (messages[index].content.startsWith("执行失败：") ||
+                    messages[index].content == "本轮已停止。" ||
+                    messages[index].content.startsWith("当前任务已无法继续扩展执行预算，"))) {
+                result += LocalTranscriptItem.Message(messages[index])
+            }
             index += 1
             continue
         }

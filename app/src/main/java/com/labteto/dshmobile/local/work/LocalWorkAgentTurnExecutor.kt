@@ -69,6 +69,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -135,6 +137,7 @@ internal class LocalWorkAgentTurnExecutor(
         )
         var foregroundLease: LocalExecutionService.Companion.TurnLease? = null
         var serviceReleased = false
+        var cpuProjection: Job? = null
         try {
             LocalSessionRuntimeRegistry.withOwner(
                 binding.sessionId,
@@ -193,6 +196,9 @@ internal class LocalWorkAgentTurnExecutor(
                 return@withOwner
             }
             foregroundLease = lease
+            cpuProjection = CoroutineScope(currentCoroutineContext()).launch {
+                workRunCpuDemand(binding).collect { lease.setCpuActive(it) }
+            }
             binding.state.update {
                 it.copy(
                     work = it.work.copy(
@@ -395,10 +401,6 @@ internal class LocalWorkAgentTurnExecutor(
                                 },
                                 persistOverflowHistory = true,
                                 requestLog = runEventLog,
-                                previewGuard = {
-                                runtimeStateStore.currentSessionId == binding.sessionId &&
-                                    runtimeStateStore.state.value.sessionId == binding.sessionId
-                            },
                                 overflowPersister = { overflowSnapshot, mode ->
                                 workModelHistoryRuntime.persistOverflowCompaction(
                                     overflowSnapshot,
@@ -845,7 +847,12 @@ internal class LocalWorkAgentTurnExecutor(
                     binding.state.update { current -> current.copy(error = "Work 回合已结束，快照保存失败：${error.message}") }
                 } finally {
                     try {
-                        try { lease.release(foregroundOutcome) }
+                        try {
+                            withContext(kotlinx.coroutines.NonCancellable) {
+                                cpuProjection?.cancelAndJoin()
+                                lease.release(foregroundOutcome)
+                            }
+                        }
                         finally { serviceReleased = true }
                     } finally {
                         workRunRegistry.finishTurn(binding, ownerJob, onIdle = {
@@ -887,7 +894,10 @@ internal class LocalWorkAgentTurnExecutor(
         }
     } finally {
         try {
-            if (!serviceReleased) foregroundLease?.release(LocalExecutionService.OUTCOME_FAILED)
+            withContext(kotlinx.coroutines.NonCancellable) {
+                cpuProjection?.cancelAndJoin()
+                if (!serviceReleased) foregroundLease?.release(LocalExecutionService.OUTCOME_FAILED)
+            }
         } finally {
             if (ownerJob != null) workRunRegistry.releaseCompletedTurn(binding, ownerJob)
         }

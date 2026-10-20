@@ -33,6 +33,13 @@ component="${1:-com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJU
 result_file="${2:-.ci/android-instrumentation-result.txt}"
 mkdir -p "$(dirname "$result_file")"
 adb shell am instrument -w -r "$component" | tr -d '\r' | tee "$result_file"
+# Native timeline captures are written by instrumentation after its assertions.
+# Collect before the emulator exits; the original test result remains authoritative.
+evidence_path="/sdcard/Android/data/com.sy220284.dshmobile.debug/files/work-timeline-review"
+if adb shell test -d "$evidence_path"; then
+  mkdir -p .ci/work-timeline-review
+  adb pull "$evidence_path/." .ci/work-timeline-review/
+fi
 if ! validate_result "$result_file"; then
   echo '::error::Android instrumentation did not report a non-empty successful test result'
   exit 1
