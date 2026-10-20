@@ -35,6 +35,7 @@ internal fun withWorkRuntimeContext(
         profile?.let { appendLine("- 认证来源：${it.sourceLabel()}") }
         protocol?.let { appendLine("- 模型协议：${it.name}") }
         appendLine("- 能力以本轮附带的工具为准；缺少任务所需工具时可使用 capability_search 查找，调用前核实权限和实际可用性。")
+        appendLine("- 多步骤工具任务在关键阶段可以先公开说明一句接下来要核查或处理的具体对象；按用户语言自然表达，避免重复口号、原始命令、内部工具标识、敏感参数及私有推理。正文结论保持完整，已完成与未完成只按真实工具回执判断。")
         if (asksModel) {
             if (configuredProfiles.isNotEmpty()) {
                 val shown = configuredProfiles.take(16).joinToString("；") { saved ->
