@@ -43,9 +43,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -746,7 +744,7 @@ fun ToolsScreen(
                                     )
                                     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
                                         ToolCapabilityRow(
-                                            icon = SyEntryIcons.Projects,
+                                            icon = SyEntryIcons.Connections,
                                             title = stringResource(R.string.tools_github_connector),
                                             status = stringResource(
                                                 if (state.githubConfigured) R.string.tools_github_configured
@@ -756,7 +754,7 @@ fun ToolsScreen(
                                             onClick = { showGitHubConfig = true },
                                         )
                                         ToolCapabilityRow(
-                                            iconPainter = painterResource(R.drawable.ic_ui_plugin),
+                                            icon = SyEntryIcons.Plugins,
                                             title = stringResource(R.string.tools_external_services),
                                             status = state.servers.size.toString(),
                                             state = if (state.servers.isNotEmpty()) StateDotState.Done else StateDotState.Idle,
@@ -948,7 +946,7 @@ fun ToolsScreen(
                 enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
                 variant = SyButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
-                icon = SyEntryIcons.Search,
+                icon = SyEntryIcons.Connections,
             )
             Text(
                 stringResource(R.string.tools_stdio_title),
@@ -1097,7 +1095,6 @@ private fun ToolCapabilityRow(
     status: String,
     state: StateDotState,
     icon: ImageVector? = null,
-    iconPainter: Painter? = null,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
@@ -1121,22 +1118,7 @@ private fun ToolCapabilityRow(
                 modifier = Modifier.size(40.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    when {
-                        iconPainter != null -> Icon(
-                            painter = iconPainter,
-                            contentDescription = null,
-                            tint = colors.textSecondary,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        icon != null -> Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = colors.textSecondary,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
+                icon?.let { com.shenyan.designsystem.components.SyIconBox(icon = it) }
             }
             BoxWithConstraints(Modifier.weight(1f)) {
                 val stackedStatus = maxWidth < 200.dp || LocalDensity.current.fontScale > 1.15f

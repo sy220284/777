@@ -149,20 +149,20 @@ internal fun LocalModeDrawer(
                 onClick = { syRailCollapsed = false }, tint = sy.text,
             )
             SyIconButton(icon = SyEntryIcons.NewSession, contentDescription = stringResource(R.string.sy_v5_new_session),
-                onClick = onNewSession, containerColor = sy.l3, tint = sy.text)
+                onClick = onNewSession, tint = sy.text)
             when (localCollapsedRailPrimaryEntry(usageMode)) {
                 LocalFeatureDrawerEntry.PERSONA_GALLERY ->
                     SyIconButton(icon = SyEntryIcons.Persona, contentDescription = stringResource(R.string.persona_gallery_title),
-                        onClick = onOpenPersonaGallery, containerColor = sy.l3, tint = sy.text)
+                        onClick = onOpenPersonaGallery, tint = sy.text)
                 LocalFeatureDrawerEntry.WORKSPACE ->
                     SyIconButton(icon = SyEntryIcons.WorkspaceFiles, contentDescription = stringResource(R.string.chatlist_workspace_files),
-                        onClick = onWorkspaceFiles, containerColor = sy.l3, tint = sy.text)
+                        onClick = onWorkspaceFiles, tint = sy.text)
                 else -> error("Unexpected collapsed rail primary destination")
             }
             SyIconButton(icon = SyEntryIcons.Tasks, contentDescription = stringResource(localCollapsedRailTaskTitle(usageMode)),
-                onClick = onTasks, containerColor = sy.l3, tint = sy.text)
+                onClick = onTasks, tint = sy.text)
             SyIconButton(icon = SyEntryIcons.Settings, contentDescription = stringResource(R.string.sy_v5_settings),
-                onClick = onSettings, containerColor = sy.l3, tint = sy.text)
+                onClick = onSettings, tint = sy.text)
         }
         }
         return

@@ -70,7 +70,7 @@ internal fun AppSettingsDivider() {
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(start = SyMetric.gapSection + 24.dp + SyMetric.gapLg, end = SyMetric.gapSection)
+            .padding(start = SyMetric.gapSection + 32.dp + SyMetric.gapLg, end = SyMetric.gapSection)
             .height(1.dp)
             .background(colors.border),
     )

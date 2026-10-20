@@ -63,6 +63,31 @@ for m in matches:
         check(strokes == pt, f"{name}: Compose and SVG pathData differ")
 check("strokeLineWidth = 1.75f" in kotlin, "V6 action Kotlin stroke width must be 1.75")
 
+# 777 paper-and-ink: compare production Kotlin and editable SVG paths.
+entry_catalog = json.loads((DESIGN / "paper-ink-icon-catalog.json").read_text())
+entry_kotlin = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/components/SyEntryIcons.kt").read_text()
+entry_matches = list(re.finditer(
+    r'val\s+(\w+)\s*:\s*ImageVector\s+by\s+lazy\s*\{\s*entryGlyph\("(\w+)",([\s\S]*?)\)\s*\}',
+    entry_kotlin,
+))
+current = set(entry_catalog["official"])
+extra = set(entry_catalog["supplemental"])
+check(len(current) == 24 and len(extra) == 3, "expected 24 active and 3 supplemental glyphs")
+check("Projects" not in current and "RunCenter" not in current, "retired route became active")
+check(current | extra <= {m.group(1) for m in entry_matches}, "production entry glyph missing")
+for m in entry_matches:
+    name, declared, body = m.group(1), m.group(2), m.group(3)
+    if name not in current | extra:
+        continue
+    check(name == declared, f"entry glyph name mismatch: {name}")
+    strokes = re.findall(r'^\s*"([^"]+)"\s*,?\s*$', body, re.M)
+    check(strokes == entry_catalog["paths"][name], f"catalog/Kotlin mismatch: {name}")
+    folder = "icons" if name in current else "icons-supplemental"
+    pt = check_svg_glyph(DESIGN / "assets" / folder / f"{name}.svg")
+    if pt is not None:
+        check(strokes == pt, f"SVG/Kotlin mismatch: {name}")
+check("strokeLineWidth = 1.75f" in entry_kotlin, "entry stroke must remain 1.75")
+
 # File styles: 10 semantic families x light/dark, one canonical JSON catalog.
 file_spec = json.loads((DESIGN / "file-icons.json").read_text())
 kinds = set(file_spec["glyphs"])

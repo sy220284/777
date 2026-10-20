@@ -70,8 +70,11 @@ fun SyCategoryRow(
             if (icon != null || iconPainter != null) {
                 if (iconPainter != null) Icon(iconPainter, contentDescription = null,
                     modifier = Modifier.size(20.dp), tint = p.textSecondary)
-                else if (icon != null) Icon(icon, contentDescription = null,
-                    modifier = Modifier.size(20.dp), tint = p.textSecondary)
+                else if (icon != null) {
+                    if (syEntryTileTone(icon.name) != null) SyIconBox(icon = icon)
+                    else Icon(icon, contentDescription = null,
+                        modifier = Modifier.size(20.dp), tint = p.textSecondary)
+                }
             }
             // The metadata must never steal the width required to display the title.
             // Measure the actual text at the user's font scale, rather than guessing

@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
@@ -116,15 +119,41 @@ fun SyValueRow(label: String, value: String?, modifier: Modifier = Modifier, hin
     }
 }
 
+/** One shared icon palette for the expanded list and the collapsed rail. */
+internal fun syEntryTileTone(name: String): Color? {
+    if (!name.startsWith("SyEntry.")) return null
+    return when (name.removePrefix("SyEntry.")) {
+"Persona", "Search", "Account", "Gallery" -> Color(0xFFE2E7E9)
+        "NewSession", "WorkspaceFiles", "Quota", "Tools" -> Color(0xFFEEE4D8)
+        "Tasks", "Permissions", "Memory", "Connections" -> Color(0xFFDFE6DA)
+        "Settings", "Models", "Diary", "Plugins" -> Color(0xFFE8E2E9)
+        "GroupChat", "Appearance", "Notifications", "Skills" -> Color(0xFFF1DFD3)
+        else -> Color(0xFFE4E8E9)
+    }
+}
+
+/**
+ * 现行入口采用参考稿的低饱和色块和墨线；动作图标不添加色块。
+ * 深/哑光主题继续使用当前主题材质，避免浅色卡片与暗背景割裂。
+ */
 @Composable
 fun SyIconBox(icon: ImageVector? = null, iconPainter: Painter? = null, modifier: Modifier = Modifier,
     contentDescription: String? = null, active: Boolean = false) {
     val p = LocalSyColors.current
     val alpha = syLiveAlpha(active)
-    Box(modifier.size(30.dp), contentAlignment = Alignment.Center) {
+    val tileTone = syEntryTileTone(icon?.name.orEmpty())
+    val tile = tileTone?.let { if (p.text.luminance() > .5f) p.materialL4 else it }
+
+    Box(
+        modifier.size(if (tile != null) 32.dp else 30.dp).then(
+            if (tile != null) Modifier.background(tile, RoundedCornerShape(9.dp)) else Modifier
+        ),
+        contentAlignment = Alignment.Center,
+    ) {
         val glyph = Modifier.size(20.dp).graphicsLayer { this.alpha = alpha }
-        if (iconPainter != null) Icon(iconPainter, contentDescription, glyph, tint = p.textSecondary)
-        else if (icon != null) Icon(icon, contentDescription, glyph, tint = p.textSecondary)
+        val ink = if (tile != null) p.text else p.textSecondary
+        if (iconPainter != null) Icon(iconPainter, contentDescription, glyph, tint = ink)
+        else if (icon != null) Icon(icon, contentDescription, glyph, tint = ink)
     }
 }
 
