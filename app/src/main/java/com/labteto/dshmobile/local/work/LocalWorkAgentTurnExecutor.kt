@@ -204,6 +204,7 @@ internal class LocalWorkAgentTurnExecutor(
                     error = null,
                 )
             }
+            val declaredToolTimes = mutableMapOf<String, Long>()
             val repliesByStep = mutableMapOf<Int, LocalModelReply>()
             val uiDefinitionsByStep = mutableMapOf<Int, String?>()
             val replyFormHandlingByStep = mutableMapOf<Int,
@@ -597,7 +598,7 @@ internal class LocalWorkAgentTurnExecutor(
                             workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_progress")
                         }
                         is AgentEvent.ToolStarted -> {
-                            runEventLog.append("tool/call", buildJsonObject {
+                            val declared = runEventLog.append("tool/call", buildJsonObject {
                                 put("source_message_id", uiSourceMessageId)
                                 put("goal_id", binding.workState.snapshot().goal?.id ?: "")
                                 put("step", event.step)
@@ -606,6 +607,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 put("arguments", event.call.arguments)
                                 put("execution_started", false)
                             })
+                            declaredToolTimes[event.call.id] = declared.createdAt
                             // Pending tool status is durable before the Work card observes it.
                             workUiDocumentPublisher.reconcile(binding, uiSourceMessageId, "publish_tool_started")
                         }
@@ -633,6 +635,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 toolIsError = event.isError,
                                 toolErrorCode = event.errorCode,
                                 toolCallId = event.call.id,
+                                toolDeclaredAt = declaredToolTimes.remove(event.call.id),
                             )
                             val artifactVersion = if (!event.isError) localWorkArtifactFileVersion(
                                 java.io.File(sessionStorage.files.workspace.path), event.call.name, event.output,
