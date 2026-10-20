@@ -298,7 +298,7 @@ private fun WorkToolStatusRow(
         onClickLabel = "查看工具回执", onClick = onClick) else Modifier
     Row(
         modifier = modifier.fillMaxWidth().then(clickable)
-            .heightIn(min = if (onClick == null) 30.dp else 48.dp)
+            .heightIn(min = if (onClick == null) 30.dp else 40.dp)
             .semantics(mergeDescendants = true) { stateDescription = status },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
