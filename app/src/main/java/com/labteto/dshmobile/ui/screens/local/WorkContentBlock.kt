@@ -209,8 +209,23 @@ internal fun WorkTimelineStepRow(
 ) {
     if (message.role != "tool") {
         val content = localWorkTimelineText(message.content) ?: return
-        SelectionContainer(Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm)) {
-            MarkdownText(content, bodyStyle = DsType.workBody.withReadingWeight())
+        val action = localWorkPublicActionLabel(content)
+        if (action != null) {
+            val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 30.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+            ) {
+                Icon(FeatherIcons.Sparkles, contentDescription = null,
+                    tint = colors.textSecondary, modifier = Modifier.size(16.dp))
+                Text(action, style = DsType.small13.withReadingWeight(),
+                    color = colors.textSecondary)
+            }
+        } else {
+            SelectionContainer(Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm)) {
+                MarkdownText(content, bodyStyle = DsType.workBody.withReadingWeight())
+            }
         }
         return
     }
