@@ -61,6 +61,18 @@ class LocalWorkRuntimeContextTest {
     }
 
     @Test
+    fun workRuntimeAsksForGroundedPublicProgressWithoutForcingToolChatter() {
+        val context = withWorkRuntimeContext(
+            context = "", workspacePath = "/workspace", model = "test-model",
+            baseUrl = "", profile = null, task = "检查界面代码与测试",
+        )
+        assertTrue(context.contains("关键阶段可以先公开说明"))
+        assertTrue(context.contains("用户语言自然表达"))
+        assertTrue(context.contains("未完成只按真实工具回执判断"))
+        assertFalse(context.contains("每次工具调用必须"))
+    }
+
+    @Test
     fun ordinaryRequestSkipsIrrelevantCapabilityAndUsageGuides() {
         val context = withWorkRuntimeContext(
             context = "当前需求", workspacePath = "/workspace", model = "test-model",

@@ -32,10 +32,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
@@ -85,8 +83,8 @@ internal fun userFacingWorkToolAction(toolName: String?): String? {
         "web_search" -> return "搜索网页"
         "web_fetch", "http_request" -> return "读取网页内容"
     }
-    if (com.labteto.dshmobile.ui.isCommandExecutionTool(name) || name in setOf("exec", "run_code", "execute"))
-        return "执行命令"
+    if (com.labteto.dshmobile.ui.agentOperationKind(name) == com.labteto.dshmobile.ui.AgentOperationKind.Execute)
+        return "运行本地任务"
     if (!name.contains("github")) return null
     return when {
         "list_pr_changed_filenames" in name -> "扫描 PR 改动文件"
@@ -114,106 +112,43 @@ internal fun userFacingWorkToolAction(toolName: String?): String? {
 }
 
 /** A readable chronological step, with optional explanation instead of a hidden disclosure. */
-@Composable
-internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
-    val action = when {
-        node.failed -> stringResource(R.string.local_reasoning_work_failed)
-        node.summary == null && node.operationKinds.size > 1 -> "工具操作"
-        node.summary == null && node.toolName != null &&
-            userFacingWorkToolActionRes(node.toolName) != null ->
-            stringResource(userFacingWorkToolActionRes(node.toolName)!!)
-        node.summary == null &&
-            node.kind == com.labteto.dshmobile.ui.AgentOperationKind.Generic -> "工具操作"
-        else -> stringResource(agentOperationLabelRes(node.kind))
-    }
-    val provider = userFacingWorkToolProvider(node.toolName)
-    val summary = node.summary ?: if (provider != null) "$provider · $action" else action
-    val label = if (provider != null && node.summary != null &&
-        !summary.contains(provider, ignoreCase = true)
-    ) "$provider · $summary" else summary
-    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
-        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-        ) {
-            when {
-                node.failed -> Icon(
-                    FeatherIcons.AlertTriangle,
-                    contentDescription = null,
-                    tint = colors.dangerInk,
-                    modifier = Modifier.size(18.dp),
-                )
-                node.count > 0 -> WorkOperationIcon(node.kind, running = running)
-                running -> WorkOperationIcon(node.kind, running = true)
-                else -> WorkOperationIcon(node.kind, running = false)
-            }
-            Text(
-                label,
-                modifier = Modifier.weight(1f),
-                style = (if (node.summary != null) DsType.mdSmall else DsType.small13)
-                    .withReadingWeight().copy(fontFamily = FontFamily.Default),
-                color = when {
-                    node.failed -> colors.dangerInk
-                    node.count > 0 -> colors.textSecondary
-                    else -> colors.text
-                },
-            )
-            if (node.failed) {
-                Text(
-                    stringResource(agentOperationStatusRes(running = false, failed = true)),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.dangerInk,
-                )
-            } else if (running) {
-                Text(
-                    stringResource(agentOperationStatusRes(running = true, failed = false)),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.primary,
-                )
-            } else if (node.count > 1) {
-                Text(
-                    stringResource(R.string.local_work_process_operation_count, node.count),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.textTertiary,
-                )
-            }
-        }
-        node.detail?.let { detail ->
-            Text(
-                detail,
-                modifier = Modifier.padding(start = 18.dp + SyMetric.gapMd),
-                style = DsType.small13.withReadingWeight(),
-                color = if (node.failed) colors.dangerInk else colors.text,
-            )
-        }
-    }
-}
-
-
 /** Public prose uses the same reading style before and after the streaming commit. */
 @Composable
 internal fun WorkTimelineStepRow(
     message: com.labteto.dshmobile.local.session.LocalHarnessMessage,
     repeatCount: Int = 1,
     active: Boolean = false,
+    activity: com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem? = null,
+    groupedMessages: List<com.labteto.dshmobile.local.session.LocalHarnessMessage> = emptyList(),
 ) {
     if (message.role != "tool") {
         val content = localWorkTimelineText(message.content) ?: return
-        SelectionContainer(Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd)) {
-            MarkdownText(content, bodyStyle = DsType.workBody.withReadingWeight())
+        val action = localWorkPublicActionLabel(content)
+        if (action != null) {
+            val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 30.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+            ) {
+                Icon(FeatherIcons.Sparkles, contentDescription = null,
+                    tint = colors.textSecondary, modifier = Modifier.size(16.dp))
+                Text(action, style = DsType.small13.withReadingWeight(),
+                    color = colors.textSecondary)
+            }
+        } else {
+            SelectionContainer(Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm)) {
+                MarkdownText(content, bodyStyle = DsType.workBody.withReadingWeight())
+            }
         }
         return
     }
     val phase = completedWorkToolPhase(message)
-    val action = workToolActionLabel(message.toolName)
+    val action = workToolActionLabel(message.toolName, activity?.argumentsPreview)
     var detailsOpen by remember(message.id) { mutableStateOf(false) }
-    val hasDetails = message.content.isNotBlank()
-    WorkToolStatusRow(message.toolName, phase,
+    val hasDetails = message.content.isNotBlank() || groupedMessages.any { it.content.isNotBlank() }
+    WorkToolStatusRow(message.toolName, phase, argumentsPreview = activity?.argumentsPreview,
+        repeatCount = repeatCount,
         modifier = Modifier.testTag(message.toolCallId?.let { "work-tool:$it" } ?: "work-tool:${message.id}"),
         onClick = if (hasDetails) ({ detailsOpen = true }) else null)
     if (detailsOpen) {
@@ -225,9 +160,15 @@ internal fun WorkTimelineStepRow(
             }) {
             Text(workToolPhaseText(phase), style = DsType.std14Strong.withReadingWeight())
             message.toolErrorCode?.let { Text(it, style = DsType.small13.withReadingWeight()) }
-            SelectionContainer {
-                Text(message.content, style = DsType.std14.withReadingWeight(),
-                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+            (listOf(message) + groupedMessages).forEachIndexed { index, receipt ->
+                if (repeatCount > 1) {
+                    Text("第 " + (index + 1) + " 次检查",
+                        style = DsType.small13.withReadingWeight())
+                }
+                SelectionContainer {
+                    Text(receipt.content, style = DsType.std14.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+                }
             }
         }
     }
@@ -244,9 +185,11 @@ internal fun completedWorkToolPhase(
 }
 
 @Composable
-private fun workToolActionLabel(name: String?): String =
-    userFacingWorkToolAction(name) ?: stringResource(userFacingWorkToolActionRes(name)
-        ?: agentOperationLabelRes(com.labteto.dshmobile.ui.agentOperationKind(name)))
+private fun workToolActionLabel(name: String?, argumentsPreview: String? = null): String =
+    naturalWorkToolAction(name, argumentsPreview)
+        ?: userFacingWorkToolAction(name)
+        ?: stringResource(userFacingWorkToolActionRes(name)
+            ?: agentOperationLabelRes(com.labteto.dshmobile.ui.agentOperationKind(name)))
 
 internal fun workToolPhaseText(phase: LocalToolUiPhase): String = when (phase) {
     LocalToolUiPhase.DECLARED -> "等待执行"
@@ -265,11 +208,14 @@ private fun WorkToolStatusRow(
     phase: LocalToolUiPhase,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    argumentsPreview: String? = null,
+    repeatCount: Int = 1,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val provider = userFacingWorkToolProvider(name)
-    val action = workToolActionLabel(name)
-    val label = if (provider == null) action else "$provider · $action"
+    val action = workToolActionLabel(name, argumentsPreview)
+    // Provider is already visible via the icon. Repeating it in every title adds noise.
+    val label = if (repeatCount > 1) "$action · 已检查 " + repeatCount + " 次" else action
     val status = workToolPhaseText(phase)
     val tint = when (phase) {
         LocalToolUiPhase.FAILED -> colors.dangerInk
@@ -281,11 +227,12 @@ private fun WorkToolStatusRow(
         onClickLabel = "查看工具回执", onClick = onClick) else Modifier
     Row(
         modifier = modifier.fillMaxWidth().then(clickable)
-            .heightIn(min = if (onClick == null) 36.dp else 48.dp)
-            .padding(vertical = SyMetric.gapXs)
-            .semantics(mergeDescendants = true) { stateDescription = status },
+            .heightIn(min = if (onClick == null) 30.dp else 40.dp)
+            .semantics(mergeDescendants = true) {
+                stateDescription = if (provider != null) "$provider，$status" else status
+            },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
         Icon(imageVector = when {
             phase == LocalToolUiPhase.FAILED || phase == LocalToolUiPhase.OUTCOME_UNKNOWN -> FeatherIcons.AlertTriangle
@@ -298,11 +245,11 @@ private fun WorkToolStatusRow(
                 com.labteto.dshmobile.ui.AgentOperationKind.Execute -> FeatherIcons.Code
                 else -> FeatherIcons.FileText
             }
-        }, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        }, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
         FlowRow(modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-            verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
-            Text(label, style = DsType.std14.withReadingWeight(),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+            verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, style = DsType.small13.withReadingWeight(),
                 color = if (phase == LocalToolUiPhase.FAILED) tint else colors.textSecondary)
             if (phase != LocalToolUiPhase.COMPLETED) {
                 Text(status, style = DsType.small13.withReadingWeight(), color = tint)
@@ -314,7 +261,7 @@ private fun WorkToolStatusRow(
 @Composable
 internal fun WorkPendingToolRow(activity: com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem) {
     if (activity.phase !in setOf(LocalToolUiPhase.DECLARED, LocalToolUiPhase.RUNNING)) return
-    WorkToolStatusRow(activity.name, activity.phase)
+    WorkToolStatusRow(activity.name, activity.phase, argumentsPreview = activity.argumentsPreview)
 }
 
 @Composable
