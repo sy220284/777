@@ -57,6 +57,43 @@ class LocalWorkReplyPresentationTest {
         assertEquals(listOf("message:u", "work-tool:first", "work-tool:second"), output.map { it.key })
     }
 
+    @Test fun repeatedIdenticalStatusChecksCompactButRetainEveryReceipt() {
+        val first = message("p1", "tool", "等待流水线", "workflow_run_status", false)
+            .copy(toolCallId = "poll-1")
+        val second = first.copy(id = "p2", content = "流水线仍在运行", toolCallId = "poll-2")
+        val activity = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
+            callId = "poll-1", name = "workflow_run_status",
+            phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.COMPLETED,
+            argumentsPreview = """{"run_id":"42"}""",
+        )
+        val compact = appendPendingWorkToolActivities(
+            listOf(LocalTranscriptItem.WorkStep(first), LocalTranscriptItem.WorkStep(second)),
+            listOf(activity, activity.copy(callId = "poll-2")), running = false,
+        ).filterIsInstance<LocalTranscriptItem.WorkStep>()
+        assertEquals(1, compact.size)
+        assertEquals(2, compact.single().repeatCount)
+        assertEquals(listOf("p2"), compact.single().groupedMessages.map { it.id })
+    }
+
+    @Test fun failedOrDifferentStatusChecksAreNeverCompacted() {
+        val first = message("p1", "tool", "成功", "job_poll", false)
+            .copy(toolCallId = "poll-1")
+        val failed = first.copy(id = "p2", content = "失败", toolCallId = "poll-2",
+            toolIsError = true)
+        val activity = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
+            callId = "poll-1", name = "job_poll",
+            phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.COMPLETED,
+            argumentsPreview = """{"id":"1"}""",
+        )
+        val other = activity.copy(callId = "poll-2", argumentsPreview = """{"id":"2"}""")
+        val inputs = listOf(LocalTranscriptItem.WorkStep(first), LocalTranscriptItem.WorkStep(failed))
+        assertEquals(2, appendPendingWorkToolActivities(inputs,
+            listOf(activity, other), running = false).size)
+        assertEquals(2, appendPendingWorkToolActivities(
+            inputs.map { it.copy(message = it.message.copy(toolIsError = false)) },
+            listOf(activity, other), running = false).size)
+    }
+
     @Test fun independentToolCallsKeepSeparateChronologicalRows() {
         val events = listOf(
             message("read-one", "tool", "ok", "mcp_github_fetch_file", false),
