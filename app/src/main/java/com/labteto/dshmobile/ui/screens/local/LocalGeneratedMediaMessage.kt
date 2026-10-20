@@ -572,7 +572,10 @@ internal fun MediaImageDetailDialog(
             ))
         }
     }
-    SyFullscreenMediaOverlay(onDismiss = onDismiss) {
+    SyFullscreenMediaOverlay(
+        onDismiss = onDismiss,
+        dismissOnBackgroundTap = zoom <= 1f,
+    ) {
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize().safeDrawingPadding()
                 .padding(horizontal = 12.dp, vertical = 16.dp)
