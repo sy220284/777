@@ -145,12 +145,11 @@ internal class LocalToolOutputStore(
         visibleLimitBytes: Int = WORK_TOOL_RECOVERY_PAGE_BYTES,
     ): String {
         require(startByte >= 0) { "start_byte 必须大于等于 0" }
-        require(maxBytes in MIN_READ_BYTES..MAX_READ_BYTES) {
-            "max_bytes 必须在 $MIN_READ_BYTES–$MAX_READ_BYTES 之间"
-        }
-        // A page larger than what the model can actually see would be re-truncated downstream while
-        // next_byte still advanced by the requested amount, silently skipping the trimmed bytes.
-        val pageBytes = maxBytes.coerceAtMost(visibleLimitBytes.coerceAtLeast(MIN_READ_BYTES))
+        require(maxBytes >= MIN_READ_BYTES) { "max_bytes 必须大于等于 $MIN_READ_BYTES" }
+        // max_bytes is a requested ceiling, not a demand to allocate an oversized page.
+        // Even older model calls asking for > MAX_READ_BYTES must advance next_byte only
+        // by the bytes actually visible; rejecting them wastes a tool step for no benefit.
+        val pageBytes = minOf(maxBytes, MAX_READ_BYTES, visibleLimitBytes.coerceAtLeast(MIN_READ_BYTES))
 
         val source = File(sessionDir(sessionId), key(callId) + ".txt")
         if (!source.isFile) return missingResult(callId)
