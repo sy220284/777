@@ -89,7 +89,6 @@ internal class LocalWorkAgentTurnExecutor(
     private val sessionStorage: LocalSessionStorageRuntime,
     private val modelGateway: LocalModelGateway,
     private val modelRequests: LocalModelRequestCoordinator,
-    private val toolActivity: com.labteto.dshmobile.local.tools.LocalToolActivityProjectionRuntime,
     private val usageTracker: DeepSeekUsageTracker,
     private val contextComposer: ContextComposer,
     private val workRunRegistry: LocalWorkRunRegistry,
@@ -197,9 +196,8 @@ internal class LocalWorkAgentTurnExecutor(
                 return@withOwner
             }
             foregroundLease = lease
-            val cpuStartSequence = runEventLog.latestSequence()
             cpuProjection = CoroutineScope(currentCoroutineContext()).launch {
-                workRunCpuDemand(binding, toolActivity, cpuStartSequence).collect { lease.setCpuActive(it) }
+                workRunCpuDemand(binding).collect { lease.setCpuActive(it) }
             }
             binding.state.update {
                 it.copy(

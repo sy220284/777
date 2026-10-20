@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import kotlinx.coroutines.flow.update
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.tools.HarnessTool
@@ -144,6 +145,9 @@ internal class LocalWorkTurnToolRuntime(
             planModeEnabled = binding.state.value.work.planMode,
             beforeExecution = stillCurrent,
             executionAttributes = mapOf("goal_id" to goal?.id.orEmpty()),
+            onExecutionActive = { active ->
+                binding.executingToolCallIds.update { ids -> if (active) ids + call.id else ids - call.id }
+            },
             observeFileVersions = { paths.mapNotNull { path ->
                 workspaceRoot?.let { localWorkFileSha256(it, path) }?.let { path to it }
             }.toMap() },

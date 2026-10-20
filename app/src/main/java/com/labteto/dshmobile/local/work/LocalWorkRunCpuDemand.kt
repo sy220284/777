@@ -1,33 +1,16 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.tools.LocalToolActivity
-import com.labteto.dshmobile.local.tools.LocalToolActivityPhase
-import com.labteto.dshmobile.local.tools.LocalToolActivityProjectionRuntime
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
-/** Derive CPU demand from the real interaction and Tool owners, never from page visibility. */
-internal fun workRunCpuDemand(
-    binding: LocalWorkRunBinding,
-    activity: LocalToolActivityProjectionRuntime,
-    startedAfter: Long,
-) = combine(
+/** CPU demand follows real executing bodies; batch receipts may be delayed by another approval. */
+internal fun workRunCpuDemand(binding: LocalWorkRunBinding) = combine(
     binding.state.map { state ->
         setOfNotNull(state.work.pendingQuestion?.callId, state.work.pendingApproval?.callId)
     }.distinctUntilChanged(),
-    binding.eventLog.changes,
-) { waiting, _ ->
-    if (waiting.isEmpty()) true else workRunNeedsCpu(
-        waiting, activity.snapshot(binding.eventLog).state.activities, startedAfter,
-    )
-}.distinctUntilChanged()
+    binding.executingToolCallIds,
+) { waiting, executing -> workRunNeedsCpu(waiting, executing) }.distinctUntilChanged()
 
-internal fun workRunNeedsCpu(
-    waitingCallIds: Set<String>,
-    activities: List<LocalToolActivity>,
-    startedAfter: Long,
-): Boolean = waitingCallIds.isEmpty() || activities.any {
-    it.phase == LocalToolActivityPhase.RUNNING && it.callId !in waitingCallIds &&
-        (it.declaredSequence ?: -1L) > startedAfter
-}
+internal fun workRunNeedsCpu(waitingCallIds: Set<String>, executingCallIds: Set<String>): Boolean =
+    waitingCallIds.isEmpty() || executingCallIds.any { it !in waitingCallIds }

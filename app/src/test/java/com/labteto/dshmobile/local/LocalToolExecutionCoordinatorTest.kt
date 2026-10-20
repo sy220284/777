@@ -32,6 +32,55 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
+    @Test fun cancellationRetiresTheRealExecutingBody() = runBlocking {
+        val started = CompletableDeferred<Unit>()
+        val changes = mutableListOf<Boolean>()
+        val registry = ToolRegistry().apply {
+            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                kotlinx.coroutines.awaitCancellation()
+            })
+        }
+        val task = async {
+            coordinator(registry).executeScoped(
+                LocalToolCall("cancel", "read", JsonObject(emptyMap()), "{}"),
+                "work", true, false, approval = { _, _, _ -> true },
+                onExecutionActive = { changes += it; if (it) started.complete(Unit) })
+        }
+        started.await()
+        task.cancel()
+        task.join()
+        assertEquals(listOf(true, false), changes)
+    }
+    @Test fun completedBodyReleasesCpuWhileAnotherBatchCallStillAwaitsApproval() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.ALWAYS) { ToolResult("read") })
+        }
+        val executor = coordinator(registry)
+        val approval = CompletableDeferred<Boolean>()
+        val waiting = CompletableDeferred<Unit>()
+        val active = linkedSetOf<String>()
+        val first = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            executor.executeScoped(LocalToolCall("first", "read", JsonObject(emptyMap()), "{}"),
+                "work", true, false, approval = { _, _, _ -> true },
+                onExecutionActive = { if (it) active += "first" else active -= "first" })
+        }
+        val second = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            executor.executeScoped(LocalToolCall("second", "read", JsonObject(emptyMap()), "{}"),
+                "work", true, false, approval = { _, _, _ -> waiting.complete(Unit); approval.await() },
+                onExecutionActive = { if (it) active += "second" else active -= "second" })
+        }
+        try {
+            waiting.await()
+            assertFalse(first.await().isError)
+            assertFalse(second.isCompleted)
+            // The Agent batch has not returned or published either ToolFinished receipt yet.
+            assertTrue(active.isEmpty())
+            assertFalse(com.labteto.dshmobile.local.work.workRunNeedsCpu(setOf("second"), active))
+            approval.complete(true)
+            assertFalse(second.await().isError)
+            assertTrue(active.isEmpty())
+        } finally { approval.complete(false) }
+    }
     @Test fun workEvidenceReadAndCommitExcludeActualCoordinatorWorkspaceMutation() = runBlocking {
         val gate = com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate()
         val source = java.nio.file.Files.createTempFile("work-proof", ".txt").toFile()

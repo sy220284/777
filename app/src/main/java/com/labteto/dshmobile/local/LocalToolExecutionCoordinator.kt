@@ -329,6 +329,7 @@ internal class LocalToolExecutionCoordinator(
         beforeExecution: () -> Boolean = { true },
         observeFileVersions: (() -> Map<String, String>)? = null,
         executionAttributes: Map<String, String> = emptyMap(),
+        onExecutionActive: (Boolean) -> Unit = {},
     ): AgentToolResult {
         val call = original.copy(name = LocalToolPolicy.canonical(original.name))
         if (!isNetworkSearchPermitted(call.name)) return AgentToolResult(
@@ -443,6 +444,7 @@ internal class LocalToolExecutionCoordinator(
                             }
                             recordExecutionStarted(sessionId, call, executionIdentity)
                             executionStarted = true
+                            onExecutionActive(true)
                         },
                     ),
                 )
@@ -507,7 +509,8 @@ internal class LocalToolExecutionCoordinator(
                 executionId = executionIdentity.executionId,
             )
         } finally {
-            executionLease?.close()
+            try { executionLease?.close() }
+            finally { if (executionStarted) onExecutionActive(false) }
         }
         executionStarted = executionStarted || invocation.executionStarted
         val result = invocation.result
