@@ -104,6 +104,8 @@ class HarnessResourceScheduler(
     private val onChanged: (HarnessResourceSnapshot) -> Unit = { },
 ) {
     // Admission and capacity changes share one lock: shrinking never revokes an active lease.
+    /** Immutable startup ceiling for consumers deriving pressure from runtime reductions. */
+    val startupBudget: HarnessResourceBudget = budget
     private var currentBudget = budget
     val budget: HarnessResourceBudget get() = synchronized(leaseStateLock) { currentBudget }
     private val capacityRevision = MutableStateFlow(0L)
