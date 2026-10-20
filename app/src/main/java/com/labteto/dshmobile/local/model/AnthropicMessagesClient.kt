@@ -80,7 +80,13 @@ internal class AnthropicMessagesClient @Inject constructor(
         val admissionTracker = LocalModelAdmissionTracker()
         val request = Request.Builder()
             .url(endpoint(route.baseUrl))
-            .header("x-api-key", route.bearerToken)
+            .apply {
+                if (LocalMiniMaxPolicy.isOfficial(route.baseUrl)) {
+                    header("Authorization", "Bearer ${route.bearerToken}")
+                } else {
+                    header("x-api-key", route.bearerToken)
+                }
+            }
             .header("anthropic-version", ANTHROPIC_VERSION)
             .header("accept", "text/event-stream")
             .header("content-type", "application/json")
