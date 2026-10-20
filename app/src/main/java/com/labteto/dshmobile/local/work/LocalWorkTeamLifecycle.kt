@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.put
 
 /** Owns mailbox reconciliation, job transitions and their visible projection. */
@@ -22,10 +23,15 @@ internal class LocalWorkTeamLifecycle(
     )
     private val teamJobSignals = ConcurrentHashMap<String, TeamJobSignal>()
     private val teamRefreshQueue: LocalTeamRefreshQueue = LocalTeamRefreshQueue(scope) { sessionId, reconcile ->
-        if (reconcile) runCatching { agentTeams.recoverMailbox(sessionId) }
-            .onFailure { AppLog.warn("LocalWorkComposition", "Agent Team 后台状态恢复失败 session=$sessionId", it) }
-        runCatching { teamUiProjection.publish(sessionId) }
-            .onFailure { AppLog.warn("LocalWorkComposition", "Agent Team UI 投影刷新失败 session=$sessionId", it) }
+        try {
+            if (reconcile) agentTeams.recoverMailboxAfterProjection(sessionId)
+            else agentTeams.awaitProjection(sessionId)
+            teamUiProjection.publish(sessionId)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (error: Exception) {
+            AppLog.warn("LocalWorkComposition", "Agent Team 状态恢复或投影刷新失败 session=$sessionId", error)
+        }
     }
 
     init {
@@ -71,22 +77,8 @@ internal class LocalWorkTeamLifecycle(
 
     fun recoverVisibleSession() {
         val sessionId = runtimeStateStore.currentSessionId
-        runCatching { agentTeams.recoverMailbox(sessionId) }
-            .onFailure { error ->
-                AppLog.warn(
-                    "LocalWorkComposition",
-                    "Agent Team 启动恢复失败 session=$sessionId",
-                    error,
-                )
-            }
-        runCatching { teamUiProjection.publish(sessionId) }
-            .onFailure { error ->
-                AppLog.warn(
-                    "LocalWorkComposition",
-                    "Agent Team 启动投影刷新失败 session=$sessionId",
-                    error,
-                )
-            }
+        // Historical replay may exceed one bounded batch; reconcile only after it is complete.
+        teamRefreshQueue.schedule(sessionId, reconcile = true)
         persistentJobs.schedule(sessionId)
     }
 
