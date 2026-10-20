@@ -47,7 +47,7 @@ class LocalHarnessSettingsCoordinatorTest {
         val recordedPreferences = Proxy.newProxyInstance(
             SharedPreferences::class.java.classLoader,
             arrayOf(SharedPreferences::class.java),
-        ) { _, method, _ ->
+        ) { _, method, args ->
             when (method.name) {
                 "contains" -> saved.containsKey(args!![0] as String)
                 "getInt" -> saved[args!![0] as String] as? Int ?: args[1] as Int
