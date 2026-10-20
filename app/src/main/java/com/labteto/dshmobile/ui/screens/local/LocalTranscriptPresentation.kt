@@ -168,6 +168,9 @@ internal fun appendPendingWorkToolActivities(
                 is LocalTranscriptItem.Thinking -> item.messages.first().createdAt > timestamp
                 is LocalTranscriptItem.WorkPendingTool -> (item.activity.declaredAt ?: Long.MAX_VALUE) > timestamp
                 is LocalTranscriptItem.WorkNode -> item.node.createdAt > timestamp
+                is LocalTranscriptItem.MediaResult -> item.result.createdAtMillis > timestamp
+                is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis > timestamp
+                is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis > timestamp
                 is LocalTranscriptItem.WorkArtifact -> true
                 else -> false
             }
