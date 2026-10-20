@@ -1228,7 +1228,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 }
                             }
                         }
-                        is LocalTranscriptItem.MediaResult -> LocalGeneratedMediaResultRow(
+                        is LocalTranscriptItem.MediaResult ->
+                            if (transcriptItem.groupedResults.size >= 2) {
+                                LocalReplyImageGallery(
+                                    results = transcriptItem.groupedResults,
+                                    viewModel = mediaStudioViewModel,
+                                )
+                            } else LocalGeneratedMediaResultRow(
                             result = transcriptItem.result,
                             inline = transcriptItem.attachedTo != null,
                             viewModel = mediaStudioViewModel,

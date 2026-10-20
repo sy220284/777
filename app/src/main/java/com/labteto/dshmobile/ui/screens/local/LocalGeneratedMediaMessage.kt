@@ -25,6 +25,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -235,6 +236,54 @@ internal fun LocalGeneratedMediaResultRow(
                 onClick = { onRevise(draft) })
         }
         error?.let { Text(it, style = DsType.caption11, color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
+    }
+}
+
+/**
+ * Bounded two-column gallery inside the unified reply. The owner is decided by the
+ * transcript projection, never by image timestamps or file names.
+ */
+@Composable
+internal fun ReplyMediaGrid(count: Int, content: @Composable (Int) -> Unit) {
+    require(count in 2..4) { "Reply image gallery accepts only 2–4 images" }
+    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+        modifier = Modifier.fillMaxWidth().widthIn(max = 640.dp)) {
+        (0 until count step 2).forEach { index ->
+            Row(Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+                Box(Modifier.weight(1f)) { content(index) }
+                if (index + 1 < count) {
+                    Box(Modifier.weight(1f)) { content(index + 1) }
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+/** Each image keeps its original owner, file handle, preview and share/save actions. */
+@Composable
+internal fun LocalReplyImageGallery(
+    results: List<LocalMediaResult>,
+    viewModel: LocalMediaStudioViewModel,
+) {
+    require(results.size in 2..4)
+    var selectedId by remember { mutableStateOf<String?>(null) }
+    val chosen = results.firstOrNull { it.id == selectedId }
+    MediaMessageCard(title = "", subtitle = "", inline = true) {
+        ReplyMediaGrid(results.size) { index ->
+            val image = results[index]
+            androidx.compose.runtime.key(image.id) {
+                val file = remember(image.id, image.fileName) { viewModel.resultFile(image) }
+                MediaInlinePicture(file, image.remoteUrl, onOpen = { selectedId = image.id },
+                    contentDescription = "生成图片 ${index + 1} / ${results.size}")
+            }
+        }
+    }
+    if (chosen != null) {
+        val file = remember(chosen.id, chosen.fileName) { viewModel.resultFile(chosen) }
+        MediaImageDetailDialog(file, chosen.remoteUrl, onDismiss = { selectedId = null })
     }
 }
 
@@ -489,6 +538,7 @@ internal fun InlineReplyMediaActions(file: File, mime: String, onError: (String)
 @Composable
 internal fun MediaInlinePicture(
     file: File?, remoteUrl: String?, onOpen: (() -> Unit)? = null,
+    contentDescription: String? = null,
 ) {
     val resources = LocalResources.current
     var bitmap by remember(file?.absolutePath, remoteUrl) { mutableStateOf<ImageBitmap?>(null) }
@@ -507,7 +557,8 @@ internal fun MediaInlinePicture(
         .border(1.dp, com.shenyan.designsystem.foundation.LocalSyColors.current.border, DsShapes.block)
     val modifier = if (onOpen != null) surface.clickable(onClick = onOpen) else surface
     if (image != null) {
-        Image(bitmap = image, contentDescription = resources.getString(R.string.media_chat_generated_image),
+        Image(bitmap = image, contentDescription = contentDescription
+            ?: resources.getString(R.string.media_chat_generated_image),
             contentScale = ContentScale.Fit, modifier = modifier)
     } else {
         androidx.compose.foundation.layout.Box(modifier,
@@ -998,23 +1049,70 @@ internal fun LocalWorkArtifactMessageRow(
                     }
                 })
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-            if (artifact.category == "file") {
-                SyButton(resources.getString(R.string.media_chat_view_entire_file), onClick = onOpen, size = SyButtonSize.Small)
-                if (file != null) {
-                    SyButton(resources.getString(R.string.media_chat_share_save), size = SyButtonSize.Small,
-                        variant = SyButtonVariant.Ghost,
-                        onClick = {
-                            shareMediaFile(context, file, localArtifactMime(file)) { error = it }
-                        })
+        if (inline && artifact.category == "file") {
+            InlineReplyArtifactActions(file, onOpen, onError = { error = it })
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                if (artifact.category == "file") {
+                    SyButton(resources.getString(R.string.media_chat_view_entire_file), onClick = onOpen,
+                        size = SyButtonSize.Small)
+                    if (file != null) {
+                        SyButton(resources.getString(R.string.media_chat_share_save),
+                            size = SyButtonSize.Small, variant = SyButtonVariant.Ghost,
+                            onClick = {
+                                shareMediaFile(context, file, localArtifactMime(file)) { error = it }
+                            })
+                    }
+                } else if (artifact.reference.startsWith("https://")) {
+                    SyButton(resources.getString(R.string.media_chat_open_result),
+                        size = SyButtonSize.Small,
+                        onClick = { openMediaUrl(context, artifact.reference) { error = it } })
                 }
-            } else if (artifact.reference.startsWith("https://")) {
-                SyButton(resources.getString(R.string.media_chat_open_result), size = SyButtonSize.Small,
-                    onClick = { openMediaUrl(context, artifact.reference) { error = it } })
             }
         }
         error?.let { Text(it, style = DsType.caption11.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
+    }
+}
+
+/**
+ * An attached Work file uses the same compact content-level overflow as audio/video.
+ * Full-file opening stays delegated to the Work owner; sharing only uses validated local files.
+ */
+@Composable
+internal fun InlineReplyArtifactActions(
+    file: File?,
+    onOpen: () -> Unit,
+    onError: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    var open by remember { mutableStateOf(false) }
+    val menu = buildList {
+        add(SyMenuItem(
+            text = resources.getString(R.string.media_chat_view_entire_file),
+            icon = FeatherIcons.FileText,
+            onClick = { open = false; onOpen() },
+        ))
+        if (file?.isFile == true) {
+            add(SyMenuItem(
+                text = resources.getString(R.string.media_chat_share_save),
+                icon = FeatherIcons.ArrowUp,
+                onClick = {
+                    open = false
+                    shareMediaFile(context, file, localArtifactMime(file), onError)
+                },
+            ))
+        }
+    }
+    Box {
+        IconButton(onClick = { open = true },
+            modifier = Modifier.testTag("inlineArtifactActions")) {
+            Icon(FeatherIcons.MoreVertical,
+                contentDescription = resources.getString(R.string.fluid_message_actions),
+                tint = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+        }
+        SyPopupMenu(expanded = open, onDismiss = { open = false }, items = menu)
     }
 }
 
