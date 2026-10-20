@@ -113,6 +113,7 @@ import kotlinx.coroutines.withContext
 internal fun LocalCreationJobMessageRow(
     job: LocalMediaCreationJob,
     viewModel: LocalMediaStudioViewModel,
+    inline: Boolean = false,
 ) {
     val resources = LocalResources.current
     val phase = when (job.phase) {
@@ -126,7 +127,9 @@ internal fun LocalCreationJobMessageRow(
     }
     MediaMessageCard(
         title = resources.getString(phase),
-        subtitle = resources.getString(if (job.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
+        subtitle = if (inline) "" else resources.getString(
+            if (job.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
+        inline = inline,
     ) {
         job.prompt?.let { prompt ->
             Text(prompt, style = DsType.small13.withReadingWeight(),
@@ -163,6 +166,7 @@ internal fun LocalGeneratedMediaResultRow(
     viewModel: LocalMediaStudioViewModel,
     onInsertText: (String) -> Unit,
     onRevise: (LocalMediaRevisionDraft) -> Unit = {},
+    inline: Boolean = false,
 ) {
     val resources = LocalResources.current
     val context = LocalContext.current
@@ -175,8 +179,12 @@ internal fun LocalGeneratedMediaResultRow(
         LocalMediaKind.TRANSCRIBE.name -> resources.getString(R.string.media_chat_transcript_done)
         else -> resources.getString(R.string.media_chat_generic_result)
     }
-    MediaMessageCard(title = label,
-        subtitle = resources.getString(if (result.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply)) {
+    MediaMessageCard(
+        title = if (inline && result.kind == LocalMediaKind.IMAGE.name) "" else label,
+        subtitle = if (inline) "" else resources.getString(
+            if (result.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
+        inline = inline,
+    ) {
         when (result.kind) {
             LocalMediaKind.IMAGE.name -> {
                 MediaInlinePicture(
@@ -190,11 +198,15 @@ internal fun LocalGeneratedMediaResultRow(
             LocalMediaKind.SPEECH.name -> {
                 if (file != null) {
                     InlineSpeechPlayer(file)
-                    Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                        MediaSaveButton(file, "audio/mpeg")
-                        SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Ghost,
-                            onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
+                    if (inline) {
+                        InlineReplyMediaActions(file, "audio/mpeg") { error = it }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                            MediaSaveButton(file, "audio/mpeg")
+                            SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Ghost,
+                                onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
+                        }
                     }
                 } else Text(resources.getString(R.string.media_chat_audio_missing), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
@@ -238,6 +250,7 @@ internal fun LocalGeneratedVideoTaskRow(
     offers: List<LocalMediaOffer>,
     viewModel: LocalMediaStudioViewModel,
     onRevise: (LocalMediaRevisionDraft) -> Unit = {},
+    inline: Boolean = false,
 ) {
     val resources = LocalResources.current
     val context = LocalContext.current
@@ -280,8 +293,12 @@ internal fun LocalGeneratedVideoTaskRow(
         LocalMediaVideoPhase.SUCCEEDED -> resources.getString(R.string.media_chat_video_done)
         LocalMediaVideoPhase.FAILED -> resources.getString(R.string.media_chat_generation_failed)
     }
-    MediaMessageCard(title = phase,
-        subtitle = resources.getString(if (task.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply)) {
+    MediaMessageCard(
+        title = phase,
+        subtitle = if (inline) "" else resources.getString(
+            if (task.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
+        inline = inline,
+    ) {
         task.description?.let {
             Text(it, style = DsType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, maxLines = 3,
@@ -300,10 +317,14 @@ internal fun LocalGeneratedVideoTaskRow(
                     onClick = { showingPlayer = false },
                 )
                 if (localVideo != null) {
-                    MediaSaveButton(localVideo, "video/mp4")
-                    SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
-                        variant = SyButtonVariant.Ghost,
-                        onClick = { shareMediaFile(context, localVideo, "video/mp4") { error = it } })
+                    if (inline) {
+                        InlineReplyMediaActions(localVideo, "video/mp4") { error = it }
+                    } else {
+                        MediaSaveButton(localVideo, "video/mp4")
+                        SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
+                            onClick = { shareMediaFile(context, localVideo, "video/mp4") { error = it } })
+                    }
                 } else {
                     // A local-only video has no remote open action; keep the nullable URL guarded.
                     task.downloadUrl?.takeIf(String::isNotBlank)?.let { remoteUrl ->
@@ -371,17 +392,20 @@ internal fun LocalGeneratedVideoTaskRow(
 }
 
 @Composable
-private fun MediaMessageCard(
+internal fun MediaMessageCard(
     title: String, subtitle: String, modifier: Modifier = Modifier,
+    inline: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Column(
-        modifier = modifier.fillMaxWidth(0.90f).widthIn(max = 470.dp)
-            .padding(vertical = SyMetric.gapMd),
+        modifier = modifier.fillMaxWidth(if (inline) 1f else 0.90f)
+            .widthIn(max = if (inline) 640.dp else 470.dp)
+            .padding(vertical = if (inline) SyMetric.gapSm else SyMetric.gapMd),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
-        Text(title, style = DsType.small13Strong.withReadingWeight(), color = colors.textSecondary)
+        if (title.isNotBlank()) Text(title, style = DsType.small13Strong.withReadingWeight(),
+            color = colors.textSecondary)
         if (subtitle.isNotBlank()) Text(subtitle, style = DsType.caption11.withReadingWeight(),
             color = colors.textTertiary)
         content()
@@ -423,6 +447,42 @@ private fun MediaSaveButton(file: File, mime: String) {
         SyButton(text = resources.getString(R.string.media_action_save), size = SyButtonSize.Small,
             onClick = { status = null; save() })
         status?.let { Text(it, style = DsType.caption11.withReadingWeight()) }
+    }
+}
+
+/**
+ * Contextual save/share actions for media owned by a reply. Standalone media archive rows
+ * retain their old visible controls. No new file or task ownership is introduced here.
+ */
+@Composable
+internal fun InlineReplyMediaActions(file: File, mime: String, onError: (String) -> Unit) {
+    val resources = LocalResources.current
+    val context = LocalContext.current
+    var open by remember(file.absolutePath) { mutableStateOf(false) }
+    val save = rememberMediaSaveAction(file, mime) { success ->
+        Toast.makeText(context,
+            resources.getString(if (success) R.string.media_action_saved else R.string.media_action_save_failed),
+            Toast.LENGTH_SHORT).show()
+    }
+    Box {
+        IconButton(onClick = { open = true },
+            modifier = Modifier.testTag("inlineMediaActions")) {
+            Icon(FeatherIcons.MoreVertical,
+                contentDescription = resources.getString(R.string.fluid_message_actions),
+                tint = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+        }
+        SyPopupMenu(
+            expanded = open,
+            onDismiss = { open = false },
+            items = listOf(
+                SyMenuItem(text = resources.getString(R.string.media_action_save),
+                    icon = FeatherIcons.Download,
+                    onClick = { open = false; save() }),
+                SyMenuItem(text = resources.getString(R.string.media_action_share),
+                    icon = FeatherIcons.ArrowUp,
+                    onClick = { open = false; shareMediaFile(context, file, mime, onError) }),
+            ),
+        )
     }
 }
 
@@ -841,6 +901,7 @@ internal fun LocalWorkArtifactMessageRow(
     actions: LocalWorkFeatureUiActions?,
     onOpen: () -> Unit,
     sessionId: String? = null,
+    inline: Boolean = false,
 ) {
     val resources = LocalResources.current
     val context = LocalContext.current
@@ -881,7 +942,9 @@ internal fun LocalWorkArtifactMessageRow(
     val name = artifact.reference.substringAfterLast('/').ifBlank { artifact.reference }
     MediaMessageCard(
         title = if (artifact.category == "file") resources.getString(R.string.media_chat_work_file, name) else resources.getString(R.string.media_chat_work_result),
-        subtitle = if (artifact.currentlyAvailable == false) resources.getString(R.string.media_chat_work_file_missing) else resources.getString(R.string.media_chat_work_output_here),
+        subtitle = if (artifact.currentlyAvailable == false) resources.getString(R.string.media_chat_work_file_missing)
+            else if (inline) "" else resources.getString(R.string.media_chat_work_output_here),
+        inline = inline,
         modifier = if (artifact.category == "file" && artifact.currentlyAvailable != false) {
             Modifier.localArtifactSharedBounds(workspacePath, artifact.reference)
         } else Modifier,
