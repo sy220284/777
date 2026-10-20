@@ -6,6 +6,8 @@ import com.labteto.dshmobile.local.profile.UserProfile
 import com.labteto.dshmobile.local.profile.UserProfileStore
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import java.io.File
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
@@ -22,6 +24,44 @@ class LocalHarnessSettingsCoordinatorTest {
     private val preferences = Proxy.newProxyInstance(
         SharedPreferences::class.java.classLoader, arrayOf(SharedPreferences::class.java),
     ) { _, method, _ -> error("Unexpected preference call: ${method.name}") } as SharedPreferences
+
+    @Test fun saveAcknowledgesOnlyAfterDurableWriteAndSkipsSupersededValues() = runTest {
+        val file = File(temporary.root, "profile/ack.json")
+        val store = UserProfileStore(file, Json)
+        val runtime = LocalRuntimeStateStore().apply { initialize(LocalHarnessState(sessionId = "ack")) }
+        val settings = LocalHarnessSettingsCoordinator(preferences, store, runtime, backgroundScope)
+        val superseded = async(start = CoroutineStart.UNDISPATCHED) {
+            settings.savePersonalization("discarded", true, true)
+        }
+        val current = async(start = CoroutineStart.UNDISPATCHED) {
+            settings.savePersonalization("current", false, true)
+        }
+        assertFalse(current.isCompleted)
+        assertEquals("", runtime.state.value.userRules)
+        assertFalse(superseded.await())
+        runCurrent()
+        assertTrue(current.await())
+        assertEquals(UserProfile("current", false, true), store.read())
+        assertEquals("current", runtime.state.value.userRules)
+    }
+
+    @Test fun failedSaveCannotAcknowledgeDurabilityAndLaterRetrySucceeds() = runTest {
+        val parent = File(temporary.root, "blocked-for-ack").apply { writeText("file") }
+        val store = UserProfileStore(File(parent, "user.json"), Json)
+        val runtime = LocalRuntimeStateStore().apply { initialize(LocalHarnessState(sessionId = "ack")) }
+        val settings = LocalHarnessSettingsCoordinator(preferences, store, runtime, backgroundScope)
+        val failed = async { runCatching { settings.savePersonalization("first", true, false) } }
+        runCurrent()
+        assertTrue(failed.await().isFailure)
+        assertNotNull(runtime.state.value.error)
+        assertEquals("", runtime.state.value.userRules)
+        assertTrue(parent.delete())
+        assertTrue(parent.mkdir())
+        val retry = async { settings.savePersonalization("second", false, true) }
+        runCurrent()
+        assertTrue(retry.await())
+        assertEquals(UserProfile("second", false, true), store.read())
+    }
 
     @Test fun rapidEditsPersistLatestValueWithoutWritingSupersededPendingValues() = runTest {
         val file = File(temporary.root, "profile/user.json")

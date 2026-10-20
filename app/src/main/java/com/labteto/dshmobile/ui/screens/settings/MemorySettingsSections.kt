@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -125,6 +126,8 @@ internal fun LocalMemorySettingsCard(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var userRules by remember(local.userRules) { mutableStateOf(local.userRules) }
     var showRulesEditor by remember { mutableStateOf(false) }
+    var savingRules by remember { mutableStateOf(false) }
+    var rulesSaveError by remember { mutableStateOf<String?>(null) }
 
     SettingsCard(stringResource(R.string.advanced_memory_settings)) {
         SyValueRow(
@@ -145,8 +148,10 @@ internal fun LocalMemorySettingsCard(
             SySwitchControl(
                 checked = local.autoRecall,
                 onCheckedChange = { next ->
-                    viewModel.configureLocalMemory(userRules, next, local.autoMemory)
-                    report(memorySavedMessage)
+                    viewModel.configureLocalMemory(userRules, next, local.autoMemory) { saved, error ->
+                        if (saved) report(memorySavedMessage)
+                        else if (error != null) report(error)
+                    }
                 },
             )
         }
@@ -162,8 +167,10 @@ internal fun LocalMemorySettingsCard(
             SySwitchControl(
                 checked = local.autoMemory,
                 onCheckedChange = { next ->
-                    viewModel.configureLocalMemory(userRules, local.autoRecall, next)
-                    report(memorySavedMessage)
+                    viewModel.configureLocalMemory(userRules, local.autoRecall, next) { saved, error ->
+                        if (saved) report(memorySavedMessage)
+                        else if (error != null) report(error)
+                    }
                 },
             )
         }
@@ -179,18 +186,31 @@ internal fun LocalMemorySettingsCard(
                 SyButton(
                     text = stringResource(R.string.common_save),
                     onClick = {
-                        viewModel.configureLocalMemory(userRules, local.autoRecall, local.autoMemory)
-                        report(memorySavedMessage)
-                        showRulesEditor = false
+                        savingRules = true
+                        rulesSaveError = null
+                        viewModel.configureLocalMemory(userRules, local.autoRecall, local.autoMemory) { saved, error ->
+                            savingRules = false
+                            if (saved) {
+                                report(memorySavedMessage)
+                                showRulesEditor = false
+                            } else {
+                                rulesSaveError = error ?: "设置已被后续修改替代，请确认后重新保存"
+                            }
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     size = SyButtonSize.Large,
+                    enabled = !savingRules,
+                    loading = savingRules,
                 )
             },
         ) {
+            rulesSaveError?.let { error ->
+                Text(error, color = MaterialTheme.colorScheme.error, style = DsType.caption11.withReadingWeight())
+            }
             SyTextField(
                 value = userRules,
-                onValueChange = { userRules = it.take(6_000) },
+                onValueChange = { userRules = it.take(6_000); rulesSaveError = null },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 5,
                 maxLines = 10,

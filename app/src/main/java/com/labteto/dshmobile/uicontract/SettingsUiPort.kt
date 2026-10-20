@@ -60,7 +60,10 @@ interface SettingsUiPort {
         credentialSourceProfileId: String? = null): List<String>
     fun configureImageInputMode(mode: LocalImageInputMode)
     fun configureRuntimeLimits(main: Int, subagent: Int, attempts: Int, workerProfileId: String?)
+    /** Enqueue without claiming durability; callers that need confirmation use savePersonalization. */
     fun configurePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean)
+    /** True only after the exact submitted generation is persisted and remains current. */
+    suspend fun savePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean): Boolean
     fun configureChatStyleGuard(enabled: Boolean)
     fun addChatStyleGuardPhrase(value: String): Boolean
     fun removeChatStyleGuardPhrase(value: String)
@@ -106,7 +109,10 @@ fun SettingsUiPort.submit(command: SettingsUiCommand): SettingsUiReceipt = try {
         is SettingsUiCommand.ApprovalMode -> configureApprovalMode(command.mode)
         is SettingsUiCommand.ImageInputMode -> configureImageInputMode(command.mode)
         is SettingsUiCommand.RuntimeLimits -> configureRuntimeLimits(command.main, command.subagent, command.attempts, command.workerProfileId)
-        is SettingsUiCommand.Personalization -> configurePersonalization(command.rules, command.autoRecall, command.autoMemory)
+        is SettingsUiCommand.Personalization -> {
+            configurePersonalization(command.rules, command.autoRecall, command.autoMemory)
+            return SettingsUiReceipt.Submitted
+        }
         is SettingsUiCommand.StyleGuard -> configureChatStyleGuard(command.enabled)
         is SettingsUiCommand.AddStylePhrase -> if (!addChatStyleGuardPhrase(command.phrase)) return SettingsUiReceipt.Rejected
         is SettingsUiCommand.RemoveStylePhrase -> removeChatStyleGuardPhrase(command.phrase)

@@ -30,6 +30,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -296,8 +297,22 @@ class SettingsViewModel @Inject constructor(
     suspend fun discoverApiModels(apiKey: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol, credentialSourceProfileId: String? = null): List<String> =
         withContext(Dispatchers.IO) { localHarness.discoverApiModels(apiKey, baseUrl, protocol, credentialSourceProfileId) }
 
-    fun configureLocalMemory(userRules: String, autoRecall: Boolean, autoMemory: Boolean) {
-        localHarness.configurePersonalization(userRules, autoRecall, autoMemory)
+    fun configureLocalMemory(
+        userRules: String,
+        autoRecall: Boolean,
+        autoMemory: Boolean,
+        onDone: (saved: Boolean, error: String?) -> Unit,
+    ) {
+        viewModelScope.launch {
+            try {
+                val saved = localHarness.savePersonalization(userRules, autoRecall, autoMemory)
+                onDone(saved, null)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                onDone(false, failure.message ?: "个性化设置保存失败")
+            }
+        }
     }
 
     fun refreshMemories() = memorySettingsController.refresh()

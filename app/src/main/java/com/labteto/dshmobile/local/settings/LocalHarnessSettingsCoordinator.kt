@@ -11,6 +11,8 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -50,35 +52,51 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
 
     private val state get() = statePort.value
     private val personalizationGeneration = AtomicLong()
-    private val personalizationWrites = Channel<Pair<Long, UserProfile>>(Channel.CONFLATED)
+    private data class PersonalizationWrite(
+        val generation: Long,
+        val profile: UserProfile,
+        val receipt: CompletableDeferred<Boolean>?,
+    )
+
+    // CONFLATED avoids writing intermediate edits. A superseded caller must be
+    // completed explicitly rather than waiting forever for a discarded value.
+    private val personalizationWrites = Channel<PersonalizationWrite>(
+        capacity = Channel.CONFLATED,
+        onUndeliveredElement = { pending -> pending.receipt?.complete(false) },
+    )
 
     init {
         scope.launch {
             var committedProfile = runCatching { userProfileStore.read() }.getOrDefault(UserProfile())
             // One writer preserves submission order; rapid edits retain only the latest pending
             // value. Runtime state is committed only after durable storage succeeds.
-            for ((generation, profile) in personalizationWrites) {
-                runCatching { userProfileStore.write(profile) }
-                    .onSuccess {
-                        committedProfile = profile
-                        if (personalizationGeneration.get() == generation) {
-                            statePort.updatePersonalization(
-                                userRules = profile.customRules,
-                                autoRecall = profile.autoRecall,
-                                autoMemory = profile.autoMemory,
-                            )
-                        }
+            for ((generation, profile, receipt) in personalizationWrites) {
+                try {
+                    userProfileStore.write(profile)
+                    committedProfile = profile
+                    val latest = personalizationGeneration.get() == generation
+                    if (latest) {
+                        statePort.updatePersonalization(
+                            userRules = profile.customRules,
+                            autoRecall = profile.autoRecall,
+                            autoMemory = profile.autoMemory,
+                        )
                     }
-                    .onFailure { error ->
-                        if (personalizationGeneration.get() == generation) {
-                            statePort.updatePersonalization(
-                                userRules = committedProfile.customRules,
-                                autoRecall = committedProfile.autoRecall,
-                                autoMemory = committedProfile.autoMemory,
-                            )
-                            statePort.publishError(error.message ?: "个性化设置保存失败")
-                        }
+                    receipt?.complete(latest)
+                } catch (cancelled: CancellationException) {
+                    receipt?.completeExceptionally(cancelled)
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (personalizationGeneration.get() == generation) {
+                        statePort.updatePersonalization(
+                            userRules = committedProfile.customRules,
+                            autoRecall = committedProfile.autoRecall,
+                            autoMemory = committedProfile.autoMemory,
+                        )
+                        statePort.publishError(error.message ?: "个性化设置保存失败")
                     }
+                    receipt?.completeExceptionally(error)
+                }
             }
         }
     }
@@ -134,10 +152,11 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
     }
 
     @Synchronized
-    fun configurePersonalization(
+    private fun submitPersonalization(
         customRules: String,
         autoRecall: Boolean,
         autoMemory: Boolean,
+        receipt: CompletableDeferred<Boolean>? = null,
     ) {
         val profile = UserProfile(
             customRules = customRules.trim().take(6_000),
@@ -145,6 +164,20 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
             autoMemory = autoMemory,
         )
         val generation = personalizationGeneration.incrementAndGet()
-        personalizationWrites.trySend(generation to profile).getOrThrow()
+        personalizationWrites.trySend(PersonalizationWrite(generation, profile, receipt)).getOrThrow()
     }
+
+    /** Returns true only after this generation was durably written and still current. */
+    suspend fun savePersonalization(
+        customRules: String,
+        autoRecall: Boolean,
+        autoMemory: Boolean,
+    ): Boolean {
+        val receipt = CompletableDeferred<Boolean>()
+        submitPersonalization(customRules, autoRecall, autoMemory, receipt)
+        return receipt.await()
+    }
+
+    fun configurePersonalization(customRules: String, autoRecall: Boolean, autoMemory: Boolean) =
+        submitPersonalization(customRules, autoRecall, autoMemory)
 }
