@@ -121,7 +121,7 @@ class V6SeamlessNavigationInteractionTest {
         compose.onNodeWithText("完成构建", substring = true).performTouchInput { longClick() }
         compose.onNodeWithText("转为任务").assertDoesNotExist()
     }
-    @Test fun assistantMessageContextMenuKeepsGenerationWithoutInlineCard() {
+    @Test fun assistantMessageOverflowMenuKeepsGenerationWithoutInlineCard() {
         val message = LocalHarnessMessage(
             id = "assistant-doc-1", role = "assistant",
             content = "这是一条等待整理的回复", createdAt = 1L,
@@ -138,10 +138,11 @@ class V6SeamlessNavigationInteractionTest {
                 )
             }
         }
-        compose.onNodeWithTag("messageActionSurface:assistant-doc-1")
-            .performTouchInput { longClick() }
-        // The modal sheet animates asynchronously after the long-press.
-        // Wait for the actual menu action to become visible before tapping.
+        // Selectable assistant Markdown owns text long-press for native selection.
+        // Its compact overflow button is the reliable message-action entry.
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        compose.onNodeWithContentDescription(context.getString(R.string.fluid_message_actions))
+            .performClick()
         compose.waitUntil(10_000) {
             compose.onAllNodesWithText("为此回复生成交互文档")
                 .fetchSemanticsNodes().isNotEmpty()
