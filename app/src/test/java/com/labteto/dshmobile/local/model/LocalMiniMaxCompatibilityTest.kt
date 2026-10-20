@@ -77,6 +77,51 @@ class LocalMiniMaxCompatibilityTest {
         assertNull(captured.single().header("Authorization"))
     }
 
+    @Test fun nativeMiniMaxStreamKeepsThinkingReplyToolAndSameRouteReplay() = runBlocking {
+        val stream = listOf(
+            """data: {"type":"message_start","message":{"id":"mm-stream","usage":{"input_tokens":8,"output_tokens":0}}}""",
+            """data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}""",
+            """data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"先检查仓库"}}""",
+            """data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"mm-signature"}}""",
+            """data: {"type":"content_block_stop","index":0}""",
+            """data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}""",
+            """data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"正在核查"}}""",
+            """data: {"type":"content_block_stop","index":1}""",
+            """data: {"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"call-1","name":"read","input":{}}}""",
+            """data: {"type":"content_block_stop","index":2}""",
+            """data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":21}}""",
+            """data: {"type":"message_stop"}""",
+        ).joinToString("\n", postfix = "\n")
+        var capturedUrl: String? = null
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            capturedUrl = chain.request().url.toString()
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200)
+                .message("OK").body(stream.toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val client = AnthropicMessagesClient(http, json)
+        val selected = route("MiniMax-M3.1-Flash", "https://api.minimaxi.com/anthropic/v1")
+        val deltas = mutableListOf<LocalModelDelta>()
+        val reply = client.complete(selected, emptyList(), emptyList(), null, true, deltas::add, "high")
+        assertEquals("https://api.minimaxi.com/anthropic/v1/messages", capturedUrl)
+        assertEquals("先检查仓库", reply.reasoning)
+        assertEquals("正在核查", reply.content)
+        assertEquals("read", reply.toolCalls.single().name)
+        assertEquals("call-1", reply.toolCalls.single().id)
+        assertEquals("先检查仓库", deltas.joinToString("") { it.reasoning })
+        assertEquals("正在核查", deltas.joinToString("") { it.content })
+        val history = LocalCanonicalModelCodec.toHistoryMessage(reply.canonicalMessage!!)
+        val restored = LocalCanonicalModelCodec.message(history)
+        val same = LocalCanonicalModelCodec.toLegacyMessages(
+            listOf(restored), LocalModelAdapterIds.ANTHROPIC_MESSAGES, selected.fingerprint,
+        ).single()
+        assertEquals("mm-signature", same["content"]!!.jsonArray[0].jsonObject["signature"]!!.jsonPrimitive.content)
+        assertEquals("read", same["content"]!!.jsonArray[2].jsonObject["name"]!!.jsonPrimitive.content)
+        val changed = LocalCanonicalModelCodec.toLegacyMessages(
+            listOf(restored), LocalModelAdapterIds.ANTHROPIC_MESSAGES, "different-route",
+        ).single()
+        assertFalse(changed.toString().contains("mm-signature"))
+    }
+
     @Test fun providerQuotaErrorIsReportedInsteadOfMissingChoices() {
         val failure = assertThrows(com.labteto.dshmobile.local.LocalModelException::class.java) {
             DeepSeekClient(OkHttpClient(), json).parse("""{"base_resp":{"status_code":1008,"status_msg":"余额不足"}}""")
