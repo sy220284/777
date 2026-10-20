@@ -32,10 +32,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
@@ -114,90 +112,6 @@ internal fun userFacingWorkToolAction(toolName: String?): String? {
 }
 
 /** A readable chronological step, with optional explanation instead of a hidden disclosure. */
-@Composable
-internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
-    val action = when {
-        node.failed -> stringResource(R.string.local_reasoning_work_failed)
-        node.summary == null && node.operationKinds.size > 1 -> "工具操作"
-        node.summary == null && node.toolName != null &&
-            userFacingWorkToolActionRes(node.toolName) != null ->
-            stringResource(userFacingWorkToolActionRes(node.toolName)!!)
-        node.summary == null && node.toolName != null &&
-            userFacingWorkToolAction(node.toolName) != null ->
-            userFacingWorkToolAction(node.toolName)!!
-        node.summary == null &&
-            node.kind == com.labteto.dshmobile.ui.AgentOperationKind.Generic -> "工具操作"
-        else -> stringResource(agentOperationLabelRes(node.kind))
-    }
-    val provider = userFacingWorkToolProvider(node.toolName)
-    val summary = node.summary ?: if (provider != null) "$provider · $action" else action
-    val label = if (provider != null && node.summary != null &&
-        !summary.contains(provider, ignoreCase = true)
-    ) "$provider · $summary" else summary
-    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
-        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-        ) {
-            when {
-                node.failed -> Icon(
-                    FeatherIcons.AlertTriangle,
-                    contentDescription = null,
-                    tint = colors.dangerInk,
-                    modifier = Modifier.size(18.dp),
-                )
-                node.count > 0 -> WorkOperationIcon(node.kind, running = running)
-                running -> WorkOperationIcon(node.kind, running = true)
-                else -> WorkOperationIcon(node.kind, running = false)
-            }
-            Text(
-                label,
-                modifier = Modifier.weight(1f),
-                style = (if (node.summary != null) DsType.mdSmall else DsType.small13)
-                    .withReadingWeight().copy(fontFamily = FontFamily.Default),
-                color = when {
-                    node.failed -> colors.dangerInk
-                    node.count > 0 -> colors.textSecondary
-                    else -> colors.text
-                },
-            )
-            if (node.failed) {
-                Text(
-                    stringResource(agentOperationStatusRes(running = false, failed = true)),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.dangerInk,
-                )
-            } else if (running) {
-                Text(
-                    stringResource(agentOperationStatusRes(running = true, failed = false)),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.primary,
-                )
-            } else if (node.count > 1) {
-                Text(
-                    stringResource(R.string.local_work_process_operation_count, node.count),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.textTertiary,
-                )
-            }
-        }
-        node.detail?.let { detail ->
-            Text(
-                detail,
-                modifier = Modifier.padding(start = 18.dp + SyMetric.gapMd),
-                style = DsType.small13.withReadingWeight(),
-                color = if (node.failed) colors.dangerInk else colors.text,
-            )
-        }
-    }
-}
-
-
 /** Public prose uses the same reading style before and after the streaming commit. */
 @Composable
 internal fun WorkTimelineStepRow(
