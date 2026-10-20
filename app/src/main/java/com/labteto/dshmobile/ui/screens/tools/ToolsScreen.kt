@@ -645,7 +645,7 @@ fun ToolsScreen(
                                     skillsOnly = selectedTab == 1,
                                     embedded = true,
                                     loading = state.loading,
-                                    error = if (selectedTab == 0 && state.loadFailed)
+                                    error = if (state.loadFailed)
                                         stringResource(R.string.tools_load_failed) else null,
                                     onRetry = viewModel::refresh,
                                     onBack = onClose,
