@@ -205,6 +205,7 @@ internal fun WorkTimelineStepRow(
     repeatCount: Int = 1,
     active: Boolean = false,
     activity: com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem? = null,
+    groupedMessages: List<com.labteto.dshmobile.local.session.LocalHarnessMessage> = emptyList(),
 ) {
     if (message.role != "tool") {
         val content = localWorkTimelineText(message.content) ?: return
@@ -216,8 +217,9 @@ internal fun WorkTimelineStepRow(
     val phase = completedWorkToolPhase(message)
     val action = workToolActionLabel(message.toolName, activity?.argumentsPreview)
     var detailsOpen by remember(message.id) { mutableStateOf(false) }
-    val hasDetails = message.content.isNotBlank()
+    val hasDetails = message.content.isNotBlank() || groupedMessages.any { it.content.isNotBlank() }
     WorkToolStatusRow(message.toolName, phase, argumentsPreview = activity?.argumentsPreview,
+        repeatCount = repeatCount,
         modifier = Modifier.testTag(message.toolCallId?.let { "work-tool:$it" } ?: "work-tool:${message.id}"),
         onClick = if (hasDetails) ({ detailsOpen = true }) else null)
     if (detailsOpen) {
@@ -229,9 +231,15 @@ internal fun WorkTimelineStepRow(
             }) {
             Text(workToolPhaseText(phase), style = DsType.std14Strong.withReadingWeight())
             message.toolErrorCode?.let { Text(it, style = DsType.small13.withReadingWeight()) }
-            SelectionContainer {
-                Text(message.content, style = DsType.std14.withReadingWeight(),
-                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+            (listOf(message) + groupedMessages).forEachIndexed { index, receipt ->
+                if (repeatCount > 1) {
+                    Text("第 " + (index + 1) + " 次检查",
+                        style = DsType.small13.withReadingWeight())
+                }
+                SelectionContainer {
+                    Text(receipt.content, style = DsType.std14.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+                }
             }
         }
     }
@@ -276,11 +284,13 @@ private fun WorkToolStatusRow(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     argumentsPreview: String? = null,
+    repeatCount: Int = 1,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val provider = userFacingWorkToolProvider(name)
     val action = workToolActionLabel(name, argumentsPreview)
-    val label = if (provider == null) action else "$provider · $action"
+    val title = if (provider == null) action else "$provider · $action"
+    val label = if (repeatCount > 1) "$title · 已检查 " + repeatCount + " 次" else title
     val status = workToolPhaseText(phase)
     val tint = when (phase) {
         LocalToolUiPhase.FAILED -> colors.dangerInk
