@@ -4,6 +4,7 @@ import com.labteto.dshmobile.harness.capability.ProcessResult
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -70,9 +71,14 @@ suspend fun executeManagedProcess(
     timeoutMillis: Long,
     maxChars: Int = 1_048_576,
     onProgress: ((String) -> Unit)? = null,
+    // Shell work may be arbitrarily long while stdout/stderr is still flowing.
+    // Other process clients retain the original absolute timeout by default.
+    progressResetsTimeout: Boolean = false,
 ): ProcessResult = withContext(Dispatchers.IO) {
     val managed = ManagedProcess.start(builder)
     val process = managed.process
+    val lastOutputNanos = AtomicLong(System.nanoTime())
+    val processPollMillis = 250L
     try {
         coroutineScope {
             suspend fun capture(input: java.io.InputStream, progress: ((String) -> Unit)?): String {
@@ -86,6 +92,7 @@ suspend fun executeManagedProcess(
                     // Process-group teardown closes the writers on timeout/cancellation.
                     val count = runInterruptible { input.read(buffer) }
                     if (count < 0) break
+                    if (count > 0) lastOutputNanos.set(System.nanoTime())
                     val keep = minOf(count, (maxChars * 4 - output.size()).coerceAtLeast(0))
                     output.write(buffer, 0, keep)
                     if (keep < count) truncated = true
@@ -104,9 +111,33 @@ suspend fun executeManagedProcess(
                 }
             }
             try {
-                val code = withTimeoutOrNull(timeoutMillis.coerceAtLeast(1)) {
-                    writer.await().getOrThrow()
-                    runInterruptible { process.waitFor() }
+                val effectiveTimeoutMillis = timeoutMillis.coerceAtLeast(1)
+                val code = if (progressResetsTimeout) {
+                    // Guard stdin startup too: a blocked pipe must never stall this task forever.
+                    val wrote = withTimeoutOrNull(effectiveTimeoutMillis) {
+                        writer.await().getOrThrow()
+                        true
+                    } ?: false
+                    if (!wrote) null else {
+                        var exitCode: Int? = null
+                        val idleNanos = TimeUnit.MILLISECONDS.toNanos(effectiveTimeoutMillis)
+                        while (true) {
+                            val finished = runInterruptible {
+                                process.waitFor(processPollMillis, TimeUnit.MILLISECONDS)
+                            }
+                            if (finished) {
+                                exitCode = process.exitValue()
+                                break
+                            }
+                            if (System.nanoTime() - lastOutputNanos.get() >= idleNanos) break
+                        }
+                        exitCode
+                    }
+                } else {
+                    withTimeoutOrNull(effectiveTimeoutMillis) {
+                        writer.await().getOrThrow()
+                        runInterruptible { process.waitFor() }
+                    }
                 }
                 managed.terminate()
                 ProcessResult(code ?: -1, stdout.await(), stderr.await(), timedOut = code == null)
