@@ -82,6 +82,7 @@ import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.ui.shenyan.SyContextActionMenu
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
@@ -303,6 +304,30 @@ internal fun LocalMessageRow(
             val readingLayer = chatMode
             val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
             val copyableContent = if (chatMode) extractLocalCharacterThought(visibleContent, streaming).second else visibleContent
+            // Primary actions live on the toolbar; the overflow contains only secondary actions.
+            // Long-press and the overflow button open this SAME set of actions.
+            val secondaryActions = buildList {
+                if (!streaming) onCreateDocument?.let { create ->
+                    add(SyMenuItem(
+                        text = "为此回复生成交互文档",
+                        icon = FeatherIcons.FileText,
+                        onClick = { create(message) },
+                    ))
+                }
+                if (chatMode && !streaming && editableGeneratedImage(message.visibleBlocks()) != null) {
+                    onEditGeneratedImage?.let { edit ->
+                        add(SyMenuItem(
+                            text = stringResource(R.string.media_chat_edit_generated_image),
+                            icon = FeatherIcons.Edit3,
+                            onClick = { edit(message) },
+                        ))
+                    }
+                }
+                if (!streaming && copyableContent.isNotBlank()) onCreateMedia?.let { create ->
+                    // Image creation is the one-tap toolbar action; video and speech stay discoverable here.
+                    addAll(fluidMessageMediaItems(message.copy(content = copyableContent), create).drop(1))
+                }
+            }
             val readingModifier = if (readingLayer) {
                 Modifier
                     .fillMaxWidth(0.91f)
@@ -324,7 +349,12 @@ internal fun LocalMessageRow(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Column(
-                    readingModifier.testTag("messageActionSurface:${message.id}").combinedClickable(onClick = {}, onLongClick = { pulse(); actionsOpen = true }),
+                    readingModifier.testTag("messageActionSurface:${message.id}").combinedClickable(
+                        onClick = {},
+                        onLongClick = if (secondaryActions.isNotEmpty()) {
+                            { pulse(); actionsOpen = true }
+                        } else null,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 ) {
                 if (groupMode) {
@@ -336,22 +366,6 @@ internal fun LocalMessageRow(
                         )
                     }
                 }
-                FluidMessageActionSheet(actionsOpen, { actionsOpen = false }, buildList {
-                    if (copyableContent.isNotBlank()) add(SyMenuItem(
-                        text = stringResource(R.string.common_copy), icon = FeatherIcons.Copy,
-                        onClick = { clipboard.setText(AnnotatedString(copyableContent)); copied = true }))
-                    if (canRegenerate) add(SyMenuItem(
-                        text = stringResource(R.string.local_regenerate_reply), icon = FeatherIcons.Retry,
-                        onClick = { if (!onRegenerate(message.id))
-                            Toast.makeText(context, regenerateFailedMessage, Toast.LENGTH_SHORT).show() }))
-                    if (!streaming) onCreateDocument?.let { create ->
-                        add(SyMenuItem(
-                            text = "为此回复生成交互文档",
-                            icon = FeatherIcons.FileText,
-                            onClick = { create(message) },
-                        ))
-                    }
-                })
                 LocalAssistantMessageContent(
                     message = message,
                     streaming = streaming,
@@ -365,16 +379,6 @@ internal fun LocalMessageRow(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    // Assistant body text is selectable, so a long press may be consumed by
-                    // SelectionContainer. Keep selection intact and expose a deterministic
-                    // compact action entry for message-scoped document generation.
-                    if (!streaming && onCreateDocument != null) {
-                        CompactMessageAction(
-                            icon = FeatherIcons.MoreVertical,
-                            contentDescription = stringResource(R.string.fluid_message_actions),
-                            onClick = { actionsOpen = true },
-                        )
-                    }
                     if (chatMode) {
                         // 分支切换作为一个整体换行，窄屏不拆散左右箭头与页码。
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -419,14 +423,18 @@ internal fun LocalMessageRow(
                             size = SyButtonSize.Small,
                         )
                     }
-                    if (chatMode && !streaming && editableGeneratedImage(message.visibleBlocks()) != null) {
-                        onEditGeneratedImage?.let { edit ->
-                            SyButton(
-                                text = stringResource(R.string.media_chat_edit_generated_image),
-                                icon = FeatherIcons.Edit3,
-                                onClick = { edit(message) },
-                                variant = SyButtonVariant.Ghost,
-                                size = SyButtonSize.Small,
+                    // Shared anchored menu for both long press and the visible overflow.
+                    if (secondaryActions.isNotEmpty()) {
+                        Box {
+                            CompactMessageAction(
+                                icon = FeatherIcons.MoreVertical,
+                                contentDescription = stringResource(R.string.fluid_message_actions),
+                                onClick = { actionsOpen = true },
+                            )
+                            SyPopupMenu(
+                                expanded = actionsOpen,
+                                onDismiss = { actionsOpen = false },
+                                items = secondaryActions,
                             )
                         }
                     }
@@ -545,7 +553,7 @@ private fun LocalTranscriptImage(
     workspacePath: String,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val context = LocalContext.current
+    var showingImage by remember(workspacePath, image.relativePath) { mutableStateOf(false) }
     val file = remember(workspacePath, image.relativePath) {
         resolveLocalTranscriptFile(workspacePath, image.relativePath)
     }
@@ -581,13 +589,7 @@ private fun LocalTranscriptImage(
         .clip(DsShapes.block)
         .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))
         .border(1.dp, colors.border, DsShapes.block)
-        .clickable(enabled = file != null) {
-            file?.let { localFile ->
-                viewMediaFile(context, localFile, image.mediaType) { error ->
-                    Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
+        .clickable(enabled = file != null) { showingImage = true }
     val loaded = bitmap
     if (loaded != null) {
         Image(
@@ -619,6 +621,13 @@ private fun LocalTranscriptImage(
                 )
             }
         }
+    }
+    if (showingImage && file != null) {
+        MediaImageDetailDialog(
+            file = file,
+            remoteUrl = null,
+            onDismiss = { showingImage = false },
+        )
     }
 }
 

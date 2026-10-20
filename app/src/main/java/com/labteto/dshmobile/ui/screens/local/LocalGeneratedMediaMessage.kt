@@ -15,6 +15,7 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.media.MediaMetadataRetriever
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
@@ -24,7 +25,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,11 +37,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -49,14 +55,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
@@ -73,7 +80,11 @@ import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.model.LocalMediaVideoTask
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
+import com.labteto.dshmobile.ui.shenyan.SyFullscreenMediaOverlay
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -174,18 +185,6 @@ internal fun LocalGeneratedMediaResultRow(
                 )
                 if (showImageDetail) {
                     MediaImageDetailDialog(file, result.remoteUrl, onDismiss = { showImageDetail = false })
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                    if (file != null) {
-                        MediaSaveButton(file, imageMime(file))
-                        SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Ghost,
-                            onClick = { shareMediaFile(context, file, imageMime(file)) { error = it } })
-                    } else result.remoteUrl?.let { url ->
-                        SyButton(text = resources.getString(R.string.media_chat_share_url), size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Ghost,
-                            onClick = { shareMediaUrl(context, url) { error = it } })
-                    }
                 }
             }
             LocalMediaKind.SPEECH.name -> {
@@ -390,29 +389,39 @@ private fun MediaMessageCard(
 }
 
 /** Explicit user-selected device destination; sharing never masquerades as a save. */
+/** The save picker is shared by audio's inline button and the photo viewer's overflow. */
 @Composable
-private fun MediaSaveButton(file: File, mime: String) {
+private fun rememberMediaSaveAction(
+    file: File?, mime: String, onResult: (Boolean) -> Unit,
+): () -> Unit {
     val context = LocalContext.current
-    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
-    var status by remember(file.absolutePath) { mutableStateOf<String?>(null) }
     val destination = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mime)) { uri ->
         if (uri != null) scope.launch {
             val saved = runCatching {
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openOutputStream(uri)?.use { output ->
-                        file.inputStream().use { input -> input.copyTo(output) }
+                        file?.inputStream()?.use { input -> input.copyTo(output) }
+                            ?: error("源文件不可用")
                     } ?: error("无法写入选定位置")
                 }
             }
-            status = resources.getString(if (saved.isSuccess) R.string.media_action_saved else R.string.media_action_save_failed)
+            onResult(saved.isSuccess)
         }
     }
+    return { file?.let { destination.launch(it.name) } }
+}
+
+@Composable
+private fun MediaSaveButton(file: File, mime: String) {
+    val resources = LocalResources.current
+    var status by remember(file.absolutePath) { mutableStateOf<String?>(null) }
+    val save = rememberMediaSaveAction(file, mime) { success ->
+        status = resources.getString(if (success) R.string.media_action_saved else R.string.media_action_save_failed)
+    }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        SyButton(text = resources.getString(R.string.media_action_save), size = SyButtonSize.Small, onClick = {
-            status = null
-            destination.launch(file.name)
-        })
+        SyButton(text = resources.getString(R.string.media_action_save), size = SyButtonSize.Small,
+            onClick = { status = null; save() })
         status?.let { Text(it, style = DsType.caption11.withReadingWeight()) }
     }
 }
@@ -456,6 +465,8 @@ internal fun MediaInlinePicture(
 private fun imageMime(file: File): String = when (file.extension.lowercase()) {
     "png" -> "image/png"
     "webp" -> "image/webp"
+    "gif" -> "image/gif"
+    "heic", "heif" -> "image/heic"
     else -> "image/jpeg"
 }
 
@@ -506,13 +517,17 @@ private fun decodeMediaPreview(file: File?, remoteUrl: String?, maxEdge: Int = 1
         BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
 }.getOrNull()
 
-/** In-chat picture inspection without sending the user to an external file viewer. */
+/** Fullscreen, wallpaper-matched image viewer. No black slab or permanent action strip. */
 @Composable
-private fun MediaImageDetailDialog(file: File?, remoteUrl: String?, onDismiss: () -> Unit) {
+internal fun MediaImageDetailDialog(
+    file: File?, remoteUrl: String?, onDismiss: () -> Unit,
+) {
     val resources = LocalResources.current
-    val imageHeight = (LocalConfiguration.current.screenHeightDp.dp * 0.62f).coerceIn(190.dp, 580.dp)
+    val context = LocalContext.current
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var detail by remember(file?.absolutePath, remoteUrl) { mutableStateOf<ImageBitmap?>(null) }
     var loading by remember(file?.absolutePath, remoteUrl) { mutableStateOf(true) }
+    var actionsOpen by remember(file?.absolutePath, remoteUrl) { mutableStateOf(false) }
     var zoom by remember(file?.absolutePath, remoteUrl) { mutableFloatStateOf(1f) }
     var offsetX by remember(file?.absolutePath, remoteUrl) { mutableFloatStateOf(0f) }
     var offsetY by remember(file?.absolutePath, remoteUrl) { mutableFloatStateOf(0f) }
@@ -527,54 +542,95 @@ private fun MediaImageDetailDialog(file: File?, remoteUrl: String?, onDismiss: (
         offsetX = if (next <= 1f) 0f else (offsetX + panChange.x).coerceIn(-1100f, 1100f)
         offsetY = if (next <= 1f) 0f else (offsetY + panChange.y).coerceIn(-1100f, 1100f)
     }
-    SyResponsiveSheet(
-        title = null,
+    val localFile = file?.takeIf(File::isFile)
+    val save = rememberMediaSaveAction(localFile, localFile?.let(::imageMime) ?: "image/jpeg") { success ->
+        Toast.makeText(context,
+            resources.getString(if (success) R.string.media_action_saved else R.string.media_action_save_failed),
+            Toast.LENGTH_SHORT).show()
+    }
+    val actions = buildList {
+        if (localFile != null) {
+            add(SyMenuItem(
+                text = resources.getString(R.string.media_action_save),
+                icon = FeatherIcons.Download,
+                onClick = save,
+            ))
+            add(SyMenuItem(
+                text = resources.getString(R.string.media_action_share),
+                icon = FeatherIcons.ArrowUp,
+                onClick = { shareMediaFile(context, localFile, imageMime(localFile)) { error ->
+                    Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+                } },
+            ))
+        } else remoteUrl?.takeIf(String::isNotBlank)?.let { url ->
+            add(SyMenuItem(
+                text = resources.getString(R.string.media_chat_share_url),
+                icon = FeatherIcons.ArrowUp,
+                onClick = { shareMediaUrl(context, url) { error ->
+                    Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+                } },
+            ))
+        }
+    }
+    SyFullscreenMediaOverlay(
         onDismiss = onDismiss,
-        scrollable = false,
-        showDragHandle = false,
+        dismissOnBackgroundTap = zoom <= 1f,
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
-                .background(Color.Black)
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize().safeDrawingPadding()
+                .padding(horizontal = 12.dp, vertical = 16.dp)
+                .clipToBounds()
+                .transformable(state = gesture),
+            contentAlignment = Alignment.Center,
         ) {
-            Row(modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End) {
-                SyButton(text = resources.getString(R.string.media_image_zoom_reset),
-                    variant = SyButtonVariant.Ghost, size = SyButtonSize.Small,
-                    onClick = { zoom = 1f; offsetX = 0f; offsetY = 0f })
-                SyButton(text = resources.getString(R.string.media_image_zoom_close),
-                    size = SyButtonSize.Small, onClick = onDismiss)
+            val bitmap = detail
+            if (bitmap != null) {
+                // Real image bounds, rather than the entire viewport, own the tap target.
+                // Taps on the image are non-destructive; surrounding space dismisses.
+                val ratio = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
+                val displayWidth = minOf(maxWidth, maxHeight * ratio)
+                val displayHeight = displayWidth / ratio
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = resources.getString(R.string.media_chat_generated_image),
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.width(displayWidth).height(displayHeight)
+                        .graphicsLayer {
+                            scaleX = zoom
+                            scaleY = zoom
+                            translationX = offsetX
+                            translationY = offsetY
+                        }
+                        .testTag("mediaImageContent")
+                        .clickable(onClick = {}),
+                )
+            } else {
+                Text(
+                    resources.getString(if (loading) R.string.media_chat_preview_pending
+                        else R.string.media_chat_preview_unavailable),
+                    color = colors.textSecondary,
+                    style = DsType.caption11.withReadingWeight(),
+                )
             }
+        }
+        if (actions.isNotEmpty()) {
             Box(
-                modifier = Modifier.fillMaxWidth().height(imageHeight)
-                    .transformable(state = gesture),
-                contentAlignment = androidx.compose.ui.Alignment.Center,
+                modifier = Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(12.dp),
             ) {
-                if (detail != null) {
-                    Image(
-                        bitmap = detail!!,
-                        contentDescription = resources.getString(R.string.media_chat_generated_image),
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxWidth().height(imageHeight)
-                            .graphicsLayer {
-                                scaleX = zoom
-                                scaleY = zoom
-                                translationX = offsetX
-                                translationY = offsetY
-                            },
-                    )
-                } else {
-                    Text(
-                        resources.getString(if (loading) R.string.media_chat_preview_pending
-                            else R.string.media_chat_preview_unavailable),
-                        color = Color.White,
-                    )
+                IconButton(
+                    onClick = { actionsOpen = true },
+                    modifier = Modifier.testTag("mediaImageActions"),
+                ) {
+                    Icon(FeatherIcons.MoreVertical,
+                        contentDescription = resources.getString(R.string.fluid_message_actions),
+                        tint = colors.text)
                 }
+                SyPopupMenu(
+                    expanded = actionsOpen,
+                    onDismiss = { actionsOpen = false },
+                    items = actions,
+                )
             }
-            Text(resources.getString(R.string.media_image_zoom_hint),
-                color = Color.White.copy(alpha = 0.78f), style = DsType.caption11.withReadingWeight())
         }
     }
 }
