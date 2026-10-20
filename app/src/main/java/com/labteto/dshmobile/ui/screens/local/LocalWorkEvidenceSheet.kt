@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.presentation.LocalRequirementUiTarget
+import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
@@ -50,6 +51,9 @@ internal fun workToolPhaseLabel(phase: LocalToolUiPhase): Int = when (phase) {
     LocalToolUiPhase.OUTCOME_UNKNOWN -> R.string.work_tool_unknown
     LocalToolUiPhase.CANCELLED -> R.string.work_tool_cancelled
 }
+
+/** A call ID identifies one activity; an execution ID is not a reliable list-row identity. */
+internal fun workEvidenceActivityKey(activity: LocalToolActivityUiItem): String = "active:${activity.callId}"
 
 /** Low-frequency evidence is reachable from the Work conversation, without another product route. */
 @Composable
@@ -116,8 +120,9 @@ internal fun LocalWorkEvidenceSheet(
             } else {
                 // Running/declared calls have no completed transcript row. Preserve their real phases.
                 items(state.activities.filter { it.phase in setOf(LocalToolUiPhase.DECLARED, LocalToolUiPhase.RUNNING) },
-                    key = { "active:${it.executionId ?: it.callId}" }) { activity ->
-                    Text(stringResource(agentOperationLabelRes(agentOperationKind(activity.name))), color = colors.text)
+                    key = ::workEvidenceActivityKey) { activity ->
+                    Text(stringResource(agentOperationLabelRes(agentOperationKind(activity.name))),
+                        modifier = Modifier.testTag("work_evidence_active_${activity.callId}"), color = colors.text)
                     Text(stringResource(workToolPhaseLabel(activity.phase)), color = colors.textSecondary)
                 }
                 if (state.records.isEmpty() && !state.loading && !state.failed && !state.invalidated) item {
@@ -133,7 +138,22 @@ internal fun LocalWorkEvidenceSheet(
                                 variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
                         }
                         record.artifacts.forEach { artifact ->
-                            LocalWorkArtifactMessageRow(artifact, workspacePath, actions, onOpen = { onOpenFile(artifact.reference) })
+                            if (artifact.category == "file") {
+                                // History is a ledger, not the live transcript: rendering every
+                                // full media card starts file previews/image decoding as soon as
+                                // the sheet opens. Show the existing reference and explicit actions.
+                                Text(artifact.reference, style = DsType.small13, color = colors.text)
+                                Text(stringResource(
+                                    if (artifact.currentlyAvailable == false) R.string.media_chat_work_file_missing
+                                    else R.string.media_chat_work_output_here,
+                                ), style = DsType.caption11, color = colors.textSecondary)
+                                SyButton(stringResource(R.string.media_chat_view_entire_file),
+                                    onClick = { onOpenFile(artifact.reference) },
+                                    size = SyButtonSize.Small, variant = SyButtonVariant.Ghost)
+                            } else {
+                                LocalWorkArtifactMessageRow(artifact, workspacePath, actions,
+                                    onOpen = { onOpenFile(artifact.reference) })
+                            }
                             if (artifact.category == "file" && artifact.currentlyAvailable == true) {
                                 SyButton(stringResource(R.string.work_evidence_current_version),
                                     onClick = { controller.inspect(artifact) }, enabled = !state.linking && !state.invalidated,
