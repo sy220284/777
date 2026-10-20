@@ -113,6 +113,7 @@ import kotlinx.coroutines.withContext
 internal fun LocalCreationJobMessageRow(
     job: LocalMediaCreationJob,
     viewModel: LocalMediaStudioViewModel,
+    inline: Boolean = false,
 ) {
     val resources = LocalResources.current
     val phase = when (job.phase) {
@@ -126,7 +127,9 @@ internal fun LocalCreationJobMessageRow(
     }
     MediaMessageCard(
         title = resources.getString(phase),
-        subtitle = resources.getString(if (job.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
+        subtitle = if (inline) "" else resources.getString(
+            if (job.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
+        inline = inline,
     ) {
         job.prompt?.let { prompt ->
             Text(prompt, style = DsType.small13.withReadingWeight(),
@@ -163,6 +166,7 @@ internal fun LocalGeneratedMediaResultRow(
     viewModel: LocalMediaStudioViewModel,
     onInsertText: (String) -> Unit,
     onRevise: (LocalMediaRevisionDraft) -> Unit = {},
+    inline: Boolean = false,
 ) {
     val resources = LocalResources.current
     val context = LocalContext.current
@@ -175,8 +179,12 @@ internal fun LocalGeneratedMediaResultRow(
         LocalMediaKind.TRANSCRIBE.name -> resources.getString(R.string.media_chat_transcript_done)
         else -> resources.getString(R.string.media_chat_generic_result)
     }
-    MediaMessageCard(title = label,
-        subtitle = resources.getString(if (result.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply)) {
+    MediaMessageCard(
+        title = if (inline && result.kind == LocalMediaKind.IMAGE.name) "" else label,
+        subtitle = if (inline) "" else resources.getString(
+            if (result.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
+        inline = inline,
+    ) {
         when (result.kind) {
             LocalMediaKind.IMAGE.name -> {
                 MediaInlinePicture(
@@ -238,6 +246,7 @@ internal fun LocalGeneratedVideoTaskRow(
     offers: List<LocalMediaOffer>,
     viewModel: LocalMediaStudioViewModel,
     onRevise: (LocalMediaRevisionDraft) -> Unit = {},
+    inline: Boolean = false,
 ) {
     val resources = LocalResources.current
     val context = LocalContext.current
@@ -280,8 +289,12 @@ internal fun LocalGeneratedVideoTaskRow(
         LocalMediaVideoPhase.SUCCEEDED -> resources.getString(R.string.media_chat_video_done)
         LocalMediaVideoPhase.FAILED -> resources.getString(R.string.media_chat_generation_failed)
     }
-    MediaMessageCard(title = phase,
-        subtitle = resources.getString(if (task.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply)) {
+    MediaMessageCard(
+        title = phase,
+        subtitle = if (inline) "" else resources.getString(
+            if (task.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
+        inline = inline,
+    ) {
         task.description?.let {
             Text(it, style = DsType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary, maxLines = 3,
@@ -373,15 +386,18 @@ internal fun LocalGeneratedVideoTaskRow(
 @Composable
 private fun MediaMessageCard(
     title: String, subtitle: String, modifier: Modifier = Modifier,
+    inline: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Column(
-        modifier = modifier.fillMaxWidth(0.90f).widthIn(max = 470.dp)
-            .padding(vertical = SyMetric.gapMd),
+        modifier = modifier.fillMaxWidth(if (inline) 1f else 0.90f)
+            .widthIn(max = if (inline) 640.dp else 470.dp)
+            .padding(vertical = if (inline) SyMetric.gapSm else SyMetric.gapMd),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
-        Text(title, style = DsType.small13Strong.withReadingWeight(), color = colors.textSecondary)
+        if (title.isNotBlank()) Text(title, style = DsType.small13Strong.withReadingWeight(),
+            color = colors.textSecondary)
         if (subtitle.isNotBlank()) Text(subtitle, style = DsType.caption11.withReadingWeight(),
             color = colors.textTertiary)
         content()
@@ -841,6 +857,7 @@ internal fun LocalWorkArtifactMessageRow(
     actions: LocalWorkFeatureUiActions?,
     onOpen: () -> Unit,
     sessionId: String? = null,
+    inline: Boolean = false,
 ) {
     val resources = LocalResources.current
     val context = LocalContext.current
