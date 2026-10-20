@@ -190,19 +190,41 @@ internal class LocalSessionRepository(
 
     /** Block a queued or in-flight snapshot from recreating a deleted session. */
     fun delete(id: String): Boolean = synchronized(sessionLock(id)) {
-        // Mark the tombstone before touching disk so a writer waiting on this same stripe cannot
-        // pass an earlier "still latest" decision after deletion completes.
-        synchronized(lock) {
+        // Fence all previous writers BEFORE the durable deletion. If it fails while
+        // recoverable bytes remain, the fence must not hide those bytes indefinitely.
+        val (wasDeleted, cachedSummary) = synchronized(lock) {
+            val old = (id in deletedIds) to summaryCache[id]
             deletedIds += id
             pending.remove(id)
             latestSnapshots.remove(id)
             summaryCache.remove(id)
+            old
         }
         val store = storeFor(id)
-        val removed = store.delete(id)
-        check(store.read(id) == null) { "会话文件删除失败：$id" }
-        summaryIndex.delete(id)
-        removed
+        try {
+            val removed = store.delete(id)
+            check(store.read(id) == null) { "会话文件删除失败：$id" }
+            summaryIndex.delete(id)
+            removed
+        } catch (failure: Exception) {
+            val recoverable = try {
+                store.hasRecoverableSnapshot(id)
+            } catch (probeFailure: Exception) {
+                failure.addSuppressed(probeFailure)
+                false
+            }
+            if (recoverable) {
+                synchronized(lock) {
+                    if (!wasDeleted) deletedIds.remove(id)
+                    cachedSummary?.let(::cacheSummaryLocked)
+                    // Even if this session wasn't in cache, the next list must rescan
+                    // authoritative durable data, not expose an incomplete deletion.
+                    summariesLoaded = false
+                }
+            }
+            // No readable primary/backup: retain tombstone against stale writers.
+            throw failure
+        }
     }
 
     /**

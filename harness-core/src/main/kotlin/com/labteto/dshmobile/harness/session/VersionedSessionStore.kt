@@ -173,6 +173,11 @@ class VersionedSessionStore(
         return changed
     }
 
+    /** Inspection-only: a failed delete may still leave a readable primary or backup. */
+    @Synchronized
+    fun hasRecoverableSnapshot(id: String): Boolean =
+        fileFor(id).isFile || backupFor(id).isFile
+
     @Synchronized
     fun ids(): List<String> = catalog.ids()
         .filter { id -> fileFor(id).isFile || backupFor(id).isFile }
