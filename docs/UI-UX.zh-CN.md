@@ -631,7 +631,7 @@ LocalConversationHeaders.kt
 LocalWorkSurfaceComponents.kt
 LocalHarnessMessageComponents.kt
 LocalWorkTimelineSupport.kt
-WorkContentBlock.kt
+LocalWorkTimelineStepRow.kt
 LocalTranscriptPresentation.kt
 CharacterBehaviorTuningDialog.kt
 PersonaGalleryDialog.kt
