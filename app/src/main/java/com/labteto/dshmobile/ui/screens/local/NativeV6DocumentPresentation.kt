@@ -17,18 +17,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.labteto.dshmobile.uicontract.UiDocument
 import com.labteto.dshmobile.uicontract.UiDocumentAction
 import com.labteto.dshmobile.uicontract.UiDocumentNode
-
-/** Work facts remain in their durable document; only dense diagnostics are initially folded. */
-internal fun nativeV6InlineVisibleNodes(
-    document: UiDocument,
-    detailsExpanded: Boolean,
-): List<UiDocumentNode> =
-    if (document.documentId.startsWith("work-live:") && !detailsExpanded) {
-        document.nodes.take(1)
-    } else document.nodes
 
 /** The text must agree with the action's actual capability, not an AI-authored label. */
 internal fun nativeV6ActionLabel(label: String, action: UiDocumentAction?): String =
