@@ -35,9 +35,12 @@ class LocalWorkCommandNarrationTest {
         assertEquals("修改界面代码",
             naturalWorkToolAction("mcp__GitHub__update_file",
                 """{"path":"app/src/ui/components/Actions.kt"}"""))
-        assertEquals("查看相关测试文件",
+        assertEquals("查看工作回复显示测试",
             naturalWorkToolAction("mcp__GitHub__fetch_file",
                 """{"path":"app/src/androidTest/WorkReplyVisualTest.kt"}"""))
+        assertEquals("查看相关测试文件",
+            naturalWorkToolAction("mcp__GitHub__fetch_file",
+                """{"path":"app/src/androidTest/RenderTest.kt"}"""))
         assertEquals("审查拉取请求的代码改动",
             naturalWorkToolAction("mcp__GitHub__fetch_pr_file_patch", null))
         assertEquals("检查构建和自动化测试进度",
