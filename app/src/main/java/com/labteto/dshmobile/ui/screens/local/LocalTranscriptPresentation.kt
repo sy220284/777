@@ -5,6 +5,8 @@ import com.labteto.dshmobile.local.model.LocalMediaResult
 import com.labteto.dshmobile.local.model.LocalMediaVideoTask
 import com.labteto.dshmobile.local.model.LocalMediaCreationJob
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
+import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
+import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 
 /**
  * User-facing transcript projection.
@@ -69,7 +71,14 @@ internal sealed interface LocalTranscriptItem {
         val message: LocalHarnessMessage,
         val repeatCount: Int = 1,
     ) : LocalTranscriptItem {
-        override val key: String = "work-step:${message.id}"
+        override val key: String =
+            message.toolCallId?.takeIf { message.role == "tool" }?.let { "work-tool:$it" }
+                ?: "work-step:${message.id}"
+    }
+
+    /** In-flight Tool-owned event. Replaced by the completion row with the same stable key. */
+    data class WorkPendingTool(val activity: LocalToolActivityUiItem) : LocalTranscriptItem {
+        override val key: String = "work-tool:${activity.callId}"
     }
 }
 
@@ -89,13 +98,87 @@ internal fun buildLocalDisplayTranscript(items: List<LocalTranscriptItem>): List
                 add(item)
                 return@forEach
             }
-            val nodes = conversationWorkProcessNodes(buildWorkProcessNodes(item.messages))
-            nodes.forEach { add(LocalTranscriptItem.WorkNode(it)) }
-            if (nodes.isEmpty() && item.messages.any { it.role == "reasoning" }) {
-                add(item) // Only a generic thinking indicator; never display reasoning body.
+            // Do not fold distinct tool results into one semantic summary: each persisted
+            // event must keep its own chronological row and error status.
+            var visible = false
+            // Only tools with an explicit declaration timestamp move to that original
+            // location. Legacy rows keep their durable historical order unchanged.
+            val ordered = item.messages.toMutableList()
+            val completedAtStart = ordered.filter {
+                it.role == "tool" && it.toolDeclaredAt != null
+            }.sortedWith(
+                compareBy<LocalHarnessMessage> { it.toolDeclaredAt ?: Long.MAX_VALUE }
+                    .thenBy { it.toolDeclaredSequence ?: Long.MAX_VALUE }
+            )
+            ordered.removeAll { it.role == "tool" && it.toolDeclaredAt != null }
+            completedAtStart.forEach { tool ->
+                val target = ordered.indexOfFirst {
+                    (if (it.role == "tool") it.toolDeclaredAt ?: it.createdAt else it.createdAt) >
+                        (tool.toolDeclaredAt ?: Long.MAX_VALUE)
+                }
+                ordered.add(if (target < 0) ordered.size else target, tool)
+            }
+            ordered.forEach { message ->
+                when (message.role) {
+                    "tool" -> {
+                        add(LocalTranscriptItem.WorkStep(message))
+                        visible = true
+                    }
+                    "progress", "assistant" -> if (localWorkTimelineText(message.content) != null) {
+                        add(LocalTranscriptItem.WorkStep(message))
+                        visible = true
+                    }
+                }
+            }
+            if (!visible && item.messages.any { it.role == "reasoning" }) {
+                add(item) // Reasoning text remains private; expose only the thinking state.
             }
         }
     }
+
+/** Only genuinely unfinished calls may appear as transient live rows. */
+internal fun appendPendingWorkToolActivities(
+    transcript: List<LocalTranscriptItem>,
+    activities: List<LocalToolActivityUiItem>,
+    running: Boolean,
+): List<LocalTranscriptItem> {
+    if (!running) return transcript
+    val completedIds = transcript.filterIsInstance<LocalTranscriptItem.WorkStep>()
+        .mapNotNull { it.message.toolCallId }.toSet()
+    val lastUserAt = transcript.filterIsInstance<LocalTranscriptItem.Message>()
+        .lastOrNull { it.message.role == "user" }?.message?.createdAt ?: Long.MIN_VALUE
+    val pending = activities.filter {
+        it.phase == LocalToolUiPhase.DECLARED || it.phase == LocalToolUiPhase.RUNNING
+    }.filter { it.callId !in completedIds && (it.declaredAt ?: Long.MIN_VALUE) >= lastUserAt }
+        .distinctBy { it.callId }.sortedWith(
+            compareBy<LocalToolActivityUiItem> { it.declaredAt ?: Long.MAX_VALUE }
+                .thenBy { it.declaredSequence ?: Long.MAX_VALUE }
+        )
+    if (pending.isEmpty()) return transcript
+    // Insert at the call's original time instead of appending below newer narration,
+    // completed replies or deliverables. Never reorder existing durable messages.
+    val result = transcript.toMutableList()
+    pending.forEach { activity ->
+        val timestamp = activity.declaredAt ?: Long.MAX_VALUE
+        val index = result.indexOfFirst { item ->
+            when (item) {
+                is LocalTranscriptItem.Message -> item.message.createdAt > timestamp
+                is LocalTranscriptItem.WorkStep -> (item.message.toolDeclaredAt ?: item.message.createdAt) > timestamp
+                is LocalTranscriptItem.WorkProcess -> item.messages.first().createdAt > timestamp
+                is LocalTranscriptItem.Thinking -> item.messages.first().createdAt > timestamp
+                is LocalTranscriptItem.WorkPendingTool -> (item.activity.declaredAt ?: Long.MAX_VALUE) > timestamp
+                is LocalTranscriptItem.WorkNode -> item.node.createdAt > timestamp
+                is LocalTranscriptItem.MediaResult -> item.result.createdAtMillis > timestamp
+                is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis > timestamp
+                is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis > timestamp
+                is LocalTranscriptItem.WorkArtifact -> true
+                else -> false
+            }
+        }
+        result.add(if (index < 0) result.size else index, LocalTranscriptItem.WorkPendingTool(activity))
+    }
+    return result
+}
 
 internal fun userVisibleDialogueMessageCount(
     messages: List<LocalHarnessMessage>,
@@ -218,6 +301,7 @@ internal fun localReplyStreamingBoundary(items: List<LocalTranscriptItem>): Loca
             item is LocalTranscriptItem.Thinking ||
             item is LocalTranscriptItem.WorkProcess ||
             item is LocalTranscriptItem.WorkNode ||
+            item is LocalTranscriptItem.WorkPendingTool ||
             item is LocalTranscriptItem.WorkStep
     }
 
@@ -257,12 +341,15 @@ internal fun mergeLocalMediaTimeline(
         is LocalTranscriptItem.Message -> item.message.createdAt
         is LocalTranscriptItem.Thinking -> item.messages.first().createdAt
         is LocalTranscriptItem.WorkProcess -> item.messages.first().createdAt
-        is LocalTranscriptItem.WorkStep -> item.message.createdAt
+        is LocalTranscriptItem.WorkStep ->
+            if (item.message.role == "tool") item.message.toolDeclaredAt ?: item.message.createdAt
+            else item.message.createdAt
         is LocalTranscriptItem.WorkNode -> item.node.createdAt
         is LocalTranscriptItem.MediaResult ->
             operationTimestamps[item.result.id] ?: item.result.createdAtMillis
         is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis
         is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis
+        is LocalTranscriptItem.WorkPendingTool -> Long.MAX_VALUE
         is LocalTranscriptItem.WorkArtifact -> Long.MAX_VALUE
     }
     // Stable sort preserves original transcript order when event timestamps tie.

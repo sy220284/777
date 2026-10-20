@@ -92,6 +92,37 @@ class LocalToolActivityProjectionTest {
         assertEquals(4_000, activity.resultPreview!!.length)
     }
 
+    @Test
+    fun declaredTimestampRemainsStableAcrossExecutionAndResult() {
+        var state = reduceLocalToolActivity(LocalToolActivityState(), event(10, "tool/call") {
+            put("id", "call"); put("name", "read")
+        })
+        assertEquals(10L, state.activities.single().declaredAt)
+        state = reduceLocalToolActivity(state, event(11, "tool/execution-started") {
+            put("id", "call"); put("name", "read")
+        })
+        state = reduceLocalToolActivity(state, event(12, "tool/result") {
+            put("id", "call"); put("name", "read"); put("is_error", false)
+        })
+        assertEquals(10L, state.activities.single().declaredAt)
+    }
+
+    @Test
+    fun unresolvedCallsSurviveMoreThanHistoryWindowOfFinishedTools() {
+        var state = LocalToolActivityState()
+        state = reduceLocalToolActivity(state, event(1, "tool/call") {
+            put("id", "slow"); put("name", "read")
+        })
+        for (i in 2L..290L) {
+            state = reduceLocalToolActivity(state, event(i * 2, "tool/result") {
+                put("id", "call-$i"); put("name", "read"); put("is_error", false)
+            })
+        }
+        assertEquals(LocalToolActivityPhase.DECLARED,
+            state.activities.single { it.callId == "slow" }.phase)
+        assertEquals(257, state.activities.size)
+    }
+
     private fun event(
         sequence: Long,
         type: String,

@@ -47,6 +47,7 @@ internal data class LocalToolActivity(
     val errorCode: String? = null,
     val sideEffect: String? = null,
     val declaredSequence: Long? = null,
+    val declaredAt: Long? = null,
     val startedSequence: Long? = null,
     val finishedSequence: Long? = null,
     val argumentsPreview: String? = null,
@@ -125,6 +126,7 @@ internal fun reduceLocalToolActivity(
             executionId = previous?.executionId,
             argumentsPreview = event.data["arguments"]?.toString()?.let { truncateWithoutSplittingSurrogatePair(it, 2_000) },
             declaredSequence = event.sequence,
+            declaredAt = event.createdAt,
             startedSequence = previous?.startedSequence,
             authorizationGranted = previous?.authorizationGranted,
             authorizationExecutionId = previous?.authorizationExecutionId,
@@ -184,9 +186,16 @@ internal fun reduceLocalToolActivity(
         }
         else -> return state
     }
+    val updated = state.activities.filterNot { it.callId == callId } + next
+    // Retain all unresolved calls even if a large batch completes other tools.
+    val unfinished = updated.filter {
+        it.phase == LocalToolActivityPhase.DECLARED || it.phase == LocalToolActivityPhase.RUNNING
+    }
+    val finished = updated.filter {
+        it.phase != LocalToolActivityPhase.DECLARED && it.phase != LocalToolActivityPhase.RUNNING
+    }.takeLast(LOCAL_TOOL_ACTIVITY_LIMIT)
     return state.copy(
-        activities = (state.activities.filterNot { it.callId == callId } + next)
-            .takeLast(LOCAL_TOOL_ACTIVITY_LIMIT),
+        activities = (unfinished + finished).sortedBy { it.declaredSequence ?: Long.MAX_VALUE },
     )
 }
 
@@ -216,8 +225,8 @@ internal fun localToolActivityKind(name: String): LocalToolActivityKind {
     }
 }
 
-private const val LOCAL_TOOL_ACTIVITY_LIMIT = 64
-private const val LOCAL_TOOL_ACTIVITY_EVENT_SCAN_LIMIT = 256
+private const val LOCAL_TOOL_ACTIVITY_LIMIT = 256
+private const val LOCAL_TOOL_ACTIVITY_EVENT_SCAN_LIMIT = 1_024
 private val LOCAL_TOOL_ACTIVITY_EVENT_TYPES = setOf(
     "tool/call",
     "tool/execution-started",

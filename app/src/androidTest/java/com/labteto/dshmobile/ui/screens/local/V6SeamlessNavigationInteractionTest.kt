@@ -5,6 +5,7 @@ import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.platform.app.InstrumentationRegistry
@@ -139,6 +140,12 @@ class V6SeamlessNavigationInteractionTest {
         }
         compose.onNodeWithTag("messageActionSurface:assistant-doc-1")
             .performTouchInput { longClick() }
+        // The modal sheet animates asynchronously after the long-press.
+        // Wait for the actual menu action to become visible before tapping.
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithText("为此回复生成交互文档")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithText("为此回复生成交互文档").performClick()
         compose.runOnIdle { assertEquals("assistant-doc-1", selectedId) }
     }

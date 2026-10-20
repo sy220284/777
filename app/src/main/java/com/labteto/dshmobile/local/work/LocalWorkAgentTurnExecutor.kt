@@ -203,6 +203,7 @@ internal class LocalWorkAgentTurnExecutor(
                     error = null,
                 )
             }
+            val declaredToolEvents = mutableMapOf<String, Pair<Long, Long>>()
             val repliesByStep = mutableMapOf<Int, LocalModelReply>()
             val uiDefinitionsByStep = mutableMapOf<Int, String?>()
             val replyFormHandlingByStep = mutableMapOf<Int,
@@ -594,7 +595,7 @@ internal class LocalWorkAgentTurnExecutor(
                             workModelHistoryRuntime.persist(binding)
                         }
                         is AgentEvent.ToolStarted -> {
-                            runEventLog.append("tool/call", buildJsonObject {
+                            val declared = runEventLog.append("tool/call", buildJsonObject {
                                 put("source_message_id", uiSourceMessageId)
                                 put("goal_id", binding.workState.snapshot().goal?.id ?: "")
                                 put("step", event.step)
@@ -603,7 +604,8 @@ internal class LocalWorkAgentTurnExecutor(
                                 put("arguments", event.call.arguments)
                                 put("execution_started", false)
                             })
-                            // The tool/call event is directly displayed by the conversation timeline.
+                            declaredToolEvents[event.call.id] = declared.createdAt to declared.sequence
+                            // Tool progress is projected from durable EventLog events, not a work-live card.
                         }
                         is AgentEvent.ToolFinished -> {
                             progressTracker.recordToolResult(event.call, event.output, event.isError)
@@ -621,6 +623,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 sideEffect = event.sideEffect,
                                 recoveryHint = event.recoveryHint,
                             ).modelVisibleContent()
+                            val declaredToolEvent = declaredToolEvents.remove(event.call.id)
                             val transcriptMessage = runTranscript.newMessage(
                                 role = "tool",
                                 content = durableToolResultContent(boundedContent, event.retention),
@@ -628,6 +631,9 @@ internal class LocalWorkAgentTurnExecutor(
                                 contentAlreadyBounded = true,
                                 toolIsError = event.isError,
                                 toolErrorCode = event.errorCode,
+                                toolCallId = event.call.id,
+                                toolDeclaredAt = declaredToolEvent?.first,
+                                toolDeclaredSequence = declaredToolEvent?.second,
                             )
                             val artifactVersion = if (!event.isError) localWorkArtifactFileVersion(
                                 java.io.File(sessionStorage.files.workspace.path), event.call.name, event.output,
@@ -680,7 +686,6 @@ internal class LocalWorkAgentTurnExecutor(
                             workModelHistoryRuntime.updateContextMetrics(binding)
                             runTranscript.applyMessages(listOf(transcriptMessage), toolEvent.sequence)
                             workModelHistoryRuntime.persist(binding)
-                            // The durable tool/result event is displayed independently of UI documents.
                         }
                         is AgentEvent.StepFinished -> {
                             runEventLog.append("step/end", buildJsonObject {

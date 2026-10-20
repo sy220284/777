@@ -20,6 +20,11 @@ data class LocalHarnessMessage(
     val toolErrorCode: String? = null,
     /** Ordered visible content. Empty means legacy text-only data and falls back to [content]. */
     val blocks: List<LocalMessageBlock> = emptyList(),
+    /** Stable Tool-owned call identity, used only to reconcile an in-flight UI row. */
+    val toolCallId: String? = null,
+    /** Original declaration time keeps the tool row in place after it finishes. */
+    val toolDeclaredAt: Long? = null,
+    val toolDeclaredSequence: Long? = null,
 )
 
 data class LocalSessionSummary(
