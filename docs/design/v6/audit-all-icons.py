@@ -63,7 +63,7 @@ for m in matches:
         check(strokes == pt, f"{name}: Compose and SVG pathData differ")
 check("strokeLineWidth = 1.75f" in kotlin, "V6 action Kotlin stroke width must be 1.75")
 
-# 777 paper-and-ink: verify current entry and supplemental SVGs match production.
+# 777 paper-and-ink: compare production Kotlin and editable SVG paths.
 entry_catalog = json.loads((DESIGN / "paper-ink-icon-catalog.json").read_text())
 entry_kotlin = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/components/SyEntryIcons.kt").read_text()
 entry_matches = list(re.finditer(
@@ -72,75 +72,15 @@ entry_matches = list(re.finditer(
 ))
 current = set(entry_catalog["official"])
 extra = set(entry_catalog["supplemental"])
-check(len(current) == 24 and len(extra) == 3, "expected 24 current and 3 extra entry glyphs")
+check(len(current) == 24 and len(extra) == 3, "expected 24 active and 3 supplemental glyphs")
 check("Projects" not in current and "RunCenter" not in current, "retired route became active")
-check(current | extra <= {m.group(1) for m in entry_matches}, "Kotlin paper-ink glyph missing")
+check(current | extra <= {m.group(1) for m in entry_matches}, "production entry glyph missing")
 for m in entry_matches:
-    name, declared, block = m.group(1), m.group(2), m.group(3)
+    name, declared, body = m.group(1), m.group(2), m.group(3)
     if name not in current | extra:
         continue
     check(name == declared, f"entry glyph name mismatch: {name}")
-    strokes = re.findall(r'^\s*"([^"]+)"\s*,?\s*
-file_spec = json.loads((DESIGN / "file-icons.json").read_text())
-kinds = set(file_spec["glyphs"])
-check(len(kinds) == 10, "file-icons.json must have 10 semantic file glyphs")
-check(set(file_spec["labels"]) == kinds, "missing file icon labels")
-check(set(file_spec["themes"]) == {"light", "dark"}, "file icons require light/dark modes")
-for kind in kinds:
-    for theme in ("light", "dark"):
-        name = f"ic_ui_file{kind}_{theme}"
-        x = xml(DRAW / f"{name}.xml")
-        y = xml(DESIGN / f"assets/file-icons/{name}.svg")
-        if x is None or y is None:
-            continue
-        check(x.get(ANDROID + "viewportWidth") == "40" and
-              x.get(ANDROID + "viewportHeight") == "40", f"{name}: expected 40dp viewport")
-        check(x.get(ANDROID + "width") == "40dp" and x.get(ANDROID + "height") == "40dp",
-              f"{name}: legacy 52x68 resource leaked back")
-        android_paths = [p.get(ANDROID + "pathData") for p in x.findall("path")]
-        check(android_paths == paths(y), f"{name}: SVG and XML shapes differ")
-        check(len(android_paths) == 3, f"{name}: expected material, fold, category paths")
-        for path in x.findall("path"):
-            check(path.get(ANDROID + "strokeWidth") == "1.75", f"{name}: nonstandard line width")
-        check(y.get("viewBox") == "0 0 40 40", f"{name}: wrong SVG viewport")
-
-# Android standalone glyphs: utility, stop/send contrast and large illustrations.
-misc_dir = DESIGN / "assets/icons-misc"
-misc = json.loads((misc_dir / "manifest.json").read_text())
-check(misc["total"] == 11 and len(set(misc["items"])) == 11, "misc icon count mismatch")
-for name in misc["items"]:
-    x = xml(DRAW / f"{name}.xml")
-    y = xml(misc_dir / f"{name}.svg")
-    if x is None or y is None:
-        continue
-    check([p.get(ANDROID + "pathData") for p in x.findall("path")] == paths(y),
-          f"{name}: Android drawable differs from SVG redraw")
-    expected = 100 if name in misc["illustrations"] else 32 if name in misc["whiteOnAccent"] else 24
-    check(x.get(ANDROID + "width") == f"{expected}dp", f"{name}: wrong nominal display size")
-    check(x.get(ANDROID + "viewportWidth") == str(100 if expected == 100 else 24),
-          f"{name}: wrong SVG grid")
-    check(y.get("viewBox") == f"0 0 {100 if expected == 100 else 24} {100 if expected == 100 else 24}",
-          f"{name}: SVG wrong viewBox")
-
-for preserved in ("ic_notification_butterfly.xml", "splash_icon_transparent.xml"):
-    check((DRAW / preserved).exists(), f"expected identity/status exception: {preserved}")
-
-# Independent assets: active semantic destinations vs archived non-route redraws.
-entry_dir = DESIGN / "assets/icons"
-legacy_dir = DESIGN / "assets/icons-legacy-redrawn"
-check(len(list(entry_dir.glob("*.svg"))) == 24, "24 active semantic SVGs required")
-check(len(list(legacy_dir.glob("*.svg"))) == 12, "12 redrawn legacy SVGs required")
-route_manifest = json.loads((DESIGN / "current-ui.json").read_text())
-check("PROJECT_MANAGEMENT" in route_manifest["retiredUI"], "retired project route was restored")
-check("RUN_CENTER_STANDALONE" in route_manifest["retiredUI"], "retired run center route was restored")
-
-if issues:
-    print("V6.3 icon system contract failed:")
-    for issue in issues:
-        print("  -", issue)
-    sys.exit(1)
-print("V6.3 icon contract passed: 24 active, 61 utility, 12 legacy, 20 file, 11 standalone = 128.")
-, block, re.M)
+    strokes = re.findall(r'^\s*"([^"]+)"\s*,?\s*$', body, re.M)
     check(strokes == entry_catalog["paths"][name], f"catalog/Kotlin mismatch: {name}")
     folder = "icons" if name in current else "icons-supplemental"
     pt = check_svg_glyph(DESIGN / "assets" / folder / f"{name}.svg")
