@@ -342,24 +342,9 @@ internal class LocalWorkComposition @Inject constructor(
     )
 
     internal fun schedulePersistentRecovery() {
-        val sessionId = runtimeStateStore.currentSessionId
-        runCatching { agentTeams.recoverMailbox(sessionId) }
-            .onFailure { error ->
-                AppLog.warn(
-                    "LocalWorkComposition",
-                    "Agent Team 启动恢复失败 session=$sessionId",
-                    error,
-                )
-            }
-        runCatching { teamUiProjection.publish(sessionId) }
-            .onFailure { error ->
-                AppLog.warn(
-                    "LocalWorkComposition",
-                    "Agent Team 启动投影刷新失败 session=$sessionId",
-                    error,
-                )
-            }
-        persistentJobs.schedule(sessionId)
+        // Both startup and session switches must wait for the full durable projection before
+        // reconciling team mailboxes, instead of accessing a partially rebuilt snapshot.
+        teamLifecycle.recoverVisibleSession()
     }
 
     private companion object {
