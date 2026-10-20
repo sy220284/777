@@ -86,7 +86,7 @@ internal fun userFacingWorkToolAction(toolName: String?): String? {
         "web_fetch", "http_request" -> return "读取网页内容"
     }
     if (com.labteto.dshmobile.ui.isCommandExecutionTool(name) || name in setOf("exec", "run_code", "execute"))
-        return "执行命令"
+        return "运行本地任务"
     if (!name.contains("github")) return null
     return when {
         "list_pr_changed_filenames" in name -> "扫描 PR 改动文件"
@@ -201,19 +201,20 @@ internal fun WorkTimelineStepRow(
     message: com.labteto.dshmobile.local.session.LocalHarnessMessage,
     repeatCount: Int = 1,
     active: Boolean = false,
+    activity: com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem? = null,
 ) {
     if (message.role != "tool") {
         val content = localWorkTimelineText(message.content) ?: return
-        SelectionContainer(Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd)) {
+        SelectionContainer(Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm)) {
             MarkdownText(content, bodyStyle = DsType.workBody.withReadingWeight())
         }
         return
     }
     val phase = completedWorkToolPhase(message)
-    val action = workToolActionLabel(message.toolName)
+    val action = workToolActionLabel(message.toolName, activity?.argumentsPreview)
     var detailsOpen by remember(message.id) { mutableStateOf(false) }
     val hasDetails = message.content.isNotBlank()
-    WorkToolStatusRow(message.toolName, phase,
+    WorkToolStatusRow(message.toolName, phase, argumentsPreview = activity?.argumentsPreview,
         modifier = Modifier.testTag(message.toolCallId?.let { "work-tool:$it" } ?: "work-tool:${message.id}"),
         onClick = if (hasDetails) ({ detailsOpen = true }) else null)
     if (detailsOpen) {
@@ -244,9 +245,15 @@ internal fun completedWorkToolPhase(
 }
 
 @Composable
-private fun workToolActionLabel(name: String?): String =
-    userFacingWorkToolAction(name) ?: stringResource(userFacingWorkToolActionRes(name)
+private fun workToolActionLabel(name: String?, argumentsPreview: String? = null): String {
+    val isCommand = name?.let {
+        com.labteto.dshmobile.ui.isCommandExecutionTool(it.lowercase()) ||
+            it.lowercase() in setOf("exec", "run_code", "execute")
+    } == true
+    if (isCommand) naturalWorkCommandAction(argumentsPreview)?.let { return it }
+    return userFacingWorkToolAction(name) ?: stringResource(userFacingWorkToolActionRes(name)
         ?: agentOperationLabelRes(com.labteto.dshmobile.ui.agentOperationKind(name)))
+}
 
 internal fun workToolPhaseText(phase: LocalToolUiPhase): String = when (phase) {
     LocalToolUiPhase.DECLARED -> "等待执行"
@@ -265,10 +272,11 @@ private fun WorkToolStatusRow(
     phase: LocalToolUiPhase,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    argumentsPreview: String? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val provider = userFacingWorkToolProvider(name)
-    val action = workToolActionLabel(name)
+    val action = workToolActionLabel(name, argumentsPreview)
     val label = if (provider == null) action else "$provider · $action"
     val status = workToolPhaseText(phase)
     val tint = when (phase) {
@@ -281,8 +289,7 @@ private fun WorkToolStatusRow(
         onClickLabel = "查看工具回执", onClick = onClick) else Modifier
     Row(
         modifier = modifier.fillMaxWidth().then(clickable)
-            .heightIn(min = if (onClick == null) 36.dp else 48.dp)
-            .padding(vertical = SyMetric.gapXs)
+            .heightIn(min = if (onClick == null) 30.dp else 48.dp)
             .semantics(mergeDescendants = true) { stateDescription = status },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
@@ -298,11 +305,11 @@ private fun WorkToolStatusRow(
                 com.labteto.dshmobile.ui.AgentOperationKind.Execute -> FeatherIcons.Code
                 else -> FeatherIcons.FileText
             }
-        }, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        }, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
         FlowRow(modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
-            Text(label, style = DsType.std14.withReadingWeight(),
+            Text(label, style = DsType.small13.withReadingWeight(),
                 color = if (phase == LocalToolUiPhase.FAILED) tint else colors.textSecondary)
             if (phase != LocalToolUiPhase.COMPLETED) {
                 Text(status, style = DsType.small13.withReadingWeight(), color = tint)
@@ -314,7 +321,7 @@ private fun WorkToolStatusRow(
 @Composable
 internal fun WorkPendingToolRow(activity: com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem) {
     if (activity.phase !in setOf(LocalToolUiPhase.DECLARED, LocalToolUiPhase.RUNNING)) return
-    WorkToolStatusRow(activity.name, activity.phase)
+    WorkToolStatusRow(activity.name, activity.phase, argumentsPreview = activity.argumentsPreview)
 }
 
 @Composable
