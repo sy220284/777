@@ -2,6 +2,12 @@ package com.labteto.dshmobile.update
 
 import java.io.File
 import java.io.IOException
+import java.io.FileOutputStream
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.StandardCopyOption
+import com.labteto.dshmobile.observability.AppLog
 
 /**
  * Update artifacts are installer staging files, not a persistent download cache.
@@ -98,6 +104,23 @@ internal object UpdateCache {
 
         var handoff = readHandoff(root)
         if (handoff == null) {
+            // No marker means unowned staging data. An existing but unreadable/corrupt marker
+            // cannot prove the APK was never handed to the system installer.
+            val markerFile = File(root, HANDOFF_MARKER)
+            val marker = markerFile.toPath()
+            if (!Files.notExists(marker, LinkOption.NOFOLLOW_LINKS)) {
+                AppLog.warn("UpdateCache", "安装交接标记损坏或不可读取，按有界交接窗口保留 APK")
+                val modifiedAt = markerFile.lastModified()
+                if (modifiedAt > 0L && nowMillis >= modifiedAt) {
+                    val elapsed = nowMillis - modifiedAt
+                    if (elapsed >= INSTALLER_HANDOFF_GRACE_MS) {
+                        root.deleteRecursively()
+                        return null
+                    }
+                    return INSTALLER_HANDOFF_GRACE_MS - elapsed
+                }
+                return INSTALLER_HANDOFF_GRACE_MS
+            }
             root.deleteRecursively()
             return null
         }
@@ -133,25 +156,36 @@ internal object UpdateCache {
     private fun writeHandoff(root: File, handoff: InstallerHandoff) {
         val marker = File(root, HANDOFF_MARKER)
         val temp = File(root, "$HANDOFF_MARKER.tmp")
-        temp.writeText(
-            listOf(
-                HANDOFF_SCHEMA,
-                handoff.apkName,
-                handoff.targetVersionCode.toString(),
-                handoff.handedAtMillis.toString(),
-            ).joinToString("\n", postfix = "\n"),
-        )
-        marker.delete()
-        if (!temp.renameTo(marker)) {
-            temp.copyTo(marker, overwrite = true)
-            temp.delete()
+        val bytes = listOf(
+            HANDOFF_SCHEMA,
+            handoff.apkName,
+            handoff.targetVersionCode.toString(),
+            handoff.handedAtMillis.toString(),
+        ).joinToString("\n", postfix = "\n").toByteArray(Charsets.UTF_8)
+        FileOutputStream(temp).use { output ->
+            output.write(bytes)
+            output.fd.sync()
+        }
+        // Never delete the old live marker before its durable replacement is ready.
+        try {
+            Files.move(temp.toPath(), marker.toPath(),
+                StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(temp.toPath(), marker.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
     }
 
     private fun readHandoff(root: File): InstallerHandoff? {
         val marker = File(root, HANDOFF_MARKER)
-        if (!marker.isFile) return null
-        val lines = runCatching { marker.readLines() }.getOrNull() ?: return null
+        val path = marker.toPath()
+        if (Files.notExists(path, LinkOption.NOFOLLOW_LINKS)) return null
+        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) return null
+        val lines = try {
+            marker.readLines()
+        } catch (error: java.io.IOException) {
+            AppLog.warn("UpdateCache", "安装交接标记读取失败，暂不清理 APK", error)
+            return null
+        }
         if (lines.size < 4 || lines[0] != HANDOFF_SCHEMA) return null
 
         val apkName = lines[1]

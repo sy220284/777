@@ -107,7 +107,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
     }
 
     private fun readAuthorizedSkill(name: String): String =
-        if (pinnedInvocations.selected.value.any {
+        if (pinnedInvocations.current().any {
                 it.kind == LocalPinnedInvocation.Kind.SKILL && it.id == name
             }) workspace.readSkill(name)
         else workspace.readModelSkill(name)

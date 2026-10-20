@@ -12,13 +12,15 @@ internal fun resolveLocalWorkSkillGuidance(
     val pinnedConnectors = selectedInvocations.filter {
         it.kind == LocalPinnedInvocation.Kind.CONNECTOR
     }.joinToString("、") { it.id }
-    val installed = workspace.skills().toSet()
     val pinnedSkills = selectedInvocations.filter {
-        it.kind == LocalPinnedInvocation.Kind.SKILL && it.id in installed
-    }.mapNotNull { selection ->
-        runCatching {
+        it.kind == LocalPinnedInvocation.Kind.SKILL
+    }.map { selection ->
+        val document = try {
             workspace.readSkill(selection.id)
-        }.getOrNull()?.let { selection.id to it }
+        } catch (error: Exception) {
+            throw IllegalArgumentException("已固定技能 ${selection.id} 无法加载，请检查技能文件后重试。", error)
+        }
+        selection.id to document
     }
     // Selected SKILL.md is loaded directly for this model step; no extra skill(name)
     // discovery/tool call is required. Keep model history free of repeated instructions.
@@ -63,8 +65,15 @@ internal fun resolveLocalWorkSkillGuidance(
     val requested = relevantSkillIdsForTask(input)
     val task = input.lowercase()
     val lines = workspace.skills().asSequence().mapNotNull { name ->
-        val meta = runCatching { workspace.skillMetadata(name) }.getOrNull()
-            ?.takeIf { it.modelInvocable } ?: return@mapNotNull null
+        val meta = try {
+            workspace.skillMetadata(name)
+        } catch (error: Exception) {
+            if (name in requested) {
+                throw IllegalArgumentException("任务所需技能 $name 无法读取，请检查技能文件后重试。", error)
+            }
+            return@mapNotNull null
+        }
+        if (!meta.modelInvocable) return@mapNotNull null
         val trigger = meta.whenToUse.orEmpty().trim()
         val keywords = (meta.displayName.orEmpty() + " " + meta.description)
             .split(Regex("[，、。；;\\s]+"))

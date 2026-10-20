@@ -46,6 +46,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -381,25 +382,49 @@ class HarnessWebhookService : Service() {
                 resultStore.update(requestId, status = WebhookRunStatus.QUEUED)
                 respond(client, 202, """{"accepted":true,"request_id":"$requestId","result_url":"/result/$requestId"}""")
                 val job = scope.launch {
-                    executeWebhookRun(
-                        update = { status, result, error -> resultStore.update(requestId, status, result, error) },
-                        run = { automationRuntime.runPrompt(prompt) },
-                    )
+                    try {
+                        executeWebhookRun(
+                            update = { status, result, error -> resultStore.update(requestId, status, result, error) },
+                            run = { automationRuntime.runPrompt(prompt) },
+                        )
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        // A receipt write can fail after the external action succeeded. Never
+                        // turn such a failure into a definitive execution failure.
+                        AppLog.error("HarnessWebhookService", "Webhook 回执提交失败，执行结果待核实", error)
+                        try {
+                            val status = resultStore.get(requestId)?.status
+                            if (status == WebhookRunStatus.QUEUED || status == WebhookRunStatus.RUNNING) {
+                                resultStore.update(
+                                    requestId, WebhookRunStatus.INTERRUPTED,
+                                    error = "Webhook 结果回执无法确认，外部副作用可能已发生，请核实后重试",
+                                )
+                            }
+                        } catch (recoveryError: Exception) {
+                            AppLog.error("HarnessWebhookService", "Webhook 未知结果回执也无法提交", recoveryError)
+                        }
+                    }
                 }
                 job.invokeOnCompletion { cause ->
-                    if (
-                        shouldMarkWebhookQueuedCancellation(
-                            cause = cause,
-                            currentStatus = resultStore.get(requestId)?.status,
-                        )
-                    ) {
-                        resultStore.update(
-                            requestId,
-                            status = WebhookRunStatus.CANCELLED,
-                            error = "Webhook 服务已停止",
-                        )
+                    try {
+                        if (
+                            shouldMarkWebhookQueuedCancellation(
+                                cause = cause,
+                                currentStatus = resultStore.get(requestId)?.status,
+                            )
+                        ) {
+                            resultStore.update(
+                                requestId,
+                                status = WebhookRunStatus.CANCELLED,
+                                error = "Webhook 服务已停止",
+                            )
+                        }
+                    } catch (error: Exception) {
+                        AppLog.error("HarnessWebhookService", "Webhook 取消回执提交失败", error)
+                    } finally {
+                        executionLimiter.release()
                     }
-                    executionLimiter.release()
                 }
                 handedOff = true
             } finally {

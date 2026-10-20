@@ -48,9 +48,11 @@ class LocalRuntimeKernel @Inject internal constructor(
         preferences.edit().putString(KEY_SESSION_ID, initialSessionId).apply()
         bootstrap.initialize(scope, initialSessionId)
         scope.launch {
-            runCatching {
+            try {
                 bootstrap.prepareAndRestore(scope, initialSessionId)
-            }.onFailure { error ->
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
                 AppLog.error("LocalRuntimeKernel", "runtime bootstrap failed", error)
                 runtimeStateStore.projection.update {
                     it.copy(

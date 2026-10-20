@@ -3,11 +3,13 @@ package com.labteto.dshmobile.local.tools
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.nio.file.LinkOption
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.labteto.dshmobile.observability.AppLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,11 +50,31 @@ internal class LocalPinnedInvocationStore @Inject constructor(@ApplicationContex
     private val lock = Any()
     private val directory = File(context.noBackupFilesDir, "local-harness")
     private val file = File(directory, "composer-invocations-v1.txt")
-    private val mutable = MutableStateFlow(read())
+    private val mutable = MutableStateFlow<List<LocalPinnedInvocation>>(emptyList())
+    private var readFailure: Exception? = null
     val selected: StateFlow<List<LocalPinnedInvocation>> = mutable.asStateFlow()
 
+    init {
+        try {
+            mutable.value = read()
+        } catch (error: Exception) {
+            readFailure = error
+            AppLog.warn("ComposerPins", "固定选择读取失败，禁止覆盖原有数据", error)
+        }
+    }
+
+    /** Retry failed startup reads before any caller uses or replaces the persisted selection. */
+    fun current(): List<LocalPinnedInvocation> = synchronized(lock) {
+        if (readFailure != null) {
+            val recovered = read()
+            mutable.value = recovered
+            readFailure = null
+        }
+        mutable.value
+    }
+
     fun toggle(item: LocalPinnedInvocation): List<LocalPinnedInvocation> = synchronized(lock) {
-        val previous = mutable.value
+        val previous = current()
         val next = if (item in previous) previous - item else {
             previous + item
         }
@@ -62,20 +84,27 @@ internal class LocalPinnedInvocationStore @Inject constructor(@ApplicationContex
     }
 
     fun remove(item: LocalPinnedInvocation): List<LocalPinnedInvocation> = synchronized(lock) {
-        val next = mutable.value - item
-        if (next != mutable.value) {
+        val previous = current()
+        val next = previous - item
+        if (next != previous) {
             save(next)
             mutable.value = next
         }
         next
     }
 
-    private fun read(): List<LocalPinnedInvocation> =
-        runCatching {
-            if (!file.isFile) emptyList() else file.readLines(Charsets.UTF_8)
-                .filter(String::isNotBlank).mapNotNull(LocalPinnedInvocation::decode)
-                .distinct()
-        }.getOrDefault(emptyList())
+    private fun read(): List<LocalPinnedInvocation> {
+        val path = file.toPath()
+        if (Files.notExists(path, LinkOption.NOFOLLOW_LINKS)) return emptyList()
+        require(Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+            "固定调用选择文件不可读取，请检查本机存储"
+        }
+        return file.readLines(Charsets.UTF_8).filter(String::isNotBlank).map { line ->
+            requireNotNull(LocalPinnedInvocation.decode(line)) {
+                "固定调用选择内容损坏，请保留原文件并修复"
+            }
+        }.distinct()
+    }
 
     private fun save(value: List<LocalPinnedInvocation>) {
         require(directory.isDirectory || directory.mkdirs()) { "无法保存固定调用选择" }
