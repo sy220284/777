@@ -436,20 +436,6 @@ internal class LocalSessionLifecycleCoordinator(
                             )
                         }
                     }
-                    beforeEventLogsDeleted(ids)
-                    withContext(Dispatchers.IO) {
-                        ids.forEach { id ->
-                            sessionCoordinator.delete(id)
-                            toolOutputStore.deleteSession(id)
-                            sessionsRoot.listFiles().orEmpty()
-                                .filter {
-                                    it.name == "$id.events.jsonl" ||
-                                        it.name.startsWith("$id.events.jsonl.part-") ||
-                                        it.name.startsWith("$id.events.jsonl.projection-")
-                                }
-                                .forEach(File::delete)
-                        }
-                    }
                     val durableDeletedIds = linkedSetOf<String>()
                     try {
                         beforeEventLogsDeleted(ids)
