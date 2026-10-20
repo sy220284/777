@@ -84,12 +84,11 @@ internal fun localResourceBudgetForMemoryClass(
     deviceMemory: LocalDeviceMemorySnapshot = LocalDeviceMemorySnapshot(),
 ): HarnessResourceBudget {
     val ramSlots = when {
-        deviceMemory.totalRamMb >= 14 * 1024 -> 10  // 16 GB class
-        deviceMemory.totalRamMb >= 10 * 1024 -> 8   // 12 GB class
-        deviceMemory.totalRamMb >= 7 * 1024 -> 6    // 8 GB class
-        deviceMemory.totalRamMb >= 5 * 1024 -> 5    // 6 GB class
-        deviceMemory.totalRamMb >= 3 * 1024 -> 3    // 4 GB class
-        deviceMemory.totalRamMb > 0 -> 2
+        deviceMemory.totalRamMb >= 14 * 1024 -> 10  // 16 GB target
+        deviceMemory.totalRamMb >= 10 * 1024 -> 8   // 12 GB target
+        // Below the target device class, retain only a protective fallback,
+        // rather than maintaining independent low-RAM performance tiers.
+        deviceMemory.totalRamMb > 0 -> 3
         // When physical RAM cannot be read, grow conservatively from app heap.
         memoryClassMb >= 512 -> 6
         memoryClassMb >= 384 -> 5
