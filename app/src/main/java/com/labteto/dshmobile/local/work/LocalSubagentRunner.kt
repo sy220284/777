@@ -735,7 +735,7 @@ internal class LocalSubagentRunner(
                 maxSteps = remainingSteps,
                 stepLimitExtender = AgentStepLimitExtender { currentLimit, stepsUsed ->
                     val liveBudget = historyBudget?.invoke(runProfile)
-                    val currentTotalLimit = recoveredBaseStep + currentLimit
+                    val currentTotalLimit = addSubagentSteps(recoveredBaseStep, currentLimit)
                     totalBudgetLimit = maxOf(totalBudgetLimit, currentTotalLimit)
                     if (currentTotalLimit >= MAX_DYNAMIC_STEPS) return@AgentStepLimitExtender null
                     if (!progressTracker.claimExtensionProgress()) {
@@ -933,7 +933,9 @@ internal class LocalSubagentRunner(
 
     private fun AgentToolCall.toLocalToolCall() = LocalToolCall(id, name, arguments, rawArguments)
     private companion object {
-        const val MAX_DYNAMIC_STEPS = 512
+        // Configuration's 512 steps are a starting budget, not a ceiling for productive work.
+        // Novel, durable progress gates each extension; device pressure and user cancellation remain effective.
+        const val MAX_DYNAMIC_STEPS = Int.MAX_VALUE
         const val SUBAGENT_EVENT_CHARS = 65_536
         val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
             "android_vscreen_status",
