@@ -220,8 +220,10 @@ internal class LocalSkillStore(
                     // Legacy installation without a baseline: don't erase an unknown user edit.
                     (previousBaseline == null && current == desired)
                 )
+            // A UI editing limit is not an ownership boundary: workspace-authored rules
+            // can legitimately be 24 KB–128 KB. Only an unchanged bundled baseline
+            // is eligible for automatic replacement.
             val validCustomDocument = current != null &&
-                current.toByteArray(Charsets.UTF_8).size <= 24_000 &&
                 current.lineSequence().firstOrNull()?.trim() == "---" &&
                 parseLocalSkillMetadata(preset.id, current).description.isNotBlank()
             if (validCustomDocument && !clean && current != desired) {
