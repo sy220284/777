@@ -78,7 +78,7 @@ internal fun NativeV6DocumentsSheet(
     val scope = rememberCoroutineScope()
     val colors = LocalSyColors.current
     val current = identity()
-    val sourceMessageId = currentMessageId()
+    val sourceMessageId = if (current != null) currentMessageId() else null
     val items = snapshot.documents.filter { it.document.source.sessionId == current?.sessionId }
     var prompt by remember(current?.sessionId) { mutableStateOf("") }
     var modelConsent by remember(current?.sessionId) { mutableStateOf(false) }
