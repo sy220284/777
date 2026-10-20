@@ -31,6 +31,22 @@ class ManagedProcessAndroidTest {
     }
 
     @Test
+    fun repeatedTimeoutsReportTypedTimeoutEvenWhenAndroidClosesPipesDuringTeardown() = runBlocking {
+        val runtime = AndroidProcessRuntime()
+        repeat(4) { attempt ->
+            val result = runtime.execute(
+                ProcessRequest(
+                    command = listOf("/system/bin/sh", "-c", "printf started; sleep 20"),
+                    timeoutMillis = 200,
+                ),
+            )
+            assertTrue("timeout attempt $attempt should return a result", result.timedOut)
+            assertEquals(-1, result.exitCode)
+            assertTrue("output read before cancellation must be retained", result.stdout.contains("started"))
+        }
+    }
+
+    @Test
     fun runtimeTimeoutKillsInheritedDescendantsWithoutIoFailure() = runBlocking {
         val root = reproRoot("runtime")
         val marker = File(root, "unexpected-output")

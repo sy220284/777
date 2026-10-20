@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.harness.tools.functionToolSchema
+import com.labteto.dshmobile.local.model.WORK_TOOL_RECOVERY_PAGE_BYTES
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -19,8 +20,8 @@ object LocalToolCatalog {
         add(tool("tool_output_read", "读取本机会话仍保留的完整工具结果，或按原文字面量搜索匹配的 UTF-8 偏移", properties(
             "call_id" to string("原工具调用编号"),
             "query" to string("可选；非空时按 UTF-8 字面量搜索原文并返回偏移，不必先全量读取"),
-            "start_byte" to integer("起始 UTF-8 字节偏移，默认 0；优先使用上次结果给出的下一偏移"),
-            "max_bytes" to integer("单次读取字节数，默认 4096，允许 1024–49152；单页实际交付不超过当前可见额度，请按返回的下一偏移继续读取"),
+            "start_byte" to integerRange("起始 UTF-8 字节偏移，默认 0；优先使用上次结果给出的下一偏移", min = 0),
+            "max_bytes" to integerRange("单次可见读取字节数，默认 ${WORK_TOOL_RECOVERY_PAGE_BYTES}，允许 1024–${WORK_TOOL_RECOVERY_PAGE_BYTES}；请按结果返回的下一偏移分页读取", min = 1_024, max = WORK_TOOL_RECOVERY_PAGE_BYTES),
         ), listOf("call_id")))
         add(tool("write", "创建或完整替换工作区文件", properties(
             "path" to string("相对工作区的路径"),
@@ -55,7 +56,7 @@ object LocalToolCatalog {
         ), listOf("query")))
         add(tool("bash", "在应用工作区执行 Android 系统 shell", properties(
             "command" to string("shell 命令"),
-            "timeout_seconds" to integer("进程执行超时秒数；前台默认 30/最大 120，后台默认 300/最大 900；会话切换等主动取消不受该值约束"),
+            "timeout_seconds" to integer("无 stdout/stderr 的连续空闲超时秒数，不是整个任务时长；每次实际输出都会续期。前台默认 30/最大 120，后台默认 300/最大 900；大型构建、全量扫描建议后台执行并持续输出进度，主动取消不受此值约束"),
             "run_in_background" to boolean("是否转为后台任务，默认 false；普通后台 shell 属当前会话非持久任务，创建、切换或删除会话时会取消"),
         ), listOf("command")))
         add(tool("job_list", "列出本机会话创建的后台任务", properties()))
@@ -450,6 +451,13 @@ object LocalToolCatalog {
     private fun integer(description: String) = buildJsonObject {
         put("type", "integer")
         put("description", description)
+    }
+
+    private fun integerRange(description: String, min: Int, max: Int? = null) = buildJsonObject {
+        put("type", "integer")
+        put("description", description)
+        put("minimum", min)
+        max?.let { put("maximum", it) }
     }
 
     private fun boolean(description: String) = buildJsonObject {

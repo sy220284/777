@@ -145,12 +145,11 @@ internal class LocalToolOutputStore(
         visibleLimitBytes: Int = WORK_TOOL_RECOVERY_PAGE_BYTES,
     ): String {
         require(startByte >= 0) { "start_byte 必须大于等于 0" }
-        require(maxBytes in MIN_READ_BYTES..MAX_READ_BYTES) {
-            "max_bytes 必须在 $MIN_READ_BYTES–$MAX_READ_BYTES 之间"
-        }
-        // A page larger than what the model can actually see would be re-truncated downstream while
-        // next_byte still advanced by the requested amount, silently skipping the trimmed bytes.
-        val pageBytes = maxBytes.coerceAtMost(visibleLimitBytes.coerceAtLeast(MIN_READ_BYTES))
+        require(maxBytes >= MIN_READ_BYTES) { "max_bytes 必须大于等于 $MIN_READ_BYTES" }
+        // max_bytes is a requested ceiling, not a demand to allocate an oversized page.
+        // Even older model calls asking for > MAX_READ_BYTES must advance next_byte only
+        // by the bytes actually visible; rejecting them wastes a tool step for no benefit.
+        val pageBytes = minOf(maxBytes, MAX_READ_BYTES, visibleLimitBytes.coerceAtLeast(MIN_READ_BYTES))
 
         val source = File(sessionDir(sessionId), key(callId) + ".txt")
         if (!source.isFile) return missingResult(callId)
@@ -404,11 +403,14 @@ internal class LocalToolOutputStore(
         private const val MAX_SEARCH_QUERY_BYTES = 512
         private const val MAX_SEARCH_MATCHES = 10
         private const val ACTIVE_REFERENCES_FILE = ".active-tool-refs"
-        private const val MAX_ACTIVE_REFERENCES = 16
+        // Long audits can legitimately reference hundreds of distinct tool results.
+        // Quotas still bound storage; this only expands which live results survive LRU eviction.
+        private const val MAX_ACTIVE_REFERENCES = 256
         private const val MIN_READ_BYTES = 1_024
         // One output may use the existing session quota, rather than an obsolete 16 MiB cap.
         private const val DEFAULT_MAX_OUTPUT_BYTES = 64 * 1024 * 1024
-        private const val DEFAULT_MAX_FILES_PER_SESSION = 64
+        // Retain longer tool histories while keeping a separate file-count guard against tiny-file storms.
+        private const val DEFAULT_MAX_FILES_PER_SESSION = 512
         private const val DEFAULT_MAX_SESSION_BYTES = 64L * 1024L * 1024L
         private const val DEFAULT_MAX_GLOBAL_BYTES = 256L * 1024L * 1024L
     }

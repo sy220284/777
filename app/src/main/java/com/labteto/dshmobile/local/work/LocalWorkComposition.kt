@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.work
 
 import java.io.File
-import com.labteto.dshmobile.observability.AppLog
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
@@ -39,7 +38,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -342,34 +340,9 @@ internal class LocalWorkComposition @Inject constructor(
     )
 
     internal fun schedulePersistentRecovery() {
-        val sessionId = runtimeStateStore.currentSessionId
-        runCatching { agentTeams.recoverMailbox(sessionId) }
-            .onFailure { error ->
-                AppLog.warn(
-                    "LocalWorkComposition",
-                    "Agent Team 启动恢复失败 session=$sessionId",
-                    error,
-                )
-            }
-        runCatching { teamUiProjection.publish(sessionId) }
-            .onFailure { error ->
-                AppLog.warn(
-                    "LocalWorkComposition",
-                    "Agent Team 启动投影刷新失败 session=$sessionId",
-                    error,
-                )
-            }
-        persistentJobs.schedule(sessionId)
-    }
-
-    private companion object {
-        val TEAM_RECONCILE_JOB_STATUSES = setOf(
-            "dormant",
-            "completed",
-            "failed",
-            "cancelled",
-            "killed",
-        )
+        // Both startup and session switches must wait for the full durable projection before
+        // reconciling team mailboxes, instead of accessing a partially rebuilt snapshot.
+        teamLifecycle.recoverVisibleSession()
     }
 
 }

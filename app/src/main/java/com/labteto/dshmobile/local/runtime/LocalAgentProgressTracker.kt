@@ -24,7 +24,11 @@ internal class LocalAgentProgressTracker {
             append('\u0000')
             append(if (isError) "error" else "ok")
             append('\u0000')
+            append(output.length)
+            append('\u0000')
             append(output.take(2_048))
+            append('\u0000')
+            append(output.takeLast(2_048))
         }
         if (seen.add(sha256(normalized))) {
             progressVersion += 1
@@ -35,7 +39,10 @@ internal class LocalAgentProgressTracker {
     @Synchronized
     fun recordAssistant(content: String, toolCallCount: Int) {
         if (toolCallCount != 0 || content.isBlank()) return
-        val fingerprint = sha256("assistant\u0000" + content.take(2_048))
+        val fingerprint = sha256(
+            "assistant\u0000" + content.length + "\u0000" +
+                content.take(2_048) + "\u0000" + content.takeLast(2_048),
+        )
         if (seen.add(fingerprint)) {
             progressVersion += 1
         }

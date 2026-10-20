@@ -1,7 +1,9 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.WORK_TOOL_INLINE_BYTES
+import com.labteto.dshmobile.local.model.WORK_TOOL_RECOVERY_PAGE_BYTES
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -32,6 +34,22 @@ class LocalToolOutputStoreTest {
             "整段响应 $pageBytes 字节必须落在 Work 内联额度 $WORK_TOOL_INLINE_BYTES 字节内",
             pageBytes <= WORK_TOOL_INLINE_BYTES,
         )
+    }
+
+    @Test
+    fun oversizedModelPageRequestStillReturnsAnAccurateNextByte() {
+        val store = LocalToolOutputStore(File(temporary.root, "oversized-pages"))
+        val content = "甲乙丙🌟".repeat(3_000)
+        assertTrue(store.store("session-big", "call-big", content) != null)
+
+        val oversized = store.read("session-big", "call-big", maxBytes = Int.MAX_VALUE)
+        val visible = store.read("session-big", "call-big", maxBytes = WORK_TOOL_RECOVERY_PAGE_BYTES)
+        assertEquals(visible, oversized)
+        val nextByte = Regex("start_byte 设为 (\\d+)").find(oversized)
+            ?.groupValues?.get(1)?.toInt() ?: error("missing continuation offset")
+        assertTrue(nextByte in 1..WORK_TOOL_RECOVERY_PAGE_BYTES)
+        assertFalse(oversized.contains("\uFFFD"))
+        assertTrue(store.read("session-big", "call-big", startByte = nextByte).contains("后续仍有内容"))
     }
 
     @Test
@@ -98,6 +116,16 @@ class LocalToolOutputStoreTest {
         assertTrue(store.read("session-a", "call-search", startByte = 8190).contains("🌟匹配正文"))
         assertTrue(store.search("session-b", "call-search", "🌟匹配正文").startsWith("未找到"))
         assertTrue(store.search("session-a", "call-search", "没有的内容").contains("没有匹配"))
+    }
+
+    @Test
+    fun longAuditRetainsMoreThanTheOldSixtyFourResultFiles() {
+        val store = LocalToolOutputStore(File(temporary.root, "long-audit-results"))
+        repeat(72) { index ->
+            assertTrue(store.store("audit-session", "call-$index", "evidence-$index") != null)
+        }
+        assertTrue(store.read("audit-session", "call-0").contains("evidence-0"))
+        assertTrue(store.read("audit-session", "call-71").contains("evidence-71"))
     }
 
     @Test

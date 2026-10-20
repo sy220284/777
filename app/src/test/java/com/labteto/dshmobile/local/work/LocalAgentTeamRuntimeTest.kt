@@ -956,7 +956,7 @@ class LocalAgentTeamRuntimeTest {
         val recovered = CountDownLatch(1)
         lateinit var fixture: Fixture
         val refreshQueue = LocalTeamRefreshQueue(scope) { id, reconcile ->
-            if (reconcile) fixture.runtime.recoverMailbox(id)
+            if (reconcile) fixture.runtime.recoverMailboxAfterProjection(id)
             recovered.countDown()
         }
         fixture = fixture(session, projectionScope = scope,
@@ -967,6 +967,8 @@ class LocalAgentTeamRuntimeTest {
         fixture.log.append(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
             teamMessage(session, "legacy-cold", "member-1", "文".repeat(4_001)))
         assertTrue(fixture.runtime.uiState(session).rebuilding)
+        // Simulate a UI cold-start refresh racing with the ongoing projection rebuild.
+        refreshQueue.schedule(session, reconcile = true)
         assertTrue("冷投影完成后必须主动恢复邮箱", recovered.await(5, TimeUnit.SECONDS))
         val state = fixture.runtime.project(session)
         assertTrue(state.pendingMessages.isEmpty())

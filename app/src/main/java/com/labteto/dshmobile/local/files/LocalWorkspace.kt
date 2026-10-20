@@ -485,7 +485,7 @@ class LocalWorkspace(
     }
 
     /**
-     * Execute Android's system shell with a hard timeout.
+     * Execute Android's system shell with an inactivity timeout that resets on output.
      *
      * Enforcement here is the kernel's, not this class's. `directory(canonicalRoot)` sets the
      * working directory only — it is not an access restriction, and a command can `cd /` out of it.
@@ -536,9 +536,10 @@ class LocalWorkspace(
             timeoutMillis = timeoutSeconds.coerceIn(1, MAX_SHELL_TIMEOUT_SECONDS) * 1000L,
             maxChars = MAX_SHELL_CHARS,
             onProgress = onProgress,
+            progressResetsTimeout = true,
         )
         val diagnosis = when {
-            result.timedOut -> "命令超时，进程组已终止；写入操作是否生效需核实"
+            result.timedOut -> "命令长时间无 stdout/stderr 进度，进程组已终止；写入操作是否生效需核实。长时间静默的构建请使用后台模式、增加进度输出或适当设置空闲超时"
             result.exitCode == 126 -> "shell 找到了命令但无法执行；检查文件执行权限、解释器、挂载选项和 Android SELinux 限制"
             result.exitCode == 127 -> "shell 无法定位命令；检查实际命令拼写、PATH、内置运行时状态和脚本解释器"
             else -> null
