@@ -93,7 +93,7 @@ internal fun naturalWorkToolAction(toolName: String?, argumentsPreview: String?)
             .containsMatchIn(hint) -> "相关测试"
         Regex("""(?:视觉|ui/|/ui|design|界面|layout)""")
             .containsMatchIn(hint) ->
-            if (pathHint.endsWith(".kt\"") || pathHint.contains(".kt")) "界面代码"
+            if (pathHint.contains(".kt")) "界面代码"
             else "界面设计资料"
         Regex("""(?:log|diagnostic|日志)""").containsMatchIn(hint) -> "诊断日志"
         else -> null
