@@ -65,7 +65,7 @@ internal class LocalModelProfileStore(
                     LocalModelAuthKind.CHATGPT_PLAN -> LocalModelProtocol.RESPONSES
                     LocalModelAuthKind.API_KEY ->
                         if (preset?.provider == "Claude" &&
-                            preset.protocol == LocalModelProtocol.ANTHROPIC_MESSAGES
+                            preset?.protocol == LocalModelProtocol.ANTHROPIC_MESSAGES
                         ) {
                             // Migrate retired official Claude profiles to the native Messages API.
                             LocalModelProtocol.ANTHROPIC_MESSAGES
