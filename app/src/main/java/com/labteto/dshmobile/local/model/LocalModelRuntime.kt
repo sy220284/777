@@ -74,20 +74,21 @@ class LocalModelRuntime @Inject constructor(
      * frozen route, and other live Work sessions never acquire this model selection.
      */
     internal fun selectModel(id: String) {
-        val originSessionId = runtimeStateStore.state.value.sessionId
+        // Bind the click to the originating Session before the coroutine can be delayed
+        // by an unrelated Work run or a navigation to another conversation.
+        val origin = runtimeStateStore.state.value
+        if (origin.loading || runtimeStateStore.sessionTransitioning) return
+        val originSessionId = origin.sessionId
+        val selected = origin.modelState.modelSelection.profiles.firstOrNull { it.id == id }
+        if (selected == null) {
+            state.publishError("所选模型已不存在，请重新选择")
+            return
+        }
         val request = latestModelSelection.incrementAndGet()
         pendingSelections[originSessionId] = request
         scope.launch {
             modelSelectionMutex.withLock {
                 if (pendingSelections[originSessionId] != request) return@withLock
-                val snapshot = runtimeStateStore.state.value
-                if (snapshot.loading || runtimeStateStore.sessionTransitioning ||
-                    snapshot.sessionId != originSessionId) return@withLock
-                val selected = snapshot.modelState.modelSelection.profiles.firstOrNull { it.id == id }
-                if (selected == null) {
-                    state.publishError("所选模型已不存在，请重新选择")
-                    return@withLock
-                }
                 try {
                     check(gateway.hasCredential(selected)) { "所选模型凭据不可用，请检查模型账户" }
                     sessionStorage.eventLogs.get(originSessionId).recordLocalModelSelection(id)
