@@ -18,6 +18,8 @@ import com.labteto.dshmobile.local.model.LocalModelExecutionSettings
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.model.LocalModelState
+import com.labteto.dshmobile.local.model.forPersistedSessionModel
+import com.labteto.dshmobile.local.model.selectedLocalModelProfileId
 import com.labteto.dshmobile.local.model.durableModelHistorySnapshot
 import com.labteto.dshmobile.local.model.migrateOfficialClaudeModel
 import com.labteto.dshmobile.local.model.workSystemPrompt
@@ -189,7 +191,12 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             LocalConversationMode.PROJECT,
             LocalConversationMode.CONTINUATION -> LOCAL_PROJECT_ID
         }
-        val activeModelProfile = recoveryState.profile
+        // A conversation's explicit selection wins over the application default and over
+        // the route used by an earlier completed turn. A live Work run is handled above.
+        val chosenSessionProfile = log.selectedLocalModelProfileId()?.let { id ->
+            modelProfiles.firstOrNull { it.id == id }
+        }
+        val activeModelProfile = chosenSessionProfile ?: recoveryState.profile
             ?: modelConfiguration.activeProfile(model, baseUrl, modelProfiles)
         val modelConfigured = activeModelProfile != null && modelGateway.hasCredential(activeModelProfile)
         activeModelProfile?.takeIf { modelConfigured }?.let(modelGateway::activate)
@@ -301,11 +308,17 @@ internal class LocalForegroundSessionLoader @Inject constructor(
     ) {
         val binding = ownedBinding ?: workRuns.live(sessionId) ?: return
         val liveState = binding.aggregateSnapshot()
-        liveState.modelState.modelSelection.activeProfile
-            ?.takeIf { liveState.modelState.configured }
+        // The running request keeps its frozen route; the picker displays the choice
+        // reserved for the next turn, including after navigation away and back.
+        val visibleModel = liveState.modelState.forPersistedSessionModel(
+            sessionStorage.eventLogs.get(sessionId).selectedLocalModelProfileId(),
+        )
+        visibleModel.modelSelection.activeProfile
+            ?.takeIf { visibleModel.configured }
             ?.let(modelGateway::activate)
         val resources = runtimeStateStore.resourceSnapshot()
         val visibleState = liveState.copy(
+            modelState = visibleModel,
             loading = runtimeStateStore.state.value.loading,
             usage = usageTracker.state.value,
             sessions = summaries(),
