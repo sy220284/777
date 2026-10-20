@@ -174,22 +174,16 @@ internal fun WorkTimelineStepRow(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     if (message.role != "tool") {
         val content = localWorkTimelineText(message.content) ?: return
-        val milestone = isWorkTimelineMilestone(content)
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
+            modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm),
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
-            if (!milestone) {
-                WorkOperationIcon(com.labteto.dshmobile.ui.AgentOperationKind.Generic, active)
-            }
-            // Public progress is real reply content, not a truncated status label.
-            // Reuse the same Markdown renderer as the final assistant answer.
+            // Public narration is first-class reading content, not a tool-status subrow.
             SelectionContainer(modifier = Modifier.weight(1f)) {
                 MarkdownText(
                     text = content,
-                    bodyStyle = (if (milestone) DsType.mdBody else DsType.small13)
-                        .withReadingWeight().copy(color = colors.text),
+                    bodyStyle = DsType.mdBody.withReadingWeight().copy(color = colors.text),
                     preserveSoftLineBreaks = true,
                 )
             }
@@ -203,7 +197,10 @@ internal fun WorkTimelineStepRow(
         return
     }
 
-    val failed = message.toolIsError ?: localWorkToolFailed(message.content)
+    val phase = completedWorkToolPhase(message)
+    val failed = phase == com.labteto.dshmobile.local.presentation.LocalToolUiPhase.FAILED
+    val unsettled = phase == com.labteto.dshmobile.local.presentation.LocalToolUiPhase.OUTCOME_UNKNOWN
+    val cancelled = phase == com.labteto.dshmobile.local.presentation.LocalToolUiPhase.CANCELLED
     val provider = userFacingWorkToolProvider(message.toolName)
     val kind = com.labteto.dshmobile.ui.agentOperationKind(message.toolName)
     val action = userFacingWorkToolAction(message.toolName) ?:
@@ -216,13 +213,14 @@ internal fun WorkTimelineStepRow(
     ) {
         Icon(
             imageVector = when {
-                failed -> FeatherIcons.AlertTriangle
+                failed || unsettled -> FeatherIcons.AlertTriangle
+                cancelled -> FeatherIcons.Clock
                 provider == "GitHub" -> FeatherIcons.GitBranch
                 provider == "Figma" -> FeatherIcons.Palette
                 else -> FeatherIcons.CheckCircle
             },
             contentDescription = null,
-            tint = if (failed) colors.dangerInk else colors.textSecondary,
+            tint = if (failed) colors.dangerInk else if (unsettled) colors.primary else colors.textSecondary,
             modifier = Modifier.size(18.dp),
         )
         Text(
@@ -230,17 +228,33 @@ internal fun WorkTimelineStepRow(
             style = DsType.small13.withReadingWeight(),
             color = if (failed) colors.dangerInk else colors.textSecondary,
         )
-        if (failed) {
-            Text(
-                stringResource(agentOperationStatusRes(running = false, failed = true)),
-                style = DsType.caption11.withReadingWeight(), color = colors.dangerInk,
-            )
-        } else {
-            Text(
-                stringResource(agentOperationStatusRes(running = false, failed = false)),
-                style = DsType.caption11.withReadingWeight(), color = colors.textTertiary,
-            )
-        }
+        Text(
+            text = when (phase) {
+                com.labteto.dshmobile.local.presentation.LocalToolUiPhase.FAILED ->
+                    stringResource(agentOperationStatusRes(running = false, failed = true))
+                com.labteto.dshmobile.local.presentation.LocalToolUiPhase.OUTCOME_UNKNOWN -> "结果待确认"
+                com.labteto.dshmobile.local.presentation.LocalToolUiPhase.CANCELLED -> "已取消"
+                else -> stringResource(agentOperationStatusRes(running = false, failed = false))
+            },
+            style = DsType.caption11.withReadingWeight(),
+            color = if (failed) colors.dangerInk else if (unsettled) colors.primary else colors.textTertiary,
+        )
+    }
+}
+
+/** Status facts come from structured tool outcome, never content matching for new records. */
+internal fun completedWorkToolPhase(
+    message: com.labteto.dshmobile.local.session.LocalHarnessMessage,
+): com.labteto.dshmobile.local.presentation.LocalToolUiPhase {
+    val code = message.toolErrorCode.orEmpty()
+    return when {
+        code == "TOOL_OUTCOME_UNKNOWN" ->
+            com.labteto.dshmobile.local.presentation.LocalToolUiPhase.OUTCOME_UNKNOWN
+        code.contains("CANCEL", ignoreCase = true) ->
+            com.labteto.dshmobile.local.presentation.LocalToolUiPhase.CANCELLED
+        message.toolIsError ?: localWorkToolFailed(message.content) ->
+            com.labteto.dshmobile.local.presentation.LocalToolUiPhase.FAILED
+        else -> com.labteto.dshmobile.local.presentation.LocalToolUiPhase.COMPLETED
     }
 }
 
