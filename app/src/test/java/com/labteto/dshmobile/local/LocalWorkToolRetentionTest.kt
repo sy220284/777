@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.WORK_TOOL_INLINE_BYTES
 import com.labteto.dshmobile.local.model.retainWorkToolResultForModel
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -24,9 +25,19 @@ class LocalWorkToolRetentionTest {
 
         assertTrue(retained.truncated)
         assertTrue(retained.omittedBytes > 0)
-        assertTrue(retained.text.length <= 4_200)
+        assertTrue(retained.text.toByteArray(Charsets.UTF_8).size <= WORK_TOOL_INLINE_BYTES)
         assertFalse(retained.text.contains("\uFFFD"))
         assertTrue(retained.text.contains("工具结果过长"))
+    }
+
+    @Test
+    fun eightKiBToolResultStaysVisibleWithoutEarlyTruncation() {
+        val source = "a".repeat(7_500)
+        assertTrue(source.toByteArray(Charsets.UTF_8).size > 4 * 1_024)
+        assertTrue(source.toByteArray(Charsets.UTF_8).size <= WORK_TOOL_INLINE_BYTES)
+        val retained = retainWorkToolResultForModel(source)
+        assertFalse(retained.truncated)
+        assertTrue(retained.text == source)
     }
 
     @Test
