@@ -95,6 +95,8 @@ class WorkReplyTimelineVisualTest {
                     .background(LocalSyColors.current.canvas).padding(16.dp)) {
                     WorkTimelineStepRow(LocalHarnessMessage(
                         "intro", "progress", "我先核对现有界面与设计规范。", createdAt = 1L))
+                    WorkTimelineStepRow(LocalHarnessMessage(
+                        "authored", "progress", "检索技能配置与仓库测试文件", createdAt = 1L))
                     WorkTimelineStepRow(LocalHarnessMessage("step1", "tool", "搜索完成",
                         "mcp__GitHub__search", createdAt = 2L,
                         toolCallId = "find-skill", toolIsError = false), activity = search)
@@ -106,6 +108,7 @@ class WorkReplyTimelineVisualTest {
             }
         }
         compose.onNodeWithText("检索视觉与 UI 设计技能").assertIsDisplayed()
+        compose.onNodeWithText("检索技能配置与仓库测试文件").assertIsDisplayed()
         compose.onNodeWithText("修改界面代码", substring = true).assertIsDisplayed()
         compose.onNodeWithText("核查结果").assertIsDisplayed()
         compose.onNodeWithText("mcp__GitHub__search", substring = true).assertDoesNotExist()
