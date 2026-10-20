@@ -25,6 +25,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.background
@@ -36,6 +37,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -80,7 +82,7 @@ import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.SyButton
-import com.labteto.dshmobile.ui.shenyan.SyContextActionMenu
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.shenyan.SyFullscreenMediaOverlay
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
@@ -571,7 +573,7 @@ internal fun MediaImageDetailDialog(
         }
     }
     SyFullscreenMediaOverlay(onDismiss = onDismiss) {
-        Box(
+        BoxWithConstraints(
             modifier = Modifier.fillMaxSize().safeDrawingPadding()
                 .padding(horizontal = 12.dp, vertical = 16.dp)
                 .clipToBounds()
@@ -580,16 +582,24 @@ internal fun MediaImageDetailDialog(
         ) {
             val bitmap = detail
             if (bitmap != null) {
+                // Real image bounds, rather than the entire viewport, own the tap target.
+                // Taps on the image are non-destructive; surrounding space dismisses.
+                val ratio = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
+                val displayWidth = minOf(maxWidth, maxHeight * ratio)
+                val displayHeight = displayWidth / ratio
                 Image(
                     bitmap = bitmap,
                     contentDescription = resources.getString(R.string.media_chat_generated_image),
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize().graphicsLayer {
-                        scaleX = zoom
-                        scaleY = zoom
-                        translationX = offsetX
-                        translationY = offsetY
-                    },
+                    modifier = Modifier.width(displayWidth).height(displayHeight)
+                        .graphicsLayer {
+                            scaleX = zoom
+                            scaleY = zoom
+                            translationX = offsetX
+                            translationY = offsetY
+                        }
+                        .testTag("mediaImageContent")
+                        .clickable(onClick = {}),
                 )
             } else {
                 Text(
@@ -612,7 +622,7 @@ internal fun MediaImageDetailDialog(
                         contentDescription = resources.getString(R.string.fluid_message_actions),
                         tint = colors.text)
                 }
-                SyContextActionMenu(
+                SyPopupMenu(
                     expanded = actionsOpen,
                     onDismiss = { actionsOpen = false },
                     items = actions,
