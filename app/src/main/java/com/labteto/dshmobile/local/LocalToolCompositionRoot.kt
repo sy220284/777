@@ -156,12 +156,12 @@ internal class LocalToolCompositionRoot @Inject constructor(
             planMode = { runtimeStateStore.state.value.work.planMode },
             networkSearchEnabled = networkSearchSettings::isEnabled,
             pinnedConnectorIds = {
-                pinnedInvocations.selected.value
+                pinnedInvocations.current()
                     .filter { it.kind == com.labteto.dshmobile.local.tools.LocalPinnedInvocation.Kind.CONNECTOR }
                     .map { it.id }
             },
             pinnedSkillIds = {
-                pinnedInvocations.selected.value
+                pinnedInvocations.current()
                     .filter { it.kind == com.labteto.dshmobile.local.tools.LocalPinnedInvocation.Kind.SKILL }
                     .map { it.id }
             },
@@ -216,7 +216,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
     ) = plugins.mcpLifecycleHistory(incarnation, afterSequence)
     override suspend fun checkMcpHealth(serverId: String) = plugins.checkMcpHealth(serverId)
     override fun selectedConnectorIds(): Set<String> =
-        pinnedInvocations.selected.value.asSequence()
+        pinnedInvocations.current().asSequence()
             .filter { it.kind == com.labteto.dshmobile.local.tools.LocalPinnedInvocation.Kind.CONNECTOR }
             .map { it.id }.toSet()
 

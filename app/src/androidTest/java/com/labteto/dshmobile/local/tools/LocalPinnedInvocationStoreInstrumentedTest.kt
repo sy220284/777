@@ -8,6 +8,7 @@ import java.util.UUID
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -35,6 +36,37 @@ class LocalPinnedInvocationStoreInstrumentedTest {
             val afterRemoval = LocalPinnedInvocationStore(wrapper)
             assertFalse(github in afterRemoval.selected.value)
             assertTrue(review in afterRemoval.selected.value)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun damagedOrUnreadableSelectionNeverGetsOverwrittenByToggle() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(context.cacheDir, "composer-corrupt-${UUID.randomUUID()}")
+        val wrapper = object : ContextWrapper(context) {
+            override fun getNoBackupFilesDir(): File = root
+        }
+        val file = File(root, "local-harness/composer-invocations-v1.txt")
+        val github = LocalPinnedInvocation(LocalPinnedInvocation.Kind.CONNECTOR, "github")
+        val review = LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "code-review")
+        try {
+            file.parentFile!!.mkdirs()
+            file.writeText("connector:github\ncorrupted-entry\n")
+            val damaged = LocalPinnedInvocationStore(wrapper)
+            assertThrows(IllegalArgumentException::class.java) { damaged.toggle(review) }
+            assertEquals("connector:github\ncorrupted-entry\n", file.readText())
+
+            file.writeText("connector:github\n")
+            assertEquals(listOf(github, review), damaged.toggle(review))
+            assertEquals(listOf(github, review), LocalPinnedInvocationStore(wrapper).selected.value)
+
+            file.delete()
+            file.mkdir()
+            val unreadable = LocalPinnedInvocationStore(wrapper)
+            assertThrows(IllegalArgumentException::class.java) { unreadable.toggle(review) }
+            assertTrue(file.isDirectory)
         } finally {
             root.deleteRecursively()
         }

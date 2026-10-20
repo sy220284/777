@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.memory
 
 import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.observability.AppLog
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -123,7 +124,13 @@ class MemoryManager @Inject constructor(
             importance = candidate.importance,
             replaceIds = replaced?.let { setOf(it.id) }.orEmpty(),
         )
-        store.consolidateIfDue()
+        // The memory record has already been committed. Optional consolidation must not
+        // transform a successful write into a false failure (or trigger duplicate retries).
+        try {
+            store.consolidateIfDue()
+        } catch (error: Exception) {
+            AppLog.warn("MemoryManager", "记忆已保存，但后台整理失败", error)
+        }
         return remembered
     }
 }

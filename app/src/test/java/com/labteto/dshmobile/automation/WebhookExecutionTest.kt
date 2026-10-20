@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.automation
 
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.serialization.SerializationException
+import java.io.IOException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -28,18 +30,14 @@ class WebhookExecutionTest {
         )
     }
 
-    @Test fun unknownPersistedWebhookStatusDegradesToFailedOnDowngrade() {
+    @Test fun unknownPersistedWebhookStatusIsNotMisclassifiedAsFailed() {
         val json = Json { encodeDefaults = true }
-        val decoded = json.decodeFromString(
-            WebhookRunResult.serializer(),
-            """{"requestId":"r-future","status":"future_waiting","updatedAt":1}""",
-        )
-
-        assertEquals(WebhookRunStatus.FAILED, decoded.status)
-        assertTrue(
-            json.encodeToString(WebhookRunResult.serializer(), decoded)
-                .contains("\"status\":\"failed\""),
-        )
+        org.junit.Assert.assertThrows(SerializationException::class.java) {
+            json.decodeFromString(
+                WebhookRunResult.serializer(),
+                """{"requestId":"r-future","status":"future_waiting","updatedAt":1}""",
+            )
+        }
     }
 
     @Test fun cancellationWhileRunningIsRecordedAndPropagated() = runTest {
@@ -48,7 +46,7 @@ class WebhookExecutionTest {
         runCurrent()
         job.cancelAndJoin()
         assertTrue(job.isCancelled)
-        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.CANCELLED), states)
+        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.INTERRUPTED), states)
     }
     @Test fun cancellationBeforeWorkCompletesSettlesWithoutRetry() = runTest {
         val states = mutableListOf<WebhookRunStatus>()
@@ -59,7 +57,7 @@ class WebhookExecutionTest {
         }
         runCurrent()
         job.cancelAndJoin()
-        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.CANCELLED), states)
+        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.INTERRUPTED), states)
     }
     @Test fun successfulRunStoresResult() = runTest {
         val states = mutableListOf<WebhookRunStatus>()
@@ -67,6 +65,26 @@ class WebhookExecutionTest {
         executeWebhookRun({ state, result, _ -> states += state; output = result }) { "done" }
         assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.COMPLETED), states)
         assertEquals("done", output)
+    }
+
+    @Test fun failedCompletionReceiptDoesNotMisreportSuccessfulExternalWork() = runTest {
+        val states = mutableListOf<WebhookRunStatus>()
+        var executed = 0
+        try {
+            executeWebhookRun(update = { status, _, _ ->
+                states += status
+                if (status == WebhookRunStatus.COMPLETED) throw IOException("disk full")
+            }) {
+                executed++
+                "success"
+            }
+            fail("完成回执存储失败应传出异常")
+        } catch (expected: IOException) {
+            assertEquals("disk full", expected.message)
+        }
+        assertEquals(1, executed)
+        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.COMPLETED), states)
+        assertFalse(WebhookRunStatus.FAILED in states)
     }
 
     @Test fun independentWebhookRunsMayOverlapAndAllSettle() = runTest {

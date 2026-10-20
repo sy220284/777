@@ -73,6 +73,70 @@ class LocalModelProfileStoreRecoveryTest {
     }
 
     @Test
+    fun malformedProfileInOtherwiseValidJsonRecoversWholePreviousSnapshot() {
+        val fixture = fakePreferences()
+        val store = LocalModelProfileStore(fixture.preferences, Json { ignoreUnknownKeys = true })
+        val previous = LocalModelProfile("plan", "gpt", "https://api.openai.com/v1",
+            authKind = LocalModelAuthKind.CHATGPT_PLAN, protocol = LocalModelProtocol.RESPONSES)
+        store.write(listOf(previous))
+        val malformed = listOf(
+            """{"id":"valid","model":"safe","baseUrl":"https://safe.example/v1"}""",
+            """{"id":"missing-url","model":"must-not-vanish"}""",
+        ).joinToString(",", prefix = "[", postfix = "]")
+        fixture.values[LocalModelConfigContract.KEY_PROFILES_V3] = malformed
+
+        assertEquals(listOf(previous), store.read())
+        // Writing a new choice cannot turn a partially parsed document into permanent data loss.
+        val next = LocalModelProfile("next", "next", "https://next.example/v1")
+        store.write(listOf(previous, next))
+        assertEquals(listOf(previous, next), store.read())
+    }
+
+    @Test
+    fun unknownExplicitAuthOrProtocolFallsBackWithoutChangingCredentialIdentity() {
+        val fixture = fakePreferences()
+        val store = LocalModelProfileStore(fixture.preferences, Json { ignoreUnknownKeys = true })
+        val original = LocalModelProfile("plan", "gpt", "https://api.openai.com/v1",
+            authKind = LocalModelAuthKind.CHATGPT_PLAN, protocol = LocalModelProtocol.RESPONSES)
+        store.write(listOf(original))
+        val brokenAuth = """[{"id":"plan","model":"gpt","baseUrl":"https://api.openai.com/v1",
+            "authKind":"UNRECOGNIZED_FUTURE_AUTH"}]""".replace("\n", "")
+        fixture.values[LocalModelConfigContract.KEY_PROFILES_V3] = brokenAuth
+        assertEquals(listOf(original), store.read())
+
+        val brokenProtocol = """[{"id":"custom","model":"custom","baseUrl":"https://custom.example/v1",
+            "authKind":"API_KEY","protocol":"UNRECOGNIZED_FUTURE_TRANSPORT"}]""".replace("\n", "")
+        fixture.values[LocalModelConfigContract.KEY_PROFILES_V3] = brokenProtocol
+        assertEquals(listOf(original), store.read())
+    }
+
+    @Test
+    fun malformedProfileWithoutBackupFailsBeforeReplacingUserConfiguration() {
+        val fixture = fakePreferences()
+        val raw = """[{"id":"partial","model":"kept-name"}]"""
+        fixture.values[LocalModelConfigContract.KEY_PROFILES_V3] = raw
+        val store = LocalModelProfileStore(fixture.preferences, Json)
+        assertThrows(CorruptPersistedJsonException::class.java) { store.read() }
+        assertEquals(raw, fixture.values[LocalModelConfigContract.KEY_PROFILES_V3])
+        assertThrows(CorruptPersistedJsonException::class.java) {
+            store.write(listOf(LocalModelProfile("new", "new", "https://new.example/v1")))
+        }
+        assertEquals(raw, fixture.values[LocalModelConfigContract.KEY_PROFILES_V3])
+    }
+
+    @Test
+    fun legacyMissingAuthAndProtocolStillDefaultsToApiKeyChatCompletions() {
+        val fixture = fakePreferences()
+        val raw = """[{"id":"legacy","model":"custom","baseUrl":"https://legacy.example/v1"}]"""
+        fixture.values[LocalModelConfigContract.KEY_PROFILES_V2] = raw
+        val store = LocalModelProfileStore(fixture.preferences, Json)
+        val entry = store.read().single()
+        assertEquals("legacy", entry.id)
+        assertEquals(LocalModelAuthKind.API_KEY, entry.authKind)
+        assertEquals(LocalModelProtocol.CHAT_COMPLETIONS, entry.protocol)
+    }
+
+    @Test
     fun failedConfigurationCommitRestoresMemoryAndDoesNotAdvanceTransaction() {
         var failNext = false
         val fixture = fakePreferences { if (failNext) { failNext = false; false } else true }

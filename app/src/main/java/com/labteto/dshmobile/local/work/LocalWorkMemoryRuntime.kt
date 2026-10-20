@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.memory.MemoryManager
+import com.labteto.dshmobile.observability.AppLog
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.buildJsonObject
@@ -19,7 +21,7 @@ internal class LocalWorkMemoryRuntime @Inject constructor(
         val snapshot = binding.aggregateSnapshot()
         if (!snapshot.autoMemory || text.isBlank()) return
 
-        val remembered = runCatching {
+        val remembered = try {
             memoryManager.captureExplicitUserDirective(
                 text = text,
                 mode = snapshot.conversationMode,
@@ -30,7 +32,16 @@ internal class LocalWorkMemoryRuntime @Inject constructor(
                     ?.takeIf(String::isNotBlank)
                     ?: snapshot.transcriptIndex.latestUserMessageId,
             )
-        }.getOrNull() ?: return
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            AppLog.warn("WorkMemory", "自动记忆写入失败 session=${binding.sessionId.take(80)}", error)
+            binding.eventLog.append("memory/auto-failed", buildJsonObject {
+                put("cause_type", error.javaClass.simpleName)
+                put("source_message_id", sourceMessageId.orEmpty())
+            })
+            return
+        } ?: return
 
         binding.eventLog.append("memory/auto", buildJsonObject {
             put("id", remembered.id)

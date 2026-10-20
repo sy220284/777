@@ -73,6 +73,61 @@ class UpdateCacheTest {
     }
 
     @Test
+    fun `handoff marker can be replaced without deleting the protected apk`() {
+        val cacheDir = temporary.newFolder("cache-replace")
+        val root = prepare(cacheDir)
+        val apk = File(root, "app-release.apk").apply { writeBytes(ByteArray(12)) }
+
+        UpdateCache.markInstallerHandoff(root, apk, 101L, 1_000_000L)
+        UpdateCache.markInstallerHandoff(root, apk, 102L, 1_050_000L)
+
+        assertEquals(
+            UpdateCache.INSTALLER_HANDOFF_GRACE_MS,
+            UpdateCache.cleanupStale(cacheDir, 100L, 1_050_000L),
+        )
+        assertTrue(apk.isFile)
+        assertFalse(File(root, ".installer-handoff.tmp").exists())
+    }
+
+    @Test
+    fun `unreadable handoff marker never triggers deletion of installer apk`() {
+        val cacheDir = temporary.newFolder("cache-unreadable")
+        val root = prepare(cacheDir)
+        val apk = File(root, "app-release.apk").apply { writeBytes(ByteArray(12)) }
+        File(root, ".installer-handoff").mkdir()
+
+        assertEquals(
+            UpdateCache.INSTALLER_HANDOFF_GRACE_MS,
+            UpdateCache.cleanupStale(cacheDir, 100L, 1_050_000L),
+        )
+        assertTrue(apk.isFile)
+        // A new explicit installation attempt must still be allowed to release old staging.
+        val replacement = prepare(cacheDir, 100L, 1_050_001L)
+        assertTrue(replacement.isDirectory)
+        assertFalse(apk.exists())
+    }
+
+    @Test
+    fun `malformed handoff contents do not erase a possibly owned apk`() {
+        val cacheDir = temporary.newFolder("cache-malformed")
+        val root = prepare(cacheDir)
+        val apk = File(root, "app-release.apk").apply { writeBytes(ByteArray(8)) }
+        val marker = File(root, ".installer-handoff").apply {
+            writeText("bad-marker")
+            assertTrue(setLastModified(1_000_000L))
+        }
+        assertEquals(
+            UpdateCache.INSTALLER_HANDOFF_GRACE_MS - 50_000L,
+            UpdateCache.cleanupStale(cacheDir, 100L, 1_050_000L),
+        )
+        assertTrue(apk.isFile)
+        assertNull(UpdateCache.cleanupStale(
+            cacheDir, 100L, 1_000_000L + UpdateCache.INSTALLER_HANDOFF_GRACE_MS,
+        ))
+        assertFalse(root.exists())
+    }
+
+    @Test
     fun `explicit new attempt supersedes an active installer handoff`() {
         val cacheDir = temporary.newFolder("cache")
         val handedAt = 1_000_000L

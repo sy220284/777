@@ -26,6 +26,12 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+/** A delivered Chat response needs at least one durable text or media block.
+ * Otherwise the assistant/message event would be written without a visible transcript. */
+internal fun requireVisibleLocalChatReply(blocks: List<LocalMessageBlock>) {
+    check(blocks.isNotEmpty()) { "模型没有返回可用回复" }
+}
+
 internal data class LocalMaterializedChatReply(
     val reply: LocalModelReply,
     val blocks: List<LocalMessageBlock>,

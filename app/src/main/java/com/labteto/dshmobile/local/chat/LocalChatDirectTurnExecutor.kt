@@ -332,9 +332,9 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 workspaceRoot = File(sessionStorage.files.workspace.path),
             )
             val durableReply = materializedReply.reply
-            if (replacingMessageId != null && materializedReply.blocks.isEmpty()) {
-                error("模型没有返回可用回复")
-            }
+            // Neither ordinary Chat nor regenerate may commit an invisible assistant row.
+            // An image-only reply is valid because materialization creates an Image block.
+            requireVisibleLocalChatReply(materializedReply.blocks)
 
             val assistantTranscript = materializedReply.blocks
                 .takeIf { it.isNotEmpty() }

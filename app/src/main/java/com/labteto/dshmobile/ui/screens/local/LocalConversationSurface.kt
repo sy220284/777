@@ -596,7 +596,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val showStreamingTail = shouldShowWorkStreamingTail(
         running = state.running,
         usageMode = state.usageMode,
-        lastItem = transcriptItems.lastOrNull(),
+        lastItem = localReplyStreamingBoundary(transcriptItems),
     )
     val transcriptLastListIndex = localTranscriptLastListIndex(
         transcriptItemCount = transcriptItems.size,
@@ -1255,19 +1255,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkStep ||
                                     transcriptItems.lastOrNull() is LocalTranscriptItem.WorkNode ||
                                     transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
-                                lastDurableNarrative = transcriptItems.asReversed().firstNotNullOfOrNull { item ->
-                                    when (item) {
-                                        is LocalTranscriptItem.WorkStep ->
-                                            item.message.takeIf {
-                                                it.role == "progress" || it.role == "assistant"
-                                            }?.content
-                                        is LocalTranscriptItem.WorkProcess ->
-                                            item.messages.lastOrNull {
-                                                it.role == "progress" || it.role == "assistant"
-                                            }?.content
-                                        else -> null
-                                    }
-                                },
+                                lastDurableNarrative = latestDurableWorkNarrativeInCurrentTurn(transcriptMessages),
                             )
                         }
                     }

@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local.model
 import android.content.SharedPreferences
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.model.chatgpt.refreshChatGptPlanProfiles
-import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.persistence.RecoveringJsonValue
 import com.labteto.dshmobile.persistence.recoverJsonValue
 import kotlinx.serialization.json.Json
@@ -37,20 +36,22 @@ internal class LocalModelProfileStore(
     }
 
     private fun decodeProfiles(raw: String): List<LocalModelProfile> =
-        json.parseToJsonElement(raw).jsonArray.mapNotNull { item ->
+        json.parseToJsonElement(raw).jsonArray.map { item ->
             val obj = item.jsonObject
-            val storedModel = obj["model"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
-                ?: return@mapNotNull null
-            val baseUrl = obj["baseUrl"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val storedModel = requireNotNull(
+                obj["model"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank),
+            ) { "模型配置条目缺少 model" }
+            val baseUrl = requireNotNull(
+                obj["baseUrl"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank),
+            ) { "模型配置条目缺少 baseUrl" }
             val model = com.labteto.dshmobile.local.model.migrateOfficialClaudeModel(storedModel, baseUrl)
+            // Missing enum fields are legitimate old-format data. An explicitly unknown
+            // enum is not: interpreting it as API_KEY changes credential identity.
             val auth = obj["authKind"]?.jsonPrimitive?.contentOrNull
-                ?.let { rawKind ->
-                    runCatching { LocalModelAuthKind.valueOf(rawKind) }
-                        .onFailure { AppLog.warn("ModelProfile",
-                            "operation=decode_auth_kind status=invalid cause_type=${it.javaClass.simpleName}") }
-                        .getOrNull()
-                }
+                ?.let { LocalModelAuthKind.valueOf(it) }
                 ?: LocalModelAuthKind.API_KEY
+            val recordedProtocol = obj["protocol"]?.jsonPrimitive?.contentOrNull
+                ?.let { LocalModelProtocol.valueOf(it) }
             val credentialRef = obj["credentialRef"]?.jsonPrimitive?.contentOrNull
             val preset = LocalModelPresets.find(model, baseUrl)
             LocalModelProfile(
@@ -64,13 +65,7 @@ internal class LocalModelProfileStore(
                     LocalModelAuthKind.CHATGPT_PLAN -> LocalModelProtocol.RESPONSES
                     LocalModelAuthKind.API_KEY ->
                         preset?.protocol?.takeIf { it == LocalModelProtocol.ANTHROPIC_MESSAGES }
-                            ?: obj["protocol"]?.jsonPrimitive?.contentOrNull
-                                ?.let { rawProtocol ->
-                                    runCatching { LocalModelProtocol.valueOf(rawProtocol) }
-                                        .onFailure { AppLog.warn("ModelProfile",
-                                            "operation=decode_model_protocol status=invalid cause_type=${it.javaClass.simpleName}") }
-                                        .getOrNull()
-                                }
+                            ?: recordedProtocol
                             ?: preset?.protocol
                             ?: LocalModelProtocol.CHAT_COMPLETIONS
                 },

@@ -192,6 +192,36 @@ private fun isWorkProcessMessage(messages: List<LocalHarnessMessage>, index: Int
 }
 
 /**
+ * Deduplicate streaming preview against the authoritative durable text from the active user
+ * turn, not WorkNodes (whose summaries are intentionally shortened), and never reuse a
+ * previous user turn's final answer as a prefix of this turn's stream.
+ */
+internal fun latestDurableWorkNarrativeInCurrentTurn(
+    messages: List<LocalHarnessMessage>,
+): String? {
+    val lastUser = messages.indexOfLast { it.role == "user" }
+    for (index in messages.lastIndex downTo (lastUser + 1)) {
+        val item = messages[index]
+        if (item.role == "progress" || item.role == "assistant") return item.content
+    }
+    return null
+}
+
+/**
+ * Read the last dialogue / Work-process item, never trailing sidecars (artifacts, paid media,
+ * background creation cards). Those sidecars may be appended after an already-durable final
+ * answer, but they cannot reactivate a transient reply preview.
+ */
+internal fun localReplyStreamingBoundary(items: List<LocalTranscriptItem>): LocalTranscriptItem? =
+    items.lastOrNull { item ->
+        item is LocalTranscriptItem.Message ||
+            item is LocalTranscriptItem.Thinking ||
+            item is LocalTranscriptItem.WorkProcess ||
+            item is LocalTranscriptItem.WorkNode ||
+            item is LocalTranscriptItem.WorkStep
+    }
+
+/**
  * A durable final assistant answer already owns the tail. It must not be duplicated by the
  * transient streaming preview while the execution coordinator is closing the turn.
  */

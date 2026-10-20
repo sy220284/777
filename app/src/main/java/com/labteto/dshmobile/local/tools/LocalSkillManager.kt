@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.files.parseLocalSkillMetadata
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -176,9 +177,15 @@ internal class LocalSkillStore(
                     val path = ".dsh/skills/${preset.id}/$relative"
                     val target = File(workspace.path, path)
                     val marker = File(skillsDir, "${preset.id}/.bundled-resource-${rawFingerprint(relative)}")
-                    val existing = runCatching { target.readText() }.getOrNull()
+                    val targetPath = target.toPath()
+                    val existing = when {
+                        Files.notExists(targetPath, LinkOption.NOFOLLOW_LINKS) -> null
+                        Files.isRegularFile(targetPath, LinkOption.NOFOLLOW_LINKS) -> target.readText()
+                        else -> error("技能资源不可读取：$path")
+                    }
                     val clean = existing == text || (
-                        marker.isFile && rawFingerprint(existing.orEmpty()) == marker.readText().trim()
+                        existing != null && marker.isFile &&
+                            rawFingerprint(existing) == marker.readText().trim()
                     )
                     // Never overwrite an untracked user-edited MOBILE.md, CLI.md or other asset.
                     if (existing == null || clean) {
@@ -191,11 +198,22 @@ internal class LocalSkillStore(
                 preset.id, preset.description, preset.instructions, preset.whenToUse, preset.title,
             )
             val path = ".dsh/skills/${preset.id}/SKILL.md"
-            val current = runCatching { workspace.readSkill(preset.id) }.getOrNull()
-            val disabled = runCatching { !workspace.skillMetadata(preset.id).modelInvocable }.getOrDefault(false)
+            val original = File(skillsDir, "${preset.id}/SKILL.md")
+            val originalPath = original.toPath()
+            val originalExists = Files.isRegularFile(originalPath, LinkOption.NOFOLLOW_LINKS)
+            require(originalExists || Files.notExists(originalPath, LinkOption.NOFOLLOW_LINKS)) {
+                "技能规则文件不可读取：${preset.id}"
+            }
+            val oversized = originalExists && Files.size(originalPath) > 128 * 1024
+            val current = if (!originalExists || oversized) null else workspace.readSkill(preset.id)
+            val disabled = if (current != null) !workspace.skillMetadata(preset.id).modelInvocable else false
             val desired = withModelInvocationDisabled(baseDocument, disabled)
             val baseline = File(skillsDir, "${preset.id}/.bundled-baseline-sha256")
-            val previousBaseline = runCatching { baseline.readText().trim() }.getOrNull()
+            val previousBaseline = when {
+                Files.notExists(baseline.toPath(), LinkOption.NOFOLLOW_LINKS) -> null
+                Files.isRegularFile(baseline.toPath(), LinkOption.NOFOLLOW_LINKS) -> baseline.readText().trim()
+                else -> error("技能升级基线不可读取：${preset.id}")
+            }
             val clean = current != null && (
                 // Known upstream version: upgrade only if the user never edited its content.
                 (previousBaseline != null && skillFingerprint(current) == previousBaseline) ||
@@ -211,11 +229,11 @@ internal class LocalSkillStore(
                 // installations created before the fingerprint marker existed.
                 continue
             }
-            if (current != null && !clean && current != desired) {
-                val raw = runCatching { File(skillsDir, "${preset.id}/SKILL.md").readText() }.getOrNull()
-                if (raw != null && raw != desired) {
-                    val backup = File(skillsDir, "${preset.id}/SKILL.pre-repair.md")
-                    if (!backup.exists()) backup.writeText(raw)
+            if (originalExists && (oversized || (current != null && !clean && current != desired))) {
+                // Preserve original bytes before repairing damaged or oversized rules.
+                val backup = File(skillsDir, "${preset.id}/SKILL.pre-repair.md")
+                if (Files.notExists(backup.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                    Files.copy(originalPath, backup.toPath())
                 }
             }
             if (current != desired) workspace.write(path, desired)
