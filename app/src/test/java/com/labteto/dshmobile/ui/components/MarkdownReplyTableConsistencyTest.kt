@@ -55,7 +55,7 @@ class MarkdownReplyTableConsistencyTest {
         assertEquals(native.rows, shared.rows)
         // A real escaped pipe is one literal cell, not a new column.
         assertEquals(listOf("A|B", "2"),
-            (parseMarkdown("| A\\|B | 2 |\\n| --- | --- |").single() as MdBlock.Table).header)
+            (parseMarkdown("| A\\|B | 2 |\n| --- | --- |").single() as MdBlock.Table).header)
     }
 
     @Test fun aRegularSentenceWithPipesButNoSeparatorRemainsParagraph() {
