@@ -12,6 +12,8 @@ import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import java.io.File
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.theme.ThemePreference
@@ -39,6 +41,15 @@ class LocalReplyCompositionVisualTest {
         compose.onNodeWithText("预览图位置").assertIsDisplayed()
         compose.onNodeWithText("报告结论：下一步验证移动端布局。").assertIsDisplayed()
         compose.onNodeWithTag("inline-media").assertWidthIsEqualTo(320.dp)
+    }
+
+    @Test fun inlineAudioUsesOneContextualActionEntrance() {
+        compose.setContent {
+            DshTheme(preference = ThemePreference.LIGHT) {
+                InlineReplyMediaActions(File("/no-such-audio.mp3"), "audio/mpeg") { }
+            }
+        }
+        compose.onNodeWithTag("inlineMediaActions").assertIsDisplayed().performClick()
     }
 
     @Test fun standaloneMediaPreservesTheOriginalNarrowerContentLayoutInDarkMode() {
