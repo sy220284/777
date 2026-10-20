@@ -112,6 +112,9 @@ internal class LocalWorkTurnStarter(
             "Work 排队续跑前台会话已切换"
         }
         val pending = runtimeStateStore.foregroundRunHandle.pendingInputs
+        // After a cold resume the pending inbox may predate an unanswered form.
+        // It must not be consumed just because the run binding was restored.
+        if (hasOutstandingWorkReplyForm(sessionStorage.eventLogs.get(sessionId))) return null
         fun nextAdmissible(): QueuedAgentInput? {
             while (true) {
                 var staleGoal = false
