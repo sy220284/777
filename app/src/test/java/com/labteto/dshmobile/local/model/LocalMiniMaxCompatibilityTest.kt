@@ -32,6 +32,25 @@ class LocalMiniMaxCompatibilityTest {
         assertFalse(LocalMiniMaxPolicy.isOfficial("https://api.minimax.io.evil.example/v1"))
     }
 
+    @Test fun miniMaxM3UsesNativeAnthropicProtocolWithoutIgnoredTemperature() {
+        for (host in listOf("api.minimaxi.com", "api.minimax.io", "api.minimax.cn")) {
+            val base = "https://$host/anthropic/v1"
+            val preset = LocalModelPresets.find("MiniMax-M3.1-Flash", base)!!
+            assertEquals(LocalModelProtocol.ANTHROPIC_MESSAGES, preset.protocol)
+            assertFalse(preset.temperatureSupported)
+            val rt = route("MiniMax-M3.1-Flash", base)
+            val payload = AnthropicMessagesClient(OkHttpClient(), json).buildPayload(
+                rt, emptyList(), emptyList(), temperature = 0.3, reasoningEffort = "max",
+            )
+            assertFalse(payload.containsKey("temperature"))
+            assertEquals("max", payload["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+        }
+        assertEquals(
+            LocalModelProtocol.CHAT_COMPLETIONS,
+            LocalModelPresets.protocolFor("MiniMax-M3.1-Flash", "https://api.minimaxi.com/v1"),
+        )
+    }
+
     @Test fun providerQuotaErrorIsReportedInsteadOfMissingChoices() {
         val failure = assertThrows(com.labteto.dshmobile.local.LocalModelException::class.java) {
             DeepSeekClient(OkHttpClient(), json).parse("""{"base_resp":{"status_code":1008,"status_msg":"余额不足"}}""")
