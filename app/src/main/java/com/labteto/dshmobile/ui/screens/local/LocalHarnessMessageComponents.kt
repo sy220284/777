@@ -360,6 +360,16 @@ internal fun LocalMessageRow(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
+                    // Assistant body text is selectable, so a long press may be consumed by
+                    // SelectionContainer. Keep selection intact and expose a deterministic
+                    // compact action entry for message-scoped document generation.
+                    if (!streaming && onCreateDocument != null) {
+                        CompactMessageAction(
+                            icon = FeatherIcons.MoreVertical,
+                            contentDescription = stringResource(R.string.fluid_message_actions),
+                            onClick = { actionsOpen = true },
+                        )
+                    }
                     if (chatMode) {
                         // 分支切换作为一个整体换行，窄屏不拆散左右箭头与页码。
                         Row(verticalAlignment = Alignment.CenterVertically) {
