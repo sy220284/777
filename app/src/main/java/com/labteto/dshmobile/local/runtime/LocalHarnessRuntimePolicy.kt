@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.harness.resource.HarnessResourceBudget
+import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
+import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
@@ -161,4 +163,31 @@ internal fun localAdaptiveResourceBudget(
         maxVirtualDisplays = localLimit(initial.maxVirtualDisplays, memory.maxVirtualDisplays),
         maxLanguageServers = localLimit(initial.maxLanguageServers, memory.maxLanguageServers),
     )
+}
+
+/**
+ * A low number of active leases can still coincide with genuine system memory/thermal
+ * pressure. History compaction must observe reduced device capacity, not only occupancy.
+ * Both foreground and delegated agents use this one policy for their history budgets.
+ */
+internal fun localEffectiveHistoryPressure(
+    snapshot: HarnessResourceSnapshot,
+    startupBudget: HarnessResourceBudget,
+): HarnessResourcePressure {
+    val current = snapshot.budget
+    val capacityRatio = minOf(
+        current.maxModelRequests.toDouble() / startupBudget.maxModelRequests,
+        current.maxAgents.toDouble() / startupBudget.maxAgents,
+        current.maxTerminals.toDouble() / startupBudget.maxTerminals,
+    )
+    val capacityPressure = when {
+        capacityRatio <= 0.45 -> HarnessResourcePressure.HIGH
+        capacityRatio <= 0.80 -> HarnessResourcePressure.MEDIUM
+        else -> HarnessResourcePressure.LOW
+    }
+    return if (snapshot.pressure.ordinal >= capacityPressure.ordinal) {
+        snapshot.pressure
+    } else {
+        capacityPressure
+    }
 }
