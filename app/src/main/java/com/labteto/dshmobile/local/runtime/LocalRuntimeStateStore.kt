@@ -56,10 +56,24 @@ class LocalRuntimeStateStore internal constructor(
         @ApplicationContext context: Context,
         json: Json,
         approvals: LocalApprovalPreferences,
+    ) : this(context, json, approvals, readLocalRuntimeMemoryProfile(context))
+
+    private constructor(
+        context: Context,
+        json: Json,
+        approvals: LocalApprovalPreferences,
+        memoryProfile: LocalRuntimeMemoryProfile,
     ) : this(
-        memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256,
-        deviceMemory = readLocalDeviceMemorySnapshot(context),
-        jobOwner = LocalRuntimeJobOwner.persistent(context, json),
+        memoryClassMb = memoryProfile.memoryClassMb,
+        deviceMemory = memoryProfile.deviceMemory,
+        jobOwner = LocalRuntimeJobOwner.persistent(
+            context,
+            json,
+            maxConcurrentJobs = localResourceBudgetForMemoryClass(
+                memoryProfile.memoryClassMb,
+                memoryProfile.deviceMemory,
+            ).maxAgents,
+        ),
     ) { bindApprovalPreferences(approvals) }
     private val mutable = MutableStateFlow(LocalHarnessState())
     internal val projection = LocalRuntimeProjection(mutable)
@@ -373,8 +387,20 @@ class LocalRuntimeStateStore internal constructor(
     )
 }
 
+/** Reuse one OS snapshot for resource scheduling and background job admission. */
+private data class LocalRuntimeMemoryProfile(
+    val memoryClassMb: Int,
+    val deviceMemory: LocalDeviceMemorySnapshot,
+)
+
+private fun readLocalRuntimeMemoryProfile(context: Context): LocalRuntimeMemoryProfile =
+    LocalRuntimeMemoryProfile(
+        memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256,
+        deviceMemory = readLocalDeviceMemorySnapshot(context),
+    )
+
 /** Android reports both Java heap class and system-wide RAM; never treat them as interchangeable. */
-internal fun readLocalDeviceMemorySnapshot(context: Context): LocalDeviceMemorySnapshot {
+private fun readLocalDeviceMemorySnapshot(context: Context): LocalDeviceMemorySnapshot {
     val manager = context.getSystemService(ActivityManager::class.java)
         ?: return LocalDeviceMemorySnapshot()
     return runCatching {
