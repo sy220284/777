@@ -41,6 +41,23 @@ class MarkdownReplyTableConsistencyTest {
         assertFalse(parseUiMarkdown(code).any { it is UiMarkdownBlock.Table })
     }
 
+    @Test fun technicalPathBackslashesMustSurviveTableParsing() {
+        val markdown = """
+            | 路径 | 编号 |
+            | --- | --- |
+            | C:\Users\demo\project | 1 |
+            | \\server\share\project | 2 |
+        """.trimIndent()
+        val native = parseMarkdown(markdown).single() as MdBlock.Table
+        val shared = parseUiMarkdown(markdown).single() as UiMarkdownBlock.Table
+        assertEquals("C:\\Users\\demo\\project", native.rows[0][0])
+        assertEquals("\\\\server\\share\\project", native.rows[1][0])
+        assertEquals(native.rows, shared.rows)
+        // A real escaped pipe is one literal cell, not a new column.
+        assertEquals(listOf("A|B", "2"),
+            (parseMarkdown("| A\\|B | 2 |\\n| --- | --- |").single() as MdBlock.Table).header)
+    }
+
     @Test fun aRegularSentenceWithPipesButNoSeparatorRemainsParagraph() {
         val text = "A | B\n这是正常说明，不是表格"
         assertEquals(1, parseMarkdown(text).size)
