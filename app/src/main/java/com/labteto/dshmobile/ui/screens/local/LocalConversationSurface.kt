@@ -72,6 +72,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.labteto.dshmobile.local.presentation.mediaCreativeDraft
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -539,22 +542,32 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             }
         }
     }
-    // Work's authoritative EventLog sequence changes on call, execution-started and result.
-    // One lifecycle-bound observer replaces the competing document/response refresh paths.
-    LaunchedEffect(state.sessionId, state.usageMode, workActions, state.running) {
+    var workToolReadFailed by remember(state.sessionId, state.usageMode) { mutableStateOf(false) }
+    var workToolRetry by remember(state.sessionId) { mutableStateOf(0) }
+    val timelineLifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(state.sessionId, state.usageMode, workActions, state.running, workToolRetry, timelineLifecycle) {
+        workToolReadFailed = false
         if (state.usageMode != LocalUsageMode.WORK || workActions == null) {
             workToolActivities = emptyList()
-        } else {
-            var lastSequence = Long.MIN_VALUE
+        } else timelineLifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            val reader = LocalWorkToolActivityReader(
+                sequence = { workActions.eventSequenceForUi(state.sessionId) },
+                activities = { workActions.toolActivities(state.sessionId) },
+            )
             do {
-                val sequence = withContext(Dispatchers.IO) {
-                    workActions.eventSequenceForUi(state.sessionId)
-                }
-                if (sequence != lastSequence) {
-                    workToolActivities = withContext(Dispatchers.IO) {
-                        workActions.toolActivities(state.sessionId)
+                when (val read = withContext(Dispatchers.IO) { reader.read() }) {
+                    is LocalWorkToolActivityRead.Available -> {
+                        workToolActivities = read.activities
+                        workToolReadFailed = false
                     }
-                    lastSequence = sequence
+                    is LocalWorkToolActivityRead.Failed -> {
+                        workToolActivities = emptyList()
+                        workToolReadFailed = true
+                        com.labteto.dshmobile.observability.AppLog.failure(
+                            "WorkTimeline", "read_tool_activity", read.cause, sessionId = state.sessionId)
+                        break // Retry is explicit; never replay tools or present stale live state.
+                    }
+                    null -> Unit
                 }
                 if (!state.running) break
                 delay(600)
@@ -1279,6 +1292,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     transcriptItem.key == transcriptItems.lastOrNull()?.key,
                             )
                         }
+                    }
+                }
+                if (workToolReadFailed) {
+                    item(key = "work-tool-read-error:${state.sessionId}") {
+                        WorkToolStatusNotice(onRetry = { workToolRetry += 1 })
                     }
                 }
                 if (showStreamingTail) {

@@ -2,6 +2,23 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,6 +73,20 @@ internal fun userFacingWorkToolActionRes(toolName: String?): Int? {
 /** Specific actions take precedence over broad provider categories, without exposing tool IDs. */
 internal fun userFacingWorkToolAction(toolName: String?): String? {
     val name = toolName?.lowercase().orEmpty()
+    when (name) {
+        "read", "read_file", "file_inspect" -> return "读取文件"
+        "grep", "search" -> return "搜索文件内容"
+        "glob", "find", "list_files" -> return "查找工作区文件"
+        "write", "write_file" -> return "写入文件"
+        "edit", "edit_file", "apply_patch", "patch" -> return "修改文件"
+        "job_output" -> return "读取后台任务输出"
+        "job_poll", "job_list" -> return "检查后台任务状态"
+        "job_kill" -> return "停止后台任务"
+        "web_search" -> return "搜索网页"
+        "web_fetch", "http_request" -> return "读取网页内容"
+    }
+    if (com.labteto.dshmobile.ui.isCommandExecutionTool(name) || name in setOf("exec", "run_code", "execute"))
+        return "执行命令"
     if (!name.contains("github")) return null
     return when {
         "list_pr_changed_filenames" in name -> "扫描 PR 改动文件"
@@ -164,149 +195,135 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
 }
 
 
-/** Each item is composed lazily, with milestones distinguished from routine operations. */
+/** Public prose uses the same reading style before and after the streaming commit. */
 @Composable
 internal fun WorkTimelineStepRow(
     message: com.labteto.dshmobile.local.session.LocalHarnessMessage,
     repeatCount: Int = 1,
     active: Boolean = false,
 ) {
-    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     if (message.role != "tool") {
         val content = localWorkTimelineText(message.content) ?: return
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-        ) {
-            // Public narration is first-class reading content, not a tool-status subrow.
-            SelectionContainer(modifier = Modifier.weight(1f)) {
-                MarkdownText(
-                    text = content,
-                    bodyStyle = DsType.mdBody.withReadingWeight().copy(color = colors.text),
-                    preserveSoftLineBreaks = true,
-                )
-            }
-            if (active) {
-                Text(
-                    stringResource(agentOperationStatusRes(running = true, failed = false)),
-                    style = DsType.caption11.withReadingWeight(), color = colors.primary,
-                )
-            }
+        SelectionContainer(Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd)) {
+            MarkdownText(content, bodyStyle = DsType.workBody.withReadingWeight())
         }
         return
     }
-
     val phase = completedWorkToolPhase(message)
-    val failed = phase == com.labteto.dshmobile.local.presentation.LocalToolUiPhase.FAILED
-    val unsettled = phase == com.labteto.dshmobile.local.presentation.LocalToolUiPhase.OUTCOME_UNKNOWN
-    val cancelled = phase == com.labteto.dshmobile.local.presentation.LocalToolUiPhase.CANCELLED
-    val provider = userFacingWorkToolProvider(message.toolName)
-    val kind = com.labteto.dshmobile.ui.agentOperationKind(message.toolName)
-    val action = userFacingWorkToolAction(message.toolName) ?:
-        stringResource(userFacingWorkToolActionRes(message.toolName) ?: agentOperationLabelRes(kind))
-    val label = if (provider != null) "$provider · $action" else action
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-    ) {
-        Icon(
-            imageVector = when {
-                failed || unsettled -> FeatherIcons.AlertTriangle
-                cancelled -> FeatherIcons.Clock
-                provider == "GitHub" -> FeatherIcons.GitBranch
-                provider == "Figma" -> FeatherIcons.Palette
-                else -> FeatherIcons.CheckCircle
-            },
-            contentDescription = null,
-            tint = if (failed) colors.dangerInk else if (unsettled) colors.primary else colors.textSecondary,
-            modifier = Modifier.size(18.dp),
-        )
-        Text(
-            text = label, modifier = Modifier.weight(1f),
-            style = DsType.small13.withReadingWeight(),
-            color = if (failed) colors.dangerInk else colors.textSecondary,
-        )
-        Text(
-            text = when (phase) {
-                com.labteto.dshmobile.local.presentation.LocalToolUiPhase.FAILED ->
-                    stringResource(agentOperationStatusRes(running = false, failed = true))
-                com.labteto.dshmobile.local.presentation.LocalToolUiPhase.OUTCOME_UNKNOWN -> "结果待确认"
-                com.labteto.dshmobile.local.presentation.LocalToolUiPhase.CANCELLED -> "已取消"
-                else -> stringResource(agentOperationStatusRes(running = false, failed = false))
-            },
-            style = DsType.caption11.withReadingWeight(),
-            color = if (failed) colors.dangerInk else if (unsettled) colors.primary else colors.textTertiary,
-        )
+    val action = workToolActionLabel(message.toolName)
+    var detailsOpen by remember(message.id) { mutableStateOf(false) }
+    val hasDetails = message.content.isNotBlank()
+    WorkToolStatusRow(message.toolName, phase,
+        modifier = Modifier.testTag(message.toolCallId?.let { "work-tool:$it" } ?: "work-tool:${message.id}"),
+        onClick = if (hasDetails) ({ detailsOpen = true }) else null)
+    if (detailsOpen) {
+        SyResponsiveSheet(title = "工具回执 · $action", onDismiss = { detailsOpen = false },
+            scrollable = true, seamlessBackground = false,
+            trailing = {
+                SyButton("关闭", onClick = { detailsOpen = false }, size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Ghost)
+            }) {
+            Text(workToolPhaseText(phase), style = DsType.std14Strong.withReadingWeight())
+            message.toolErrorCode?.let { Text(it, style = DsType.small13.withReadingWeight()) }
+            SelectionContainer {
+                Text(message.content, style = DsType.std14.withReadingWeight(),
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+            }
+        }
     }
 }
 
-/** Status facts come from structured tool outcome, never content matching for new records. */
 internal fun completedWorkToolPhase(
     message: com.labteto.dshmobile.local.session.LocalHarnessMessage,
-): com.labteto.dshmobile.local.presentation.LocalToolUiPhase {
-    val code = message.toolErrorCode.orEmpty()
-    return when {
-        code == "TOOL_OUTCOME_UNKNOWN" ->
-            com.labteto.dshmobile.local.presentation.LocalToolUiPhase.OUTCOME_UNKNOWN
-        code.contains("CANCEL", ignoreCase = true) ->
-            com.labteto.dshmobile.local.presentation.LocalToolUiPhase.CANCELLED
-        message.toolIsError ?: localWorkToolFailed(message.content) ->
-            com.labteto.dshmobile.local.presentation.LocalToolUiPhase.FAILED
-        else -> com.labteto.dshmobile.local.presentation.LocalToolUiPhase.COMPLETED
-    }
+): LocalToolUiPhase = when {
+    message.toolErrorCode == "TOOL_OUTCOME_UNKNOWN" -> LocalToolUiPhase.OUTCOME_UNKNOWN
+    message.toolErrorCode?.contains("CANCEL", ignoreCase = true) == true ||
+        message.toolErrorCode == "TOOL_NOT_STARTED" -> LocalToolUiPhase.CANCELLED
+    message.toolIsError ?: localWorkToolFailed(message.content) -> LocalToolUiPhase.FAILED
+    else -> LocalToolUiPhase.COMPLETED
 }
 
-/** An in-flight call reads its status from the Tool-owned event projection. */
 @Composable
-internal fun WorkPendingToolRow(
-    activity: com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem,
+private fun workToolActionLabel(name: String?): String =
+    userFacingWorkToolAction(name) ?: stringResource(userFacingWorkToolActionRes(name)
+        ?: agentOperationLabelRes(com.labteto.dshmobile.ui.agentOperationKind(name)))
+
+internal fun workToolPhaseText(phase: LocalToolUiPhase): String = when (phase) {
+    LocalToolUiPhase.DECLARED -> "等待执行"
+    LocalToolUiPhase.RUNNING -> "执行中"
+    LocalToolUiPhase.COMPLETED -> "已返回"
+    LocalToolUiPhase.FAILED -> "失败"
+    LocalToolUiPhase.CANCELLED -> "已中断"
+    LocalToolUiPhase.OUTCOME_UNKNOWN -> "结果待确认"
+}
+
+/** Labels and status can wrap independently; narrow screens never squeeze the action column. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun WorkToolStatusRow(
+    name: String?,
+    phase: LocalToolUiPhase,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val provider = userFacingWorkToolProvider(activity.name)
-    val kind = com.labteto.dshmobile.ui.agentOperationKind(activity.name)
-    val action = userFacingWorkToolAction(activity.name) ?:
-        stringResource(userFacingWorkToolActionRes(activity.name) ?: agentOperationLabelRes(kind))
-    val label = if (provider != null) "$provider · $action" else action
-    val status = when (activity.phase) {
-        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.DECLARED -> "等待执行"
-        com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING -> "执行中"
-        else -> return
+    val provider = userFacingWorkToolProvider(name)
+    val action = workToolActionLabel(name)
+    val label = if (provider == null) action else "$provider · $action"
+    val status = workToolPhaseText(phase)
+    val tint = when (phase) {
+        LocalToolUiPhase.FAILED -> colors.dangerInk
+        LocalToolUiPhase.OUTCOME_UNKNOWN -> colors.warningInk
+        LocalToolUiPhase.RUNNING, LocalToolUiPhase.DECLARED -> colors.successInk
+        else -> colors.textSecondary
     }
+    val clickable = if (onClick != null) Modifier.clickable(role = Role.Button,
+        onClickLabel = "查看工具回执", onClick = onClick) else Modifier
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
+        modifier = modifier.fillMaxWidth().then(clickable)
+            .heightIn(min = if (onClick == null) 36.dp else 48.dp)
+            .padding(vertical = SyMetric.gapXs)
+            .semantics(mergeDescendants = true) { stateDescription = status },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
-        Icon(
-            imageVector = when (provider) {
-                "GitHub" -> FeatherIcons.GitBranch
-                "Figma" -> FeatherIcons.Palette
-                else -> FeatherIcons.Clock
-            },
-            contentDescription = null,
-            tint = colors.primary,
-            modifier = Modifier.size(18.dp),
-        )
-        Text(
-            text = label,
-            modifier = Modifier.weight(1f),
-            style = DsType.small13.withReadingWeight(),
-            color = colors.textSecondary,
-        )
-        Text(
-            text = status,
-            style = DsType.caption11.withReadingWeight(),
-            color = colors.primary,
-        )
+        Icon(imageVector = when {
+            phase == LocalToolUiPhase.FAILED || phase == LocalToolUiPhase.OUTCOME_UNKNOWN -> FeatherIcons.AlertTriangle
+            phase == LocalToolUiPhase.RUNNING || phase == LocalToolUiPhase.DECLARED || phase == LocalToolUiPhase.CANCELLED -> FeatherIcons.Clock
+            provider == "GitHub" -> FeatherIcons.GitBranch
+            provider == "Figma" -> FeatherIcons.Palette
+            else -> when (com.labteto.dshmobile.ui.agentOperationKind(name)) {
+                com.labteto.dshmobile.ui.AgentOperationKind.Search -> FeatherIcons.Search
+                com.labteto.dshmobile.ui.AgentOperationKind.Update -> FeatherIcons.Edit3
+                com.labteto.dshmobile.ui.AgentOperationKind.Execute -> FeatherIcons.Code
+                else -> FeatherIcons.FileText
+            }
+        }, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        FlowRow(modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
+            Text(label, style = DsType.std14.withReadingWeight(),
+                color = if (phase == LocalToolUiPhase.FAILED) tint else colors.textSecondary)
+            if (phase != LocalToolUiPhase.COMPLETED) {
+                Text(status, style = DsType.small13.withReadingWeight(), color = tint)
+            }
+        }
     }
 }
 
-/** Explicit narrated findings are foregrounded; prose alone never proves a tool succeeded. */
-internal fun isWorkTimelineMilestone(text: String): Boolean =
-    WORK_TIMELINE_MILESTONE.containsMatchIn(text.trimStart())
+@Composable
+internal fun WorkPendingToolRow(activity: com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem) {
+    if (activity.phase !in setOf(LocalToolUiPhase.DECLARED, LocalToolUiPhase.RUNNING)) return
+    WorkToolStatusRow(activity.name, activity.phase)
+}
 
-private val WORK_TIMELINE_MILESTONE = Regex(
-    "^(?:发现|已发现|已定位|定位到|确认|已确认|已完成|完成了|结果|验证通过|验证失败|阻塞|失败|风险|问题是|存在.+问题)"
-)
+@Composable
+internal fun WorkToolStatusNotice(onRetry: () -> Unit) {
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    Column(Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd)) {
+        Text("工具状态暂时无法更新，已保存的回复仍可查看", style = DsType.std14.withReadingWeight(),
+            color = colors.warningInk)
+        SyButton("重试状态读取", onClick = onRetry, size = SyButtonSize.Small,
+            variant = SyButtonVariant.Ghost)
+    }
+}

@@ -12,6 +12,13 @@ class LocalWorkReplyPresentationTest {
         LocalHarnessMessage(id = id, role = role, content = content,
             toolName = toolName, createdAt = id.length.toLong(), toolIsError = error)
 
+    @Test fun builtInToolActionsDescribeTheActualCapability() {
+        assertEquals("读取文件", userFacingWorkToolAction("read"))
+        assertEquals("搜索文件内容", userFacingWorkToolAction("grep"))
+        assertEquals("执行命令", userFacingWorkToolAction("bash"))
+        assertEquals("修改文件", userFacingWorkToolAction("edit"))
+    }
+
     @Test fun sameMillisecondPendingCallStaysBeforeLaterCompletedCall() {
         val user = LocalTranscriptItem.Message(message("u", "user", "检查").copy(createdAt = 100L))
         val completed = LocalTranscriptItem.WorkStep(message("r", "tool", "ok", "read", false)

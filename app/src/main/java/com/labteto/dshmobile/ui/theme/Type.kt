@@ -48,6 +48,7 @@ object DsType {
     val mdH3 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 28.sp)
     val mdH4 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 26.sp)
     val mdBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 23.sp)
+    val workBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 25.sp)
     val mdSmall = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 23.sp)
     val mdCode = TextStyle(fontFamily = codeFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 22.sp)
 

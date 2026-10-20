@@ -518,7 +518,7 @@ private fun LocalAssistantMessageContent(
                     SelectionContainer {
                         MarkdownText(
                             body,
-                            bodyStyle = if (chatMode) DsType.chatBody else DsType.mdBody,
+                            bodyStyle = if (chatMode) DsType.chatBody else DsType.workBody,
                             preserveSoftLineBreaks = chatMode,
                         )
                     }

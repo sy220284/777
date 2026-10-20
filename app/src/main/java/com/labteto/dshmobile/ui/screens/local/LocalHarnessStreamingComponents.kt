@@ -146,7 +146,7 @@ internal fun LocalStreamingWorkPreview(
         }
         if (visiblePreview) {
             SelectionContainer {
-                MarkdownText(text = text, bodyStyle = DsType.mdBody)
+                MarkdownText(text = text, bodyStyle = DsType.workBody)
             }
         }
     }
