@@ -407,7 +407,7 @@ private fun readLocalRuntimeMemoryProfile(context: Context): LocalRuntimeMemoryP
     )
 
 /** Android reports both Java heap class and system-wide RAM; never treat them as interchangeable. */
-private fun readLocalDeviceMemorySnapshot(context: Context): LocalDeviceMemorySnapshot {
+internal fun readLocalDeviceMemorySnapshot(context: Context): LocalDeviceMemorySnapshot {
     val manager = context.getSystemService(ActivityManager::class.java)
         ?: return LocalDeviceMemorySnapshot()
     return runCatching {
