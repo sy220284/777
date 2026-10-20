@@ -198,11 +198,15 @@ internal fun LocalGeneratedMediaResultRow(
             LocalMediaKind.SPEECH.name -> {
                 if (file != null) {
                     InlineSpeechPlayer(file)
-                    Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                        MediaSaveButton(file, "audio/mpeg")
-                        SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Ghost,
-                            onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
+                    if (inline) {
+                        InlineReplyMediaActions(file, "audio/mpeg") { error = it }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                            MediaSaveButton(file, "audio/mpeg")
+                            SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Ghost,
+                                onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
+                        }
                     }
                 } else Text(resources.getString(R.string.media_chat_audio_missing), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
@@ -313,10 +317,14 @@ internal fun LocalGeneratedVideoTaskRow(
                     onClick = { showingPlayer = false },
                 )
                 if (localVideo != null) {
-                    MediaSaveButton(localVideo, "video/mp4")
-                    SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
-                        variant = SyButtonVariant.Ghost,
-                        onClick = { shareMediaFile(context, localVideo, "video/mp4") { error = it } })
+                    if (inline) {
+                        InlineReplyMediaActions(localVideo, "video/mp4") { error = it }
+                    } else {
+                        MediaSaveButton(localVideo, "video/mp4")
+                        SyButton(text = resources.getString(R.string.media_action_share), size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
+                            onClick = { shareMediaFile(context, localVideo, "video/mp4") { error = it } })
+                    }
                 } else {
                     // A local-only video has no remote open action; keep the nullable URL guarded.
                     task.downloadUrl?.takeIf(String::isNotBlank)?.let { remoteUrl ->
@@ -439,6 +447,42 @@ private fun MediaSaveButton(file: File, mime: String) {
         SyButton(text = resources.getString(R.string.media_action_save), size = SyButtonSize.Small,
             onClick = { status = null; save() })
         status?.let { Text(it, style = DsType.caption11.withReadingWeight()) }
+    }
+}
+
+/**
+ * Contextual save/share actions for media owned by a reply. Standalone media archive rows
+ * retain their old visible controls. No new file or task ownership is introduced here.
+ */
+@Composable
+internal fun InlineReplyMediaActions(file: File, mime: String, onError: (String) -> Unit) {
+    val resources = LocalResources.current
+    val context = LocalContext.current
+    var open by remember(file.absolutePath) { mutableStateOf(false) }
+    val save = rememberMediaSaveAction(file, mime) { success ->
+        Toast.makeText(context,
+            resources.getString(if (success) R.string.media_action_saved else R.string.media_action_save_failed),
+            Toast.LENGTH_SHORT).show()
+    }
+    Box {
+        IconButton(onClick = { open = true },
+            modifier = Modifier.testTag("inlineMediaActions")) {
+            Icon(FeatherIcons.MoreVertical,
+                contentDescription = resources.getString(R.string.fluid_message_actions),
+                tint = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+        }
+        SyPopupMenu(
+            expanded = open,
+            onDismiss = { open = false },
+            items = listOf(
+                SyMenuItem(text = resources.getString(R.string.media_action_save),
+                    icon = FeatherIcons.Download,
+                    onClick = { open = false; save() }),
+                SyMenuItem(text = resources.getString(R.string.media_action_share),
+                    icon = FeatherIcons.ArrowUp,
+                    onClick = { open = false; shareMediaFile(context, file, mime, onError) }),
+            ),
+        )
     }
 }
 
