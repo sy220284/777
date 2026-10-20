@@ -9,8 +9,8 @@ package com.labteto.dshmobile.local.model
  */
 internal data class LocalModelBudgetPolicy(
     val historyCharScale: Double = 1.0,
-    val workRequestsPerSlice: Int = 64,
-    val pendingWorkTokens: Long = 256_000L,
+    val workRequestsPerSlice: Int = 128,
+    val pendingWorkTokens: Long = 512_000L,
     val workProjectionTargetPermille: Int? = null,
     val workProjectionTriggerPermille: Int? = null,
 )
