@@ -183,6 +183,24 @@ class LocalWorkReplyPresentationTest {
         assertEquals(items.map { it.key }, beforeFinish.map { it.key })
     }
 
+    @Test fun mediaTimelineKeepsCompletedToolAtDeclarationPosition() {
+        val user = message("u", "user", "开始检查").copy(createdAt = 100L)
+        val progress = message("p", "progress", "继续核查").copy(createdAt = 140L)
+        val completed = message("t", "tool", "完成", "mcp__GitHub__fetch_file", false)
+            .copy(createdAt = 170L, toolCallId = "read-1", toolDeclaredAt = 120L)
+        val transcript = buildLocalDisplayTranscript(
+            buildLocalTranscript(listOf(user, progress, completed)))
+        val media = com.labteto.dshmobile.local.model.LocalMediaResult(
+            id = "image-1", model = "test", provider = "OPENAI", kind = "IMAGE",
+            createdAtMillis = 150L, textOutput = "结果", sessionId = "session",
+        )
+        val combined = mergeLocalMediaTimeline(
+            transcript, "session", listOf(media), emptyList())
+        assertEquals(
+            listOf("message:u", "work-tool:read-1", "work-step:p", "media-result:image-1"),
+            combined.map { it.key })
+    }
+
     @Test fun concurrentCallsWithSameTimestampKeepDeclarationOrderAfterReverseCompletion() {
         val user = message("u", "user", "审计").copy(createdAt = 100L)
         val progress = message("n", "progress", "继续检查").copy(createdAt = 160L)
