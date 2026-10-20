@@ -604,6 +604,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 contentAlreadyBounded = true,
                                 toolIsError = event.isError,
                                 toolErrorCode = event.errorCode,
+                                toolCallId = event.call.id,
                             )
                             val artifactVersion = if (!event.isError) localWorkArtifactFileVersion(
                                 java.io.File(sessionStorage.files.workspace.path), event.call.name, event.output,
