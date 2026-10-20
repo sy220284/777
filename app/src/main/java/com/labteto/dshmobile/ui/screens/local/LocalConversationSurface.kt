@@ -535,7 +535,19 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             }
         }
     }
-    val transcriptItems = remember(transcriptMessages, state.usageMode, state.sessionId, generatedMedia, videoMediaTasks, pendingMediaJobs, workArtifacts) {
+    // Reuse the existing Tool-owned event projection. Document updates publish the
+    // start event, while transcript changes publish the completed tool result.
+    var workToolActivities by remember(state.sessionId) {
+        mutableStateOf<List<com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem>>(emptyList())
+    }
+    LaunchedEffect(state.sessionId, state.usageMode, workActions, nativeDocumentSnapshot,
+        state.messages.size, state.running) {
+        workToolActivities = if (state.usageMode == LocalUsageMode.WORK && workActions != null) {
+            withContext(Dispatchers.IO) { workActions.toolActivities(state.sessionId) }
+        } else emptyList()
+    }
+    val transcriptItems = remember(transcriptMessages, state.usageMode, state.sessionId,
+        generatedMedia, videoMediaTasks, pendingMediaJobs, workArtifacts, workToolActivities, state.running) {
         val mediaTimeline = mergeLocalMediaTimeline(
             buildLocalDisplayTranscript(buildLocalTranscript(
                 transcriptMessages,
@@ -546,8 +558,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             videoMediaTasks,
             pendingMediaJobs,
         )
-        if (state.usageMode == LocalUsageMode.WORK) appendWorkArtifactsToTranscript(mediaTimeline, workArtifacts)
-        else mediaTimeline
+        if (state.usageMode == LocalUsageMode.WORK) appendPendingWorkToolActivities(
+            appendWorkArtifactsToTranscript(mediaTimeline, workArtifacts), workToolActivities, state.running,
+        ) else mediaTimeline
     }
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
@@ -1220,6 +1233,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     transcriptItem.key == transcriptItems.lastOrNull()?.key,
                             )
                         }
+                        is LocalTranscriptItem.WorkPendingTool -> Box(
+                            modifier = Modifier.fillMaxWidth().animateItem(),
+                        ) {
+                            WorkPendingToolRow(transcriptItem.activity)
+                        }
                         is LocalTranscriptItem.WorkStep -> Box(
                             modifier = Modifier.fillMaxWidth().animateItem(
                                 fadeInSpec = tween(durationMillis = com.shenyan.designsystem.foundation.SyMotion.duration(
@@ -1258,6 +1276,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 sessionId = state.sessionId,
                                 streamingState = streamingState,
                                 hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkStep ||
+                                    transcriptItems.lastOrNull() is LocalTranscriptItem.WorkPendingTool ||
                                     transcriptItems.lastOrNull() is LocalTranscriptItem.WorkNode ||
                                     transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
                                 lastDurableNarrative = latestDurableWorkNarrativeInCurrentTurn(transcriptMessages),
