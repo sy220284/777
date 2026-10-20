@@ -12,20 +12,22 @@ private val visualSceneCue = Regex(
 )
 
 private fun visualSceneFromReply(message: String): String {
-    // Prefer scene directions, while excluding explanatory parentheses such as
-    // model names, file paths and other text that has no visual content.
-    val stage = Regex("（([^）]+)）|\\(([^)]+)\\)").findAll(message)
+    // Parenthesized stage directions can be genuine actions or just notes
+    // about software. Keep only drawable actions, without enclosing dialogue.
+    val parentheses = Regex("（([^）]+)）|\\(([^)]+)\\)")
+    val stage = parentheses.findAll(message)
         .map { it.value.drop(1).dropLast(1).trim() }
         .filter { visualSceneCue.containsMatchIn(it) }
         .take(8).joinToString("；")
-    if (stage.isNotBlank()) return stage.take(600)
 
-    // Narrative prose can describe a scene without brackets. Select the visual
-    // clauses instead of the opening 200 characters of an arbitrary reply.
-    return message.split(Regex("[。！？\\n]")).asSequence()
+    // Extract visual narrative separately. Otherwise an inline action in
+    // parentheses can pull all of the surrounding chatbot explanation back in.
+    val narrative = message.replace(parentheses, "")
+        .split(Regex("[。！？\\n]")).asSequence()
         .map { it.trim().trimStart('•', '-', '*').trim() }
         .filter { it.length in 4..200 && visualSceneCue.containsMatchIn(it) }
-        .take(4).joinToString("；").take(600)
+        .take(4).joinToString("；")
+    return listOf(narrative, stage).filter(String::isNotBlank).joinToString("；").take(600)
 }
 
 /** A user-editable draft, not a second model request or automatically paid task. */
@@ -39,7 +41,7 @@ internal fun mediaCreativeDraft(
     val character = personaName.trim().take(60).takeUnless { it.isBlank() || it == "默认角色" }
     // A biography or capability description must not masquerade as a visible
     // character design. Keep explicitly visual appearance details only.
-    val appearance = personaIdentity.trim().take(500).takeIf { visualSceneCue.containsMatchIn(it) }
+    val appearance = visualSceneFromReply(personaIdentity.trim().take(500)).takeIf(String::isNotBlank)
     return when (kind) {
         LocalMediaKind.IMAGE, LocalMediaKind.VIDEO -> {
             val scene = visualSceneFromReply(message)
