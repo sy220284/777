@@ -92,11 +92,7 @@ class LocalModelRuntime @Inject constructor(
                 try {
                     check(gateway.hasCredential(selected)) { "所选模型凭据不可用，请检查模型账户" }
                     sessionStorage.eventLogs.get(originSessionId).recordLocalModelSelection(id)
-                    runtimeStateStore.projection.update { current ->
-                        if (current.sessionId == originSessionId && !current.loading) {
-                            current.copy(modelState = current.modelState.forSessionModel(selected), error = null)
-                        } else current
-                    }
+                    state.selectForSession(originSessionId, selected)
                     // Compatibility for foreground features that query the active credential.
                     // Each model request still freezes its own explicit route.
                     if (runtimeStateStore.currentSessionId == originSessionId &&
