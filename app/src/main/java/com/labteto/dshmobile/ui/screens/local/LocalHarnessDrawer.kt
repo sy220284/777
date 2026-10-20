@@ -474,8 +474,7 @@ internal fun LocalModeDrawer(
                             count = sessionSections.pinned.size,
                         )
                     }
-                    itemsIndexed(sessionSections.pinned, key = { _, item -> "pinned:" + item.id }) { index, session ->
-                        com.shenyan.designsystem.components.SyEntranceCascade(drawerOpen || docked, index) {
+                    itemsIndexed(sessionSections.pinned, key = { _, item -> "pinned:" + item.id }) { _, session ->
                         LocalSessionDrawerRow(
                             session = session,
                             displayTitle = sessionTitleOverrides[session.id] ?: session.title,
@@ -505,7 +504,6 @@ internal fun LocalModeDrawer(
                                     R.string.usage_mode_chat else R.string.usage_mode_work,
                             ) else null,
                         )
-                        }
                     }
                 }
 
@@ -516,8 +514,7 @@ internal fun LocalModeDrawer(
                             count = sessionSections.recent.size,
                         )
                     }
-                    itemsIndexed(sessionSections.recent, key = { _, item -> "recent:" + item.id }) { index, session ->
-                        com.shenyan.designsystem.components.SyEntranceCascade(drawerOpen || docked, index + sessionSections.pinned.size) {
+                    itemsIndexed(sessionSections.recent, key = { _, item -> "recent:" + item.id }) { _, session ->
                         LocalSessionDrawerRow(
                             session = session,
                             displayTitle = sessionTitleOverrides[session.id] ?: session.title,
@@ -547,7 +544,6 @@ internal fun LocalModeDrawer(
                                     R.string.usage_mode_chat else R.string.usage_mode_work,
                             ) else null,
                         )
-                        }
                     }
                 }
 
