@@ -46,6 +46,7 @@ import kotlinx.serialization.json.Json
 @Singleton
 class LocalRuntimeStateStore internal constructor(
     internal val memoryClassMb: Int = 256,
+    internal val deviceMemory: LocalDeviceMemorySnapshot = LocalDeviceMemorySnapshot(),
     private val jobOwner: LocalRuntimeJobOwner = LocalRuntimeJobOwner.inMemory(),
 ) {
     @Inject
@@ -55,6 +56,7 @@ class LocalRuntimeStateStore internal constructor(
         approvals: LocalApprovalPreferences,
     ) : this(
         memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256,
+        deviceMemory = readLocalDeviceMemorySnapshot(context),
         jobOwner = LocalRuntimeJobOwner.persistent(context, json),
     ) { bindApprovalPreferences(approvals) }
     private val mutable = MutableStateFlow(LocalHarnessState())
@@ -77,7 +79,7 @@ class LocalRuntimeStateStore internal constructor(
     private val resourceObservers = CopyOnWriteArrayList<(HarnessResourceSnapshot) -> Unit>()
 
     internal val imageCapabilities = LocalImageCapabilityRegistry()
-    internal val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb)
+    internal val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb, deviceMemory)
     internal val resourceScheduler = HarnessResourceScheduler(
         budget = resourceBudget,
         onChanged = ::publishResourceSnapshot,
@@ -365,4 +367,20 @@ class LocalRuntimeStateStore internal constructor(
             contextBudgetChars = contextBudgetCharsFor(state, snapshot),
         ),
     )
+}
+
+/** Android reports both Java heap class and system-wide RAM; never treat them as interchangeable. */
+private fun readLocalDeviceMemorySnapshot(context: Context): LocalDeviceMemorySnapshot {
+    val manager = context.getSystemService(ActivityManager::class.java)
+        ?: return LocalDeviceMemorySnapshot()
+    return runCatching {
+        val info = ActivityManager.MemoryInfo()
+        manager.getMemoryInfo(info)
+        LocalDeviceMemorySnapshot(
+            totalRamMb = (info.totalMem / (1024L * 1024L)).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            availableRamMb = (info.availMem / (1024L * 1024L)).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            lowMemory = info.lowMemory,
+            lowRamDevice = manager.isLowRamDevice,
+        )
+    }.getOrDefault(LocalDeviceMemorySnapshot())
 }
