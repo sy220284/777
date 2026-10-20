@@ -78,8 +78,8 @@ class LocalEffectiveModelContractTest {
             LocalModelProfile("ds", "deepseek-flash", "https://api.deepseek.com"),
         )
         assertEquals(256, miniMax.executionBudget.workRequestsPerSlice)
-        assertEquals(64, proxy.executionBudget.workRequestsPerSlice)
-        assertEquals(64, deepSeek.executionBudget.workRequestsPerSlice)
+        assertEquals(128, proxy.executionBudget.workRequestsPerSlice)
+        assertEquals(128, deepSeek.executionBudget.workRequestsPerSlice)
         assertTrue(miniMax.operationalInputLimitTokens > proxy.operationalInputLimitTokens)
         assertEquals(LocalPromptCacheMode.NONE, proxy.cache.mode)
         assertEquals(LocalPromptCacheMode.PREFIX_AUTO, deepSeek.cache.mode)
@@ -123,7 +123,7 @@ class LocalEffectiveModelContractTest {
         assertNull(unknown.documentedContextWindowTokens)
         assertEquals(192_000, unknown.operationalInputLimitTokens)
         assertNull(unknown.temperature)
-        assertEquals(64, unknown.executionBudget.workRequestsPerSlice)
+        assertEquals(128, unknown.executionBudget.workRequestsPerSlice)
     }
 
     @Test

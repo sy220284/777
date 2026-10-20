@@ -78,11 +78,9 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val imageCapabilities
         get() = runtimeStateStore.imageCapabilities
-    private val imageRequestBudget by lazy {
-        localImageRequestBudgetForModelConcurrency(
-            runtimeStateStore.resourceBudget.maxModelRequests,
+    private val imageRequestBudget get() = localImageRequestBudgetForModelConcurrency(
+            runtimeStateStore.resourceScheduler.snapshot().budget.maxModelRequests,
         )
-    }
 
     internal fun start(
         input: String,

@@ -3,7 +3,8 @@ package com.labteto.dshmobile.harness.resource
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 
 enum class HarnessResourceKind {
     MODEL_REQUEST,
@@ -98,12 +99,20 @@ class HarnessResourceLease internal constructor(
  * and language servers hold a [HarnessResourceLease] until the underlying resource is closed.
  */
 class HarnessResourceScheduler(
-    val budget: HarnessResourceBudget,
+    budget: HarnessResourceBudget,
+    private val beforeAcquire: suspend () -> Unit = { },
     private val onChanged: (HarnessResourceSnapshot) -> Unit = { },
 ) {
-    private val semaphores = HarnessResourceKind.values().associateWith { kind ->
-        Semaphore(budget.limit(kind))
-    }
+    // Admission and capacity changes share one lock: shrinking never revokes an active lease.
+    /** Immutable startup ceiling for consumers deriving pressure from runtime reductions. */
+    val startupBudget: HarnessResourceBudget = budget
+    private var currentBudget = budget
+    val budget: HarnessResourceBudget get() = synchronized(leaseStateLock) { currentBudget }
+    private val capacityRevision = MutableStateFlow(0L)
+    // FIFO tickets retain the fairness of the old semaphore when capacity changes.
+    private val admissionQueues = HarnessResourceKind.values()
+        .associateWith { java.util.ArrayDeque<Long>() }
+    private var nextTicket = 0L
     private val activeModels = AtomicInteger()
     private val activeAgents = AtomicInteger()
     private val activeTerminals = AtomicInteger()
@@ -115,30 +124,74 @@ class HarnessResourceScheduler(
     private val publicationLock = Any()
     private val leases = linkedMapOf<String, HarnessResourceLeaseInfo>()
 
+    /**
+     * Recalculate capacity without replacing the scheduler or cancelling in-flight work.
+     * Existing leases may temporarily exceed the new ceiling; admissions resume on release.
+     */
+    fun updateBudget(next: HarnessResourceBudget) {
+        val changed = synchronized(leaseStateLock) {
+            if (currentBudget == next) false else {
+                currentBudget = next
+                capacityRevision.value += 1
+                true
+            }
+        }
+        if (changed) publish()
+    }
+
     suspend fun acquire(
         kind: HarnessResourceKind,
         owner: String = kind.name.lowercase(),
     ): HarnessResourceLease {
-        val semaphore = semaphores.getValue(kind)
-        semaphore.acquire()
-        val info = HarnessResourceLeaseInfo(
-            id = "lease-" + UUID.randomUUID().toString().replace("-", "").take(16),
-            kind = kind,
-            owner = owner.take(160),
-            acquiredAt = System.currentTimeMillis(),
-        )
-        synchronized(leaseStateLock) {
-            increment(kind)
-            leases[info.id] = info
+        // Refresh the device budget at the admission boundary, not on a polling timer.
+        beforeAcquire()
+        val ticket = synchronized(leaseStateLock) {
+            val id = ++nextTicket
+            admissionQueues.getValue(kind).addLast(id)
+            id
         }
-        publish()
-        return HarnessResourceLease(info) {
-            synchronized(leaseStateLock) {
-                leases.remove(info.id)
-                decrement(kind)
+        try {
+            while (true) {
+                var admitted: HarnessResourceLeaseInfo? = null
+                val observedRevision = synchronized(leaseStateLock) {
+                    val queue = admissionQueues.getValue(kind)
+                    if (queue.peekFirst() == ticket &&
+                        counter(kind).get() < currentBudget.limit(kind)) {
+                        queue.removeFirst()
+                        admitted = HarnessResourceLeaseInfo(
+                            id = "lease-" + UUID.randomUUID().toString().replace("-", "").take(16),
+                            kind = kind,
+                            owner = owner.take(160),
+                            acquiredAt = System.currentTimeMillis(),
+                        )
+                        increment(kind)
+                        leases[admitted!!.id] = admitted!!
+                        // The next FIFO waiter may also fit the enlarged capacity.
+                        capacityRevision.value += 1
+                    }
+                    capacityRevision.value
+                }
+                val info = admitted
+                if (info != null) {
+                    publish()
+                    return HarnessResourceLease(info) {
+                        synchronized(leaseStateLock) {
+                            leases.remove(info.id)
+                            decrement(kind)
+                            capacityRevision.value += 1
+                        }
+                        publish()
+                    }
+                }
+                // StateFlow retains the latest revision: no release/update wake-up can be lost.
+                capacityRevision.first { it != observedRevision }
             }
-            semaphore.release()
-            publish()
+        } finally {
+            synchronized(leaseStateLock) {
+                if (admissionQueues.getValue(kind).remove(ticket)) {
+                    capacityRevision.value += 1
+                }
+            }
         }
     }
 
@@ -161,7 +214,7 @@ class HarnessResourceScheduler(
         activeTerminals = activeTerminals.get(),
         activeVirtualDisplays = activeVirtualDisplays.get(),
         activeLanguageServers = activeLanguageServers.get(),
-        budget = budget,
+        budget = currentBudget,
         leases = leases.values.sortedBy(HarnessResourceLeaseInfo::acquiredAt),
     ) }
 

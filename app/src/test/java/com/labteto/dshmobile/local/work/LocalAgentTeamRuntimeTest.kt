@@ -1323,7 +1323,7 @@ class LocalAgentTeamRuntimeTest {
             eventLog = fixture.log,
         )
 
-        repeat(16) { index ->
+        repeat(LocalAgentTeamContract.MAX_TEAMMATES) { index ->
             requireNotNull(
                 fixture.runtime.execute(
                     LocalToolCall(
@@ -1384,7 +1384,7 @@ class LocalAgentTeamRuntimeTest {
 
         assertTrue(replacement.contains("已创建"))
         assertEquals(
-            16,
+            LocalAgentTeamContract.MAX_TEAMMATES,
             fixture.runtime.project(sessionId).members.count {
                 it.phase != LocalTeamMemberPhase.DISMISSED
             },

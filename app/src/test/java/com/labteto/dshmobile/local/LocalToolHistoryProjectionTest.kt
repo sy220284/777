@@ -40,6 +40,32 @@ class LocalToolHistoryProjectionTest {
         assertEquals(history.last(), projected.messages.last())
     }
     @Test
+    fun eightKiBRecentWorkOutputSurvivesButOlderCopyShrinks() {
+        val freshContent = "v".repeat(7_500)
+        val history = listOf(
+            buildJsonObject { put("role", "tool"); put("tool_call_id", "older"); put("content", freshContent) },
+            buildJsonObject { put("role", "tool"); put("tool_call_id", "latest"); put("content", freshContent) },
+        )
+        val budget = LocalHistoryBudget(
+            maxHistoryChars = 900_000,
+            tailChars = 400_000,
+            maxSummaryChars = 24_000,
+            maxToolResultChars = 8_192,
+            maxHistoryTokens = 192_000,
+            tailTokens = 48_000,
+        )
+        val projected = projectStaleToolResults(
+            history = history,
+            budget = budget,
+            keepRecentToolResults = 1,
+            protectedRecentMaxBytes = WORK_TOOL_INLINE_BYTES,
+        )
+        assertNotNull(projected)
+        assertEquals(history.last(), projected!!.messages.last())
+        assertTrue(projected.messages.first()["content"]!!.jsonPrimitive.content.contains("tool_output_read"))
+    }
+
+    @Test
     fun recentProtectionOnlyKeepsAlreadyBoundedToolResultsVerbatim() {
         val history = buildList {
             add(buildJsonObject { put("role", "system"); put("content", "rules") })

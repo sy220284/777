@@ -16,8 +16,8 @@ internal data class LocalAgentRuntimeRollbackSnapshot(
 internal object LocalAgentRuntimeSettings {
     const val KEY_MAIN_MAX_STEPS = "main_max_steps"
     const val KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
-    const val DEFAULT_MAIN_MAX_STEPS = 128
-    const val DEFAULT_SUBAGENT_MAX_STEPS = 128
+    const val DEFAULT_MAIN_MAX_STEPS = 512
+    const val DEFAULT_SUBAGENT_MAX_STEPS = 512
 
     fun read(preferences: SharedPreferences): LocalAgentRuntimeSettingsSnapshot =
         LocalAgentRuntimeSettingsSnapshot(

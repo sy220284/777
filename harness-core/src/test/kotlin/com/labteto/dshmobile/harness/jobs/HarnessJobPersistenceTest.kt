@@ -232,6 +232,39 @@ class HarnessJobPersistenceTest {
     }
 
     @Test
+    fun liveDeviceCapacityChangesOnlyGateNewJobsAndRestoreAdmission() = runTest {
+        val manager = HarnessJobManager(
+            scope = backgroundScope,
+            onChanged = {},
+            maxConcurrentJobs = 3,
+            maxRetainedJobs = 8,
+        )
+        val first = manager.start("already-running-a") { _, _ -> awaitCancellation() }
+        val second = manager.start("already-running-b") { _, _ -> awaitCancellation() }
+        assertTrue(first.contains("已"))
+        assertTrue(second.contains("已"))
+        runCurrent()
+        assertEquals(1, manager.availableSlots())
+
+        // Thermal or memory pressure lowers new admissions, never terminates existing jobs.
+        manager.updateConcurrentLimit(1)
+        assertEquals(0, manager.availableSlots())
+        assertTrue(manager.start("blocked") { _, _ -> "should-not-run" }.contains("并发已满"))
+        assertEquals(2, manager.snapshots().count { it.status == "running" })
+
+        // Restoring device capacity admits pending work again without recreating the owner.
+        manager.updateConcurrentLimit(3)
+        assertEquals(1, manager.availableSlots())
+        val third = manager.start("admitted-after-recovery") { _, _ -> awaitCancellation() }
+        assertTrue(third.contains("已"))
+        runCurrent()
+        assertEquals(3, manager.snapshots().count { it.status == "running" })
+        assertEquals(0, manager.availableSlots())
+        manager.stopAllAndJoin()
+        assertEquals(3, manager.availableSlots())
+    }
+
+    @Test
     fun cancelledJobKeepsItsSlotAndRemainsOwnedUntilCleanupCompletes() = runTest {
         val cleaning = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()

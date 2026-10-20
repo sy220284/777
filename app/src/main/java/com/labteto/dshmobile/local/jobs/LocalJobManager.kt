@@ -12,10 +12,12 @@ import kotlinx.coroutines.CoroutineScope
 internal class LocalJobManager(
     scope: CoroutineScope,
     store: LocalPersistentJobStore? = null,
+    maxConcurrentJobs: Int = 4,
     onChanged: (List<LocalJobInfo>) -> Unit,
 ) {
     private val delegate = HarnessJobManager(
         scope = scope,
+        maxConcurrentJobs = maxConcurrentJobs,
         onChanged = { jobs ->
             onChanged(jobs.map { it.toLocalJobInfo() })
         },
@@ -72,6 +74,8 @@ internal class LocalJobManager(
 
     fun pendingContinuableAgentMessageSnapshots(): List<JobSnapshot> =
         delegate.pendingContinuableAgentMessageSnapshots()
+
+    fun updateConcurrentLimit(limit: Int) = delegate.updateConcurrentLimit(limit)
 
     fun availableSlots(): Int = delegate.availableSlots()
 

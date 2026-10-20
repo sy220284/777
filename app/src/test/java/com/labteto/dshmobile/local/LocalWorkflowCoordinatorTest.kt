@@ -197,6 +197,19 @@ class LocalWorkflowCoordinatorTest {
         assertEquals(0, launched)
     }
 
+    @Test
+    fun workflowSupports128NodesButRejects129BeforeScheduling() {
+        val coordinator = LocalWorkflowCoordinator(
+            execute = { "完成" }, pruneOutput = { it }, onProgress = {},
+            maxParallelism = 8,
+        )
+        val accepted = coordinator.prepare(List(128) { "检查第${it + 1}项" }, "parallel", emptyList())
+        assertEquals(128, accepted.nodes.size)
+        assertTrue(runCatching {
+            coordinator.prepare(List(129) { "检查第${it + 1}项" }, "parallel", emptyList())
+        }.exceptionOrNull() is IllegalArgumentException)
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun mismatchedEvidenceCannotSilentlyPass() = runTest {
         LocalWorkflowCoordinator(execute = { "完成" }, pruneOutput = { it }, onProgress = {})

@@ -65,7 +65,7 @@ class LocalToolOutputStoreTest {
         )
         val pageBytes = page.toByteArray(Charsets.UTF_8).size
 
-        // 修复前：正文按 4 KiB 交付，连同 header 超出 Work 内联额度，下游再次截断时
+        // 修复前：正文按最大可见页交付，连同 header 超出 Work 内联额度，下游再次截断时
         // next_byte 已前移到模型看不到的位置，被裁掉的字节会被静默跳过。
         assertTrue(
             "整段响应 $pageBytes 字节必须落在 Work 内联额度 $WORK_TOOL_INLINE_BYTES 字节内",
@@ -129,7 +129,7 @@ class LocalToolOutputStoreTest {
     }
 
     @Test
-    fun defaultRecoveryPageStaysNearFourKiB() {
+    fun defaultRecoveryPageStaysNearEightKiB() {
         val store = LocalToolOutputStore(File(temporary.root, "tool-output-default"))
         val content = "x".repeat(20_000)
         assertTrue(store.store("session-default", "call-default", content) != null)

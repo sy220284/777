@@ -28,6 +28,7 @@ import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
 import com.labteto.dshmobile.local.record
 import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+import com.labteto.dshmobile.local.runtime.localEffectiveHistoryPressure
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,12 +44,13 @@ internal class LocalSubagentRunnerFactory(
     private val modelHistory: LocalModelHistoryBuffer,
     private val toolOutputStore: LocalToolOutputStore,
     private val workspacePath: String,
-    private val imageRequestBudget: LocalImageRequestBudget,
+    private val imageRequestBudget: () -> LocalImageRequestBudget,
     private val imageCapabilities: LocalImageCapabilityRegistry,
     private val usageTracker: DeepSeekUsageTracker,
     private val resourceScheduler: HarnessResourceScheduler,
     private val virtualDisplayProvider: HarnessVirtualDisplayProvider,
     private val memoryClassMb: Int,
+    private val deviceRamMb: Int = 0,
     private val agentRunCoordinator: LocalAgentRunCoordinator,
     private val contextComposer: ContextComposer,
     private val memoryStore: MemoryStore,
@@ -140,7 +142,7 @@ internal class LocalSubagentRunnerFactory(
                 messages = messages,
                 workspaceRoot = File(workspacePath),
                 mode = mode,
-                budget = imageRequestBudget,
+                budget = imageRequestBudget(),
                 maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(model, baseUrl),
                 model = model,
                 baseUrl = baseUrl,
@@ -158,7 +160,17 @@ internal class LocalSubagentRunnerFactory(
         acquireVirtualScreen = { owner -> virtualDisplayProvider.acquireAgentVirtualDisplay(owner) },
         releaseVirtualScreen = virtualDisplayProvider::releaseAgentVirtualDisplay,
         historyBudget = { profile ->
-            localHistoryBudgetFor(memoryClassMb, resourceScheduler.snapshot().pressure, profile.model, profile.baseUrl, profile.contextWindowTokensOverride)
+            localHistoryBudgetFor(
+                memoryClassMb = memoryClassMb,
+                pressure = localEffectiveHistoryPressure(
+                    resourceScheduler.snapshot(),
+                    resourceScheduler.startupBudget,
+                ),
+                model = profile.model,
+                baseUrl = profile.baseUrl,
+                contextWindowTokensOverride = profile.contextWindowTokensOverride,
+                deviceRamMb = deviceRamMb,
+            )
         },
         runCoordinator = agentRunCoordinator,
         runSessionId = runSessionId,

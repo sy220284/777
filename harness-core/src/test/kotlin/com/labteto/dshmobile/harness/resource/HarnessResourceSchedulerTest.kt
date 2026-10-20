@@ -242,4 +242,72 @@ class HarnessResourceSchedulerTest {
         assertEquals(HarnessResourcePressure.LOW, snapshot.pressure)
     }
 
+    @Test
+    fun liveCapacityReductionWaitsForExistingLeasesWithoutRevokingThem() = runTest {
+        val scheduler = HarnessResourceScheduler(
+            HarnessResourceBudget(maxModelRequests = 3, maxAgents = 3),
+        )
+        val leases = (1..3).map { scheduler.acquire(HarnessResourceKind.MODEL_REQUEST) }
+        scheduler.updateBudget(HarnessResourceBudget(maxModelRequests = 1, maxAgents = 1))
+        assertEquals(3, scheduler.snapshot().activeModelRequests)
+        assertEquals(1, scheduler.snapshot().budget.maxModelRequests)
+
+        val next = async { scheduler.acquire(HarnessResourceKind.MODEL_REQUEST) }
+        runCurrent()
+        leases[0].close()
+        leases[1].close()
+        runCurrent()
+        assertFalse(next.isCompleted)
+        leases[2].close()
+        val admitted = next.await()
+        assertEquals(1, scheduler.snapshot().activeModelRequests)
+        admitted.close()
+        assertTrue(scheduler.snapshot().leases.isEmpty())
+    }
+
+    @Test
+    fun liveCapacityIncreaseWakesWaitersWithoutReleasingAnActiveLease() = runTest {
+        val scheduler = HarnessResourceScheduler(
+            HarnessResourceBudget(maxModelRequests = 1, maxAgents = 1),
+        )
+        val held = scheduler.acquire(HarnessResourceKind.AGENT)
+        val waiting = (1..2).map { async { scheduler.acquire(HarnessResourceKind.AGENT) } }
+        runCurrent()
+        assertTrue(waiting.none { it.isCompleted })
+        scheduler.updateBudget(HarnessResourceBudget(maxModelRequests = 1, maxAgents = 3))
+        val granted = waiting.map { it.await() }
+        assertEquals(3, scheduler.snapshot().activeAgents)
+        granted.forEach { it.close() }
+        held.close()
+        assertEquals(0, scheduler.snapshot().activeAgents)
+    }
+
+    @Test
+    fun admissionRemainsFifoAfterCapacityChangesAndCancelledWaiters() = runTest {
+        val scheduler = HarnessResourceScheduler(
+            HarnessResourceBudget(maxModelRequests = 1, maxAgents = 1),
+        )
+        val held = scheduler.acquire(HarnessResourceKind.MODEL_REQUEST)
+        val order = mutableListOf<Int>()
+        val cancelled = async {
+            scheduler.withResource(HarnessResourceKind.MODEL_REQUEST) { order += 0 }
+        }
+        runCurrent()
+        val first = async {
+            scheduler.withResource(HarnessResourceKind.MODEL_REQUEST) { order += 1 }
+        }
+        runCurrent()
+        val second = async {
+            scheduler.withResource(HarnessResourceKind.MODEL_REQUEST) { order += 2 }
+        }
+        runCurrent()
+        cancelled.cancelAndJoin()
+        scheduler.updateBudget(HarnessResourceBudget(maxModelRequests = 1, maxAgents = 2))
+        held.close()
+        first.await()
+        second.await()
+        assertEquals(listOf(1, 2), order)
+        assertTrue(scheduler.snapshot().leases.isEmpty())
+    }
+
 }

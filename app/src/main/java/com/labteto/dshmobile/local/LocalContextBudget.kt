@@ -43,8 +43,23 @@ internal fun localHistoryBudgetFor(
     model: String?,
     baseUrl: String? = null,
     contextWindowTokensOverride: Int? = null,
+    deviceRamMb: Int = 0,
 ): LocalHistoryBudget {
     val base = when {
+        // The device RAM governs local history retention; the routed token ceiling is independent.
+        // Respect the app Java heap tier too: physical RAM does not enlarge a small app heap.
+        deviceRamMb >= 14 * 1024 && memoryClassMb >= 384 -> LocalHistoryBudget(
+            maxHistoryChars = 1_100_000,
+            tailChars = 480_000,
+            maxSummaryChars = 28_000,
+            maxToolResultChars = 85_000,
+        )
+        deviceRamMb >= 10 * 1024 && memoryClassMb >= 256 -> LocalHistoryBudget(
+            maxHistoryChars = 900_000,
+            tailChars = 400_000,
+            maxSummaryChars = 24_000,
+            maxToolResultChars = 70_000,
+        )
         memoryClassMb >= 512 -> LocalHistoryBudget(
             maxHistoryChars = 700_000,
             tailChars = 320_000,

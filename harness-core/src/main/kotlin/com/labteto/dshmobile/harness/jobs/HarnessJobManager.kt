@@ -102,6 +102,13 @@ class HarnessJobManager(
     )
 
     private val lock = Any()
+    // Runtime admission may shrink below already-running jobs; only new starts are restricted.
+    private var liveConcurrentLimit = maxConcurrentJobs
+
+    fun updateConcurrentLimit(limit: Int) {
+        require(limit in 1..maxConcurrentJobs) { "运行中并发额度不得超过设备启动上限" }
+        synchronized(lock) { liveConcurrentLimit = limit }
+    }
     // Capture and commit in one order. Otherwise an older callback/write can arrive after a
     // terminal snapshot and restore a running UI or durable record.
     private val publicationLock = Any()
@@ -254,8 +261,8 @@ class HarnessJobManager(
                 return "后台任务无需恢复：$id [${found.status}]"
             }
             val running = records.values.count { it.occupiesSlot() }
-            if (running >= maxConcurrentJobs) {
-                return "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务"
+            if (running >= liveConcurrentLimit) {
+                return "后台任务并发已满：最多同时运行 $liveConcurrentLimit 个任务"
             }
             previousStatus = found.status
             previousOutput = found.output
@@ -319,7 +326,7 @@ class HarnessJobManager(
     fun infos(): List<JobInfo> = snapshotRecords()
 
     fun availableSlots(): Int = synchronized(lock) {
-        (maxConcurrentJobs - records.values.count { it.occupiesSlot() }).coerceAtLeast(0)
+        (liveConcurrentLimit - records.values.count { it.occupiesSlot() }).coerceAtLeast(0)
     }
 
     fun completeInterrupted(
@@ -502,11 +509,11 @@ class HarnessJobManager(
             }
             pruneRetainedLocked()
             val running = records.values.count { it.occupiesSlot() }
-            if (running >= maxConcurrentJobs) {
+            if (running >= liveConcurrentLimit) {
                 return JobStartResult(
                     false,
                     null,
-                    "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务",
+                    "后台任务并发已满：最多同时运行 $liveConcurrentLimit 个任务",
                 )
             }
             if (records.size >= maxRetainedJobs) {

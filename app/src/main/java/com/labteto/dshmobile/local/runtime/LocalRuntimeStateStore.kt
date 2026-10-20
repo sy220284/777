@@ -46,16 +46,38 @@ import kotlinx.serialization.json.Json
 @Singleton
 class LocalRuntimeStateStore internal constructor(
     internal val memoryClassMb: Int = 256,
-    private val jobOwner: LocalRuntimeJobOwner = LocalRuntimeJobOwner.inMemory(),
+    internal val deviceMemory: LocalDeviceMemorySnapshot = LocalDeviceMemorySnapshot(),
+    private val capacityMonitor: LocalDeviceCapacityMonitor? = null,
+    private val jobOwner: LocalRuntimeJobOwner = LocalRuntimeJobOwner.inMemory(
+        maxConcurrentJobs = localResourceBudgetForMemoryClass(memoryClassMb, deviceMemory).maxAgents,
+    ),
 ) {
     @Inject
     internal constructor(
         @ApplicationContext context: Context,
         json: Json,
         approvals: LocalApprovalPreferences,
+    ) : this(context, json, approvals, readLocalRuntimeMemoryProfile(context))
+
+    private constructor(
+        context: Context,
+        json: Json,
+        approvals: LocalApprovalPreferences,
+        memoryProfile: LocalRuntimeMemoryProfile,
     ) : this(
-        memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256,
-        jobOwner = LocalRuntimeJobOwner.persistent(context, json),
+        memoryClassMb = memoryProfile.memoryClassMb,
+        deviceMemory = memoryProfile.deviceMemory,
+        capacityMonitor = LocalDeviceCapacityMonitor(
+            context, memoryProfile.memoryClassMb, memoryProfile.deviceMemory,
+        ),
+        jobOwner = LocalRuntimeJobOwner.persistent(
+            context,
+            json,
+            maxConcurrentJobs = localResourceBudgetForMemoryClass(
+                memoryProfile.memoryClassMb,
+                memoryProfile.deviceMemory,
+            ).maxAgents,
+        ),
     ) { bindApprovalPreferences(approvals) }
     private val mutable = MutableStateFlow(LocalHarnessState())
     internal val projection = LocalRuntimeProjection(mutable)
@@ -77,9 +99,10 @@ class LocalRuntimeStateStore internal constructor(
     private val resourceObservers = CopyOnWriteArrayList<(HarnessResourceSnapshot) -> Unit>()
 
     internal val imageCapabilities = LocalImageCapabilityRegistry()
-    internal val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb)
+    internal val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb, deviceMemory)
     internal val resourceScheduler = HarnessResourceScheduler(
         budget = resourceBudget,
+        beforeAcquire = { capacityMonitor?.refresh() },
         onChanged = ::publishResourceSnapshot,
     )
 
@@ -185,11 +208,12 @@ class LocalRuntimeStateStore internal constructor(
         snapshot: HarnessResourceSnapshot = resourceScheduler.snapshot(),
     ): LocalHistoryBudget = localHistoryBudgetFor(
         memoryClassMb = memoryClassMb,
-        pressure = snapshot.pressure,
+        pressure = localEffectiveHistoryPressure(snapshot, resourceScheduler.startupBudget),
         model = state.modelState.model,
         baseUrl = state.modelState.baseUrl,
         contextWindowTokensOverride =
             state.modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
+        deviceRamMb = deviceMemory.totalRamMb,
     )
 
     internal fun contextBudgetCharsFor(
@@ -202,11 +226,12 @@ class LocalRuntimeStateStore internal constructor(
         snapshot: HarnessResourceSnapshot,
     ): Int = localHistoryBudgetFor(
         memoryClassMb = memoryClassMb,
-        pressure = snapshot.pressure,
+        pressure = localEffectiveHistoryPressure(snapshot, resourceScheduler.startupBudget),
         model = modelState.model,
         baseUrl = modelState.baseUrl,
         contextWindowTokensOverride =
             modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
+        deviceRamMb = deviceMemory.totalRamMb,
     ).maxHistoryChars
 
     internal suspend fun <T> withModelRequestResource(block: suspend () -> T): T =
@@ -349,6 +374,7 @@ class LocalRuntimeStateStore internal constructor(
             // Scheduler callbacks and initial replay may arrive out of order. Re-read the
             // authority under the projection lock instead of publishing a captured snapshot.
             val latest = resourceScheduler.snapshot()
+            jobOwner.updateConcurrentLimit(latest.budget.maxAgents)
             mutable.update { current -> projectResourceSnapshot(current, latest) }
             resourceObservers.forEach { observer ->
                 runCatching { observer(resourceScheduler.snapshot()) }
@@ -365,4 +391,33 @@ class LocalRuntimeStateStore internal constructor(
             contextBudgetChars = contextBudgetCharsFor(state, snapshot),
         ),
     )
+    init { capacityMonitor?.bind(resourceScheduler) }
+}
+
+/** Reuse one OS snapshot for resource scheduling and background job admission. */
+private data class LocalRuntimeMemoryProfile(
+    val memoryClassMb: Int,
+    val deviceMemory: LocalDeviceMemorySnapshot,
+)
+
+private fun readLocalRuntimeMemoryProfile(context: Context): LocalRuntimeMemoryProfile =
+    LocalRuntimeMemoryProfile(
+        memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256,
+        deviceMemory = readLocalDeviceMemorySnapshot(context),
+    )
+
+/** Android reports both Java heap class and system-wide RAM; never treat them as interchangeable. */
+internal fun readLocalDeviceMemorySnapshot(context: Context): LocalDeviceMemorySnapshot {
+    val manager = context.getSystemService(ActivityManager::class.java)
+        ?: return LocalDeviceMemorySnapshot()
+    return runCatching {
+        val info = ActivityManager.MemoryInfo()
+        manager.getMemoryInfo(info)
+        LocalDeviceMemorySnapshot(
+            totalRamMb = (info.totalMem / (1024L * 1024L)).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            availableRamMb = (info.availMem / (1024L * 1024L)).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            lowMemory = info.lowMemory,
+            lowRamDevice = manager.isLowRamDevice,
+        )
+    }.getOrDefault(LocalDeviceMemorySnapshot())
 }

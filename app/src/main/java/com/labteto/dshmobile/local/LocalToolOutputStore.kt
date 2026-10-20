@@ -403,7 +403,7 @@ internal class LocalToolOutputStore(
     private class ToolOutputBudgetExceeded : IOException("工具输出超过本次安全存储预算")
 
     companion object {
-        const val DEFAULT_READ_BYTES = 4 * 1024
+        const val DEFAULT_READ_BYTES = 8 * 1024
         const val MAX_READ_BYTES = 48 * 1024
         private const val MAX_SEARCH_QUERY_BYTES = 512
         private const val MAX_SEARCH_MATCHES = 10

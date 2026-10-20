@@ -302,8 +302,8 @@ private const val WORK_REQUEST_TRIGGER_TOKENS = 36_000
 private const val WORK_REQUEST_TAIL_TOKENS = 10_000
 private const val WORK_REQUEST_TAIL_CHARS = 40_000
 private const val WORK_REQUEST_SUMMARY_CHARS = 8_000
-private const val WORK_REQUEST_TOOL_RESULT_CHARS = 4_096
-private const val WORK_REQUEST_TOOL_RESULT_TOKENS = 1_600
+private const val WORK_REQUEST_TOOL_RESULT_CHARS = 8_192
+private const val WORK_REQUEST_TOOL_RESULT_TOKENS = 3_200
 
 /**
  * Newest tool results kept at write-time retention size in the hot request; older ones shrink to the

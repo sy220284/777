@@ -15,6 +15,47 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class LocalRuntimeStateStoreTest {
+    @Test
+    fun backgroundJobSlotsMatchDeviceAgentBudgetInsteadOfFixedFour() {
+        val twelve = LocalRuntimeStateStore(
+            memoryClassMb = 384,
+            deviceMemory = LocalDeviceMemorySnapshot(totalRamMb = 11_200, availableRamMb = 4_096),
+        )
+        val sixteen = LocalRuntimeStateStore(
+            memoryClassMb = 512,
+            deviceMemory = LocalDeviceMemorySnapshot(totalRamMb = 15_200, availableRamMb = 4_096),
+        )
+        val underPressure = LocalRuntimeStateStore(
+            memoryClassMb = 512,
+            deviceMemory = LocalDeviceMemorySnapshot(totalRamMb = 15_200, availableRamMb = 800),
+        )
+        assertEquals(10, twelve.jobManager.availableSlots())
+        assertEquals(twelve.resourceBudget.maxAgents, twelve.jobManager.availableSlots())
+        assertEquals(12, sixteen.jobManager.availableSlots())
+        assertEquals(sixteen.resourceBudget.maxAgents, sixteen.jobManager.availableSlots())
+        assertEquals(3, underPressure.jobManager.availableSlots())
+    }
+
+    @Test
+    fun modelHistoryBudgetShrinksWithLiveDeviceCapacityAndRestoresAfterRecovery() {
+        val runtime = LocalRuntimeStateStore(
+            memoryClassMb = 512,
+            deviceMemory = LocalDeviceMemorySnapshot(totalRamMb = 15_200, availableRamMb = 4_096),
+        )
+        val state = LocalHarnessState(sessionId = "capacity-history")
+        runtime.initialize(state)
+        val normal = runtime.historyBudgetFor(state).maxHistoryChars
+        assertEquals(1_100_000, normal)
+        runtime.resourceScheduler.updateBudget(runtime.resourceBudget.copy(
+            maxModelRequests = 2,
+            maxAgents = 2,
+            maxTerminals = 1,
+        ))
+        assertTrue(runtime.historyBudgetFor(state).maxHistoryChars < normal)
+        runtime.resourceScheduler.updateBudget(runtime.resourceBudget)
+        assertEquals(normal, runtime.historyBudgetFor(state).maxHistoryChars)
+    }
+
     @Test fun activatingSessionReattachesItsLivePreviewWithoutNewOutput() {
         val runtime = LocalRuntimeStateStore()
         runtime.initialize(LocalHarnessState(sessionId = "a"))

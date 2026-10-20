@@ -59,8 +59,9 @@ internal class LocalWorkflowCoordinator(
     private val execute: suspend (String) -> String,
     private val pruneOutput: (String) -> String,
     private val onProgress: (TaskGraphProgress) -> Unit,
+    maxParallelism: Int = 4,
 ) {
-    private val graph = TaskGraphExecutor(maxNodes = 64, maxParallelism = 4)
+    private val graph = TaskGraphExecutor(maxNodes = 128, maxParallelism = maxParallelism.coerceIn(1, 8))
 
     suspend fun run(
         tasks: List<String>,
@@ -75,8 +76,8 @@ internal class LocalWorkflowCoordinator(
         requiredEvidence: List<String>,
         dependencies: List<List<Int>> = emptyList(),
     ): LocalPreparedWorkflow {
-        require(tasks.size in 1..64 && tasks.none(String::isBlank)) {
-            "工作流需要 1 到 64 个非空子任务"
+        require(tasks.size in 1..128 && tasks.none(String::isBlank)) {
+            "工作流需要 1 到 128 个非空子任务"
         }
         require(requiredEvidence.isEmpty() || requiredEvidence.size == tasks.size) {
             "验收证据必须与子任务逐项对应"

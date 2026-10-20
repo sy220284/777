@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.tools.ToolResultRetention
+import com.labteto.dshmobile.local.model.WORK_TOOL_INLINE_BYTES
+import com.labteto.dshmobile.local.model.projectRecoverableToolResult
 import com.labteto.dshmobile.local.model.retainWorkToolResultForModel
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -24,9 +27,35 @@ class LocalWorkToolRetentionTest {
 
         assertTrue(retained.truncated)
         assertTrue(retained.omittedBytes > 0)
-        assertTrue(retained.text.length <= 4_200)
+        assertTrue(retained.text.toByteArray(Charsets.UTF_8).size <= WORK_TOOL_INLINE_BYTES)
         assertFalse(retained.text.contains("\uFFFD"))
         assertTrue(retained.text.contains("工具结果过长"))
+    }
+
+    @Test
+    fun eightKiBToolResultStaysVisibleWithoutEarlyTruncation() {
+        val source = "a".repeat(7_500)
+        assertTrue(source.toByteArray(Charsets.UTF_8).size > 4 * 1_024)
+        assertTrue(source.toByteArray(Charsets.UTF_8).size <= WORK_TOOL_INLINE_BYTES)
+        val retained = retainWorkToolResultForModel(source)
+        assertFalse(retained.truncated)
+        assertTrue(retained.text == source)
+    }
+
+    @Test
+    fun oversizedWorkResultPlusRecoveryInstructionsFitsFreshEightKiBWindow() {
+        val source = "审计日志a".repeat(4_000)
+        val projected = projectRecoverableToolResult(
+            value = source,
+            retention = ToolResultRetention.DURABLE,
+            usageMode = LocalUsageMode.WORK,
+            callId = "call-" + "x".repeat(64),
+            spill = { _, _ -> true },
+        )
+        assertTrue(projected.truncated)
+        assertTrue(projected.stored)
+        assertTrue(projected.text.contains("tool_output_read"))
+        assertTrue(projected.text.toByteArray(Charsets.UTF_8).size <= WORK_TOOL_INLINE_BYTES)
     }
 
     @Test

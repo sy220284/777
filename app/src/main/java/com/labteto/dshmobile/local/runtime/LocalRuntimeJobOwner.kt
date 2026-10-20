@@ -22,14 +22,18 @@ import kotlinx.serialization.json.Json
 internal class LocalRuntimeJobOwner internal constructor(
     scope: CoroutineScope,
     store: LocalPersistentJobStore?,
+    maxConcurrentJobs: Int = 4,
 ) {
     private val observers = CopyOnWriteArrayList<(List<LocalJobInfo>) -> Unit>()
 
     internal val manager = LocalJobManager(
         scope = scope,
         store = store,
+        maxConcurrentJobs = maxConcurrentJobs,
         onChanged = ::publish,
     )
+
+    internal fun updateConcurrentLimit(limit: Int) = manager.updateConcurrentLimit(limit)
 
     internal fun observe(observer: (List<LocalJobInfo>) -> Unit) {
         observers += observer
@@ -45,19 +49,25 @@ internal class LocalRuntimeJobOwner internal constructor(
     }
 
     companion object {
-        internal fun inMemory(): LocalRuntimeJobOwner =
+        internal fun inMemory(maxConcurrentJobs: Int = 4): LocalRuntimeJobOwner =
             LocalRuntimeJobOwner(
                 scope = processScope(),
                 store = null,
+                maxConcurrentJobs = maxConcurrentJobs,
             )
 
-        internal fun persistent(context: Context, json: Json): LocalRuntimeJobOwner =
+        internal fun persistent(
+            context: Context,
+            json: Json,
+            maxConcurrentJobs: Int,
+        ): LocalRuntimeJobOwner =
             LocalRuntimeJobOwner(
                 scope = processScope(),
                 store = LocalPersistentJobStore(
                     file = File(context.filesDir, "local-harness/jobs.json"),
                     json = json,
                 ),
+                maxConcurrentJobs = maxConcurrentJobs,
             )
 
         private fun processScope(): CoroutineScope =

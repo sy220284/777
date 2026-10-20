@@ -22,7 +22,7 @@ class DomainSettingsOwnershipTest {
         )
         val restored = LocalAgentRuntimeSettings.read(preferences)
 
-        assertEquals(512, written.mainMaxSteps)
+        assertEquals(1_024, written.mainMaxSteps)
         assertEquals(1, written.subagentMaxSteps)
         assertEquals(written, restored)
     }
