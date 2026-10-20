@@ -76,6 +76,8 @@ class LocalSettingsRuntime @Inject internal constructor(
         settingsCoordinator.configureRuntimeLimits(main, subagent, attempts, workerProfileId)
     override fun configurePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean) =
         settingsCoordinator.configurePersonalization(rules, autoRecall, autoMemory)
+    override suspend fun savePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean): Boolean =
+        settingsCoordinator.savePersonalization(rules, autoRecall, autoMemory)
     override fun configureChatStyleGuard(enabled: Boolean) = chatStyleGuardSettings.configureEnabled(enabled)
     override fun addChatStyleGuardPhrase(value: String) = chatStyleGuardSettings.addPhrase(value)
     override fun removeChatStyleGuardPhrase(value: String) = chatStyleGuardSettings.removePhrase(value)
