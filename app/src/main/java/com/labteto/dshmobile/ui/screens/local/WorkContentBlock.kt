@@ -122,6 +122,9 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
         node.summary == null && node.toolName != null &&
             userFacingWorkToolActionRes(node.toolName) != null ->
             stringResource(userFacingWorkToolActionRes(node.toolName)!!)
+        node.summary == null && node.toolName != null &&
+            userFacingWorkToolAction(node.toolName) != null ->
+            userFacingWorkToolAction(node.toolName)!!
         node.summary == null &&
             node.kind == com.labteto.dshmobile.ui.AgentOperationKind.Generic -> "工具操作"
         else -> stringResource(agentOperationLabelRes(node.kind))
