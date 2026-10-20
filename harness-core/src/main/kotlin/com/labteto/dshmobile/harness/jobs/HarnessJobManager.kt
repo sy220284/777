@@ -1159,16 +1159,19 @@ class HarnessJobManager(
             }
         }
         synchronized(lock) {
-            record.status = "failed"
+            // The external action may already have completed. Disk failure proves only
+            // that its terminal receipt is missing, not that the action itself failed.
+            // Preserve an explicit unknown outcome; never advertise a safe retry.
+            record.status = "interrupted"
             record.output = (
                 record.output.takeLast(MAX_OUTPUT / 2) +
-                    "\n任务终态持久化失败：" +
+                    "\n任务终态无法持久确认，外部副作用可能已发生，结果未知；请核实后再重试：" +
                     (lastFailure?.message ?: lastFailure?.javaClass?.simpleName ?: "unknown")
                 ).takeLast(MAX_OUTPUT)
             record.updatedAt = System.currentTimeMillis()
         }
         notifyChanged()
-        throw IllegalStateException("后台任务终态持久化失败", lastFailure)
+        throw IllegalStateException("后台任务终态持久化失败，实际结果未知", lastFailure)
     }
 
     private fun publish() = synchronized(publicationLock) {
