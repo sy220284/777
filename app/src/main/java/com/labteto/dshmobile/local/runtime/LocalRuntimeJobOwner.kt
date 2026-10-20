@@ -33,6 +33,8 @@ internal class LocalRuntimeJobOwner internal constructor(
         onChanged = ::publish,
     )
 
+    internal fun updateConcurrentLimit(limit: Int) = manager.updateConcurrentLimit(limit)
+
     internal fun observe(observer: (List<LocalJobInfo>) -> Unit) {
         observers += observer
         runCatching { observer(manager.snapshotInfos()) }
