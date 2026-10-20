@@ -695,10 +695,10 @@ internal class LocalSubagentRunner(
                                 eventLog().append("subagent/end", buildJsonObject {
                                     put("agent_id", subagentId)
                                     put("status", "completed")
-                                    put("steps", addSubagentSteps(recoveredBaseStep, event.step)s)
+                                    put("steps", addSubagentSteps(recoveredBaseStep, event.steps))
                                 })
                                 persistContinuationCheckpoint(
-                                    step = addSubagentSteps(recoveredBaseStep, event.step)s,
+                                    step = addSubagentSteps(recoveredBaseStep, event.steps),
                                     terminalOutput = event.answer.ifBlank { "子代理已结束，但没有返回文字。" },
                                 )
                             }
@@ -707,7 +707,7 @@ internal class LocalSubagentRunner(
                             eventLog().append("subagent/end", buildJsonObject {
                                 put("agent_id", subagentId)
                                 put("status", "step_limit")
-                                put("steps", addSubagentSteps(recoveredBaseStep, event.step)s)
+                                put("steps", addSubagentSteps(recoveredBaseStep, event.steps))
                             })
                         }
                         is AgentEvent.TurnCancelled -> {
