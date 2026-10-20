@@ -29,8 +29,8 @@ internal class LocalTranscriptRuntime(
         contentAlreadyBounded: Boolean = false,
         toolIsError: Boolean? = null,
         toolErrorCode: String? = null,
-        toolCallId: String? = null,
         blocks: List<LocalMessageBlock> = emptyList(),
+        toolCallId: String? = null,
     ): LocalHarnessMessage = LocalHarnessMessage(
         id = UUID.randomUUID().toString(),
         role = role,
