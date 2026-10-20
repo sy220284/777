@@ -510,6 +510,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val generatedMedia = mediaPage.results
     val videoMediaTasks = mediaPage.videos
     val pendingMediaJobs = mediaPage.jobs
+    var workToolActivities by remember(state.sessionId) {
+        mutableStateOf<List<com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem>>(emptyList())
+    }
     var workArtifacts by remember(state.sessionId) {
         mutableStateOf<List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>>(emptyList())
     }
@@ -535,7 +538,30 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             }
         }
     }
-    val transcriptItems = remember(transcriptMessages, state.usageMode, state.sessionId, generatedMedia, videoMediaTasks, pendingMediaJobs, workArtifacts) {
+    // Work's authoritative EventLog sequence changes on call, execution-started and result.
+    // One lifecycle-bound observer replaces the competing document/response refresh paths.
+    LaunchedEffect(state.sessionId, state.usageMode, workActions, state.running) {
+        if (state.usageMode != LocalUsageMode.WORK || workActions == null) {
+            workToolActivities = emptyList()
+        } else {
+            var lastSequence = Long.MIN_VALUE
+            do {
+                val sequence = withContext(Dispatchers.IO) {
+                    workActions.eventSequenceForUi(state.sessionId)
+                }
+                if (sequence != lastSequence) {
+                    workToolActivities = withContext(Dispatchers.IO) {
+                        workActions.toolActivities(state.sessionId)
+                    }
+                    lastSequence = sequence
+                }
+                if (!state.running) break
+                delay(600)
+            } while (true)
+        }
+    }
+    val transcriptItems = remember(transcriptMessages, state.usageMode, state.sessionId,
+        generatedMedia, videoMediaTasks, pendingMediaJobs, workArtifacts, workToolActivities, state.running) {
         val mediaTimeline = mergeLocalMediaTimeline(
             buildLocalDisplayTranscript(buildLocalTranscript(
                 transcriptMessages,
@@ -546,8 +572,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             videoMediaTasks,
             pendingMediaJobs,
         )
-        if (state.usageMode == LocalUsageMode.WORK) appendWorkArtifactsToTranscript(mediaTimeline, workArtifacts)
-        else mediaTimeline
+        if (state.usageMode == LocalUsageMode.WORK) appendPendingWorkToolActivities(
+            appendWorkArtifactsToTranscript(mediaTimeline, workArtifacts), workToolActivities, state.running,
+        ) else mediaTimeline
     }
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
@@ -974,7 +1001,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     top = SyMetric.gapSection,
                     bottom = SyMetric.gapPage,
                 ),
-                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSection),
+                verticalArrangement = Arrangement.spacedBy(
+                    if (state.usageMode == LocalUsageMode.WORK) SyMetric.gapXs else SyMetric.gapSection,
+                ),
             ) {
                 if (mediaPage.unavailable) {
                     item(key = "media-storage-error") {
@@ -1054,7 +1083,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 }
                 items(transcriptItems, key = { it.key }) { transcriptItem ->
                     when (transcriptItem) {
-                        is LocalTranscriptItem.Message -> Column {
+                        is LocalTranscriptItem.Message -> Column(
+                            modifier = Modifier.padding(vertical =
+                                if (state.usageMode == LocalUsageMode.WORK) SyMetric.gapMd else 0.dp),
+                        ) {
                             LocalMessageRow(
                                 message = if (transcriptItem.message.role == "assistant")
                                     transcriptItem.message.copy(content = visibleAssistantText(transcriptItem.message.content))
@@ -1215,6 +1247,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     transcriptItem.key == transcriptItems.lastOrNull()?.key,
                             )
                         }
+                        is LocalTranscriptItem.WorkPendingTool -> Box(
+                            modifier = Modifier.fillMaxWidth().animateItem(),
+                        ) {
+                            WorkPendingToolRow(transcriptItem.activity)
+                        }
                         is LocalTranscriptItem.WorkStep -> Box(
                             modifier = Modifier.fillMaxWidth().animateItem(
                                 fadeInSpec = tween(durationMillis = com.shenyan.designsystem.foundation.SyMotion.duration(
@@ -1253,6 +1290,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 sessionId = state.sessionId,
                                 streamingState = streamingState,
                                 hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkStep ||
+                                    transcriptItems.lastOrNull() is LocalTranscriptItem.WorkPendingTool ||
                                     transcriptItems.lastOrNull() is LocalTranscriptItem.WorkNode ||
                                     transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
                                 lastDurableNarrative = latestDurableWorkNarrativeInCurrentTurn(transcriptMessages),
