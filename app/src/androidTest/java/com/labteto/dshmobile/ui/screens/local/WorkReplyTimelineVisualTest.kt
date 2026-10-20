@@ -60,6 +60,26 @@ class WorkReplyTimelineVisualTest {
         compose.onNodeWithText(result.content).assertDoesNotExist()
     }
 
+    @Test fun commandToolShowsNaturalActionWithReceiptAvailable() {
+        val activity = LocalToolActivityUiItem(
+            "check-curl", "bash", LocalToolUiPhase.COMPLETED,
+            argumentsPreview = """{"command":"command -v curl"}""",
+        )
+        val command = result.copy(id = "check-curl", toolCallId = "check-curl",
+            toolName = "bash", content = "curl 可用")
+        compose.setContent {
+            DshTheme(preference = ThemePreference.LIGHT) {
+                Column(Modifier.width(320.dp)) {
+                    WorkTimelineStepRow(command, activity = activity)
+                }
+            }
+        }
+        compose.onNodeWithText("检查 curl 是否可用").assertIsDisplayed()
+        compose.onNodeWithText("执行命令").assertDoesNotExist()
+        compose.onNodeWithTag("work-tool:check-curl").performClick()
+        compose.onNodeWithText("curl 可用").assertIsDisplayed()
+    }
+
     @Test fun darkLargeTextKeepsFailureAndRunningStatusReadable() {
         compose.setContent { DshTheme(preference = ThemePreference.DARK, textScale = 1.3f) { Timeline() } }
         compose.onNodeWithText("结果待确认").assertIsDisplayed()
