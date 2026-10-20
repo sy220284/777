@@ -145,7 +145,7 @@ fun SyIconBox(icon: ImageVector? = null, iconPainter: Painter? = null, modifier:
     val tile = tileTone?.let { if (p.text.luminance() > .5f) p.materialL4 else it }
 
     Box(
-        modifier.size(32.dp).then(
+        modifier.size(if (tile != null) 32.dp else 30.dp).then(
             if (tile != null) Modifier.background(tile, RoundedCornerShape(9.dp)) else Modifier
         ),
         contentAlignment = Alignment.Center,

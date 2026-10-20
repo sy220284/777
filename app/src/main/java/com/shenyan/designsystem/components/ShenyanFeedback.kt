@@ -91,7 +91,7 @@ fun SyIconButton(
     )
     val entryTone = if (iconPainter == null) syEntryTileTone(icon?.name.orEmpty()) else null
     val tile = entryTone?.let { if (p.text.luminance() > .5f) p.materialL4 else it }
-    val foreground = if (selected || tile != null) p.text else tint ?: p.textSecondary
+    val foreground = if (selected) p.text else tint ?: if (tile != null) p.text else p.textSecondary
     Surface(
         onClick = onClick, enabled = enabled, modifier = modifier.size(SyMetric.touch),
         interactionSource = interaction, color = fill, shadowElevation = shadowElevation,
