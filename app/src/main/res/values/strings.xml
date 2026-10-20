@@ -2085,6 +2085,7 @@
     <string name="minimax_media_no_voices">当前账户未返回可选音色，可继续输入音色编号。</string>
     <string name="media_studio_title">多模态创作</string>
     <string name="media_studio_entry">多模态创作</string>
+    <string name="media_reply_requires_visual_scene">这段回复主要是文字说明，没有明确的可绘制画面。请先描述人物、场景或动作，再生成图片或视频，避免产生与原意无关的文字图片。</string>
     <string name="media_studio_no_model">当前没有为此功能接入可用的创作模型。请在设置中配置受支持的官方账户。</string>
     <string name="media_studio_selected_model">%1$s · %2$s</string>
     <string name="media_studio_select_model">选择创作模型</string>
