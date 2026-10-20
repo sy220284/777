@@ -38,7 +38,8 @@ class HarnessJobPersistenceTest {
     fun deletionFailureRetainsOwnedJobReceiptsUntilDurableCommit() = runTest {
         val manager = HarnessJobManager(backgroundScope, {})
         val never = CompletableDeferred<Unit>()
-        manager.start("unfinished", ownerId = "session-a") { _, _ ->
+        manager.start("unfinished", ownerId = "session-a") { _, progress ->
+            progress("工作已完成一半：重要证据")
             never.await()
             "should-not-complete"
         }
@@ -50,6 +51,8 @@ class HarnessJobPersistenceTest {
         val retained = manager.snapshots().filter { it.ownerId == "session-a" }
         assertEquals(2, retained.size)
         assertEquals("cancelled", retained.single { it.label == "unfinished" }.status)
+        assertTrue(retained.single { it.label == "unfinished" }.output.contains("工作已完成一半：重要证据"))
+        assertTrue(retained.single { it.label == "unfinished" }.output.contains("任务已取消"))
         assertEquals("completed", retained.single { it.label == "finished" }.status)
         assertTrue(retained.any { it.output.contains("completed-result") })
         assertTrue(manager.snapshots().any { it.ownerId == "session-b" })

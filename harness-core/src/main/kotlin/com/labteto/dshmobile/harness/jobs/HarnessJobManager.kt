@@ -1070,7 +1070,16 @@ class HarnessJobManager(
      */
     suspend fun stopOwnedAndJoin(ownerIds: Set<String>) {
         if (ownerIds.isEmpty()) return
-        val jobs = markRunningJobsCancelled { it.ownerId in ownerIds }
+        val jobs = synchronized(lock) {
+            records.values.filter { it.ownerId in ownerIds && it.occupiesSlot() }.onEach { record ->
+                if (record.status == "running") {
+                    record.status = "cancelled"
+                    record.output = if (record.output.isBlank()) "任务已取消" else
+                        (record.output + "\n任务已取消").takeLast(MAX_OUTPUT)
+                    record.updatedAt = nextActivityTimestamp(record.updatedAt)
+                }
+            }.mapNotNull { it.job }
+        }
         jobs.forEach { it.cancel() }
         jobs.joinAll()
         publish()
