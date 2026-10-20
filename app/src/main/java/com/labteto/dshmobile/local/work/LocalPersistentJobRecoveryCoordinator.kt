@@ -130,7 +130,9 @@ internal class LocalPersistentJobRecoveryCoordinator(
         teamManaged: Boolean = false,
         initialOptionalTools: Set<String> = emptySet(),
     ): JobStartResult {
-        val runProfile = modelGateway.profileForRun(model)
+        val runProfile = modelGateway.profileForRun(
+            model ?: boundState.modelState.modelSelection.activeProfileId,
+        )
         val protocol = effectiveProtocol(runProfile)
         val runner = subagentRunner(sessionId, boundState, historySnapshot)
         val capabilities = LocalSubagentCapabilities(

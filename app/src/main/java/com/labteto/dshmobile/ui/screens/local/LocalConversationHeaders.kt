@@ -60,6 +60,8 @@ internal fun ChatSurfaceHeader(
     onRenameSession: () -> Unit,
     onDeleteSession: () -> Unit,
     tuningEnabled: Boolean = true,
+    modelLabel: String = "",
+    onModelClick: () -> Unit = {},
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
@@ -143,6 +145,12 @@ internal fun ChatSurfaceHeader(
                 )
             }
         }
+        SyIconButton(
+            icon = SyEntryIcons.Models,
+            contentDescription = stringResource(R.string.models_title) + "：" + modelLabel,
+            onClick = onModelClick,
+            tint = colors.textSecondary,
+        )
         if (groupEnabled) {
             SyButton(
                 text = stringResource(R.string.local_group_chat_leave),
@@ -190,7 +198,7 @@ internal fun WorkSurfaceHeader(
                 .widthIn(max = 168.dp)
                 .heightIn(min = SyMetric.touch)
                 .clip(DsShapes.row)
-                .clickable(enabled = !running, role = Role.Button, onClick = onModelClick)
+                .clickable(role = Role.Button, onClick = onModelClick)
                 .semantics(mergeDescendants = true) { }
                 .padding(horizontal = SyMetric.gapMd),
             verticalAlignment = Alignment.CenterVertically,

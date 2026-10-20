@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.model.forSessionModel
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentEventSink
 import com.labteto.dshmobile.harness.agent.AgentTurnEngine
@@ -243,15 +244,16 @@ internal class LocalSubagentRunner(
         }
         val progress = ArrayDeque<String>()
         val progressTracker = LocalAgentProgressTracker()
-        val runProfile = try { modelGateway.profileForRun(modelOverride) } catch (error: Exception) {
+        val current = state.value
+        val inheritedModel = current.modelState.modelSelection.activeProfileId
+        val runProfile = try { modelGateway.profileForRun(modelOverride ?: inheritedModel) } catch (error: Exception) {
             if (error is kotlinx.coroutines.CancellationException) throw error
             return LocalSubagentResult(LocalSubagentStatus.FAILED,
                 "[subagent][$subagentId] ${error.message}", (error as? LocalModelException)?.code ?: "NO_MODEL_CREDENTIAL")
         }
         val runSurface = runProfile.toRunModelSurface()
-        val current = state.value
         val snapshot = current.copy(
-            modelState = current.modelState.copy(model = runSurface.model, baseUrl = runSurface.baseUrl),
+            modelState = current.modelState.forSessionModel(runProfile),
         )
         val routeModel = runSurface.model
         val runHistoryBudget = historyBudget?.invoke(runProfile)

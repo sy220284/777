@@ -25,6 +25,8 @@ import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalEffectiveModelContracts
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.normalizeModelBaseUrl
+import com.labteto.dshmobile.local.model.forPersistedSessionModel
+import com.labteto.dshmobile.local.model.selectedLocalModelProfileId
 import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.model.durableToolResultContent
@@ -224,7 +226,7 @@ internal class LocalWorkAgentTurnExecutor(
             val runSnapshot = runState.value
             val goalAtTurnStart = runSnapshot.work.goal
             val steeringRevisionAtTurnStart = binding.steeringRevision.value
-            val runToolSurface = LocalRunToolSurface(
+            var runToolSurface = LocalRunToolSurface(
                 runSnapshot.modelState.modelSelection.activeProfile?.toRunModelSurface(),
             )
             val mainMaxSteps = runSnapshot.mainMaxSteps
@@ -327,6 +329,35 @@ internal class LocalWorkAgentTurnExecutor(
                     while (true) {
                     val observedSteer = binding.steeringRevision.value
                     workModelHistoryRuntime.drainPendingInputs(binding)
+                    // This callback is entered once per model request, after the previous
+                    // request and its tool results have settled. Switching here never mutates
+                    // the route of a request already in flight.
+                    val beforeModel = binding.state.value.modelState
+                    val selectedModel = beforeModel.forPersistedSessionModel(
+                        runEventLog.selectedLocalModelProfileId(),
+                    )
+                    if (selectedModel.modelSelection.activeProfileId !=
+                        beforeModel.modelSelection.activeProfileId
+                    ) {
+                        binding.state.update { current ->
+                            current.copy(modelState = current.modelState.forPersistedSessionModel(
+                                selectedModel.modelSelection.activeProfileId,
+                            ))
+                        }
+                        runToolSurface = LocalRunToolSurface(
+                            selectedModel.modelSelection.activeProfile?.toRunModelSurface(),
+                        )
+                        workPromptContext = contextComposer.composeWorkTurnContext(
+                            input = input,
+                            snapshot = runState.value,
+                            workspacePath = workspacePath,
+                            skillGuidance = resolveLocalWorkSkillGuidance(
+                                sessionStorage.files.workspace, input,
+                                selectedInvocations = pinnedInvocations.current(),
+                            ),
+                        )
+                        workModelHistoryRuntime.updateContextMetrics(binding)
+                    }
                     val snapshot = runState.value
                     if (observedSteer != projectedSteeringRevision) {
                         val effectiveInput = runHistory.snapshot().asReversed()

@@ -886,6 +886,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 else showPersonaPicker = true
                             },
                             onOpenCharacterTuning = { showCharacterTuning = true },
+                            modelLabel = state.model,
+                            onModelClick = {
+                                if (state.modelProfiles.isNotEmpty()) showModelPicker = true else onConfigure()
+                            },
                             onExitGroupChat = onExitGroupChat,
                             onNewSession = onNewSession,
                             sessionPinned = sessionPinned,

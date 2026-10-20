@@ -5,6 +5,8 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelState
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.forSessionModel
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.local.session.appendLocalTranscriptRuntimeIndex
@@ -180,6 +182,14 @@ internal class LocalRuntimeProjection(
                     ),
                 )
             }
+        }
+    }
+
+    internal fun projectSessionModelSelection(sessionId: String, profile: LocalModelProfile) {
+        state.update { current ->
+            if (current.sessionId != sessionId || current.loading ||
+                current.modelState.modelSelection.profiles.none { it.id == profile.id }) current
+            else current.copy(modelState = current.modelState.forSessionModel(profile), error = null)
         }
     }
 

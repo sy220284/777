@@ -13,6 +13,8 @@ import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.syncForegroundJobs
 import com.labteto.dshmobile.local.model.durableModelHistorySnapshot
+import com.labteto.dshmobile.local.model.forPersistedSessionModel
+import com.labteto.dshmobile.local.model.selectedLocalModelProfileId
 import com.labteto.dshmobile.local.runtime.MAX_PENDING_INPUTS
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
@@ -261,6 +263,12 @@ class LocalWorkRunRegistry internal constructor(
                 )
             }
             binding.runHandle.modelHistory.append(durableMessage)
+            // A new queued turn is the safe route-change boundary: the previous turn's
+            // in-flight model requests stay frozen, while this successor uses the user's choice.
+            val selectedProfileId = binding.eventLog.selectedLocalModelProfileId()
+            binding.state.update { current ->
+                current.copy(modelState = current.modelState.forPersistedSessionModel(selectedProfileId))
+            }
             refreshBindingContextMetrics(binding)
             persistDerivedBinding(binding)
             successor = startNext(next, binding)

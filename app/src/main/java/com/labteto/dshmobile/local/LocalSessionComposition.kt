@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.chat.LocalChatPersistence
 import com.labteto.dshmobile.local.chat.LocalChatSessionLifecyclePlanner
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.local.model.recordLocalModelSelection
 import com.labteto.dshmobile.local.runtime.MAX_HANDOFF_CHARS
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
@@ -108,6 +109,9 @@ internal class LocalSessionComposition @Inject constructor(
         restartInterruptedSafeJobs = workComposition::schedulePersistentRecovery,
         startNextQueuedTurnIfIdle = wake::startNextIfIdle,
         sessionSummaries = loader::summaries,
+        recordInitialModelSelection = { sessionId, profileId ->
+            sessionStorage.eventLogs.get(sessionId).recordLocalModelSelection(profileId)
+        },
         beforeEventLogsDeleted = sessionStorage.eventLogs::clearAndEvict,
     )
 
