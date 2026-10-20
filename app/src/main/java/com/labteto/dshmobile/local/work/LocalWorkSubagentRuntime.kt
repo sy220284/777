@@ -64,6 +64,7 @@ internal class LocalWorkSubagentRuntime(
         // Persist a unique activation identity even if a graph ID is reused.
         val graphExecutionId = java.util.UUID.randomUUID().toString()
         val workflow = LocalWorkflowCoordinator(
+            maxParallelism = binding.aggregateSnapshot().kernel.resources.maxAgents.coerceIn(1, 8),
             execute = { prompt ->
                 // Fence the real subagent launch, not merely its completion projection.
                 checkGoalOwner()
