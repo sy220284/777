@@ -575,8 +575,7 @@ internal fun MediaImageDetailDialog(
             modifier = Modifier.fillMaxSize().safeDrawingPadding()
                 .padding(horizontal = 12.dp, vertical = 16.dp)
                 .clipToBounds()
-                .transformable(state = gesture)
-                .clickable(onClick = {}),
+                .transformable(state = gesture),
             contentAlignment = Alignment.Center,
         ) {
             val bitmap = detail
