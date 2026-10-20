@@ -321,6 +321,37 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun shellKeepsRunningPastTotalTimeoutWhileStdoutMakesProgress() = runBlocking {
+        val isolated = LocalWorkspace(root = root, shellExecutable = "/bin/sh")
+        // 2.4 seconds total, but neither individual quiet period exceeds 2 seconds.
+        val result = isolated.shellResult(
+            "printf first; sleep 1.2; printf second; sleep 1.2; printf third",
+            timeoutSeconds = 2,
+        )
+        assertFalse("progressing command must not be killed: $result", result.isError)
+        assertTrue(result.content.contains("firstsecondthird"))
+    }
+
+    @Test
+    fun shellStderrAlsoRenewsTheIdleTimeout() = runBlocking {
+        val isolated = LocalWorkspace(root = root, shellExecutable = "/bin/sh")
+        val result = isolated.shellResult(
+            "printf first >&2; sleep 1.2; printf second >&2; sleep 1.2; printf third >&2",
+            timeoutSeconds = 2,
+        )
+        assertFalse("stderr progress must keep the command alive: $result", result.isError)
+        assertTrue(result.content.contains("firstsecondthird"))
+    }
+
+    @Test
+    fun shellStillStopsACompletelySilentStalledCommand() = runBlocking {
+        val isolated = LocalWorkspace(root = root, shellExecutable = "/bin/sh")
+        val result = isolated.shellResult("sleep 5", timeoutSeconds = 1)
+        assertTrue(result.isError)
+        assertEquals("TOOL_TIMEOUT", result.errorCode)
+    }
+
+    @Test
     fun shellEvidenceUsesExitCodeInsteadOfSuccessLookingOutput() = runBlocking {
         val isolated = LocalWorkspace(root = root, shellExecutable = "/bin/sh")
         val failed = isolated.shellResult("echo BUILD SUCCESSFUL; exit 1", 5)
