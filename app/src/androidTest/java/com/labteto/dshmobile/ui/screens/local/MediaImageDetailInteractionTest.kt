@@ -54,7 +54,7 @@ class MediaImageDetailInteractionTest {
     @Test fun remoteOnlyImageShowsShareWithoutPretendingLocalSave() {
         compose.setContent {
             DshTheme {
-                MediaImageDetailDialog(file = null, remoteUrl = "https://example.com/image.png", onDismiss = {})
+                MediaImageDetailDialog(file = null, remoteUrl = "https://example.com:8443/image.png", onDismiss = {})
             }
         }
         compose.onNodeWithTag("mediaImageActions").performClick()
