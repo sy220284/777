@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -88,23 +89,31 @@ fun SyIconButton(
         resolved, animationSpec = tween(SyMotion.duration(SyMotion.selectMs, motion, tempo)),
         label = "syIconSurface",
     )
-    val foreground = if (selected) p.text else tint ?: p.textSecondary
+    val entryTone = if (iconPainter == null) syEntryTileTone(icon?.name.orEmpty()) else null
+    val tile = entryTone?.let { if (p.text.luminance() > .5f) p.materialL4 else it }
+    val foreground = if (selected || tile != null) p.text else tint ?: p.textSecondary
     Surface(
         onClick = onClick, enabled = enabled, modifier = modifier.size(SyMetric.touch),
         interactionSource = interaction, color = fill, shadowElevation = shadowElevation,
-        shape = CircleShape,
+        shape = if (tile != null) RoundedCornerShape(12.dp) else CircleShape,
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            val glyphModifier = Modifier.requiredSize(iconSize).scale(scale)
-            when {
-                iconPainter != null -> Icon(
-                    painter = iconPainter, contentDescription = contentDescription,
-                    tint = if (enabled) foreground else foreground.copy(alpha = .4f),
-                    modifier = glyphModifier)
-                icon != null -> Icon(
-                    imageVector = icon, contentDescription = contentDescription,
-                    tint = if (enabled) foreground else foreground.copy(alpha = .4f),
-                    modifier = glyphModifier)
+            Box(
+                modifier = if (tile != null) Modifier.requiredSize(32.dp)
+                    .background(tile, RoundedCornerShape(9.dp)) else Modifier,
+                contentAlignment = Alignment.Center,
+            ) {
+                val glyphModifier = Modifier.requiredSize(iconSize).scale(scale)
+                when {
+                    iconPainter != null -> Icon(
+                        painter = iconPainter, contentDescription = contentDescription,
+                        tint = if (enabled) foreground else foreground.copy(alpha = .4f),
+                        modifier = glyphModifier)
+                    icon != null -> Icon(
+                        imageVector = icon, contentDescription = contentDescription,
+                        tint = if (enabled) foreground else foreground.copy(alpha = .4f),
+                        modifier = glyphModifier)
+                }
             }
         }
     }

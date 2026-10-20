@@ -43,9 +43,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -756,7 +754,7 @@ fun ToolsScreen(
                                             onClick = { showGitHubConfig = true },
                                         )
                                         ToolCapabilityRow(
-                                            iconPainter = painterResource(R.drawable.ic_ui_plugin),
+                                            icon = SyEntryIcons.Plugins,
                                             title = stringResource(R.string.tools_external_services),
                                             status = state.servers.size.toString(),
                                             state = if (state.servers.isNotEmpty()) StateDotState.Done else StateDotState.Idle,
@@ -1097,7 +1095,6 @@ private fun ToolCapabilityRow(
     status: String,
     state: StateDotState,
     icon: ImageVector? = null,
-    iconPainter: Painter? = null,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
@@ -1121,15 +1118,7 @@ private fun ToolCapabilityRow(
                 modifier = Modifier.size(40.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                when {
-                    iconPainter != null -> Icon(
-                        painter = iconPainter,
-                        contentDescription = null,
-                        tint = colors.textSecondary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    icon != null -> com.shenyan.designsystem.components.SyIconBox(icon = icon)
-                }
+                icon?.let { com.shenyan.designsystem.components.SyIconBox(icon = it) }
             }
             BoxWithConstraints(Modifier.weight(1f)) {
                 val stackedStatus = maxWidth < 200.dp || LocalDensity.current.fontScale > 1.15f
