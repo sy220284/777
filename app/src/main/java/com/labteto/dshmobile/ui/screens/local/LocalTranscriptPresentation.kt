@@ -159,7 +159,7 @@ internal fun appendPendingWorkToolActivities(
         val index = result.indexOfFirst { item ->
             when (item) {
                 is LocalTranscriptItem.Message -> item.message.createdAt > timestamp
-                is LocalTranscriptItem.WorkStep -> item.message.createdAt > timestamp
+                is LocalTranscriptItem.WorkStep -> item.message.toolDeclaredAt ?: item.message.createdAt > timestamp
                 is LocalTranscriptItem.WorkProcess -> item.messages.first().createdAt > timestamp
                 is LocalTranscriptItem.Thinking -> item.messages.first().createdAt > timestamp
                 is LocalTranscriptItem.WorkPendingTool -> (item.activity.declaredAt ?: Long.MAX_VALUE) > timestamp
