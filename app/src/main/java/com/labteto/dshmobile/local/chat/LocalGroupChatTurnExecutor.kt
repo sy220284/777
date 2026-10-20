@@ -101,9 +101,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
         get() = chatPersistence.diaryStore
     private val imageCapabilities
         get() = runtimeStateStore.imageCapabilities
-    private val imageRequestBudget by lazy {
-        localImageRequestBudgetForModelConcurrency(runtimeStateStore.resourceBudget.maxModelRequests)
-    }
+    private val imageRequestBudget get() = localImageRequestBudgetForModelConcurrency(runtimeStateStore.resourceScheduler.snapshot().budget.maxModelRequests)
     private val workspacePath: String
         get() = sessionStorage.files.workspace.path
 
