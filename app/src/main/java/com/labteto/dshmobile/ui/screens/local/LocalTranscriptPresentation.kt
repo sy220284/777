@@ -106,11 +106,15 @@ internal fun buildLocalDisplayTranscript(items: List<LocalTranscriptItem>): List
             val ordered = item.messages.toMutableList()
             val completedAtStart = ordered.filter {
                 it.role == "tool" && it.toolDeclaredAt != null
-            }.sortedBy { it.toolDeclaredAt }
+            }.sortedWith(
+                compareBy<LocalHarnessMessage> { it.toolDeclaredAt ?: Long.MAX_VALUE }
+                    .thenBy { it.toolDeclaredSequence ?: Long.MAX_VALUE }
+            )
             ordered.removeAll { it.role == "tool" && it.toolDeclaredAt != null }
             completedAtStart.forEach { tool ->
                 val target = ordered.indexOfFirst {
-                    it.createdAt > (tool.toolDeclaredAt ?: Long.MAX_VALUE)
+                    (if (it.role == "tool") it.toolDeclaredAt ?: it.createdAt else it.createdAt) >
+                        (tool.toolDeclaredAt ?: Long.MAX_VALUE)
                 }
                 ordered.add(if (target < 0) ordered.size else target, tool)
             }
