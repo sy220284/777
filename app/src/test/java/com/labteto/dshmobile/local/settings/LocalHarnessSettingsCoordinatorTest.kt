@@ -43,7 +43,7 @@ class LocalHarnessSettingsCoordinatorTest {
     fun agentAndModelRuntimeSettingsPublishInOneSharedPreferenceTransaction() = runTest {
         val saved = linkedMapOf<String, Any?>()
         var editCalls = 0
-        var applyCalls = 0
+        var commitCalls = 0
         val recordedPreferences = Proxy.newProxyInstance(
             SharedPreferences::class.java.classLoader,
             arrayOf(SharedPreferences::class.java),
@@ -65,7 +65,8 @@ class LocalHarnessSettingsCoordinatorTest {
                                 staged[args!![0] as String] = null
                                 editor
                             }
-                            "apply" -> { saved.putAll(staged); applyCalls++; null }
+                            "commit" -> { saved.putAll(staged); commitCalls++; true }
+                            "apply" -> error("运行参数必须使用可检查结果的 commit")
                             else -> error("Unexpected editor method: ${operation.name}")
                         }
                     } as SharedPreferences.Editor
@@ -79,7 +80,7 @@ class LocalHarnessSettingsCoordinatorTest {
         val settings = LocalHarnessSettingsCoordinator(recordedPreferences, store, runtime, backgroundScope)
         settings.configureRuntimeLimits(mainMaxSteps = 40, subagentMaxSteps = 75, modelAttempts = 99)
         assertEquals(1, editCalls)
-        assertEquals(1, applyCalls)
+        assertEquals(1, commitCalls)
         assertEquals(40, saved["main_max_steps"])
         assertEquals(75, saved["subagent_max_steps"])
         assertEquals(5, saved["model_attempts"])
@@ -103,5 +104,44 @@ class LocalHarnessSettingsCoordinatorTest {
         runCurrent()
         assertEquals("second", runtime.state.value.userRules)
         assertEquals(UserProfile("second", false, true), store.read())
+    }
+
+    @Test
+    fun failedPreferenceCommitDoesNotPublishRuntimeLimits() = runTest {
+        var commitCalls = 0
+        val rejectingPreferences = Proxy.newProxyInstance(
+            SharedPreferences::class.java.classLoader,
+            arrayOf(SharedPreferences::class.java),
+        ) { _, method, _ ->
+            when (method.name) {
+                "edit" -> Proxy.newProxyInstance(
+                    SharedPreferences.Editor::class.java.classLoader,
+                    arrayOf(SharedPreferences.Editor::class.java),
+                ) { editor, operation, _ ->
+                    when (operation.name) {
+                        "putInt", "putString", "remove" -> editor
+                        "commit" -> { commitCalls++; false }
+                        "apply" -> error("不得异步发布失败提交")
+                        else -> error("Unexpected editor method: ${operation.name}")
+                    }
+                } as SharedPreferences.Editor
+                else -> error("Unexpected preferences method: ${method.name}")
+            }
+        } as SharedPreferences
+        val runtime = LocalRuntimeStateStore().apply { initialize(LocalHarnessState(sessionId = "settings")) }
+        val original = runtime.state.value
+        val settings = LocalHarnessSettingsCoordinator(
+            rejectingPreferences,
+            UserProfileStore(File(temporary.root, "failure.json"), Json),
+            runtime,
+            backgroundScope,
+        )
+        assertThrows(IllegalStateException::class.java) {
+            settings.configureRuntimeLimits(40, 75, 5)
+        }
+        assertEquals(1, commitCalls)
+        assertEquals(original.mainMaxSteps, runtime.state.value.mainMaxSteps)
+        assertEquals(original.subagentMaxSteps, runtime.state.value.subagentMaxSteps)
+        assertEquals(original.modelState.modelAttempts, runtime.state.value.modelState.modelAttempts)
     }
 }
