@@ -41,6 +41,8 @@ internal sealed interface LocalTranscriptItem {
         val result: LocalMediaResult,
         /** Visual attachment identity; null keeps independent historical/media-studio rows. */
         val attachedTo: String? = null,
+        /** 2-4 adjacent images of the same owner. Includes [result] when non-empty. */
+        val groupedResults: List<LocalMediaResult> = emptyList(),
     ) : LocalTranscriptItem {
         override val key: String = "media-result:${result.id}"
     }
@@ -451,10 +453,41 @@ internal fun composeLocalReplyAttachments(
         }
     }
     if (attachments.isEmpty()) return timeline
-    return buildList(timeline.size) {
+    val ordered = buildList(timeline.size) {
         unowned.forEach { item ->
             add(item)
             attachments[item.key]?.let { addAll(it) }
         }
     }
+    return groupOwnedReplyImages(ordered)
+}
+
+/**
+ * Gallery is only a bounded presentation optimization. Original asset IDs, provenance,
+ * download ownership and image-viewer actions stay independent and addressable.
+ * Keep the first asset's original LazyColumn key to avoid a scroll jump on grouping.
+ */
+private fun groupOwnedReplyImages(items: List<LocalTranscriptItem>): List<LocalTranscriptItem> {
+    val result = ArrayList<LocalTranscriptItem>(items.size)
+    var index = 0
+    while (index < items.size) {
+        val first = items[index] as? LocalTranscriptItem.MediaResult
+        if (first == null || first.attachedTo == null ||
+            !first.result.kind.equals("IMAGE", ignoreCase = true)) {
+            result += items[index++]
+            continue
+        }
+        val images = mutableListOf(first.result)
+        var next = index + 1
+        while (next < items.size && images.size < 4) {
+            val candidate = items[next] as? LocalTranscriptItem.MediaResult ?: break
+            if (candidate.attachedTo != first.attachedTo ||
+                !candidate.result.kind.equals("IMAGE", ignoreCase = true)) break
+            images += candidate.result
+            next += 1
+        }
+        result += if (images.size > 1) first.copy(groupedResults = images) else first
+        index = next
+    }
+    return result
 }

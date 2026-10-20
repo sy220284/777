@@ -80,4 +80,41 @@ class LocalReplyCompositionTest {
         assertEquals(step.key, (actual[1] as LocalTranscriptItem.WorkArtifact).attachedTo)
         assertNull((actual[2] as LocalTranscriptItem.WorkArtifact).attachedTo)
     }
+    @Test fun consecutiveOwnedImagesFormGalleryWithFirstImageStableKey() {
+        val timeline = listOf(message("a"), result("img1", "a"), result("img2", "a"),
+            result("img3", "a"), message("next", "user"))
+        val grouped = composeLocalReplyAttachments(timeline)
+        assertEquals(listOf("message:a", "media-result:img1", "message:next"),
+            grouped.map { it.key })
+        val gallery = grouped[1] as LocalTranscriptItem.MediaResult
+        assertEquals(listOf("img1", "img2", "img3"),
+            gallery.groupedResults.map { it.id })
+        assertEquals("message:a", gallery.attachedTo)
+    }
+
+    @Test fun manyImagesSplitIntoBoundedGroupsWithoutDroppingOriginalIds() {
+        val many = (1..11).map { result("image-$it", "a") }
+        val grouped = composeLocalReplyAttachments(listOf(message("a")) + many)
+            .filterIsInstance<LocalTranscriptItem.MediaResult>()
+        assertEquals(3, grouped.size)
+        assertEquals(listOf(4, 4, 3), grouped.map { it.groupedResults.size })
+        assertEquals((1..11).map { "image-$it" },
+            grouped.flatMap { it.groupedResults }.map { it.id })
+        assertEquals(listOf("media-result:image-1", "media-result:image-5",
+            "media-result:image-9"), grouped.map { it.key })
+    }
+
+    @Test fun unrelatedMediaNeverCombineWithReplyGallery() {
+        val first = message("a")
+        val second = message("b")
+        val legacy = result("legacy", null)
+        val grouped = composeLocalReplyAttachments(listOf(first, second,
+            result("i1", "a"), result("i2", "b"), legacy, result("i3", "a")))
+        val ordered = grouped.filterIsInstance<LocalTranscriptItem.MediaResult>()
+        assertEquals(listOf("i1", "i2", "legacy"), ordered.map { it.result.id })
+        assertEquals(listOf("i1", "i3"), ordered.first().groupedResults.map { it.id })
+        assertEquals(listOf(2, 0, 0), ordered.map { it.groupedResults.size })
+        assertNull(ordered.last().attachedTo)
+    }
+
 }
