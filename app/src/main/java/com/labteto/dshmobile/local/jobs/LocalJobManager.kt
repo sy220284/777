@@ -13,9 +13,11 @@ internal class LocalJobManager(
     scope: CoroutineScope,
     store: LocalPersistentJobStore? = null,
     onChanged: (List<LocalJobInfo>) -> Unit,
+    maxConcurrentJobs: Int = 4,
 ) {
     private val delegate = HarnessJobManager(
         scope = scope,
+        maxConcurrentJobs = maxConcurrentJobs,
         onChanged = { jobs ->
             onChanged(jobs.map { it.toLocalJobInfo() })
         },
