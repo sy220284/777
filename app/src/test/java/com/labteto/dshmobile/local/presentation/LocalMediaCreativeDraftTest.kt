@@ -31,6 +31,22 @@ class LocalMediaCreativeDraftTest {
         assertFalse(draft.contains("哈喽"))
     }
 
+    @Test fun inlineStageDirectionDoesNotImportSurroundingCapabilityExplanation() {
+        val reply = "你好！（女孩站在雨中握着红伞）我可以整理文件、运行命令。"
+        val draft = mediaCreativeDraft(LocalMediaKind.IMAGE, reply, "", "")
+        assertTrue(draft.contains("女孩站在雨中握着红伞"))
+        assertFalse(draft.contains("运行命令"))
+        assertFalse(draft.contains("我可以整理文件"))
+    }
+
+    @Test fun stageAndNarrativeAreBothRetained() {
+        val reply = "女孩坐在窗边，夕阳映在墙上。（她微笑着挥手）你好。"
+        val draft = mediaCreativeDraft(LocalMediaKind.IMAGE, reply, "", "")
+        assertTrue(draft.contains("女孩坐在窗边"))
+        assertTrue(draft.contains("她微笑着挥手"))
+        assertFalse(draft.contains("你好"))
+    }
+
     @Test fun directNarrativeSceneStillPrefillsAnImage() {
         val reply = "黄昏时分，女孩站在山顶，举起灯笼，远处夕阳映红了云层。\n我还能帮你分析代码。"
         val draft = mediaCreativeDraft(LocalMediaKind.IMAGE, reply, "阿青", "她穿着蓝色长裙")
