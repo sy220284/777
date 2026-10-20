@@ -75,9 +75,13 @@ internal fun naturalWorkToolAction(toolName: String?, argumentsPreview: String?)
     val data = argumentsPreview?.let { preview ->
         runCatching { Json.parseToJsonElement(preview) }.getOrNull() as? JsonObject
     }
-    val hint = listOf("query", "q", "search", "search_query", "path", "file_path", "filename")
+    val pathHint = listOf("path", "file_path", "filename")
         .mapNotNull { key -> data?.get(key)?.toString() }
         .joinToString(" ").lowercase()
+    val queryHint = listOf("query", "q", "search", "search_query")
+        .mapNotNull { key -> data?.get(key)?.toString() }
+        .joinToString(" ").lowercase()
+    val hint = "$pathHint $queryHint"
     // Broad categories only: no user-authored query or private path is echoed.
     val subject = when {
         Regex("""(?:timeline|transcript|workstep|workreply|工作步骤|时间线|回复显示)""")
@@ -88,9 +92,17 @@ internal fun naturalWorkToolAction(toolName: String?, argumentsPreview: String?)
         Regex("""(?:androidtest|regression|test\.kt|测试|回归)""")
             .containsMatchIn(hint) -> "相关测试"
         Regex("""(?:视觉|ui/|/ui|design|界面|layout)""")
-            .containsMatchIn(hint) -> "界面设计"
+            .containsMatchIn(hint) ->
+            if (pathHint.endsWith(".kt\"") || pathHint.contains(".kt")) "界面代码"
+            else "界面设计资料"
         Regex("""(?:log|diagnostic|日志)""").containsMatchIn(hint) -> "诊断日志"
         else -> null
+    }
+    val fileSubject = when (subject) {
+        "工作回复时间线" -> "工作回复时间线代码"
+        "相关测试" -> "相关测试文件"
+        "技能配置" -> "技能配置文件"
+        else -> subject
     }
 
     return when {
@@ -107,10 +119,10 @@ internal fun naturalWorkToolAction(toolName: String?, argumentsPreview: String?)
         name.contains("github") && name.contains("get_pr_info") ->
             "查看拉取请求状态与改动"
         name.contains("github") && name.contains("fetch_file") ->
-            "查看" + (subject ?: "仓库代码文件")
+            "查看" + (fileSubject ?: "仓库代码文件")
         name.contains("github") && (name.contains("update_file") ||
             name.contains("create_file")) ->
-            (if (name.contains("create_file")) "新增" else "修改") + (subject ?: "仓库文件")
+            (if (name.contains("create_file")) "新增" else "修改") + (fileSubject ?: "仓库文件")
         name.contains("figma") && (name.contains("get") || name.contains("read") ||
             name.contains("search")) -> "查看视觉设计稿"
         name == "web_search" -> "检索" + (subject ?: "网络资料")
