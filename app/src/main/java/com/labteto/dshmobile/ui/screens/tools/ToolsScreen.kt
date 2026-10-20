@@ -31,11 +31,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
@@ -57,6 +62,8 @@ import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyDialog
@@ -98,7 +105,6 @@ enum class ToolsNotice {
 
 data class ToolsUiState(
     val loading: Boolean = false,
-    val capabilities: List<com.labteto.dshmobile.local.presentation.LocalCapabilityUiEntry> = emptyList(),
     val servers: List<McpServerSnapshot> = emptyList(),
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
@@ -244,7 +250,6 @@ class ToolsViewModel @Inject constructor(
                     servers = servers,
                     githubConfigured = localTools.githubConfigured(),
                     localPlugins = plugins,
-                    capabilities = localTools.capabilityCatalogue(),
                     skills = skills,
                     presets = presets,
                 )
@@ -382,7 +387,6 @@ class ToolsViewModel @Inject constructor(
                     loading = false,
                     servers = localTools.servers(),
                     localPlugins = localTools.installedPluginIds(),
-                    capabilities = localTools.capabilityCatalogue(),
                     notice = ToolsNotice.CONNECTED,
                 )
             } catch (cancelled: CancellationException) {
@@ -406,7 +410,6 @@ class ToolsViewModel @Inject constructor(
                     loading = false,
                     servers = localTools.servers(),
                     localPlugins = localTools.installedPluginIds(),
-                    capabilities = localTools.capabilityCatalogue(),
                     notice = ToolsNotice.CONNECTED,
                 )
             } catch (cancelled: CancellationException) {
@@ -430,7 +433,6 @@ class ToolsViewModel @Inject constructor(
                     loading = false,
                     githubConfigured = true,
                     localPlugins = localTools.installedPluginIds(),
-                    capabilities = localTools.capabilityCatalogue(),
                     notice = ToolsNotice.CONNECTED,
                 )
             } catch (cancelled: CancellationException) {
@@ -476,7 +478,6 @@ class ToolsViewModel @Inject constructor(
                     loading = false,
                     servers = localTools.servers(),
                     localPlugins = localTools.installedPluginIds(),
-                    capabilities = localTools.capabilityCatalogue(),
                     notice = ToolsNotice.DISCONNECTED,
                 )
             } catch (cancelled: CancellationException) {
@@ -534,14 +535,9 @@ fun ToolsScreen(
     var expandedMcpServer by remember { mutableStateOf<String?>(null) }
     var showAgentSettings by remember { mutableStateOf(false) }
     var confirmClearGitHub by remember { mutableStateOf(false) }
-    var showPluginBrowser by remember(startAtPlugins, startAtSkills) { mutableStateOf(startAtPlugins || startAtSkills) }
-    var capabilityCatalogueVisible by remember { mutableStateOf(true) }
-    var catalogueFailure by remember { mutableStateOf(false) }
-    LaunchedEffect(state.notice) { if (state.notice == ToolsNotice.LOAD_FAILED) catalogueFailure = true }
-    LaunchedEffect(state.loading) { if (state.loading) catalogueFailure = false }
-    var skillsOnly by remember(startAtSkills) { mutableStateOf(startAtSkills) }
-    LaunchedEffect(showPluginBrowser, skillsOnly) {
-        if (showPluginBrowser && skillsOnly) viewModel.refresh()
+    // Single page with three tabs. The registered tool catalogue is not user-facing.
+    var selectedTab by rememberSaveable(startAtPlugins, startAtSkills) {
+        mutableIntStateOf(if (startAtSkills) 1 else 0)
     }
 
     val noticeMessage = state.notice?.let { notice ->
@@ -557,13 +553,11 @@ fun ToolsScreen(
         )
     }
 
-    BackHandler(enabled = showGitHubBrowser || showGitHubConfig || showPluginBrowser || showAgentSettings || !capabilityCatalogueVisible || handleRootSystemBack) {
+    BackHandler(enabled = showGitHubBrowser || showGitHubConfig || showAgentSettings || handleRootSystemBack) {
         when {
             showGitHubBrowser -> showGitHubBrowser = false
             showGitHubConfig -> showGitHubConfig = false
             showAgentSettings -> showAgentSettings = false
-            showPluginBrowser -> showPluginBrowser = false
-            !capabilityCatalogueVisible -> capabilityCatalogueVisible = true
             else -> onClose()
         }
     }
@@ -615,60 +609,52 @@ fun ToolsScreen(
                 SyToastHost(toast)
             }
         }
-    } else if (showPluginBrowser) {
-        PluginInventoryBrowser(
-            localIds = state.localPlugins,
-            connectedServices = state.servers,
-            skills = state.skills,
-            presets = state.presets,
-            createdSkillId = state.createdSkillId,
-            skillEditor = state.skillEditor,
-            savedSkillId = state.savedSkillId,
-            skillsOnly = skillsOnly,
-            loading = state.loading,
-            error = if (!skillsOnly && state.notice == ToolsNotice.LOAD_FAILED) stringResource(R.string.tools_load_failed) else null,
-            onRetry = viewModel::refresh,
-            onBack = { showPluginBrowser = false },
-            onManageConnections = {
-                showPluginBrowser = false
-                showExternalConfig = true
-            },
-            onReturnToChat = onClose,
-            onUseCapability = onUseCapability,
-            onInstallPreset = viewModel::installPreset,
-            onCreateSkill = viewModel::createSkill,
-            onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
-            onRemoveSkill = viewModel::removeSkill,
-            onOpenSkillEditor = viewModel::openSkillEditor,
-            onCloseSkillEditor = viewModel::closeSkillEditor,
-            onSaveSkillDocument = viewModel::saveSkillDocument,
-            onSetSkillModelInvocable = viewModel::setSkillModelInvocable,
-        )
-    } else if (capabilityCatalogueVisible) {
-        FluidCapabilityCatalogue(
-            entries = state.capabilities, loading = state.loading, failed = catalogueFailure,
-            connections = state.servers.size, onRefresh = viewModel::refresh, onBack = onClose,
-            onManage = { capabilityCatalogueVisible = false },
-            onPlugins = { skillsOnly = false; showPluginBrowser = true },
-            onSkills = { skillsOnly = true; showPluginBrowser = true },
-            onUseCapability = onUseCapability,
-        )
     } else {
-    Box(Modifier.fillMaxSize()) {
-        Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
-            Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                SyTopBar(
-                    title = stringResource(R.string.tools_title),
-                    subtitle = stringResource(R.string.tools_subtitle),
-                    onBack = { capabilityCatalogueVisible = true },
-                    backContentDescription = stringResource(R.string.common_back),
-                    largeTitle = false,
-                    actionIcon = FeatherIcons.RefreshCw,
-                    actionContentDescription = stringResource(R.string.tools_refresh),
-                    actionEnabled = !state.loading,
-                    onAction = viewModel::refresh,
-                )
-
+        Box(Modifier.fillMaxSize()) {
+            Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
+                Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+                    SyTopBar(
+                        title = stringResource(R.string.tools_title),
+                        onBack = onClose,
+                        backContentDescription = stringResource(R.string.common_back),
+                        actionIcon = FeatherIcons.RefreshCw,
+                        actionContentDescription = stringResource(R.string.tools_refresh),
+                        actionEnabled = !state.loading,
+                        onAction = viewModel::refresh,
+                    )
+                    CapabilityCenterTabs(selectedTab) { selectedTab = it }
+                    Box(Modifier.weight(1f)) {
+                        when (selectedTab) {
+                            0, 1 -> key(selectedTab) {
+                                PluginInventoryBrowser(
+                                    localIds = state.localPlugins,
+                                    connectedServices = state.servers,
+                                    skills = state.skills,
+                                    presets = state.presets,
+                                    createdSkillId = state.createdSkillId,
+                                    skillEditor = state.skillEditor,
+                                    savedSkillId = state.savedSkillId,
+                                    skillsOnly = selectedTab == 1,
+                                    embedded = true,
+                                    loading = state.loading,
+                                    error = if (selectedTab == 0 && state.notice == ToolsNotice.LOAD_FAILED)
+                                        stringResource(R.string.tools_load_failed) else null,
+                                    onRetry = viewModel::refresh,
+                                    onBack = onClose,
+                                    onManageConnections = { selectedTab = 2 },
+                                    onReturnToChat = onClose,
+                                    onUseCapability = onUseCapability,
+                                    onInstallPreset = viewModel::installPreset,
+                                    onCreateSkill = viewModel::createSkill,
+                                    onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
+                                    onRemoveSkill = viewModel::removeSkill,
+                                    onOpenSkillEditor = viewModel::openSkillEditor,
+                                    onCloseSkillEditor = viewModel::closeSkillEditor,
+                                    onSaveSkillDocument = viewModel::saveSkillDocument,
+                                    onSetSkillModelInvocable = viewModel::setSkillModelInvocable,
+                                )
+                            }
+                            else -> Column(Modifier.fillMaxSize()) {
                 val initialLoading = state.loading &&
                     state.localPlugins.isEmpty() &&
                     state.servers.isEmpty() &&
@@ -749,14 +735,6 @@ fun ToolsScreen(
                         color = colors.textSecondary,
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
-                        val builtinAvailable = "android-local-builtins" in state.localPlugins
-                        ToolCapabilityRow(
-                            iconPainter = painterResource(R.drawable.ic_ui_plugin),
-                            title = stringResource(R.string.skills_title),
-                            status = capabilityStateLabel(builtinAvailable),
-                            state = if (builtinAvailable) StateDotState.Done else StateDotState.Idle,
-                            onClick = { skillsOnly = true; showPluginBrowser = true },
-                        )
                         ToolCapabilityRow(
                             icon = SyEntryIcons.Projects,
                             title = stringResource(R.string.tools_github_connector),
@@ -777,9 +755,12 @@ fun ToolsScreen(
                     }
                 }
             }
+                        }
+                    }
+                }
+            }
+            SyToastHost(toast, Modifier.safeDrawingPadding())
         }
-        SyToastHost(toast, Modifier.safeDrawingPadding())
-    }
     }
 
     if (showGitHubBrowser) {
@@ -1068,6 +1049,36 @@ fun ToolsScreen(
             }
         }
     }
+}
+
+/** All three user-facing sections stay in the same screen and navigation entry. */
+@Composable
+internal fun CapabilityCenterTabs(selectedTab: Int, onSelect: (Int) -> Unit) {
+    SySegmented(
+        segments = listOf(
+            SySegment("plugins", stringResource(R.string.tools_catalog_title)),
+            SySegment("skills", stringResource(R.string.skills_title)),
+            SySegment("permissions", stringResource(R.string.settings_page_permissions)),
+        ),
+        selectedKey = when (selectedTab) {
+            1 -> "skills"
+            2 -> "permissions"
+            else -> "plugins"
+        },
+        onSelect = { key ->
+            onSelect(when (key) {
+                "skills" -> 1
+                "permissions" -> 2
+                else -> 0
+            })
+        },
+        role = Role.Tab,
+        hapticOnChange = true,
+        stretch = true,
+        modifier = Modifier.fillMaxWidth()
+            .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapSm)
+            .testTag("capability-center-tabs"),
+    )
 }
 
 @Composable
