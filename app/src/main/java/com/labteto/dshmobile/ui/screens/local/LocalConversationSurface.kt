@@ -588,9 +588,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             videoMediaTasks,
             pendingMediaJobs,
         )
-        if (state.usageMode == LocalUsageMode.WORK) appendPendingWorkToolActivities(
+        val withActivities = if (state.usageMode == LocalUsageMode.WORK) appendPendingWorkToolActivities(
             appendWorkArtifactsToTranscript(mediaTimeline, workArtifacts), workToolActivities, state.running,
         ) else mediaTimeline
+        composeLocalReplyAttachments(withActivities)
     }
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
@@ -1229,6 +1230,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         }
                         is LocalTranscriptItem.MediaResult -> LocalGeneratedMediaResultRow(
                             result = transcriptItem.result,
+                            inline = transcriptItem.attachedTo != null,
                             viewModel = mediaStudioViewModel,
                             onRevise = { draft ->
                                 mediaRevision = draft
@@ -1247,10 +1249,12 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         )
                         is LocalTranscriptItem.CreationJob -> LocalCreationJobMessageRow(
                             job = transcriptItem.job,
+                            inline = transcriptItem.attachedTo != null,
                             viewModel = mediaStudioViewModel,
                         )
                         is LocalTranscriptItem.VideoTask -> LocalGeneratedVideoTaskRow(
                             task = transcriptItem.task,
+                            inline = transcriptItem.attachedTo != null,
                             offers = com.labteto.dshmobile.local.model.LocalMediaCatalog.offers(state.modelProfiles),
                             viewModel = mediaStudioViewModel,
                             onRevise = { draft ->
@@ -1263,6 +1267,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         )
                         is LocalTranscriptItem.WorkArtifact -> LocalWorkArtifactMessageRow(
                             artifact = transcriptItem.artifact,
+                            inline = transcriptItem.attachedTo != null,
                             workspacePath = state.workspacePath,
                             actions = workActions,
                             onOpen = { onOpenWorkArtifact(transcriptItem.artifact.reference) },
