@@ -12,6 +12,18 @@ class LocalWorkReplyPresentationTest {
         LocalHarnessMessage(id = id, role = role, content = content,
             toolName = toolName, createdAt = id.length.toLong(), toolIsError = error)
 
+    @Test fun sameMillisecondPendingCallStaysBeforeLaterCompletedCall() {
+        val user = LocalTranscriptItem.Message(message("u", "user", "检查").copy(createdAt = 100L))
+        val completed = LocalTranscriptItem.WorkStep(message("r", "tool", "ok", "read", false)
+            .copy(createdAt = 180L, toolCallId = "second", toolDeclaredAt = 120L, toolDeclaredSequence = 6L))
+        val first = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
+            callId = "first", name = "read",
+            phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING,
+            declaredAt = 120L, declaredSequence = 5L)
+        val output = appendPendingWorkToolActivities(listOf(user, completed), listOf(first), true)
+        assertEquals(listOf("message:u", "work-tool:first", "work-tool:second"), output.map { it.key })
+    }
+
     @Test fun independentToolCallsKeepSeparateChronologicalRows() {
         val events = listOf(
             message("read-one", "tool", "ok", "mcp_github_fetch_file", false),
