@@ -1722,6 +1722,12 @@ internal class LocalAgentTeamRuntime(
         projectionRuntime.awaitReady(sessionId, eventLogFor(sessionId))
     }
 
+    /** Cold-start mailbox reconciliation must not run against a half-rebuilt event projection. */
+    internal suspend fun recoverMailboxAfterProjection(sessionId: String) {
+        awaitProjection(sessionId)
+        recoverMailbox(sessionId)
+    }
+
     internal fun project(sessionId: String): LocalTeamProjection =
         projectionRuntime.project(sessionId, eventLogFor(sessionId))
 
