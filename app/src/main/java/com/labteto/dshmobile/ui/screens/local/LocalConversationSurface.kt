@@ -596,7 +596,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val showStreamingTail = shouldShowWorkStreamingTail(
         running = state.running,
         usageMode = state.usageMode,
-        lastItem = transcriptItems.lastOrNull(),
+        lastItem = localReplyStreamingBoundary(transcriptItems),
     )
     val transcriptLastListIndex = localTranscriptLastListIndex(
         transcriptItemCount = transcriptItems.size,
