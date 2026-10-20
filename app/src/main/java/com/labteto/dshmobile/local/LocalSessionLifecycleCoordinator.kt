@@ -442,13 +442,15 @@ internal class LocalSessionLifecycleCoordinator(
                     }
                     val durableDeletedIds = linkedSetOf<String>()
                     try {
-                        beforeEventLogsDeleted(ids)
                         withContext(Dispatchers.IO) {
                             // Delete background sessions first; current session last.
                             // On a partial deletion failure the visible conversation remains intact.
                             localSessionDeletionOrder(ids, sourceId).forEach { id ->
                                 sessionCoordinator.delete(id)
                                 durableDeletedIds += id
+                                // Do not clear event-log bytes before primary/backup deletion
+                                // succeeds: a failed deletion must remain recoverable with history.
+                                beforeEventLogsDeleted(setOf(id))
                                 toolOutputStore.deleteSession(id)
                                 sessionsRoot.listFiles().orEmpty()
                                     .filter {
