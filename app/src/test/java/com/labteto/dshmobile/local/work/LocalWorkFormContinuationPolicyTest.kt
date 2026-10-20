@@ -48,6 +48,27 @@ class LocalWorkFormContinuationPolicyTest {
         assertFalse(hasOutstandingWorkReplyForm(reopened))
         reopened.close()
     }
+    @Test fun userInputAlreadyQueuedBeforeTheFormDoesNotCountAsItsSubmission() {
+        val log = LocalSessionEventLog(File(temporary.root, "prequeued.events.jsonl"),
+            Json, sessionId = "s")
+        fun userQueued(id: String) {
+            log.append(com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE,
+                encodeLocalAgentInboxEvent("queued",
+                    listOf(QueuedAgentInput(content = "用户先前排队的消息", id = id)),
+                    listOf(QueuedAgentInput(content = "用户先前排队的消息", id = id))))
+        }
+        userQueued("before-form")
+        log.append(WORK_REPLY_FORM_WAIT_EVENT, buildJsonObject {
+            put("source_message_id", "source-user-message")
+        })
+        assertTrue("prequeued user must not release new form", hasOutstandingWorkReplyForm(log))
+        log.append("tool/result", buildJsonObject { put("id", "tool") })
+        assertTrue(hasOutstandingWorkReplyForm(log))
+        userQueued("after-form")
+        assertFalse("only the new user input releases the form", hasOutstandingWorkReplyForm(log))
+        log.close()
+    }
+
     @Test fun queuedRetryAndCrashRecoveryContinuationCannotPassUnsubmittedForm() {
         val log = LocalSessionEventLog(File(temporary.root, "resume.events.jsonl"), Json, sessionId = "s")
         val goal = LocalGoal("待用户决策", id = "g", revision = 1L)
