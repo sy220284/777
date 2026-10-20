@@ -107,10 +107,10 @@ internal fun retainTextForModel(
  * payload. The full durable result is spilled by the caller; this returns a bounded recoverable
  * preview so cache-friendly history can keep growing by append instead of compaction.
  *
- * The Work visible allowance below is shared by three consumers and must not drift: write-time
- * retention here, request-time projection (LocalWorkRequestContextProjection) and the recovery
- * page ceiling in LocalToolOutputStore. A page ceiling above this allowance would be re-truncated
- * downstream while next_byte still advanced by the full page, silently skipping bytes.
+ * Work uses a two-tier model-visible policy: the newest tool result may use the larger
+ * inline window, while stale results shrink aggressively in LocalToolHistoryProjection. The
+ * full result is always recoverable from LocalToolOutputStore. The recovery page plus headers
+ * must remain inside the fresh inline window; otherwise next_byte can advance past invisible data.
  */
 internal fun retainToolResultForModel(
     value: String,
@@ -137,14 +137,14 @@ internal fun retainWorkToolResultForModel(value: String): LocalRetainedText {
  * Fresh Work tool results stay verbatim up to this size. It equals
  * LocalToolOutputStore.DEFAULT_READ_BYTES, so one default recovery page stays fully visible.
  */
-internal const val WORK_TOOL_INLINE_BYTES = 4 * 1024
+internal const val WORK_TOOL_INLINE_BYTES = 8 * 1024
 
 /**
- * Preview allowance for oversized fresh results. The char cap adds the omission marker length (18)
- * so the resulting byte window still equals WORK_TOOL_INLINE_BYTES and no size range is lost.
+ * Preserve a UTF-8 safety margin for the truncation marker so a fresh oversized preview
+ * fits in the same 8 KiB request allowance as a recovered page.
  */
-internal const val WORK_TOOL_PREVIEW_CHARS = WORK_TOOL_INLINE_BYTES + 18
-internal const val WORK_TOOL_PREVIEW_TOKENS = 1_600
+internal const val WORK_TOOL_PREVIEW_CHARS = WORK_TOOL_INLINE_BYTES
+internal const val WORK_TOOL_PREVIEW_TOKENS = 2_700
 
 /**
  * Recovery page ceiling in Work mode. One page plus its header must stay inside
