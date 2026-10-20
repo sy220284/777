@@ -49,6 +49,9 @@ class LocalHarnessSettingsCoordinatorTest {
             arrayOf(SharedPreferences::class.java),
         ) { _, method, _ ->
             when (method.name) {
+                "contains" -> saved.containsKey(args!![0] as String)
+                "getInt" -> saved[args!![0] as String] as? Int ?: args[1] as Int
+                "getString" -> saved[args!![0] as String] as? String ?: args[1] as String?
                 "edit" -> {
                     editCalls++
                     val staged = linkedMapOf<String, Any?>()
@@ -84,6 +87,7 @@ class LocalHarnessSettingsCoordinatorTest {
         assertEquals(40, saved["main_max_steps"])
         assertEquals(75, saved["subagent_max_steps"])
         assertEquals(5, saved["model_attempts"])
+        assertTrue("workerProfileId must stage in the same editor", saved.containsKey("worker_profile_id"))
         assertEquals(40, runtime.state.value.mainMaxSteps)
         assertEquals(75, runtime.state.value.subagentMaxSteps)
         assertEquals(5, runtime.state.value.modelState.modelAttempts)
@@ -109,22 +113,50 @@ class LocalHarnessSettingsCoordinatorTest {
     @Test
     fun failedPreferenceCommitDoesNotPublishRuntimeLimits() = runTest {
         var commitCalls = 0
+        val originalPreferences = linkedMapOf<String, Any?>(
+            "main_max_steps" to 25,
+            "subagent_max_steps" to 50,
+            "model_attempts" to 2,
+            "worker_profile_id" to "original-worker",
+        )
+        val saved = LinkedHashMap(originalPreferences)
         val rejectingPreferences = Proxy.newProxyInstance(
             SharedPreferences::class.java.classLoader,
             arrayOf(SharedPreferences::class.java),
-        ) { _, method, _ ->
+        ) { _, method, args ->
             when (method.name) {
-                "edit" -> Proxy.newProxyInstance(
-                    SharedPreferences.Editor::class.java.classLoader,
-                    arrayOf(SharedPreferences.Editor::class.java),
-                ) { editor, operation, _ ->
-                    when (operation.name) {
-                        "putInt", "putString", "remove" -> editor
-                        "commit" -> { commitCalls++; false }
-                        "apply" -> error("不得异步发布失败提交")
-                        else -> error("Unexpected editor method: ${operation.name}")
-                    }
-                } as SharedPreferences.Editor
+                "contains" -> saved.containsKey(args!![0] as String)
+                "getInt" -> saved[args!![0] as String] as? Int ?: args[1] as Int
+                "getString" -> saved[args!![0] as String] as? String ?: args[1] as String?
+                "edit" -> {
+                    val staged = linkedMapOf<String, Any?>()
+                    Proxy.newProxyInstance(
+                        SharedPreferences.Editor::class.java.classLoader,
+                        arrayOf(SharedPreferences.Editor::class.java),
+                    ) { editor, operation, editorArgs ->
+                        when (operation.name) {
+                            "putInt", "putString" -> {
+                                staged[editorArgs!![0] as String] = editorArgs[1]
+                                editor
+                            }
+                            "remove" -> {
+                                staged[editorArgs!![0] as String] = null
+                                editor
+                            }
+                            "commit" -> {
+                                // Match Android's in-memory-before-disk behavior:
+                                // failed first commit already changes visible preferences.
+                                staged.forEach { (key, value) ->
+                                    if (value == null) saved.remove(key) else saved[key] = value
+                                }
+                                commitCalls++
+                                commitCalls != 1
+                            }
+                            "apply" -> error("不得异步发布失败提交")
+                            else -> error("Unexpected editor method: ${operation.name}")
+                        }
+                    } as SharedPreferences.Editor
+                }
                 else -> error("Unexpected preferences method: ${method.name}")
             }
         } as SharedPreferences
@@ -139,7 +171,8 @@ class LocalHarnessSettingsCoordinatorTest {
         assertThrows(IllegalStateException::class.java) {
             settings.configureRuntimeLimits(40, 75, 5)
         }
-        assertEquals(1, commitCalls)
+        assertEquals(2, commitCalls)
+        assertEquals(originalPreferences, saved)
         assertEquals(original.mainMaxSteps, runtime.state.value.mainMaxSteps)
         assertEquals(original.subagentMaxSteps, runtime.state.value.subagentMaxSteps)
         assertEquals(original.modelState.modelAttempts, runtime.state.value.modelState.modelAttempts)
