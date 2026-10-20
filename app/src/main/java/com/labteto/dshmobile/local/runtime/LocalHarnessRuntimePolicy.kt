@@ -67,26 +67,60 @@ internal fun projectWorkResourceCount(
 internal fun canResolvePendingByEnablingAutoApproval(approval: LocalApproval?): Boolean =
     approval != null
 
-internal fun localResourceBudgetForMemoryClass(memoryClassMb: Int): HarnessResourceBudget = when {
-    memoryClassMb >= 512 -> HarnessResourceBudget(
-        maxModelRequests = 4,
-        maxAgents = 4,
-        maxTerminals = 4,
-        maxVirtualDisplays = 2,
-        maxLanguageServers = 4,
-    )
-    memoryClassMb >= 256 -> HarnessResourceBudget(
-        maxModelRequests = 3,
-        maxAgents = 3,
-        maxTerminals = 3,
-        maxVirtualDisplays = 2,
-        maxLanguageServers = 3,
-    )
-    else -> HarnessResourceBudget(
-        maxModelRequests = 2,
-        maxAgents = 2,
-        maxTerminals = 2,
-        maxVirtualDisplays = 1,
-        maxLanguageServers = 2,
+/**
+ * A memory class is only the app's Java heap tier, not the device's physical RAM.
+ * Read a stable Android MemoryInfo snapshot at startup; scheduler pressure still protects
+ * individual resource pools at runtime. Missing OS readings fall back to heap-only limits.
+ */
+internal data class LocalDeviceMemorySnapshot(
+    val totalRamMb: Int = 0,
+    val availableRamMb: Int = 0,
+    val lowMemory: Boolean = false,
+    val lowRamDevice: Boolean = false,
+)
+
+internal fun localResourceBudgetForMemoryClass(
+    memoryClassMb: Int,
+    deviceMemory: LocalDeviceMemorySnapshot = LocalDeviceMemorySnapshot(),
+): HarnessResourceBudget {
+    val ramSlots = when {
+        deviceMemory.totalRamMb >= 14 * 1024 -> 10  // 16 GB class
+        deviceMemory.totalRamMb >= 10 * 1024 -> 8   // 12 GB class
+        deviceMemory.totalRamMb >= 7 * 1024 -> 6    // 8 GB class
+        deviceMemory.totalRamMb >= 5 * 1024 -> 5    // 6 GB class
+        deviceMemory.totalRamMb >= 3 * 1024 -> 3    // 4 GB class
+        deviceMemory.totalRamMb > 0 -> 2
+        // When physical RAM cannot be read, grow conservatively from app heap.
+        memoryClassMb >= 512 -> 6
+        memoryClassMb >= 384 -> 5
+        memoryClassMb >= 256 -> 4
+        else -> 2
+    }
+    val heapSlots = when {
+        memoryClassMb >= 384 -> 10
+        memoryClassMb >= 256 -> 8
+        memoryClassMb >= 192 -> 6
+        memoryClassMb >= 128 -> 4
+        else -> 2
+    }
+    val availableSlots = when {
+        deviceMemory.lowMemory || deviceMemory.lowRamDevice -> 2
+        deviceMemory.availableRamMb in 1 until 512 -> 2
+        deviceMemory.availableRamMb in 512 until 1_024 -> 3
+        deviceMemory.availableRamMb in 1_024 until 2_048 -> 4
+        else -> 10
+    }
+    val slots = minOf(ramSlots, heapSlots, availableSlots)
+    return HarnessResourceBudget(
+        maxModelRequests = slots,
+        // Idle agents are less expensive than simultaneous provider requests.
+        maxAgents = (slots + if (slots >= 4) 2 else 0).coerceAtMost(12),
+        maxTerminals = (slots - 1).coerceIn(2, 6),
+        maxVirtualDisplays = when {
+            slots >= 8 -> 3
+            slots >= 4 -> 2
+            else -> 1
+        },
+        maxLanguageServers = (slots - 1).coerceIn(2, 6),
     )
 }
