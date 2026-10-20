@@ -183,7 +183,7 @@ internal fun parseMarkdown(markdown: String): List<MdBlock> {
                 val alignments = parseTableAlignments(lines[i + 1], header.size)
                 val rows = mutableListOf<List<String>>()
                 i += 2
-                while (i < lines.size && lines[i].trimStart().startsWith("|")) {
+                while (i < lines.size && isMarkdownTableRow(lines[i])) {
                     val cells = splitTableRow(lines[i])
                     rows += List(header.size) { column -> cells.getOrElse(column) { "" } }
                     i++
@@ -194,7 +194,8 @@ internal fun parseMarkdown(markdown: String): List<MdBlock> {
             else -> {
                 val para = mutableListOf(line)
                 i++
-                while (i < lines.size && lines[i].isNotBlank() && !isSpecialLine(lines[i])) {
+                while (i < lines.size && lines[i].isNotBlank() && !isSpecialLine(lines[i]) &&
+                    !isMarkdownTableStart(lines, i)) {
                     para += lines[i]
                     i++
                 }
@@ -220,12 +221,17 @@ private fun isSpecialLine(line: String): Boolean {
 
 private fun isMarkdownTableStart(lines: List<String>, index: Int): Boolean =
     index + 1 < lines.size &&
-        lines[index].trimStart().startsWith("|") &&
-        isTableSeparator(lines[index + 1])
+        isMarkdownTableRow(lines[index]) &&
+        isTableSeparator(lines[index + 1]) &&
+        splitTableRow(lines[index]).size == splitTableRow(lines[index + 1]).size
+
+/** A table row can omit its outside pipes; escaped and backtick pipes are not delimiters. */
+private fun isMarkdownTableRow(line: String): Boolean =
+    line.trimStart().startsWith("|") || splitTableRow(line).size > 1
 
 /** A separator cell is at least three dashes with optional leading/trailing alignment colons. */
 internal fun isTableSeparator(line: String): Boolean {
-    if (!line.trimStart().startsWith("|")) return false
+    if (!isMarkdownTableRow(line)) return false
     val cells = splitTableRow(line)
     return cells.isNotEmpty() && cells.all { it.trim().matches(Regex("^:?-{3,}:?$")) }
 }
