@@ -70,6 +70,7 @@ internal sealed interface LocalTranscriptItem {
     data class WorkStep(
         val message: LocalHarnessMessage,
         val repeatCount: Int = 1,
+        val activity: LocalToolActivityUiItem? = null,
     ) : LocalTranscriptItem {
         override val key: String =
             message.toolCallId?.takeIf { message.role == "tool" }?.let { "work-tool:$it" }
@@ -142,8 +143,16 @@ internal fun appendPendingWorkToolActivities(
     activities: List<LocalToolActivityUiItem>,
     running: Boolean,
 ): List<LocalTranscriptItem> {
-    if (!running) return transcript
-    val completedIds = transcript.filterIsInstance<LocalTranscriptItem.WorkStep>()
+    // The declaration has the true command arguments. Attach them to the durable completion
+    // by callId so a completed step retains the same natural-language description as in flight.
+    val byCallId = activities.associateBy { it.callId }
+    val enriched = transcript.map { item ->
+        if (item is LocalTranscriptItem.WorkStep && item.message.role == "tool") {
+            item.copy(activity = item.message.toolCallId?.let(byCallId::get) ?: item.activity)
+        } else item
+    }
+    if (!running) return enriched
+    val completedIds = enriched.filterIsInstance<LocalTranscriptItem.WorkStep>()
         .mapNotNull { it.message.toolCallId }.toSet()
     val lastUserAt = transcript.filterIsInstance<LocalTranscriptItem.Message>()
         .lastOrNull { it.message.role == "user" }?.message?.createdAt ?: Long.MIN_VALUE
@@ -154,10 +163,10 @@ internal fun appendPendingWorkToolActivities(
             compareBy<LocalToolActivityUiItem> { it.declaredAt ?: Long.MAX_VALUE }
                 .thenBy { it.declaredSequence ?: Long.MAX_VALUE }
         )
-    if (pending.isEmpty()) return transcript
+    if (pending.isEmpty()) return enriched
     // Insert at the call's original time instead of appending below newer narration,
     // completed replies or deliverables. Never reorder existing durable messages.
-    val result = transcript.toMutableList()
+    val result = enriched.toMutableList()
     pending.forEach { activity ->
         val timestamp = activity.declaredAt ?: Long.MAX_VALUE
         val index = result.indexOfFirst { item ->
