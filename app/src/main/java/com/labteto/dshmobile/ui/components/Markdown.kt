@@ -268,7 +268,7 @@ internal fun splitTableRow(line: String): List<String> {
             // C:\Users\name must retain their literal backslash characters.
             char == '\\' -> {
                 val next = source.getOrNull(index + 1)
-                if (next != null && next.code in 33..126 && !next.isLetterOrDigit()) {
+                if (next == '|' || next == '`') {
                     escaped = true
                 } else {
                     current.append(char)
