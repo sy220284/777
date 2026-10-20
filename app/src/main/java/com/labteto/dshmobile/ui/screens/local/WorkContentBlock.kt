@@ -314,7 +314,9 @@ private fun WorkToolStatusRow(
     Row(
         modifier = modifier.fillMaxWidth().then(clickable)
             .heightIn(min = if (onClick == null) 30.dp else 40.dp)
-            .semantics(mergeDescendants = true) { stateDescription = status },
+            .semantics(mergeDescendants = true) {
+                stateDescription = if (provider != null) "$provider，$status" else status
+            },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
