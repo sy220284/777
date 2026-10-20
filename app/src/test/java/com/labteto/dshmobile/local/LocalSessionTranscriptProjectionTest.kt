@@ -275,7 +275,7 @@ class LocalSessionTranscriptProjectionTest {
         val original = LocalHarnessMessage(
             id = "tool-identity", role = "tool", content = "完成", createdAt = 42L,
             toolName = "mcp__GitHub__fetch_file", toolCallId = "call-42",
-            toolDeclaredAt = 30L, toolIsError = false,
+            toolDeclaredAt = 30L, toolDeclaredSequence = 15L, toolIsError = false,
         )
         val encoded = buildJsonObject { put("transcript", encodeTranscriptMessages(listOf(original))) }
         assertEquals(original, decodeTranscriptMessages(encoded)!!.single())
