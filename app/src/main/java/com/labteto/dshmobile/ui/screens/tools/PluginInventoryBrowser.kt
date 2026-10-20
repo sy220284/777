@@ -346,7 +346,21 @@ internal fun PluginInventoryBrowser(
                         }
                     }
                 }
-                if (error != null || list.isEmpty()) {
+                if (error != null) {
+                    item(key = "inventory-error") {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
+                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(error, style = DsType.std14.withReadingWeight(), color = colors.dangerInk)
+                            if (onRetry != null) {
+                                SyButton(text = stringResource(R.string.common_retry), onClick = onRetry)
+                            }
+                        }
+                    }
+                }
+                if (list.isEmpty() && error == null) {
                     item(key = "inventory-empty") {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
@@ -354,13 +368,10 @@ internal fun PluginInventoryBrowser(
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(
-                                error ?: stringResource(if (loading) R.string.common_loading else if (query.isNotBlank()) R.string.tools_catalog_no_matches else if (skillsOnly) R.string.skills_catalog_empty else R.string.tools_catalog_empty),
+                                stringResource(if (loading) R.string.common_loading else if (query.isNotBlank()) R.string.tools_catalog_no_matches else if (skillsOnly) R.string.skills_catalog_empty else R.string.tools_catalog_empty),
                                 style = DsType.std14.withReadingWeight(),
                                 color = colors.textSecondary,
                             )
-                            if (error != null && onRetry != null) {
-                                SyButton(text = stringResource(R.string.common_retry), onClick = onRetry)
-                            }
                             // The existing V5 service-nav action above remains available here.
                             // Do not render a second visually identical external-service button.
                         }
