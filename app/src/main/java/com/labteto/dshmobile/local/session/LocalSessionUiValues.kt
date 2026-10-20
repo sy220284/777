@@ -22,6 +22,8 @@ data class LocalHarnessMessage(
     val blocks: List<LocalMessageBlock> = emptyList(),
     /** Stable Tool-owned call identity, used only to reconcile an in-flight UI row. */
     val toolCallId: String? = null,
+    /** Original declaration time keeps the tool row in place after it finishes. */
+    val toolDeclaredAt: Long? = null,
 )
 
 data class LocalSessionSummary(
