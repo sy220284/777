@@ -282,4 +282,32 @@ class HarnessResourceSchedulerTest {
         assertEquals(0, scheduler.snapshot().activeAgents)
     }
 
+    @Test
+    fun admissionRemainsFifoAfterCapacityChangesAndCancelledWaiters() = runTest {
+        val scheduler = HarnessResourceScheduler(
+            HarnessResourceBudget(maxModelRequests = 1, maxAgents = 1),
+        )
+        val held = scheduler.acquire(HarnessResourceKind.MODEL_REQUEST)
+        val order = mutableListOf<Int>()
+        val cancelled = async {
+            scheduler.withResource(HarnessResourceKind.MODEL_REQUEST) { order += 0 }
+        }
+        runCurrent()
+        val first = async {
+            scheduler.withResource(HarnessResourceKind.MODEL_REQUEST) { order += 1 }
+        }
+        runCurrent()
+        val second = async {
+            scheduler.withResource(HarnessResourceKind.MODEL_REQUEST) { order += 2 }
+        }
+        runCurrent()
+        cancelled.cancelAndJoin()
+        scheduler.updateBudget(HarnessResourceBudget(maxModelRequests = 1, maxAgents = 2))
+        held.close()
+        first.await()
+        second.await()
+        assertEquals(listOf(1, 2), order)
+        assertTrue(scheduler.snapshot().leases.isEmpty())
+    }
+
 }
