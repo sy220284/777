@@ -13,11 +13,25 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 
+/** A model-authored card is not an interaction waiter. Work must not run another goal slice
+ * while a real form is waiting for the user to commit their choices. */
+internal enum class WorkReplyFormHandling { NONE, DEFER_UNTIL_NO_TOOLS, WAIT_FOR_SUBMISSION }
+
 /** Optional presentation payload carried by the already authorized reply, never a new model call. */
 internal object LocalReplyUiDocumentProtocol {
     internal const val marker = "```ui_document\n"
     internal val acceptedMarkers = listOf(marker, "```ui_document\r\n")
     val budget = UiDocumentBudget(512, 16, 262_144)
+    /**
+     * A Work agent keeps sampling after a step that contains tool calls. A generated form must
+     * not become actionable mid-step, before the user has had a chance to complete it.
+     * The tool-free final step closes that Work turn and allows the next user-submitted turn.
+     */
+    internal fun workFormMayBePublished(definition: String?, modelToolCallCount: Int): Boolean =
+        !definition.isNullOrBlank() &&
+            (modelToolCallCount == 0 ||
+                workReplyFormHandling(definition, hasToolCalls = true) == WorkReplyFormHandling.NONE)
+
     val instruction = """
         Reply normally in readable language. When a structured card materially improves a
         reply (such as a comparison, choice, editable form or chart), include it automatically,
@@ -30,7 +44,7 @@ internal object LocalReplyUiDocumentProtocol {
         nodes, actions, fallbackText. Each node needs a unique id and type.
         Example of an editable choice:
         ```ui_document
-        {"schemaVersion":1,"documentId":"reply","revision":0,"title":"选择下一步","nodes":[{"id":"choice","type":"select","label":"处理方式","options":["核对","修改"],"initial":"核对"},{"id":"go","type":"button","label":"继续","actionId":"draft"}],"actions":[{"id":"draft","type":"send_user_input","text":"按所选方式继续：","fieldIds":["choice"]}],"fallbackText":"请选择核对或修改。"}
+        {"schemaVersion":1,"documentId":"reply","revision":0,"title":"选择下一步","nodes":[{"id":"choice","type":"select","label":"处理方式","options":["核对","修改"],"initial":"核对"},{"id":"go","type":"button","label":"确认并发送表单","actionId":"submit"}],"actions":[{"id":"submit","type":"submit_user_input","text":"按所选方式继续：","fieldIds":["choice"]}],"fallbackText":"请选择核对或修改。"}
         ```
         Supported nodes: text(text), table(headers,rows), bar_chart(title,unit,points),
         line_chart(title,unit,points), field(label,initial,required), textarea(label,initial,required),
@@ -49,12 +63,38 @@ internal object LocalReplyUiDocumentProtocol {
         Sliders use 1-100 discrete intervals and a nonnegative numeric range.
         Supported actions: send_user_input or submit_user_input with id,type,text,fieldIds.
         The former prepares a composer draft; the latter requires explicit user confirmation.
+        Use submit_user_input for confirmation or submission buttons, so the confirmed form is
+        sent as a real user turn. Do not call send_user_input a confirmation or submission;
+        label it "放入输入框（需手动发送）" because it only prepares an unsent draft.
+        In Work, emit an interactive form only as the FINAL reply with no tool calls; the
+        agent must wait for the user's actual submission before continuing the task.
         Actions may only reference existing input field IDs. Provide fallbackText describing
         the card if it cannot be displayed, and keep the normal answer useful without the card.
         Cards cannot execute tools, change permissions, spend money or assert verified progress.
         Do not include URLs, code, paths, extra properties, media IDs or source identities.
         At most 8 table columns, 12 chart points, 512 nodes/actions, depth 16, 262144 characters.
     """.trimIndent()
+
+    /** Analyze ONLY a fully validated input card, never instructions in untrusted free text. */
+    fun workReplyFormHandling(definition: String?, hasToolCalls: Boolean): WorkReplyFormHandling {
+        if (definition == null) return WorkReplyFormHandling.NONE
+        val source = UiDocumentSource("work-form-validation", "answer", 0L, null, null, true)
+        val doc = LocalUiDocumentCodec.decode(definition, source, budget, emptySet(), null)
+            .getOrNull() ?: return WorkReplyFormHandling.NONE
+        val inputActions = doc.actions.filterIsInstance<UiDocumentAction.SendUserInput>()
+            .filter { it.fieldIds.isNotEmpty() }.mapTo(linkedSetOf()) { it.id }
+        if (inputActions.isEmpty()) return WorkReplyFormHandling.NONE
+        fun containsSubmission(node: UiDocumentNode): Boolean = when (node) {
+            is UiDocumentNode.Button -> node.actionId in inputActions
+            is UiDocumentNode.Row -> node.children.any(::containsSubmission)
+            is UiDocumentNode.Column -> node.children.any(::containsSubmission)
+            is UiDocumentNode.Disclosure -> node.children.any(::containsSubmission)
+            else -> false
+        }
+        if (!doc.nodes.any(::containsSubmission)) return WorkReplyFormHandling.NONE
+        return if (hasToolCalls) WorkReplyFormHandling.DEFER_UNTIL_NO_TOOLS
+            else WorkReplyFormHandling.WAIT_FOR_SUBMISSION
+    }
 
     data class Parts(val text: String, val definition: String?)
     fun split(content: String): Parts {

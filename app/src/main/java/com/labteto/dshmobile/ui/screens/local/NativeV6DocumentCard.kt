@@ -1,12 +1,15 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -32,6 +35,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.uicontract.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -53,6 +57,9 @@ internal fun NativeV6DocumentMessage(
     var prompt by remember(messageId) { mutableStateOf("把这条回复整理成可交互的文档") }
     var feedback by remember(messageId) { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        // Show action feedback BEFORE long forms, so a prepared draft or rejected
+        // submission never looks like an inert button at the bottom of the screen.
+        feedback?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         documents.forEach { snapshot ->
             NativeV6DocumentCard(snapshot, controller, readOnly = readOnly, onFeedback = { feedback = it },
                 onPreparedDraft = onPreparedDraft)
@@ -62,7 +69,6 @@ internal fun NativeV6DocumentMessage(
                 Text(if (generating) "正在生成交互文档…" else "生成交互文档")
             }
         }
-        feedback?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
     }
     if (creating && !readOnly) {
         SyDialog(title = "生成交互文档", onDismiss = { creating = false }) {
@@ -108,13 +114,32 @@ private fun NativeV6DocumentCard(
     }
     var confirmation by remember(doc.documentId, doc.revision) { mutableStateOf<String?>(null) }
     var deleting by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
+    var submitting by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
+    var submitted by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
     var confirmDelete by remember(doc.documentId, doc.revision) { mutableStateOf(false) }
+    var progressDetailsExpanded by remember(doc.documentId) { mutableStateOf(false) }
     fun perform(actionId: String, confirmed: Boolean) {
+        if (submitting || submitted) return
+        submitting = true
         val values = fields
         scope.launch {
-            val receipt = withContext(Dispatchers.IO) { controller.submit(snapshot, actionId, values, confirmed) }
-            onFeedback(nativeV6DocumentReceiptMessage(receipt))
-            if (receipt == UiDocumentReceipt.DraftPrepared) onPreparedDraft()
+            try {
+                val receipt = withContext(Dispatchers.IO) {
+                    controller.submit(snapshot, actionId, values, confirmed)
+                }
+                if (nativeV6SubmittedToOwner(receipt) &&
+                    doc.actions.any { it.id == actionId && it is UiDocumentAction.SendUserInput && it.submit }) {
+                    submitted = true
+                }
+                onFeedback(nativeV6DocumentReceiptMessage(receipt))
+                if (receipt == UiDocumentReceipt.DraftPrepared) onPreparedDraft()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                onFeedback("表单提交失败：${failure.message.orEmpty().ifBlank { failure.javaClass.simpleName }}")
+            } finally {
+                submitting = false
+            }
         }
     }
     Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 2.dp,
@@ -126,21 +151,29 @@ private fun NativeV6DocumentCard(
                 Text("该文档仅提供历史内容，不能执行操作。")
             } else {
                 if (readOnly) Text("历史文档只读，操作已禁用。")
-                doc.nodes.forEach { node ->
+                nativeV6InlineVisibleNodes(doc, progressDetailsExpanded).forEach { node ->
                     NativeV6DocumentNode(
                         node, snapshot.bindings, fields,
-                        onFieldChange = { id, value -> if (!readOnly) controller.forms.update(formKey, id, value) },
-                        readOnly = readOnly, media = controller.media, sessionId = doc.source.sessionId,
+                        onFieldChange = { id, value -> if (!readOnly && !submitting && !submitted) controller.forms.update(formKey, id, value) },
+                        readOnly = readOnly || submitting || submitted, media = controller.media, sessionId = doc.source.sessionId,
+                        actions = doc.actions,
                     ) { actionId ->
                         val action = doc.actions.firstOrNull { it.id == actionId }
-                        if (snapshot.actions[actionId]?.available != true) {
-                            onFeedback("当前会话中的操作不可用")
+                        if (submitted) {
+                            onFeedback("该表单已提交，等待会话处理")
+                        } else if (snapshot.actions[actionId]?.available != true) {
+                            onFeedback("当前会话中的操作不可用：${snapshot.actions[actionId]?.reason ?: UiCommandRejection.STALE_IDENTITY}")
                         } else if (action is UiDocumentAction.AnswerApproval ||
                             action is UiDocumentAction.SendUserInput && action.submit) {
                             confirmation = actionId
                         } else {
                             perform(actionId, false)
                         }
+                    }
+                }
+                if (doc.documentId.startsWith("work-live:") && doc.nodes.size > 1) {
+                    TextButton(onClick = { progressDetailsExpanded = !progressDetailsExpanded }) {
+                        Text(if (progressDetailsExpanded) "收起执行明细" else "查看工具记录与阶段输出")
                     }
                 }
             }
@@ -160,7 +193,7 @@ private fun NativeV6DocumentCard(
         TextButton(onClick = {
                 confirmation = null
                 perform(actionId, true)
-            }) { Text("确认") }
+            }, enabled = !submitting && !submitted) { Text(if (submitting) "正在提交…" else "确认") }
     }
 }
     }
@@ -196,20 +229,28 @@ private fun NativeV6DocumentNode(
     readOnly: Boolean,
     media: MediaUiPort,
     sessionId: String,
+    actions: List<UiDocumentAction>,
     onAction: (String) -> Unit,
 ) {
     when (node) {
         is UiDocumentNode.Text -> Text(node.text, style = MaterialTheme.typography.bodyMedium)
         is UiDocumentNode.Media -> NativeV6DocumentMedia(node, sessionId, media)
-        is UiDocumentNode.Table -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        is UiDocumentNode.Table -> Column(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            // Each column needs a real minimum width inside horizontal scrolling. Weighted
+            // children otherwise squeeze technical receipt tables into illegible mobile cells.
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                node.headers.forEach { Text(it, modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelMedium) }
+                node.headers.forEach { header ->
+                    Text(header, modifier = Modifier.width(144.dp),
+                        style = MaterialTheme.typography.labelMedium)
+                }
             }
             node.rows.forEach { cells ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     node.headers.indices.forEach { i ->
-                        Text(cells.getOrElse(i) { "" }, modifier = Modifier.weight(1f),
+                        Text(cells.getOrElse(i) { "" }, modifier = Modifier.width(144.dp),
                             style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -256,25 +297,20 @@ private fun NativeV6DocumentNode(
             Text("${node.label}：$label")
         }
         is UiDocumentNode.Column -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            node.children.forEach { NativeV6DocumentNode(it, bindings, fields, onFieldChange, readOnly, media, sessionId, onAction) }
+            node.children.forEach { NativeV6DocumentNode(it, bindings, fields, onFieldChange, readOnly, media, sessionId, actions, onAction) }
         }
         is UiDocumentNode.Row -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             node.children.forEach { child ->
-                Column(Modifier.weight(1f)) { NativeV6DocumentNode(child, bindings, fields, onFieldChange, readOnly, media, sessionId, onAction) }
+                Column(Modifier.weight(1f)) { NativeV6DocumentNode(child, bindings, fields, onFieldChange, readOnly, media, sessionId, actions, onAction) }
             }
         }
         is UiDocumentNode.Field -> OutlinedTextField(
             value = fields[node.id].orEmpty(), onValueChange = { onFieldChange(node.id, it) },
             label = { Text(node.label) }, singleLine = !node.multiline, enabled = !readOnly,
             modifier = Modifier.fillMaxWidth())
-        is UiDocumentNode.Select -> Column {
-            Text(node.label, style = MaterialTheme.typography.labelMedium)
-            node.options.forEach { option ->
-                Row { Checkbox(checked = fields[node.id] == option,
-                    onCheckedChange = { if (it) onFieldChange(node.id, option) }, enabled = !readOnly)
-                    Text(option, modifier = Modifier.padding(top = 12.dp)) }
-            }
-        }
+        is UiDocumentNode.Select -> NativeV6CompactSelect(
+            node = node, fields = fields, enabled = !readOnly, onFieldChange = onFieldChange,
+        )
         is UiDocumentNode.Switch -> Row {
             Checkbox(checked = fields[node.id].toBoolean(), onCheckedChange = { onFieldChange(node.id, it.toString()) }, enabled = !readOnly)
             Text(node.label, modifier = Modifier.padding(top = 12.dp))
@@ -297,14 +333,16 @@ private fun NativeV6DocumentNode(
             Text(calculateUiDocumentValue(node, fields) ?: "请输入有效数字",
                 style = MaterialTheme.typography.titleMedium)
         }
-        is UiDocumentNode.Button -> TextButton(onClick = { onAction(node.actionId) }, enabled = !readOnly) { Text(node.label) }
+        is UiDocumentNode.Button -> TextButton(onClick = { onAction(node.actionId) }, enabled = !readOnly) {
+            Text(nativeV6ActionLabel(node.label, actions.firstOrNull { it.id == node.actionId }))
+        }
         is UiDocumentNode.Disclosure -> {
             var expanded by remember(node.id) { mutableStateOf(false) }
             Column {
                 TextButton(onClick = { expanded = !expanded }) {
                     Text(if (expanded) "收起 · ${node.title}" else "展开 · ${node.title}")
                 }
-                if (expanded) node.children.forEach { NativeV6DocumentNode(it, bindings, fields, onFieldChange, readOnly, media, sessionId, onAction) }
+                if (expanded) node.children.forEach { NativeV6DocumentNode(it, bindings, fields, onFieldChange, readOnly, media, sessionId, actions, onAction) }
             }
         }
     }
@@ -319,9 +357,19 @@ internal fun nativeV6DocumentReceiptMessage(receipt: UiDocumentReceipt): String 
     is UiDocumentReceipt.InvalidFields -> "请检查输入：${receipt.fieldIds.joinToString()}"
     is UiDocumentReceipt.Fallback -> "无法显示文档：${receipt.reason}"
     is UiDocumentReceipt.Rejected -> "操作未执行：${receipt.reason}"
-    is UiDocumentReceipt.OwnerReceipt -> when (receipt.receipt) {
-        UiCommandReceipt.Accepted, UiCommandReceipt.Queued -> "操作已受理"
-        else -> "操作结果：${receipt.receipt}"
+    is UiDocumentReceipt.OwnerReceipt -> when (val outcome = receipt.receipt) {
+        UiCommandReceipt.Accepted -> "表单已提交，等待会话处理"
+        UiCommandReceipt.Queued -> "表单已加入工作队列，稍后处理"
+        is UiCommandReceipt.Rejected -> when (outcome.reason) {
+            UiCommandRejection.STALE_IDENTITY, UiCommandRejection.SESSION_TRANSITION ->
+                "表单所属会话已失效或正在切换，请重新打开当前会话"
+            UiCommandRejection.QUEUE_FULL -> "当前工作队列已满，提交未成功，请稍后重试"
+            UiCommandRejection.UNCONFIGURED -> "模型尚未配置，提交未成功"
+            else -> "表单提交未成功：${outcome.reason}"
+        }
+        is UiCommandReceipt.Failed -> "表单提交失败：${outcome.message}"
+        UiCommandReceipt.NotAdmitted -> "当前会话拒绝了这次表单提交"
+        else -> "操作未确认：$outcome"
     }
     is UiDocumentReceipt.Failed -> "操作失败：${receipt.message.orEmpty()}"
 }

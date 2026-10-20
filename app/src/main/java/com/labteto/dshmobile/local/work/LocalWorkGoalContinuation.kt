@@ -151,7 +151,12 @@ internal fun localWorkGoalFingerprint(goal: LocalGoal): String {
 internal fun isCurrentWorkGoalContinuation(
     continuation: com.labteto.dshmobile.harness.agent.AgentContinuationRef?,
     work: LocalWorkState,
+    eventLog: LocalSessionEventLog? = null,
 ): Boolean {
+    // A user-facing form blocks *every* autonomous continuation, including retry and
+    // recovery ones. Only a subsequent real user send can release its durable fence.
+    if (continuation != null && eventLog != null &&
+        hasOutstandingWorkReplyForm(eventLog)) return false
     if (continuation?.failureCode != WORK_GOAL_PROGRESS_CONTINUATION) return true
     val goal = work.goal ?: return false
     return !work.planMode && goal.status == "active" &&
@@ -178,11 +183,12 @@ internal fun shouldDiscardWorkGoalContinuation(
     input: com.labteto.dshmobile.harness.agent.QueuedAgentInput,
     remaining: List<com.labteto.dshmobile.harness.agent.QueuedAgentInput>,
     work: LocalWorkState,
+    eventLog: LocalSessionEventLog? = null,
 ): Boolean =
     input.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.WORK_CONTINUATION &&
-        input.continuation?.failureCode == WORK_GOAL_PROGRESS_CONTINUATION &&
-        (remaining.any { it.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.USER } ||
-            !isCurrentWorkGoalContinuation(input.continuation, work))
+        (!isCurrentWorkGoalContinuation(input.continuation, work, eventLog) ||
+            (input.continuation?.failureCode == WORK_GOAL_PROGRESS_CONTINUATION &&
+                remaining.any { it.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.USER }))
 
 internal const val WORK_GOAL_PROGRESS_CONTINUATION = "WORK_GOAL_PROGRESS"
 
@@ -207,6 +213,7 @@ internal fun queueWorkGoalProgressFollowUp(
 ): Boolean {
     val work = binding.state.value.work
     val goal = work.goal
+    if (hasOutstandingWorkReplyForm(binding.eventLog)) return false
     // Resolve the same evidence contract used by Goal completion; never trust model prose.
     val assessment = assessLocalWorkGoal(
         work,
