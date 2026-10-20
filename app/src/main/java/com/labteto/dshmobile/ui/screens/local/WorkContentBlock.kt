@@ -156,10 +156,9 @@ internal fun WorkTimelineStepRow(
             }
             // Public progress is real reply content, not a truncated status label.
             // Reuse the same Markdown renderer as the final assistant answer.
-            SelectionContainer {
+            SelectionContainer(modifier = Modifier.weight(1f)) {
                 MarkdownText(
                     text = content,
-                    modifier = Modifier.weight(1f),
                     bodyStyle = (if (milestone) DsType.mdBody else DsType.small13)
                         .withReadingWeight().copy(color = colors.text),
                     preserveSoftLineBreaks = true,
