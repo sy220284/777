@@ -90,6 +90,7 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
         mainMaxSteps: Int,
         subagentMaxSteps: Int,
         modelAttempts: Int,
+        workerProfileId: String? = state.modelState.modelSelection.workerProfileId,
     ) {
         val current = state
         // Validate both domains before staging anything. One editor publishes all
@@ -98,29 +99,21 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
         val agent = LocalAgentRuntimeSettings.prepare(mainMaxSteps, subagentMaxSteps)
         val model = LocalModelExecutionSettings.prepare(
             modelAttempts = modelAttempts,
-            workerProfileId = current.modelState.modelSelection.workerProfileId,
+            workerProfileId = workerProfileId,
             availableProfiles = current.modelState.modelSelection.profiles,
         )
-        preferences.edit().also { editor ->
+        // Settings UI submits these four values as one decision. Never acknowledge the
+        // first three while the worker model remains from a previous generation.
+        check(preferences.edit().also { editor ->
             LocalAgentRuntimeSettings.stage(editor, agent)
             LocalModelExecutionSettings.stage(editor, model)
-        }.apply()
+        }.commit()) { "运行参数写入持久存储失败，状态保持原值" }
         statePort.updateRuntimeLimits(
             mainMaxSteps = agent.mainMaxSteps,
             subagentMaxSteps = agent.subagentMaxSteps,
             modelAttempts = model.modelAttempts,
+            workerProfileId = model.workerProfileId,
         )
-    }
-
-    fun configureWorkerProfile(profileId: String?) {
-        val current = state
-        val model = LocalModelExecutionSettings.write(
-            preferences = preferences,
-            modelAttempts = current.modelState.modelAttempts,
-            workerProfileId = profileId,
-            availableProfiles = current.modelState.modelSelection.profiles,
-        )
-        statePort.updateWorkerProfile(model.workerProfileId)
     }
 
     @Synchronized

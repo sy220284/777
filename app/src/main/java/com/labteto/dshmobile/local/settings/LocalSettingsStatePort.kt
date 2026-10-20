@@ -15,8 +15,7 @@ internal data class LocalSettingsStateSnapshot(
 
 internal interface LocalSettingsStatePort {
     val value: LocalSettingsStateSnapshot
-    fun updateRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int)
-    fun updateWorkerProfile(profileId: String?)
+    fun updateRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int, workerProfileId: String?)
     fun updatePersonalization(userRules: String, autoRecall: Boolean, autoMemory: Boolean)
     fun publishError(message: String)
 }
@@ -35,16 +34,13 @@ internal fun localSettingsStatePort(runtimeStateStore: LocalRuntimeStateStore): 
                 )
             }
 
-        override fun updateRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) {
+        override fun updateRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int, workerProfileId: String?) {
             runtimeStateStore.projection.updateSettingsRuntimeLimits(
                 mainMaxSteps = mainMaxSteps,
                 subagentMaxSteps = subagentMaxSteps,
                 modelAttempts = modelAttempts,
+                workerProfileId = workerProfileId,
             )
-        }
-
-        override fun updateWorkerProfile(profileId: String?) {
-            runtimeStateStore.projection.updateSettingsWorkerProfile(profileId)
         }
 
         override fun updatePersonalization(userRules: String, autoRecall: Boolean, autoMemory: Boolean) {
