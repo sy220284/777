@@ -198,6 +198,7 @@ class LocalModelProfilesTest {
         assertEquals("https://api.minimaxi.com/anthropic/v1", miniMaxLatest.baseUrl)
         assertEquals(LocalModelProtocol.ANTHROPIC_MESSAGES, miniMaxLatest.protocol)
         assertFalse(miniMaxLatest.temperatureSupported)
+        assertEquals(65_536, miniMaxLatest.defaultMaxOutputTokens)
         assertEquals(1_000_000, miniMaxLatest.contextWindowTokens)
         assertEquals("https://api.minimaxi.com/v1/models", miniMaxLatest.modelsEndpoint)
         assertTrue(LocalModelCapability.IMAGE in miniMaxLatest.capabilities)
