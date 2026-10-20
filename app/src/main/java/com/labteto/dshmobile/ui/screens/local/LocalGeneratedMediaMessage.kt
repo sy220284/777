@@ -898,7 +898,9 @@ internal fun LocalWorkArtifactMessageRow(
     val name = artifact.reference.substringAfterLast('/').ifBlank { artifact.reference }
     MediaMessageCard(
         title = if (artifact.category == "file") resources.getString(R.string.media_chat_work_file, name) else resources.getString(R.string.media_chat_work_result),
-        subtitle = if (artifact.currentlyAvailable == false) resources.getString(R.string.media_chat_work_file_missing) else resources.getString(R.string.media_chat_work_output_here),
+        subtitle = if (artifact.currentlyAvailable == false) resources.getString(R.string.media_chat_work_file_missing)
+            else if (inline) "" else resources.getString(R.string.media_chat_work_output_here),
+        inline = inline,
         modifier = if (artifact.category == "file" && artifact.currentlyAvailable != false) {
             Modifier.localArtifactSharedBounds(workspacePath, artifact.reference)
         } else Modifier,
