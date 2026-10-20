@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.tools.LocalToolCatalog
+import com.labteto.dshmobile.local.model.WORK_TOOL_RECOVERY_PAGE_BYTES
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -31,6 +32,19 @@ class LocalToolCatalogTest {
                 ),
             ),
         )
+    }
+
+    @Test
+    fun toolOutputPageSchemaMatchesTheActuallyVisiblePage() {
+        val tool = LocalToolCatalog.specs.single {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content == "tool_output_read"
+        }
+        val properties = tool.jsonObject["function"]!!.jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+        val maxBytes = properties.getValue("max_bytes").jsonObject
+        val startByte = properties.getValue("start_byte").jsonObject
+        assertEquals(1_024, maxBytes.getValue("minimum").jsonPrimitive.content.toInt())
+        assertEquals(WORK_TOOL_RECOVERY_PAGE_BYTES, maxBytes.getValue("maximum").jsonPrimitive.content.toInt())
+        assertEquals(0, startByte.getValue("minimum").jsonPrimitive.content.toInt())
     }
 
     @Test
