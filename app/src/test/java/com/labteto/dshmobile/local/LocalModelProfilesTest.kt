@@ -212,6 +212,7 @@ class LocalModelProfilesTest {
         assertEquals("https://api.minimaxi.com/v1/chat/completions", miniMax.chatEndpoint)
         // The old OpenAI-compatible route retains its matching request protocol.
         assertEquals(LocalModelProtocol.CHAT_COMPLETIONS, miniMax.protocol)
+        assertNull(miniMax.defaultMaxOutputTokens)
         assertFalse(miniMax.temperatureSupported)
         assertNull(LocalModelPresets.chatTemperatureRangeFor("MiniMax-M3", "https://api.minimaxi.com/v1"))
         assertNull(LocalModelPresets.samplingTemperatureFor("MiniMax-M3", "https://api.minimaxi.com/v1", 0.7))
