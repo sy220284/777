@@ -123,3 +123,42 @@ internal fun localResourceBudgetForMemoryClass(
         maxLanguageServers = (slots - 1).coerceIn(2, 6),
     )
 }
+
+
+/**
+ * Cloud model requests are network-bound; CPU headroom mainly governs local execution.
+ * Always apply live RAM limits, but never cancel a lease when capacity shrinks.
+ * Android 16 SystemHealthManager reports CPU headroom as a percentage in [0, 100].
+ */
+internal fun localAdaptiveResourceBudget(
+    memoryClassMb: Int,
+    initial: HarnessResourceBudget,
+    liveMemory: LocalDeviceMemorySnapshot,
+    cpuHeadroomPercent: Float?,
+    thermalStatus: Int,
+    powerSave: Boolean,
+): HarnessResourceBudget {
+    val memory = localResourceBudgetForMemoryClass(memoryClassMb, liveMemory)
+    val cpuScale = when {
+        thermalStatus >= 4 -> 0.25
+        thermalStatus >= 3 -> 0.40
+        cpuHeadroomPercent != null && cpuHeadroomPercent < 15f -> 0.45
+        cpuHeadroomPercent != null && cpuHeadroomPercent < 30f -> 0.65
+        thermalStatus >= 2 || powerSave -> 0.70
+        else -> 1.0
+    }
+    fun localLimit(initialLimit: Int, liveLimit: Int, minimum: Int = 1): Int =
+        (minOf(initialLimit, liveLimit) * cpuScale).toInt().coerceAtLeast(minimum)
+    val modelCap = when {
+        thermalStatus >= 4 -> 2
+        thermalStatus >= 3 -> 4
+        else -> initial.maxModelRequests
+    }
+    return HarnessResourceBudget(
+        maxModelRequests = minOf(initial.maxModelRequests, memory.maxModelRequests, modelCap),
+        maxAgents = localLimit(initial.maxAgents, memory.maxAgents, 2),
+        maxTerminals = localLimit(initial.maxTerminals, memory.maxTerminals),
+        maxVirtualDisplays = localLimit(initial.maxVirtualDisplays, memory.maxVirtualDisplays),
+        maxLanguageServers = localLimit(initial.maxLanguageServers, memory.maxLanguageServers),
+    )
+}
