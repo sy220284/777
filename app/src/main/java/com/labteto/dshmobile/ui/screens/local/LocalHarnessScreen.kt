@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -102,6 +103,9 @@ import com.labteto.dshmobile.local.model.canQueryMiniMaxQuota
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
+import com.shenyan.designsystem.foundation.LocalSyMotionTempo
+import com.shenyan.designsystem.foundation.LocalSyReduceMotion
+import com.shenyan.designsystem.foundation.SyMotion
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import com.labteto.dshmobile.ui.shenyan.SyDimensions
@@ -160,6 +164,22 @@ fun LocalHarnessScreen(
     val pinnedSessionIds by viewModel.pinnedSessionIds.collectAsStateWithLifecycle()
     val sessionTitleOverrides by viewModel.sessionTitleOverrides.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    // Native drags remain finger-tracked; short, explicit animations handle
+    // toolbar taps, completed navigation and returning from drawer pages.
+    val drawerMotionSpec = tween<Float>(
+        durationMillis = SyMotion.duration(
+            SyMotion.sidebarMs, LocalSyReduceMotion.current, LocalSyMotionTempo.current,
+        ),
+        easing = SyMotion.ease,
+    )
+    @Suppress("DEPRECATION")
+    suspend fun openDrawerPromptly() {
+        drawerState.animateTo(DrawerValue.Open, drawerMotionSpec)
+    }
+    @Suppress("DEPRECATION")
+    suspend fun closeDrawerPromptly() {
+        drawerState.animateTo(DrawerValue.Closed, drawerMotionSpec)
+    }
     var openGlobalSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     val syWideViewport = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 1024
     val scope = rememberCoroutineScope()
@@ -312,11 +332,11 @@ fun LocalHarnessScreen(
         val back = localFeatureBack(featureStack, drawerFeatureOriginStack)
         featureStack = back.stack
         drawerFeatureOriginStack = back.drawerOriginStack
-        if (back.reopenDrawer && !syWideViewport) scope.launch { drawerState.open() }
+        if (back.reopenDrawer && !syWideViewport) scope.launch { openDrawerPromptly() }
     }
 
     fun reopenDrawerWhenModalReturns(fromDrawer: Boolean) {
-        if (fromDrawer && !syWideViewport) scope.launch { drawerState.open() }
+        if (fromDrawer && !syWideViewport) scope.launch { openDrawerPromptly() }
     }
 
     fun resetFeatureNavigation() {
@@ -343,7 +363,7 @@ fun LocalHarnessScreen(
         if (accepted && sessionId == shell.sessionId) {
             // Tapping the current conversation must return to its conversation surface.
             resetFeatureNavigation()
-            scope.launch { drawerState.close() }
+            scope.launch { closeDrawerPromptly() }
         }
         return accepted
     }
@@ -370,7 +390,7 @@ fun LocalHarnessScreen(
                     requestedFilePath = null
                     filesMode = LocalFilesMode.WORKSPACE
                     composerHandoff = emptyList()
-                    if (drawerState.isOpen) drawerState.close()
+                    if (drawerState.isOpen) closeDrawerPromptly()
                 }
                 // Intermediate queued mode changes must not close the drawer either.
                 if (!keepDrawer || drawerModeSwitchTarget == shell.usageMode) {
@@ -401,7 +421,7 @@ fun LocalHarnessScreen(
                 pendingUsageMode = null
                 showGroupSetup = false
                 showNewSessionMode = false
-                drawerState.close()
+                closeDrawerPromptly()
             } else if (deleted == 0) {
                 android.widget.Toast.makeText(
                     context, R.string.local_delete_session_failed, android.widget.Toast.LENGTH_SHORT,
@@ -566,10 +586,10 @@ fun LocalHarnessScreen(
                 newSessionOpenedFromDrawer = false
                 showNewSessionMode = true
             },
-            onOpenDrawer = { scope.launch { drawerState.open() } },
+            onOpenDrawer = { scope.launch { openDrawerPromptly() } },
             onOpenGlobalSearch = {
                 openGlobalSearchRequest++
-                scope.launch { drawerState.open() }
+                scope.launch { openDrawerPromptly() }
             },
             onOpenPersonaGallery = {
                 // Preserve the same unsaved-persona guard used by the drawer.
@@ -618,7 +638,7 @@ fun LocalHarnessScreen(
             },
             onPromptPersonaSave = { showPersonaGallerySavePrompt = true },
             onOpenFromDrawer = ::openFeatureFromDrawer,
-            onCloseDrawer = { scope.launch { drawerState.close() } },
+            onCloseDrawer = { scope.launch { closeDrawerPromptly() } },
         ),
         localWorkFeatureUiContribution(
             filesMode = filesMode,
@@ -637,7 +657,7 @@ fun LocalHarnessScreen(
                 popFeature()
             },
             onOpenFromDrawer = ::openFeatureFromDrawer,
-            onCloseDrawer = { scope.launch { drawerState.close() } },
+            onCloseDrawer = { scope.launch { closeDrawerPromptly() } },
         ),
         localAutomationFeatureUiContribution(
             taskMode = taskMode,
@@ -648,7 +668,7 @@ fun LocalHarnessScreen(
             onTaskModeChange = { taskMode = it },
             onPopFeature = ::popFeature,
             onOpenFromDrawer = ::openFeatureFromDrawer,
-            onCloseDrawer = { scope.launch { drawerState.close() } },
+            onCloseDrawer = { scope.launch { closeDrawerPromptly() } },
         ),
         localToolsFeatureUiContribution(
             startAtPlugins = toolsStartAtPlugins,
@@ -658,7 +678,7 @@ fun LocalHarnessScreen(
             onPushFeature = ::pushFeature,
             onPopFeature = { toolsStartAtPlugins = false; toolsStartAtSkills = false; popFeature() },
             onOpenFromDrawer = ::openFeatureFromDrawer,
-            onCloseDrawer = { scope.launch { drawerState.close() } },
+            onCloseDrawer = { scope.launch { closeDrawerPromptly() } },
         ),
         localSettingsFeatureUiContribution(
             settingsDestination = settingsDestination,
@@ -670,7 +690,7 @@ fun LocalHarnessScreen(
             onSettingsDestinationChange = ::prepareSettingsEntry,
             onPopFeature = ::popFeature,
             onOpenFromDrawer = ::openFeatureFromDrawer,
-            onCloseDrawer = { scope.launch { drawerState.close() } },
+            onCloseDrawer = { scope.launch { closeDrawerPromptly() } },
         ),
     )
 
@@ -738,8 +758,8 @@ fun LocalHarnessScreen(
     }
 
     // Swiping the drawer open must release the composer focus as well as its IME.
-    LaunchedEffect(drawerState.targetValue, drawerState.isOpen) {
-        if (drawerState.targetValue == DrawerValue.Open || drawerState.isOpen) {
+    LaunchedEffect(drawerState.isOpen) {
+        if (drawerState.isOpen) {
             drawerFocusManager.clearFocus(force = true)
             drawerKeyboard?.hide()
         }
@@ -776,7 +796,7 @@ fun LocalHarnessScreen(
         if (shell.loading || shell.sessionId.isBlank()) return@LaunchedEffect
         if (target == shell.sessionId) {
             resetFeatureNavigation()
-            if (drawerState.isOpen) drawerState.close()
+            if (drawerState.isOpen) closeDrawerPromptly()
             onSessionRequestConsumed()
         } else if (shell.sessions.none { it.id == target }) {
             onSessionRequestConsumed()
@@ -794,7 +814,7 @@ fun LocalHarnessScreen(
     }
 
     BackHandler(enabled = !syWideViewport && drawerState.isOpen) {
-        scope.launch { drawerState.close() }
+        scope.launch { closeDrawerPromptly() }
     }
     BackHandler(
         enabled = localConversationShouldReturnToDrawer(
@@ -802,7 +822,7 @@ fun LocalHarnessScreen(
         ),
     ) {
         conversationOpenedFromDrawer = false
-        scope.launch { drawerState.open() }
+        scope.launch { openDrawerPromptly() }
     }
 
     val reduceMotionForBackGesture = com.shenyan.designsystem.foundation.LocalSyReduceMotion.current
@@ -855,7 +875,7 @@ fun LocalHarnessScreen(
                 usageMode = localHarnessDrawerUsageMode(shell.usageMode, pendingUsageMode),
                 modeSwitchEnabled = shell.sessionId.isNotBlank() &&
                     localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
-                drawerOpen = syWideViewport || drawerState.isOpen,
+                drawerOpen = syWideViewport || drawerState.targetValue == DrawerValue.Open || drawerState.isOpen,
                 globalSearchOpenRequest = openGlobalSearchRequest,
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
@@ -872,7 +892,7 @@ fun LocalHarnessScreen(
                     switchUsageMode(it)
                 },
                 onNewSession = {
-                    scope.launch { drawerState.close() }
+                    scope.launch { closeDrawerPromptly() }
                     newSessionOpenedFromDrawer = true
                     showNewSessionMode = true
                 },
