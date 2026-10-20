@@ -60,7 +60,6 @@ internal class LocalWorkComposition @Inject constructor(
     usageTracker: DeepSeekUsageTracker,
     contextComposer: ContextComposer,
     private val workRunRegistry: LocalWorkRunRegistry,
-    private val workUiDocumentPublisher: LocalWorkUiDocumentPublisher,
     replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
     workMemoryRuntime: LocalWorkMemoryRuntime,
     workModelHistoryRuntime: LocalWorkModelHistoryRuntime,
@@ -283,7 +282,6 @@ internal class LocalWorkComposition @Inject constructor(
         workSessionProjection = workSessionProjection,
         workToolResultRuntime = toolResultRuntime,
         workTurnToolRuntime = turnToolRuntime,
-        workUiDocumentPublisher = workUiDocumentPublisher,
         replyDocuments = replyDocuments,
         onRootExecutionSliceStarted = { sessionId ->
             persistentJobs.schedule(sessionId, rootSliceAdmitted = true)
