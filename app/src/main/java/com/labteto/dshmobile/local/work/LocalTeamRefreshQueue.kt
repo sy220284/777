@@ -8,7 +8,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 /** One Work-owned refresh consumer coalesces progress while terminal notifications wake it early. */
 internal class LocalTeamRefreshQueue(
     scope: CoroutineScope,
-    private val refresh: (sessionId: String, reconcile: Boolean) -> Unit,
+    private val refresh: suspend (sessionId: String, reconcile: Boolean) -> Unit,
 ) {
     private val lock = Any()
     private val pending = linkedMapOf<String, Boolean>()
