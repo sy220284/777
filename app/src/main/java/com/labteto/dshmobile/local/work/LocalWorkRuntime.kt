@@ -363,7 +363,16 @@ class LocalWorkRuntime @Inject internal constructor(
 
     override fun toolActivitiesForUi(sessionId: String): List<LocalToolActivityUiItem> {
         if (sessionId != runtimeStateStore.currentSessionId) return emptyList()
-        return toolActivity.snapshot(eventLogs.get(sessionId)).state.activities.takeLast(32).map { activity ->
+        val activities = toolActivity.snapshot(eventLogs.get(sessionId)).state.activities
+        // Every unfinished call remains visible; completed calls only need a recent window,
+        // since durable transcript owns the full chronological history.
+        val recent = activities.filter {
+            it.phase != LocalToolActivityPhase.DECLARED && it.phase != LocalToolActivityPhase.RUNNING
+        }.takeLast(32)
+        val unfinished = activities.filter {
+            it.phase == LocalToolActivityPhase.DECLARED || it.phase == LocalToolActivityPhase.RUNNING
+        }
+        return (unfinished + recent).sortedBy { it.declaredSequence ?: Long.MAX_VALUE }.map { activity ->
             val phase = when (activity.phase) {
                 LocalToolActivityPhase.DECLARED -> LocalToolUiPhase.DECLARED
                 LocalToolActivityPhase.RUNNING -> LocalToolUiPhase.RUNNING
@@ -385,6 +394,7 @@ class LocalWorkRuntime @Inject internal constructor(
                 resultPreview = activity.resultPreview,
                 authorizationGranted = activity.authorizationGranted,
                 authorizationSequence = activity.authorizationSequence,
+                declaredAt = activity.declaredAt,
             )
         }
     }
