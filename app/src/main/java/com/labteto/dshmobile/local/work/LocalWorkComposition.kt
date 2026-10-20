@@ -101,6 +101,7 @@ internal class LocalWorkComposition @Inject constructor(
             resourceScheduler = runtimeStateStore.resourceScheduler,
             virtualDisplayProvider = tools.plugins.virtualDisplayProvider,
             memoryClassMb = runtimeStateStore.memoryClassMb,
+            deviceRamMb = runtimeStateStore.deviceMemory.totalRamMb,
             agentRunCoordinator = sessionStorage.agentRunCoordinator,
             contextComposer = contextComposer,
             memoryStore = memoryStore,
