@@ -154,6 +154,7 @@ internal fun LocalMessageRow(
     onCreateMedia: ((LocalHarnessMessage, LocalMediaKind) -> Unit)? = null,
     onEditGeneratedImage: ((LocalHarnessMessage) -> Unit)? = null,
     onConvertToWork: ((LocalHarnessMessage) -> Unit)? = null,
+    onCreateDocument: ((LocalHarnessMessage) -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val pulse = rememberHapticPulse()
@@ -338,6 +339,13 @@ internal fun LocalMessageRow(
                         text = stringResource(R.string.local_regenerate_reply), icon = FeatherIcons.Retry,
                         onClick = { if (!onRegenerate(message.id))
                             Toast.makeText(context, regenerateFailedMessage, Toast.LENGTH_SHORT).show() }))
+                    if (!streaming) onCreateDocument?.let { create ->
+                        add(SyMenuItem(
+                            text = "为此回复生成交互文档",
+                            icon = FeatherIcons.FileText,
+                            onClick = { create(message) },
+                        ))
+                    }
                 })
                 LocalAssistantMessageContent(
                     message = message,
