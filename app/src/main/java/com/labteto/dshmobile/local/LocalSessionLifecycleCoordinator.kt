@@ -97,6 +97,7 @@ internal class LocalSessionLifecycleCoordinator(
     private val restartInterruptedSafeJobs: () -> Unit,
     private val startNextQueuedTurnIfIdle: () -> Job?,
     private val sessionSummaries: () -> List<LocalSessionSummary>,
+    private val recordInitialModelSelection: (String, String) -> Unit = { _, _ -> },
     private val beforeEventLogsDeleted: (Set<String>) -> Unit = {},
 ) {
     // Mode and history taps share the same latest destination while a session is restored.
@@ -170,6 +171,9 @@ internal class LocalSessionLifecycleCoordinator(
 
                     val nextSessionId = UUID.randomUUID().toString()
                     pendingSessions.remember(nextSessionId, usageMode)
+                    sourceState.modelState.modelSelection.activeProfileId?.let { id ->
+                        recordInitialModelSelection(nextSessionId, id)
+                    }
                     activateSession(nextSessionId, -1L)
                     resetModelHistory()
 
@@ -428,6 +432,9 @@ internal class LocalSessionLifecycleCoordinator(
                         if (currentSessionId() != sourceId) return
                         val mode = requireNotNull(freshUsageMode)
                         pendingSessions.remember(nextSessionId, mode)
+                        previous.modelState.modelSelection.activeProfileId?.let { id ->
+                            recordInitialModelSelection(nextSessionId, id)
+                        }
                         activateSession(nextSessionId, -1L)
                         resetModelHistory()
                         state.update {
