@@ -29,8 +29,11 @@ internal class LocalStreamPreview(
         }
     }
 
-    private fun snapshot(): String = buildString(length) {
-        for (index in 0 until length) append(charAt(index))
+    private fun snapshot(): String {
+        val count = length
+        return buildString(count) {
+            for (index in 0 until count) append(charAt(index))
+        }
     }
 
     private var lastPublishMs: Long? = null
