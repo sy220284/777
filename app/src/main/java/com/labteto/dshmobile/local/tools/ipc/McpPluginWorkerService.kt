@@ -45,7 +45,7 @@ class McpPluginWorkerService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val instances = ConcurrentHashMap<String, Instance>()
     private val json = Json
-    private val http = OkHttpClient()
+    private val http = createMcpWorkerHttpClient()
     private val incoming = Messenger(object : Handler(Looper.getMainLooper()) {
         override fun handleMessage(message: Message) {
             if (message.what !in setOf(McpWorkerWire.OPEN, McpWorkerWire.REQUEST,
