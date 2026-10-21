@@ -243,10 +243,16 @@ internal fun syncChatBranchState(
     val dialogue = activeMessages.filter { it.role == "user" || it.role == "assistant" }
     if (dialogue.isEmpty()) return if (current.nodes.isEmpty()) current else current
 
-    var state = current
+    // Build the branch projection in one mutable pass. Repeated upsert copied the
+    // complete node list and selection map for every message (quadratic on first materialization).
+    val nodes = current.nodes.toMutableList()
+    val positions = HashMap<String, Int>(nodes.size + dialogue.size)
+    nodes.forEachIndexed { index, node -> positions.putIfAbsent(node.message.id, index) }
+    val selected = current.selectedChildByParent.toMutableMap()
     var parentId: String? = null
     dialogue.forEachIndexed { index, message ->
-        val existing = state.nodes.firstOrNull { it.message.id == message.id }
+        val existingIndex = positions[message.id]
+        val existing = existingIndex?.let(nodes::get)
         val node = if (existing == null) {
             LocalChatBranchNode(
                 message = message,
@@ -279,10 +285,16 @@ internal fun syncChatBranchState(
                 },
             )
         }
-        state = upsertChatBranchNode(state, node, select = true)
+        if (existingIndex == null) {
+            positions[message.id] = nodes.size
+            nodes.add(node)
+        } else {
+            nodes[existingIndex] = node
+        }
+        selected[branchParentKey(node.parentId)] = node.message.id
         parentId = message.id
     }
-    return state
+    return current.copy(nodes = nodes, selectedChildByParent = selected)
 }
 
 /**
@@ -398,6 +410,27 @@ internal fun hasChatBranchAlternatives(state: LocalChatBranchState): Boolean =
     state.nodes.groupBy { branchParentKey(it.parentId) }
         .values
         .any { siblings -> siblings.groupBy { it.message.role }.values.any { it.size > 1 } }
+
+/** Build branch badges in one pass per node, preserving legacy first-ID semantics. */
+internal fun chatBranchInfoIndex(state: LocalChatBranchState): Map<String, LocalChatBranchInfo> {
+    if (state.nodes.isEmpty()) return emptyMap()
+    val groupSizes = state.nodes.groupingBy { it.parentId to it.message.role }.eachCount()
+    val groupPositions = HashMap<Pair<String?, String>, Int>()
+    val seenIds = HashSet<String>()
+    val index = HashMap<String, LocalChatBranchInfo>()
+    state.nodes.forEach { node ->
+        val key = node.parentId to node.message.role
+        val position = groupPositions[key] ?: 0
+        groupPositions[key] = position + 1
+        // If a malformed legacy graph repeats an ID, the original lookup resolves
+        // the *first node in transcript order*, even when that group has no siblings.
+        if (seenIds.add(node.message.id)) {
+            val count = groupSizes.getValue(key)
+            if (count > 1) index[node.message.id] = LocalChatBranchInfo(position, count)
+        }
+    }
+    return index
+}
 
 internal fun chatBranchInfo(
     state: LocalChatBranchState,

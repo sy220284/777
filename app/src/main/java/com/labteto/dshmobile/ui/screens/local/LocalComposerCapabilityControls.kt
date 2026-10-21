@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -90,7 +90,7 @@ internal fun LocalComposerCapabilityActions(
     onReasoningModeChange: (LocalReasoningUiMode) -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val limits = LocalModelPerformanceControls.state.collectAsState().value
+    val limits = LocalModelPerformanceControls.state.collectAsStateWithLifecycle().value
     val modes = LocalReasoningControls.availableModes(profile, usageMode, limits.reasoningCeiling)
     val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
     Box {
@@ -159,7 +159,7 @@ internal fun LocalComposerCapabilityPanel(
     onTemperatureLevelChange: (Int) -> Unit = {},
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val limits = LocalModelPerformanceControls.state.collectAsState().value
+    val limits = LocalModelPerformanceControls.state.collectAsStateWithLifecycle().value
     val modes = LocalReasoningControls.availableModes(profile, usageMode, limits.reasoningCeiling)
     val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
     val effectiveMode = LocalReasoningControls.effectiveMode(reasoningMode, modes, basicReasoning)

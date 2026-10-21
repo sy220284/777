@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.chat.activeChatBranchMessages
 import com.labteto.dshmobile.local.chat.activeTranscriptForUserEdit
 import com.labteto.dshmobile.local.chat.appendMaterializedChatBranchMessage
 import com.labteto.dshmobile.local.chat.chatBranchInfo
+import com.labteto.dshmobile.local.chat.chatBranchInfoIndex
 import com.labteto.dshmobile.local.chat.chatBranchLastContext
 import com.labteto.dshmobile.local.chat.chatBranchingEligible
 import com.labteto.dshmobile.local.chat.decodeChatBranchStateEvent
@@ -527,4 +528,75 @@ class LocalChatBranchingTest {
         assertEquals(state, decoded)
         assertTrue(chatBranchingEligible(activeChatBranchMessages(decoded!!)))
     }
+    @Test
+    fun batchBranchMaterializationMatchesLegacySequentialUpsertForLongHistory() {
+        val messages = (0 until 750).map { n ->
+            message("node-$n", if (n % 2 == 0) "user" else "assistant", "内容$n", n.toLong())
+        }
+        val before = syncChatBranchState(
+            LocalChatBranchState(), messages.take(300), ChatCharacterState(mood = "旧"),
+            emptyList(),
+        )
+        val edited = messages.mapIndexed { index, item ->
+            if (index % 13 == 0) item.copy(content = "updated-$index") else item
+        }
+        val character = ChatCharacterState(mood = "最新")
+        val newState = syncChatBranchState(before, edited, character, emptyList())
+        var reference = before
+        var parent: String? = null
+        edited.forEachIndexed { index, item ->
+            val existing = reference.nodes.firstOrNull { it.message.id == item.id }
+            val node = if (existing == null) LocalChatBranchNode(
+                message = item, parentId = parent,
+                chatStateAfter = if (index == edited.lastIndex) character else null,
+                chatContextAfter = if (index == edited.lastIndex) ChatContextState() else null,
+            ) else existing.copy(
+                message = item, parentId = existing.parentId ?: parent,
+                chatStateAfter = if (index == edited.lastIndex && existing.chatStateAfter == null)
+                    character else existing.chatStateAfter,
+                chatContextAfter = if (index == edited.lastIndex && existing.chatContextAfter == null)
+                    ChatContextState() else existing.chatContextAfter,
+            )
+            reference = upsertChatBranchNode(reference, node, select = true)
+            parent = item.id
+        }
+        assertEquals(reference, newState)
+        assertEquals(reference.selectedChildByParent, newState.selectedChildByParent)
+    }
+
+    @Test
+    fun indexedBranchBadgesMatchOriginalPerRowLookup() {
+        val base = (0 until 500).map { n ->
+            LocalChatBranchNode(
+                message = message("m-$n", if (n % 2 == 0) "user" else "assistant", "", n.toLong()),
+                parentId = if (n < 10) null else "m-${n / 4}",
+            )
+        }
+        val state = LocalChatBranchState(nodes = base)
+        val index = chatBranchInfoIndex(state)
+        base.forEach { node ->
+            assertEquals(chatBranchInfo(state, node.message.id), index[node.message.id])
+        }
+    }
+
+    @Test
+    fun branchIndexAgreesWithLegacyForRepeatedIdsAcrossDifferentParentsAndRoles() {
+        val nodes = listOf(
+            LocalChatBranchNode(message("repeat", "user", "first", 1), parentId = null),
+            LocalChatBranchNode(message("single", "assistant", "reply", 2), parentId = "root"),
+            LocalChatBranchNode(message("repeat", "assistant", "later", 3), parentId = "root"),
+            LocalChatBranchNode(message("next", "assistant", "sibling", 4), parentId = "root"),
+            LocalChatBranchNode(message("other", "user", "other", 5), parentId = null),
+        )
+        val graph = LocalChatBranchState(nodes = nodes)
+        val indexed = chatBranchInfoIndex(graph)
+        nodes.forEach { node ->
+            assertEquals("first occurrence must win for ${node.message.id}",
+                chatBranchInfo(graph, node.message.id), indexed[node.message.id])
+        }
+        // The duplicate is first found in the root-user group, not the later assistant group.
+        assertEquals(0, indexed["repeat"]?.index)
+        assertEquals(2, indexed["repeat"]?.count)
+    }
+
 }

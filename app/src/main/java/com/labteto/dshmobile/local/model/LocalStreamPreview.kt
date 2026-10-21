@@ -9,7 +9,33 @@ internal class LocalStreamPreview(
     private val clockMs: () -> Long,
     private val publish: (String) -> Unit,
 ) {
-    private val text = StringBuilder()
+    // Fixed-capacity UTF-16 ring: trimming a full stream no longer shifts up to 64KiB
+    // of existing text for every tiny incoming chunk.
+    private val chars = CharArray(maxChars)
+    private var head = 0
+    private var length = 0
+
+    private fun charAt(index: Int): Char = chars[(head + index) % maxChars]
+
+    private fun discard(count: Int) {
+        head = (head + count) % maxChars
+        length -= count
+    }
+
+    private fun write(value: String) {
+        for (ch in value) {
+            chars[(head + length) % maxChars] = ch
+            length++
+        }
+    }
+
+    private fun snapshot(): String {
+        val count = length
+        return buildString(count) {
+            for (index in 0 until count) append(charAt(index))
+        }
+    }
+
     private var lastPublishMs: Long? = null
     private var dirty = false
 
@@ -21,20 +47,20 @@ internal class LocalStreamPreview(
     fun append(delta: String) {
         if (delta.isEmpty()) return
         if (delta.length >= maxChars) {
-            text.clear()
-            text.append(takeLastWithoutSplittingSurrogatePair(delta, maxChars))
+            head = 0
+            length = 0
+            write(takeLastWithoutSplittingSurrogatePair(delta, maxChars))
         } else {
-            var overflow = text.length + delta.length - maxChars
+            var overflow = length + delta.length - maxChars
             if (
-                overflow > 0 &&
-                overflow < text.length &&
-                Character.isHighSurrogate(text[overflow - 1]) &&
-                Character.isLowSurrogate(text[overflow])
+                overflow > 0 && overflow < length &&
+                Character.isHighSurrogate(charAt(overflow - 1)) &&
+                Character.isLowSurrogate(charAt(overflow))
             ) {
                 overflow += 1
             }
-            if (overflow > 0) text.delete(0, overflow.coerceAtMost(text.length))
-            text.append(delta)
+            if (overflow > 0) discard(overflow.coerceAtMost(length))
+            write(delta)
         }
         dirty = true
         val now = clockMs()
@@ -47,7 +73,7 @@ internal class LocalStreamPreview(
     }
 
     private fun publishAt(now: Long) {
-        publish(text.toString())
+        publish(snapshot())
         lastPublishMs = now
         dirty = false
     }

@@ -257,7 +257,8 @@ internal class LocalSessionLifecycleCoordinator(
             return
         }
         navigationInbox.offer(LocalSessionNavigationRequest.ChatDomain(command))
-        continueQueuedNavigation()
+        // Admission may read an older session snapshot; never do that disk work on the tap thread.
+        scope.launch { continueQueuedNavigation() }
     }
 
     private fun startChatDomainModeSwitch(command: LocalSessionDomainModeCommand): Boolean {
@@ -294,7 +295,8 @@ internal class LocalSessionLifecycleCoordinator(
 
     fun switchUsageMode(mode: LocalUsageMode) {
         navigationInbox.offer(LocalSessionNavigationRequest.Mode(mode))
-        continueQueuedNavigation()
+        // Resolve the latest destination on Session's IO owner, not Compose's main thread.
+        scope.launch { continueQueuedNavigation() }
     }
 
     private fun startUsageModeSwitch(mode: LocalUsageMode): Boolean {
@@ -334,11 +336,13 @@ internal class LocalSessionLifecycleCoordinator(
             sessionCoordinator.summaries().any { it.id == sessionId }
 
     fun switchSession(sessionId: String): Boolean {
-        // Visible history stays in memory; deep links may target a persisted session
-        // before the UI summary index has refreshed.
-        if (sessionId != currentSessionId() && !isKnownSession(sessionId)) return false
+        if (sessionId.isBlank()) return false
+        // This synchronous UI/SessionUiPort entrypoint only queues the desired identity.
+        // Validating a cold deep link may scan session JSON and must run on the Session IO
+        // owner with the rest of navigation, never while the UI command lock is held.
+        // A queued receipt means "will be resolved", not that the session exists.
         navigationInbox.offer(LocalSessionNavigationRequest.Session(sessionId))
-        continueQueuedNavigation()
+        scope.launch { continueQueuedNavigation() }
         return true
     }
 

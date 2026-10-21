@@ -13,18 +13,23 @@ internal data class LocalTranscriptHistoryLoadResult(
     val loadedRawMessages: Int = 0,
 )
 
-/**
- * Reads event-backed transcript pages until a foreground-visible dialogue target is satisfied.
- *
- * Raw runtime/history paging remains bounded by [LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES]. This
- * loader only decides how many bounded pages are needed to satisfy the separate foreground quota.
- */
+/** Narrow, cancellable history source for deterministic navigation ordering tests. */
+internal interface LocalTranscriptHistoryPageSource {
+    suspend fun bootstrap(sessionId: String): LocalTranscriptHistoryLoadResult?
+    suspend fun olderBatch(
+        sessionId: String,
+        olderMessages: List<LocalHarnessMessage>,
+        startCursor: LocalTranscriptPageCursor,
+    ): LocalTranscriptHistoryLoadResult?
+}
+
+/** Bounded Session Event paging and foreground-visible transcript projection. */
 internal class LocalTranscriptHistoryLoader(
     private val session: LocalSessionUiFacade,
     private val currentSessionId: () -> String,
     private val liveMessages: () -> List<LocalHarnessMessage>,
-) {
-    suspend fun bootstrap(sessionId: String): LocalTranscriptHistoryLoadResult? {
+) : LocalTranscriptHistoryPageSource {
+    override suspend fun bootstrap(sessionId: String): LocalTranscriptHistoryLoadResult? = withContext(Dispatchers.Default) {
         var olderMessages = emptyList<LocalHarnessMessage>()
         var pageCursor: LocalTranscriptPageCursor? = null
         var nextCursor: LocalTranscriptPageCursor? = null
@@ -37,7 +42,7 @@ internal class LocalTranscriptHistoryLoader(
             val page = readPage(sessionId, pageCursor)
             loadedPages++
             loadedRawMessages += page.messages.size
-            if (currentSessionId() != sessionId) return null
+            if (currentSessionId() != sessionId) return@withContext null
 
             val live = liveMessages()
             olderMessages = prependUniqueOlderMessages(page.messages, olderMessages, live)
@@ -56,18 +61,18 @@ internal class LocalTranscriptHistoryLoader(
             loadedRawMessages < LOCAL_TRANSCRIPT_HISTORY_MAX_RAW_MESSAGES_PER_LOAD
         )
 
-        return LocalTranscriptHistoryLoadResult(
+        LocalTranscriptHistoryLoadResult(
             olderMessages = olderMessages,
             nextCursor = nextCursor,
             loadedRawMessages = loadedRawMessages,
         )
     }
 
-    suspend fun olderBatch(
+    override suspend fun olderBatch(
         sessionId: String,
         olderMessages: List<LocalHarnessMessage>,
         startCursor: LocalTranscriptPageCursor,
-    ): LocalTranscriptHistoryLoadResult? {
+    ): LocalTranscriptHistoryLoadResult? = withContext(Dispatchers.Default) {
         var accumulated = olderMessages
         var nextCursor: LocalTranscriptPageCursor? = startCursor
         var loadedRawMessages = 0
@@ -83,7 +88,7 @@ internal class LocalTranscriptHistoryLoader(
             val page = readPage(sessionId, requestedCursor)
             loadedPages++
             loadedRawMessages += page.messages.size
-            if (currentSessionId() != sessionId) return null
+            if (currentSessionId() != sessionId) return@withContext null
 
             accumulated = prependUniqueOlderMessages(
                 pageMessages = page.messages,
@@ -105,7 +110,7 @@ internal class LocalTranscriptHistoryLoader(
             loadedRawMessages < LOCAL_TRANSCRIPT_HISTORY_MAX_RAW_MESSAGES_PER_LOAD
         )
 
-        return LocalTranscriptHistoryLoadResult(
+        LocalTranscriptHistoryLoadResult(
             olderMessages = accumulated,
             nextCursor = nextCursor,
             loadedRawMessages = loadedRawMessages,

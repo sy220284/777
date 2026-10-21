@@ -114,15 +114,21 @@ internal fun LocalWorkspaceFilesDialog(
     val chooserTitle = stringResource(R.string.local_files_share_chooser)
     val failedText = stringResource(R.string.local_files_share_failed)
     val limitText = stringResource(R.string.local_files_share_limit, MAX_LOCAL_SHARE_FILES)
-    val shareableFiles = when (mode) {
-        LocalFilesMode.WORKSPACE -> when (section) {
-            0 -> workspace.filter { query.isNotBlank() || it.path.substringBeforeLast('/', "") == directory }
-            1 -> conversation.involved
-            else -> conversation.artifacts
-        }
-        LocalFilesMode.CONVERSATION -> (conversation.artifacts + conversation.involved).distinctBy { it.path }
-    }.filter { isShareableWorkspacePath(it.path) && (query.isBlank() || it.path.contains(query.trim(), ignoreCase = true)) }
-    val visibleSharePaths = shareableFiles.map { it.path }.distinct()
+    val shareableFiles = remember(mode, section, directory, workspace, conversation, query) {
+        val normalizedQuery = query.trim()
+        (when (mode) {
+            LocalFilesMode.WORKSPACE -> when (section) {
+                0 -> workspace.filter { normalizedQuery.isNotBlank() || it.path.substringBeforeLast('/', "") == directory }
+                1 -> conversation.involved
+                else -> conversation.artifacts
+            }
+            LocalFilesMode.CONVERSATION -> (conversation.artifacts + conversation.involved).distinctBy { it.path }
+        }).filter { isShareableWorkspacePath(it.path) &&
+            (normalizedQuery.isBlank() || it.path.contains(normalizedQuery, ignoreCase = true)) }
+    }
+    val visibleSharePaths = remember(shareableFiles) {
+        shareableFiles.map { it.path }.distinct()
+    }
 
     LaunchedEffect(visibleSharePaths) {
         selected.retainAll(visibleSharePaths.toSet())
@@ -557,11 +563,13 @@ private fun LocalFileList(
 ) {
     val scope = rememberCoroutineScope()
     val prefix = if (directory.isEmpty()) "" else "$directory/"
-    val children = files.asSequence().mapNotNull { file ->
-        if (!file.path.startsWith(prefix)) return@mapNotNull null
-        file.path.removePrefix(prefix).takeIf { it.isNotEmpty() }?.substringBefore('/')
-    }.distinct().sorted().toList()
-    val filesByPath = files.associateBy(LocalWorkspaceFile::path)
+    val children = remember(files, directory) {
+        files.asSequence().mapNotNull { file ->
+            if (!file.path.startsWith(prefix)) return@mapNotNull null
+            file.path.removePrefix(prefix).takeIf { it.isNotEmpty() }?.substringBefore('/')
+        }.distinct().sorted().toList()
+    }
+    val filesByPath = remember(files) { files.associateBy(LocalWorkspaceFile::path) }
     var showInternalOnly by remember(directory, files) { mutableStateOf(false) }
     if (directory.isEmpty() && children == listOf(".adsh") && !showInternalOnly) {
         SyEmptyState(

@@ -30,7 +30,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -93,10 +93,10 @@ internal fun LocalMediaStudioSheetContent(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val models = remember(profiles) { LocalMediaCatalog.offers(profiles) }
-    val archive by viewModel.archive.collectAsState()
+    val archive by viewModel.archive.collectAsStateWithLifecycle()
     val videoTasks = archive.videos
     val generatedResults = archive.results
-    val storageError by viewModel.storageError.collectAsState()
+    val storageError by viewModel.storageError.collectAsStateWithLifecycle()
     var showHistory by remember { mutableStateOf(false) }
     var showArchive by rememberSaveable { mutableStateOf(false) }
     var archiveRevision by rememberSaveable { mutableStateOf<LocalMediaRevisionDraft?>(null) }

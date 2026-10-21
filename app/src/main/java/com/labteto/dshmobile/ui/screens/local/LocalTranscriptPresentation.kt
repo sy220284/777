@@ -98,19 +98,43 @@ internal fun isRepeatedWorkPollingTool(name: String?): Boolean {
  * Keep the original tool declaration order without combining independent operations.
  */
 private fun orderedWorkSteps(messages: List<LocalHarnessMessage>): List<LocalTranscriptItem.WorkStep> {
-    val ordered = messages.filter { it.role != "reasoning" }.toMutableList()
-    val completed = ordered.filter { it.role == "tool" && it.toolDeclaredAt != null }
+    val base = messages.filter { it.role != "reasoning" &&
+        !(it.role == "tool" && it.toolDeclaredAt != null) }
+    val completed = messages.filter { it.role == "tool" && it.toolDeclaredAt != null }
         .sortedWith(compareBy<LocalHarnessMessage> { it.toolDeclaredAt ?: Long.MAX_VALUE }
             .thenBy { it.toolDeclaredSequence ?: Long.MAX_VALUE })
-    ordered.removeAll { it.role == "tool" && it.toolDeclaredAt != null }
+    // Original insertion semantics: each completed tool precedes the first base row whose
+    // timestamp is strictly greater. Earlier inserted tools cannot be greater because tools
+    // are processed in timestamp order. Prefix maxima preserve this even for out-of-order
+    // legacy rows, without repeatedly scanning and inserting into an expanding ArrayList.
+    val prefixMax = LongArray(base.size)
+    var maximum = Long.MIN_VALUE
+    base.forEachIndexed { index, message ->
+        val timestamp = if (message.role == "tool") message.toolDeclaredAt ?: message.createdAt
+            else message.createdAt
+        maximum = maxOf(maximum, timestamp)
+        prefixMax[index] = maximum
+    }
+    val inserts = arrayOfNulls<MutableList<LocalHarnessMessage>>(base.size + 1)
     completed.forEach { tool ->
-        val at = tool.toolDeclaredAt ?: Long.MAX_VALUE
-        val target = ordered.indexOfFirst { other ->
-            val otherAt = if (other.role == "tool") other.toolDeclaredAt ?: other.createdAt
-                else other.createdAt
-            otherAt > at
+        val timestamp = tool.toolDeclaredAt ?: Long.MAX_VALUE
+        var low = 0
+        var high = base.size
+        while (low < high) {
+            val mid = (low + high) ushr 1
+            if (prefixMax[mid] > timestamp) high = mid else low = mid + 1
         }
-        ordered.add(if (target < 0) ordered.size else target, tool)
+        val bucket = inserts[low] ?: mutableListOf<LocalHarnessMessage>().also {
+            inserts[low] = it
+        }
+        bucket += tool
+    }
+    val ordered = buildList(base.size + completed.size) {
+        base.forEachIndexed { index, message ->
+            inserts[index]?.let(::addAll)
+            add(message)
+        }
+        inserts[base.size]?.let(::addAll)
     }
     return ordered.mapNotNull { message ->
         when (message.role) {
@@ -154,35 +178,50 @@ internal fun appendPendingWorkToolActivities(
     if (pending.isEmpty()) return compactRepeatedWorkStatusChecks(enriched)
     // Insert at the call's original time instead of appending below newer narration,
     // completed replies or deliverables. Never reorder existing durable messages.
-    val result = enriched.toMutableList()
-    pending.forEach { activity ->
-        val timestamp = activity.declaredAt ?: Long.MAX_VALUE
-        val index = result.indexOfFirst { item ->
-            when (item) {
-                is LocalTranscriptItem.Message -> item.message.createdAt > timestamp
-                is LocalTranscriptItem.WorkStep -> {
-                    val at = item.message.toolDeclaredAt ?: item.message.createdAt
-                    at > timestamp || (at == timestamp && item.message.role == "tool" &&
-                        (item.message.toolDeclaredSequence ?: Long.MAX_VALUE) >
-                        (activity.declaredSequence ?: Long.MAX_VALUE))
-                }
-                is LocalTranscriptItem.Thinking -> item.messages.first().createdAt > timestamp
-                is LocalTranscriptItem.WorkPendingTool -> {
-                    val at = item.activity.declaredAt ?: Long.MAX_VALUE
-                    at > timestamp || (at == timestamp &&
-                        (item.activity.declaredSequence ?: Long.MAX_VALUE) >
-                        (activity.declaredSequence ?: Long.MAX_VALUE))
-                }
-                is LocalTranscriptItem.MediaResult -> item.result.createdAtMillis > timestamp
-                is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis > timestamp
-                is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis > timestamp
-                is LocalTranscriptItem.WorkArtifact -> true
-                else -> false
-            }
+    // Both streams have a stable order: pending declarations are sorted by (time, sequence).
+    // Walk original rows once and drain declarations that belong before each row. This
+    // reproduces the previous indexOfFirst + ArrayList.add semantics even when durable
+    // timestamps are out of order, without rescanning/shifting for every pending tool.
+    val result = ArrayList<LocalTranscriptItem>(enriched.size + pending.size)
+    var nextPending = 0
+    for (item in enriched) {
+        while (nextPending < pending.size && pendingToolPrecedes(item, pending[nextPending])) {
+            result += LocalTranscriptItem.WorkPendingTool(pending[nextPending++])
         }
-        result.add(if (index < 0) result.size else index, LocalTranscriptItem.WorkPendingTool(activity))
+        result += item
+    }
+    while (nextPending < pending.size) {
+        result += LocalTranscriptItem.WorkPendingTool(pending[nextPending++])
     }
     return compactRepeatedWorkStatusChecks(result)
+}
+
+/** Legacy row precedence for an uncompleted declaration; ties keep declared sequence. */
+private fun pendingToolPrecedes(
+    item: LocalTranscriptItem,
+    activity: LocalToolActivityUiItem,
+): Boolean {
+    val timestamp = activity.declaredAt ?: Long.MAX_VALUE
+    return when (item) {
+        is LocalTranscriptItem.Message -> item.message.createdAt > timestamp
+        is LocalTranscriptItem.WorkStep -> {
+            val at = item.message.toolDeclaredAt ?: item.message.createdAt
+            at > timestamp || (at == timestamp && item.message.role == "tool" &&
+                (item.message.toolDeclaredSequence ?: Long.MAX_VALUE) >
+                (activity.declaredSequence ?: Long.MAX_VALUE))
+        }
+        is LocalTranscriptItem.Thinking -> item.messages.first().createdAt > timestamp
+        is LocalTranscriptItem.WorkPendingTool -> {
+            val at = item.activity.declaredAt ?: Long.MAX_VALUE
+            at > timestamp || (at == timestamp &&
+                (item.activity.declaredSequence ?: Long.MAX_VALUE) >
+                (activity.declaredSequence ?: Long.MAX_VALUE))
+        }
+        is LocalTranscriptItem.MediaResult -> item.result.createdAtMillis > timestamp
+        is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis > timestamp
+        is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis > timestamp
+        is LocalTranscriptItem.WorkArtifact -> true
+    }
 }
 
 /**

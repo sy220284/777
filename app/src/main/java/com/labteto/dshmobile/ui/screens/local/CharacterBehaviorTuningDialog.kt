@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,7 +82,7 @@ internal fun CharacterBehaviorTuningDialog(
     onDismiss: () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val performanceLimits by LocalModelPerformanceControls.state.collectAsState()
+    val performanceLimits by LocalModelPerformanceControls.state.collectAsStateWithLifecycle()
     val positionLimit = temperatureRange?.let(performanceLimits::temperaturePositionLimit) ?: 100
     var draft by remember(initial) { mutableStateOf(initial.normalized()) }
     var saving by remember { mutableStateOf(false) }

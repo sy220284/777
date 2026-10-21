@@ -11,6 +11,7 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaPresetCatalog as ChatPersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.chatBranchInfo as featureChatBranchInfo
+import com.labteto.dshmobile.local.chat.chatBranchInfoIndex as featureChatBranchInfoIndex
 import com.labteto.dshmobile.local.chat.chatMessageHasAttachmentContext as featureChatMessageHasAttachmentContext
 import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey as featureChatRelationshipSubjectKey
 import com.labteto.dshmobile.local.chat.editableChatUserText as featureEditableChatUserText
@@ -56,6 +57,9 @@ internal fun editableChatUserText(message: LocalHarnessMessage): String =
 
 internal fun chatBranchInfo(state: LocalChatBranchState, messageId: String): LocalChatBranchInfo? =
     featureChatBranchInfo(state, messageId)
+
+internal fun chatBranchInfoIndex(state: LocalChatBranchState): Map<String, LocalChatBranchInfo> =
+    featureChatBranchInfoIndex(state)
 
 internal fun groupMessageVisibleContent(message: LocalHarnessMessage): String =
     featureGroupMessageVisibleContent(message)

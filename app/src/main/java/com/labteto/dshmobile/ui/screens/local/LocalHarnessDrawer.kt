@@ -261,11 +261,20 @@ internal fun LocalModeDrawer(
     val matchedTasks = remember(searchTasks, historyQuery, crossModeSearch) {
         if (crossModeSearch) localDrawerMatchingTasks(searchTasks, historyQuery) else emptyList()
     }
-    val matchedFiles = remember(searchableFiles, historyQuery, crossModeSearch) {
-        if (crossModeSearch) localDrawerMatchingFiles(searchableFiles, historyQuery) else emptyList()
+    val sortedSearchableFiles = remember(searchableFiles) {
+        searchableFiles.asSequence().filter { isShareableWorkspacePath(it.path) }
+            .distinctBy(LocalWorkspaceFile::path).sortedBy(LocalWorkspaceFile::path).toList()
+    }
+    val matchedFiles = remember(sortedSearchableFiles, historyQuery, crossModeSearch) {
+        if (crossModeSearch) sortedSearchableFiles.filter {
+            it.path.contains(historyQuery.trim(), ignoreCase = true)
+        } else emptyList()
+    }
+    val sortedSessions = remember(sessions) {
+        sessions.sortedByDescending(LocalSessionSummary::updatedAt)
     }
     val sessionSections = remember(
-        sessions,
+        sortedSessions,
         usageMode,
         pinnedSessionIds,
         historyQuery,
@@ -273,12 +282,13 @@ internal fun LocalModeDrawer(
         crossModeSearch,
     ) {
         localDrawerSessionSections(
-            sessions = sessions,
+            sessions = sortedSessions,
             usageMode = usageMode,
             pinnedSessionIds = pinnedSessionIds,
             query = historyQuery,
             sessionTitleOverrides = sessionTitleOverrides,
             includeOtherModes = crossModeSearch,
+            preSortedByUpdatedAt = true,
         )
     }
     val matchedPersonas = remember(gallery, historyQuery, crossModeSearch) {

@@ -40,7 +40,7 @@ internal class NativeV6Documents(
         val identity = conversations.identitySnapshot()
             ?: return UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
         return port.generate(GenerateUiDocumentCommand(identity,
-            conversations.work.snapshot().identity == identity, messageId, prompt,
+            conversations.documentFactsSnapshot().let { it.workMode && it.identity == identity }, messageId, prompt,
             acknowledgedAdditionalModelRequest = true))
     }
 

@@ -534,6 +534,7 @@ private fun LocalAssistantMessageContent(
                             body,
                             bodyStyle = if (chatMode) DsType.chatBody else DsType.workBody,
                             preserveSoftLineBreaks = chatMode,
+                            streaming = streaming,
                         )
                     }
                 }

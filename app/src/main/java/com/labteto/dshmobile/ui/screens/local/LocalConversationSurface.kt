@@ -82,7 +82,7 @@ import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.presentation.chatBranchInfo
+import com.labteto.dshmobile.local.presentation.chatBranchInfoIndex
 import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalMediaRevisionDraft
@@ -342,7 +342,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val nativeDocuments = args.nativeDocuments
     val nativeDocumentSnapshot by (nativeDocuments?.snapshots ?: kotlinx.coroutines.flow.flowOf(
         com.labteto.dshmobile.uicontract.UiDocumentsSceneSnapshot(null, emptyList(), false, null)
-    )).collectAsState(initial = com.labteto.dshmobile.uicontract.UiDocumentsSceneSnapshot(null, emptyList(), false, null))
+    )).collectAsStateWithLifecycle(initialValue = com.labteto.dshmobile.uicontract.UiDocumentsSceneSnapshot(null, emptyList(), false, null))
     val onOpenWorkArtifact = args.onOpenWorkArtifact
     val activeModelProfile = args.activeModelProfile
     val sendFeedback = args.sendFeedback
@@ -419,7 +419,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val scope = rememberCoroutineScope()
     val appContext = LocalContext.current
     // Global ceiling changes must also refresh the exact per-model persona/Work projection.
-    val performanceCeiling = LocalModelPerformanceControls.state.collectAsState().value.temperatureCeiling
+    val performanceCeiling = LocalModelPerformanceControls.state.collectAsStateWithLifecycle().value.temperatureCeiling
     var reasoningMode by remember(state.sessionId, state.usageMode) {
         LocalReasoningControls.attach(appContext)
         mutableStateOf(LocalReasoningControls.mode(state.sessionId, state.usageMode))
@@ -577,23 +577,24 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             } while (true)
         }
     }
-    val transcriptItems = remember(transcriptMessages, state.usageMode, state.sessionId,
-        generatedMedia, videoMediaTasks, pendingMediaJobs, workArtifacts, workToolActivities, state.running) {
-        val mediaTimeline = mergeLocalMediaTimeline(
-            buildLocalTranscript(
-                transcriptMessages,
-                includeWorkProcess = state.usageMode == LocalUsageMode.WORK,
-            ),
-            state.sessionId,
-            generatedMedia,
-            videoMediaTasks,
-            pendingMediaJobs,
-        )
-        val withActivities = if (state.usageMode == LocalUsageMode.WORK) appendPendingWorkToolActivities(
-            appendWorkArtifactsToTranscript(mediaTimeline, workArtifacts), workToolActivities, state.running,
-        ) else mediaTimeline
-        composeLocalReplyAttachments(withActivities)
+    // Cache each projection stage independently: an active tool tick must not parse the
+    // historical transcript or sort the entire media timeline again.
+    val baseTranscript = remember(transcriptMessages, state.usageMode) {
+        buildLocalTranscript(transcriptMessages, includeWorkProcess = state.usageMode == LocalUsageMode.WORK)
     }
+    val mediaTimeline = remember(baseTranscript, state.sessionId, generatedMedia, videoMediaTasks, pendingMediaJobs) {
+        mergeLocalMediaTimeline(baseTranscript, state.sessionId, generatedMedia, videoMediaTasks, pendingMediaJobs)
+    }
+    val withArtifacts = remember(mediaTimeline, state.usageMode, workArtifacts) {
+        if (state.usageMode == LocalUsageMode.WORK) appendWorkArtifactsToTranscript(mediaTimeline, workArtifacts)
+        else mediaTimeline
+    }
+    val withActivities = remember(withArtifacts, state.usageMode, workToolActivities, state.running) {
+        if (state.usageMode == LocalUsageMode.WORK)
+            appendPendingWorkToolActivities(withArtifacts, workToolActivities, state.running)
+        else withArtifacts
+    }
+    val transcriptItems = remember(withActivities) { composeLocalReplyAttachments(withActivities) }
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
     val loadingOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
@@ -669,6 +670,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     )
     val messageEditingEnabled = true
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT
+    // One branch lookup index per changed graph; row composition must stay O(1).
+    val branchInfoByMessageId = remember(state.chatBranches, messageBranchingEnabled, state.groupChat.enabled) {
+        if (messageBranchingEnabled && !state.groupChat.enabled) chatBranchInfoIndex(state.chatBranches)
+        else emptyMap()
+    }
     val messageActionsEnabled =
         state.configured &&
             !state.loading &&
@@ -1155,7 +1161,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     messageActionsEnabled &&
                                     !state.groupChat.enabled,
                                 branchInfo = if (messageBranchingEnabled && !state.groupChat.enabled) {
-                                    chatBranchInfo(state.chatBranches, transcriptItem.message.id)
+                                    branchInfoByMessageId[transcriptItem.message.id]
                                 } else {
                                     null
                                 },

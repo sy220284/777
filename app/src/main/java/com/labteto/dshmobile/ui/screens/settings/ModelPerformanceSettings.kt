@@ -17,7 +17,7 @@ import com.shenyan.designsystem.components.SyRadioControl
 import com.labteto.dshmobile.ui.shenyan.SySlider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -44,7 +44,7 @@ import kotlin.math.roundToInt
 internal fun ModelPerformanceSettingsPage() {
     val context = LocalContext.current
     remember(context) { LocalModelPerformanceControls.attach(context); true }
-    val limits by LocalModelPerformanceControls.state.collectAsState()
+    val limits by LocalModelPerformanceControls.state.collectAsStateWithLifecycle()
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
 
     SettingsSeamlessGroup(stringResource(R.string.settings_model_performance_reasoning)) {
