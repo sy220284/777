@@ -53,11 +53,16 @@ internal class LocalModelAccountStateCoordinator(
     suspend fun retireChatGptAccountProfiles(accountId: String) {
         if (state.value.loading) state.awaitReady()
         if (gateway.hasChatGptPlanAuthorization(accountId)) return
+        val selected = gateway.activeProfile()
+        val wasActive = selected?.authKind == LocalModelAuthKind.CHATGPT_PLAN &&
+            selected.credentialRef == accountId
         configuration.saveChatGptModels(accountId, emptyList()) { result ->
             onCommitted(
                 result,
-                "当前 ChatGPT 套餐授权已失效，已停止使用该模型；请重新启用套餐或手动选择其他模型",
-                true,
+                if (wasActive)
+                    "当前 ChatGPT 套餐授权已失效，已停止使用该模型；请重新启用套餐或手动选择其他模型"
+                else null,
+                wasActive,
             )
         }
     }

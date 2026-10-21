@@ -71,7 +71,11 @@ class LocalModelRuntime @Inject constructor(
             credentialSourceProfileId,
             onCommitted = { result ->
                 commit(result)
-                runtimeStateStore.imageCapabilities.clearRoute(result.baseUrl, result.model)
+                runCatching {
+                    runtimeStateStore.imageCapabilities.clearRoute(result.baseUrl, result.model)
+                }.onFailure { failure ->
+                    AppLog.warn("ModelConfiguration", "image-route-cache-clear-failed", failure)
+                }
             },
         )
     }
