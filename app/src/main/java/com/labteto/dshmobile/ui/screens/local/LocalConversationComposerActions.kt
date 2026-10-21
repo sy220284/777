@@ -19,21 +19,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
-import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.ui.theme.DsAnimations
 
-/** Keeps send/stop pinned to the right on narrow devices without clipping capability controls. */
+/** Keeps the single send/stop action pinned to the right on narrow devices. */
 @Composable
 internal fun LocalConversationComposerExpandedRow(
     visible: Boolean,
-    state: LocalConversationSurfaceState,
     menuControl: @Composable () -> Unit,
     replySuggestionsControl: @Composable () -> Unit,
     planControl: @Composable () -> Unit,
     capabilityControls: @Composable (showLabels: Boolean) -> Unit,
-    stopControl: @Composable () -> Unit,
-    sendControl: @Composable (queue: Boolean) -> Unit,
+    primaryActionControl: @Composable () -> Unit,
 ) {
     val motion = com.shenyan.designsystem.foundation.SyMotion
     val reduced = com.shenyan.designsystem.foundation.LocalSyReduceMotion.current
@@ -67,12 +63,7 @@ internal fun LocalConversationComposerExpandedRow(
                     planControl()
                     replySuggestionsControl()
                 }
-                if (state.running) {
-                    stopControl()
-                    if (state.usageMode == LocalUsageMode.WORK) sendControl(true)
-                } else {
-                    sendControl(false)
-                }
+                primaryActionControl()
             }
         }
     }

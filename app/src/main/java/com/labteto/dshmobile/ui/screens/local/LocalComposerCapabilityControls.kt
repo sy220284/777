@@ -19,7 +19,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -104,13 +103,14 @@ internal fun LocalComposerCapabilityActions(
                 onClick = { onSelectPanel(if (openPanel == "reasoning") null else "reasoning") },
                 enabled = !running,
                 tint = colors.text,
-                containerColor = Color.Transparent,
+                disabledTint = colors.text.copy(alpha = 0.72f),
+                containerColor = colors.primary.copy(alpha = 0.22f),
             )
             if (showLabels) {
                 Text(
                     text = stringResource(composerReasoningLabel(reasoningMode, modes, basicReasoning)),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.textSecondary,
+                    color = colors.text,
                 )
             }
 
@@ -349,7 +349,8 @@ internal fun LocalComposerPlanAction(
         contentDescription = stringResource(R.string.local_composer_plan_title) + " · " + label,
         onClick = { pulse(); onToggle() },
         enabled = enabled && !waitingForApproval,
-        tint = if (selected) colors.primary else colors.textSecondary,
-        containerColor = if (selected) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
+        tint = if (selected) colors.onPrimary else colors.text,
+        disabledTint = if (selected) colors.onPrimary else colors.text.copy(alpha = 0.72f),
+        containerColor = if (selected) colors.primary else colors.primary.copy(alpha = 0.22f),
     )
 }

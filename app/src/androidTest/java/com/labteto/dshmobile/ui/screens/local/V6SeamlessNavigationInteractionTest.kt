@@ -151,4 +151,25 @@ class V6SeamlessNavigationInteractionTest {
         compose.runOnIdle { assertEquals("assistant-doc-1", selectedId) }
     }
 
+
+    @Test fun conversationDocumentsMoveIntoExistingMoreMenu() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        var opened = 0
+        compose.setContent {
+            DshTheme {
+                ConversationActionsMenu(
+                    pinned = false,
+                    onTogglePin = {},
+                    onRename = {},
+                    onDelete = {},
+                    onOpenNativeDocuments = { opened++ },
+                )
+            }
+        }
+        compose.onNodeWithContentDescription(ctx.getString(R.string.local_session_actions))
+            .performClick()
+        compose.onNodeWithText("交互文档").performClick()
+        compose.runOnIdle { assertEquals(1, opened) }
+    }
+
 }

@@ -62,6 +62,7 @@ internal fun ChatSurfaceHeader(
     tuningEnabled: Boolean = true,
     modelLabel: String = "",
     onModelClick: () -> Unit = {},
+    onOpenNativeDocuments: (() -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
@@ -171,6 +172,7 @@ internal fun ChatSurfaceHeader(
             onTogglePin = onTogglePin,
             onRename = onRenameSession,
             onDelete = onDeleteSession,
+            onOpenNativeDocuments = onOpenNativeDocuments,
         )
     }
 }
@@ -187,6 +189,7 @@ internal fun WorkSurfaceHeader(
     onRenameSession: () -> Unit,
     onDeleteSession: () -> Unit,
     onOpenWorkEvidence: (() -> Unit)? = null,
+    onOpenNativeDocuments: (() -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
@@ -236,6 +239,7 @@ internal fun WorkSurfaceHeader(
             onRename = onRenameSession,
             onDelete = onDeleteSession,
             onOpenWorkEvidence = onOpenWorkEvidence,
+            onOpenNativeDocuments = onOpenNativeDocuments,
         )
     }
 }

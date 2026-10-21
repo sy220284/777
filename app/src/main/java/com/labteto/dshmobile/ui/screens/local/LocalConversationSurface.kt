@@ -896,6 +896,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             onTogglePin = onTogglePinSession,
                             onRenameSession = { renameSessionOpen = true },
                             onDeleteSession = onDeleteSession,
+                            onOpenNativeDocuments = onOpenNativeDocuments.takeIf {
+                                state.sessionId.isNotBlank() && !state.loading
+                            },
                         )
                     } else {
                         WorkSurfaceHeader(
@@ -911,6 +914,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             onRenameSession = { renameSessionOpen = true },
                             onDeleteSession = onDeleteSession,
                             onOpenWorkEvidence = workActions?.let { { showWorkEvidence = true } },
+                            onOpenNativeDocuments = onOpenNativeDocuments.takeIf {
+                                state.sessionId.isNotBlank() && !state.loading
+                            },
                         )
                     }
                 }
@@ -929,12 +935,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             }
         }
 
-        Row(Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
-            horizontalArrangement = Arrangement.End) {
-            SyButton(text = "交互文档", onClick = onOpenNativeDocuments,
-                variant = SyButtonVariant.Ghost, size = SyButtonSize.Small,
-                enabled = state.sessionId.isNotBlank() && !state.loading)
-        }
         LocalModeIntroBanner(modeIntro)
 
         if (state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {

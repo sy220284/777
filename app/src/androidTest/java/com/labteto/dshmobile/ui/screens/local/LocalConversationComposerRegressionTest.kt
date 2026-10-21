@@ -6,6 +6,8 @@ import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -353,5 +355,88 @@ class LocalConversationComposerRegressionTest {
         compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).assertTextContains(draft)
     }
 
+
+
+    @Test
+    fun workRunningShowsOnlyStopAndIdleRestoresSend() {
+        val running = androidx.compose.runtime.mutableStateOf(true)
+        var stopCount = 0
+        var sendCount = 0
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = false,
+                        configured = true,
+                        sessionId = "work-one-primary-action",
+                        usageMode = LocalUsageMode.WORK,
+                        running = running.value,
+                    ),
+                    activeModelProfile = null,
+                    input = "待提交内容",
+                    attachments = emptyList(),
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = {},
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onSend = { _, _ -> sendCount++; LocalSendResult.Empty },
+                    onStop = { stopCount++ },
+                    onPlanModeChange = {},
+                )
+            }
+        }
+        val sendLabel = context.getString(R.string.chat_composer_send)
+        val stopLabel = context.getString(R.string.chat_composer_stop)
+
+        compose.onAllNodesWithContentDescription(stopLabel).assertCountEquals(1)
+        compose.onAllNodesWithContentDescription(sendLabel).assertCountEquals(0)
+        compose.onNodeWithContentDescription(stopLabel).performClick()
+        compose.runOnIdle {
+            assertEquals(1, stopCount)
+            assertEquals(0, sendCount)
+            running.value = false
+        }
+        compose.waitForIdle()
+        compose.onAllNodesWithContentDescription(stopLabel).assertCountEquals(0)
+        compose.onAllNodesWithContentDescription(sendLabel).assertCountEquals(1)
+        compose.onNodeWithContentDescription(sendLabel).performClick()
+        compose.runOnIdle { assertEquals(1, sendCount) }
+    }
+
+    @Test
+    fun compactChatRunningAlsoHasOnlyStop() {
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = false,
+                        configured = true,
+                        sessionId = "chat-one-primary-action",
+                        usageMode = LocalUsageMode.CHAT,
+                        running = true,
+                    ),
+                    activeModelProfile = null,
+                    input = "",
+                    attachments = emptyList(),
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = {},
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onStop = {},
+                    onPlanModeChange = {},
+                )
+            }
+        }
+        compose.onAllNodesWithContentDescription(
+            context.getString(R.string.chat_composer_stop),
+        ).assertCountEquals(1)
+        compose.onAllNodesWithContentDescription(
+            context.getString(R.string.chat_composer_send),
+        ).assertCountEquals(0)
+    }
 
 }

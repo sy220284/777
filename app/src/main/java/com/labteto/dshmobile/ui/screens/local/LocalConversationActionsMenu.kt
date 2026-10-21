@@ -22,6 +22,7 @@ internal fun ConversationActionsMenu(
     onRename: () -> Unit,
     onDelete: () -> Unit,
     onOpenWorkEvidence: (() -> Unit)? = null,
+    onOpenNativeDocuments: (() -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var expanded by remember { mutableStateOf(false) }
@@ -42,6 +43,8 @@ internal fun ConversationActionsMenu(
             seamlessBackground = true,
             items = onOpenWorkEvidence?.let { open -> listOf(SyMenuItem(
                 text = stringResource(R.string.work_evidence_title), icon = FeatherIcons.FileText, onClick = open,
+            )) }.orEmpty() + onOpenNativeDocuments?.let { open -> listOf(SyMenuItem(
+                text = "交互文档", icon = FeatherIcons.FileText, onClick = open,
             )) }.orEmpty() + listOf(
                 SyMenuItem(
                     text = stringResource(R.string.common_rename),
