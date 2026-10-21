@@ -18,7 +18,7 @@ internal class LocalModelAccountStateCoordinator(
     private val gateway: LocalModelGateway,
     private val state: LocalModelStatePort,
     private val isBusy: () -> Boolean,
-    private val onCommitted: (LocalModelConfigurationResult, String?, Boolean) -> Unit,
+    private val onCommitted: (LocalModelConfigurationResult, String?, Boolean, String?) -> Unit,
 ) {
     fun observeInvalidations(scope: CoroutineScope) {
         scope.launch {
@@ -36,6 +36,7 @@ internal class LocalModelAccountStateCoordinator(
         accountId: String,
         models: List<ChatGptModelOption>,
         selectFirst: Boolean,
+        originatingSessionId: String? = null,
     ) {
         if (!selectFirst && state.value.loading) state.awaitReady()
         if (shouldDeferBackgroundChatGptModelSync(selectFirst, isBusy())) return
@@ -46,6 +47,7 @@ internal class LocalModelAccountStateCoordinator(
                 result,
                 if (models.isEmpty()) "当前 ChatGPT 账户没有可用于套餐共享的模型" else null,
                 selectFirst,
+                originatingSessionId,
             )
         }
     }
@@ -63,6 +65,7 @@ internal class LocalModelAccountStateCoordinator(
                     "当前 ChatGPT 套餐授权已失效，已停止使用该模型；请重新启用套餐或手动选择其他模型"
                 else null,
                 wasActive,
+                null,
             )
         }
     }
@@ -74,7 +77,7 @@ internal class LocalModelAccountStateCoordinator(
             accountId = accountId,
             currentModel = before.model,
             currentBaseUrl = before.baseUrl,
-            onCommitted = { onCommitted(it, null, true) },
+            onCommitted = { onCommitted(it, null, true, null) },
         )
     }
 }
