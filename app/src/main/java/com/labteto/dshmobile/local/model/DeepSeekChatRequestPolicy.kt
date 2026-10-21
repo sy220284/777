@@ -24,7 +24,10 @@ internal object DeepSeekChatRequestPolicy {
                 uri.host.equals("api.deepseek.com", ignoreCase = true) &&
                 uri.userInfo == null && uri.query == null && uri.fragment == null &&
                 uri.port in setOf(-1, 443) &&
-                uri.path.trimEnd('/') in setOf("", "/v1")
+                // Existing saved routes may use the full completion endpoint.
+                uri.path.trimEnd('/') in setOf(
+                    "", "/v1", "/chat/completions", "/v1/chat/completions",
+                )
         }.getOrDefault(false)
 
     /**
