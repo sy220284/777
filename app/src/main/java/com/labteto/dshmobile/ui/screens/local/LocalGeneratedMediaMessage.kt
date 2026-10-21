@@ -22,6 +22,7 @@ import android.net.Uri
 import android.widget.MediaController
 import android.widget.VideoView
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
@@ -522,6 +523,7 @@ internal fun LocalGeneratedVideoTaskRow(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 internal fun MediaMessageCard(
     title: String, subtitle: String, modifier: Modifier = Modifier,
     inline: Boolean = false,
@@ -621,6 +623,7 @@ internal fun InlineReplyMediaActions(file: File, mime: String, onError: (String)
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 internal fun MediaInlinePicture(
     file: File?, remoteUrl: String?, onOpen: (() -> Unit)? = null,
     contentDescription: String? = null,
@@ -721,6 +724,7 @@ private fun decodeMediaPreview(file: File?, remoteUrl: String?, maxEdge: Int = 1
 
 /** Fullscreen, wallpaper-matched image viewer. No black slab or permanent action strip. */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 internal fun MediaImageDetailDialog(
     file: File?, remoteUrl: String?, onDismiss: () -> Unit,
     onDeleteRequest: (() -> Unit)? = null,
@@ -847,6 +851,7 @@ internal fun MediaImageDetailDialog(
 
 /** The first saved video frame replaces the empty playback slab; preparation is off the UI thread. */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun MediaVideoPoster(file: File?, onPlay: () -> Unit,
     onLongPress: (() -> Unit)? = null) {
     val resources = LocalResources.current
