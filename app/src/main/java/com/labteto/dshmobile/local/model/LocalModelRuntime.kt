@@ -221,10 +221,14 @@ class LocalModelRuntime @Inject constructor(
             result.profiles, result.activeProfileId, error, preferredSessionId,
         )
         val after = runtimeStateStore.state.value
-        if (before.sessionId != after.sessionId || runtimeStateStore.sessionTransitioning) return
+        // Navigation can complete while a configuration transaction is running.
+        // Skip a transition in progress, but restore the foreground route even when
+        // another session became visible between the before/after snapshots.
+        if (runtimeStateStore.sessionTransitioning || after.loading) return
 
         val active = after.modelState.modelSelection.activeProfile
-        if (recordSessionSelection && after.sessionId.isNotBlank() &&
+        if (recordSessionSelection && before.sessionId == after.sessionId &&
+            after.sessionId.isNotBlank() &&
             active != null &&
             before.modelState.modelSelection.activeProfileId != active.id) {
             runCatching {
