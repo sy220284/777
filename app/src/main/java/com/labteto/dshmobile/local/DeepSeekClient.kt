@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
 import com.labteto.dshmobile.local.model.ModelStreamLineReader
+import com.labteto.dshmobile.local.model.DeepSeekChatRequestPolicy
 import com.labteto.dshmobile.local.model.LocalModelStreamProgressMonitor
 import com.labteto.dshmobile.local.model.ModelStreamLimitException
 import com.labteto.dshmobile.local.model.ModelStreamLimitKind
@@ -26,7 +27,6 @@ import com.labteto.dshmobile.local.model.withModelAdmissionTracking
 import com.labteto.dshmobile.local.tools.LocalToolCatalog
 import com.labteto.dshmobile.local.tools.long
 import java.io.ByteArrayOutputStream
-import java.net.URI
 import java.net.SocketTimeoutException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -77,16 +77,23 @@ class DeepSeekClient @Inject constructor(
         tools: JsonArray = LocalToolCatalog.specs,
         temperature: Double? = null,
         reasoningEffort: String? = null,
+        maxTokens: Int? = null,
     ): LocalModelReply = withContext(Dispatchers.IO) {
         val requestId = UUID.randomUUID().toString()
         val promptBreakdown = estimatePromptBreakdown(messages, tools)
         val toolCallingMode = resolveToolCallingMode(model, baseUrl, tools)
+        val officialDeepSeek = DeepSeekChatRequestPolicy.isOfficialOrigin(baseUrl)
         val payload = buildJsonObject {
             put("model", model)
             put("messages", JsonArray(messages))
             put("stream", false)
             // Official Kimi Code models use provider-fixed sampling parameters.
-            if (!LocalKimiPolicy.isOfficial(baseUrl)) temperature?.let { put("temperature", it) }
+            if (!LocalKimiPolicy.isOfficial(baseUrl) &&
+                (!officialDeepSeek || reasoningEffort == "none")) {
+                temperature?.let { put("temperature", it) }
+            }
+            DeepSeekChatRequestPolicy.checkedMaxTokens(model, baseUrl, maxTokens)
+                ?.let { put("max_tokens", it) }
             val miniMax = LocalMiniMaxPolicy.isOfficial(baseUrl)
             if (miniMax) {
                 if (LocalMiniMaxPolicy.needsLegacyReasoningSplit(model)) put("reasoning_split", true)
@@ -95,9 +102,6 @@ class DeepSeekClient @Inject constructor(
             if (LocalKimiPolicy.isOfficial(baseUrl)) {
                 LocalKimiPolicy.writeThinking(this, model, reasoningEffort)
             } else if (reasoningEffort != null && !miniMax) {
-                val officialDeepSeek = runCatching {
-                    URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.deepseek.com", true)
-                }.getOrDefault(false)
                 if (officialDeepSeek) {
                     put("thinking", buildJsonObject {
                         put("type", if (reasoningEffort == "none") "disabled" else "enabled")
@@ -192,17 +196,24 @@ class DeepSeekClient @Inject constructor(
         tools: JsonArray = LocalToolCatalog.specs,
         temperature: Double? = null,
         reasoningEffort: String? = null,
+        maxTokens: Int? = null,
         onDelta: (LocalModelDelta) -> Unit = { },
     ): LocalModelReply = withContext(Dispatchers.IO) {
         val requestId = UUID.randomUUID().toString()
         val promptBreakdown = estimatePromptBreakdown(messages, tools)
         val toolCallingMode = resolveToolCallingMode(model, baseUrl, tools)
+        val officialDeepSeek = DeepSeekChatRequestPolicy.isOfficialOrigin(baseUrl)
         val payload = buildJsonObject {
             put("model", model)
             put("messages", JsonArray(messages))
             put("stream", true)
             // Official Kimi Code models use provider-fixed sampling parameters.
-            if (!LocalKimiPolicy.isOfficial(baseUrl)) temperature?.let { put("temperature", it) }
+            if (!LocalKimiPolicy.isOfficial(baseUrl) &&
+                (!officialDeepSeek || reasoningEffort == "none")) {
+                temperature?.let { put("temperature", it) }
+            }
+            DeepSeekChatRequestPolicy.checkedMaxTokens(model, baseUrl, maxTokens)
+                ?.let { put("max_tokens", it) }
             put("stream_options", buildJsonObject { put("include_usage", true) })
             val miniMax = LocalMiniMaxPolicy.isOfficial(baseUrl)
             if (miniMax) {
@@ -212,9 +223,6 @@ class DeepSeekClient @Inject constructor(
             if (LocalKimiPolicy.isOfficial(baseUrl)) {
                 LocalKimiPolicy.writeThinking(this, model, reasoningEffort)
             } else if (reasoningEffort != null && !miniMax) {
-                val officialDeepSeek = runCatching {
-                    URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.deepseek.com", true)
-                }.getOrDefault(false)
                 if (officialDeepSeek) {
                     put("thinking", buildJsonObject {
                         put("type", if (reasoningEffort == "none") "disabled" else "enabled")
@@ -275,7 +283,14 @@ class DeepSeekClient @Inject constructor(
                 var streamUsage: JsonObject? = null
                                 var sawStreamData = false
                 var sawTerminalFrame = false
-                val usefulProgress = LocalModelStreamProgressMonitor()
+                val usefulProgress = LocalModelStreamProgressMonitor(
+                    // DeepSeek officially keeps a pending inference alive for up to ten minutes.
+                    // Allow a small scheduling margin before useful progress starts; after that,
+                    // the normal eight-minute no-progress guard still applies.
+                    startupTimeoutNanos = TimeUnit.MINUTES.toNanos(
+                        if (officialDeepSeek) 11 else 8,
+                    ),
+                )
                 // Response 统一由 withCancellableModelResponse 收尾，避免成功后 reader.close()
                 // 的连接异常覆盖已完成结果并触发重复请求。
                 val reader = ModelStreamLineReader(responseBody.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_MODEL_RESPONSE_BYTES)
@@ -297,7 +312,7 @@ class DeepSeekClient @Inject constructor(
                         if (usefulProgress.isStalled()) {
                             throw modelPostAdmissionFailure(
                                 code = "MODEL_STREAM_STALLED_AFTER_ADMISSION",
-                                detail = "模型流仍有网络活动，但连续八分钟没有产生任何有效文本、推理或工具调用数据",
+                                detail = "模型流持续保活但没有开始或继续生成有效文本、推理或工具调用数据",
                                 requestId = requestId,
                             )
                         }
@@ -671,9 +686,7 @@ private fun requireCompleteFinishReason(reason: String) {
 }
 
 internal fun shouldSendToolChoice(baseUrl: String, model: String): Boolean {
-    val officialDeepSeek = normalizeModelBaseUrl(baseUrl)
-        .lowercase()
-        .contains("api.deepseek.com")
+    val officialDeepSeek = DeepSeekChatRequestPolicy.isOfficialOrigin(baseUrl)
     val thinkingModel = model.trim().lowercase() in setOf(
         "deepseek-flash",
         "deepseek-v4-pro",

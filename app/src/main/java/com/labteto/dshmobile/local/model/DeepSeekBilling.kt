@@ -496,7 +496,7 @@ internal fun parseDeepSeekPricingPage(html: String): List<DeepSeekModelPricing> 
         DeepSeekModelPricing(
             modelId = "deepseek-flash",
             displayName = "DeepSeek Flash",
-            version = "DeepSeek-V4.1-Flash",
+            version = "DeepSeek-V4.1-Flash-1017",
             offPeak = DeepSeekPriceTier(values[0], values[4], values[8]),
             peak = DeepSeekPriceTier(values[2], values[6], values[10]),
             aliases = setOf("deepseek-v4-flash", "deepseek-v4-flash-vision-exp"),
@@ -515,7 +515,7 @@ fun defaultDeepSeekPricing(): List<DeepSeekModelPricing> = listOf(
     DeepSeekModelPricing(
         modelId = "deepseek-flash",
         displayName = "DeepSeek Flash",
-        version = "DeepSeek-V4.1-Flash",
+        version = "DeepSeek-V4.1-Flash-1017",
         offPeak = DeepSeekPriceTier(
             cacheHitCnyPerMillion = 0.02,
             cacheMissCnyPerMillion = 1.0,

@@ -130,6 +130,8 @@ object LocalModelPresets {
             imageInputSupported = true,
             modelsEndpoint = "https://api.deepseek.com/models",
             contextWindowTokens = 1_000_000,
+            // Operational context reserve, not DeepSeek's API max_tokens limit (393,216).
+            // Real per-request output budgets are selected and clamped by DeepSeekChatRequestPolicy.
             defaultMaxOutputTokens = 256_000,
             systemPromptUpdateMode = LocalModelPromptUpdateMode.APPEND_ONLY,
             toolUpdateMode = LocalModelPromptUpdateMode.APPEND_ONLY,
@@ -142,6 +144,8 @@ object LocalModelPresets {
             imageInputSupported = false,
             modelsEndpoint = "https://api.deepseek.com/models",
             contextWindowTokens = 1_000_000,
+            // Operational context reserve, not DeepSeek's API max_tokens limit (393,216).
+            // Real per-request output budgets are selected and clamped by DeepSeekChatRequestPolicy.
             defaultMaxOutputTokens = 256_000,
             systemPromptUpdateMode = LocalModelPromptUpdateMode.APPEND_ONLY,
             toolUpdateMode = LocalModelPromptUpdateMode.APPEND_ONLY,
