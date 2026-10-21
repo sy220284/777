@@ -98,6 +98,30 @@ class LocalSessionCoordinatorTest {
     }
 
     @Test
+    fun legacyMigrationDoesNotAppendWhenSnapshotCursorIsAhead() = runTest {
+        val json = Json { ignoreUnknownKeys = true }
+        val sessions = temporary.newFolder("legacy-cursor-ahead")
+        val repository = LocalSessionRepository(sessions, json, backgroundScope, {}, {})
+        val log = LocalSessionEventLog(File(sessions, "stale.events.jsonl"), json)
+        val coordinator = LocalSessionCoordinator(
+            repository = repository,
+            eventLogFor = { log },
+            runtimeWindowMessages = 2,
+            domainCodecs = listOf(LocalChatSessionDomainCodec),
+        )
+        val persisted = LocalHarnessSession(
+            id = "stale",
+            messages = listOf(message("m1", "user", "旧历史")),
+            transcriptProjectedThroughSequence = 99L,
+        )
+        assertThrows(SessionProjectionCursorAheadException::class.java) {
+            coordinator.restoreTranscript(persisted, persistedSnapshotExists = true)
+        }
+        assertEquals(-1L, log.latestSequence())
+        assertTrue(log.snapshot().isEmpty())
+    }
+
+    @Test
     fun readCanonicalizesLegacyChatContextAtPersistenceBoundary() = runTest {
         val json = Json { ignoreUnknownKeys = true }
         val sessions = temporary.newFolder("legacy-chat-context")

@@ -372,10 +372,7 @@ class HarnessWebhookService : Service() {
             if (method != "POST" || path != "/run") {
                 return respond(client, 404, """{"error":"not found"}""")
             }
-            if (headers["transfer-encoding"]?.contains("chunked", ignoreCase = true) == true) {
-                return respond(client, 400, """{"error":"chunked encoding unsupported"}""")
-            }
-            // Authorization precedes body reading: unauthenticated clients cannot hold a body slot.
+             // Authorization precedes body reading: unauthenticated clients cannot hold a body slot.
             val length = try {
                 webhookBodyLength(headers["content-length"], MAX_BODY_BYTES)
             } catch (_: WebhookPayloadTooLarge) {

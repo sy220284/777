@@ -48,6 +48,15 @@ internal class LocalSessionCoordinator(
         persistedSnapshotExists: Boolean,
     ): LocalSessionTranscriptRestore {
         val eventLog = eventLogFor(stored.id)
+        // Validate before legacy migration: migration itself appends authoritative events.
+        // A stale snapshot must never mutate the archive before the cursor mismatch is reported.
+        val persistedCursor = stored.transcriptProjectedThroughSequence
+        val durableBeforeMigration = eventLog.latestSequence()
+        if (persistedCursor != null && persistedCursor > durableBeforeMigration) {
+            throw SessionProjectionCursorAheadException(
+                "会话投影游标 $persistedCursor 超出事件日志末尾 $durableBeforeMigration；已停止自动恢复以保护历史",
+            )
+        }
         val migration = if (persistedSnapshotExists) {
             migrateLegacyTranscriptSnapshot(
                 session = stored,

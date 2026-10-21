@@ -46,6 +46,9 @@ internal class WebhookHttpRequestReader(
             if (index <= 0) return null
             val name = line.substring(0, index).trim().lowercase()
             if (name.isBlank()) return null
+            // This minimal HTTP server supports only Content-Length framing.
+            // Reject every Transfer-Encoding variant, including identity, before body reads.
+            if (name == "transfer-encoding") return null
             // Multiple framing headers create request-smuggling ambiguity.
             if (name in headers && (name == "content-length" || name == "transfer-encoding")) return null
             headers[name] = line.substring(index + 1).trim()

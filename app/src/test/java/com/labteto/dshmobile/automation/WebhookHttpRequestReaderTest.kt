@@ -43,6 +43,14 @@ class WebhookHttpRequestReaderTest {
         assertThrows(SocketTimeoutException::class.java) { reader.readBody(4) }
     }
 
+    @Test fun unsupportedTransferEncodingIsRejectedEvenIfNotChunked() = withSocketPair { client, accepted ->
+        client.getOutputStream().write(
+            "POST /run HTTP/1.1\r\nTransfer-Encoding: identity\r\nContent-Length: 5\r\n\r\n".toByteArray(),
+        )
+        val reader = WebhookHttpRequestReader(accepted, System.nanoTime() + TimeUnit.SECONDS.toNanos(1))
+        assertTrue(reader.readHead(16 * 1024) == null)
+    }
+
     @Test fun conflictingContentLengthsAreRejected() = withSocketPair { client, accepted ->
         client.getOutputStream().write("POST /run HTTP/1.1\r\nContent-Length: 1\r\nContent-Length: 2\r\n\r\n".toByteArray())
         val reader = WebhookHttpRequestReader(accepted, System.nanoTime() + TimeUnit.SECONDS.toNanos(1))
