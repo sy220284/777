@@ -421,6 +421,27 @@ internal fun chatRegenerationSourceMessages(
     return selected.dropLast(1)
 }
 
+/** All alternative answers to this user turn are display-only during regeneration. */
+internal fun chatRegenerationPreviousAnswerIds(
+    state: LocalChatBranchState,
+    replacingMessageId: String,
+): Set<String> {
+    val selected = state.nodes.first { it.message.id == replacingMessageId }
+    return state.nodes.asSequence()
+        .filter { it.parentId == selected.parentId && it.message.role == "assistant" }
+        .map { it.message.id }
+        .toSet()
+}
+
+/** Do not use the displayed old reply (or its reasoning) as a style/continuity example. */
+internal fun chatRegenerationReferenceMessages(
+    messages: List<LocalHarnessMessage>,
+    replacingMessageId: String,
+): List<LocalHarnessMessage> = messages.filterNot { message ->
+    message.id == replacingMessageId ||
+        message.id == com.labteto.dshmobile.local.session.chatReasoningTranscriptId(replacingMessageId)
+}
+
 internal fun hasChatBranchAlternatives(state: LocalChatBranchState): Boolean =
     state.nodes.groupBy { branchParentKey(it.parentId) }
         .values
