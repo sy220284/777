@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
+import com.labteto.dshmobile.local.chat.chatBranchInfoIndex
+import com.labteto.dshmobile.local.chat.LocalChatBranchState
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.uiBindingIdentity
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
@@ -22,6 +25,7 @@ import com.labteto.dshmobile.uicontract.UiCommandRejection
 import com.labteto.dshmobile.uicontract.UiExecutionPhase
 import com.labteto.dshmobile.uicontract.UiMessageRole
 import com.labteto.dshmobile.uicontract.UiMessageSnapshot
+import com.labteto.dshmobile.uicontract.UiQuestionSnapshot
 import com.labteto.dshmobile.uicontract.UiSceneStatus
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
 import com.labteto.dshmobile.uicontract.WorkConversationSceneSnapshot
@@ -33,6 +37,20 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine
+
+/**
+ * A narrow, owner-authenticated view for UI documents. No transcript projection is
+ * required to determine phase, active approval or authorization of a document action.
+ */
+internal data class LocalConversationDocumentFacts(
+    val identity: UiSessionIdentity?,
+    val workMode: Boolean,
+    val status: UiSceneStatus,
+    val phase: UiExecutionPhase,
+    val queuedInputCount: Int,
+    val approval: UiApprovalSnapshot?,
+    val error: String?,
+)
 
 /**
  * Application composition adapter for conversation commands and real interaction waiters. All writes still go to
@@ -47,6 +65,51 @@ class LocalConversationUiPortComposition @Inject internal constructor(
     private val workOwner: LocalWorkExecutionPort,
     private val approvalOwner: LocalWorkApprovalUiPort,
 ) {
+    private val projectedMessages = LocalConversationMessageProjectionCache()
+
+    /** The lightweight document path never constructs UiMessageSnapshot rows. */
+    internal fun documentFactsSnapshot(): LocalConversationDocumentFacts =
+        synchronized(stateStore.foregroundRunHandle.lock) {
+            val state = stateStore.state.value
+            val workMode = state.usageMode == LocalUsageMode.WORK
+            val approval = if (workMode) uiWorkApproval(state) else null
+            val question = if (workMode) uiWorkQuestion(state) else null
+            LocalConversationDocumentFacts(
+                identity = identity(state),
+                workMode = workMode,
+                status = status(state),
+                phase = when {
+                    workMode && (approval != null || question != null) -> UiExecutionPhase.WAITING_FOR_USER
+                    state.kernel.running -> UiExecutionPhase.RUNNING
+                    else -> UiExecutionPhase.IDLE
+                },
+                queuedInputCount = state.kernel.queuedInputCount,
+                approval = approval,
+                error = state.error,
+            )
+        }
+
+    private fun uiWorkApproval(state: LocalHarnessState): UiApprovalSnapshot? {
+        if (state.usageMode != LocalUsageMode.WORK || state.sessionId.isBlank() ||
+            state.loading || stateStore.sessionTransitioning) return null
+        val approval = approvalOwner.pendingApproval() ?: return null
+        return UiApprovalSnapshot(requireNotNull(approval.requestId), approval.toolName,
+            approval.summary, approval.arguments, when (approval.impact) {
+                com.labteto.dshmobile.local.interaction.LocalApprovalImpact.LOW -> UiApprovalImpact.LOW
+                com.labteto.dshmobile.local.interaction.LocalApprovalImpact.MEDIUM -> UiApprovalImpact.MEDIUM
+                com.labteto.dshmobile.local.interaction.LocalApprovalImpact.HIGH -> UiApprovalImpact.HIGH
+                com.labteto.dshmobile.local.interaction.LocalApprovalImpact.CRITICAL -> UiApprovalImpact.CRITICAL
+            }, canApproveDeviceTurn = approval.canApproveDeviceTurn)
+    }
+
+    private fun uiWorkQuestion(state: LocalHarnessState): UiQuestionSnapshot? {
+        if (state.usageMode != LocalUsageMode.WORK || state.loading ||
+            stateStore.sessionTransitioning) return null
+        return approvalOwner.pendingQuestion()?.let { question ->
+            UiQuestionSnapshot(requireNotNull(question.requestId), question.question, question.options.toList())
+        }
+    }
+
     /** Captured by a legacy frame without copying message bodies; admission still belongs to ports. */
     internal fun identitySnapshot(): UiSessionIdentity? = synchronized(stateStore.foregroundRunHandle.lock) {
         identity(stateStore.state.value)
@@ -72,7 +135,7 @@ class LocalConversationUiPortComposition @Inject internal constructor(
                 identity = identity(state).takeIf { active },
                 status = if (active) status(state) else UiSceneStatus.EMPTY,
                 phase = if (active && state.kernel.running) UiExecutionPhase.RUNNING else UiExecutionPhase.IDLE,
-                messages = if (active) messages(state) else emptyList(),
+                messages = if (active) projectedMessages.project(state) else emptyList(),
                 queuedInputCount = if (active) state.kernel.queuedInputCount else 0,
                 send = availability(state, active),
                 error = state.error.takeIf { active },
@@ -111,10 +174,8 @@ class LocalConversationUiPortComposition @Inject internal constructor(
         override fun snapshot(): WorkConversationSceneSnapshot = synchronized(stateStore.foregroundRunHandle.lock) {
             val state = stateStore.state.value
             val active = state.usageMode == LocalUsageMode.WORK
-            val approval = if (active && state.sessionId.isNotBlank() && !state.loading && !stateStore.sessionTransitioning)
-                approvalOwner.pendingApproval() else null
-            val question = if (active && !state.loading && !stateStore.sessionTransitioning)
-                approvalOwner.pendingQuestion() else null
+            val approval = if (active) uiWorkApproval(state) else null
+            val question = if (active) uiWorkQuestion(state) else null
             WorkConversationSceneSnapshot(
                 identity = identity(state).takeIf { active },
                 status = if (active) status(state) else UiSceneStatus.EMPTY,
@@ -123,19 +184,12 @@ class LocalConversationUiPortComposition @Inject internal constructor(
                     active && state.kernel.running -> UiExecutionPhase.RUNNING
                     else -> UiExecutionPhase.IDLE
                 },
-                messages = if (active) messages(state) else emptyList(),
+                messages = if (active) projectedMessages.project(state) else emptyList(),
                 queuedInputCount = if (active) state.kernel.queuedInputCount else 0,
                 send = availability(state, active),
-                approval = approval?.let {
-                    UiApprovalSnapshot(requireNotNull(it.requestId), it.toolName, it.summary, it.arguments, when (it.impact) {
-                        com.labteto.dshmobile.local.interaction.LocalApprovalImpact.LOW -> UiApprovalImpact.LOW
-                        com.labteto.dshmobile.local.interaction.LocalApprovalImpact.MEDIUM -> UiApprovalImpact.MEDIUM
-                        com.labteto.dshmobile.local.interaction.LocalApprovalImpact.HIGH -> UiApprovalImpact.HIGH
-                        com.labteto.dshmobile.local.interaction.LocalApprovalImpact.CRITICAL -> UiApprovalImpact.CRITICAL
-                    }, canApproveDeviceTurn = it.canApproveDeviceTurn)
-                },
+                approval = approval,
                 error = state.error.takeIf { active },
-                question = question?.let { com.labteto.dshmobile.uicontract.UiQuestionSnapshot(requireNotNull(it.requestId), it.question, it.options.toList()) },
+                question = question,
                 livePreview = liveConversationPreview(state, LocalUsageMode.WORK),
             )
         }
@@ -219,18 +273,50 @@ private fun status(state: LocalHarnessState): UiSceneStatus = when {
     else -> UiSceneStatus.CONTENT
 }
 
-private fun messages(state: LocalHarnessState): List<UiMessageSnapshot> = state.messages.map {
-    UiMessageSnapshot(it.id, when (it.role) {
-        "user" -> UiMessageRole.USER
-        "assistant", "progress" -> UiMessageRole.ASSISTANT
-        "tool" -> UiMessageRole.TOOL
-        else -> UiMessageRole.SYSTEM
-    }, it.content, it.createdAt,
-        if (it.role == "user") com.labteto.dshmobile.local.chat.editableChatUserText(it) else null,
-        if (state.usageMode == LocalUsageMode.CHAT && !state.chat.groupChat.enabled)
-            com.labteto.dshmobile.local.chat.chatBranchInfo(state.chat.chatBranches, it.id)?.let { info ->
-                com.labteto.dshmobile.uicontract.UiMessageBranch(info.index, info.count)
-            } else null, it.proactive, it.role == "progress")
+/**
+ * A single, bounded projection for the visible transcript only.
+ *
+ * Runtime updates publish new message/branch lists rather than mutating a published list.
+ * Referencing the same list and branch state therefore means an unrelated state update.
+ * Never key by message count or session ID alone: edits and A -> B -> A must invalidate.
+ * This object is accessed solely under the foreground run lock.
+ */
+internal class LocalConversationMessageProjectionCache {
+    private var sessionId: String? = null
+    private var usageMode: LocalUsageMode? = null
+    private var sourceMessages: List<LocalHarnessMessage>? = null
+    private var sourceBranches: LocalChatBranchState? = null
+    private var groupChatEnabled: Boolean? = null
+    private var cached: List<UiMessageSnapshot> = emptyList()
+
+    fun project(state: LocalHarnessState): List<UiMessageSnapshot> {
+        val branches = if (state.usageMode == LocalUsageMode.CHAT && !state.chat.groupChat.enabled)
+            state.chat.chatBranches else null
+        if (sessionId == state.sessionId && usageMode == state.usageMode &&
+            sourceMessages === state.messages && sourceBranches === branches &&
+            groupChatEnabled == state.chat.groupChat.enabled) return cached
+
+        val branchIndex = branches?.let(::chatBranchInfoIndex).orEmpty()
+        val projected = state.messages.map { message ->
+            val info = branchIndex[message.id]
+            UiMessageSnapshot(message.id, when (message.role) {
+                "user" -> UiMessageRole.USER
+                "assistant", "progress" -> UiMessageRole.ASSISTANT
+                "tool" -> UiMessageRole.TOOL
+                else -> UiMessageRole.SYSTEM
+            }, message.content, message.createdAt,
+                if (message.role == "user") com.labteto.dshmobile.local.chat.editableChatUserText(message) else null,
+                info?.let { com.labteto.dshmobile.uicontract.UiMessageBranch(it.index, it.count) },
+                message.proactive, message.role == "progress")
+        }
+        sessionId = state.sessionId
+        usageMode = state.usageMode
+        sourceMessages = state.messages
+        sourceBranches = branches
+        groupChatEnabled = state.chat.groupChat.enabled
+        cached = projected
+        return projected
+    }
 }
 
 internal fun LocalSendResult.toUiReceipt(): UiCommandReceipt = when (disposition) {
