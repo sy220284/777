@@ -12,6 +12,30 @@ class LocalConversationEmptyStateTest {
         assertFalse(shouldShowEmptyLocalHarness(LocalUsageMode.CHAT, transcriptEmpty = false))
     }
 
+    @Test fun unboundEmptyChatShowsPersonaWelcomeInsteadOfQuickStart() {
+        assertTrue(shouldShowChatPersonaWelcome(
+            LocalUsageMode.CHAT, transcriptEmpty = true,
+            groupChatEnabled = false, personaUnbound = true,
+        ))
+        assertFalse(shouldShowEmptyLocalHarness(LocalUsageMode.CHAT, transcriptEmpty = true))
+        assertFalse(shouldShowChatPersonaWelcome(
+            LocalUsageMode.CHAT, transcriptEmpty = false,
+            groupChatEnabled = false, personaUnbound = true,
+        ))
+        assertFalse(shouldShowChatPersonaWelcome(
+            LocalUsageMode.CHAT, transcriptEmpty = true,
+            groupChatEnabled = true, personaUnbound = true,
+        ))
+        assertFalse(shouldShowChatPersonaWelcome(
+            LocalUsageMode.CHAT, transcriptEmpty = true,
+            groupChatEnabled = false, personaUnbound = false,
+        ))
+        assertFalse(shouldShowChatPersonaWelcome(
+            LocalUsageMode.WORK, transcriptEmpty = true,
+            groupChatEnabled = false, personaUnbound = true,
+        ))
+    }
+
     @Test fun workRetainsQuickStartOnlyWhenTranscriptIsEmpty() {
         assertTrue(shouldShowEmptyLocalHarness(LocalUsageMode.WORK, transcriptEmpty = true))
         assertFalse(shouldShowEmptyLocalHarness(LocalUsageMode.WORK, transcriptEmpty = false))

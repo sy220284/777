@@ -640,6 +640,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         usageMode = state.usageMode,
         transcriptEmpty = transcriptItems.isEmpty(),
     )
+    val showChatPersonaWelcome = shouldShowChatPersonaWelcome(
+        usageMode = state.usageMode,
+        transcriptEmpty = transcriptItems.isEmpty(),
+        groupChatEnabled = state.groupChat.enabled,
+        personaUnbound = state.chatPersona.isUnboundChatPersona(),
+    )
+    val showEmptyGuide = showEmptyWorkbench || showChatPersonaWelcome
     val showEmptyGroupSetup = transcriptItems.isEmpty() &&
         state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled &&
         state.groupChat.members.size < 2
@@ -654,7 +661,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val transcriptLastListIndex = localTranscriptLastListIndex(
         transcriptItemCount = transcriptItems.size,
         showPagingRow = showTranscriptPagingRow,
-        showEmptyWorkbench = showEmptyWorkbench,
+        showEmptyWorkbench = showEmptyGuide,
         showEmptyGroupSetup = showEmptyGroupSetup,
         showPlanReview = planReview != null,
         showStreamingTail = showStreamingTail,
@@ -1059,11 +1066,22 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         )
                     }
                 }
-                if (showEmptyWorkbench) {
-                    item {
+                if (showEmptyGuide) {
+                    item(key = "local-empty-guide") {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                            EmptyLocalHarness { suggestion ->
-                                drafts.putBoundedLocalDraft(state.sessionId, suggestion)
+                            if (showChatPersonaWelcome) {
+                                Text(
+                                    stringResource(R.string.local_chat_persona_welcome_title),
+                                    style = DsType.large20.withReadingWeight(),
+                                    color = colors.text,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp)
+                                        .widthIn(max = 280.dp),
+                                )
+                            } else {
+                                EmptyLocalHarness { suggestion ->
+                                    drafts.putBoundedLocalDraft(state.sessionId, suggestion)
+                                }
                             }
                         }
                     }
@@ -1571,7 +1589,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         listState = listState,
         leadingRows = listOf(
             mediaPage.unavailable, mediaPage.hasMore, showTranscriptPagingRow,
-            showEmptyWorkbench, showEmptyGroupSetup, planReview != null,
+            showEmptyGuide, showEmptyGroupSetup, planReview != null,
         ).count { it },
         visible = state.usageMode == LocalUsageMode.CHAT,
         onSearchAll = onOpenGlobalSearch,
@@ -1942,6 +1960,15 @@ internal fun shouldShowEmptyLocalHarness(
     usageMode: LocalUsageMode,
     transcriptEmpty: Boolean,
 ): Boolean = usageMode == LocalUsageMode.WORK && transcriptEmpty
+
+/** Unbound one-to-one Chat gets only the persona invitation, never Work quick-start actions. */
+internal fun shouldShowChatPersonaWelcome(
+    usageMode: LocalUsageMode,
+    transcriptEmpty: Boolean,
+    groupChatEnabled: Boolean,
+    personaUnbound: Boolean,
+): Boolean = usageMode == LocalUsageMode.CHAT && transcriptEmpty &&
+    !groupChatEnabled && personaUnbound
 
 @Composable
 private fun EmptyLocalHarness(

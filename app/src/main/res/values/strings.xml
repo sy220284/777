@@ -181,6 +181,7 @@
     <string name="local_approval_scope_hide">收起授权范围</string>
     <string name="local_device_approval_scope">当前代理回合中的普通界面点击、输入和滑动会直接执行；高权限、MCP、凭据和命令仍需逐次确认。</string>
     <string name="local_welcome_title">今天想做什么？</string>
+    <string name="local_chat_persona_welcome_title">今天翻谁的牌子呢？</string>
     <string name="local_welcome_hint">描述目标即可开始。需要改动文件或操作设备时，我会先请求你确认。</string>
     <string name="local_suggestions_title">试试这些</string>
     <string name="local_suggestion_files">整理工作区文件</string>
