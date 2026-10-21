@@ -11,6 +11,12 @@ class DeepSeekChatRequestPolicyTest {
     fun exactOfficialHttpsOriginDoesNotTrustImpersonatingHosts() {
         assertTrue(DeepSeekChatRequestPolicy.isOfficial("deepseek-flash", "https://api.deepseek.com"))
         assertTrue(DeepSeekChatRequestPolicy.isOfficial("deepseek-v4-pro", "https://api.deepseek.com/v1"))
+        assertTrue(DeepSeekChatRequestPolicy.isOfficial(
+            "deepseek-flash", "https://api.deepseek.com/chat/completions",
+        ))
+        assertTrue(DeepSeekChatRequestPolicy.isOfficial(
+            "deepseek-flash", "https://api.deepseek.com/v1/chat/completions",
+        ))
         for (url in listOf(
             "http://api.deepseek.com",
             "https://api.deepseek.com.attacker.example",
