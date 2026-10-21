@@ -6,6 +6,26 @@ import kotlinx.serialization.json.put
 /** Preserve the original snapshot on an impossible event cursor rather than replaying side effects. */
 internal class SessionProjectionCursorAheadException(message: String) : IllegalStateException(message)
 
+/**
+ * Validate both snapshot projections before repair and legacy migration mutate event history.
+ * A cursor < -1 is as unsafe as one ahead of the durable tail: it can replay known side effects.
+ */
+internal fun requireSessionSnapshotCursorsWithinLog(
+    stored: LocalHarnessSession,
+    latestSequence: Long,
+) {
+    for ((name, cursor) in listOf(
+        "控制状态" to stored.controlProjectedThroughSequence,
+        "对话历史" to stored.transcriptProjectedThroughSequence,
+    )) {
+        if (cursor != null && (cursor < -1L || cursor > latestSequence)) {
+            throw SessionProjectionCursorAheadException(
+                "$name 投影游标 $cursor 超出事件日志有效范围 -1..$latestSequence；已停止自动恢复以保护历史",
+            )
+        }
+    }
+}
+
 internal data class LocalSessionTranscriptRestore(
     val messages: List<LocalHarnessMessage>,
     val index: LocalTranscriptRuntimeIndex,
@@ -50,13 +70,7 @@ internal class LocalSessionCoordinator(
         val eventLog = eventLogFor(stored.id)
         // Validate before legacy migration: migration itself appends authoritative events.
         // A stale snapshot must never mutate the archive before the cursor mismatch is reported.
-        val persistedCursor = stored.transcriptProjectedThroughSequence
-        val durableBeforeMigration = eventLog.latestSequence()
-        if (persistedCursor != null && persistedCursor > durableBeforeMigration) {
-            throw SessionProjectionCursorAheadException(
-                "会话投影游标 $persistedCursor 超出事件日志末尾 $durableBeforeMigration；已停止自动恢复以保护历史",
-            )
-        }
+        requireSessionSnapshotCursorsWithinLog(stored, eventLog.latestSequence())
         val migration = if (persistedSnapshotExists) {
             migrateLegacyTranscriptSnapshot(
                 session = stored,
@@ -92,7 +106,7 @@ internal class LocalSessionCoordinator(
             else -> stored.messages.takeLast(runtimeWindowMessages)
         }
         val durableLatest = eventLog.latestSequence()
-        if (cursor > durableLatest) {
+        if (cursor < -1L || cursor > durableLatest) {
             throw SessionProjectionCursorAheadException(
                 "会话投影游标 $cursor 超出事件日志末尾 $durableLatest；已停止自动恢复以保护历史",
             )

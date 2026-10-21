@@ -189,11 +189,14 @@ class SessionEventLog(
             rotateActiveSegment()
         }
         try {
+            val createsActiveFile = !file.exists()
             FileOutputStream(file, true).use { output ->
                 output.write(encoded.toByteArray(Charsets.UTF_8))
                 // Publish the append only after the authoritative event reaches storage.
                 output.fd.sync()
             }
+            // The new filename itself also needs to survive a sudden power loss.
+            if (createsActiveFile) syncDirectoryUnsafe(requireNotNull(file.parentFile))
         } catch (error: Exception) {
             runCatching { repairTornActiveTailUnsafe() }
             throw error
@@ -990,6 +993,8 @@ class SessionEventLog(
         } catch (_: AtomicMoveNotSupportedException) {
             Files.move(file.toPath(), target.toPath())
         }
+        // The rotated segment name must be committed before the active path is reused.
+        syncDirectoryUnsafe(parent)
         runCatching(onSegmentRotated)
             .onFailure { error -> reportArchiveFailure("archive-signal", error) }
     }
@@ -1000,7 +1005,15 @@ class SessionEventLog(
         val temporary = File(source.path + ".gz.tmp")
         try {
             source.inputStream().buffered().use { input ->
-                GZIPOutputStream(temporary.outputStream().buffered()).use { output -> input.copyTo(output) }
+                FileOutputStream(temporary).use { raw ->
+                    GZIPOutputStream(raw.buffered()).use { output ->
+                        input.copyTo(output)
+                        output.finish()
+                        output.flush()
+                        // A valid gzip CRC is not a replacement for fsync before deleting raw data.
+                        raw.fd.sync()
+                    }
+                }
             }
             // Verify the whole stream and CRC before dropping the durable source.
             var decodedBytes = 0L
@@ -1018,9 +1031,22 @@ class SessionEventLog(
             } catch (_: AtomicMoveNotSupportedException) {
                 Files.move(temporary.toPath(), compressed.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
+            // Make the published archive filename durable before removing its only raw copy.
+            syncDirectoryUnsafe(requireNotNull(source.parentFile))
             check(source.delete()) { "事件原分片删除失败" }
+            syncDirectoryUnsafe(requireNotNull(source.parentFile))
         } finally {
             temporary.delete()
+        }
+    }
+
+    /**
+     * Sync directory-entry changes only when files are created, renamed or deleted.
+     * Regular event appends sync the file contents, not the parent directory on every row.
+     */
+    private fun syncDirectoryUnsafe(parent: File) {
+        java.nio.channels.FileChannel.open(parent.toPath(), StandardOpenOption.READ).use { channel ->
+            channel.force(true)
         }
     }
 

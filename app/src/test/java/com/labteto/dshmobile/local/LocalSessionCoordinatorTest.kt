@@ -25,6 +25,7 @@ import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.LocalSessionSnapshotBoundary
 import com.labteto.dshmobile.local.session.SessionProjectionCursorAheadException
+import com.labteto.dshmobile.local.session.requireSessionSnapshotCursorsWithinLog
 import com.labteto.dshmobile.local.work.LocalGoal
 import com.labteto.dshmobile.local.work.LocalTodoItem
 import com.labteto.dshmobile.local.work.LocalWorkState
@@ -119,6 +120,53 @@ class LocalSessionCoordinatorTest {
         }
         assertEquals(-1L, log.latestSequence())
         assertTrue(log.snapshot().isEmpty())
+    }
+
+    @Test
+    fun controlCursorAheadStopsLegacyTranscriptMigrationWithoutAppend() = runTest {
+        val json = Json { ignoreUnknownKeys = true }
+        val sessions = temporary.newFolder("control-cursor-ahead")
+        val repository = LocalSessionRepository(sessions, json, backgroundScope, {}, {})
+        val log = LocalSessionEventLog(File(sessions, "control.events.jsonl"), json)
+        val coordinator = LocalSessionCoordinator(
+            repository = repository,
+            eventLogFor = { log },
+            runtimeWindowMessages = 2,
+            domainCodecs = listOf(LocalChatSessionDomainCodec),
+        )
+        val snapshot = LocalHarnessSession(
+            id = "control",
+            messages = listOf(message("m1", "user", "迁移前检查")),
+            controlProjectedThroughSequence = 42L,
+        )
+        assertThrows(SessionProjectionCursorAheadException::class.java) {
+            coordinator.restoreTranscript(snapshot, persistedSnapshotExists = true)
+        }
+        assertEquals(-1L, log.latestSequence())
+        assertTrue(log.snapshot().isEmpty())
+    }
+
+    @Test
+    fun negativeAndAheadCursorsAreRejectedBeforeAnyRecoveryMutation() {
+        val cases = listOf(
+            LocalHarnessSession(controlProjectedThroughSequence = -2L),
+            LocalHarnessSession(transcriptProjectedThroughSequence = -3L),
+            LocalHarnessSession(controlProjectedThroughSequence = 8L),
+            LocalHarnessSession(transcriptProjectedThroughSequence = 8L),
+        )
+        cases.forEach { snapshot ->
+            assertThrows(SessionProjectionCursorAheadException::class.java) {
+                requireSessionSnapshotCursorsWithinLog(snapshot, latestSequence = 3L)
+            }
+        }
+        requireSessionSnapshotCursorsWithinLog(
+            LocalHarnessSession(
+                controlProjectedThroughSequence = -1L,
+                transcriptProjectedThroughSequence = 3L,
+            ),
+            latestSequence = 3L,
+        )
+        requireSessionSnapshotCursorsWithinLog(LocalHarnessSession(), latestSequence = -1L)
     }
 
     @Test
