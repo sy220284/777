@@ -286,12 +286,16 @@ class LocalConversationUiPortTest {
         runCurrent()
         val identity = requireNotNull(port.work.snapshot().identity)
         val pendingId = requireNotNull(port.work.snapshot().approval).pendingId
+        assertEquals(port.work.snapshot().approval, port.documentFactsSnapshot().approval)
+        assertEquals(com.labteto.dshmobile.uicontract.UiExecutionPhase.WAITING_FOR_USER,
+            port.documentFactsSnapshot().phase)
         assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.APPROVAL_EXPIRED),
             port.work.submit(WorkConversationUiCommand.AnswerApproval(identity, "invented", true)))
         assertFalse(waiter.isCompleted)
         assertEquals(UiCommandReceipt.Accepted,
             port.work.submit(WorkConversationUiCommand.AnswerApproval(identity, pendingId, true)))
         assertTrue(waiter.await())
+        assertNull(port.documentFactsSnapshot().approval)
         assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.APPROVAL_EXPIRED),
             port.work.submit(WorkConversationUiCommand.AnswerApproval(identity, pendingId, true)))
         val replacement = async { interaction.awaitApproval(LocalApproval("pending", "write_file", "write", "{}", "write")) }
