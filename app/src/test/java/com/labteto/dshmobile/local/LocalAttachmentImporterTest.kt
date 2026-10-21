@@ -105,6 +105,9 @@ class LocalAttachmentImporterTest {
             attachmentImportFailureReceipt(SecurityException("access revoked")))
         val missing = attachmentImportFailureReceipt(java.io.FileNotFoundException("file deleted"))
         assertTrue(missing is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Failed)
+        val saveError = attachmentImportFailureReceipt(java.nio.file.FileSystemException("/data/private-target", "/data/private-temp", "Operation not permitted"))
+        assertTrue(saveError is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Failed)
+        assertFalse((saveError as com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Failed).message.orEmpty().contains("/data/"))
     }
 
     @Test
@@ -139,8 +142,8 @@ class LocalAttachmentImporterTest {
             val target = File(dir, "digest.txt")
             commitImportedAttachmentFile(incoming, target)
             assertEquals("complete attachment", target.readText())
-            // Caller cleanup owns the original temporary file; the published inode is stable.
-            assertTrue(incoming.exists())
+            // A successful rename consumes the staging file.
+            assertFalse(incoming.exists())
             assertTrue(dir.listFiles().orEmpty().none { it.name.startsWith(".commit-") })
         } finally { dir.deleteRecursively() }
     }
@@ -158,6 +161,47 @@ class LocalAttachmentImporterTest {
             second.writeText("DIFFERENT")
             assertTrue(runCatching { commitImportedAttachmentFile(second, target) }.isFailure)
             assertEquals("same bytes", target.readText())
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test
+    fun publishingAttachmentUsesRenameWithoutKeepingHardLinkAlias() {
+        val dir = kotlin.io.path.createTempDirectory("attachment-rename").toFile()
+        try {
+            val incoming = File(dir, ".incoming").apply { writeText("saved on device") }
+            val target = File(dir, "saved.txt")
+            commitImportedAttachmentFile(incoming, target)
+            assertFalse(incoming.exists())
+            assertEquals("saved on device", target.readText())
+            assertEquals(1L, (Files.getAttribute(target.toPath(), "unix:nlink") as Number).toLong())
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test
+    fun simultaneousIdenticalImportsKeepOneCompleteTarget() {
+        val dir = kotlin.io.path.createTempDirectory("attachment-concurrent").toFile()
+        try {
+            val first = File(dir, ".incoming-first").apply { writeText("same uploaded bytes") }
+            val second = File(dir, ".incoming-second").apply { writeText("same uploaded bytes") }
+            val target = File(dir, "same.txt")
+            val begin = CountDownLatch(1)
+            val failures = java.util.Collections.synchronizedList(mutableListOf<Throwable>())
+            val threads = listOf(first, second).map { source ->
+                Thread {
+                    try {
+                        begin.await()
+                        commitImportedAttachmentFile(source, target)
+                    } catch (error: Throwable) {
+                        failures.add(error)
+                    }
+                }.also(Thread::start)
+            }
+            begin.countDown()
+            threads.forEach { it.join(5_000) }
+            assertTrue(threads.none { it.isAlive })
+            assertTrue(failures.toString(), failures.isEmpty())
+            assertEquals("same uploaded bytes", target.readText())
+            assertEquals(1L, (Files.getAttribute(target.toPath(), "unix:nlink") as Number).toLong())
         } finally { dir.deleteRecursively() }
     }
 

@@ -25,7 +25,7 @@ internal fun isSupportedPickerAttachmentUri(scheme: String?, authority: String?)
 
 internal fun attachmentImportFailureReceipt(error: Exception): UiAttachmentReceipt =
     if (error is SecurityException) UiAttachmentReceipt.GrantRevoked
-    else UiAttachmentReceipt.Failed(error.message)
+    else UiAttachmentReceipt.Failed("附件导入失败，请重新选择文件并重试")
 
 /** Platform data adaptation; the existing Session/File owner performs the only durable import. */
 @Singleton

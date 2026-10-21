@@ -858,7 +858,7 @@
     <string name="local_usage_unpriced">另有 %1$s Token 暂无匹配官网价格，未计入金额</string>
     <string name="local_usage_unreported">另有 %1$d 次请求未返回 Token 用量，其 Token 与费用未计入</string>
     <string name="local_image_selection_limit">一次最多选择 %1$d 张图片</string>
-    <string name="local_image_import_failed">图片导入失败</string>
+    <string name="local_image_import_failed">图片导入失败，请重新选择图片并重试</string>
     <string name="local_new_session_dialog_title">新建对话</string>
     <string name="local_new_session_dialog_intro">选择新对话可以使用哪些已有上下文。长期规则始终保留，其他内容按作用域隔离。</string>
     <string name="local_new_session_continue">继续当前任务</string>
@@ -1404,7 +1404,7 @@
     <string name="local_model_pro_label">DeepSeek V4 Pro｜专家模型</string>
     <string name="local_endpoint_hint">兼容 OpenAI 聊天补全协议的服务也可使用。</string>
     <string name="local_model_save_enter">保存并进入本机 Harness</string>
-    <string name="local_file_import_failed">文件导入失败</string>
+    <string name="local_file_import_failed">文件保存失败，请重新选择文件并重试</string>
     <string name="local_restore_request">恢复请求</string>
     <string name="local_manage_model_config">管理 AI 模型</string>
     <string name="local_attachment_image">图片</string>
