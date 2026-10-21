@@ -16,7 +16,9 @@ internal object BundledRuntimeInstallation {
      */
     @Synchronized
     fun prepareVersion(context: Context, runtime: String, versionRoot: File, version: String, abi: String,
-        initialize: () -> Unit = {}) {
+        initialize: () -> Unit = {},
+        extraReady: () -> Boolean = { true },
+    ) {
         val lockDir = File(context.noBackupFilesDir, "runtime/shared/$abi")
         check(lockDir.isDirectory || lockDir.mkdirs()) { "无法建立共享运行库锁目录：${lockDir.path}" }
         val lockFile = File(lockDir, ".runtime-install.lock")
@@ -26,7 +28,8 @@ internal object BundledRuntimeInstallation {
                 val marker = File(versionRoot, ".ready")
                 val expected = "$version|" + BundledRuntimeLibraryStore.LAYOUT_VERSION
                 val prepared = runCatching { marker.readText().trim() }.getOrNull() == expected
-                if (prepared && BundledRuntimeLibraryStore.isMaterializedValid(context, runtime, abi, libraryDir)) {
+                if (prepared && BundledRuntimeLibraryStore.isMaterializedValid(context, runtime, abi, libraryDir) &&
+                    extraReady()) {
                     return
                 }
                 check(!versionRoot.exists() || versionRoot.deleteRecursively()) { "无法清理旧运行库：${versionRoot.path}" }
