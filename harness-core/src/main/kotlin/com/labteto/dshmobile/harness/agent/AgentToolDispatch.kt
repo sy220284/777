@@ -51,6 +51,7 @@ internal class AgentToolDispatch(
                     retention = result.retention,
                     processExitCode = result.processExitCode,
                     fileVersions = result.fileVersions,
+                    richContent = result.richContent,
                     executionId = result.executionId,
                 ))
                 turn.appendToolResult(call, result)

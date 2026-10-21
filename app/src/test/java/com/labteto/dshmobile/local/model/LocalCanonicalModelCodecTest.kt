@@ -302,4 +302,34 @@ class LocalCanonicalModelCodecTest {
         assertEquals(listOf("read"), LocalCanonicalModelCodec.diagnosticToolNames(damaged))
         assertTrue(runCatching { LocalCanonicalModelCodec.canonicalToolCalls(damaged) }.isFailure)
     }
+    @Test
+    fun partialCompletionRoundTripsLocallyAndNeverLeaksOntoWire() {
+        val canonical = LocalCanonicalMessage(LocalCanonicalRole.ASSISTANT,
+            listOf(LocalCanonicalContent.Text("第一段")),
+            completionReason = LocalModelCompletionReason.OUTPUT_LIMIT, rawStopReason = "length")
+        val history = LocalCanonicalModelCodec.toHistoryMessage(canonical)
+        assertEquals(canonical, LocalCanonicalModelCodec.message(history))
+        listOf(LocalModelAdapterIds.OPENAI_CHAT, LocalModelAdapterIds.OPENAI_RESPONSES, LocalModelAdapterIds.ANTHROPIC_MESSAGES).forEach { adapter ->
+            val wire = LocalCanonicalModelCodec.toLegacyMessages(listOf(canonical), adapter, "route").single()
+            assertFalse(wire.containsKey("_dsh_completion"))
+            assertFalse(wire.containsKey("_dsh_stop_reason"))
+            assertEquals("第一段", wire["content"]?.jsonPrimitive?.content)
+        }
+    }
+
+    @Test
+    fun emptyPartialKeepsLocalTerminalAndUsageWhileEveryWireOmitsEmptyAssistant() {
+        val partial = LocalModelReply(buildJsonObject { put("role", "assistant") }, null, "reasoning", emptyList(),
+            completionReason = LocalModelCompletionReason.OUTPUT_LIMIT, rawStopReason = "length",
+            usage = DeepSeekTokenUsage(promptTokens = 2, completionTokens = 11, reported = true))
+        val canonicalized = LocalCanonicalModelCodec.canonicalizeReply(partial, LocalModelAdapterIds.OPENAI_CHAT, "route")
+        validateUsableModelReply(canonicalized)
+        assertEquals(partial.usage, canonicalized.usage)
+        val restored = LocalCanonicalModelCodec.message(canonicalized.message)
+        assertEquals(LocalModelCompletionReason.OUTPUT_LIMIT, restored.completionReason)
+        listOf(LocalModelAdapterIds.OPENAI_CHAT, LocalModelAdapterIds.OPENAI_RESPONSES, LocalModelAdapterIds.ANTHROPIC_MESSAGES).forEach { adapter ->
+            assertTrue(LocalCanonicalModelCodec.toLegacyMessages(listOf(restored), adapter, "route").isEmpty())
+        }
+    }
+
 }

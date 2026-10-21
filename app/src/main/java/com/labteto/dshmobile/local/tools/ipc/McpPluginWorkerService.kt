@@ -45,7 +45,7 @@ class McpPluginWorkerService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val instances = ConcurrentHashMap<String, Instance>()
     private val json = Json
-    private val http = OkHttpClient()
+    private val http = createMcpWorkerHttpClient()
     private val incoming = Messenger(object : Handler(Looper.getMainLooper()) {
         override fun handleMessage(message: Message) {
             if (message.what !in setOf(McpWorkerWire.OPEN, McpWorkerWire.REQUEST,
@@ -63,10 +63,36 @@ class McpPluginWorkerService : Service() {
                             check(!instances.containsKey(token)) { "IPC transport identity already exists" }
                             check(instances.size < 24) { "IPC transport budget exhausted" }
                             val transport = when (fields.getString("kind")) {
-                                "http" -> McpNegotiatingHttpTransport(
-                                    requireNotNull(fields.getString("endpoint")),
-                                    http, json,
-                                )
+                                "http" -> {
+                                    val endpoint = requireNotNull(fields.getString("endpoint"))
+                                    val bearer = fields.getString("bearer_credential")
+                                    val client = if (bearer == null) http else {
+                                        val uri = java.net.URI(endpoint)
+                                        val host = requireNotNull(uri.host)
+                                        val scheme = uri.scheme?.lowercase()
+                                        require(scheme == "https" || scheme == "http" &&
+                                            host.lowercase() in
+                                                setOf("localhost", "127.0.0.1", "::1", "[::1]")) {
+                                            "远程 MCP Bearer 认证仅允许 HTTPS"
+                                        }
+                                        require(bearer.length in 1..4096 &&
+                                            bearer.all { it.code in 0x21..0x7e })
+                                        val expectedPort = if (uri.port != -1) uri.port
+                                            else if (scheme == "https") 443 else 80
+                                        http.newBuilder().followRedirects(false).followSslRedirects(false)
+                                            .addInterceptor { chain ->
+                                                val target = chain.request().url
+                                                require(target.scheme == scheme &&
+                                                    target.host.equals(host, true) &&
+                                                    target.port == expectedPort) {
+                                                    "MCP 认证请求偏离已授权服务地址"
+                                                }
+                                                chain.proceed(chain.request().newBuilder()
+                                                    .header("Authorization", "Bearer $bearer").build())
+                                            }.build()
+                                    }
+                                    McpNegotiatingHttpTransport(endpoint, client, json)
+                                }
                                 "stdio" -> {
                                     val command = fields.getStringArrayList("command").orEmpty()
                                     require(command.size in 1..32 && command.all { it.length <= 2048 })

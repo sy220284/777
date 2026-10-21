@@ -2,7 +2,7 @@ package com.labteto.dshmobile.local.web
 
 import java.io.ByteArrayOutputStream
 import java.net.UnknownHostException
-import javax.net.ssl.SSLPeerUnverifiedException
+import javax.net.ssl.SSLException
 
 internal const val LOCAL_WEB_USER_AGENT = "DSH-Mobile-Android16/0.12.0"
 internal const val LOCAL_WEB_MAX_RESPONSE_BYTES = 4 * 1024 * 1024
@@ -30,4 +30,4 @@ internal fun readBoundedWebBody(input: java.io.InputStream, maxBytes: Int): Boun
 internal data class BoundedWebBody(val bytes: ByteArray, val truncated: Boolean)
 
 internal fun isRetryableWebTransportFailure(error: java.io.IOException): Boolean =
-    error !is UnknownHostException && error !is SSLPeerUnverifiedException
+    error !is UnknownHostException && error !is SSLException

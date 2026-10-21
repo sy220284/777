@@ -116,6 +116,7 @@ internal fun userFacingWorkToolAction(toolName: String?): String? {
 @Composable
 internal fun WorkTimelineStepRow(
     message: com.labteto.dshmobile.local.session.LocalHarnessMessage,
+    workspacePath: String = "",
     repeatCount: Int = 1,
     active: Boolean = false,
     activity: com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem? = null,
@@ -146,7 +147,7 @@ internal fun WorkTimelineStepRow(
     val phase = completedWorkToolPhase(message)
     val action = workToolActionLabel(message.toolName, activity?.argumentsPreview)
     var detailsOpen by remember(message.id) { mutableStateOf(false) }
-    val hasDetails = message.content.isNotBlank() || groupedMessages.any { it.content.isNotBlank() }
+    val hasDetails = message.content.isNotBlank() || message.blocks.isNotEmpty() || groupedMessages.any { it.content.isNotBlank() || it.blocks.isNotEmpty() }
     WorkToolStatusRow(message.toolName, phase, argumentsPreview = activity?.argumentsPreview,
         repeatCount = repeatCount,
         modifier = Modifier.testTag(message.toolCallId?.let { "work-tool:$it" } ?: "work-tool:${message.id}"),
@@ -164,6 +165,9 @@ internal fun WorkTimelineStepRow(
                 if (repeatCount > 1) {
                     Text("第 " + (index + 1) + " 次检查",
                         style = DsType.small13.withReadingWeight())
+                }
+                receipt.blocks.filterIsInstance<com.labteto.dshmobile.local.session.LocalMessageBlock.Image>().forEach { image ->
+                    LocalTranscriptImage(image, workspacePath)
                 }
                 SelectionContainer {
                     Text(receipt.content, style = DsType.std14.withReadingWeight(),

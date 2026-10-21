@@ -20,6 +20,8 @@ data class TaskGraphNode(
     val dependsOn: List<String> = emptyList(),
 )
 
+class TaskGraphNodeExecutionException(message: String) : IllegalStateException(message)
+
 enum class TaskGraphOutcome { COMPLETED, FAILED, BLOCKED }
 
 data class TaskGraphNodeResult(
@@ -52,7 +54,7 @@ data class TaskGraphTaskContext(
 )
 
 /**
- * Platform-neutral DAG scheduler used by Work's read-only subagent delegation.
+ * Platform-neutral DAG scheduler used by Work's durable subagent delegation.
  * Its authority is confined to task admission and dependency ordering. EventLog,
  * persisted Agent Team facts, tool approval and resource leases keep their owners.
  *
@@ -70,6 +72,9 @@ class TaskGraphExecutor(
 
     suspend fun run(
         nodes: List<TaskGraphNode>,
+        initialResults: Map<String, TaskGraphNodeResult> = emptyMap(),
+        onResult: (TaskGraphNodeResult, Map<String, String>) -> Unit = { _, _ -> },
+        onTerminal: (TaskGraphNodeResult) -> Unit = {},
         maxAttempts: Int = 1,
         retrySafe: Boolean = false,
         accept: suspend (TaskGraphTaskContext, String) -> TaskGraphAcceptance =
@@ -83,6 +88,12 @@ class TaskGraphExecutor(
         require(maxAttempts == 1 || retrySafe) {
             "Only proven read-only/idempotent graph executors may retry"
         }
+        require(initialResults.all { (id, result) ->
+            val node = accepted.singleOrNull { it.id == id }
+            node == result.node && result.index == accepted.indexOf(node) &&
+                result.succeeded && !result.output.isNullOrBlank() &&
+                result.node.dependsOn.all { it in initialResults }
+        }) { "Recovered results must be completed, match the immutable graph and include dependencies" }
         val semaphore = Semaphore(maxParallelism)
         val completed = AtomicInteger(0)
         val indices = accepted.mapIndexed { i, node -> node.id to i }.toMap()
@@ -104,7 +115,11 @@ class TaskGraphExecutor(
                     .filter { (_, result) -> result.outcome != TaskGraphOutcome.COMPLETED }
                     .map { (dependencyId, _) -> dependencyId }
                 val index = indices.getValue(node.id)
-                if (blockedBy.isNotEmpty()) {
+                val recovered = initialResults[node.id]
+                val terminal = if (recovered != null) {
+                    completed.incrementAndGet()
+                    recovered
+                } else if (blockedBy.isNotEmpty()) {
                     val reason = "依赖未完成：${blockedBy.joinToString()}"
                     val result = TaskGraphNodeResult(
                         node = node, index = index,
@@ -137,9 +152,12 @@ class TaskGraphExecutor(
                             retrySafe = retrySafe,
                             shouldRetryError = shouldRetryError,
                             onProgress = onProgress,
+                            onResult = onResult,
                         )
                     }
                 }
+                onTerminal(terminal)
+                terminal
             }
         }
         // Graph admission is atomic; no model/tool executor starts during validation.
@@ -157,6 +175,7 @@ class TaskGraphExecutor(
         retrySafe: Boolean,
         shouldRetryError: (Exception) -> Boolean,
         onProgress: (TaskGraphProgress) -> Unit,
+        onResult: (TaskGraphNodeResult, Map<String, String>) -> Unit,
     ): TaskGraphNodeResult {
         var feedback = ""
         for (attempt in 1..maxAttempts) {
@@ -171,6 +190,11 @@ class TaskGraphExecutor(
                 execute(ctx, prompt)
             } catch (cancelled: CancellationException) {
                 throw cancelled
+            } catch (failed: TaskGraphNodeExecutionException) {
+                val detail = failed.message.orEmpty()
+                onProgress(TaskGraphProgress(ctx.index, ctx.node.task, "受阻", completed.incrementAndGet(), total,
+                    detail, nodeId = ctx.node.id))
+                return TaskGraphNodeResult(ctx.node, ctx.index, TaskGraphOutcome.FAILED, error = detail, attempts = attempt)
             } catch (error: Exception) {
                 if (!retrySafe || !shouldRetryError(error)) throw error
                 feedback = (error.message ?: error::class.java.simpleName).take(500)
@@ -191,11 +215,13 @@ class TaskGraphExecutor(
                 continue
             }
             if (verdict.accepted) {
+                val result = TaskGraphNodeResult(ctx.node, ctx.index, TaskGraphOutcome.COMPLETED,
+                    output = output, attempts = attempt)
+                onResult(result, ctx.dependencyOutputs)
                 val count = completed.incrementAndGet()
                 onProgress(TaskGraphProgress(ctx.index, ctx.node.task, "已完成", count, total,
                     nodeId = ctx.node.id))
-                return TaskGraphNodeResult(ctx.node, ctx.index, TaskGraphOutcome.COMPLETED,
-                    output = output, attempts = attempt)
+                return result
             }
             feedback = verdict.feedback.ifBlank { "验收未通过" }.take(500)
         }

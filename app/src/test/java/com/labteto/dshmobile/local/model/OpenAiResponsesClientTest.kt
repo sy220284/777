@@ -177,7 +177,7 @@ class OpenAiResponsesClientTest {
             created + """data: {"type":"response.output_text.delta","delta":"partial"}""" + "\n\n",
             created + """data: {"type":"response.failed","response":{"error":{"code":"server_error","message":"failed"}}}""" + "\n\n",
         )
-        for (body in bodies) {
+        bodies.forEachIndexed { index, body ->
             var requests = 0
             val transport = OkHttpClient.Builder().addInterceptor { chain ->
                 requests++
@@ -185,14 +185,24 @@ class OpenAiResponsesClientTest {
                     .message("OK").header("x-request-id", "req-start")
                     .body(body.toResponseBody("text/event-stream".toMediaType())).build()
             }.build()
-            val failure = try {
+            val result = runCatching {
                 OpenAiResponsesClient(transport, Json).completeStreaming(
                     accessToken = "test", baseUrl = "https://api.openai.com/v1", model = "gpt-test",
                     messages = chatPostTurnModelMessages("test"), tools = JsonArray(emptyList()), planSharing = true,
                 )
-                error("expected failed stream")
-            } catch (error: LocalModelException) { error }
-            assertFalse(failure.retryable)
+            }
+            if (index == 1) {
+                val partial = result.getOrThrow()
+                assertEquals(LocalModelCompletionReason.INTERRUPTED, partial.completionReason)
+                assertEquals("partial", partial.content)
+                assertTrue(partial.toolCalls.isEmpty())
+                val denied = runCatching { requireCompletedModelReply(partial) }.exceptionOrNull()
+                assertEquals("MODEL_INTERRUPTED", (denied as? LocalModelException)?.code)
+            } else {
+                val failure = result.exceptionOrNull() as? LocalModelException
+                assertTrue(failure != null)
+                assertFalse(failure!!.retryable)
+            }
             assertEquals(1, requests)
         }
     }
@@ -1777,4 +1787,36 @@ class OpenAiResponsesClientTest {
             content[1].jsonObject["image_url"]?.jsonPrimitive?.content,
         )
     }
+    @Test
+    fun incompleteAndRefusalIgnoreEarlierHalfToolAndRetainReportedUsage() {
+        val limit = client.parseCompleted(Json.parseToJsonElement("""{"id":"partial","status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":[{"type":"function_call","arguments":"{"},{"type":"message","content":[{"type":"output_text","text":"第一段"}]}],"usage":{"input_tokens":3,"output_tokens":8}}""").jsonObject, com.labteto.dshmobile.local.TokenPromptBreakdown())
+        assertEquals(LocalModelCompletionReason.OUTPUT_LIMIT, limit.completionReason)
+        assertEquals("max_output_tokens", limit.rawStopReason)
+        assertEquals("第一段", limit.content)
+        assertEquals(8L, limit.usage.completionTokens)
+        assertTrue(limit.toolCalls.isEmpty())
+        val refused = client.parseCompleted(Json.parseToJsonElement("""{"status":"completed","output":[{"type":"function_call","arguments":"{"},{"type":"message","content":[{"type":"refusal","refusal":"不能执行"}]}]}""").jsonObject, com.labteto.dshmobile.local.TokenPromptBreakdown())
+        assertEquals(LocalModelCompletionReason.REFUSED, refused.completionReason)
+        assertTrue(refused.toolCalls.isEmpty())
+        assertEquals("不能执行", refused.content)
+    }
+
+    @Test
+    fun incompleteHalfToolOrReasoningOnlyRetainsUsageAtProviderCanonicalAndGatewayValidation() {
+        listOf(
+            """[{"type":"function_call","arguments":"{"}]""",
+            """[{"type":"reasoning","summary":[{"text":"thinking"}]}]""",
+        ).forEach { output ->
+            val response = Json.parseToJsonElement("""{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":$output,"usage":{"input_tokens":3,"output_tokens":9}}""").jsonObject
+            val reply = client.parseCompleted(response, com.labteto.dshmobile.local.TokenPromptBreakdown())
+            val accepted = LocalCanonicalModelCodec.canonicalizeReply(reply, LocalModelAdapterIds.OPENAI_RESPONSES, "route")
+            validateUsableModelReply(accepted)
+            assertEquals(LocalModelCompletionReason.OUTPUT_LIMIT, accepted.completionReason)
+            assertTrue(accepted.content.isNullOrBlank())
+            assertTrue(accepted.toolCalls.isEmpty())
+            assertEquals(9L, accepted.usage.completionTokens)
+            assertTrue(accepted.usage.reported)
+        }
+    }
+
 }

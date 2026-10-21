@@ -18,6 +18,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -42,20 +45,11 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 
-internal fun boundedMcpToolResult(
-    result: JsonObject,
-    maxChars: Int = MAX_MCP_TOOL_RESULT_CHARS,
-): String {
-    val text = result.toString()
-    if (text.length <= maxChars) return text
-    val notice = "\n...[MCP 结果过大，已在进入会话历史前截断；请缩小远端查询范围]...\n"
-    val retained = (maxChars - notice.length).coerceAtLeast(0)
-    val head = retained * 2 / 3
-    val tail = retained - head
-    return text.take(head) + notice + text.takeLast(tail)
-}
+/** Accepted transport results remain lossless until the app's durable output store projects them. */
+internal fun completeMcpToolResult(result: JsonObject): String = result.toString()
 
 /** Explicit MCP failures; never expose remote response bodies or credential-bearing endpoint URLs. */
 internal fun mcpExtensionFailure(serverId: String, error: Exception, connecting: Boolean): ToolResult {
@@ -68,11 +62,13 @@ internal fun mcpExtensionFailure(serverId: String, error: Exception, connecting:
             429 -> "MCP_RATE_LIMITED"
             else -> "MCP_HTTP_FAILED"
         }
+        error is McpRpcException && error.code == -32601 -> "MCP_METHOD_NOT_SUPPORTED"
         error is IOException -> "MCP_TRANSPORT_FAILED"
         else -> if (connecting) "MCP_CONNECT_FAILED" else "MCP_REMOTE_CALL_FAILED"
     }
     val hint = when (code) {
         "MCP_CONNECTION_BUSY" -> "服务正在重连，请等待当前操作结束后再查看连接状态。"
+        "MCP_METHOD_NOT_SUPPORTED" -> "此 MCP 服务未实现请求的方法；请检查资源或工具能力声明，其他已注册方法仍可使用。"
         "MCP_NOT_CONNECTED" -> "服务已断开，请先连接 MCP 服务并重新发现可用工具。"
         "MCP_AUTH_REQUIRED" -> "核实 MCP 服务认证信息和访问权限，并重新建立连接。"
         "MCP_ENDPOINT_UNAVAILABLE" -> "核实 MCP 端点和协议；先断开再使用正确地址连接。"
@@ -91,7 +87,6 @@ internal fun mcpExtensionFailure(serverId: String, error: Exception, connecting:
     )
 }
 
-internal const val MAX_MCP_TOOL_RESULT_CHARS = 256 * 1024
 
 enum class McpServerLifecycle { CONNECTING, REGISTERED, RECONNECTING, DISCONNECTING, FAILED }
 data class McpServerSnapshot(
@@ -137,6 +132,29 @@ class McpToolBridgePlugin(
     private val transportFactory: (String) -> McpTransport = { endpoint ->
         McpNegotiatingHttpTransport(endpoint, http, json)
     },
+    private val httpCredentialProvider: suspend (String, String) -> String? = { _, _ -> null },
+    private val authorizedTransportFactory: (String, String) -> McpTransport = { endpoint, bearer ->
+        val uri = URI(endpoint)
+        val scheme = uri.scheme?.lowercase()
+        val host = requireNotNull(uri.host)
+        require(scheme == "https" || scheme == "http" &&
+            host.lowercase() in setOf("localhost", "127.0.0.1", "::1", "[::1]")) {
+            "远程 MCP Bearer 认证仅允许 HTTPS"
+        }
+        val expectedPort = if (uri.port >= 0) uri.port else if (scheme == "https") 443 else 80
+        val builder = http.newBuilder().followRedirects(false).followSslRedirects(false)
+        // Run before caller-provided interceptors, which may implement mock transports
+        // or additional request routing. Never expose an unauthenticated first hop.
+        builder.interceptors().add(0, Interceptor { chain ->
+            val target = chain.request().url
+            require(target.scheme == scheme && target.host.equals(host, true) &&
+                target.port == expectedPort) { "MCP 认证请求偏离已授权服务地址" }
+            chain.proceed(chain.request().newBuilder()
+                .header("Authorization", "Bearer $bearer").build())
+        })
+        val authenticated = builder.build()
+        McpNegotiatingHttpTransport(endpoint, authenticated, json)
+    },
     private val stdioTransportFactory: (List<String>, File?) -> McpTransport = { command, workingDirectory ->
         McpNegotiatingStdioTransport(
             command = command,
@@ -153,18 +171,28 @@ class McpToolBridgePlugin(
         val id: String,
         val transport: String,
         val displayTarget: String,
-        val clientFactory: () -> McpClient,
+        val clientFactory: suspend () -> McpClient,
         val client: McpClient,
         val toolNames: List<String>,
         val definitionBytes: Int,
+        val remoteToolCount: Int,
     ) {
         data class DisconnectTicket(
             val started: Boolean,
             val drained: CompletableDeferred<Unit>?,
-        )
+            val calls: List<Job>,
+            val serverId: String,
+        ) {
+            suspend fun cancelAndDrain(except: Job? = null) {
+                calls.filterNot { it === except }.forEach {
+                    it.cancel(CancellationException("MCP 连接所有者取消在途调用：$serverId"))
+                }
+                drained?.await()
+            }
+        }
 
         private var acceptingCalls = true
-        private var activeCalls = 0
+        private val activeCalls = mutableSetOf<Job>()
         private var drained: CompletableDeferred<Unit>? = null
         private var clientClosed = false
         var watchJob: Job? = null
@@ -175,20 +203,19 @@ class McpToolBridgePlugin(
             beginDisconnect()
         }
 
-        fun beginCall(): Boolean = synchronized(this) {
+        fun beginCall(job: Job): Boolean = synchronized(this) {
             if (!acceptingCalls) {
                 false
             } else {
-                activeCalls += 1
+                check(activeCalls.add(job)) { "MCP 调用作用域重复：$id" }
                 true
             }
         }
 
-        fun endCall() {
+        fun endCall(job: Job) {
             val completion = synchronized(this) {
-                check(activeCalls > 0) { "MCP 活跃调用计数失衡：$id" }
-                activeCalls -= 1
-                if (activeCalls == 0) drained.also { drained = null } else null
+                check(activeCalls.remove(job)) { "MCP 活跃调用归属失衡：$id" }
+                if (activeCalls.isEmpty()) drained.also { drained = null } else null
             }
             completion?.complete(Unit)
         }
@@ -197,15 +224,15 @@ class McpToolBridgePlugin(
 
         fun beginDisconnect(): DisconnectTicket = synchronized(this) {
             if (!acceptingCalls) {
-                return@synchronized DisconnectTicket(started = false, drained = drained)
+                return@synchronized DisconnectTicket(started = false, drained = drained, calls = activeCalls.toList(), serverId = id)
             }
             acceptingCalls = false
-            val waitForDrain = if (activeCalls == 0) {
+            val waitForDrain = if (activeCalls.isEmpty()) {
                 null
             } else {
                 CompletableDeferred<Unit>().also { drained = it }
             }
-            DisconnectTicket(started = true, drained = waitForDrain)
+            DisconnectTicket(started = true, drained = waitForDrain, calls = activeCalls.toList(), serverId = id)
         }
 
         fun closeClientOnce() {
@@ -546,7 +573,7 @@ class McpToolBridgePlugin(
 
         withContext(NonCancellable) {
             shutdown.first?.await()
-            shutdown.second.forEach { (_, ticket) -> ticket.drained?.await() }
+            shutdown.second.forEach { (_, ticket) -> ticket.cancelAndDrain() }
 
             val owned = mutex.withLock {
                 servers.values.toList().also { bindings ->
@@ -580,18 +607,19 @@ class McpToolBridgePlugin(
      * uninstall closing its transport mid-ping. A timeout/remote protocol error is
      * unconfirmed, not proof of disconnection or permission denial.
      */
-    suspend fun checkServerHealthFromUi(serverId: String): McpServerHealth {
-        val binding = mutex.withLock { servers[serverId] } ?: return McpServerHealth.NOT_CONNECTED
-        if (binding.isTransportFailed()) return McpServerHealth.NOT_CONNECTED
-        if (!binding.beginCall()) return McpServerHealth.BUSY
-        return try {
+    suspend fun checkServerHealthFromUi(serverId: String): McpServerHealth = coroutineScope {
+        val callJob = currentCoroutineContext().job
+        val binding = mutex.withLock { servers[serverId] } ?: return@coroutineScope McpServerHealth.NOT_CONNECTED
+        if (binding.isTransportFailed()) return@coroutineScope McpServerHealth.NOT_CONNECTED
+        if (!binding.beginCall(callJob)) return@coroutineScope McpServerHealth.BUSY
+        try {
             val received = withTimeoutOrNull(8_000L) { binding.client.ping(); true } == true
             if (!binding.isAcceptingCalls()) McpServerHealth.BUSY
             else if (received) McpServerHealth.RESPONDED
             else McpServerHealth.UNCONFIRMED
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { McpServerHealth.UNCONFIRMED }
-        finally { binding.endCall() }
+        finally { binding.endCall(callJob) }
     }
 
     suspend fun serverSnapshots(): List<McpServerSnapshot> = mutex.withLock {
@@ -616,12 +644,17 @@ class McpToolBridgePlugin(
 
     private suspend fun connectHttp(context: HarnessContext, rawId: String, rawEndpoint: String): String {
         val endpoint = validateEndpoint(rawEndpoint)
+        val serverId = validateServerId(rawId)
         return connect(
             context = context,
-            rawId = rawId,
+            rawId = serverId,
             transport = "http",
             displayTarget = displayEndpoint(endpoint),
-            clientFactory = { McpClient(transportFactory(endpoint)) },
+            clientFactory = {
+                val bearer = httpCredentialProvider(serverId, endpoint)
+                McpClient(if (bearer == null) transportFactory(endpoint)
+                    else authorizedTransportFactory(endpoint, bearer))
+            },
         )
     }
 
@@ -648,7 +681,7 @@ class McpToolBridgePlugin(
         rawId: String,
         transport: String,
         displayTarget: String,
-        clientFactory: () -> McpClient,
+        clientFactory: suspend () -> McpClient,
         fromReconnect: Boolean = false,
     ): String {
         val serverId = validateServerId(rawId)
@@ -674,9 +707,14 @@ class McpToolBridgePlugin(
         }
         val registered = mutableListOf<String>()
         try {
-            val definitions = client.listTools()
-            require(definitions.size <= MAX_REMOTE_TOOLS) {
-                "MCP 服务工具过多：${definitions.size}，上限 $MAX_REMOTE_TOOLS"
+            val remoteDefinitions = client.listTools(allowUnsupported = true)
+            val resourceDefinitions = resourceToolDefinitions(serverId, remoteDefinitions)
+            val resourceMethods = resourceDefinitions.map { it.name }.zip(
+                listOf("resources/list", "resources/templates/list", "resources/read"),
+            ).toMap()
+            val definitions = remoteDefinitions + resourceDefinitions
+            require(remoteDefinitions.size <= MAX_REMOTE_TOOLS) {
+                "MCP 服务工具过多：${remoteDefinitions.size}，上限 $MAX_REMOTE_TOOLS"
             }
             val names = definitions.map { definition -> localToolName(serverId, definition.name) }
             val definitionBytes = definitions.sumOf { definition ->
@@ -693,6 +731,7 @@ class McpToolBridgePlugin(
                 client = client,
                 toolNames = names,
                 definitionBytes = definitionBytes,
+                remoteToolCount = remoteDefinitions.size,
             )
             val connectedMessage = buildString {
                 append("已连接 MCP 服务：").append(serverId)
@@ -709,7 +748,7 @@ class McpToolBridgePlugin(
                 require(servers.size < MAX_CONNECTED_SERVERS) {
                     "MCP 已连接服务数超过总上限 $MAX_CONNECTED_SERVERS"
                 }
-                val totalTools = servers.values.sumOf { it.toolNames.size } + names.size
+                val totalTools = servers.values.sumOf { it.remoteToolCount } + remoteDefinitions.size
                 require(totalTools <= MAX_TOTAL_REMOTE_TOOLS) {
                     "MCP 工具总数超过全局上限 $MAX_TOTAL_REMOTE_TOOLS"
                 }
@@ -746,52 +785,61 @@ class McpToolBridgePlugin(
                             ),
                             timeoutMillis = REMOTE_TOOL_TIMEOUT_MILLIS,
                             executor = HarnessToolExecutor { _, input, _ ->
-                                if (!binding.beginCall()) {
-                                    ToolResult(
-                                        content = "MCP 服务正在断开：$serverId",
-                                        isError = true,
-                                    )
-                                } else {
-                                    var failedCleanup: ServerBinding.DisconnectTicket? = null
-                                    try {
-                                        val result = client.callTool(definition.name, input)
-                                        val remoteError = result["isError"]?.jsonPrimitive?.booleanOrNull == true
+                                coroutineScope {
+                                    val callJob = currentCoroutineContext().job
+                                    if (!binding.beginCall(callJob)) {
                                         ToolResult(
-                                            content = boundedMcpToolResult(result),
-                                            isError = remoteError,
-                                            errorCode = if (remoteError) "MCP_REMOTE_REJECTED" else null,
-                                            recoveryHint = if (remoteError)
-                                                "远端工具报告失败；先检查副作用和参数，不要直接重放。"
-                                                else null,
+                                            content = "MCP 服务正在断开：$serverId",
+                                            isError = true,
                                         )
-                                    } catch (cancelled: CancellationException) {
-                                        throw cancelled
-                                    } catch (error: Exception) {
-                                        // A transport termination invalidates all tool registrations on the
-                                        // same server. Semantic tool errors/rate limits do not imply disconnection.
-                                        if (error is IOException ||
-                                            (error is McpHttpException &&
-                                                error.statusCode in setOf(401, 403, 404, 410))) {
-                                            failedCleanup = withContext(NonCancellable) {
-                                                mutex.withLock {
-                                                    if (servers[serverId] === binding) {
-                                                        binding.markTransportFailed().also { ticket ->
-                                                            if (ticket.started) {
-                                                                binding.toolNames.forEach(context.tools::unregister)
-                                                                signalLifecycleChangedLocked()
+                                    } else {
+                                        var failedCleanup: ServerBinding.DisconnectTicket? = null
+                                        try {
+                                            val result = when (resourceMethods[definition.name]) {
+                                                "resources/list" -> client.listResources((input["cursor"] as? JsonPrimitive)?.contentOrNull)
+                                                "resources/templates/list" -> client.listResourceTemplates((input["cursor"] as? JsonPrimitive)?.contentOrNull)
+                                                "resources/read" -> client.readResource(input.required("uri"))
+                                                else -> client.callTool(definition.name, input)
+                                            }
+                                            val remoteError = result["isError"]?.jsonPrimitive?.booleanOrNull == true
+                                            ToolResult(
+                                                content = completeMcpToolResult(result),
+                                                richContent = com.labteto.dshmobile.harness.tools.ToolRichContent(result),
+                                                isError = remoteError,
+                                                errorCode = if (remoteError) "MCP_REMOTE_REJECTED" else null,
+                                                recoveryHint = if (remoteError)
+                                                    "远端工具报告失败；先检查副作用和参数，不要直接重放。"
+                                                    else null,
+                                            )
+                                        } catch (cancelled: CancellationException) {
+                                            throw cancelled
+                                        } catch (error: Exception) {
+                                            // A transport termination invalidates all tool registrations on the
+                                            // same server. Semantic tool errors/rate limits do not imply disconnection.
+                                            if (error is IOException ||
+                                                (error is McpHttpException &&
+                                                    error.statusCode in setOf(401, 403, 404, 410))) {
+                                                failedCleanup = withContext(NonCancellable) {
+                                                    mutex.withLock {
+                                                        if (servers[serverId] === binding) {
+                                                            binding.markTransportFailed().also { ticket ->
+                                                                if (ticket.started) {
+                                                                    binding.toolNames.forEach(context.tools::unregister)
+                                                                    signalLifecycleChangedLocked()
+                                                                }
                                                             }
-                                                        }
-                                                    } else null
+                                                        } else null
+                                                    }
                                                 }
                                             }
-                                        }
-                                        mcpExtensionFailure(serverId, error, connecting = false)
-                                    } finally {
-                                        binding.endCall()
-                                        failedCleanup?.let { ticket ->
-                                            withContext(NonCancellable) {
-                                                ticket.drained?.await()
-                                                binding.closeClientOnce()
+                                            mcpExtensionFailure(serverId, error, connecting = false)
+                                        } finally {
+                                            binding.endCall(callJob)
+                                            failedCleanup?.let { ticket ->
+                                                withContext(NonCancellable) {
+                                                    ticket.cancelAndDrain(except = callJob)
+                                                    binding.closeClientOnce()
+                                                }
                                             }
                                         }
                                     }
@@ -819,7 +867,7 @@ class McpToolBridgePlugin(
                                         }
                                     }
                                 }
-                                ticket?.drained?.await()
+                                ticket?.cancelAndDrain()
                                 if (ticket != null) binding.closeClientOnce()
                             }
                         }
@@ -853,7 +901,7 @@ class McpToolBridgePlugin(
             requireNotNull(existing) {
                 "MCP 服务未连接：$serverId。请先用 mcp_http_connect 或 mcp_stdio_connect 建立连接"
             }
-            // Reconnect only after in-flight calls drain; never replay the failed tools/call.
+            // Cancel and drain the old binding before reconnecting; never replay tools/call.
             disconnect(context, serverId, fromReconnect = true)
             return connect(context, serverId, existing.transport, existing.displayTarget,
                 existing.clientFactory, fromReconnect = true)
@@ -880,12 +928,12 @@ class McpToolBridgePlugin(
 
         val (binding, ticket) = prepared
         if (!ticket.started && !binding.isTransportFailed()) {
-            ticket.drained?.await()
+            ticket.cancelAndDrain()
             return "MCP 服务正在断开：$serverId"
         }
 
         withContext(NonCancellable) {
-            ticket.drained?.await()
+            ticket.cancelAndDrain()
             mutex.withLock {
                 if (servers[serverId] === binding) {
                     binding.toolNames.forEach(context.tools::unregister)
@@ -1017,6 +1065,28 @@ class McpToolBridgePlugin(
         val available = MAX_TOOL_NAME_LENGTH - prefix.length
         require(available > 0) { "MCP server_id 过长" }
         return prefix + normalized.ifBlank { "tool" }.take(available)
+    }
+
+    private fun resourceToolDefinitions(serverId: String, remote: List<McpToolDefinition>): List<McpToolDefinition> = listOf(
+        "resources_list" to "分页列出资源（原样返回 nextCursor）",
+        "resources_templates_list" to "分页列出资源模板（原样返回 nextCursor）",
+        "resources_read" to "读取资源 URI 的完整内容",
+    ).map { (baseName, description) ->
+        // Synthetic tools must never intercept a same-named legitimate tools/call operation.
+        val reserved = remote.map { localToolName(serverId, it.name) }.toSet()
+        var name = baseName
+        var suffix = 1
+        while (localToolName(serverId, name) in reserved) name = "${baseName}_${suffix++}"
+        val schema = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                put(if (baseName == "resources_read") "uri" else "cursor", stringSchema(description))
+            })
+            if (baseName == "resources_read") put("required", buildJsonArray { add(JsonPrimitive("uri")) })
+        }
+        McpToolDefinition(name, description, schema, buildJsonObject {
+            put("name", name); put("description", description); put("inputSchema", schema)
+        })
     }
 
     private fun JsonObject.required(key: String): String =

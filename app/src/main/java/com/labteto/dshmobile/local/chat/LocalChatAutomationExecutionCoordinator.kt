@@ -473,6 +473,7 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                     proactive = true,
                 )
                 val assistantEvent = boundEventLog.append("assistant/message", buildJsonObject {
+                    reply.message.forEach { (key, value) -> put(key, value) }
                     put("role", "assistant")
                     put("content", content)
                     // Proactive/automation metadata lives inside the transcript message. Keep the
@@ -554,12 +555,15 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                     )
                 }
                 boundEventLog.append("turn/end", buildJsonObject {
-                    put("reason", "completed")
+                    put("reason", reply.completionReason.name.lowercase())
                     put("steps", 1)
                     put("mode", "chat")
                     put("automation", true)
                     put("proactive", true)
                 })
+                if (reply.completionReason != com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED)
+                    throw com.labteto.dshmobile.local.LocalModelException("MODEL_PARTIAL_RESPONSE",
+                        "主动消息未完成（${reply.rawStopReason ?: reply.completionReason.name}），已保留部分正文。", false)
                 LocalChatAutomationResult(sessionId = session.id, output = content)
             }
         } finally {

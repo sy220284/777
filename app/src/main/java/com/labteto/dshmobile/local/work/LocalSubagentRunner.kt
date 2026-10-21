@@ -51,7 +51,6 @@ import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.model.durableModelHistorySnapshot
 import com.labteto.dshmobile.local.model.durableToolResultContent
-import com.labteto.dshmobile.local.model.hasLocalImageRefs
 import com.labteto.dshmobile.local.model.hasMaterializedImageUrls
 import com.labteto.dshmobile.local.model.imageInputUnsupported
 import com.labteto.dshmobile.local.model.localToolHistoryMessage
@@ -98,6 +97,10 @@ internal fun runSubagentTurnBoundaryCleanup(
     }
 }
 
+/** A persisted route uses its exact credential-checked context, even when Work's active model differs. */
+internal fun subagentModelSelection(modelOverride: String?, inheritedModel: String?, pinnedProfileId: String?): String? =
+    if (pinnedProfileId != null && modelOverride == pinnedProfileId) null else modelOverride ?: inheritedModel
+
 internal class LocalSubagentRunner(
     private val modelGateway: LocalModelGateway,
     private val state: StateFlow<LocalHarnessState>,
@@ -107,6 +110,8 @@ internal class LocalSubagentRunner(
     private val eventLog: () -> LocalSessionEventLog,
     private val schemas: (Boolean, Boolean, MutableSet<String>) -> JsonArray,
     private val execute: suspend (LocalToolCall, Boolean, MutableSet<String>) -> AgentToolResult,
+    private val teamSchemas: (() -> JsonArray)? = null,
+    private val executeTeamTool: (suspend (String, LocalToolCall) -> AgentToolResult)? = null,
     private val spillToolOutput: (String, String) -> Boolean = { _, _ -> false },
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
     private val resolveImageMode: (LocalImageInputMode, String, String) -> LocalImageInputMode,
@@ -123,6 +128,7 @@ internal class LocalSubagentRunner(
     private val runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
     private val modelAdmission: LocalModelAdmissionPort? = null,
     private val compactionPolicy: LocalSubagentCompactionPolicy,
+    private val importToolImages: suspend (com.labteto.dshmobile.harness.tools.ToolRichContent?) -> List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = { emptyList() },
 ) {
     private val historyPolicy = com.labteto.dshmobile.local.agent.LocalSubagentHistoryPolicy(
         spillToolOutput = spillToolOutput,
@@ -170,6 +176,7 @@ internal class LocalSubagentRunner(
         recoveredEnabledOptionalTools: Set<String> = emptySet(),
         resumeAfterCompletion: Boolean = false,
         onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)? = null,
+        executionFence: () -> Unit = {},
     ): LocalSubagentResult {
         val validated = validateLocalSubagentLaunchSpec(
             spec,
@@ -197,6 +204,7 @@ internal class LocalSubagentRunner(
                     recoveredEnabledOptionalTools = recoveredEnabledOptionalTools,
                     resumeAfterCompletion = resumeAfterCompletion,
                     onCheckpointProgress = onCheckpointProgress,
+                    executionFence = executionFence,
                 )
             } finally {
                 virtualScreenId?.let(releaseVirtualScreen)
@@ -214,6 +222,7 @@ internal class LocalSubagentRunner(
         recoveredEnabledOptionalTools: Set<String>,
         resumeAfterCompletion: Boolean,
         onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)?,
+        executionFence: () -> Unit,
     ): LocalSubagentResult {
         val task = spec.task
         val instructions = spec.instructions
@@ -246,7 +255,9 @@ internal class LocalSubagentRunner(
         val progressTracker = LocalAgentProgressTracker()
         val current = state.value
         val inheritedModel = current.modelState.modelSelection.activeProfileId
-        val runProfile = try { modelGateway.profileForRun(modelOverride ?: inheritedModel) } catch (error: Exception) {
+        val pinnedProfile = currentCoroutineContext()[LocalModelRunContext]?.profile
+        val selection = subagentModelSelection(modelOverride, inheritedModel, pinnedProfile?.id)
+        val runProfile = try { modelGateway.profileForRun(selection) } catch (error: Exception) {
             if (error is kotlinx.coroutines.CancellationException) throw error
             return LocalSubagentResult(LocalSubagentStatus.FAILED,
                 "[subagent][$subagentId] ${error.message}", (error as? LocalModelException)?.code ?: "NO_MODEL_CREDENTIAL")
@@ -291,7 +302,12 @@ internal class LocalSubagentRunner(
             addAll(capabilities.toolAllowlist.orEmpty())
             addAll(capabilities.initialOptionalTools)
         }
-        val initialToolSchemas = schemas(
+        fun executionSchemas(mutation: Boolean, virtual: Boolean, enabled: MutableSet<String>): JsonArray {
+            val normal = schemas(mutation, virtual, enabled)
+            return if (capabilities.teamManaged && backgroundJobId != null)
+                JsonArray(normal + (teamSchemas?.invoke().orEmpty())) else normal
+        }
+        val initialToolSchemas = executionSchemas(
             allowMutation,
             virtualScreenId != null,
             enabledOptionalTools,
@@ -464,6 +480,7 @@ internal class LocalSubagentRunner(
             val remainingSteps = totalBudgetLimit - recoveredBaseStep
             val loop = AgentTurnEngine(
                 model = AgentModel {
+                    executionFence()
                     currentCoroutineContext().ensureActive()
                     backgroundJobId?.let { jobId ->
                         val queuedMessages = jobs.peekMessages(jobId)
@@ -504,10 +521,10 @@ internal class LocalSubagentRunner(
                     modelStep = addSubagentSteps(recoveredBaseStep, activationStep)
                     val durableHistory = history.snapshot()
                     val selectedMode = resolveImageMode(snapshot.modelState.imageInputMode, snapshot.modelState.baseUrl, routeModel)
-                    if (hasLocalImageRefs(durableHistory) &&
-                        resolveImageMode(LocalImageInputMode.AUTO, snapshot.modelState.baseUrl, routeModel) == LocalImageInputMode.TOOL) {
-                        throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
-                    }
+                    com.labteto.dshmobile.local.model.requireLocalImageInputSupported(
+                        durableHistory,
+                        unsupported = resolveImageMode(LocalImageInputMode.AUTO, snapshot.modelState.baseUrl, routeModel) == LocalImageInputMode.TOOL,
+                    )
                     val preparedHistory = prepareMessages(
                         durableHistory,
                         selectedMode,
@@ -522,7 +539,7 @@ internal class LocalSubagentRunner(
                             tools = modelToolStepSurface.capture(
                                 runToolSurface.next(
                                     filterLocalSubagentSchemas(
-                                        schemas(
+                                        executionSchemas(
                                             allowMutation,
                                             virtualScreenId != null,
                                             enabledOptionalTools,
@@ -576,6 +593,9 @@ internal class LocalSubagentRunner(
                     onUsage(routeModel, reply, usageContext)
                     repliesByStep[activationStep] = reply
                     AgentModelReply(
+                        completionReason = reply.completionReason,
+                        rawStopReason = reply.rawStopReason,
+                        reportedUsage = com.labteto.dshmobile.local.model.agentReportedModelUsage(reply.usage),
                         content = reply.content.orEmpty(),
                         toolCalls = reply.toolCalls.map { call ->
                             AgentToolCall(
@@ -588,6 +608,7 @@ internal class LocalSubagentRunner(
                     )
                 },
                 tools = AgentToolExecutor { call ->
+                    executionFence()
                     currentCoroutineContext().ensureActive()
                     toolCallPolicy.rejection(call)
                         ?: if (capabilities.teamManaged && call.name == "capability_search") {
@@ -596,7 +617,11 @@ internal class LocalSubagentRunner(
                             )
                         } else withContext(LocalModelRunContext(runProfile)) {
                         currentCoroutineContext().ensureActive()
-                        execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
+                        if (capabilities.teamManaged && call.name in LocalAgentTeamContract.TOOL_NAMES) {
+                            requireNotNull(executeTeamTool) { "TEAM_CALLER_UNAVAILABLE" }(
+                                requireNotNull(backgroundJobId), call.toLocalToolCall(),
+                            )
+                        } else execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
                             .also { currentCoroutineContext().ensureActive() }
                     }
                 },
@@ -611,7 +636,7 @@ internal class LocalSubagentRunner(
                                 ?: error("缺少子代理第 $absoluteStep 步模型响应")
                             progressTracker.recordAssistant(reply.content.orEmpty(), reply.toolCalls.size)
                             history.append(reply.message)
-                            pendingTerminalOutput = if (reply.toolCalls.isEmpty()) {
+                            pendingTerminalOutput = if (reply.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED && reply.toolCalls.isEmpty()) {
                                 reply.content.orEmpty().ifBlank { "子代理已结束，但没有返回文字。" }
                             } else {
                                 null
@@ -645,16 +670,30 @@ internal class LocalSubagentRunner(
                         is AgentEvent.ToolFinished -> {
                             val absoluteStep = addSubagentSteps(recoveredBaseStep, event.step)
                             progressTracker.recordToolResult(event.call, event.output, event.isError)
-                            val boundedContent = historyPolicy.retainToolResult(
-                                event.call.id,
-                                event.output,
-                                event.retention,
+                            val delivery = com.labteto.dshmobile.local.model.deliverLocalToolResult(
+                                retain = {
+                                    historyPolicy.retainToolResult(
+                                        event.call.id,
+                                        event.output,
+                                        event.retention,
+                                        requireStored = event.richContent != null,
+                                        preview = event.richContent?.modelPreview(),
+                                    )
+                                },
+                                materialize = { importToolImages(event.richContent) },
                             )
+                            currentCoroutineContext().ensureActive()
+                            if (runContext != null && runCoordinator?.isCurrentOwner(runContext) == false) return@AgentEventSink
+                            val boundedContent = delivery.content
+                            val toolImages = delivery.images
+                            val deliveryIsError = event.isError || delivery.failed
+                            val deliveryErrorCode = if (delivery.failed) "TOOL_RESULT_DELIVERY_FAILED" else event.errorCode
+                            val deliveryRetryable = !delivery.failed && event.retryable
                             val modelOutput = AgentToolResult(
                                 content = boundedContent,
-                                isError = event.isError,
-                                errorCode = event.errorCode,
-                                retryable = event.retryable,
+                                isError = deliveryIsError,
+                                errorCode = deliveryErrorCode,
+                                retryable = deliveryRetryable,
                                 sideEffect = event.sideEffect,
                                 recoveryHint = event.recoveryHint,
                             ).modelVisibleContent()
@@ -666,6 +705,7 @@ internal class LocalSubagentRunner(
                                     ),
                             )
                             eventLog().append("subagent/tool-result", buildJsonObject {
+                                backgroundJobId?.let { put("background_job_id", it) }
                                 put("agent_id", subagentId)
                                 put("step", absoluteStep)
                                 put("id", event.call.id)
@@ -677,13 +717,16 @@ internal class LocalSubagentRunner(
                                     ),
                                 )
                                 put("model_content", durableToolResultContent(modelOutput, event.retention))
-                                put("is_error", event.isError)
-                                event.errorCode?.let { put("error_code", it) }
-                                put("retryable", event.retryable)
+                                put("tool_images", com.labteto.dshmobile.local.model.toolImageReferences(toolImages))
+                                put("is_error", deliveryIsError)
+                                deliveryErrorCode?.let { put("error_code", it) }
+                                put("retryable", deliveryRetryable)
+                                event.executionId?.let { put("execution_id", it) }
+                                put("file_versions", JsonObject(event.fileVersions.mapValues { JsonPrimitive(it.value) }))
                                 put("side_effect", event.sideEffect.name.lowercase())
                                 event.recoveryHint?.let { put("recovery_hint", it) }
                             })
-                            history.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention))
+                            history.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention, toolImages))
                         }
                         is AgentEvent.StepFinished -> {
                             if (pendingTerminalOutput == null) {
@@ -838,6 +881,11 @@ internal class LocalSubagentRunner(
                 )
             }
 
+            if (result.stopReason != AgentStopReason.STEP_LIMIT) {
+                persistContinuationCheckpoint(step = addSubagentSteps(recoveredBaseStep, result.steps))
+                return LocalSubagentResult(LocalSubagentStatus.FAILED,
+                    result.answer, result.stopReason.name)
+            }
             val partial = progress.joinToString("\n")
             val output = buildString {
                 append(
@@ -863,6 +911,9 @@ internal class LocalSubagentRunner(
                 if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
             }
             return LocalSubagentResult(LocalSubagentStatus.CANCELLED, output, "TASK_CANCELLED")
+        } catch (superseded: LocalWorkflowSuperseded) {
+            primaryFailure = superseded
+            throw superseded // The Jobs owner retains a recoverable slice after checking tool settlement.
         } catch (error: JobContinuationPersistenceException) {
             // The outer persistent Job owner is the authority for this failure. Converting it into
             // a normal subagent failure would permanently mark a safely resumable activation as failed.

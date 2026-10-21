@@ -23,6 +23,8 @@ internal data class GroupGeneratedReply(
     val uiDefinition: String? = null,
     val requestId: String = "",
     val uiUsageReported: Boolean = false,
+    val completionReason: com.labteto.dshmobile.local.model.LocalModelCompletionReason = com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED,
+    val rawStopReason: String? = null,
 )
 
 /**
@@ -61,3 +63,16 @@ internal fun mergeRefreshedGroupMembers(
         chatState = state.withoutLegacyConversationContext(),
     )
 }
+
+/** Executor delivery must use the accepted repair's identity, completion and accounting facts. */
+internal fun groupGeneratedReplyFromFinalReply(
+    member: LocalGroupChatMember,
+    persona: PersonaProfile,
+    reply: com.labteto.dshmobile.local.model.LocalModelReply,
+    uiDefinition: String? = null,
+): GroupGeneratedReply = GroupGeneratedReply(
+    member = member, persona = persona, content = reply.content.orEmpty(),
+    uiDefinition = uiDefinition.takeIf { reply.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED },
+    requestId = reply.requestId, uiUsageReported = reply.usage.reported,
+    completionReason = reply.completionReason, rawStopReason = reply.rawStopReason,
+)

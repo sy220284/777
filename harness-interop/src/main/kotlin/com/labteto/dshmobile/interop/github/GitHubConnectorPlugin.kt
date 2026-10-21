@@ -32,6 +32,7 @@ import kotlinx.serialization.json.put
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
+import com.labteto.dshmobile.interop.mcp.executeCancellable
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -342,41 +343,45 @@ class GitHubConnectorPlugin(
         attempts: Int,
         mutation: Boolean,
     ): GitHubApiResponse = withContext(Dispatchers.IO) {
-        // Three read attempts must fit the outer 35s tool budget; writes admit once.
+        // Only read requests can retry. Mutation acknowledgement may be lost after commit.
         val perAttemptLimit = if (mutation) WRITE_CALL_DEADLINE_MILLIS else READ_CALL_DEADLINE_MILLIS
         val configuredLimit = http.callTimeoutMillis.toLong().takeIf { it > 0L }
         val callLimit = configuredLimit?.coerceAtMost(perAttemptLimit) ?: perAttemptLimit
-        val boundedClient = http.newBuilder().callTimeout(callLimit, TimeUnit.MILLISECONDS).build()
+        val boundedClient = http.newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .retryOnConnectionFailure(false)
+            .callTimeout(callLimit, TimeUnit.MILLISECONDS)
+            .build()
         repeat(attempts.coerceAtLeast(1)) { index ->
             try {
-                boundedClient.newCall(request).execute().use { response ->
-                    val body = response.body?.byteStream()?.let(::readBounded).orEmpty()
-                    val result = GitHubApiResponse(
-                        status = response.code,
-                        body = body,
-                        headers = buildMap {
-                            SAFE_RESPONSE_HEADERS.forEach { name ->
-                                response.header(name)?.let { value -> put(name, value) }
-                            }
-                        },
-                    )
-                    if (
-                        !mutation &&
-                        index + 1 < attempts &&
-                        response.code in TRANSIENT_HTTP_STATUSES
-                    ) {
-                        delay(RETRY_BACKOFF_MILLIS * (index + 1))
-                        return@repeat
+                // Cancellation propagates to OkHttp Call, including while reading the body.
+                // Backoff runs outside the response lifetime, leaving pooled sockets reusable.
+                val result = boundedClient.newCall(request).executeCancellable { response ->
+                    if (!mutation && index + 1 < attempts &&
+                        response.code in TRANSIENT_HTTP_STATUSES) {
+                        null
+                    } else {
+                        val body = response.body?.byteStream()?.let(::readBounded).orEmpty()
+                        GitHubApiResponse(
+                            status = response.code,
+                            body = body,
+                            headers = buildMap {
+                                SAFE_RESPONSE_HEADERS.forEach { name ->
+                                    response.header(name)?.let { value -> put(name, value) }
+                                }
+                            },
+                        )
                     }
-                    return@withContext result
                 }
+                if (result != null) return@withContext result
             } catch (error: IOException) {
                 val retryable = !mutation &&
                     error !is UnknownHostException &&
-                    error !is SSLPeerUnverifiedException
+                    error !is javax.net.ssl.SSLException
                 if (!retryable || index + 1 >= attempts) throw error
-                delay(RETRY_BACKOFF_MILLIS * (index + 1))
             }
+            delay(RETRY_BACKOFF_MILLIS * (index + 1))
         }
         error("GitHub API 重试循环异常结束")
     }

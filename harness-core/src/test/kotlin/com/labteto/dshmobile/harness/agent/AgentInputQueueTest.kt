@@ -7,6 +7,20 @@ import org.junit.Test
 
 class AgentInputQueueTest {
     @Test
+    fun userInputPrecedesAgentCommunicationWithoutChangingItsOrigin() {
+        val queue = AgentInputQueue()
+        val source = kotlinx.serialization.json.buildJsonObject {
+            put("sender_id", kotlinx.serialization.json.JsonPrimitive("member-1"))
+        }
+        val message = QueuedAgentInput("agent data", memoryInput = "", id = "mail",
+            kind = QueuedAgentInputKind.AGENT_MESSAGE, agentSource = source)
+        queue.offer(message)
+        queue.offer(QueuedAgentInput("user request", id = "user"))
+        assertEquals("user", queue.poll()?.id)
+        assertEquals(message, queue.poll())
+    }
+
+    @Test
     fun preservesOrderAndEnforcesCapacity() {
         val queue = AgentInputQueue(capacity = 2)
 

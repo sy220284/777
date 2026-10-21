@@ -298,7 +298,7 @@ internal fun LocalMessageRow(
         )
 
         "reasoning" -> ChatThinkingRow(listOf(message), streaming = streaming)
-        "tool", "progress" -> WorkTimelineStepRow(message)
+        "tool", "progress" -> WorkTimelineStepRow(message, workspacePath = workspacePath)
 
         else -> {
             var actionsOpen by remember(message.id) { mutableStateOf(false) }
@@ -549,7 +549,7 @@ private fun LocalAssistantMessageContent(
 }
 
 @Composable
-private fun LocalTranscriptImage(
+internal fun LocalTranscriptImage(
     image: LocalMessageBlock.Image,
     workspacePath: String,
 ) {

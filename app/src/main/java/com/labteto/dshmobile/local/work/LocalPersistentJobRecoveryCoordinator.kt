@@ -4,6 +4,7 @@ import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.jobs.JobMessageAdmission
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import com.labteto.dshmobile.harness.jobs.JobStartResult
+import com.labteto.dshmobile.harness.jobs.JobExecutionSliceBoundaryException
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.agent.requireCompletedOutput
 import com.labteto.dshmobile.local.jobs.LocalJobManager
@@ -30,6 +31,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -64,6 +66,7 @@ internal fun mustPreserveUnknownRecoveryOutcome(snapshot: JobSnapshot): Boolean 
 
 internal class LocalPersistentJobRecoveryCoordinator(
     private val scope: CoroutineScope,
+    private val workspaceRoot: java.io.File,
     private val jobs: LocalJobManager,
     private val json: Json,
     private val modelGateway: LocalModelGateway,
@@ -129,6 +132,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         allowMutation: Boolean = false,
         teamManaged: Boolean = false,
         initialOptionalTools: Set<String> = emptySet(),
+        workflowFence: JsonObject? = null,
     ): JobStartResult {
         val runProfile = modelGateway.profileForRun(
             model ?: boundState.modelState.modelSelection.activeProfileId,
@@ -150,7 +154,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             LocalSubagentLaunchSpec(
                 task = task,
                 instructions = instructions,
-                modelOverride = null,
+                modelOverride = runProfile.id,
                 maxSteps = maxSteps,
                 backgroundJobId = "pending",
                 capabilities = capabilities,
@@ -193,6 +197,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             put("max_steps", maxSteps)
             forkParentCallId?.let { put("parent_call_id", it) }
             put("capabilities", encodeLocalSubagentCapabilities(capabilities))
+            workflowFence?.let { put("workflow_fence", it) }
         }.toString()
         return jobs.startPersistentResult(
             label = "子代理：${task.take(100)}",
@@ -202,22 +207,29 @@ internal class LocalPersistentJobRecoveryCoordinator(
             continuable = true,
             requestedId = requestedJobId,
         ) { jobId, report ->
-            withContext(LocalModelRunContext(runProfile)) {
+            suspendWorkflowJobForNewUser(eventLogFor(sessionId), jobId, workflowFence != null, allowMutation) {
+              withContext(LocalModelRunContext(runProfile) + LocalWorkflowExecutionFence {
+                if (workflowFence != null) requireWorkflowFenceCurrent(sessionId, workflowFence)
+              }) {
                 runner.runResult(
                     spec = LocalSubagentLaunchSpec(
                         task = task,
                         instructions = instructions,
-                        modelOverride = null,
+                        modelOverride = runProfile.id,
                         maxSteps = maxSteps,
                         parentCallId = forkParentCallId,
                         backgroundJobId = jobId,
                         capabilities = capabilities,
                     ),
                     recoveredHistory = initialHistorySeed,
+                    executionFence = {
+                        if (workflowFence != null) requireWorkflowFenceCurrent(sessionId, workflowFence)
+                    },
                     onCheckpointProgress = { step, totalLimit ->
                         report("子代理执行进度：$step/$totalLimit")
                     },
-                ).requireCompletedOutput()
+                ).requireCompletedOutput().also { persistWorkflowOutput(sessionId, jobId, it, workflowFence) }
+              }
             }
         }
     }
@@ -392,6 +404,15 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val credentialRef = payload["credential_ref"]?.jsonPrimitive?.contentOrNull
         val fingerprint = payload.requiredString("route_fingerprint")
         val capabilities = decodeLocalSubagentCapabilities(payload, version)
+        val workflowFence = payload["workflow_fence"] as? JsonObject
+        if (workflowFence != null) {
+            try { requireWorkflowFenceCurrent(sessionId, workflowFence) }
+            catch (_: LocalWorkflowSuperseded) { return } // New USER runs first; preserve a safe slice for explicit resume.
+            catch (invalid: IllegalStateException) {
+                markRecoveryUnavailable(snapshot, "任务图目标或节点证据已失效：${invalid.message.orEmpty()}")
+                return
+            }
+        }
         val log = eventLogFor(sessionId)
         val checkpointEvent = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
             data["background_job_id"]?.jsonPrimitive?.contentOrNull == snapshot.id
@@ -400,6 +421,13 @@ internal class LocalPersistentJobRecoveryCoordinator(
             ?.let { event -> decodeLocalSubagentHistoryCheckpoint(event.data) }
 
         var pendingIds = jobs.peekMessages(snapshot.id).mapTo(hashSetOf()) { it.id }
+        if (workflowFence != null && continuation?.terminalOutput != null &&
+            log.latestMatching(setOf("taskgraph/job-result")) { it["job_id"]?.jsonPrimitive?.contentOrNull == snapshot.id } == null
+        ) {
+            // Legacy bounded checkpoint text is insufficient as a complete graph result.
+            markRecoveryUnavailable(snapshot, "节点终态存在但完整结果未持久化，需要核验，不能重放")
+            return
+        }
         if (
             shouldSettleCompletedSubagentCheckpoint(continuation, pendingIds) &&
             jobs.settleResumableAgentIfInboxClaimed(
@@ -415,7 +443,8 @@ internal class LocalPersistentJobRecoveryCoordinator(
         // to inspect it before reassigning work. A typed local request-slice boundary is
         // reached before provider admission, after the last completed tool checkpoint.
         // The latter resumes only with a newly admitted root Work slice.
-        if (requiresLeadVerificationForSubagentResume(
+        if ((workflowFence != null && workflowWritableResumeNeedsVerification(capabilities.allowMutation, snapshot.status)) ||
+            requiresLeadVerificationForSubagentResume(
                 capabilities.teamManaged, capabilities.allowMutation, snapshot.status,
             )
         ) {
@@ -424,6 +453,14 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 "可写团队成员在应用中断后停止自动续跑；请由主代理先核验文件和任务状态，再重新分配。",
             )
             return
+        }
+        if (workflowFence != null && capabilities.allowMutation) {
+            try {
+                check(workflowToolContinuationSafe(log, snapshot.id)) { "工具回执之后缺少安全历史检查点" }
+            } catch (unsettled: IllegalStateException) {
+                markRecoveryUnavailable(snapshot, "可写节点工具副作用或历史检查点未安全结算，停止自动恢复：${unsettled.message.orEmpty()}")
+                return
+            }
         }
         // Only an actual model continuation needs a live, session-owned execution context.
         // Terminal checkpoint settlement above is fully durable and can finish off-screen.
@@ -468,6 +505,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
 
         jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { jobId, report ->
+          suspendWorkflowJobForNewUser(eventLogFor(sessionId), jobId, workflowFence != null, capabilities.allowMutation) {
             val profile = modelGateway.profileForRoute(profileId, model, baseUrl)
             require(
                 profile.authKind.name == authKind &&
@@ -475,13 +513,15 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     profile.credentialRef == credentialRef &&
                     profile.routeFingerprint() == fingerprint
             ) { "持久子代理原模型路由身份已变化，已停止自动续跑" }
-            withContext(LocalModelRunContext(profile)) {
+            withContext(LocalModelRunContext(profile) + LocalWorkflowExecutionFence {
+                if (workflowFence != null) requireWorkflowFenceCurrent(sessionId, workflowFence)
+            }) {
                 runner.runResult(
                     spec = validateLocalSubagentLaunchSpec(
                         LocalSubagentLaunchSpec(
                             task = task,
                             instructions = instructions,
-                            modelOverride = null,
+                            modelOverride = profile.id,
                             maxSteps = maxSteps,
                             parentCallId = payload["parent_call_id"]?.jsonPrimitive?.contentOrNull,
                             backgroundJobId = jobId,
@@ -496,12 +536,180 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     recoveredEnabledOptionalTools = continuation?.enabledOptionalTools.orEmpty(),
                     resumeAfterCompletion =
                         shouldColdResumeCompletedSubagent(continuation, pendingIds),
+                    executionFence = {
+                        if (workflowFence != null) requireWorkflowFenceCurrent(sessionId, workflowFence)
+                    },
                     onCheckpointProgress = { step, totalLimit ->
                         report("子代理执行进度：$step/$totalLimit")
                     },
-                ).requireCompletedOutput()
+                ).requireCompletedOutput().also { persistWorkflowOutput(sessionId, jobId, it, workflowFence) }
             }
+          }
         }
+    }
+
+    internal suspend fun workflowRoute(model: String?): Pair<String, String> =
+        modelGateway.profileForRun(model).let { it.id to it.routeFingerprint() }
+    internal suspend fun workflowRouteFingerprint(model: String?): String = workflowRoute(model).second
+
+    private fun persistWorkflowOutput(sessionId: String, jobId: String, output: String, fence: JsonObject?) {
+        if (fence == null) return
+        requireWorkflowFenceCurrent(sessionId, fence)
+        val toolExecutions = workflowToolSettlementEvidence(eventLogFor(sessionId), jobId)
+        eventLogFor(sessionId).append("taskgraph/job-result", buildJsonObject {
+            fence.forEach { (key, value) -> put(key, value) }
+            put("job_id", jobId)
+            put("output", output)
+            put("tool_execution_ids", JsonArray(toolExecutions.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+            put("output_files", buildJsonObject {
+                (fence["output_paths"] as? JsonArray).orEmpty().forEach { path ->
+                    val name = path.jsonPrimitive.content
+                    put(name, localWorkFileSha256(workspaceRoot, name) ?: "missing")
+                }
+            })
+        })
+    }
+
+    /** The Job's execution identity stays fixed; only the root USER authorization may advance. */
+    private fun requireWorkflowFenceCurrent(sessionId: String, fence: JsonObject) {
+        val log = eventLogFor(sessionId)
+        val execution = fence["graph_execution_id"]?.jsonPrimitive?.contentOrNull
+            ?: error("节点缺少图执行身份")
+        check(log.latestMatching(setOf("taskgraph/end")) {
+                it["graph_execution_id"]?.jsonPrimitive?.contentOrNull == execution
+            } == null) { "任务图已结算，拒绝迟到节点结果" }
+        val renewed = log.latestMatching(setOf("taskgraph/resume-authorized")) {
+            it["graph_execution_id"]?.jsonPrimitive?.contentOrNull == execution
+        }?.data
+        // A new USER wins even when it also changed a file while the old Job was waiting.
+        if (workflowAuthorizationSuperseded(log, renewed ?: fence)) throw LocalWorkflowSuperseded()
+        val start = log.latestMatching(setOf("taskgraph/start")) {
+            it["graph_execution_id"]?.jsonPrimitive?.contentOrNull == execution
+        }?.data ?: error("节点缺少原图定义")
+        val plan = LocalWorkTaskGraphPlan(start["plan"] as? JsonObject ?: error("原图定义不完整"))
+        val nodeId = fence["node_id"]?.jsonPrimitive?.contentOrNull ?: error("节点身份缺失")
+        val index = plan.nodes.indexOfFirst { it.id == nodeId }
+        check(index >= 0 && fence["node_version"]?.jsonPrimitive?.contentOrNull == plan.nodeVersion(plan.nodes[index])) {
+            "节点定义版本已改变"
+        }
+        val originalFiles = fence["files"] as? JsonObject ?: error("节点文件版本缺失")
+        val currentFiles = plan.fileVersions(workspaceRoot, index)
+        val identityPaths = if (plan.writable) plan.inputPaths(index) else
+            plan.inputPaths(index) + plan.outputPaths(index)
+        check(identityPaths.all { originalFiles[it] == currentFiles[it] }) { "节点输入文件证据已变化" }
+        val accepted = plan.recoveredResults(log, execution, workspaceRoot)
+        check(plan.nodes[index].dependsOn.all { it in accepted }) { "节点依赖已失效" }
+        val dependencyHashes = buildJsonObject { plan.nodes[index].dependsOn.forEach { id ->
+            put(id, workflowVersion(accepted.getValue(id).output.orEmpty()))
+        } }
+        check(fence["dependencies"] == dependencyHashes) { "节点依赖内容版本已变化" }
+        val expectedVersions = fence["dependency_versions"] as? JsonObject
+        if (expectedVersions != null) check(plan.nodes[index].dependsOn.all { id ->
+            log.latestMatching(setOf("taskgraph/node-accepted")) {
+                it["graph_execution_id"]?.jsonPrimitive?.contentOrNull == execution &&
+                    it["node_id"]?.jsonPrimitive?.contentOrNull == id
+            }?.data?.get("result_sequence") == expectedVersions[id]
+        }) { "节点依赖验收版本已变化" }
+        if (plan.writable && renewed != null) check(
+            renewed["allow_mutation"]?.jsonPrimitive?.booleanOrNull == true
+        ) { "可写图本轮未授权" }
+        val goal = stateForSession(sessionId)?.work?.goal
+        val fingerprint = fence["goal_fingerprint"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        check(if (fingerprint.isBlank()) goal == null else
+            goal?.status == "active" && localWorkGoalFingerprint(goal) == fingerprint) { "任务图目标版本已失效" }
+    }
+
+    /** Consume the original durable result before looking at a possibly cancelled/retained Job. */
+    private fun requireWorkflowJobResult(result: JsonObject, jobId: String, fence: JsonObject, sessionId: String): String {
+        requireWorkflowFenceCurrent(sessionId, fence)
+        val original = result["files"] as? JsonObject ?: error("原 Job 缺少输入文件版本")
+        val now = fence["files"] as? JsonObject ?: error("节点缺少输入文件版本")
+        val execution = fence["graph_execution_id"]?.jsonPrimitive?.contentOrNull
+        val plan = LocalWorkTaskGraphPlan(eventLogFor(sessionId).latestMatching(setOf("taskgraph/start")) {
+            it["graph_execution_id"]?.jsonPrimitive?.contentOrNull == execution
+        }?.data?.get("plan") as? JsonObject ?: error("原图定义缺失"))
+        val index = plan.nodes.indexOfFirst { it.id == fence["node_id"]?.jsonPrimitive?.contentOrNull }
+        check(index >= 0 && plan.inputPaths(index).all { original[it] == now[it] }) { "原 Job 输入文件版本已变化" }
+        check(result["job_id"]?.jsonPrimitive?.contentOrNull == jobId &&
+            result["graph_execution_id"] == fence["graph_execution_id"] &&
+            result["node_id"] == fence["node_id"] &&
+            result["node_version"] == fence["node_version"] &&
+            result["goal_fingerprint"] == fence["goal_fingerprint"] &&
+            result["dependencies"] == fence["dependencies"] &&
+            result["tool_execution_ids"] is JsonArray) { "原节点 Job 结果身份或副作用证据不匹配" }
+        val outputPaths = (fence["output_paths"] as? JsonArray).orEmpty().map { it.jsonPrimitive.content }
+        val outputs = result["output_files"] as? JsonObject ?: error("原 Job 缺少交付文件证据")
+        check(outputPaths.all { path ->
+            val current = localWorkFileSha256(workspaceRoot, path)
+            current != null && outputs[path]?.jsonPrimitive?.contentOrNull == current
+        }) { "原节点交付文件已变化" }
+        val output = result["output"]?.jsonPrimitive?.contentOrNull
+        check(!output.isNullOrBlank()) { "原节点缺少完整结果" }
+        return output
+    }
+
+    /** Jobs remains the sole execution owner; this caller only waits for durable terminal evidence. */
+    internal suspend fun awaitWorkflowNode(
+        jobId: String, task: String, model: String?, expectedRoute: String,
+        maxSteps: Int, outputSchema: JsonObject?, toolAllowlist: Set<String>?,
+        allowMutation: Boolean, binding: LocalWorkRunBinding, fence: JsonObject,
+    ): String {
+        val log = binding.eventLog
+        requireWorkflowFenceCurrent(binding.sessionId, fence)
+        val prior = log.latestMatching(setOf("taskgraph/job-result")) {
+            it["job_id"]?.jsonPrimitive?.contentOrNull == jobId
+        }
+        if (prior != null) return requireWorkflowJobResult(prior.data, jobId, fence, binding.sessionId)
+        require(workflowRouteFingerprint(model) == expectedRoute) { "任务图原模型路由已变化，停止恢复" }
+        val existing = jobs.snapshots().singleOrNull { it.id == jobId }
+        if (existing == null) {
+            // A result survives Jobs retention; never recreate an already executed job.
+            val launched = log.latestMatching(setOf("taskgraph/job-admitted", "taskgraph/job-rejected")) {
+                it["job_id"]?.jsonPrimitive?.contentOrNull == jobId
+            }
+            check(workflowCanCreateMissingJob(allowMutation, launched != null, launched?.type == "taskgraph/job-rejected")) { "可写节点原 Job 缺失且副作用未知，必须核验，禁止重放" }
+            log.append("taskgraph/job-admitted", buildJsonObject {
+                fence.forEach { (key, value) -> put(key, value) }
+                put("job_id", jobId)
+            })
+            val admitted = startReadonlySubagentResult(
+                task = task, model = model, maxSteps = maxSteps, virtualScreen = false,
+                outputSchema = outputSchema, toolAllowlist = toolAllowlist,
+                sessionId = binding.sessionId, boundState = binding.aggregateSnapshot(),
+                historySnapshot = binding.runHandle.modelHistory::snapshot,
+                requestedJobId = jobId, allowMutation = allowMutation,
+                workflowFence = fence,
+            )
+            if (!admitted.accepted) {
+                log.append("taskgraph/job-rejected", buildJsonObject { put("job_id", jobId); put("detail", admitted.message) })
+                if (jobs.availableSlots() == 0) throw LocalWorkflowSuspended()
+                error(admitted.message)
+            }
+        } else {
+            check(existing.ownerId == binding.sessionId) { "节点 Job 所有权不一致" }
+            schedule(binding.sessionId, rootSliceAdmitted = true)
+        }
+        return awaitPersistedWorkflowJob(jobId, jobs,
+            checkFence = { requireWorkflowFenceCurrent(binding.sessionId, fence) },
+            consumeResult = {
+                log.latestMatching(setOf("taskgraph/job-result")) {
+                    it["job_id"]?.jsonPrimitive?.contentOrNull == jobId
+                }?.data?.let { requireWorkflowJobResult(it, jobId, fence, binding.sessionId) }
+                    ?: error("节点 Job 完成但缺少完整持久结果")
+            },
+        )
+    }
+
+    internal fun cancelWorkflowJobs(sessionId: String, executionId: String, preserveSafeSlice: Boolean = false) {
+        jobs.snapshots().filter { snapshot ->
+            snapshot.ownerId == sessionId && snapshot.resumePayload?.let { raw ->
+                runCatching { json.parseToJsonElement(raw).jsonObject["workflow_fence"]
+                    ?.jsonObject?.get("graph_execution_id")?.jsonPrimitive?.contentOrNull == executionId }.getOrDefault(false)
+            } == true
+        // A running Job observes its own fence and becomes a checked waiting_slice. Killing it here
+        // would turn USER preemption into an unrecoverable cancelled Job before that checkpoint.
+        }.filterNot { preserveSafeSlice }
+            .forEach { jobs.kill(it.id, sessionId) }
     }
 
     private fun recoverClaimedMessagesAfterCheckpoint(
@@ -549,5 +757,41 @@ internal class LocalPersistentJobRecoveryCoordinator(
         const val MIN_PERSISTENT_SUBAGENT_RESUME_VERSION = 1
         const val PERSISTENT_SUBAGENT_RESUME_VERSION = 3
         const val RECOVERY_EVENT_PAGE_SIZE = 200
+    }
+}
+
+/** Actual persisted Jobs block, retaining only a slice without uncheckpointed write effects. */
+internal suspend fun <T> suspendWorkflowJobForNewUser(
+    log: LocalSessionEventLog, jobId: String, workflowNode: Boolean, allowMutation: Boolean,
+    block: suspend () -> T,
+): T = try { block() } catch (superseded: LocalWorkflowSuperseded) {
+    if (!workflowNode) throw superseded
+    // A USER fence can fire between a tool's settlement and its history checkpoint.
+    // Without a matching terminal result, even a settled write must not be reissued.
+    if (allowMutation && !workflowToolContinuationSafe(log, jobId)) throw superseded
+    throw JobExecutionSliceBoundaryException(superseded)
+}
+
+/** The production Jobs wait path; root Work alone decides whether an interruption pauses or settles the graph. */
+internal suspend fun awaitPersistedWorkflowJob(
+    jobId: String,
+    jobs: LocalJobManager,
+    checkFence: () -> Unit,
+    consumeResult: () -> String,
+): String {
+    while (true) {
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        checkFence()
+        val snapshot = jobs.snapshots().singleOrNull { it.id == jobId }
+            ?: error("节点 Job 丢失，不能安全重放")
+        when (snapshot.status) {
+            "dormant", "completed" -> return consumeResult()
+            "waiting_slice" -> throw LocalWorkflowSuspended()
+            "running", "interrupted" -> Unit
+            else -> throw com.labteto.dshmobile.harness.workflow.TaskGraphNodeExecutionException(
+                "节点 Job 未成功：${snapshot.status}：${snapshot.output}",
+            )
+        }
+        delay(100)
     }
 }

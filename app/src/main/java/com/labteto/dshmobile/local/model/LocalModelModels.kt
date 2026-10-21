@@ -28,6 +28,8 @@ data class LocalPromptCacheDiagnostic(
     val cacheMissedTokens: Long? = null,
 )
 
+typealias LocalModelCompletionReason = com.labteto.dshmobile.harness.agent.AgentCompletionReason
+
 /** Parsed model response retained verbatim for the next request. */
 data class LocalModelReply(
     val message: JsonObject,
@@ -42,6 +44,8 @@ data class LocalModelReply(
     val promptCacheDiagnostic: LocalPromptCacheDiagnostic? = null,
     /** Native content before display splitting; replay only under the producing route identity. */
     val providerContentForReplay: JsonElement? = null,
+    val completionReason: LocalModelCompletionReason = LocalModelCompletionReason.COMPLETED,
+    val rawStopReason: String? = null,
 )
 
 enum class LocalModelPreviewPhase { IDLE, WAITING, STREAMING, RETRYING }
@@ -57,3 +61,11 @@ data class LocalHarnessStreamingState(
     val phase: LocalModelPreviewPhase = LocalModelPreviewPhase.IDLE,
     val attempt: Int = 1,
 )
+
+/** Value projection, not an accounting write; usageTracker remains the sole accounting owner. */
+internal fun agentReportedModelUsage(usage: DeepSeekTokenUsage): com.labteto.dshmobile.harness.agent.AgentModelUsage? =
+    if (!usage.reported) null else com.labteto.dshmobile.harness.agent.AgentModelUsage(
+        promptTokens = usage.promptTokens, completionTokens = usage.completionTokens,
+        cacheHitTokens = usage.cacheHitTokens, cacheMissTokens = usage.cacheMissTokens,
+        cacheWriteTokens = usage.cacheWriteTokens, reasoningTokens = usage.reasoningTokens,
+    )

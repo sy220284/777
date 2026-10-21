@@ -18,7 +18,7 @@ internal class LocalModelCancellationException(
 internal suspend fun <T> withCancellableModelResponse(
     call: Call,
     admissionTracker: LocalModelAdmissionTracker? = null,
-    read: (Response) -> T,
+    read: suspend (Response) -> T,
 ): T = try {
     withCancellableHttpResponse(call, read = { read(it) })
 } catch (cancelled: CancellationException) {

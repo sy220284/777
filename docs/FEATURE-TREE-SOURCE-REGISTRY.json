@@ -26,6 +26,14 @@
       "test": "app/src/test/java/com/labteto/dshmobile/local/model/MiniMaxProviderQuotaTest.kt#legacyRemainingCountAndNewUsedCountAreResolvedByProviderPercent"
     },
     {
+      "id": "shared.tools.mcp-resources",
+      "path": "第二层｜共享运行能力 / 共享工具执行 / MCP资源分页与完整内容",
+      "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpClient.kt",
+      "entry": "listResources",
+      "owner": "TOOLS",
+      "test": "harness-interop/src/test/kotlin/com/labteto/dshmobile/interop/mcp/McpClientTest.kt#resourceRequestsPreservePagesAndContents"
+    },
+    {
       "id": "skills.minimax-official-bundles",
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 预置技能目录",
       "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
@@ -80,6 +88,22 @@
       "entry": "LocalFeatureCatalog",
       "owner": "SHELL",
       "test": "app/src/test/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalogTest.kt#everyRouteHasExactlyOneStableOwnerAndModuleRouteList"
+    },
+    {
+      "id": "work.agent-team.member-collaboration",
+      "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 真实成员身份与窄授权协作（未合并）",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "executeMember",
+      "owner": "WORK",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#trustedMembersSendPeerLeadAndReadOwnDurableMailbox"
+    },
+    {
+      "id": "work.taskgraph.durable-acceptance",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 持久任务图与节点验收（未合并）",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlan.kt",
+      "entry": "recoveredResults",
+      "owner": "WORK",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlanTest.kt#coldRestoreReusesCompletedNodeAndContinuesRemainingNode"
     }
   ]
 }

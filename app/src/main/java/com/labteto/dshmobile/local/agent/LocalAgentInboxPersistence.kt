@@ -58,6 +58,7 @@ internal fun decodeLocalAgentInboxPending(data: JsonObject): List<QueuedAgentInp
         val modelMessage = item["model_message"] as? JsonObject
         val kind = when (stringValue(item, "kind")) {
             null, "USER" -> QueuedAgentInputKind.USER
+            "AGENT_MESSAGE" -> QueuedAgentInputKind.AGENT_MESSAGE
             "WORK_CONTINUATION" -> QueuedAgentInputKind.WORK_CONTINUATION
             else -> return null
         }
@@ -83,6 +84,9 @@ internal fun decodeLocalAgentInboxPending(data: JsonObject): List<QueuedAgentInp
                 stringValue(ref, "source_message_id"), goalId, goalFingerprint, goalRevision)
         }
         if ((kind == QueuedAgentInputKind.WORK_CONTINUATION) != (continuation != null)) return null
+        val source = item["agent_source"] as? JsonObject
+        if ((kind == QueuedAgentInputKind.AGENT_MESSAGE) != (source != null)) return null
+        if (kind == QueuedAgentInputKind.AGENT_MESSAGE && memoryInput.isNotEmpty()) return null
         decoded += QueuedAgentInput(
             content = content,
             memoryInput = memoryInput,
@@ -90,6 +94,7 @@ internal fun decodeLocalAgentInboxPending(data: JsonObject): List<QueuedAgentInp
             id = id,
             kind = kind,
             continuation = continuation,
+            agentSource = source,
         )
     }
     return decoded
@@ -100,6 +105,7 @@ private fun encodeQueuedAgentInput(input: QueuedAgentInput): JsonObject = buildJ
     put("content", input.content)
     put("memory_input", input.memoryInput)
     put("kind", input.kind.name)
+    input.agentSource?.let { put("agent_source", it) }
     input.continuation?.let { ref ->
         put("continuation", buildJsonObject {
             put("source_run_id", ref.sourceRunId)

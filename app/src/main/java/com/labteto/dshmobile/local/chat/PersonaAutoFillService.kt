@@ -446,6 +446,7 @@ class PersonaAutoFillService @Inject constructor(
             )
         }
 
+        com.labteto.dshmobile.local.model.requireCompletedModelReply(reply)
         val raw = reply.content?.trim().orEmpty()
         if (raw.isBlank()) error("模型没有返回可用的人设")
 
@@ -488,6 +489,7 @@ class PersonaAutoFillService @Inject constructor(
                 )
             }
 
+            com.labteto.dshmobile.local.model.requireCompletedModelReply(repairedReply)
             val repairedRaw = repairedReply.content?.trim().orEmpty()
             if (repairedRaw.isBlank()) {
                 throw IllegalStateException("AI 返回的人设格式无法解析，请再试一次", firstCause)
@@ -546,6 +548,7 @@ class PersonaAutoFillService @Inject constructor(
                 )
             }
 
+            com.labteto.dshmobile.local.model.requireCompletedModelReply(immersionReply)
             val immersionRaw = immersionReply.content?.trim().orEmpty()
             if (immersionRaw.isBlank()) {
                 throw IllegalStateException("AI 生成人设包含脱离角色的设定，且自动修复失败，请再试一次")
@@ -604,7 +607,11 @@ class PersonaAutoFillService @Inject constructor(
                     route = completionReply.routeIdentity,
                 )
             }
-            val supplement = completionReply?.content?.trim().orEmpty()
+            // Optional enrichment may keep the completed first draft, but cannot merge partial fields.
+            val completeSupplement = completionReply?.takeIf { candidate ->
+                runCatching { com.labteto.dshmobile.local.model.requireCompletedModelReply(candidate) }.isSuccess
+            }
+            val supplement = completeSupplement?.content?.trim().orEmpty()
             if (supplement.isNotBlank()) {
                 // Malformed supplementary responses must not erase the successful first draft.
                 runCatching { parsePersonaDraft(json, supplement) }.getOrNull()?.let { extra ->

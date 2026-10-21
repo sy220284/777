@@ -445,7 +445,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             }
 
             eventLog.append("turn/end", buildJsonObject {
-                put("reason", "completed")
+                put("reason", durableReply.completionReason.name.lowercase())
                 put("steps", 1)
                 put(
                     "messages",
@@ -456,18 +456,19 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             if (replacingMessageId != null) {
                 modelHistory.checkpoint(sessionId, "chat/regenerated")
             } else {
-                modelHistory.checkpointAtTurnBoundary(sessionId, "chat/completed")
+                modelHistory.checkpointAtTurnBoundary(sessionId, "chat/${durableReply.completionReason.name.lowercase()}")
             }
 
             runtimeStateStore.projection.setForegroundRunning(
                 sessionId = sessionId,
                 running = false,
-                error = null,
+                error = if (durableReply.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) null
+                    else "模型未完成：${durableReply.rawStopReason ?: durableReply.completionReason.name}；已保留部分正文。",
             )
             sessionStorage.enqueueCurrentSnapshot(sessionId)
 
             val assistantMessage = durableReply.content?.takeIf(String::isNotBlank)
-            if (assistantTranscript != null && assistantMessage != null) {
+            if (durableReply.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED && assistantTranscript != null && assistantMessage != null) {
                 snapshot.modelState.modelSelection.activeProfile?.let { profile ->
                     postTurn.schedule(
                         userMessage = input,
@@ -489,6 +490,16 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 put("reason", "aborted")
                 put("mode", "chat")
             })
+            // Keep a durable, explicitly partial visible row if the admitted stream failed.
+            runCatching { recoverInterruptedChatReply(eventLog) }.onSuccess { partial ->
+                partial?.let { message ->
+                    runtimeStateStore.projection.appendForegroundTranscript(sessionId, listOf(message))
+                    runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor = maxOf(
+                        runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor ?: -1L,
+                        eventLog.latestSequence(),
+                    )
+                }
+            }
             modelHistory.checkpointAtTurnBoundary(sessionId, "chat/cancelled")
             sessionStorage.enqueueCurrentSnapshot(sessionId)
             throw cancelled
@@ -522,6 +533,16 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 put("detail", detail.take(2_000))
                 put("mode", "chat")
             })
+            // Keep a durable, explicitly partial visible row if the admitted stream failed.
+            runCatching { recoverInterruptedChatReply(eventLog) }.onSuccess { partial ->
+                partial?.let { message ->
+                    runtimeStateStore.projection.appendForegroundTranscript(sessionId, listOf(message))
+                    runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor = maxOf(
+                        runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor ?: -1L,
+                        eventLog.latestSequence(),
+                    )
+                }
+            }
             modelHistory.checkpointAtTurnBoundary(sessionId, "chat/failed")
             sessionStorage.enqueueCurrentSnapshot(sessionId)
         } finally {

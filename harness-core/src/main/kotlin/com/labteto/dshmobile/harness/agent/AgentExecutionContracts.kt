@@ -18,11 +18,25 @@ data class AgentMessage(
     val toolCallId: String? = null,
     val toolName: String? = null,
     val toolCalls: List<AgentToolCall> = emptyList(),
+    val completionReason: AgentCompletionReason = AgentCompletionReason.COMPLETED,
+    val rawStopReason: String? = null,
+)
+
+enum class AgentCompletionReason { COMPLETED, OUTPUT_LIMIT, REFUSED, INTERRUPTED }
+
+/** Provider-reported facts only; the runtime usage owner remains responsible for billing once. */
+data class AgentModelUsage(
+    val promptTokens: Long, val completionTokens: Long,
+    val cacheHitTokens: Long = 0L, val cacheMissTokens: Long = 0L,
+    val cacheWriteTokens: Long = 0L, val reasoningTokens: Long = 0L,
 )
 
 data class AgentModelReply(
     val content: String = "",
     val toolCalls: List<AgentToolCall> = emptyList(),
+    val completionReason: AgentCompletionReason = AgentCompletionReason.COMPLETED,
+    val rawStopReason: String? = null,
+    val reportedUsage: AgentModelUsage? = null,
 )
 
 enum class AgentToolSideEffect {
@@ -41,6 +55,7 @@ data class AgentToolResult(
     val processExitCode: Int? = null,
     val fileVersions: Map<String, String> = emptyMap(),
     val executionId: String? = null,
+    val richContent: com.labteto.dshmobile.harness.tools.ToolRichContent? = null,
 )
 
 fun AgentToolResult.modelVisibleContent(): String {
@@ -57,6 +72,9 @@ fun AgentToolResult.modelVisibleContent(): String {
 
 enum class AgentStopReason {
     COMPLETED,
+    OUTPUT_LIMIT,
+    REFUSED,
+    INTERRUPTED,
     STEP_LIMIT,
 }
 
@@ -86,6 +104,9 @@ sealed interface AgentEvent {
         val step: Int,
         val content: String,
         val toolCalls: List<AgentToolCall>,
+        val completionReason: AgentCompletionReason = AgentCompletionReason.COMPLETED,
+        val rawStopReason: String? = null,
+        val reportedUsage: AgentModelUsage? = null,
     ) : AgentEvent
 
     data class ToolStarted(
@@ -108,6 +129,7 @@ sealed interface AgentEvent {
         val processExitCode: Int? = null,
         val fileVersions: Map<String, String> = emptyMap(),
         val executionId: String? = null,
+        val richContent: com.labteto.dshmobile.harness.tools.ToolRichContent? = null,
     ) : AgentEvent
 
     data class StepFinished(
@@ -129,6 +151,7 @@ sealed interface AgentEvent {
     data class TurnFailed(
         override val turnId: String,
         val reason: String,
+        val completionReason: AgentCompletionReason? = null,
     ) : AgentEvent
 
     data class TurnCancelled(

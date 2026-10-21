@@ -10,6 +10,8 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -116,7 +118,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                     requestId = requestId,
                     retryAfterMs = retryAfterMs,
                     onDelta = if (streaming) onDelta else { _: LocalModelDelta -> },
-                )
+                ).also { currentCoroutineContext().ensureActive() }
             }
         } catch (error: LocalModelException) {
             if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED && error.retryable) {
@@ -310,6 +312,7 @@ internal class AnthropicMessagesClient @Inject constructor(
     ): LocalModelReply {
         val blocks = linkedMapOf<Int, StreamBlock>()
         var messageId: String? = null
+        var usageReported = false
         var inputTokens = 0L
         var cacheReadTokens = 0L
         var cacheCreationTokens = 0L
@@ -335,6 +338,9 @@ internal class AnthropicMessagesClient @Inject constructor(
                         retryable = false,
                         requestId = requestId,
                     )
+                } catch (failure: java.io.IOException) {
+                    if (!(blocks.values.any { it.type == "text" && it.text.isNotBlank() })) throw failure
+                    null
                 } ?: break
                 if (!line.startsWith("data:")) continue
                 val data = line.removePrefix("data:").trim()
@@ -352,6 +358,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                             ?: throw protocolError("message_start 缺少 message", requestId)
                         messageId = message["id"]?.jsonPrimitive?.contentOrNull ?: messageId
                         (message["usage"] as? JsonObject)?.let { usage ->
+                            usageReported = true
                             inputTokens = usage["input_tokens"]?.jsonPrimitive?.longOrNull ?: inputTokens
                             cacheReadTokens = usage["cache_read_input_tokens"]?.jsonPrimitive?.longOrNull ?: cacheReadTokens
                             cacheCreationTokens = usage["cache_creation_input_tokens"]?.jsonPrimitive?.longOrNull ?: cacheCreationTokens
@@ -408,6 +415,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                         val delta = event["delta"] as? JsonObject
                         stopReason = delta?.get("stop_reason")?.jsonPrimitive?.contentOrNull ?: stopReason
                         (event["usage"] as? JsonObject)?.let { usage ->
+                            usageReported = true
                             outputTokens = usage["output_tokens"]?.jsonPrimitive?.longOrNull ?: outputTokens
                             inputTokens = usage["input_tokens"]?.jsonPrimitive?.longOrNull ?: inputTokens
                             cacheReadTokens = usage["cache_read_input_tokens"]?.jsonPrimitive?.longOrNull ?: cacheReadTokens
@@ -429,20 +437,28 @@ internal class AnthropicMessagesClient @Inject constructor(
             }
         }
 
-        if (!sawMessageStop) {
+        val hasVisibleText = blocks.values.any { it.type == "text" && it.text.isNotBlank() }
+        if (!sawMessageStop && !hasVisibleText) {
             throw modelPostAdmissionFailure(
                 code = "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION",
                 detail = "Anthropic Messages 流在 message_stop 前结束",
                 requestId = requestId ?: messageId,
             )
         }
-        if (!sawMessageStart || messageId.isNullOrBlank() || closedBlocks.size != blocks.size) {
+        if (!sawMessageStart || messageId.isNullOrBlank() || (sawMessageStop && stopReason !in setOf("max_tokens", "refusal") && closedBlocks.size != blocks.size)) {
             throw protocolError("message 起始身份或 block 终态不完整", requestId)
         }
-        requireCompleteStopReason(stopReason, requestId ?: messageId)
+        if (sawMessageStop) requireCompleteStopReason(stopReason, requestId ?: messageId)
+        val completionReason = when {
+            !sawMessageStop -> LocalModelCompletionReason.INTERRUPTED
+            stopReason == "max_tokens" -> LocalModelCompletionReason.OUTPUT_LIMIT
+            stopReason == "refusal" -> LocalModelCompletionReason.REFUSED
+            else -> LocalModelCompletionReason.COMPLETED
+        }
 
         val nativeContent = buildJsonArray {
-            blocks.toSortedMap().values.forEach { add(it.toNative(json, requestId ?: messageId)) }
+            blocks.toSortedMap().values.filter { completionReason == LocalModelCompletionReason.COMPLETED || it.type == "text" }
+                .forEach { add(it.toNative(json, requestId ?: messageId)) }
         }
         val canonicalBlocks = mutableListOf<LocalCanonicalContent>()
         nativeContent.forEach { raw ->
@@ -472,7 +488,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         }
         val ids = canonicalBlocks.filterIsInstance<LocalCanonicalContent.ToolCall>().map { it.id }
         if (ids.distinct().size != ids.size) throw protocolError("工具调用 id 重复", requestId)
-        if ((stopReason == "tool_use") != ids.isNotEmpty()) throw protocolError("stop_reason 与工具调用不一致", requestId)
+        if (completionReason == LocalModelCompletionReason.COMPLETED && (stopReason == "tool_use") != ids.isNotEmpty()) throw protocolError("stop_reason 与工具调用不一致", requestId)
         val replay = LocalModelReplayEnvelope(
             adapterId = LocalModelAdapterIds.ANTHROPIC_MESSAGES,
             routeFingerprint = route.fingerprint,
@@ -485,12 +501,14 @@ internal class AnthropicMessagesClient @Inject constructor(
         val canonical = LocalCanonicalMessage(
             role = LocalCanonicalRole.ASSISTANT,
             content = canonicalBlocks,
-            replay = replay,
+            replay = replay.takeIf { completionReason == LocalModelCompletionReason.COMPLETED },
+            completionReason = completionReason, rawStopReason = stopReason,
         )
         val promptTokens = safeAdd(inputTokens, safeAdd(cacheReadTokens, cacheCreationTokens))
         val toolCalls = canonicalBlocks.filterIsInstance<LocalCanonicalContent.ToolCall>()
             .map(LocalCanonicalContent.ToolCall::toLocalToolCall)
         return LocalModelReply(
+            completionReason = completionReason, rawStopReason = stopReason,
             message = LocalCanonicalModelCodec.toHistoryMessage(canonical),
             content = canonicalBlocks.filterIsInstance<LocalCanonicalContent.Text>()
                 .joinToString("") { it.text }.ifBlank { null },
@@ -502,7 +520,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                 cacheHitTokens = cacheReadTokens.coerceAtLeast(0L),
                 cacheMissTokens = safeAdd(inputTokens, cacheCreationTokens),
                 completionTokens = outputTokens.coerceAtLeast(0L),
-                reported = true,
+                reported = usageReported,
             ),
             requestId = requestId ?: messageId.orEmpty(),
             promptBreakdown = promptBreakdown,
@@ -664,12 +682,7 @@ internal class AnthropicMessagesClient @Inject constructor(
     private fun requireCompleteStopReason(reason: String?, requestId: String?) {
         when (reason) {
             "end_turn", "stop_sequence", "tool_use", "refusal" -> return
-            "max_tokens" -> throw LocalModelException(
-                code = "MODEL_OUTPUT_TRUNCATED",
-                message = "模型输出达到长度上限，回复未完整生成，请缩短任务后重试。",
-                retryable = false,
-                requestId = requestId,
-            )
+            "max_tokens" -> return
             else -> throw LocalModelException(
                 code = "MODEL_FINISH_$reason",
                 message = "Anthropic 模型未正常完成回复（$reason）",

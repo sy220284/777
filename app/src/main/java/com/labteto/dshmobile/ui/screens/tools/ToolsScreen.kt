@@ -378,11 +378,11 @@ class ToolsViewModel @Inject constructor(
         localTools.setSkillModelInvocable(id, enabled)
     }
 
-    fun connectHttp(serverId: String, endpoint: String) {
+    fun connectHttp(serverId: String, endpoint: String, bearer: String = "") {
         launchOperation {
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
             try {
-                localTools.connectHttp(serverId, endpoint)
+                localTools.connectHttpWithCredential(serverId, endpoint, bearer)
                 _state.value = _state.value.copy(
                     loading = false,
                     servers = localTools.servers(),
@@ -419,6 +419,25 @@ class ToolsViewModel @Inject constructor(
                     loading = false,
                     notice = null,
                     feedbackRes = localToolConnectionErrorMessageRes(error),
+                )
+            }
+        }
+    }
+
+    fun clearMcpCredential(serverId: String) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null)
+            try {
+                localTools.clearMcpCredential(serverId)
+                _state.value = _state.value.copy(
+                    loading = false,
+                    feedback = "MCP 凭据已清除；已连接的服务请断开并重新连接。",
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false, feedbackRes = localToolConnectionErrorMessageRes(error),
                 )
             }
         }
@@ -526,6 +545,7 @@ fun ToolsScreen(
     val toast = rememberSyToast()
     var serverId by remember { mutableStateOf("") }
     var endpoint by remember { mutableStateOf("") }
+    var mcpBearer by remember { mutableStateOf("") }
     var stdioCommand by remember { mutableStateOf("") }
     var stdioWorkingDirectory by remember { mutableStateOf("") }
     var githubToken by remember { mutableStateOf("") }
@@ -568,6 +588,7 @@ fun ToolsScreen(
             ToolsNotice.CONNECTED -> {
                 serverId = ""
                 endpoint = ""
+                mcpBearer = ""
                 stdioCommand = ""
                 stdioWorkingDirectory = ""
                 githubToken = ""
@@ -857,7 +878,7 @@ fun ToolsScreen(
         SyResponsiveSheet(
             title = stringResource(R.string.tools_external_services),
             subtitle = stringResource(R.string.tools_external_services_hint),
-            onDismiss = { showExternalConfig = false },
+            onDismiss = { showExternalConfig = false; mcpBearer = "" },
         ) {
             if (state.servers.isEmpty()) {
                 Text(
@@ -936,17 +957,35 @@ fun ToolsScreen(
                 singleLine = true,
                 shape = DsShapes.row,
             )
+            SyTextField(
+                value = mcpBearer,
+                onValueChange = { mcpBearer = it.take(4096) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("MCP Bearer Token（可选）") },
+                supportingText = { Text("加密保存、绑定该服务地址；留空使用已有凭据。远程认证需使用 HTTPS。") },
+                enabled = !state.loading,
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                shape = DsShapes.row,
+            )
             SyButton(
                 text = stringResource(
                     if (state.loading) R.string.tools_processing else R.string.tools_connect,
                 ),
                 onClick = {
-                    viewModel.connectHttp(serverId.trim(), endpoint.trim())
+                    viewModel.connectHttp(serverId.trim(), endpoint.trim(), mcpBearer)
                 },
                 enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
                 variant = SyButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
                 icon = SyEntryIcons.Connections,
+            )
+            SyButton(
+                text = "清除该 MCP 服务的认证信息",
+                onClick = { viewModel.clearMcpCredential(serverId.trim()) },
+                enabled = !state.loading && serverId.isNotBlank(),
+                variant = SyButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth(),
             )
             Text(
                 stringResource(R.string.tools_stdio_title),

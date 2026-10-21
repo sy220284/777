@@ -12,6 +12,8 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -116,6 +118,7 @@ class OpenAiResponsesClient @Inject constructor(
                     detail = "Responses API 返回了空响应",
                 )
                 var completedResponse: JsonObject? = null
+                var reportedUsage: JsonObject? = null
                 val streamed = OpenAiResponsesStreamSnapshot()
                                 // Response 生命周期由 withCancellableModelResponse 统一关闭；这里不要单独 use(reader)，
                 // 否则成功终态后的 reader.close() 异常仍可能把成功请求翻成失败。
@@ -134,6 +137,9 @@ class OpenAiResponsesClient @Inject constructor(
                                 },
                                 retryable = false,
                             )
+                        } catch (failure: java.io.IOException) {
+                            if (!(streamed.content.isNotBlank())) throw failure
+                            null
                         } ?: break
                         if (!line.startsWith("data:")) continue
                         val data = line.removePrefix("data:").trim()
@@ -147,6 +153,7 @@ class OpenAiResponsesClient @Inject constructor(
                                     cause = cause,
                                 )
                             }
+                        ((event["response"] as? JsonObject)?.get("usage") as? JsonObject)?.let { reportedUsage = it }
                         streamed.record(event)?.let { onDelta(it) }
                         when (event["type"]?.jsonPrimitive?.contentOrNull) {
                             "error" -> throw streamError(event, planSharing, requestId, retryAfterMs)
@@ -156,11 +163,12 @@ class OpenAiResponsesClient @Inject constructor(
                                 requestId = requestId,
                                 retryAfterMs = retryAfterMs,
                             )
-                            "response.incomplete" -> throw LocalModelException(
-                                code = "RESPONSES_INCOMPLETE",
-                                message = incompleteReason(event),
-                                retryable = false,
-                            )
+                            "response.incomplete" -> {
+                                val partial = event["response"] as? JsonObject
+                                    ?: throw responseProtocolError("incomplete 事件缺少 response")
+                                completedResponse = JsonObject(partial + ("status" to JsonPrimitive("incomplete")))
+                                break
+                            }
                             "response.completed" -> {
                                 completedResponse = event["response"] as? JsonObject
                                     ?: throw responseProtocolError("completed 事件缺少 response")
@@ -170,10 +178,14 @@ class OpenAiResponsesClient @Inject constructor(
                         }
                     }
                 }
-                val completed = completedResponse ?: throw streamInterruptedAfterAdmission(
-                    planSharing = planSharing,
-                    requestId = requestId,
-                    detail = "Responses API 流在 response.completed 前结束",
+                currentCoroutineContext().ensureActive()
+                val completed = completedResponse ?: if (streamed.content.isNotBlank()) buildJsonObject {
+                    put("status", "interrupted")
+                    reportedUsage?.let { put("usage", it) }
+                    put("id", requestId.orEmpty())
+                } else throw streamInterruptedAfterAdmission(
+                    planSharing = planSharing, requestId = requestId,
+                    detail = "Responses API 流在终态前结束",
                 )
                 parseCompleted(
                     response = streamed.settledResponse(completed),
@@ -616,7 +628,24 @@ class OpenAiResponsesClient @Inject constructor(
         streamedContent: String = "",
         streamedReasoning: String = "",
     ): LocalModelReply {
+        val rawStopReason = (response["incomplete_details"] as? JsonObject)?.get("reason")?.jsonPrimitive?.contentOrNull
+            ?: response["status"]?.jsonPrimitive?.contentOrNull
+        var completionReason = when (response["status"]?.jsonPrimitive?.contentOrNull) {
+            "incomplete" -> when (rawStopReason) {
+                "content_filter" -> LocalModelCompletionReason.REFUSED
+                "max_output_tokens" -> LocalModelCompletionReason.OUTPUT_LIMIT
+                else -> LocalModelCompletionReason.INTERRUPTED
+            }
+            "interrupted" -> LocalModelCompletionReason.INTERRUPTED
+            else -> LocalModelCompletionReason.COMPLETED
+        }
         val output = response["output"] as? JsonArray ?: JsonArray(emptyList())
+        if (output.any { item ->
+                val objectValue = item as? JsonObject
+                (objectValue?.get("content") as? JsonArray).orEmpty().any { part ->
+                    (part as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull == "refusal"
+                }
+            }) completionReason = LocalModelCompletionReason.REFUSED
         val content = StringBuilder()
         val reasoning = StringBuilder()
         val toolCalls = mutableListOf<LocalToolCall>()
@@ -632,7 +661,7 @@ class OpenAiResponsesClient @Inject constructor(
                         val visible = part as? JsonObject ?: return@partLoop
                         when (visible["type"]?.jsonPrimitive?.contentOrNull) {
                             "output_text" -> visible["text"]?.jsonPrimitive?.contentOrNull
-                            "refusal" -> visible["refusal"]?.jsonPrimitive?.contentOrNull
+                            "refusal" -> { completionReason = LocalModelCompletionReason.REFUSED; visible["refusal"]?.jsonPrimitive?.contentOrNull }
                             else -> null
                         }?.takeIf(String::isNotBlank)?.let { text ->
                             content.append(text)
@@ -661,6 +690,7 @@ class OpenAiResponsesClient @Inject constructor(
                     }
                 }
                 "function_call" -> {
+                    if (completionReason != LocalModelCompletionReason.COMPLETED) return@forEach
                     val callId = (obj["call_id"] as? JsonPrimitive)?.contentOrNull
                         ?.takeIf(String::isNotBlank)
                         ?: throw responseProtocolError("工具调用缺少 call_id")
@@ -693,6 +723,7 @@ class OpenAiResponsesClient @Inject constructor(
                 }
             }
         }
+        if (completionReason != LocalModelCompletionReason.COMPLETED) toolCalls.clear()
         val rawContent = content.toString().takeIf(String::isNotBlank)
             ?: streamedContent.takeIf(String::isNotBlank)
         val settledContent = if (webSources.isEmpty()) rawContent else buildString {
@@ -734,9 +765,10 @@ class OpenAiResponsesClient @Inject constructor(
                     }
                 })
             }
-            put(RESPONSES_OUTPUT_KEY, responseReplayOutput(output))
+            if (completionReason == LocalModelCompletionReason.COMPLETED) put(RESPONSES_OUTPUT_KEY, responseReplayOutput(output))
         }
         return LocalModelReply(
+            completionReason = completionReason, rawStopReason = rawStopReason,
             message = message,
             content = settledContent,
             reasoning = settledReasoning,

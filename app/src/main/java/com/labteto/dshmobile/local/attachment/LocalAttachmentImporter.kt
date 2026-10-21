@@ -46,11 +46,25 @@ internal class LocalAttachmentImporter(
             }
         }
 
+        val mediaType = resolver.getType(uri)?.lowercase() ?: "application/octet-stream"
+        val input = resolver.openInputStream(uri) ?: error("无法读取所选附件")
+        return importStream(input, displayName, mediaType)
+    }
+
+    /** MCP bytes enter the same validated, content-addressed attachment lifecycle as picked files. */
+    suspend fun importImageBytes(bytes: ByteArray, mediaType: String): LocalImportedAttachment {
+        require(mediaType.startsWith("image/") && bytes.isNotEmpty() &&
+            bytes.size <= LocalMessageMediaPolicy.MAX_GENERATED_IMAGE_BYTES) { "MCP 图片类型或大小无效" }
+        return importStream(bytes.inputStream(), "MCP图片", mediaType).also {
+            require(it.width != null && it.height != null) { "MCP 图片无法解码为可用图片附件" }
+        }
+    }
+
+    private suspend fun importStream(input: InputStream, displayName: String?, originalMediaType: String): LocalImportedAttachment {
         val safeName = (displayName ?: "attachment-${System.currentTimeMillis()}")
             .replace(Regex("[^A-Za-z0-9._()\\-\\u4e00-\\u9fff]"), "_")
             .take(120)
             .ifBlank { "attachment-${System.currentTimeMillis()}" }
-        val originalMediaType = resolver.getType(uri)?.lowercase() ?: "application/octet-stream"
         // SVG is text/XML and should stay a document attachment instead of entering the raster-image path.
         val declaredMediaType = if (
             originalMediaType == "image/svg+xml" ||
@@ -64,7 +78,6 @@ internal class LocalAttachmentImporter(
         val incoming = File(dir, ".incoming-${UUID.randomUUID()}")
         val digest = MessageDigest.getInstance("SHA-256")
 
-        val input = resolver.openInputStream(uri) ?: error("无法读取所选附件")
         try {
             currentCoroutineContext().ensureActive()
             input.use { source ->

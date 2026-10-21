@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
 import com.labteto.dshmobile.local.model.ModelStreamLineReader
 import com.labteto.dshmobile.local.model.DeepSeekChatRequestPolicy
 import com.labteto.dshmobile.local.model.LocalModelStreamProgressMonitor
+import com.labteto.dshmobile.local.model.LocalModelStreamWatchdog
 import com.labteto.dshmobile.local.model.ModelStreamLimitException
 import com.labteto.dshmobile.local.model.ModelStreamLimitKind
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
@@ -33,6 +34,8 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -249,8 +252,12 @@ class DeepSeekClient @Inject constructor(
             .header("Content-Type", "application/json")
             .post(payload.toString().toRequestBody(JSON_MEDIA).withModelAdmissionTracking(admissionTracker))
             .build()
+        // Official DeepSeek may wait ten minutes before first output. Keep transport reads
+        // alive while an independent monotonic watcher enforces the useful-progress limit.
+        val modelCall = (if (officialDeepSeek) modelHttp.newBuilder()
+            .readTimeout(12, TimeUnit.MINUTES).build() else modelHttp).newCall(request)
         try {
-            withCancellableModelResponse(modelHttp.newCall(request), admissionTracker) { response ->
+            withCancellableModelResponse(modelCall, admissionTracker) { response ->
                 if (!response.isSuccessful) {
                     val body = response.readModelBodyBounded()
                     val detail = providerErrorDetail(body, json)
@@ -281,8 +288,10 @@ class DeepSeekClient @Inject constructor(
                 val fallback = StringBuilder()
                 val toolCalls = linkedMapOf<Int, StreamToolCall>()
                 var streamUsage: JsonObject? = null
-                                var sawStreamData = false
+                var sawStreamData = false
                 var sawTerminalFrame = false
+                var rawStopReason: String? = null
+                var sawRefusal = false
                 val usefulProgress = LocalModelStreamProgressMonitor(
                     // DeepSeek officially keeps a pending inference alive for up to ten minutes.
                     // Allow a small scheduling margin before useful progress starts; after that,
@@ -291,6 +300,9 @@ class DeepSeekClient @Inject constructor(
                         if (officialDeepSeek) 11 else 8,
                     ),
                 )
+                val streamWatchdog = if (officialDeepSeek)
+                    LocalModelStreamWatchdog(usefulProgress, modelCall::cancel) else null
+                try {
                 // Response 统一由 withCancellableModelResponse 收尾，避免成功后 reader.close()
                 // 的连接异常覆盖已完成结果并触发重复请求。
                 val reader = ModelStreamLineReader(responseBody.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_MODEL_RESPONSE_BYTES)
@@ -308,6 +320,17 @@ class DeepSeekClient @Inject constructor(
                                 },
                                 retryable = false,
                             )
+                        } catch (failure: java.io.IOException) {
+                            if (streamWatchdog?.timedOut() == true && content.isBlank()) {
+                                throw modelPostAdmissionFailure(
+                                    code = "MODEL_STREAM_STALLED_AFTER_ADMISSION",
+                                    detail = "模型在规定时间内未生成有效进度",
+                                    requestId = requestId,
+                                    cause = failure,
+                                )
+                            }
+                            if (content.isBlank()) throw failure
+                            null
                         } ?: break
                         if (usefulProgress.isStalled()) {
                             throw modelPostAdmissionFailure(
@@ -351,10 +374,12 @@ class DeepSeekClient @Inject constructor(
                             ?.contentOrNull
                         if (!finishReason.isNullOrBlank()) {
                             requireCompleteFinishReason(finishReason)
+                            rawStopReason = finishReason
                             sawTerminalFrame = true
                         }
                         val delta = firstChoice?.get("delta") as? JsonObject
                         if (delta == null) continue
+                        if ((delta["refusal"] as? JsonPrimitive)?.contentOrNull?.isNotBlank() == true) sawRefusal = true
                         val rawTextDelta = assistantText(delta["content"]).orEmpty() +
                             (delta["refusal"] as? JsonPrimitive)?.contentOrNull.orEmpty()
                         providerContent.append(rawTextDelta)
@@ -442,14 +467,19 @@ class DeepSeekClient @Inject constructor(
                         throw streamProtocolError("模型响应无法解析", error)
                     }
                 }
-                if (!sawTerminalFrame) {
+                if ((!sawTerminalFrame || rawStopReason.isNullOrBlank()) && content.isBlank() && !sawRefusal) {
                     throw modelPostAdmissionFailure(
                         code = "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION",
                         detail = "模型流式响应提前结束，未收到完成标记",
                         requestId = requestId,
                     )
                 }
-                val accumulated = toolCalls.toSortedMap().values.toList()
+                currentCoroutineContext().ensureActive()
+                val completionReason = if (sawRefusal) com.labteto.dshmobile.local.model.LocalModelCompletionReason.REFUSED
+                    else if (!sawTerminalFrame || rawStopReason.isNullOrBlank()) com.labteto.dshmobile.local.model.LocalModelCompletionReason.INTERRUPTED
+                    else completionForFinishReason(rawStopReason)
+                val accumulated = if (completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED)
+                    toolCalls.toSortedMap().values.toList() else emptyList()
                 val calls = accumulated.map { call ->
                     validatedModelToolCall(
                         id = call.id?.let(::JsonPrimitive),
@@ -485,6 +515,7 @@ class DeepSeekClient @Inject constructor(
                     parseDeepSeekOpenAiUsage(buildJsonObject { put("usage", value) })
                 } ?: DeepSeekTokenUsage(reported = false)
                 LocalModelReply(
+                    completionReason = completionReason, rawStopReason = rawStopReason,
                     message = message,
                     providerContentForReplay = if (miniMaxSplitter != null && providerContent.toString() != content.toString())
                         JsonPrimitive(providerContent.toString()) else null,
@@ -495,6 +526,9 @@ class DeepSeekClient @Inject constructor(
                     requestId = requestId,
                     promptBreakdown = promptBreakdown,
                 )
+                } finally {
+                    streamWatchdog?.close()
+                }
             }
         } catch (error: LocalModelException) {
             throw error
@@ -543,10 +577,13 @@ class DeepSeekClient @Inject constructor(
         val root = json.parseToJsonElement(body).jsonObject
         LocalMiniMaxPolicy.requireSuccessfulResponse(root)
         val choice = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
-        (choice?.get("finish_reason") as? JsonPrimitive)?.contentOrNull
-            ?.takeIf(String::isNotBlank)?.let(::requireCompleteFinishReason)
+        val rawStopReason = (choice?.get("finish_reason") as? JsonPrimitive)?.contentOrNull
+        rawStopReason?.takeIf(String::isNotBlank)?.let(::requireCompleteFinishReason)
+        val initialCompletionReason = completionForFinishReason(rawStopReason)
         val message = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
             ?.get("message")?.jsonObject ?: error("模型响应缺少 choices[0].message")
+        val completionReason = if ((message["refusal"] as? JsonPrimitive)?.contentOrNull?.isNotBlank() == true)
+            com.labteto.dshmobile.local.model.LocalModelCompletionReason.REFUSED else initialCompletionReason
         val rawToolCalls = message["tool_calls"]?.takeUnless { it == JsonNull }?.let {
             it as? JsonArray ?: throw LocalModelException("MODEL_RESPONSE_PROTOCOL", "tool_calls 必须是数组", false)
         }.orEmpty()
@@ -565,7 +602,7 @@ class DeepSeekClient @Inject constructor(
         } else {
             message
         }
-        val calls = rawToolCalls.map { element ->
+        val calls = (if (completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) rawToolCalls else emptyList()).map { element ->
             val item = element as? JsonObject
                 ?: throw LocalModelException("MODEL_RESPONSE_PROTOCOL", "工具调用必须是对象", false)
             val function = item["function"] as? JsonObject
@@ -575,7 +612,9 @@ class DeepSeekClient @Inject constructor(
         requireUniqueModelToolCallIds(calls, "MODEL_RESPONSE_PROTOCOL")
         val usage = parseDeepSeekOpenAiUsage(root)
         return LocalModelReply(
-            message = normalizedMessage,
+            completionReason = completionReason, rawStopReason = rawStopReason,
+            message = if (completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) normalizedMessage
+                else JsonObject(normalizedMessage - "tool_calls"),
             content = assistantText(normalizedMessage["content"])
                 ?: (message["refusal"] as? JsonPrimitive)?.contentOrNull,
             providerContentForReplay = replayContent,
@@ -676,11 +715,10 @@ internal fun mergeModelMetadata(previous: JsonObject, next: JsonObject): JsonObj
     })
 
 private fun requireCompleteFinishReason(reason: String) {
-    if (reason in setOf("stop", "tool_calls", "function_call")) return
+    if (reason in setOf("stop", "tool_calls", "function_call", "length", "content_filter")) return
     throw LocalModelException(
-        code = if (reason == "length") "MODEL_OUTPUT_TRUNCATED" else "MODEL_FINISH_$reason",
-        message = if (reason == "length") "模型输出达到长度上限，回复未完整生成，请缩短任务后重试。"
-            else "模型未正常完成回复（$reason），请调整请求后重试。",
+        code = "MODEL_FINISH_$reason",
+        message = "模型未正常完成回复（$reason），请调整请求后重试。",
         retryable = false,
     )
 }
@@ -765,4 +803,10 @@ internal fun contextWindowExceeded(error: Throwable): Boolean {
         "输入过长",
         "token 数量超过",
     ).any(detail::contains)
+}
+
+private fun completionForFinishReason(reason: String?): com.labteto.dshmobile.local.model.LocalModelCompletionReason = when (reason) {
+    "length" -> com.labteto.dshmobile.local.model.LocalModelCompletionReason.OUTPUT_LIMIT
+    "content_filter" -> com.labteto.dshmobile.local.model.LocalModelCompletionReason.REFUSED
+    else -> com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED
 }

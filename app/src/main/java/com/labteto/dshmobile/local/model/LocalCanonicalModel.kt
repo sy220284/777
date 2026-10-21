@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.model
 
+// FEATURE_TREE: {"id":"shared.model.partial-terminal","path":"第二层｜共享运行能力 / 共享模型与路由 / 模型部分输出与终态结算","owner":"SHARED","entry":"toHistoryMessage","test":"app/src/test/java/com/labteto/dshmobile/local/model/LocalCanonicalModelCodecTest.kt#partialCompletionRoundTripsLocallyAndNeverLeaksOntoWire"}
+
 import com.labteto.dshmobile.local.LocalModelException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -54,6 +56,8 @@ data class LocalCanonicalMessage(
     val role: LocalCanonicalRole,
     val content: List<LocalCanonicalContent>,
     val replay: LocalModelReplayEnvelope? = null,
+    val completionReason: LocalModelCompletionReason = LocalModelCompletionReason.COMPLETED,
+    val rawStopReason: String? = null,
 )
 
 internal data class LocalCanonicalToolDefinition(
@@ -124,7 +128,11 @@ internal object LocalCanonicalModelCodec {
                 requireUniqueModelToolCallIds(historyCalls, "MODEL_HISTORY_INVALID")
             }
         }
-        return LocalCanonicalMessage(role, blocks, replay(source))
+        return LocalCanonicalMessage(role, blocks, replay(source),
+            source["_dsh_completion"]?.jsonPrimitive?.contentOrNull?.let { value ->
+                LocalModelCompletionReason.entries.firstOrNull { it.name == value } ?: LocalModelCompletionReason.INTERRUPTED
+            } ?: LocalModelCompletionReason.COMPLETED,
+            source["_dsh_stop_reason"]?.jsonPrimitive?.contentOrNull)
     }
 
     fun tools(source: JsonArray): List<LocalCanonicalToolDefinition> = source.mapIndexed { index, raw ->
@@ -225,7 +233,7 @@ internal object LocalCanonicalModelCodec {
         routeFingerprint: String,
     ): LocalModelReply {
         val parsed = message(reply.message)
-        if (isEmptyCanonicalAssistant(parsed)) {
+        if (reply.completionReason == LocalModelCompletionReason.COMPLETED && isEmptyCanonicalAssistant(parsed)) {
             throw LocalModelException(
                 "MODEL_EMPTY_RESPONSE", "模型没有返回正文或工具调用，本轮未写入会话历史；请稍后重试。", false,
                 requestId = reply.requestId,
@@ -241,7 +249,7 @@ internal object LocalCanonicalModelCodec {
         } else {
             null
         }
-        val canonical = parsed.copy(replay = replay)
+        val canonical = parsed.copy(replay = replay.takeIf { reply.completionReason == LocalModelCompletionReason.COMPLETED }, completionReason = reply.completionReason, rawStopReason = reply.rawStopReason)
         return reply.copy(
             message = toHistoryMessage(canonical),
             canonicalMessage = canonical,
@@ -280,6 +288,10 @@ internal object LocalCanonicalModelCodec {
         adapterId: String,
         routeFingerprint: String,
     ): JsonObject = buildJsonObject {
+        if (adapterId.isEmpty() && (message.completionReason != LocalModelCompletionReason.COMPLETED || message.rawStopReason != null)) {
+            put("_dsh_completion", message.completionReason.name)
+            message.rawStopReason?.let { put("_dsh_stop_reason", it) }
+        }
         put("role", when (message.role) {
             LocalCanonicalRole.SYSTEM -> "system"
             LocalCanonicalRole.DEVELOPER -> "developer"

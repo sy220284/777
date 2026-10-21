@@ -100,4 +100,14 @@ class VisionClientTest {
         val result = runCatching { client.parse(body) }
         assertTrue(result.isFailure)
     }
+    @Test
+    fun visionStringConsumerCannotErasePartialOrRefusedTerminal() {
+        listOf("length", "content_filter").forEach { reason ->
+            val failure = runCatching {
+                client.parse("""{"choices":[{"finish_reason":"$reason","message":{"content":"可见但未完成的分析"}}]}""")
+            }.exceptionOrNull() as? LocalModelException
+            assertEquals(if (reason == "length") "MODEL_OUTPUT_LIMIT" else "MODEL_REFUSED", failure?.code)
+        }
+    }
+
 }

@@ -13,7 +13,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.yield
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
@@ -31,6 +30,86 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class McpToolBridgePluginTest {
+    @Test fun resourceOnlyAndFullToolCapacityUseOneConnection() = runBlocking {
+        for (toolCount in listOf(0, 128)) {
+            var connections = 0
+            val methods = mutableListOf<String>()
+            val plugin = McpToolBridgePlugin(http = OkHttpClient(), json = Json, transportFactory = {
+                connections++
+                object : McpTransport {
+                    override suspend fun request(method: String, params: JsonObject): JsonObject {
+                        methods += method
+                        if (method == "tools/list" && toolCount == 0) return buildJsonObject {
+                            put("error", buildJsonObject { put("code", -32601); put("message", "Method not found") })
+                        }
+                        return buildJsonObject { put("result", buildJsonObject {
+                            if (method == "tools/list") put("tools", buildJsonArray {
+                                repeat(toolCount) { index -> add(buildJsonObject {
+                                    put("name", if (index == 0) "resources_list" else "tool_$index")
+                                    put("inputSchema", buildJsonObject { put("type", "object") })
+                                }) }
+                            }) else put("nextCursor", "page2")
+                        }) }
+                    }
+                    override fun close() = Unit
+                }
+            })
+            val registry = PluginRegistry()
+            registry.install(plugin)
+            plugin.connectHttpFromUi(registry.context, "resources", "https://example.com/mcp")
+            assertEquals(toolCount + 3, plugin.serverSnapshots().single().tools.size)
+            val resourceName = "mcp_resources_resources_list" + if (toolCount == 0) "" else "_1"
+            val result = registry.context.tools.execute(resourceName, buildJsonObject { put("cursor", "opaque-page") },
+                context = ToolContext(approval = { true }))
+            assertFalse(result.isError)
+            assertEquals("resources/list", methods.last())
+            assertTrue(result.richContent != null)
+            assertEquals(1, connections)
+            plugin.uninstall(registry.context)
+        }
+    }
+
+    @Test fun resourceToolsShareApprovalBindingAndDisconnectCancellation() = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<String>()
+        var resourceCalls = 0
+        val plugin = McpToolBridgePlugin(http = OkHttpClient(), json = Json, transportFactory = {
+            object : McpTransport {
+                override suspend fun request(method: String, params: JsonObject): JsonObject {
+                    if (method == "tools/list") return buildJsonObject {
+                        put("result", buildJsonObject { put("tools", buildJsonArray { }) })
+                    }
+                    assertEquals("resources/read", method)
+                    assertEquals("test:image", params["uri"]?.jsonPrimitive?.content)
+                    resourceCalls++
+                    entered.complete(Unit)
+                    try { awaitCancellation() } catch (error: kotlinx.coroutines.CancellationException) {
+                        cancelled.complete(error.message.orEmpty())
+                        throw error
+                    }
+                }
+                override fun close() = Unit
+            }
+        })
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        plugin.connectHttpFromUi(registry.context, "resource", "https://example.com/mcp")
+        val name = "mcp_resource_resources_read"
+        val input = buildJsonObject { put("uri", "test:image") }
+        assertTrue(registry.context.tools.execute(name, input).isError)
+        assertEquals(0, resourceCalls)
+        val call = async { registry.context.tools.execute(name, input, context = ToolContext(approval = { true })) }
+        entered.await()
+        withTimeout(2_000L) {
+            plugin.disconnectFromUi(registry.context, "resource")
+            assertEquals("MCP 连接所有者取消在途调用：resource", cancelled.await())
+            call.join()
+        }
+        assertTrue(call.isCancelled)
+        assertNull(registry.context.tools.get(name))
+        assertEquals(1, resourceCalls)
+    }
+
     @Test fun agentSubscriptionAndLifecycleToolUseTheSameOrderedOwnerCursor() = runBlocking {
         val plugin = McpToolBridgePlugin(http = OkHttpClient(), json = Json,
             transportFactory = {
@@ -97,15 +176,15 @@ class McpToolBridgePluginTest {
         registry.install(plugin)
         plugin.connectHttpFromUi(registry.context, "server", "https://example.com/mcp")
         val registered = plugin.serverSnapshots().single().tools
-        assertEquals(1, registered.size)
-        assertTrue(registry.context.tools.get(registered.single()) != null)
+        assertEquals(4, registered.size)
+        assertTrue(registered.all { registry.context.tools.get(it) != null })
         val revision = plugin.lifecycleRevisions.value
         termination.emit(java.io.IOException("stream ended without a request"))
         withTimeout(5_000) {
             while (plugin.lifecycleSnapshots().singleOrNull()?.lifecycle != McpServerLifecycle.FAILED) delay(10)
         }
         assertTrue(plugin.lifecycleRevisions.value > revision)
-        assertNull(registry.context.tools.get(registered.single()))
+        registered.forEach { assertNull(registry.context.tools.get(it)) }
         assertEquals(McpServerLifecycle.FAILED, plugin.lifecycleSnapshots().single().lifecycle)
         val changes = plugin.lifecycleEventsSince(null, -1L)
         assertEquals(listOf(
@@ -178,17 +257,15 @@ class McpToolBridgePluginTest {
     }
 
     @Test
-    fun oversizedToolResultIsBoundedBeforeEnteringHarnessHistory() {
+    fun largeToolResultPreservesMiddleBeforeDurableProjection() {
         val result = buildJsonObject {
-            put("content", "x".repeat(MAX_MCP_TOOL_RESULT_CHARS * 2))
+            put("content", "x".repeat(300_000) + "MIDDLE_SENTINEL" + "y".repeat(300_000))
         }
 
-        val bounded = boundedMcpToolResult(result)
+        val bounded = completeMcpToolResult(result)
 
-        assertTrue(bounded.length <= MAX_MCP_TOOL_RESULT_CHARS)
-        assertTrue(bounded.contains("已在进入会话历史前截断"))
-        assertTrue(bounded.startsWith("{"))
-        assertTrue(bounded.endsWith("}"))
+        assertEquals(result.toString(), bounded)
+        assertTrue(bounded.contains("MIDDLE_SENTINEL"))
     }
 
     @Test
@@ -436,6 +513,7 @@ class McpToolBridgePluginTest {
     fun disconnectWaitsForInflightCallBeforeClosingTransport() = runTest {
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<String>()
         var closed = false
         val transport = object : McpTransport {
             override suspend fun request(method: String, params: JsonObject): JsonObject =
@@ -452,12 +530,10 @@ class McpToolBridgePluginTest {
                     }
                     "tools/call" -> {
                         entered.complete(Unit)
-                        release.await()
-                        buildJsonObject {
-                            put("result", buildJsonObject {
-                                put("isError", false)
-                                put("content", buildJsonArray { })
-                            })
+                        try { awaitCancellation() } catch (error: kotlinx.coroutines.CancellationException) {
+                            cancelled.complete(error.message.orEmpty())
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { release.await() }
+                            throw error
                         }
                     }
                     else -> error("unexpected method $method")
@@ -488,7 +564,9 @@ class McpToolBridgePluginTest {
         val disconnect = async {
             plugin.disconnectFromUi(registry.context, "slow-server")
         }
-        yield()
+        withTimeout(2_000L) {
+            assertEquals("MCP 连接所有者取消在途调用：slow-server", cancelled.await())
+        }
 
         assertFalse(disconnect.isCompleted)
         assertFalse(closed)
@@ -498,8 +576,11 @@ class McpToolBridgePluginTest {
         )
 
         release.complete(Unit)
-        assertFalse(call.await().isError)
-        assertTrue(disconnect.await().contains("已断开"))
+        withTimeout(2_000L) {
+            call.join()
+            assertTrue(disconnect.await().contains("已断开"))
+        }
+        assertTrue(call.isCancelled)
         assertTrue(closed)
         assertNull(registry.context.tools.get("mcp_slow-server_slow"))
     }

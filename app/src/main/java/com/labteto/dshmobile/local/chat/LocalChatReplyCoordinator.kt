@@ -21,7 +21,6 @@ import com.labteto.dshmobile.local.chat.stripGroupSpeakerPrefix
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalCanonicalContent
 import com.labteto.dshmobile.local.model.LocalModelReply
-import com.labteto.dshmobile.local.model.OpenAiResponsesClient
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
 import javax.inject.Inject
@@ -76,6 +75,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
         val imageOnly = reply.content.isNullOrBlank() &&
             reply.canonicalMessage?.content?.any { it is LocalCanonicalContent.Image } == true
         if (
+            reply.completionReason != com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
             reply.toolCalls.isNotEmpty() ||
             imageOnly
@@ -114,6 +114,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             candidate: LocalModelReply,
             candidateUsageContext: TokenUsageContext,
         ): LocalModelReply = ChatReplyImmersionGuard.enforce(
+            isComplete = { candidate -> candidate.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED },
             persona = persona,
             initial = finalizeCandidate(candidate, candidateUsageContext),
             contentOf = { checked -> checked.content.orEmpty() },
@@ -134,6 +135,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
 
         val scene = snapshot.chat.chatContext.scene
         return ChatReplyContinuityGuard.enforce(
+            isComplete = { candidate -> candidate.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED },
             previous = scene,
             userMessage = userMessage,
             initial = finalizeImmersedCandidate(reply, usageContext),
@@ -212,12 +214,15 @@ internal class LocalChatReplyCoordinator @Inject constructor(
         usageContext: TokenUsageContext,
         retryRaw: suspend (repairHint: String) -> LocalModelReply,
         appendEvent: (type: String, data: JsonObject) -> Unit,
-    ): String {
-        val repairBudget = ChatReplyRepairBudget()
+    ): LocalModelReply {
+        if (rawReply.completionReason != com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) {
+            usageTracker.record(snapshot, rawReply, usageContext)
+            return rawReply
+        }
         suspend fun finalizeCandidate(
             candidate: LocalModelReply,
             candidateUsageContext: TokenUsageContext,
-        ): String {
+        ): LocalModelReply {
             val guarded = finalizeStyled(
                 snapshot = snapshot,
                 persona = persona,
@@ -232,55 +237,29 @@ internal class LocalChatReplyCoordinator @Inject constructor(
                     })
                 },
             )
-            return stripGroupSpeakerPrefix(
-                guarded.content.orEmpty(),
-                member.displayName,
-                persona.name,
-            )
+            if (guarded.completionReason != com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) return guarded
+            return ChatStyleGuard.withContent(guarded, stripGroupSpeakerPrefix(
+                guarded.content.orEmpty(), member.displayName, persona.name))
         }
 
-        suspend fun finalizeImmersedCandidate(
-            candidate: LocalModelReply,
-            candidateUsageContext: TokenUsageContext,
-        ): String = ChatReplyImmersionGuard.enforce(
-            persona = persona,
-            initial = finalizeCandidate(candidate, candidateUsageContext),
-            contentOf = { content -> content },
-            retry = { immersionHint ->
-                finalizeCandidate(
-                    repairBudget.repair(immersionHint, retryRaw),
-                    candidateUsageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
-                )
+        return finalizeGroupReplyCandidate(
+            persona = persona, initial = rawReply, scene = sharedContext.scene, input = input,
+            retryRaw = retryRaw,
+            finalizeCandidate = { candidate, repair ->
+                finalizeCandidate(candidate, if (repair) usageContext.copy(action = TokenUsageAction.CHAT_REPAIR) else usageContext)
             },
-            onEvent = { action, violations ->
+            onImmersionEvent = { action, violations ->
                 appendEvent("chat/immersion-guard", buildJsonObject {
-                    put("step", 100 + index)
-                    put("action", action)
+                    put("step", 100 + index); put("action", action)
                     put("group_gallery_id", member.galleryId)
                     put("violations", JsonArray(violations.map(::JsonPrimitive)))
                 })
             },
-        )
-
-        val scene = sharedContext.scene
-        return ChatReplyContinuityGuard.enforce(
-            previous = scene,
-            userMessage = input,
-            initial = finalizeImmersedCandidate(rawReply, usageContext),
-            mode = ChatContinuityGuardMode.GROUP,
-            contentOf = { content -> content },
-            retry = { repairHint ->
-                finalizeImmersedCandidate(
-                    repairBudget.repair(repairHint, retryRaw),
-                    usageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
-                )
-            },
-            onEvent = { action, check ->
+            onContinuityEvent = { action, check ->
                 appendEvent("chat/continuity-guard", buildJsonObject {
-                    put("step", 100 + index)
-                    put("action", action)
+                    put("step", 100 + index); put("action", action)
                     put("group_gallery_id", member.galleryId)
-                    put("location", scene.location)
+                    put("location", sharedContext.scene.location)
                     put("violation_count", check.violations.size)
                 })
             },
@@ -300,6 +279,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
         retryRaw: suspend (repairHint: String) -> LocalModelReply,
         appendEvent: (type: String, data: JsonObject) -> Unit,
     ): LocalModelReply {
+        if (initial.completionReason != com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) return initial
         val repairBudget = ChatReplyRepairBudget()
         suspend fun finalizeRawCandidate(
             candidate: LocalModelReply,
@@ -323,6 +303,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             candidate: LocalModelReply,
             candidateUsageContext: TokenUsageContext,
         ): LocalModelReply = ChatReplyImmersionGuard.enforce(
+            isComplete = { candidate -> candidate.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED },
             persona = persona,
             initial = candidate,
             contentOf = { checked -> checked.content.orEmpty().trim() },
@@ -347,6 +328,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             candidateUsageContext = usageContext,
         )
         return ChatReplyContinuityGuard.enforce(
+            isComplete = { candidate -> candidate.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED },
             previous = scene,
             userMessage = "",
             initial = immersedInitial,
@@ -407,24 +389,47 @@ internal fun preserveLocalChatReplyMediaForTextRepair(
         .orEmpty()
     if (originalImages.isEmpty()) return repaired
 
-    val merged = ChatStyleGuard.withContent(original, repaired.content.orEmpty())
-    val canonical = original.canonicalMessage?.copy(
-        content = buildList {
-            repaired.content?.takeIf(String::isNotBlank)
-                ?.let { add(LocalCanonicalContent.Text(it)) }
-            addAll(originalImages)
-        },
+    val repairedCanonical = repaired.canonicalMessage
+        ?: com.labteto.dshmobile.local.model.LocalCanonicalModelCodec.message(repaired.message)
+    val canonical = repairedCanonical.copy(
+        content = repairedCanonical.content.filterNot { it is LocalCanonicalContent.Image } + originalImages,
         replay = null,
+        completionReason = repaired.completionReason,
+        rawStopReason = repaired.rawStopReason,
     )
-    return merged.copy(
-        message = JsonObject(merged.message - OpenAiResponsesClient.RESPONSES_OUTPUT_KEY),
+    return repaired.copy(
+        message = com.labteto.dshmobile.local.model.LocalCanonicalModelCodec.toHistoryMessage(canonical),
         canonicalMessage = canonical,
-        reasoning = repaired.reasoning,
-        toolCalls = repaired.toolCalls,
-        usage = repaired.usage,
-        requestId = repaired.requestId,
-        promptBreakdown = repaired.promptBreakdown,
-        routeIdentity = repaired.routeIdentity,
-        promptCacheDiagnostic = repaired.promptCacheDiagnostic,
+        providerContentForReplay = null,
+    )
+}
+
+/** The production group candidate pipeline keeps the selected provider result intact. */
+internal suspend fun finalizeGroupReplyCandidate(
+    persona: PersonaProfile,
+    initial: LocalModelReply,
+    scene: ChatSceneState,
+    input: String,
+    retryRaw: suspend (String) -> LocalModelReply,
+    finalizeCandidate: suspend (LocalModelReply, Boolean) -> LocalModelReply,
+    onImmersionEvent: (String, List<String>) -> Unit = { _, _ -> },
+    onContinuityEvent: (String, ChatContinuityCheck) -> Unit = { _, _ -> },
+): LocalModelReply {
+    val repairBudget = ChatReplyRepairBudget()
+    suspend fun immersed(candidate: LocalModelReply, repair: Boolean): LocalModelReply =
+        ChatReplyImmersionGuard.enforce(
+            persona = persona, initial = finalizeCandidate(candidate, repair),
+            contentOf = { it.content.orEmpty() },
+            isComplete = { it.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED },
+            retry = { hint -> finalizeCandidate(repairBudget.repair(hint, retryRaw), true) },
+            onEvent = onImmersionEvent,
+        )
+    return ChatReplyContinuityGuard.enforce(
+        previous = scene, userMessage = input, initial = immersed(initial, false),
+        mode = ChatContinuityGuardMode.GROUP,
+        contentOf = { it.content.orEmpty() },
+        isComplete = { it.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED },
+        retry = { hint -> immersed(repairBudget.repair(hint, retryRaw), true) },
+        onEvent = onContinuityEvent,
     )
 }

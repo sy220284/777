@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.chat
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.decodeTranscriptMessages
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -23,6 +24,7 @@ internal fun recoverAutomationChatOutput(
     var beforeSequenceExclusive = Long.MAX_VALUE
     var turnEnded = false
     var recovered: Pair<Long, String>? = null
+    var completionReason = "COMPLETED"
     while (true) {
         val page = eventLog.pageBeforeNewestFirst(
             sequenceExclusive = beforeSequenceExclusive,
@@ -41,7 +43,10 @@ internal fun recoverAutomationChatOutput(
                             .lastOrNull { message ->
                                 message.role == "assistant" && message.proactive
                             }
-                            ?.let { message -> recovered = event.sequence to message.content }
+                            ?.let { message ->
+                                recovered = event.sequence to message.content
+                                completionReason = event.data["_dsh_completion"]?.jsonPrimitive?.contentOrNull ?: "COMPLETED"
+                            }
                     }
                 }
             }
@@ -55,7 +60,7 @@ internal fun recoverAutomationChatOutput(
     val output = recovered?.second ?: return null
     if (!turnEnded) {
         eventLog.append("turn/end", buildJsonObject {
-            put("reason", "completed")
+            put("reason", completionReason.lowercase())
             put("steps", 1)
             put("mode", "chat")
             put("automation", true)
@@ -63,6 +68,8 @@ internal fun recoverAutomationChatOutput(
             put("recovered", true)
         })
     }
+    if (completionReason != "COMPLETED") throw com.labteto.dshmobile.local.LocalModelException(
+        "MODEL_PARTIAL_RESPONSE", "主动消息未完成（$completionReason），已保留部分正文，未重发原请求。", false)
     return output
 }
 

@@ -18,9 +18,31 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalSessionTranscriptProjectionTest {
+    @Test
+    fun partialVisibleCheckpointNeverBecomesModelHistory() {
+        val partial = message("interrupted-stream:one", "assistant", "【部分回复 · 本轮未完成】\\n半段", 5L)
+        val event = LocalSessionEventLog.Event(
+            sequence = 8L, type = "assistant/partial-visible", createdAt = 5L,
+            data = buildJsonObject {
+                put("request_uid", "one")
+                put("completion_reason", "INTERRUPTED")
+                put("transcript", encodeTranscriptMessages(listOf(partial)))
+            },
+        )
+        val visible = projectSessionTranscriptTail(emptyList(), listOf(event), -1L)
+        assertEquals(listOf(partial), visible.messages)
+        val model = restoreLocalModelHistory(
+            events = listOf(event),
+            legacyFallback = emptyList(),
+            codec = ModelHistoryCheckpointCodec(),
+        )
+        assertTrue(model.messages.isEmpty())
+    }
+
     @Test
     fun regeneratedAnswerReplacesOldBubbleAndOldModelReplyOnRestart() {
         val old = message("old", "assistant", "原回答", 1L)

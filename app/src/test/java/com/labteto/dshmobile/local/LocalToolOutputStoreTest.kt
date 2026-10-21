@@ -12,6 +12,19 @@ import org.junit.rules.TemporaryFolder
 
 class LocalToolOutputStoreTest {
     @Test
+    fun acceptedMcpEnvelopeKeepsReadableMiddleAfterPreviewProjection() {
+        val store = LocalToolOutputStore(temporary.newFolder("mcp-full"))
+        val raw = "{\"content\":\"" + "a".repeat(300_000) + "MCP_MIDDLE_SENTINEL" + "z".repeat(300_000) + "\"}"
+        com.labteto.dshmobile.local.model.projectRecoverableToolResult(
+            value = raw, retention = com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE,
+            usageMode = LocalUsageMode.WORK, callId = "mcp-call", requireStored = true,
+            spill = { id, content -> store.store("original-session", id, content) != null },
+        )
+        assertTrue(store.read("original-session", "mcp-call", startByte = 300_010).contains("MCP_MIDDLE_SENTINEL"))
+        assertFalse(store.read("other-session", "mcp-call").contains("MCP_MIDDLE_SENTINEL"))
+    }
+
+    @Test
     fun unsuccessfulDirectoryDeletionMustRemainAnError() {
         val root = temporary.newFolder("delete-error")
         val store = LocalToolOutputStore(root)

@@ -1322,6 +1322,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         ) {
                             WorkTimelineStepRow(
                                 message = transcriptItem.message,
+                                workspacePath = state.workspacePath,
                                 repeatCount = transcriptItem.repeatCount,
                                 activity = transcriptItem.activity,
                                 groupedMessages = transcriptItem.groupedMessages,

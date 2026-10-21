@@ -232,6 +232,7 @@ internal class LocalAgentRunCoordinator(
                     LocalAgentRunPhase.ASSISTANT_OBSERVED,
                     step = event.step,
                     toolCallCount = event.toolCalls.size,
+                    completionReason = event.completionReason.name,
                 )
                 // AgentTurnEngine reports the model-declared call here. Actual executor admission is
                 // persisted as tool/execution-started by the execution coordinator.
@@ -267,7 +268,7 @@ internal class LocalAgentRunCoordinator(
                     context,
                     LocalAgentRunCheckpointStatus.FAILED,
                     LocalAgentRunPhase.TURN_FINISHED,
-                    reason = event.reason,
+                    reason = event.completionReason?.name ?: event.reason,
                 )
                 is AgentEvent.TurnCancelled -> append(
                     context,
@@ -402,7 +403,8 @@ internal class LocalAgentRunCoordinator(
         val toolCallCount = data["tool_call_count"]?.jsonPrimitive?.intOrNull
         if (
             phase == LocalAgentRunPhase.ASSISTANT_OBSERVED.name.lowercase() &&
-            toolCallCount == 0
+            toolCallCount == 0 &&
+            (data["completion_reason"]?.jsonPrimitive?.contentOrNull ?: "COMPLETED") == "COMPLETED"
         ) {
             // The user-visible final answer is already durable. SessionRecovery only needs to close
             // the interrupted bookkeeping tail; replaying the model would duplicate the answer.
@@ -489,6 +491,7 @@ internal class LocalAgentRunCoordinator(
         toolName: String? = null,
         reason: String? = null,
         toolCallCount: Int? = null,
+        completionReason: String? = null,
         sideEffect: String? = null,
         answer: String? = null,
     ) {
@@ -534,6 +537,7 @@ internal class LocalAgentRunCoordinator(
                 callId?.let { put("call_id", it) }
                 toolName?.let { put("tool_name", it) }
                 toolCallCount?.let { put("tool_call_count", it) }
+                completionReason?.let { put("completion_reason", it) }
                 sideEffect?.takeIf(String::isNotBlank)?.let { put("side_effect", it) }
                 answer?.let { put("answer", it.take(MAX_RECOVERY_OUTPUT_CHARS)) }
                 reason?.takeIf(String::isNotBlank)?.let { put("reason", it.take(2_000)) }
@@ -581,6 +585,7 @@ internal class LocalAgentRunCoordinator(
         val turnStart = log.latest("turn/start") ?: return false
         val assistant = log.latest("assistant/message") ?: return false
         if (assistant.sequence <= turnStart.sequence) return false
+        if ((assistant.data["_dsh_completion"]?.jsonPrimitive?.contentOrNull ?: "COMPLETED") != "COMPLETED") return false
         val genericToolCalls = assistant.data[LOCAL_MODEL_TOOL_CALLS_EVENT_KEY] as? JsonArray
         if (genericToolCalls != null) return genericToolCalls.isEmpty()
         val legacyToolCalls = assistant.data["tool_calls"] as? JsonArray

@@ -8,7 +8,7 @@ import kotlinx.serialization.json.contentOrNull
 /**
  * A typed read-only projector for Work's durable taskgraph/start and taskgraph/end facts.
  * It never schedules work or claims success. A started graph without a matching
- * terminal fact is unresolved after a crash, and must not be replayed automatically.
+ * terminal fact is unresolved after a crash; the admitted Work root slice decides recovery.
  */
 internal class LocalWorkTaskGraphRecoveryLedger {
     internal data class OpenGraph(
@@ -16,6 +16,7 @@ internal class LocalWorkTaskGraphRecoveryLedger {
         val goalId: String,
         val goalFingerprint: String?,
         val graphExecutionId: String? = null,
+        val plan: JsonObject? = null,
         val lastNodeStages: Map<String, String> = emptyMap(),
     )
 
@@ -32,15 +33,12 @@ internal class LocalWorkTaskGraphRecoveryLedger {
             ?.takeIf(String::isNotBlank)
         when (type) {
             "taskgraph/start" -> {
-                // Graph-less legacy events and user-independent workflow sessions
-                // cannot be confused with an existing Work Goal.
-                if (goalId.isNotBlank()) {
-                    open.getOrPut(key) { mutableListOf() } += OpenGraph(
-                        graphId, goalId,
-                        (data["goal_fingerprint"] as? JsonPrimitive)?.contentOrNull,
-                        graphExecutionId = executionId,
-                    )
-                }
+                open.getOrPut(key) { mutableListOf() } += OpenGraph(
+                    graphId, goalId,
+                    (data["goal_fingerprint"] as? JsonPrimitive)?.contentOrNull,
+                    graphExecutionId = executionId,
+                    plan = data["plan"] as? JsonObject,
+                )
             }
             "taskgraph/progress" -> {
                 val candidates = open[key] ?: return
@@ -77,6 +75,8 @@ internal class LocalWorkTaskGraphRecoveryLedger {
         }
     }
 
+    fun unresolved(): List<OpenGraph> = open.values.flatMap { it }
+
     fun unresolvedForGoal(goalId: String): List<OpenGraph> =
         open.filterKeys { it.second == goalId }.values.flatMap { it }
 }
@@ -93,4 +93,25 @@ internal fun hasUnsettledWorkGoalTaskGraphs(
         ledger.observe(event.type, event.data)
     }
     return ledger.unresolvedForGoal(goal.id).isNotEmpty()
+}
+
+/** A disposable, read-only incremental fold of the authoritative Session log. */
+internal class LocalWorkOpenGraphProjection {
+    private var generation = -1L
+    private var throughSequence = -1L
+    private var ledger = LocalWorkTaskGraphRecoveryLedger()
+
+    fun unresolved(log: LocalSessionEventLog): List<LocalWorkTaskGraphRecoveryLedger.OpenGraph> {
+        val latest = log.latestSequence()
+        if (generation != log.resetGeneration || latest < throughSequence) {
+            generation = log.resetGeneration
+            throughSequence = -1L
+            ledger = LocalWorkTaskGraphRecoveryLedger()
+        }
+        log.forEachAfter(throughSequence) { event ->
+            ledger.observe(event.type, event.data)
+            throughSequence = event.sequence
+        }
+        return ledger.unresolved()
+    }
 }

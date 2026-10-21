@@ -409,6 +409,25 @@
         }
       ],
       "conclusion": "原 UI 3.0 的场景包兼容检查已退役；目前由 V6 原生 LocalFeatureCatalog 确认每个功能路由与模块归属，已有源码与单测。真实页面操作、系统返回和导航恢复需独立设备验证。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 真实成员身份与窄授权协作（未合并）",
+      "kind": "unmerged_member_collaboration",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+          "symbol": "executeMember"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt",
+          "method": "trustedMembersSendPeerLeadAndReadOwnDurableMailbox"
+        }
+      ],
+      "conclusion": "未合并：复用Team Owner与持久Jobs，真实运行身份约束成员消息和任务CAS；测试源码存在，按用户要求未执行工具链。"
     }
   ]
 }

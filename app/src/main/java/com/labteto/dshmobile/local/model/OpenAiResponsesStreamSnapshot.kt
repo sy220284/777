@@ -11,6 +11,7 @@ import kotlinx.serialization.json.intOrNull
 internal class OpenAiResponsesStreamSnapshot {
     private val text = sortedMapOf<Pair<Int, Int>, StringBuilder>(compareBy({ it.first }, { it.second }))
     private val reasoning = sortedMapOf<Pair<Int, Int>, StringBuilder>(compareBy({ it.first }, { it.second }))
+    private val refusals = mutableSetOf<Pair<Int, Int>>()
     private val items = sortedMapOf<Int, JsonObject>()
 
     val content: String get() = text.values.joinToString("")
@@ -25,6 +26,7 @@ internal class OpenAiResponsesStreamSnapshot {
         return when (type) {
             "response.output_text.delta", "response.refusal.delta" -> {
                 val delta = event.string("delta") ?: return null
+                if (type == "response.refusal.delta") refusals += key
                 text.getOrPut(key, ::StringBuilder).append(delta)
                 LocalModelDelta(content = delta)
             }
@@ -34,7 +36,7 @@ internal class OpenAiResponsesStreamSnapshot {
                 LocalModelDelta(reasoning = delta)
             }
             "response.output_text.done" -> { replace(text, key, event.string("text")); null }
-            "response.refusal.done" -> { replace(text, key, event.string("refusal")); null }
+            "response.refusal.done" -> { refusals += key; replace(text, key, event.string("refusal")); null }
             "response.reasoning_text.done", "response.reasoning_summary_text.done" -> {
                 replace(reasoning, key, event.string("text")); null
             }
@@ -56,20 +58,42 @@ internal class OpenAiResponsesStreamSnapshot {
         }
     }
 
-    fun settledResponse(response: JsonObject): JsonObject =
-        if ((response["output"] as? JsonArray).isNullOrEmpty() && items.isNotEmpty()) {
-            JsonObject(response + ("output" to JsonArray(items.values.toList())))
-        } else response
+    fun settledResponse(response: JsonObject): JsonObject {
+        val terminal = (response["output"] as? JsonArray).orEmpty()
+        val indexes = (terminal.indices + items.keys + text.keys.map { it.first }).distinct().sorted()
+        val output = indexes.map { index ->
+            val native = terminal.getOrNull(index) as? JsonObject ?: items[index]
+            val parts = (native?.get("content") as? JsonArray).orEmpty().toMutableList()
+            text.filterKeys { it.first == index }.forEach { (key, accumulated) ->
+                while (parts.size <= key.second) parts += JsonObject(emptyMap())
+                val part = parts[key.second] as? JsonObject ?: JsonObject(emptyMap())
+                val field = if (part.string("type") == "refusal" || key in refusals) "refusal" else "text"
+                val finalText = part.string(field)
+                // A shorter terminal prefix must not erase accepted streamed text.
+                val settled = finalText?.takeUnless { accumulated.startsWith(it) && accumulated.length > it.length }
+                    ?: accumulated.toString()
+                parts[key.second] = JsonObject(part + mapOf("type" to JsonPrimitive(if (field == "refusal") "refusal" else "output_text"),
+                    field to JsonPrimitive(settled)))
+            }
+            if (parts.isEmpty()) native ?: JsonObject(emptyMap()) else JsonObject(
+                (native ?: JsonObject(mapOf("type" to JsonPrimitive("message"), "role" to JsonPrimitive("assistant")))) +
+                    ("content" to JsonArray(parts)))
+        }
+        return JsonObject(response + ("output" to JsonArray(output)))
+    }
 
     private fun recordPart(outputIndex: Int, index: Int, part: JsonObject) {
         when (part.string("type")) {
             "output_text" -> replace(text, outputIndex to index, part.string("text"))
-            "refusal" -> replace(text, outputIndex to index, part.string("refusal"))
+            "refusal" -> { refusals += outputIndex to index; replace(text, outputIndex to index, part.string("refusal")) }
         }
     }
 
     private fun replace(target: MutableMap<Pair<Int, Int>, StringBuilder>, key: Pair<Int, Int>, value: String?) {
-        if (value != null) target[key] = StringBuilder(value)
+        if (value == null) return
+        val accepted = target[key]
+        if (accepted != null && accepted.length > value.length && accepted.startsWith(value)) return
+        target[key] = StringBuilder(value)
     }
 
     private fun JsonObject.string(key: String): String? {

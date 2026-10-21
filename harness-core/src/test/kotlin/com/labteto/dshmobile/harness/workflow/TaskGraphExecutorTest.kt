@@ -267,4 +267,50 @@ class TaskGraphExecutorTest {
         assertEquals(3, steps.count { it.stage == "验收中" })
         assertEquals(3, steps.maxOf { it.completed })
     }
+    @Test fun recoveredNodesAreNotExecutedAndTheirFullOutputFeedsDependents() = runTest {
+        val nodes = listOf(TaskGraphNode("a", "research"), TaskGraphNode("b", "summarize", listOf("a")))
+        val saved = TaskGraphNodeResult(nodes[0], 0, TaskGraphOutcome.COMPLETED, "durable output")
+        val called = mutableListOf<String>()
+        val results = graph.run(nodes, initialResults = mapOf("a" to saved)) { context, _ ->
+            called += context.node.id
+            assertEquals("durable output", context.dependencyOutputs["a"])
+            "summary"
+        }
+        assertEquals(listOf("b"), called)
+        assertEquals(saved, results[0])
+    }
+
+    @Test fun recoveredDescendantWithoutItsAcceptedDependencyIsRejectedBeforeExecution() = runTest {
+        val nodes = listOf(TaskGraphNode("a", "research"), TaskGraphNode("b", "summarize", listOf("a")))
+        var calls = 0
+        val error = runCatching {
+            graph.run(nodes, initialResults = mapOf("b" to TaskGraphNodeResult(nodes[1], 1,
+                TaskGraphOutcome.COMPLETED, "summary"))) { _, _ -> calls++; "output" }
+        }.exceptionOrNull()
+        assertTrue(error is IllegalArgumentException)
+        assertEquals(0, calls)
+    }
+
+    @Test fun persistentNodeFailureBlocksDependentButIndependentBranchCompletes() = runTest {
+        val nodes = listOf(TaskGraphNode("a", "failed job"), TaskGraphNode("b", "dependent", listOf("a")),
+            TaskGraphNode("c", "independent"))
+        val results = graph.run(nodes) { context, _ ->
+            if (context.node.id == "a") throw TaskGraphNodeExecutionException("durable job failed")
+            check(context.node.id != "b")
+            "done"
+        }
+        assertEquals(listOf(TaskGraphOutcome.FAILED, TaskGraphOutcome.BLOCKED, TaskGraphOutcome.COMPLETED), results.map { it.outcome })
+    }
+
+    @Test fun cancellationNeverCommitsAcceptanceEvidence() = runTest {
+        var accepted = false
+        val failure = runCatching {
+            graph.run(listOf(TaskGraphNode("a", "cancel")), onResult = { _, _ -> accepted = true }) { _, _ ->
+                throw CancellationException("cancelled")
+            }
+        }.exceptionOrNull()
+        assertTrue(failure is CancellationException)
+        assertFalse(accepted)
+    }
+
 }

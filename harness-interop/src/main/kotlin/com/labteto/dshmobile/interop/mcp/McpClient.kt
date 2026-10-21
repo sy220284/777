@@ -30,6 +30,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import okhttp3.Call
 import okhttp3.Callback
@@ -47,6 +48,8 @@ class McpHttpException(
     val statusCode: Int,
     val responseBody: String,
 ) : IllegalStateException("MCP HTTP $statusCode：${responseBody.take(2_000)}")
+
+class McpRpcException(val code: Int) : IllegalStateException("MCP RPC 错误（$code）")
 
 data class McpToolDefinition(
     val name: String,
@@ -69,16 +72,22 @@ class McpClient(
 ) : Closeable {
     val terminalEvents: Flow<Throwable>? get() =
         (transport as? McpTerminationSource)?.terminalEvents
-    suspend fun listTools(): List<McpToolDefinition> {
+    suspend fun listTools(allowUnsupported: Boolean = false): List<McpToolDefinition> {
         val tools = mutableListOf<McpToolDefinition>()
         val names = mutableSetOf<String>()
         val cursors = mutableSetOf<String>()
         var cursor: String? = null
         var definitionBytes = 0
         repeat(MAX_TOOL_PAGES) {
-            val result = transport.request("tools/list", buildJsonObject {
-                cursor?.let { put("cursor", it) }
-            }).requireResult()
+            val result = try {
+                transport.request("tools/list", buildJsonObject {
+                    cursor?.let { put("cursor", it) }
+                }).requireResult()
+            } catch (error: McpRpcException) {
+                // Only first-page JSON-RPC method-not-found proves an absent tool capability.
+                if (allowUnsupported && cursor == null && error.code == -32601) return emptyList()
+                throw error
+            }
             result["tools"]?.jsonArray.orEmpty().forEach { element ->
                 val tool = element.jsonObject
                 val name = tool["name"]?.jsonPrimitive?.content ?: error("MCP 工具缺少 name")
@@ -114,6 +123,26 @@ class McpClient(
             },
         ).requireResult()
 
+    /** One page per call: preserve opaque cursors and all server extension fields. */
+    // FEATURE_TREE: {"id":"shared.tools.mcp-resources","path":"第二层｜共享运行能力 / 共享工具执行 / MCP资源分页与完整内容","owner":"TOOLS","entry":"listResources","test":"harness-interop/src/test/kotlin/com/labteto/dshmobile/interop/mcp/McpClientTest.kt#resourceRequestsPreservePagesAndContents"}
+    suspend fun listResources(cursor: String? = null): JsonObject =
+        transport.request("resources/list", pageParams(cursor)).requireResult()
+
+    suspend fun listResourceTemplates(cursor: String? = null): JsonObject =
+        transport.request("resources/templates/list", pageParams(cursor)).requireResult()
+
+    suspend fun readResource(uri: String): JsonObject {
+        require(uri.isNotBlank()) { "MCP 资源 URI 不能为空" }
+        return transport.request("resources/read", buildJsonObject { put("uri", uri) }).requireResult()
+    }
+
+    private fun pageParams(cursor: String?): JsonObject = buildJsonObject {
+        cursor?.let {
+            require(it.isNotEmpty()) { "MCP 分页游标不能为空" }
+            put("cursor", it)
+        }
+    }
+
     /** MCP-standard read-only liveness request. Success does not grant any tool authorization. */
     suspend fun ping() {
         transport.request("ping").requireResult()
@@ -132,7 +161,11 @@ class McpClient(
     }
 
     private fun JsonObject.requireResult(): JsonObject {
-        this["error"]?.let { error -> throw IllegalStateException("MCP 返回错误：$error") }
+        this["error"]?.let { error ->
+            val code = (error as? JsonObject)?.get("code")?.jsonPrimitive?.intOrNull
+                ?: throw IllegalStateException("MCP 错误响应缺少有效 code")
+            throw McpRpcException(code)
+        }
         return this["result"]?.jsonObject ?: error("MCP 响应缺少 result")
     }
 }
@@ -377,7 +410,10 @@ internal suspend fun <T> Call.executeCancellable(block: (Response) -> T): T =
         enqueue(
             object : Callback {
                 override fun onFailure(call: Call, error: IOException) {
-                    if (continuation.isActive) continuation.resumeWithException(error)
+                    // OkHttp wraps an interceptor's CancellationException in IOException
+                    // and attaches the original as suppressed. Preserve cancellation semantics.
+                    val cancellation = error.suppressed.firstOrNull { it is CancellationException }
+                    if (continuation.isActive) continuation.resumeWithException(cancellation ?: error)
                 }
 
                 override fun onResponse(call: Call, response: Response) {

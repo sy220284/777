@@ -69,6 +69,7 @@ internal fun guardWorkCompletionDelivery(
     eventLog: LocalSessionEventLog,
     workspaceRoot: java.io.File? = null,
 ): LocalModelReply {
+    if (reply.completionReason != com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) return reply
     if (state.usageMode != LocalUsageMode.WORK || reply.toolCalls.isNotEmpty()) return reply
     val original = reply.content?.takeIf(String::isNotBlank) ?: return reply
     val evidence = localWorkCompletionEvidence(

@@ -26,6 +26,7 @@ import com.labteto.dshmobile.local.model.migrateOfficialClaudeModel
 import com.labteto.dshmobile.local.model.workSystemPrompt
 import com.labteto.dshmobile.local.runtime.LOCAL_PROJECT_ID
 import com.labteto.dshmobile.local.chat.projectChatSessionControls
+import com.labteto.dshmobile.local.chat.recoverInterruptedChatReply
 import com.labteto.dshmobile.local.work.LocalForegroundRecoveryCoordinator
 import com.labteto.dshmobile.local.work.projectWorkSessionControls
 import com.labteto.dshmobile.local.work.LocalWorkTimelineMemoryRecovery
@@ -142,6 +143,15 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             ).sequence
         } else {
             null
+        }
+        // On a cold restart recover the most recent stranded Chat text before projection.
+        // The recovered UI row is not a model-history or tool-success record.
+        if (stored.usageMode == LocalUsageMode.CHAT &&
+            !runtimeStateStore.foregroundRunHandle.hasLiveJob()) {
+            runCatching { recoverInterruptedChatReply(log) }.onFailure { error ->
+                com.labteto.dshmobile.observability.AppLog.warn(
+                    "SessionRestore", "chat_partial_checkpoint_recovery_failed", error)
+            }
         }
         val projectionCursor = projectionReplayCursor(
             snapshot = stored,

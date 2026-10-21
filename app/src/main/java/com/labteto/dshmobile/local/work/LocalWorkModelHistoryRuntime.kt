@@ -114,7 +114,7 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
                 put("role", "user")
                 put("content", input.content)
             })
-            workMemory.captureAutoMemoryDirective(
+            if (input.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.USER) workMemory.captureAutoMemoryDirective(
                 text = input.memoryInput,
                 sourceMessageId = input.id,
                 binding = binding,

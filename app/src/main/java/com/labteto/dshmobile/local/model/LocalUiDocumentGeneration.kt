@@ -101,6 +101,7 @@ internal class LocalUiDocumentGeneration @Inject constructor(
                             promptBreakdown = reply.promptBreakdown, route = reply.routeIdentity)
                     }
                     if (!isCurrent(command)) return@coroutineScope UiDocumentReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                    requireCompletedModelReply(reply)
                     val raw = reply.content.orEmpty()
                     val parsed = LocalUiDocumentCodec.decode(raw, source, budget, generationScenes, null)
                     if (parsed.isFailure) return@coroutineScope UiDocumentReceipt.Fallback(raw, "ui_document_unavailable")

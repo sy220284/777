@@ -30,6 +30,52 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class McpClientTest {
+    @Test fun optionalToolDiscoveryDoesNotHideAuthenticationOrProtocolFailure() = runTest {
+        for (code in listOf(-32601, -32602, -32000)) {
+            val client = McpClient(object : McpTransport {
+                override suspend fun request(method: String, params: JsonObject) = buildJsonObject {
+                    put("error", buildJsonObject { put("code", code) })
+                }
+                override fun close() = Unit
+            })
+            if (code == -32601) assertTrue(client.listTools(allowUnsupported = true).isEmpty())
+            else {
+                try {
+                    client.listTools(allowUnsupported = true)
+                    org.junit.Assert.fail("Only method-not-found may yield an empty tool capability")
+                } catch (error: McpRpcException) { assertEquals(code, error.code) }
+            }
+        }
+        val client = McpClient(object : McpTransport {
+            override suspend fun request(method: String, params: JsonObject): JsonObject = throw McpHttpException(401, "unauthorized")
+            override fun close() = Unit
+        })
+        try { client.listTools(allowUnsupported = true); org.junit.Assert.fail("Authentication must fail") }
+        catch (error: McpHttpException) { assertEquals(401, error.statusCode) }
+    }
+
+    @Test
+    fun resourceRequestsPreservePagesAndContents() = runTest {
+        val requests = mutableListOf<Pair<String, JsonObject>>()
+        val result = Json.parseToJsonElement("""{"nextCursor":"next/opaque+","contents":[{"uri":"test:a","blob":"YWJj","mimeType":"image/png"}],"extension":{"kept":true}}""") as JsonObject
+        val client = McpClient(object : McpTransport {
+            override suspend fun request(method: String, params: JsonObject): JsonObject {
+                requests += method to params
+                return buildJsonObject { put("result", result) }
+            }
+            override fun close() = Unit
+        })
+        assertEquals(result, client.listResources())
+        assertEquals(result, client.listResources("next/opaque+"))
+        assertEquals(result, client.listResourceTemplates("template-page"))
+        assertEquals(result, client.readResource("test:a"))
+        assertEquals(listOf("resources/list", "resources/list", "resources/templates/list", "resources/read"), requests.map { it.first })
+        assertEquals(buildJsonObject { }, requests[0].second)
+        assertEquals(buildJsonObject { put("cursor", "next/opaque+") }, requests[1].second)
+        assertEquals(buildJsonObject { put("cursor", "template-page") }, requests[2].second)
+        assertEquals(buildJsonObject { put("uri", "test:a") }, requests[3].second)
+    }
+
     @Test
     fun pingChecksRemoteResponseWithoutListingOrCallingTools() = runTest {
         val requests = mutableListOf<String>()

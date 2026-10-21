@@ -36,12 +36,20 @@ internal class GroupReplyDeliveryLedger(
         return candidate
     }
 
-    fun recordCompletedOutcome(log: LocalSessionEventLog, replies: Int) {
+    private var completionReason = com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED
+
+    val terminalReason: String get() = completionReason.name.lowercase()
+
+    fun observe(reason: com.labteto.dshmobile.local.model.LocalModelCompletionReason) {
+        if (reason != com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) completionReason = reason
+    }
+
+    fun recordOutcome(log: LocalSessionEventLog, replies: Int) {
         log.append("turn/end", buildJsonObject {
-            put("reason", "completed")
+            put("reason", completionReason.name.lowercase())
             put("mode", "group-chat")
             put("replies", replies)
-            put("partial_success", failedIds.isNotEmpty())
+            put("partial_success", failedIds.isNotEmpty() || terminalReason != "completed")
             put("failed_members", JsonArray(failedIds.map(::JsonPrimitive)))
         })
     }

@@ -137,6 +137,7 @@ class VisionClient @Inject constructor(
                 promptBreakdown = reply.promptBreakdown,
                 route = reply.routeIdentity,
             )
+            com.labteto.dshmobile.local.model.requireCompletedModelReply(reply)
             return@withContext reply.content?.trim()?.takeIf(String::isNotBlank)
                 ?: error("当前模型返回了空文本")
         }
@@ -163,7 +164,6 @@ class VisionClient @Inject constructor(
                     )
                 }
                 val root = json.parseToJsonElement(body).jsonObject
-                val result = parseRoot(root)
                 usageTracker.get().record(
                     model = model,
                     usage = parseDeepSeekOpenAiUsage(root),
@@ -184,7 +184,7 @@ class VisionClient @Inject constructor(
                         protocol = LocalModelProtocol.CHAT_COMPLETIONS.name,
                     ),
                 )
-                result
+                parseRoot(root)
             }
         } catch (error: LocalModelException) {
             throw error
@@ -243,6 +243,19 @@ class VisionClient @Inject constructor(
         parseRoot(json.parseToJsonElement(body).jsonObject)
 
     private fun parseRoot(root: JsonObject): String {
+        val choice = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
+        val message = choice?.get("message") as? JsonObject ?: JsonObject(emptyMap())
+        val stop = choice?.get("finish_reason")?.jsonPrimitive?.contentOrNull
+        val completion = when {
+            message["refusal"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true || stop == "content_filter" ->
+                com.labteto.dshmobile.local.model.LocalModelCompletionReason.REFUSED
+            stop == "length" -> com.labteto.dshmobile.local.model.LocalModelCompletionReason.OUTPUT_LIMIT
+            stop == null || stop == "stop" -> com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED
+            else -> com.labteto.dshmobile.local.model.LocalModelCompletionReason.INTERRUPTED
+        }
+        com.labteto.dshmobile.local.model.requireCompletedModelReply(
+            com.labteto.dshmobile.local.model.LocalModelReply(message, null, null, emptyList(),
+                completionReason = completion, rawStopReason = stop))
         val content = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
             ?.get("message")?.jsonObject
             ?.get("content")

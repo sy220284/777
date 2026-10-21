@@ -3,6 +3,27 @@
   "policy": "手工逐项核对的源码声明线索，仅用于静态证据等级，不代表行为验收或授权自动改树",
   "items": [
     {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 持久任务图与节点验收（未合并）",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlan.kt",
+          "symbols": ["recoveredResults"]
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt",
+          "symbols": ["runWorkflow", "resumePendingWorkflows"]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlanTest.kt",
+          "method": "coldRestoreReusesCompletedNodeAndContinuesRemainingNode",
+          "references": "recoveredResults"
+        }
+      ],
+      "scope": "真实生产入口与持久验收投影的源码和测试声明存在；本地未运行编译及测试，尚须最新主线验证"
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 跳转定义与查找引用",
       "sources": [
         {
@@ -794,6 +815,26 @@
         }
       ],
       "scope": "恢复 V6 原生界面后的静态源码定位；具体交互、状态及设备效果以本 PR 最新 Head 的运行测试为准。"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享工具执行 / MCP资源分页与完整内容",
+      "sources": [
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpClient.kt",
+          "symbols": [
+            "listResources",
+            "listResourceTemplates",
+            "readResource"
+          ]
+        },
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
+          "symbols": [
+            "resourceToolDefinitions"
+          ]
+        }
+      ],
+      "scope": "R2未合并：正式连接共享审批、身份和取消；资源分页与完整内容源码存在，测试尚未执行，不代表主线交付或行为验收。"
     }
   ]
 }

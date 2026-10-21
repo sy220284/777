@@ -70,6 +70,16 @@ class AgentRunExecutionContext internal constructor(
 ) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<AgentRunExecutionContext>
 
+    fun <T> commitCurrent(sessionId: String = identity.sessionId, action: () -> T): T {
+        requireCurrent(sessionId)
+        var result: T? = null
+        if (!owners.commit(identity) { result = action() }) {
+            throw CancellationException("任务执行所有权已失效：${identity.runId}")
+        }
+        @Suppress("UNCHECKED_CAST")
+        return result as T
+    }
+
     fun requireCurrent(sessionId: String = identity.sessionId) {
         if (identity.sessionId != sessionId || !owners.isCurrent(identity)) {
             throw CancellationException("任务执行所有权已失效：${identity.runId}")

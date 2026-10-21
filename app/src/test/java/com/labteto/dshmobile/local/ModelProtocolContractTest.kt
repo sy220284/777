@@ -31,19 +31,41 @@ class ModelProtocolContractTest {
     }.build(), json)
 
     @Test fun errorFrameAndTruncatedStreamNeverBecomeSuccessfulReplies() = runBlocking {
-        listOf(
-            "data: {\"error\":{\"message\":\"quota exhausted\"}}\n\ndata: [DONE]\n\n" to "MODEL_STREAM_ERROR",
-            "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"},\"finish_reason\":\"length\"}]}\n\ndata: [DONE]\n\n" to "MODEL_OUTPUT_TRUNCATED",
-            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"content_filter\"}]}\n\ndata: [DONE]\n\n" to "MODEL_FINISH_content_filter",
-        ).forEach { (body, code) ->
-            val error = runCatching { chat(body).completeStreaming("test", "https://test.example/v1", "test", messages, emptyTools) }.exceptionOrNull()
-            assertEquals(code, (error as? LocalModelException)?.code)
-        }
+        val errorBody = """data: {"error":{"message":"quota exhausted"}}""" + "\n\ndata: [DONE]\n\n"
+        val failure = runCatching {
+            chat(errorBody).completeStreaming("test", "https://test.example/v1", "test", messages, emptyTools)
+        }.exceptionOrNull()
+        assertEquals("MODEL_STREAM_ERROR", (failure as? LocalModelException)?.code)
+
+        val truncated = chat("""data: {"choices":[{"delta":{"content":"partial"},"finish_reason":"length"}]}""" + "\n\ndata: [DONE]\n\n")
+            .completeStreaming("test", "https://test.example/v1", "test", messages, emptyTools)
+        assertEquals(com.labteto.dshmobile.local.model.LocalModelCompletionReason.OUTPUT_LIMIT, truncated.completionReason)
+        assertEquals("length", truncated.rawStopReason)
+        assertEquals("partial", truncated.content)
+        assertTrue(truncated.toolCalls.isEmpty())
+        assertEquals("MODEL_OUTPUT_LIMIT", runCatching {
+            com.labteto.dshmobile.local.model.requireCompletedModelReply(truncated)
+        }.exceptionOrNull().let { (it as? LocalModelException)?.code })
+
+        val refused = chat("""data: {"choices":[{"delta":{},"finish_reason":"content_filter"}]}""" + "\n\ndata: [DONE]\n\n")
+            .completeStreaming("test", "https://test.example/v1", "test", messages, emptyTools)
+        assertEquals(com.labteto.dshmobile.local.model.LocalModelCompletionReason.REFUSED, refused.completionReason)
+        assertEquals("content_filter", refused.rawStopReason)
+        assertTrue(refused.toolCalls.isEmpty())
+        assertEquals("MODEL_REFUSED", runCatching {
+            com.labteto.dshmobile.local.model.requireCompletedModelReply(refused)
+        }.exceptionOrNull().let { (it as? LocalModelException)?.code })
     }
 
-    @Test fun nonStreamingTruncationAlsoFails() {
-        val error = runCatching { chat("").parse("""{"choices":[{"finish_reason":"length","message":{"role":"assistant","content":"partial"}}]}""") }.exceptionOrNull()
-        assertEquals("MODEL_OUTPUT_TRUNCATED", (error as? LocalModelException)?.code)
+    @Test fun nonStreamingTruncationPreservesPartialButCannotBeAcceptedAsComplete() {
+        val reply = chat("").parse("""{"choices":[{"finish_reason":"length","message":{"role":"assistant","content":"partial"}}]}""")
+        assertEquals(com.labteto.dshmobile.local.model.LocalModelCompletionReason.OUTPUT_LIMIT, reply.completionReason)
+        assertEquals("length", reply.rawStopReason)
+        assertEquals("partial", reply.content)
+        assertTrue(reply.toolCalls.isEmpty())
+        assertEquals("MODEL_OUTPUT_LIMIT", runCatching {
+            com.labteto.dshmobile.local.model.requireCompletedModelReply(reply)
+        }.exceptionOrNull().let { (it as? LocalModelException)?.code })
     }
 
     @Test fun streamedToolMetadataSurvivesOutOfOrderParallelCallsAndContinuation() = runBlocking {

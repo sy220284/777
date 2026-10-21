@@ -175,8 +175,17 @@ internal fun replaceLocalUserModelMessageText(
 internal fun hasLocalImageRefs(messages: List<JsonObject>): Boolean =
     messages.any(::hasLocalImageRefs)
 
+internal fun requireLocalImageInputSupported(messages: List<JsonObject>, unsupported: Boolean) {
+    check(!unsupported || !hasLocalImageRefs(messages)) {
+        "当前模型不支持图片理解，请切换支持图片的模型后重试。"
+    }
+}
+
 private fun hasLocalImageRefs(message: JsonObject): Boolean =
-    hasLocalRef(message, LOCAL_IMAGE_REF)
+    hasLocalRef(message, LOCAL_IMAGE_REF) ||
+        (message["_dsh_tool_images"] as? JsonArray).orEmpty().any { part ->
+            (part as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull == LOCAL_IMAGE_REF
+        }
 
 private fun hasLocalFileRefs(message: JsonObject): Boolean =
     hasLocalRef(message, LOCAL_FILE_REF)
@@ -199,6 +208,7 @@ internal suspend fun prepareLocalMultimodalMessages(
     baseUrl: String? = null,
     planSharing: Boolean = false,
 ): List<JsonObject> = withContext(Dispatchers.IO) {
+    val messages = expandToolImageMessages(messages, toolImageMode = mode == LocalImageInputMode.TOOL)
     val activeImageMessageIndices = activeImageMessageIndices(messages, mode)
     val activeFileMessageIndices = activeFileMessageIndices(messages)
     val root = workspaceRoot.canonicalFile

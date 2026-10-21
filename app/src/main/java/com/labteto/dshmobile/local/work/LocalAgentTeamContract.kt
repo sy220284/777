@@ -11,7 +11,7 @@ internal object LocalAgentTeamContract {
         const val TEAM_EVENT_VERSION = 2
         // Official V2 whole-value protocol remains at version 4; local activity projection adds display state.
         const val OFFICIAL_TEAM_PROJECTION_STATE_VERSION = 4
-        const val LOCAL_TEAM_PROJECTION_STATE_VERSION = 5
+        const val LOCAL_TEAM_PROJECTION_STATE_VERSION = 6
         val TEAM_EVENTS = setOf(
             TEAM_MEMBER_EVENT,
             TEAM_TASK_EVENT,
@@ -19,6 +19,7 @@ internal object LocalAgentTeamContract {
             TEAM_MESSAGE_DELIVERED,
             TEAM_MESSAGE_DISCARDED,
         )
+        val MEMBER_TOOL_NAMES = com.labteto.dshmobile.local.tools.LocalTeamMemberToolContract.NAMES
         val TOOL_NAMES = setOf(
             "team_members",
             "team_member_status",

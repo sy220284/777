@@ -77,6 +77,7 @@ internal class LocalWorkComposition @Inject constructor(
     private val toolResultRuntime = LocalWorkToolResultRuntime(
         runtimeStateStore = runtimeStateStore,
         toolOutputStore = tools.toolOutputStore,
+        importToolImages = sessionStorage.files::importToolImages,
     )
     private val turnToolRuntime = LocalWorkTurnToolRuntime(
         registry = tools.registry,
@@ -89,9 +90,14 @@ internal class LocalWorkComposition @Inject constructor(
     private val subagentFactory by lazy {
         LocalSubagentRunnerFactory(
             modelGateway = modelGateway,
+            teamSchemas = { tools.schemas.teamMemberSchemas() },
+            executeTeamTool = { sessionId, jobId, call ->
+                AgentToolResult(agentTeams.executeMember(sessionId, jobId, call))
+            },
             jobs = runtimeStateStore.jobManager,
             modelHistory = runtimeStateStore.foregroundRunHandle.modelHistory,
             toolOutputStore = tools.toolOutputStore,
+            importToolImages = sessionStorage.files::importToolImages,
             workspacePath = sessionStorage.files.workspace.path,
             imageRequestBudget = {
                 localImageRequestBudgetForModelConcurrency(
@@ -116,6 +122,8 @@ internal class LocalWorkComposition @Inject constructor(
     }
     private val subagents by lazy {
         LocalWorkSubagentRuntime(
+            persistentJobs = persistentJobs,
+            workspaceRoot = File(sessionStorage.files.workspace.path),
             factory = subagentFactory,
             schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
                 tools.schemas.subagentSchemas(
@@ -132,6 +140,7 @@ internal class LocalWorkComposition @Inject constructor(
     }
     private val persistentJobs by lazy {
         LocalPersistentJobRecoveryCoordinator(
+            workspaceRoot = File(sessionStorage.files.workspace.path),
             scope = scope,
             jobs = runtimeStateStore.jobManager,
             json = json,
@@ -257,6 +266,9 @@ internal class LocalWorkComposition @Inject constructor(
             projectionRegistry = sessionStorage.projectionRegistry,
             projectionScope = scope,
             onProjectionReady = { sessionId -> teamLifecycle.projectionReady(sessionId) },
+            sendToLead = { sessionId, input ->
+                workRunRegistry.enqueueAgentMessage(sessionId, input, sessionStorage.eventLogs.get(sessionId))
+            },
         )
     }
     private val agentControlBuiltins by lazy {
@@ -284,8 +296,9 @@ internal class LocalWorkComposition @Inject constructor(
         workToolResultRuntime = toolResultRuntime,
         workTurnToolRuntime = turnToolRuntime,
         replyDocuments = replyDocuments,
-        onRootExecutionSliceStarted = { sessionId ->
-            persistentJobs.schedule(sessionId, rootSliceAdmitted = true)
+        onRootExecutionSliceStarted = { binding ->
+            persistentJobs.schedule(binding.sessionId, rootSliceAdmitted = true)
+            subagents.resumePendingWorkflows(binding)
         },
     )
 

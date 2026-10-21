@@ -117,6 +117,7 @@ class PersonaInspectionService @Inject constructor(
                 route = reply.routeIdentity,
             )
         }
+        com.labteto.dshmobile.local.model.requireCompletedModelReply(reply)
         val raw = reply.content?.trim().orEmpty()
         if (raw.isBlank()) error("人物检查没有返回结果")
 

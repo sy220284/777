@@ -36,6 +36,7 @@ import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
 import com.labteto.dshmobile.local.model.LocalRequestReconstruction
 import com.labteto.dshmobile.local.model.reconstructLocalModelRequest
 import com.labteto.dshmobile.local.model.LocalStreamPreview
+import com.labteto.dshmobile.local.session.LocalChatStreamCheckpointWriter
 import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.modelTransportFailureKind
 import com.labteto.dshmobile.local.model.redactModelImages
@@ -819,6 +820,16 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 ?.let { streamingPreviewStore.publishAssistant(it, preview) }
                         },
                     )
+                    // Checkpoint only the same filtered Chat text sent to the visible preview.
+                    // Chunking avoids repeatedly fsync-ing a growing 65 KiB snapshot.
+                    val durableChatPreview = if (snapshot.usageMode == LocalUsageMode.CHAT &&
+                        step == 1 && publishPreviewEnabled) LocalChatStreamCheckpointWriter(
+                        log = log,
+                        requestUid = requestUid,
+                        onFailure = { failure ->
+                            AppLog.warn("LocalModelRequest", "chat_stream_checkpoint_failed", failure)
+                        },
+                    ) else null
                     // Every protocol already emits normalized content/reasoning deltas.
                     // Publish both through the same request-owned, bounded preview pipeline.
                     val reasoningPreview = LocalStreamPreview(
@@ -857,7 +868,9 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             onDelta = { delta ->
                                     val visible = delta.content
                                     attemptEvidence.observe(delta)
-                                    streamPreview.append(previewDeltaTransform?.invoke(visible) ?: visible)
+                                    val visibleDelta = previewDeltaTransform?.invoke(visible) ?: visible
+                                    durableChatPreview?.append(visibleDelta)
+                                    streamPreview.append(visibleDelta)
                                     reasoningPreview.append(delta.reasoning)
                                 },
                             )
@@ -909,6 +922,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 }
                             })
                             throw error
+                        } finally {
+                            durableChatPreview?.flush()
                         }
                             streamPreview.flush()
                             reasoningPreview.flush()
@@ -942,6 +957,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 put("header_seq", requestHeader.sequence)
                                 put("step", step)
                                 put("request_id", reply.requestId)
+                                put("completion_reason", reply.completionReason.name)
+                                reply.rawStopReason?.let { put("provider_stop_reason", it) }
                                 put("reported", reply.usage.reported)
                                 put("prompt_tokens", reply.usage.promptTokens)
                                 put("cache_hit_tokens", reply.usage.cacheHitTokens)

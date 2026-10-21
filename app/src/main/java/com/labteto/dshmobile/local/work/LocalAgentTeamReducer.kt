@@ -67,6 +67,7 @@ internal object LocalAgentTeamReducer {
                         "TEAM_MESSAGE_QUEUED_AFTER_DISCARD：" + message.id
                     }
                     require(
+                        message.targetId == event.data["teamId"]?.jsonPrimitive?.contentOrNull ||
                         state.members.any { member ->
                             member.id == message.targetId &&
                                 member.phase == LocalTeamMemberPhase.ACTIVE

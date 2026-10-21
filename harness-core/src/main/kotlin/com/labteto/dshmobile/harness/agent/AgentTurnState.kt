@@ -46,6 +46,7 @@ internal class AgentTurnState(
             role = "assistant",
             content = reply.content,
             toolCalls = reply.toolCalls,
+            completionReason = reply.completionReason, rawStopReason = reply.rawStopReason,
         )
         if (reply.toolCalls.isNotEmpty()) phase = Phase.TOOL_ACTIVE
     }

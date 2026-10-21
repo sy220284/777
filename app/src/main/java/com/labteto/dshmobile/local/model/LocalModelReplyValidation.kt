@@ -2,8 +2,9 @@ package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelException
 
-/** A terminal response without text or executable calls cannot satisfy a user request. */
+/** Completed answers need visible content; partial results must reach the existing usage owner. */
 internal fun validateUsableModelReply(reply: LocalModelReply) {
+    if (reply.completionReason != LocalModelCompletionReason.COMPLETED) return
     val hasImage = reply.canonicalMessage?.content
         ?.any { it is LocalCanonicalContent.Image }
         ?: runCatching {
@@ -18,4 +19,15 @@ internal fun validateUsableModelReply(reply: LocalModelReply) {
             requestId = reply.requestId,
         )
     }
+}
+
+/** Call after recording provider usage, before accepting a complete/structured consumer result. */
+internal fun requireCompletedModelReply(reply: LocalModelReply) {
+    if (reply.completionReason == LocalModelCompletionReason.COMPLETED) return
+    throw LocalModelException(
+        code = "MODEL_${reply.completionReason.name}",
+        message = "模型结果未完成（${reply.rawStopReason ?: reply.completionReason.name}），本次结果未作为完整内容写入。",
+        retryable = false,
+        requestId = reply.requestId,
+    )
 }
