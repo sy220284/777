@@ -132,6 +132,7 @@ class McpToolBridgePlugin(
     private val transportFactory: (String) -> McpTransport = { endpoint ->
         McpNegotiatingHttpTransport(endpoint, http, json)
     },
+    private val credentialAwareHttpTransportFactory: ((String, String, String?) -> McpTransport)? = null,
     private val httpCredentialProvider: suspend (String, String) -> String? = { _, _ -> null },
     private val authorizedTransportFactory: (String, String) -> McpTransport = { endpoint, bearer ->
         val uri = URI(endpoint)
@@ -652,7 +653,8 @@ class McpToolBridgePlugin(
             displayTarget = displayEndpoint(endpoint),
             clientFactory = {
                 val bearer = httpCredentialProvider(serverId, endpoint)
-                McpClient(if (bearer == null) transportFactory(endpoint)
+                McpClient(credentialAwareHttpTransportFactory?.invoke(serverId, endpoint, bearer)
+                    ?: if (bearer == null) transportFactory(endpoint)
                     else authorizedTransportFactory(endpoint, bearer))
             },
         )

@@ -2364,4 +2364,5 @@
     <string name="persona_v4_discard_body">人物设定有未保存的内容。离开后这些修改不会保留。</string>
     <string name="persona_v4_discard_confirm">放弃修改</string>
     <string name="persona_v4_discard_cancel">继续编辑</string>
+    <string name="usage_action_work_summary">工作背景摘要</string>
 </resources>

@@ -6,7 +6,6 @@ import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import java.io.File
 import java.security.MessageDigest
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import com.labteto.dshmobile.harness.session.ToolAttemptLedger
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -126,17 +125,9 @@ internal fun hasUnresolvedWorkGoalToolEffects(
     goal: LocalGoal,
     executingToolId: String? = null,
 ): Boolean {
-    // Share SessionRecovery's typed tool-attempt reducer. Each event is
-    // consumed once, from this Goal's first persisted sequence onwards.
-    val ledger = ToolAttemptLedger()
-    val goalStartSequence = goal.startedAtSequence.takeIf { it >= 0L } ?: -1L
-    eventLog.forEachAfter(goalStartSequence) { event ->
-        ledger.observe(event.type, event.data)
-    }
-    return goal.id.isNotBlank() && ledger.snapshot().any {
-        it.goalId == goal.id && it.unresolvedExternalEffect &&
-            (executingToolId == null || it.executionId != executingToolId)
-    }
+    if (goal.id.isBlank()) return false
+    return LocalWorkRecoveryProjections.forLog(eventLog).goalAssessment(eventLog, goal)
+        .hasUnresolvedTools(executingToolId)
 }
 
 /** Content-addressed identity for a Work goal including its acceptance contract. */
@@ -250,10 +241,14 @@ internal fun queueWorkGoalProgressFollowUp(
     )
     if (!canAutomaticallyFollowUpWorkGoal(conditions)) return false
     // Even a different, successful tool receipt cannot certify an older unknown mutation.
-    if (hasUnresolvedWorkGoalToolEffects(binding.eventLog, requireNotNull(goal))) return false
+    val facts = assessment.evidence.deliveryEvidence?.runtimeFacts
+        ?.takeIf { it.throughSequence == binding.eventLog.latestSequence() }
+        ?: LocalWorkRecoveryProjections.forLog(binding.eventLog)
+            .goalAssessment(binding.eventLog, requireNotNull(goal))
+    if (facts.hasUnresolvedTools()) return false
     // A process crash may leave a graph without its terminal event. Its nodes
     // must be reconciled by recovery, never blindly spawned again by GoalDriver.
-    if (hasUnsettledWorkGoalTaskGraphs(binding.eventLog, goal)) return false
+    if (facts.hasUnsettledGraphs) return false
 
     val resume = LocalWorkResumeCommand(
         sourceRunId = sourceRunId,

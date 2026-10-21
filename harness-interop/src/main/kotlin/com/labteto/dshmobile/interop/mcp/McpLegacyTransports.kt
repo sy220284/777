@@ -141,7 +141,7 @@ class McpLegacyStreamableHttpTransport(
         sessionId?.let { builder.header("Mcp-Session-Id", it) }
 
         nonReplayHttp.newCall(builder.build()).executeCancellable { response ->
-            if (!response.isSuccessful) throw McpHttpException(response.code, response.readMcpBodyBounded())
+            if (!response.isSuccessful) throw response.mcpHttpFailure(response.readMcpBodyBounded())
             if (notification || response.code == 202) {
                 return@executeCancellable LegacyHttpResponse(
                     JsonObject(emptyMap()),
@@ -229,9 +229,9 @@ class McpLegacyHttpSseTransport(
         ).awaitResponseCancellable()
         if (!response.isSuccessful) {
             val body = response.readMcpBodyBounded()
-            val code = response.code
+            val failure = response.mcpHttpFailure(body)
             response.close()
-            throw McpHttpException(code, body)
+            throw failure
         }
         require(
             response.header("Content-Type").orEmpty()
@@ -304,7 +304,7 @@ class McpLegacyHttpSseTransport(
             .build()
         nonReplayHttp.newCall(request).executeCancellable { response ->
             val body = response.readMcpBodyBounded()
-            if (!response.isSuccessful) throw McpHttpException(response.code, body)
+            if (!response.isSuccessful) throw response.mcpHttpFailure(body)
             if (
                 body.isNotBlank() &&
                 response.header("Content-Type").orEmpty().contains("application/json")

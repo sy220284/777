@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.work
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.harness.session.ToolAttemptLedger
 import java.util.WeakHashMap
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -12,7 +13,8 @@ import kotlinx.serialization.json.contentOrNull
  * It never schedules work or claims success. A started graph without a matching
  * terminal fact is unresolved after a crash; the admitted Work root slice decides recovery.
  */
-internal class LocalWorkTaskGraphRecoveryLedger {
+internal class LocalWorkTaskGraphRecoveryLedger(initial: List<OpenGraph> = emptyList()) {
+    @Serializable
     internal data class OpenGraph(
         val graphId: String,
         val goalId: String,
@@ -25,6 +27,12 @@ internal class LocalWorkTaskGraphRecoveryLedger {
     // Graph IDs should be unique, but old logs or multiple activations can reuse them.
     // Never overwrite an earlier unclosed graph with a later start of the same ID.
     private val open = linkedMapOf<Pair<String, String>, MutableList<OpenGraph>>()
+
+    init {
+        initial.forEach { graph ->
+            open.getOrPut(graph.graphId to graph.goalId) { mutableListOf() }.add(graph)
+        }
+    }
 
     fun observe(type: String, data: JsonObject) {
         val graphId = (data["graph_id"] as? JsonPrimitive)
@@ -89,12 +97,7 @@ internal fun hasUnsettledWorkGoalTaskGraphs(
     goal: LocalGoal,
 ): Boolean {
     if (goal.id.isBlank()) return false
-    val ledger = LocalWorkTaskGraphRecoveryLedger()
-    val from = goal.startedAtSequence.takeIf { it >= 0L } ?: -1L
-    eventLog.forEachAfter(from) { event ->
-        ledger.observe(event.type, event.data)
-    }
-    return ledger.unresolvedForGoal(goal.id).isNotEmpty()
+    return LocalWorkRecoveryProjections.forLog(eventLog).goalAssessment(eventLog, goal).hasUnsettledGraphs
 }
 
 /**
@@ -105,6 +108,17 @@ internal fun hasUnsettledWorkGoalTaskGraphs(
  * Each query still validates current file/dependency versions at the execution owner.
  */
 internal class LocalWorkOpenGraphProjection {
+    private val goalFacts = LocalWorkGoalFactsProjection()
+
+    fun goalAssessment(log: LocalSessionEventLog, goal: LocalGoal): LocalWorkGoalFacts =
+        goalFacts.assess(log, goal)
+
+    private fun <T> query(log: LocalSessionEventLog, read: () -> T): T =
+        log.withWriterLease {
+            check(!log.isClosed) { "会话已关闭，无法读取任务执行事实。" }
+            synchronized(this) { read() }
+        }
+
     private var generation = -1L
     private var throughSequence = -1L
     private var ledger = LocalWorkTaskGraphRecoveryLedger()
@@ -221,14 +235,12 @@ internal class LocalWorkOpenGraphProjection {
         }
     }
 
-    @Synchronized
-    fun unresolved(log: LocalSessionEventLog): List<LocalWorkTaskGraphRecoveryLedger.OpenGraph> {
+    fun unresolved(log: LocalSessionEventLog): List<LocalWorkTaskGraphRecoveryLedger.OpenGraph> = query(log) {
         refresh(log)
-        return ledger.unresolved()
+        return@query ledger.unresolved()
     }
 
-    @Synchronized
-    fun acceptedFor(log: LocalSessionEventLog, execution: String): Pair<Map<String, JsonObject>, Map<Long, JsonObject>> {
+    fun acceptedFor(log: LocalSessionEventLog, execution: String): Pair<Map<String, JsonObject>, Map<Long, JsonObject>> = query(log) {
         refresh(log)
         val indices = accepted[execution].orEmpty()
         val events = eventsAt(log, "taskgraph/node-accepted", indices.values.toSet())
@@ -240,35 +252,31 @@ internal class LocalWorkOpenGraphProjection {
         }.filter { jobResultsBySequence[it] == execution }.toSet()
         val results = eventsAt(log, "taskgraph/job-result", resultSequences)
             .mapValues { it.value.data }
-        return facts to results
+        return@query facts to results
     }
 
-    @Synchronized
-    fun acceptedNode(log: LocalSessionEventLog, execution: String, nodeId: String): LocalSessionEventLog.Event? {
+    fun acceptedNode(log: LocalSessionEventLog, execution: String, nodeId: String): LocalSessionEventLog.Event? = query(log) {
         refresh(log)
-        return accepted[execution]?.get(nodeId)?.let { eventAt(log, it) }
+        return@query accepted[execution]?.get(nodeId)?.let { eventAt(log, it) }
     }
 
-    @Synchronized
-    fun nodeAdmissions(log: LocalSessionEventLog, execution: String, nodeId: String): List<JsonObject> {
+    fun nodeAdmissions(log: LocalSessionEventLog, execution: String, nodeId: String): List<JsonObject> = query(log) {
         refresh(log)
         val sequences = admissions[execution to nodeId].orEmpty()
         val events = eventsAt(log, "taskgraph/job-admitted", sequences.toSet())
-        return sequences.mapNotNull { events[it]?.data }
+        return@query sequences.mapNotNull { events[it]?.data }
     }
 
-    @Synchronized
-    fun jobResult(log: LocalSessionEventLog, jobId: String): LocalSessionEventLog.Event? {
+    fun jobResult(log: LocalSessionEventLog, jobId: String): LocalSessionEventLog.Event? = query(log) {
         refresh(log)
-        return jobResultsById[jobId]?.let { eventAt(log, it) }
+        return@query jobResultsById[jobId]?.let { eventAt(log, it) }
     }
 
     /**
      * Replay only events belonging to the named persistent Job. The original reducer still owns
      * admission, call-id reuse, execution-id identity and unknown-effect semantics.
      */
-    @Synchronized
-    fun toolAttempts(log: LocalSessionEventLog, jobId: String): List<ToolAttemptLedger.Attempt> {
+    fun toolAttempts(log: LocalSessionEventLog, jobId: String): List<ToolAttemptLedger.Attempt> = query(log) {
         refresh(log)
         val agent = localPersistentSubagentId(jobId)
         val runs = runsByAgent[agent].orEmpty()
@@ -299,21 +307,19 @@ internal class LocalWorkOpenGraphProjection {
             throw error
         }
         state.throughSequence = throughSequence
-        return state.ledger.snapshot()
+        return@query state.ledger.snapshot()
     }
 
-    @Synchronized
-    fun historyCheckpoint(log: LocalSessionEventLog, jobId: String): LocalSessionEventLog.Event? {
+    fun historyCheckpoint(log: LocalSessionEventLog, jobId: String): LocalSessionEventLog.Event? = query(log) {
         refresh(log)
-        return historyCheckpoints[jobId]?.let { eventAt(log, it) }?.takeIf { checkpoint ->
+        return@query historyCheckpoints[jobId]?.let { eventAt(log, it) }?.takeIf { checkpoint ->
             (checkpoint.data["agent_id"] as? JsonPrimitive)?.contentOrNull == localPersistentSubagentId(jobId)
         }
     }
 
-    @Synchronized
-    fun toolResult(log: LocalSessionEventLog, jobId: String, executionId: String, callId: String): LocalSessionEventLog.Event? {
+    fun toolResult(log: LocalSessionEventLog, jobId: String, executionId: String, callId: String): LocalSessionEventLog.Event? = query(log) {
         refresh(log)
-        return toolResults[Triple(jobId, executionId, callId)]?.let { eventAt(log, it) }
+        return@query toolResults[Triple(jobId, executionId, callId)]?.let { eventAt(log, it) }
     }
 }
 

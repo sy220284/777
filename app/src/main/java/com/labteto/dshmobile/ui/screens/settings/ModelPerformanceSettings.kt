@@ -17,6 +17,13 @@ import com.shenyan.designsystem.components.SyRadioControl
 import com.labteto.dshmobile.ui.shenyan.SySlider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.labteto.dshmobile.local.presentation.LocalWorkSummaryControls
+import com.labteto.dshmobile.ui.components.ToggleRow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -46,6 +53,26 @@ internal fun ModelPerformanceSettingsPage() {
     remember(context) { LocalModelPerformanceControls.attach(context); true }
     val limits by LocalModelPerformanceControls.state.collectAsStateWithLifecycle()
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    remember(context) { LocalWorkSummaryControls.attach(context); true }
+    val semanticSummary by LocalWorkSummaryControls.state.collectAsStateWithLifecycle()
+    var summaryError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    SettingsSeamlessGroup("工作上下文摘要") {
+        ToggleRow("模型背景摘要", semanticSummary,
+            "默认关闭。开启后，常规压缩会额外调用当前模型保留背景和原因，并计入用量；任务与执行事实仍以原记录为准。") {
+            scope.launch {
+                try {
+                    withContext(Dispatchers.IO) { LocalWorkSummaryControls.setEnabled(!semanticSummary) }
+                    summaryError = null
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (failure: Exception) { summaryError = failure.message ?: "摘要设置保存失败" }
+            }
+        }
+        summaryError?.let { Text(it, style = DsType.small13, color = colors.textSecondary) }
+        Text("紧急上下文溢出仍使用本地压缩，避免在请求占用模型资源时再排队调用模型。",
+            style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+    }
+
 
     SettingsSeamlessGroup(stringResource(R.string.settings_model_performance_reasoning)) {
         Text(

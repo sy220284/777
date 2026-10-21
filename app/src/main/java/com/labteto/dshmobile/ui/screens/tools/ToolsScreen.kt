@@ -104,6 +104,7 @@ enum class ToolsNotice {
 data class ToolsUiState(
     val loading: Boolean = false,
     val loadFailed: Boolean = false,
+    val mcpLoginServerId: String? = null,
     val servers: List<McpServerSnapshot> = emptyList(),
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
@@ -152,6 +153,7 @@ class ToolsViewModel @Inject constructor(
 
     fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
     private val operationGate = ToolsOperationGate()
+    private var mcpLoginJob: kotlinx.coroutines.Job? = null
     private val _githubBrowse = MutableStateFlow(GitHubBrowseState())
     internal val githubBrowse: StateFlow<GitHubBrowseState> = _githubBrowse.asStateFlow()
 
@@ -401,6 +403,56 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
+    fun loginMcp(serverId: String, endpoint: String, clientId: String) {
+        mcpLoginJob = viewModelScope.launch { operationGate.run {
+            _state.value = _state.value.copy(loading = true, mcpLoginServerId = serverId,
+                feedback = "请在浏览器完成 MCP 登录，再返回此处。", feedbackRes = null)
+            try {
+                localTools.loginMcp(serverId, endpoint, clientId.takeIf(String::isNotBlank))
+                _state.value = _state.value.copy(servers = localTools.servers(),
+                    localPlugins = localTools.installedPluginIds(), feedback = "MCP 已登录并连接。")
+            } catch (cancelled: CancellationException) {
+                _state.value = _state.value.copy(feedback = "MCP 登录已取消。")
+                throw cancelled
+            } catch (_: Exception) {
+                _state.value = _state.value.copy(feedback = "MCP 登录未完成。请核对服务地址；不支持自动注册的服务需填写预注册 Client ID。")
+            } finally {
+                _state.value = _state.value.copy(loading = false, mcpLoginServerId = null)
+            }
+        } }
+    }
+
+    fun cancelMcpLogin() {
+        mcpLoginJob?.cancel()
+        _state.value.mcpLoginServerId?.let(localTools::cancelMcpLogin)
+    }
+
+    fun refreshMcpLogin(serverId: String, endpoint: String) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                localTools.refreshMcpLogin(serverId, endpoint)
+                _state.value = _state.value.copy(servers = localTools.servers(), feedback = "MCP 登录已刷新并重新连接。")
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { _state.value = _state.value.copy(feedback = "MCP 登录刷新未完成，请重新授权。") }
+            finally { _state.value = _state.value.copy(loading = false) }
+        }
+    }
+
+    fun revokeMcpLogin(serverId: String, endpoint: String) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val remote = localTools.revokeMcpLogin(serverId, endpoint)
+                _state.value = _state.value.copy(servers = localTools.servers(), feedback = if (remote)
+                    "MCP 授权已撤销，本机凭据已清除。" else
+                    "已断开并清除本机凭据；服务未确认远程撤销，可前往服务账户页检查授权。")
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { _state.value = _state.value.copy(feedback = "MCP 授权清理未完成，请重试。") }
+            finally { _state.value = _state.value.copy(loading = false) }
+        }
+    }
+
     fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?) {
         launchOperation {
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
@@ -431,7 +483,8 @@ class ToolsViewModel @Inject constructor(
                 localTools.clearMcpCredential(serverId)
                 _state.value = _state.value.copy(
                     loading = false,
-                    feedback = "MCP 凭据已清除；已连接的服务请断开并重新连接。",
+                    feedback = "MCP 已断开，本机凭据已清除。",
+                    servers = localTools.servers(),
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -546,6 +599,7 @@ fun ToolsScreen(
     var serverId by remember { mutableStateOf("") }
     var endpoint by remember { mutableStateOf("") }
     var mcpBearer by remember { mutableStateOf("") }
+    var mcpClientId by remember { mutableStateOf("") }
     var stdioCommand by remember { mutableStateOf("") }
     var stdioWorkingDirectory by remember { mutableStateOf("") }
     var githubToken by remember { mutableStateOf("") }
@@ -878,7 +932,7 @@ fun ToolsScreen(
         SyResponsiveSheet(
             title = stringResource(R.string.tools_external_services),
             subtitle = stringResource(R.string.tools_external_services_hint),
-            onDismiss = { showExternalConfig = false; mcpBearer = "" },
+            onDismiss = { viewModel.cancelMcpLogin(); showExternalConfig = false; mcpBearer = "" },
         ) {
             if (state.servers.isEmpty()) {
                 Text(
@@ -957,6 +1011,32 @@ fun ToolsScreen(
                 singleLine = true,
                 shape = DsShapes.row,
             )
+            SyTextField(
+                value = mcpClientId,
+                onValueChange = { mcpClientId = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("OAuth Client ID（可选）") },
+                supportingText = { Text("可填写预注册 ID 或客户端元数据 HTTPS 地址；留空尝试服务支持的自动注册。") },
+                enabled = !state.loading, singleLine = true, shape = DsShapes.row,
+            )
+            SyButton(
+                text = if (state.mcpLoginServerId != null) "等待浏览器授权…" else "浏览器登录并连接",
+                onClick = { viewModel.loginMcp(serverId.trim(), endpoint.trim(), mcpClientId.trim()) },
+                enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
+                variant = SyButtonVariant.Outline, modifier = Modifier.fillMaxWidth(),
+            )
+            if (state.mcpLoginServerId != null) {
+                SyButton(text = "取消登录", onClick = viewModel::cancelMcpLogin,
+                    variant = SyButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+                SyButton(text = "刷新登录", onClick = { viewModel.refreshMcpLogin(serverId.trim(), endpoint.trim()) },
+                    enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
+                    variant = SyButtonVariant.Ghost, modifier = Modifier.weight(1f))
+                SyButton(text = "撤销授权", onClick = { viewModel.revokeMcpLogin(serverId.trim(), endpoint.trim()) },
+                    enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
+                    variant = SyButtonVariant.Ghost, modifier = Modifier.weight(1f))
+            }
             SyTextField(
                 value = mcpBearer,
                 onValueChange = { mcpBearer = it.take(4096) },

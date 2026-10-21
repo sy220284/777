@@ -16,6 +16,7 @@ internal data class LocalWorkDeliveryEvidence(
     val artifactCallId: String? = null,
     val testCallId: String? = null,
     val unmetRequirements: List<String>? = null,
+    val runtimeFacts: LocalWorkGoalFacts? = null,
 ) {
     val missing: List<String> get() = unmetRequirements ?: buildList {
         if (needsArtifact && artifactCallId == null) add("缺少本次目标的真实文件版本或可核验提交证据")
@@ -79,19 +80,21 @@ internal fun localWorkDeliveryEvidence(
 ): LocalWorkDeliveryEvidence {
     val needsArtifact = goal.artifactPaths.isNotEmpty()
     val needsTest = goal.verificationCommands.isNotEmpty()
+    val facts = if (goal.id.isBlank()) null else
+        LocalWorkRecoveryProjections.forLog(log).goalAssessment(log, goal)
     val graphMissing = buildList {
         addAll(localWorkGraphDeliveryMissing(log, goal))
-        if (hasUnsettledWorkGoalTaskGraphs(log, goal)) add("目标仍有关联工作流未结算")
-        if (hasUnresolvedWorkGoalToolEffects(log, goal, executingToolId)) add("目标仍有关联工具副作用未核实")
+        if (facts?.hasUnsettledGraphs == true) add("目标仍有关联工作流未结算")
+        if (facts?.hasUnresolvedTools(executingToolId) == true) add("目标仍有关联工具副作用未核实")
     }
-    if (goal.id.isBlank() && goal.status != "completed") return LocalWorkDeliveryEvidence(needsArtifact, needsTest,
+    if (goal.id.isBlank() && goal.status != "completed") return LocalWorkDeliveryEvidence(needsArtifact, needsTest, runtimeFacts = facts,
         unmetRequirements = listOf("旧目标尚未明确验收要求；请依据原任务重新声明成果与验收，不适用时显式为空，已完成进度保留"))
-    if (!needsArtifact && !needsTest) return LocalWorkDeliveryEvidence(false, false,
+    if (!needsArtifact && !needsTest) return LocalWorkDeliveryEvidence(false, false, runtimeFacts = facts,
         unmetRequirements = graphMissing)
     val start = goal.startedAtSequence.takeIf { it >= 0L } ?: log.latestMatching(setOf("goal/state")) {
         it.value("id") == goal.id && goal.id.isNotBlank()
     }?.sequence ?: -1L
-    if (start < 0) return LocalWorkDeliveryEvidence(needsArtifact, needsTest,
+    if (start < 0) return LocalWorkDeliveryEvidence(needsArtifact, needsTest, runtimeFacts = facts,
         unmetRequirements = buildList {
             if (needsArtifact) add("缺少本次目标的真实文件版本或可核验提交证据")
             if (needsTest) add("缺少本次目标的实际测试/构建成功结果")
@@ -153,7 +156,7 @@ internal fun localWorkDeliveryEvidence(
         if (!success) missing += "验收命令未成功执行、最新执行失败或成果版本已变化：$command"
         else verificationId = result?.data?.value("id")
     }
-    return LocalWorkDeliveryEvidence(needsArtifact, needsTest,
+    return LocalWorkDeliveryEvidence(needsArtifact, needsTest, runtimeFacts = facts,
         artifactCallId = artifactId.takeIf { missing.none { it.startsWith("成果") } },
         testCallId = verificationId.takeIf { missing.none { it.startsWith("验收") } },
         unmetRequirements = missing)

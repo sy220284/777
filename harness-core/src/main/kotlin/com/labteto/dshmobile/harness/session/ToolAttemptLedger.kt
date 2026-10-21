@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.harness.session
 
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -45,6 +47,7 @@ class ToolAttemptLedger {
                 state == ToolAttemptState.EXTERNAL_PENDING
     }
 
+    @Serializable
     private data class MutableAttempt(
         val id: String,
         var name: String? = null,
@@ -72,6 +75,34 @@ class ToolAttemptLedger {
     // A provider call ID has request scope, not session scope. Once reused,
     // a legacy receipt without execution identity cannot identify its target.
     private val ambiguousLegacyCallIds = mutableSetOf<String>()
+
+    @Serializable
+    private data class Checkpoint(
+        val attempts: List<MutableAttempt>,
+        val ambiguousLegacyCallIds: Set<String>,
+    )
+
+    /** Disposable reducer state only: no arguments, outputs, authorization or execution rights. */
+    fun checkpoint(): String = Json.encodeToString(Checkpoint.serializer(),
+        Checkpoint(attempts, ambiguousLegacyCallIds))
+
+    companion object {
+        fun fromCheckpoint(payload: String): ToolAttemptLedger {
+            val saved = Json.decodeFromString(Checkpoint.serializer(), payload)
+            return ToolAttemptLedger().apply {
+                saved.attempts.forEach { attempt ->
+                    attempts.add(attempt)
+                    latestByCallId[attempt.id] = attempt
+                    attempt.executionId?.let { execution ->
+                        require(byExecutionId.put(execution, attempt) == null) {
+                            "工具投影检查点包含重复执行身份"
+                        }
+                    }
+                }
+                ambiguousLegacyCallIds.addAll(saved.ambiguousLegacyCallIds)
+            }
+        }
+    }
 
     fun observe(event: SessionEvent, stepHint: Int? = null) {
         observe(event.type, event.data, stepHint)

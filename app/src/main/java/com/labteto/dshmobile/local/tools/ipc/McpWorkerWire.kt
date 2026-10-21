@@ -8,6 +8,7 @@ internal object McpWorkerWire {
     const val CLOSE = 3
     const val RESPONSE = 4
     const val TERMINATED = 5
+    const val UPDATE_AUTH = 6
 
     // Binder calls share an OS transaction budget with framework metadata. A too-large
     // response must fail explicitly, never silently truncate a command or claim success.

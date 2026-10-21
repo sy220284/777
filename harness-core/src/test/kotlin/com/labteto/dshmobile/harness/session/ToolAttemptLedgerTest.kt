@@ -432,4 +432,23 @@ class ToolAttemptLedgerTest {
         assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
     }
 
+    @Test fun checkpointRestoresAdmissionAndLegacyAmbiguityForLateReceipts() {
+        val ledger = ToolAttemptLedger()
+        for (execution in listOf("first", "second")) {
+            ledger.observe("tool/execution-started", buildJsonObject {
+                put("id", "same"); put("execution_id", execution); put("read_only", false)
+            })
+        }
+        val restored = ToolAttemptLedger.fromCheckpoint(ledger.checkpoint())
+        assertEquals(ledger.snapshot(), restored.snapshot())
+        for (target in listOf(ledger, restored)) {
+            target.observe("tool/result", buildJsonObject { put("id", "same") })
+            target.observe("tool/result", buildJsonObject {
+                put("id", "same"); put("execution_id", "first")
+            })
+        }
+        assertEquals(ledger.snapshot(), restored.snapshot())
+        assertEquals("second", restored.pending().single().executionId)
+    }
+
 }
