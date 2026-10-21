@@ -342,7 +342,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val nativeDocuments = args.nativeDocuments
     val nativeDocumentSnapshot by (nativeDocuments?.snapshots ?: kotlinx.coroutines.flow.flowOf(
         com.labteto.dshmobile.uicontract.UiDocumentsSceneSnapshot(null, emptyList(), false, null)
-    )).collectAsState(initial = com.labteto.dshmobile.uicontract.UiDocumentsSceneSnapshot(null, emptyList(), false, null))
+    )).collectAsStateWithLifecycle(initialValue = com.labteto.dshmobile.uicontract.UiDocumentsSceneSnapshot(null, emptyList(), false, null))
     val onOpenWorkArtifact = args.onOpenWorkArtifact
     val activeModelProfile = args.activeModelProfile
     val sendFeedback = args.sendFeedback
@@ -419,7 +419,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val scope = rememberCoroutineScope()
     val appContext = LocalContext.current
     // Global ceiling changes must also refresh the exact per-model persona/Work projection.
-    val performanceCeiling = LocalModelPerformanceControls.state.collectAsState().value.temperatureCeiling
+    val performanceCeiling = LocalModelPerformanceControls.state.collectAsStateWithLifecycle().value.temperatureCeiling
     var reasoningMode by remember(state.sessionId, state.usageMode) {
         LocalReasoningControls.attach(appContext)
         mutableStateOf(LocalReasoningControls.mode(state.sessionId, state.usageMode))
