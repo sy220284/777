@@ -3,6 +3,9 @@ package com.labteto.dshmobile.local.session
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+/** Preserve the original snapshot on an impossible event cursor rather than replaying side effects. */
+internal class SessionProjectionCursorAheadException(message: String) : IllegalStateException(message)
+
 internal data class LocalSessionTranscriptRestore(
     val messages: List<LocalHarnessMessage>,
     val index: LocalTranscriptRuntimeIndex,
@@ -80,8 +83,10 @@ internal class LocalSessionCoordinator(
             else -> stored.messages.takeLast(runtimeWindowMessages)
         }
         val durableLatest = eventLog.latestSequence()
-        check(cursor <= durableLatest) {
-            "会话投影游标 $cursor 超出事件日志末尾 $durableLatest；拒绝静默跳过历史事件"
+        if (cursor > durableLatest) {
+            throw SessionProjectionCursorAheadException(
+                "会话投影游标 $cursor 超出事件日志末尾 $durableLatest；已停止自动恢复以保护历史",
+            )
         }
         val tailEvents = eventLog.snapshotAfter(cursor)
         val projected = projectSessionTranscriptTail(

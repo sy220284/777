@@ -24,6 +24,7 @@ import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.LocalSessionSnapshotBoundary
+import com.labteto.dshmobile.local.session.SessionProjectionCursorAheadException
 import com.labteto.dshmobile.local.work.LocalGoal
 import com.labteto.dshmobile.local.work.LocalTodoItem
 import com.labteto.dshmobile.local.work.LocalWorkState
@@ -35,6 +36,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -69,6 +71,30 @@ class LocalSessionCoordinatorTest {
         assertEquals(listOf("m3", "m4"), restored.messages.map { it.id })
         assertEquals(5L, restored.index.totalMessageCount)
         assertTrue(restored.needsPersist)
+    }
+
+    @Test
+    fun cursorBeyondAuthoritativeLogIsBlockedWithoutModifyingSnapshot() = runTest {
+        val json = Json { ignoreUnknownKeys = true }
+        val sessions = temporary.newFolder("cursor-ahead")
+        val repository = LocalSessionRepository(sessions, json, backgroundScope, {}, {})
+        val log = LocalSessionEventLog(File(sessions, "ahead.events.jsonl"), json)
+        val coordinator = LocalSessionCoordinator(
+            repository = repository,
+            eventLogFor = { log },
+            runtimeWindowMessages = 2,
+            domainCodecs = listOf(LocalChatSessionDomainCodec),
+        )
+        val persisted = LocalHarnessSession(
+            id = "ahead",
+            transcriptWindow = listOf(message("m1", "user", "待恢复")),
+            transcriptProjectedThroughSequence = 99L,
+        )
+        assertThrows(SessionProjectionCursorAheadException::class.java) {
+            coordinator.restoreTranscript(persisted, persistedSnapshotExists = true)
+        }
+        assertEquals(-1L, log.latestSequence())
+        assertEquals("待恢复", persisted.transcriptWindow.single().content)
     }
 
     @Test
