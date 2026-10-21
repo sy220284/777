@@ -4,6 +4,10 @@ import android.content.Context
 import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.security.KeyStore
+import java.util.Base64
+import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509TrustManager
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +38,9 @@ class BundledNodeRuntime @Inject constructor(
     @Volatile
     private var prepared = false
 
+    @Volatile
+    private var platformCaBundle: File? = null
+
     suspend fun prepare() = withContext(Dispatchers.IO) {
         // Multiple runtime instances may be created by startup, instrumentation and recovery.
         // Serialize the entire prepare/cleanup/link sequence, not only blob extraction.
@@ -56,7 +63,12 @@ class BundledNodeRuntime @Inject constructor(
 
             BundledRuntimeInstallation.removeOldVersions(runtimeHome, version)
 
+            // Node from the embedded Termux runtime cannot assume that a Termux filesystem
+            // or its OpenSSL CA directory exists inside this Android application.
+            // Export only roots the Android platform already trusts. Never disable TLS checks.
+            val caBundle = installPlatformCaBundle()
             activeLibraryDir = libraryDir
+            platformCaBundle = caBundle
             runtimeVersion = version
             prepared = true
         }
@@ -71,7 +83,47 @@ class BundledNodeRuntime @Inject constructor(
             "LD_LIBRARY_PATH" to listOf(libraryDir.path, nativeDir).joinToString(File.pathSeparator),
             "HOME" to context.filesDir.path,
             "TMPDIR" to context.cacheDir.path,
+            "NODE_EXTRA_CA_CERTS" to checkNotNull(platformCaBundle).absolutePath,
         )
+    }
+
+    private fun installPlatformCaBundle(): File {
+        val factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+        factory.init(null as KeyStore?)
+        val certificates = factory.trustManagers.filterIsInstance<X509TrustManager>()
+            .flatMap { it.acceptedIssuers.toList() }
+        check(certificates.isNotEmpty()) { "Android 系统未提供可信根证书，无法安全启用 Node HTTPS。" }
+        val pem = buildString {
+            certificates.map { it.encoded }.distinctBy { Base64.getEncoder().encodeToString(it) }
+                .forEach { encoded ->
+                    append("-----BEGIN CERTIFICATE-----\n")
+                    append(Base64.getMimeEncoder(64, "\n".toByteArray(Charsets.US_ASCII))
+                        .encodeToString(encoded))
+                    append("\n-----END CERTIFICATE-----\n")
+                }
+        }
+        val directory = File(context.noBackupFilesDir, "runtime/tls")
+        check(directory.isDirectory || directory.mkdirs()) { "Node 证书目录创建失败" }
+        val target = File(directory, "android-trusted-roots.pem")
+        if (target.isFile && target.readText() == pem) return target
+        val stage = File(directory, ".android-trusted-roots.pem.tmp")
+        try {
+            stage.outputStream().use { stream ->
+                stream.write(pem.toByteArray(Charsets.US_ASCII))
+                stream.flush()
+                stream.fd.sync()
+            }
+            check(stage.setReadable(false, false) && stage.setReadable(true, true) &&
+                stage.setWritable(false, false) && stage.setWritable(true, true)) {
+                "Node 证书文件权限设置失败"
+            }
+            java.nio.file.Files.move(stage.toPath(), target.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+        } finally {
+            stage.delete()
+        }
+        return target
     }
 
     fun status(): String = when {

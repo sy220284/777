@@ -209,7 +209,7 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
         binding: LocalWorkRunBinding,
         extraTokens: Int,
         summarize: suspend (LocalWorkSummaryRequest) -> String?,
-    ) {
+    ): Boolean {
         val history = binding.runHandle.modelHistory
         val source = history.snapshot()
         val snapshot = binding.aggregateSnapshot()
@@ -219,14 +219,14 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
             runtimeStateStore.historyBudgetFor(snapshot, runtimeStateStore.resourceSnapshot()),
             history.estimatedTokens, extraTokens, snapshot)
         val candidate = semanticWorkCompaction(source, budget, extraTokens,
-            structuredWorkState(snapshot, binding.eventLog, workSessionProjection), summarize) ?: return
+            structuredWorkState(snapshot, binding.eventLog, workSessionProjection), summarize) ?: return false
         kotlinx.coroutines.currentCoroutineContext().ensureActive()
         // The auxiliary request's own request/usage events may advance EventLog. Compare the
         // actual source history and Work state, rather than treating those events as edits.
         if (binding.runHandle.cancellationRequested || binding.eventLog.isClosed ||
             binding.eventLog.resetGeneration != generation || binding.steeringRevision.value != steering ||
             history.snapshot() != source || binding.state.value.work != snapshot.work ||
-            !LocalWorkSummarySettings.state.value) return
+            !LocalWorkSummarySettings.state.value) return false
         val sourceSequence = binding.eventLog.latestSequence()
         history.reset(candidate.messages)
         runtimeStateStore.requestPressureStore.advanceGeneration(binding.sessionId, candidate.estimatedTokensAfter)
@@ -241,6 +241,7 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
         checkpoint(binding, "session/semantic-compaction")
         updateContextMetrics(binding)
         persist(binding)
+        return true
     }
 
     internal fun persistOverflowCompaction(

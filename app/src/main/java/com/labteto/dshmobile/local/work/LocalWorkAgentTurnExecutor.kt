@@ -426,6 +426,15 @@ internal class LocalWorkAgentTurnExecutor(
                                 }
                             }
                             if (outcome is LocalWorkSamplingOutcome.Steered) continue
+                            // Optional remote background generation must never disable the existing
+                            // local, bounded and evidence-preserving compactor when it produces no
+                            // admissible history replacement. Revalidate steering and ownership
+                            // before touching the history after the auxiliary provider request.
+                            if (outcome is LocalWorkSamplingOutcome.Completed && !outcome.value) {
+                                agentRunCoordinator.ensureCurrentOwner(runContext)
+                                if (binding.steeringRevision.value != observedSteer) continue
+                                workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
+                            }
                         } else {
                             workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
                         }
