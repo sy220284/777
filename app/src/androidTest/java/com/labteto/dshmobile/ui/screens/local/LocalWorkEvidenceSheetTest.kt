@@ -27,6 +27,22 @@ import java.util.concurrent.atomic.AtomicInteger
 class LocalWorkEvidenceSheetTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun documentsListRemainsReachableFromSessionMenu() {
+        var opened = 0
+        compose.setContent {
+            DshTheme {
+                ConversationActionsMenu(
+                    pinned = false, onTogglePin = {}, onRename = {}, onDelete = {},
+                    onOpenDocuments = { opened++ },
+                )
+            }
+        }
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        compose.onNodeWithContentDescription(context.getString(R.string.local_session_actions)).performClick()
+        compose.onNodeWithTag("menu-item:" + context.getString(R.string.local_session_documents)).performClick()
+        compose.runOnIdle { assertEquals(1, opened) }
+    }
+
     @Test fun openingHistoryDoesNotStartHistoricalFilePreviews() {
         val previewReads = AtomicInteger(0)
         val artifact = LocalArtifactUiItem(
