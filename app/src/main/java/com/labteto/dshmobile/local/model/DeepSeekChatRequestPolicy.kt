@@ -26,7 +26,6 @@ internal object DeepSeekChatRequestPolicy {
                 uri.port in setOf(-1, 443) &&
                 uri.path.trimEnd('/') in setOf("", "/v1")
         }.getOrDefault(false)
-    }
 
     /**
      * Explicit output ceiling for a frozen request, not a promise to consume
