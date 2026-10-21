@@ -68,6 +68,7 @@ internal class LocalAgentModelRequestRuntime(
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
         allowImageGeneration: Boolean = false,
+        maxTokens: Int? = null,
         admission: LocalModelAdmissionPort? = null,
         beforeProviderInvoke: suspend () -> Unit = {},
         onDelta: (LocalModelDelta) -> Unit = {},
@@ -87,6 +88,7 @@ internal class LocalAgentModelRequestRuntime(
                     promptCacheKey = promptCacheKey,
                     promptCacheTtl = promptCacheTtl,
                     allowImageGeneration = allowImageGeneration,
+                    maxTokens = maxTokens,
                     onDelta = onDelta,
                 )
             } else {
@@ -102,6 +104,7 @@ internal class LocalAgentModelRequestRuntime(
                     promptCacheKey = promptCacheKey,
                     promptCacheTtl = promptCacheTtl,
                     allowImageGeneration = allowImageGeneration,
+                    maxTokens = maxTokens,
                 )
             }
         }
