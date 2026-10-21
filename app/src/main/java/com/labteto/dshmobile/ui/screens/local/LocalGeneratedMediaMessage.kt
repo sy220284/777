@@ -22,6 +22,7 @@ import android.net.Uri
 import android.widget.MediaController
 import android.widget.VideoView
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
@@ -102,6 +103,55 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** A visible media asset keeps its own deletion identity, including inside image galleries. */
+@Composable
+internal fun MediaDeleteTarget(
+    id: String,
+    onDelete: suspend (String) -> Unit,
+    enabled: Boolean = true,
+    isVideo: Boolean = false,
+    content: @Composable ((() -> Unit)?) -> Unit,
+) {
+    val resources = LocalResources.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var confirming by remember(id) { mutableStateOf(false) }
+    var deleting by remember(id) { mutableStateOf(false) }
+    var error by remember(id) { mutableStateOf<String?>(null) }
+    val requestDelete: (() -> Unit)? = if (enabled) {{
+        if (!deleting) { error = null; confirming = true }
+    }} else null
+    content(requestDelete)
+    if (confirming) {
+        ConfirmDialog(
+            title = resources.getString(R.string.media_studio_delete_record),
+            body = resources.getString(if (isVideo) R.string.media_delete_video_warning
+                else R.string.media_studio_confirm_delete),
+            confirmLabel = resources.getString(R.string.media_studio_delete_confirm),
+            onDismiss = { if (!deleting) confirming = false },
+            onConfirm = {
+                if (!deleting) {
+                    deleting = true
+                    scope.launch {
+                        try {
+                            onDelete(id)
+                            confirming = false
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (failure: Exception) {
+                            error = failure.message ?: resources.getString(R.string.media_chat_delete_failed)
+                            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                        } finally { deleting = false }
+                    }
+                }
+            },
+        )
+    }
+    error?.let {
+        Text(it, style = DsType.caption11.withReadingWeight(),
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+    }
+}
+
 /**
  * Chat-native presentation of persisted media work. The attached result is NOT a text turn,
  * so a fictional persona/model never gets a fabricated speech message in its history.
@@ -126,11 +176,16 @@ internal fun LocalCreationJobMessageRow(
         LocalMediaCreationPhase.FAILED -> R.string.media_chat_creation_failed
         LocalMediaCreationPhase.SUCCEEDED -> R.string.media_chat_creation_saved
     }
+    val removable = job.phase in setOf(LocalMediaCreationPhase.OUTCOME_UNKNOWN,
+        LocalMediaCreationPhase.FAILED, LocalMediaCreationPhase.SAVE_FAILED,
+        LocalMediaCreationPhase.SUCCEEDED)
+    MediaDeleteTarget(job.id, viewModel::dismissCreationJob, enabled = removable) { requestDelete ->
     MediaMessageCard(
         title = resources.getString(phase),
         subtitle = if (inline) "" else resources.getString(
             if (job.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
         inline = inline,
+        onLongPress = requestDelete,
     ) {
         job.prompt?.let { prompt ->
             Text(prompt, style = DsType.small13.withReadingWeight(),
@@ -159,6 +214,7 @@ internal fun LocalCreationJobMessageRow(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -180,20 +236,27 @@ internal fun LocalGeneratedMediaResultRow(
         LocalMediaKind.TRANSCRIBE.name -> resources.getString(R.string.media_chat_transcript_done)
         else -> resources.getString(R.string.media_chat_generic_result)
     }
+    MediaDeleteTarget(result.id, viewModel::removeResult) { requestDelete ->
     MediaMessageCard(
         title = if (inline && result.kind == LocalMediaKind.IMAGE.name) "" else label,
         subtitle = if (inline) "" else resources.getString(
             if (result.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
         inline = inline,
+        onLongPress = requestDelete,
     ) {
         when (result.kind) {
             LocalMediaKind.IMAGE.name -> {
                 MediaInlinePicture(
                     file = file, remoteUrl = result.remoteUrl,
                     onOpen = { showImageDetail = true },
+                    onLongPress = requestDelete,
                 )
                 if (showImageDetail) {
-                    MediaImageDetailDialog(file, result.remoteUrl, onDismiss = { showImageDetail = false })
+                    MediaImageDetailDialog(file, result.remoteUrl,
+                        onDismiss = { showImageDetail = false },
+                        onDeleteRequest = requestDelete?.let { request ->
+                            { showImageDetail = false; request() }
+                        })
                 }
             }
             LocalMediaKind.SPEECH.name -> {
@@ -237,6 +300,7 @@ internal fun LocalGeneratedMediaResultRow(
         }
         error?.let { Text(it, style = DsType.caption11, color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
     }
+    }
 }
 
 /**
@@ -270,20 +334,30 @@ internal fun LocalReplyImageGallery(
 ) {
     require(results.size in 2..4)
     var selectedId by remember { mutableStateOf<String?>(null) }
-    val chosen = results.firstOrNull { it.id == selectedId }
     MediaMessageCard(title = "", subtitle = "", inline = true) {
         ReplyMediaGrid(results.size) { index ->
             val image = results[index]
             androidx.compose.runtime.key(image.id) {
                 val file = remember(image.id, image.fileName) { viewModel.resultFile(image) }
-                MediaInlinePicture(file, image.remoteUrl, onOpen = { selectedId = image.id },
-                    contentDescription = "生成图片 ${index + 1} / ${results.size}")
+                MediaDeleteTarget(image.id, viewModel::removeResult) { requestDelete ->
+                    MediaInlinePicture(
+                        file, image.remoteUrl,
+                        onOpen = { selectedId = image.id },
+                        onLongPress = requestDelete,
+                        contentDescription = "生成图片 ${index + 1} / ${results.size}",
+                    )
+                    if (selectedId == image.id) {
+                        MediaImageDetailDialog(
+                            file, image.remoteUrl,
+                            onDismiss = { selectedId = null },
+                            onDeleteRequest = requestDelete?.let { request ->
+                                { selectedId = null; request() }
+                            },
+                        )
+                    }
+                }
             }
         }
-    }
-    if (chosen != null) {
-        val file = remember(chosen.id, chosen.fileName) { viewModel.resultFile(chosen) }
-        MediaImageDetailDialog(file, chosen.remoteUrl, onDismiss = { selectedId = null })
     }
 }
 
@@ -342,11 +416,15 @@ internal fun LocalGeneratedVideoTaskRow(
         LocalMediaVideoPhase.SUCCEEDED -> resources.getString(R.string.media_chat_video_done)
         LocalMediaVideoPhase.FAILED -> resources.getString(R.string.media_chat_generation_failed)
     }
+    val removable = task.phase in setOf(LocalMediaVideoPhase.OUTCOME_UNKNOWN,
+        LocalMediaVideoPhase.SUCCEEDED, LocalMediaVideoPhase.FAILED)
+    MediaDeleteTarget(task.id, viewModel::removeResult, enabled = removable, isVideo = true) { requestDelete ->
     MediaMessageCard(
         title = phase,
         subtitle = if (inline) "" else resources.getString(
             if (task.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
         inline = inline,
+        onLongPress = requestDelete,
     ) {
         task.description?.let {
             Text(it, style = DsType.small13.withReadingWeight(),
@@ -357,7 +435,8 @@ internal fun LocalGeneratedVideoTaskRow(
             if (showingPlayer) {
                 InlineVideoPlayer(task.downloadUrl.orEmpty(), localVideo, onError = { error = it })
             } else {
-                MediaVideoPoster(localVideo, onPlay = { showingPlayer = true })
+                MediaVideoPoster(localVideo, onPlay = { showingPlayer = true },
+                    onLongPress = requestDelete)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 if (showingPlayer) SyButton(
@@ -438,17 +517,22 @@ internal fun LocalGeneratedVideoTaskRow(
         error?.let { Text(it, color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             style = DsType.caption11.withReadingWeight()) }
     }
+    }
 }
 
 @Composable
 internal fun MediaMessageCard(
     title: String, subtitle: String, modifier: Modifier = Modifier,
     inline: Boolean = false,
+    onLongPress: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    val gesture = if (onLongPress == null) Modifier else Modifier.combinedClickable(
+        onClick = {}, onLongClick = onLongPress,
+    )
     Column(
-        modifier = modifier.fillMaxWidth(if (inline) 1f else 0.90f)
+        modifier = modifier.then(gesture).fillMaxWidth(if (inline) 1f else 0.90f)
             .widthIn(max = if (inline) 640.dp else 470.dp)
             .padding(vertical = if (inline) SyMetric.gapSm else SyMetric.gapMd),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
@@ -539,6 +623,7 @@ internal fun InlineReplyMediaActions(file: File, mime: String, onError: (String)
 internal fun MediaInlinePicture(
     file: File?, remoteUrl: String?, onOpen: (() -> Unit)? = null,
     contentDescription: String? = null,
+    onLongPress: (() -> Unit)? = null,
 ) {
     val resources = LocalResources.current
     var bitmap by remember(file?.absolutePath, remoteUrl) { mutableStateOf<ImageBitmap?>(null) }
@@ -555,7 +640,12 @@ internal fun MediaInlinePicture(
         .clip(DsShapes.block)
         .background(com.shenyan.designsystem.foundation.LocalSyColors.current.materialL3)
         .border(1.dp, com.shenyan.designsystem.foundation.LocalSyColors.current.border, DsShapes.block)
-    val modifier = if (onOpen != null) surface.clickable(onClick = onOpen) else surface
+    val modifier = when {
+        onLongPress != null -> surface.combinedClickable(
+            onClick = { onOpen?.invoke() }, onLongClick = onLongPress)
+        onOpen != null -> surface.clickable(onClick = onOpen)
+        else -> surface
+    }.testTag("mediaInlinePicture")
     if (image != null) {
         Image(bitmap = image, contentDescription = contentDescription
             ?: resources.getString(R.string.media_chat_generated_image),
@@ -632,6 +722,7 @@ private fun decodeMediaPreview(file: File?, remoteUrl: String?, maxEdge: Int = 1
 @Composable
 internal fun MediaImageDetailDialog(
     file: File?, remoteUrl: String?, onDismiss: () -> Unit,
+    onDeleteRequest: (() -> Unit)? = null,
 ) {
     val resources = LocalResources.current
     val context = LocalContext.current
@@ -660,6 +751,12 @@ internal fun MediaImageDetailDialog(
             Toast.LENGTH_SHORT).show()
     }
     val actions = buildList {
+        if (onDeleteRequest != null) add(SyMenuItem(
+            text = resources.getString(R.string.media_studio_delete_record),
+            icon = FeatherIcons.Trash2,
+            onClick = onDeleteRequest,
+            danger = true,
+        ))
         if (localFile != null) {
             add(SyMenuItem(
                 text = resources.getString(R.string.media_action_save),
@@ -713,7 +810,8 @@ internal fun MediaImageDetailDialog(
                             translationY = offsetY
                         }
                         .testTag("mediaImageContent")
-                        .clickable(onClick = {}),
+                        .then(if (onDeleteRequest == null) Modifier.clickable(onClick = {})
+                            else Modifier.combinedClickable(onClick = {}, onLongClick = onDeleteRequest)),
                 )
             } else {
                 Text(
@@ -748,7 +846,8 @@ internal fun MediaImageDetailDialog(
 
 /** The first saved video frame replaces the empty playback slab; preparation is off the UI thread. */
 @Composable
-private fun MediaVideoPoster(file: File?, onPlay: () -> Unit) {
+private fun MediaVideoPoster(file: File?, onPlay: () -> Unit,
+    onLongPress: (() -> Unit)? = null) {
     val resources = LocalResources.current
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var poster by remember(file?.absolutePath) { mutableStateOf<ImageBitmap?>(null) }
@@ -764,10 +863,12 @@ private fun MediaVideoPoster(file: File?, onPlay: () -> Unit) {
             }.getOrNull()
         }
     }
+    val gesture = if (onLongPress == null) Modifier.clickable(onClick = onPlay)
+        else Modifier.combinedClickable(onClick = onPlay, onLongClick = onLongPress)
     Box(
         modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
             .clip(DsShapes.block).background(colors.materialL3)
-            .clickable(onClick = onPlay),
+            .then(gesture),
         contentAlignment = androidx.compose.ui.Alignment.Center,
     ) {
         poster?.let {

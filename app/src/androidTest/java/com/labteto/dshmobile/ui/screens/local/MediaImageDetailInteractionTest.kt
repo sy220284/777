@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -12,7 +13,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.testTag
 import androidx.test.core.app.ApplicationProvider
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.io.File
@@ -114,6 +117,60 @@ class MediaImageDetailInteractionTest {
         compose.onNodeWithText("复制").assertDoesNotExist()
         compose.onNodeWithText("为此回复生成交互文档").performClick()
         compose.runOnIdle { assertTrue(createdDocuments == 1) }
+    }
+
+
+    @Test fun longPressImageRequestsConfirmedDeletionWithoutOpeningPreview() {
+        var opened = 0
+        var deleted = ""
+        compose.setContent {
+            DshTheme {
+                MediaDeleteTarget(id = "image-one", onDelete = { deleted = it }) { requestDelete ->
+                    MediaInlinePicture(file = null, remoteUrl = null,
+                        onOpen = { opened++ }, onLongPress = requestDelete)
+                }
+            }
+        }
+        compose.onNodeWithTag("mediaInlinePicture").performTouchInput { longClick() }
+        compose.onNodeWithText("确认删除").assertIsDisplayed()
+        compose.runOnIdle { assertTrue(opened == 0 && deleted.isEmpty()) }
+        compose.onNodeWithText("确认删除").performClick()
+        compose.waitUntil(5_000) { deleted == "image-one" }
+        compose.runOnIdle { assertTrue(opened == 0) }
+    }
+
+    @Test fun videoAndAudioCardsKeepLongPressDeletionButPendingCannotDelete() {
+        var deleted = ""
+        compose.setContent {
+            DshTheme {
+                androidx.compose.foundation.layout.Column {
+                    MediaDeleteTarget(id = "audio-one", onDelete = { deleted = it }) { request ->
+                        MediaMessageCard(title = "语音成果", subtitle = "",
+                            modifier = androidx.compose.ui.Modifier.testTag("audioDeletion"),
+                            onLongPress = request) {
+                            androidx.compose.material3.Text("音频播放")
+                        }
+                    }
+                    MediaDeleteTarget(id = "still-generating", enabled = false,
+                        onDelete = { deleted = it }) { request ->
+                        MediaMessageCard(title = "生成中", subtitle = "",
+                            modifier = androidx.compose.ui.Modifier.testTag("pendingDeletion"),
+                            onLongPress = request) {
+                            androidx.compose.material3.Text("正在处理")
+                        }
+                    }
+                }
+            }
+        }
+        compose.onNodeWithTag("pendingDeletion").performTouchInput { longClick() }
+        compose.onNodeWithText("确认删除").assertDoesNotExist()
+        compose.onNodeWithTag("audioDeletion").performTouchInput { longClick() }
+        compose.onNodeWithText("确认删除").assertIsDisplayed()
+        compose.onNodeWithText("取消").performClick()
+        compose.runOnIdle { assertTrue(deleted.isEmpty()) }
+        compose.onNodeWithTag("audioDeletion").performTouchInput { longClick() }
+        compose.onNodeWithText("确认删除").performClick()
+        compose.waitUntil(5_000) { deleted == "audio-one" }
     }
 
     @Test fun zoomedOverlayDoesNotDismissOnBackgroundTap() {
