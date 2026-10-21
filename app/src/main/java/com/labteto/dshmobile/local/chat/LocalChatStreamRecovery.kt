@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.session.CHAT_STREAM_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
@@ -9,7 +10,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /** Visible text only. No reasoning, tool arguments or executable model-history changes. */
-internal const val CHAT_STREAM_CHECKPOINT_EVENT = "chat/stream-checkpoint"
 private const val CHAT_PARTIAL_VISIBLE_EVENT = "assistant/partial-visible"
 
 /** Materialize a stranded Chat checkpoint at most once, without replaying the provider request. */

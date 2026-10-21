@@ -10,6 +10,9 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
 
+/** Shared durable event contract for visible Chat checkpoints (never model history). */
+internal const val CHAT_STREAM_CHECKPOINT_EVENT = "chat/stream-checkpoint"
+
 /** Stable reasoning row identity tied to its visible Chat assistant answer. */
 internal fun chatReasoningTranscriptId(assistantId: String): String = "reasoning:$assistantId"
 

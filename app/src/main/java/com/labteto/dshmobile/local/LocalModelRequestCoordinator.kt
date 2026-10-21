@@ -36,7 +36,7 @@ import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
 import com.labteto.dshmobile.local.model.LocalRequestReconstruction
 import com.labteto.dshmobile.local.model.reconstructLocalModelRequest
 import com.labteto.dshmobile.local.model.LocalStreamPreview
-import com.labteto.dshmobile.local.chat.CHAT_STREAM_CHECKPOINT_EVENT
+import com.labteto.dshmobile.local.session.CHAT_STREAM_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.modelTransportFailureKind
 import com.labteto.dshmobile.local.model.redactModelImages
