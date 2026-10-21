@@ -36,7 +36,7 @@ import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
 import com.labteto.dshmobile.local.model.LocalRequestReconstruction
 import com.labteto.dshmobile.local.model.reconstructLocalModelRequest
 import com.labteto.dshmobile.local.model.LocalStreamPreview
-import com.labteto.dshmobile.local.session.CHAT_STREAM_CHECKPOINT_EVENT
+import com.labteto.dshmobile.local.session.LocalChatStreamCheckpointWriter
 import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.modelTransportFailureKind
 import com.labteto.dshmobile.local.model.redactModelImages
@@ -820,24 +820,14 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 ?.let { streamingPreviewStore.publishAssistant(it, preview) }
                         },
                     )
-                    // Durable, bounded Chat checkpoints contain only visible, UI-filtered text.
-                    // They do not become model history, and Work/tool/reasoning stays excluded.
+                    // Checkpoint only the same filtered Chat text sent to the visible preview.
+                    // Chunking avoids repeatedly fsync-ing a growing 65 KiB snapshot.
                     val durableChatPreview = if (snapshot.usageMode == LocalUsageMode.CHAT &&
-                        step == 1 && publishPreviewEnabled) LocalStreamPreview(
-                        maxChars = maxStreamPreviewChars,
-                        minIntervalMs = 3_000L,
-                        clockMs = { System.nanoTime() / 1_000_000 },
-                        publish = { content ->
-                            if (content.isNotBlank()) try {
-                                log.append(CHAT_STREAM_CHECKPOINT_EVENT, buildJsonObject {
-                                    put("request_uid", requestUid)
-                                    put("mode", "chat")
-                                    put("content", content)
-                                })
-                            } catch (failure: Exception) {
-                                // Optional durability failure must not destroy the live reply.
-                                AppLog.warn("LocalModelRequest", "chat_stream_checkpoint_failed", failure)
-                            }
+                        step == 1 && publishPreviewEnabled) LocalChatStreamCheckpointWriter(
+                        log = log,
+                        requestUid = requestUid,
+                        onFailure = { failure ->
+                            AppLog.warn("LocalModelRequest", "chat_stream_checkpoint_failed", failure)
                         },
                     ) else null
                     // Every protocol already emits normalized content/reasoning deltas.

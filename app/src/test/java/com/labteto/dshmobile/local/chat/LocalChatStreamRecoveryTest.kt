@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.session.CHAT_STREAM_CHECKPOINT_EVENT
+import com.labteto.dshmobile.local.session.LocalChatStreamCheckpointWriter
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.decodeTranscriptMessages
 import java.nio.file.Files
@@ -14,28 +15,27 @@ import org.junit.Test
 
 class LocalChatStreamRecoveryTest {
     @Test
-    fun strandedCheckpointBecomesOneDurableVisiblePartial() {
+    fun strandedMultipleChunksRecoverOnceWithoutModelReplay() {
         val directory = Files.createTempDirectory("chat-stream-recovery").toFile()
         try {
             val log = LocalSessionEventLog(directory.resolve("events.jsonl"), Json)
             log.append("turn/start", buildJsonObject { put("mode", "chat") })
-            log.append(CHAT_STREAM_CHECKPOINT_EVENT, buildJsonObject {
-                put("mode", "chat")
-                put("request_uid", "request-one")
-                put("content", "已交付的部分文本")
-            })
+            var now = 0L
+            val writer = LocalChatStreamCheckpointWriter(log, "request-one", { now }, chunkChars = 4)
+            writer.append("第一段")
+            now = 4_000L
+            writer.append("第二段")
+            writer.flush()
             val recovered = recoverInterruptedChatReply(log)
             assertNotNull(recovered)
             assertEquals("interrupted-stream:request-one", recovered!!.id)
-            assertEquals("【部分回复 · 本轮未完成】\n已交付的部分文本", recovered.content)
+            assertEquals("【部分回复 · 本轮未完成】\n第一段第二段", recovered.content)
             assertNull(recoverInterruptedChatReply(log))
             val recorded = log.latest("assistant/partial-visible")
             assertNotNull(recorded)
             assertEquals(recovered, decodeTranscriptMessages(recorded!!.data)!!.single())
             assertEquals(1, log.snapshot().count { it.type == "assistant/partial-visible" })
-        } finally {
-            directory.deleteRecursively()
-        }
+        } finally { directory.deleteRecursively() }
     }
 
     @Test
@@ -44,19 +44,15 @@ class LocalChatStreamRecoveryTest {
         try {
             val log = LocalSessionEventLog(directory.resolve("events.jsonl"), Json)
             log.append("turn/start", buildJsonObject { put("mode", "chat") })
-            log.append(CHAT_STREAM_CHECKPOINT_EVENT, buildJsonObject {
-                put("mode", "chat")
-                put("request_uid", "request-two")
-                put("content", "生成中")
-            })
+            val writer = LocalChatStreamCheckpointWriter(log, "request-two")
+            writer.append("生成中")
+            writer.flush()
             log.append("assistant/message", buildJsonObject {
                 put("role", "assistant")
                 put("content", "完整回复")
             })
             assertNull(recoverInterruptedChatReply(log))
-        } finally {
-            directory.deleteRecursively()
-        }
+        } finally { directory.deleteRecursively() }
     }
 
     @Test
@@ -65,14 +61,41 @@ class LocalChatStreamRecoveryTest {
         try {
             val log = LocalSessionEventLog(directory.resolve("events.jsonl"), Json)
             log.append("turn/start", buildJsonObject { put("mode", "chat") })
-            log.append(CHAT_STREAM_CHECKPOINT_EVENT, buildJsonObject {
-                put("request_uid", "old")
-                put("content", "旧的回复")
-            })
+            LocalChatStreamCheckpointWriter(log, "old").apply { append("旧的回复"); flush() }
             log.append("turn/start", buildJsonObject { put("mode", "chat") })
             assertNull(recoverInterruptedChatReply(log))
-        } finally {
-            directory.deleteRecursively()
-        }
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test
+    fun missingCheckpointChunkNeverProducesInventedAssistantText() {
+        val directory = Files.createTempDirectory("chat-stream-torn").toFile()
+        try {
+            val log = LocalSessionEventLog(directory.resolve("events.jsonl"), Json)
+            log.append("turn/start", buildJsonObject { put("mode", "chat") })
+            log.append(CHAT_STREAM_CHECKPOINT_EVENT, buildJsonObject {
+                put("request_uid", "broken")
+                put("chunk_index", 1)
+                put("content", "尾部")
+            })
+            assertNull(recoverInterruptedChatReply(log))
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test
+    fun longStreamStoresIncrementalBoundedChunksInsteadOfSnapshots() {
+        val directory = Files.createTempDirectory("chat-stream-long").toFile()
+        try {
+            val log = LocalSessionEventLog(directory.resolve("events.jsonl"), Json)
+            log.append("turn/start", buildJsonObject { put("mode", "chat") })
+            val writer = LocalChatStreamCheckpointWriter(log, "long", chunkChars = 16)
+            val expected = "ab".repeat(200)
+            expected.chunked(7).forEach(writer::append)
+            writer.flush()
+            val rows = log.snapshot().filter { it.type == CHAT_STREAM_CHECKPOINT_EVENT }
+            assertEquals(expected, rows.joinToString("") { it.data["content"]!!.toString().trim('"') })
+            assertEquals(rows.indices.toList(), rows.map { it.data["chunk_index"].toString().toInt() })
+            assertEquals("【部分回复 · 本轮未完成】\n$expected", recoverInterruptedChatReply(log)!!.content)
+        } finally { directory.deleteRecursively() }
     }
 }
