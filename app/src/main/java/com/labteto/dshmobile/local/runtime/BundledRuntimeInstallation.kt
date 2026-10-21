@@ -16,8 +16,8 @@ internal object BundledRuntimeInstallation {
      */
     @Synchronized
     fun prepareVersion(context: Context, runtime: String, versionRoot: File, version: String, abi: String,
-        initialize: () -> Unit = {},
         extraReady: () -> Boolean = { true },
+        initialize: () -> Unit = {},
     ) {
         val lockDir = File(context.noBackupFilesDir, "runtime/shared/$abi")
         check(lockDir.isDirectory || lockDir.mkdirs()) { "无法建立共享运行库锁目录：${lockDir.path}" }
