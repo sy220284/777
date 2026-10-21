@@ -352,7 +352,7 @@ class ToolAttemptLedgerTest {
     }
 
     @Test
-    fun secondExecutionIdentityCannotReplaceAnUnsettledAdmission() {
+    fun secondExecutionIdentitySettlesSeparatelyWithoutReplacingFirstAdmission() {
         val ledger = ToolAttemptLedger()
         ledger.observe("tool/call", buildJsonObject {
             put("id", "call"); put("goal_id", "goal"); put("execution_started", false)
@@ -366,6 +366,8 @@ class ToolAttemptLedgerTest {
         ledger.observe("tool/result", buildJsonObject {
             put("id", "call"); put("execution_id", "second"); put("is_error", false)
         })
+        assertEquals(2, ledger.snapshot().size)
+        assertTrue(ledger.snapshot().last().settled)
         assertEquals("first", ledger.pending().single().executionId)
         assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
         ledger.observe("tool/result", buildJsonObject {
@@ -399,6 +401,35 @@ class ToolAttemptLedgerTest {
         })
         assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
         assertEquals("shared", ledger.pending().first().executionId)
+    }
+
+    @Test fun distinctAdmissionsWithReusedCallIdRemainSeparateWithoutDeclarations() {
+        val ledger = ToolAttemptLedger()
+        fun start(execution: String, readOnly: Boolean) {
+            ledger.observe("tool/execution-started", buildJsonObject {
+                put("id", "reused"); put("execution_id", execution); put("read_only", readOnly)
+                put("attributes", buildJsonObject { put("goal_id", "goal"); put("run_id", "run") })
+            })
+        }
+        start("first", true)
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "reused"); put("execution_id", "first"); put("is_error", false)
+        })
+        start("second", false)
+        assertEquals(2, ledger.snapshot().size)
+        assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "reused"); put("execution_id", "second")
+            put("is_error", true); put("error_code", "TOOL_OUTCOME_UNKNOWN")
+        })
+        assertEquals(ToolAttemptState.UNKNOWN_EXTERNAL_EFFECT, ledger.snapshot().last().state)
+        // A delayed duplicate of the first admission/receipt cannot hide the second.
+        start("first", true)
+        ledger.observe("tool/result", buildJsonObject {
+            put("id", "reused"); put("execution_id", "first"); put("is_error", false)
+        })
+        assertEquals(2, ledger.snapshot().size)
+        assertTrue(ledger.hasUnresolvedExternalEffects("goal"))
     }
 
 }

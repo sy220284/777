@@ -97,7 +97,6 @@ internal fun hasUnsettledWorkGoalTaskGraphs(
     return ledger.unresolvedForGoal(goal.id).isNotEmpty()
 }
 
-/** A disposable, read-only incremental fold of the authoritative Session log. */
 /**
  * One disposable, read-only fold of the authoritative Session EventLog.
  *
@@ -109,14 +108,32 @@ internal class LocalWorkOpenGraphProjection {
     private var generation = -1L
     private var throughSequence = -1L
     private var ledger = LocalWorkTaskGraphRecoveryLedger()
-    private val accepted = linkedMapOf<String, MutableMap<String, LocalSessionEventLog.Event>>()
-    private val jobResultsBySequence = linkedMapOf<Long, LocalSessionEventLog.Event>()
-    private val jobResultsById = linkedMapOf<String, LocalSessionEventLog.Event>()
-    private val admissions = linkedMapOf<Pair<String, String>, MutableList<JsonObject>>()
+    private val accepted = linkedMapOf<String, MutableMap<String, Long>>()
+    private val jobResultsBySequence = linkedMapOf<Long, String?>()
+    private val jobResultsById = linkedMapOf<String, Long>()
+    private val admissions = linkedMapOf<Pair<String, String>, MutableList<Long>>()
     private val runsByAgent = linkedMapOf<String, MutableSet<String>>()
-    private val startsByRun = linkedMapOf<String, MutableList<LocalSessionEventLog.Event>>()
-    private val resultsByJob = linkedMapOf<String, MutableList<LocalSessionEventLog.Event>>()
-    private val historyCheckpoints = linkedMapOf<String, LocalSessionEventLog.Event>()
+    private val startsByRun = linkedMapOf<String, MutableList<Long>>()
+    private val resultsByJob = linkedMapOf<String, MutableList<Long>>()
+    private val historyCheckpoints = linkedMapOf<String, Long>()
+    private val callsByAgent = linkedMapOf<String, MutableList<Long>>()
+    private val toolResults = linkedMapOf<Triple<String, String?, String?>, Long>()
+    private class JobTools(val runs: Set<String>) {
+        val ledger = ToolAttemptLedger()
+        var throughSequence = -1L
+    }
+    private val toolsByJob = linkedMapOf<String, JobTools>()
+
+    // Retain only sequence/identity indices, never complete output, arguments or history.
+    // Closed graph/Job evidence remains addressable without truncating durable facts.
+    private fun eventAt(log: LocalSessionEventLog, sequence: Long): LocalSessionEventLog.Event? =
+        log.pageAfter(sequence - 1L, 1).firstOrNull()?.takeIf { it.sequence == sequence }
+
+    private fun List<Long>.after(sequence: Long): List<Long> {
+        val found = binarySearch(sequence)
+        val from = if (found >= 0) found + 1 else -found - 1
+        return subList(from, size)
+    }
 
     private fun reset() {
         throughSequence = -1L
@@ -129,6 +146,9 @@ internal class LocalWorkOpenGraphProjection {
         startsByRun.clear()
         resultsByJob.clear()
         historyCheckpoints.clear()
+        callsByAgent.clear()
+        toolResults.clear()
+        toolsByJob.clear()
     }
 
     private fun refresh(log: LocalSessionEventLog) {
@@ -145,14 +165,14 @@ internal class LocalWorkOpenGraphProjection {
             val node = (data["node_id"] as? JsonPrimitive)?.contentOrNull
             when (event.type) {
                 "taskgraph/node-accepted" -> if (!execution.isNullOrBlank() && !node.isNullOrBlank()) {
-                    accepted.getOrPut(execution) { linkedMapOf() }[node] = event
+                    accepted.getOrPut(execution) { linkedMapOf() }[node] = event.sequence
                 }
                 "taskgraph/job-result" -> {
-                    jobResultsBySequence[event.sequence] = event
-                    (data["job_id"] as? JsonPrimitive)?.contentOrNull?.let { jobResultsById[it] = event }
+                    jobResultsBySequence[event.sequence] = execution
+                    (data["job_id"] as? JsonPrimitive)?.contentOrNull?.let { jobResultsById[it] = event.sequence }
                 }
                 "taskgraph/job-admitted" -> if (!execution.isNullOrBlank() && !node.isNullOrBlank()) {
-                    admissions.getOrPut(execution to node) { mutableListOf() }.add(data)
+                    admissions.getOrPut(execution to node) { mutableListOf() }.add(event.sequence)
                 }
                 "agent/subagent-run-checkpoint" -> {
                     val agentId = (data["agent_id"] as? JsonPrimitive)?.contentOrNull
@@ -164,11 +184,20 @@ internal class LocalWorkOpenGraphProjection {
                 "tool/execution-started" -> {
                     val attributes = data["attributes"] as? JsonObject
                     val runId = (attributes?.get("run_id") as? JsonPrimitive)?.contentOrNull
-                    if (!runId.isNullOrBlank()) startsByRun.getOrPut(runId) { mutableListOf() }.add(event)
+                    if (!runId.isNullOrBlank()) startsByRun.getOrPut(runId) { mutableListOf() }.add(event.sequence)
+                }
+                "subagent/tool-call" -> {
+                    val agentId = (data["agent_id"] as? JsonPrimitive)?.contentOrNull
+                    if (!agentId.isNullOrBlank()) callsByAgent.getOrPut(agentId) { mutableListOf() }.add(event.sequence)
                 }
                 "subagent/tool-result" -> {
                     val jobId = (data["background_job_id"] as? JsonPrimitive)?.contentOrNull
-                    if (!jobId.isNullOrBlank()) resultsByJob.getOrPut(jobId) { mutableListOf() }.add(event)
+                    if (!jobId.isNullOrBlank()) {
+                        resultsByJob.getOrPut(jobId) { mutableListOf() }.add(event.sequence)
+                        val executionId = (data["execution_id"] as? JsonPrimitive)?.contentOrNull
+                        val callId = (data["id"] as? JsonPrimitive)?.contentOrNull
+                        toolResults[Triple(jobId, executionId, callId)] = event.sequence
+                    }
                 }
                 LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT -> {
                     val jobId = (data["background_job_id"] as? JsonPrimitive)?.contentOrNull
@@ -176,7 +205,7 @@ internal class LocalWorkOpenGraphProjection {
                     // Match the authoritative reverse predicate: an unrelated checkpoint must
                     // not hide an earlier valid checkpoint for this persistent Job.
                     if (!jobId.isNullOrBlank() && agentId == localPersistentSubagentId(jobId)) {
-                        historyCheckpoints[jobId] = event
+                        historyCheckpoints[jobId] = event.sequence
                     }
                 }
             }
@@ -193,32 +222,37 @@ internal class LocalWorkOpenGraphProjection {
     @Synchronized
     fun acceptedFor(log: LocalSessionEventLog, execution: String): Pair<Map<String, JsonObject>, Map<Long, JsonObject>> {
         refresh(log)
-        val facts = accepted[execution].orEmpty().mapValues { it.value.data }
-        val results = facts.values.mapNotNull { (it["result_sequence"] as? JsonPrimitive)?.contentOrNull?.toLongOrNull() }
-            .distinct().mapNotNull { sequence ->
-                jobResultsBySequence[sequence]?.takeIf { event ->
-                    (event.data["graph_execution_id"] as? JsonPrimitive)?.contentOrNull == execution
-                }?.let { sequence to it.data }
-            }.toMap()
+        val indices = accepted[execution].orEmpty()
+        val events = log.latestMatchingByKey(setOf("taskgraph/node-accepted"), indices.values.toSet()) { it.sequence }
+        val facts = indices.mapNotNull { (node, sequence) ->
+            events[sequence]?.let { node to it.data }
+        }.toMap()
+        val resultSequences = facts.values.mapNotNull {
+            (it["result_sequence"] as? JsonPrimitive)?.contentOrNull?.toLongOrNull()
+        }.filter { jobResultsBySequence[it] == execution }.toSet()
+        val results = log.latestMatchingByKey(setOf("taskgraph/job-result"), resultSequences) { it.sequence }
+            .mapValues { it.value.data }
         return facts to results
     }
 
     @Synchronized
     fun acceptedNode(log: LocalSessionEventLog, execution: String, nodeId: String): LocalSessionEventLog.Event? {
         refresh(log)
-        return accepted[execution]?.get(nodeId)
+        return accepted[execution]?.get(nodeId)?.let { eventAt(log, it) }
     }
 
     @Synchronized
     fun nodeAdmissions(log: LocalSessionEventLog, execution: String, nodeId: String): List<JsonObject> {
         refresh(log)
-        return admissions[execution to nodeId]?.toList().orEmpty()
+        val sequences = admissions[execution to nodeId].orEmpty()
+        val events = log.latestMatchingByKey(setOf("taskgraph/job-admitted"), sequences.toSet()) { it.sequence }
+        return sequences.mapNotNull { events[it]?.data }
     }
 
     @Synchronized
     fun jobResult(log: LocalSessionEventLog, jobId: String): LocalSessionEventLog.Event? {
         refresh(log)
-        return jobResultsById[jobId]
+        return jobResultsById[jobId]?.let { eventAt(log, it) }
     }
 
     /**
@@ -228,20 +262,42 @@ internal class LocalWorkOpenGraphProjection {
     @Synchronized
     fun toolAttempts(log: LocalSessionEventLog, jobId: String): List<ToolAttemptLedger.Attempt> {
         refresh(log)
-        val runs = runsByAgent[localPersistentSubagentId(jobId)].orEmpty()
-        val events = runs.flatMap { startsByRun[it].orEmpty() } + resultsByJob[jobId].orEmpty()
-        val attempts = ToolAttemptLedger()
-        events.sortedBy(LocalSessionEventLog.Event::sequence).forEach { event ->
-            if (event.type == "subagent/tool-result") attempts.observe("tool/result", event.data)
-            else attempts.observe(event.type, event.data)
+        val agent = localPersistentSubagentId(jobId)
+        val runs = runsByAgent[agent].orEmpty()
+        val state = toolsByJob[jobId]?.takeIf { it.runs == runs }
+            ?: JobTools(runs.toSet()).also { toolsByJob[jobId] = it }
+        // Only newly appended facts are reduced. If a late checkpoint associates an older
+        // Run, rebuild from the same durable indices so cold and live recovery agree.
+        val sequences = runs.flatMap { startsByRun[it].orEmpty().after(state.throughSequence) } +
+            resultsByJob[jobId].orEmpty().after(state.throughSequence) +
+            callsByAgent[agent].orEmpty().after(state.throughSequence)
+        val remaining = sequences.toMutableSet()
+        // Read the new tail once, rather than reopening/redecoding the segment per fact.
+        try {
+            if (remaining.isNotEmpty()) log.forEachAfter(state.throughSequence) { event ->
+                if (!remaining.remove(event.sequence)) return@forEachAfter
+                val type = when (event.type) {
+                    "subagent/tool-call" -> "tool/call"
+                    "subagent/tool-result" -> "tool/result"
+                    else -> event.type
+                }
+                state.ledger.observe(type, event.data)
+            }
+            // An indexed admission cannot disappear during reread and become a safe result.
+            check(remaining.isEmpty()) { "任务工具执行记录读取不完整，无法确认执行结果。" }
+        } catch (error: Exception) {
+            // A partial fold must be rebuilt before retry, including declarations.
+            toolsByJob.remove(jobId)
+            throw error
         }
-        return attempts.snapshot()
+        state.throughSequence = throughSequence
+        return state.ledger.snapshot()
     }
 
     @Synchronized
     fun historyCheckpoint(log: LocalSessionEventLog, jobId: String): LocalSessionEventLog.Event? {
         refresh(log)
-        return historyCheckpoints[jobId]?.takeIf { checkpoint ->
+        return historyCheckpoints[jobId]?.let { eventAt(log, it) }?.takeIf { checkpoint ->
             (checkpoint.data["agent_id"] as? JsonPrimitive)?.contentOrNull == localPersistentSubagentId(jobId)
         }
     }
@@ -249,10 +305,7 @@ internal class LocalWorkOpenGraphProjection {
     @Synchronized
     fun toolResult(log: LocalSessionEventLog, jobId: String, executionId: String, callId: String): LocalSessionEventLog.Event? {
         refresh(log)
-        return resultsByJob[jobId]?.asReversed()?.firstOrNull { event ->
-            (event.data["execution_id"] as? JsonPrimitive)?.contentOrNull == executionId &&
-                (event.data["id"] as? JsonPrimitive)?.contentOrNull == callId
-        }
+        return toolResults[Triple(jobId, executionId, callId)]?.let { eventAt(log, it) }
     }
 }
 

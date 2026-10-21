@@ -152,7 +152,18 @@ class ToolAttemptLedger {
                 // Replayed or delayed admissions may neither rebind a provider call ID
                 // nor rewrite the Run/read-only contract of an earlier invocation.
                 if (known != null && known.id != id) return
-                val attempt = known ?: track(id)
+                val latest = latestByCallId[id]
+                // Admission is an authoritative execution fact even when a consumer did not
+                // observe the declaration. A new execution must not disappear behind an
+                // earlier admission with the same request-scoped provider call ID.
+                val attempt = known ?: if (executionId != null && latest != null &&
+                    (latest.admissionObserved || latest.settled || latest.executionId != null)) {
+                    ambiguousLegacyCallIds += id
+                    MutableAttempt(id).also {
+                        attempts.add(it)
+                        latestByCallId[id] = it
+                    }
+                } else track(id)
                 if (attempt.admissionObserved || attempt.settled || attempt.executionId != null) return
                 attempt.apply {
                     name = readString(data, "name") ?: name
