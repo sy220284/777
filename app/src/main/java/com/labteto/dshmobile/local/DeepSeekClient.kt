@@ -27,7 +27,6 @@ import com.labteto.dshmobile.local.model.withModelAdmissionTracking
 import com.labteto.dshmobile.local.tools.LocalToolCatalog
 import com.labteto.dshmobile.local.tools.long
 import java.io.ByteArrayOutputStream
-import java.net.URI
 import java.net.SocketTimeoutException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
