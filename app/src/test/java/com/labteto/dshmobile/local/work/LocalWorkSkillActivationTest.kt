@@ -192,4 +192,26 @@ class LocalWorkSkillActivationTest {
             discoverLocalWorkSkills("Improve the UI", emptySet(), catalog).map { it.first })
         assertTrue(discoverLocalWorkSkills("Prepare printable forms", emptySet(), catalog).isEmpty())
     }
+    @Test fun sentencePrepositionsCannotDisplaceRelevantSkills() {
+        val unrelated = (1..8).map { index ->
+            "invoice-$index" to LocalSkillMetadata("invoice-$index", "specialist checks",
+                whenToUse = "Use this skill to audit invoices")
+        }
+        val catalog = unrelated + ("icon-art" to LocalSkillMetadata("icon-art", "draw icons"))
+        assertEquals(listOf("icon-art"), discoverLocalWorkSkills(
+            "Help me to draw icons", emptySet(), catalog).map { it.first })
+        for (word in listOf("to", "in", "on", "of")) {
+            val sentence = listOf("invoice-check" to LocalSkillMetadata("invoice-check",
+                "specialist checks", whenToUse = "Use this skill $word audit invoices"))
+            assertTrue(discoverLocalWorkSkills("Help me $word draw icons", emptySet(), sentence).isEmpty())
+        }
+    }
+
+    @Test fun shortTagsInSentencesRemainDiscoverable() {
+        val catalog = listOf("interface-helper" to LocalSkillMetadata("interface-helper",
+            "specialist checks", whenToUse = "Use this skill to review ui layouts"))
+        assertEquals(listOf("interface-helper"), discoverLocalWorkSkills(
+            "Improve the UI", emptySet(), catalog).map { it.first })
+    }
+
 }

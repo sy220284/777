@@ -99,11 +99,16 @@ internal fun discoverLocalWorkSkills(
     val task = input.lowercase(Locale.ROOT)
     if (task.isBlank() || limit <= 0) return emptyList()
     val delimiters = Regex("[，、。；;,|/\\s]+")
-    val ignored = setOf("with", "from", "into", "using", "about", "that", "this", "your", "the", "and", "for")
+    val ignored = setOf(
+        "with", "from", "into", "using", "about", "that", "this", "your", "the", "and", "for",
+        "to", "in", "on", "of", "use", "skill", "me", "is", "as", "at", "by", "an", "or", "it", "be",
+    )
     fun matches(term: String, allowShortTag: Boolean = false): Boolean {
         val value = term.trim().lowercase(Locale.ROOT)
         if (value.length < 2) return false
         if (value.all { it in 'a'..'z' || it in '0'..'9' || it == '-' }) {
+            // Keep PR/UI and user-defined tags case-insensitive, while grammatical
+            // words in trigger sentences must not become topic matches.
             if ((!allowShortTag && value.length < 3) || value in ignored) return false
             return Regex("(?<![a-z0-9])" + Regex.escape(value) + "(?![a-z0-9])").containsMatchIn(task)
         }
