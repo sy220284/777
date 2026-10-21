@@ -21,6 +21,8 @@ class BundledNodeRuntimeTest {
 
         val node = File(runtime.binDir, "node")
         assertTrue("node command link is missing", node.exists())
+        val trustedCa = File(runtime.environment().getValue("NODE_EXTRA_CA_CERTS"))
+        assertTrue("Node TLS trust roots are not bundled", trustedCa.isFile && trustedCa.length() > 0L)
 
         val process = ProcessBuilder(
             node.absolutePath,
