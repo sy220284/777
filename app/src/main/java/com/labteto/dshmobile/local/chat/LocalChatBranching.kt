@@ -406,6 +406,21 @@ internal fun activeChatBranchMessages(state: LocalChatBranchState): List<LocalHa
     return result
 }
 
+/**
+ * Regeneration reads only the selected conversation prefix. Superseded replies remain in
+ * the branch graph for display/selection, never in the prompt assembled for a new candidate.
+ */
+internal fun chatRegenerationSourceMessages(
+    state: LocalChatBranchState,
+    replacingMessageId: String,
+): List<LocalHarnessMessage> {
+    val selected = activeChatBranchMessages(state)
+    require(selected.lastOrNull()?.let { it.id == replacingMessageId && it.role == "assistant" } == true) {
+        "重新生成的回复必须是当前分支末尾"
+    }
+    return selected.dropLast(1)
+}
+
 internal fun hasChatBranchAlternatives(state: LocalChatBranchState): Boolean =
     state.nodes.groupBy { branchParentKey(it.parentId) }
         .values
