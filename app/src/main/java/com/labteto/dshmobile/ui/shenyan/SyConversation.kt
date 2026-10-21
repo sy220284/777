@@ -165,6 +165,8 @@ fun SyComposerAction(
     iconSize: Dp = SyComposerMetrics.actionIconSize,
     content: (@Composable () -> Unit)? = null,
     iconPainter: Painter? = null,
+    disabledTint: Color? = null,
+    disabledContainerAlpha: Float = 0.38f,
 ) {
     val p = LocalSyColors.current
     Surface(
@@ -177,7 +179,7 @@ fun SyComposerAction(
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Box(
                 Modifier.size(visualSize).background(
-                    if (enabled) containerColor else containerColor.copy(alpha = .38f),
+                    if (enabled) containerColor else containerColor.copy(alpha = disabledContainerAlpha),
                     CircleShape,
                 ),
                 contentAlignment = Alignment.Center,
@@ -185,10 +187,10 @@ fun SyComposerAction(
                 when {
                     content != null -> content()
                     iconPainter != null -> Icon(iconPainter, contentDescription = null,
-                        tint = if (enabled) tint else p.textTertiary,
+                        tint = if (enabled) tint else (disabledTint ?: p.textTertiary),
                         modifier = Modifier.size(iconSize))
                     icon != null -> Icon(icon, contentDescription = null,
-                        tint = if (enabled) tint else p.textTertiary,
+                        tint = if (enabled) tint else (disabledTint ?: p.textTertiary),
                         modifier = Modifier.size(iconSize))
                 }
             }

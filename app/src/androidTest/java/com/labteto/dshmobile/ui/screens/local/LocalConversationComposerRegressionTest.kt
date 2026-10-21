@@ -354,4 +354,69 @@ class LocalConversationComposerRegressionTest {
     }
 
 
+    @Test
+    fun workComposerKeepsOnePrimaryRunActionAndDraft() {
+        verifySingleRunAction(LocalUsageMode.WORK)
+    }
+
+    @Test
+    fun chatComposerKeepsOnePrimaryRunActionAndDraft() {
+        verifySingleRunAction(LocalUsageMode.CHAT)
+    }
+
+    private fun verifySingleRunAction(mode: LocalUsageMode) {
+        val running = androidx.compose.runtime.mutableStateOf(false)
+        var stopped = 0
+        var sent = 0
+        val draft = "保持未发送的草稿"
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = false,
+                        configured = true,
+                        sessionId = "single-action-${mode.name}",
+                        usageMode = mode,
+                        running = running.value,
+                    ),
+                    activeModelProfile = null,
+                    input = draft,
+                    attachments = emptyList(),
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = {},
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onSend = { _, _ ->
+                        sent++
+                        LocalSendResult.Empty
+                    },
+                    onStop = { stopped++ },
+                    onPlanModeChange = {},
+                )
+            }
+        }
+
+        val send = context.getString(R.string.chat_composer_send)
+        val stop = context.getString(R.string.chat_composer_stop)
+        compose.onNodeWithContentDescription(send).assertExists()
+        compose.onNodeWithContentDescription(stop).assertDoesNotExist()
+        compose.runOnIdle { running.value = true }
+
+        compose.onNodeWithContentDescription(stop).assertExists()
+        compose.onNodeWithContentDescription(send).assertDoesNotExist()
+        compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).assertTextContains(draft)
+        compose.onNodeWithContentDescription(stop).performClick()
+        compose.runOnIdle {
+            assertEquals(1, stopped)
+            assertEquals(0, sent)
+            running.value = false
+        }
+
+        compose.onNodeWithContentDescription(send).assertExists()
+        compose.onNodeWithContentDescription(stop).assertDoesNotExist()
+        compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).assertTextContains(draft)
+    }
+
 }

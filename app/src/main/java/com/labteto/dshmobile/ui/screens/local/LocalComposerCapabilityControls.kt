@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Slider
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -93,18 +94,22 @@ internal fun LocalComposerCapabilityActions(
     val limits = LocalModelPerformanceControls.state.collectAsState().value
     val modes = LocalReasoningControls.availableModes(profile, usageMode, limits.reasoningCeiling)
     val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
+    val reasoningAccent = if (colors.text.luminance() < 0.5f) Color(0xFF7453A3) else colors.lilac
     Box {
         Row(verticalAlignment = Alignment.CenterVertically) {
             SyComposerAction(
-                icon = FeatherIcons.Gauge,
+                icon = FeatherIcons.Sparkles,
+                iconSize = 20.dp,
                 contentDescription = stringResource(
                     R.string.local_composer_reasoning_action,
                     stringResource(composerReasoningLabel(reasoningMode, modes, basicReasoning)),
                 ),
                 onClick = { onSelectPanel(if (openPanel == "reasoning") null else "reasoning") },
                 enabled = !running,
-                tint = colors.text,
-                containerColor = Color.Transparent,
+                tint = reasoningAccent,
+                disabledTint = reasoningAccent.copy(alpha = 0.78f),
+                containerColor = colors.lilac.copy(alpha = 0.22f),
+                disabledContainerAlpha = 0.85f,
             )
             if (showLabels) {
                 Text(
@@ -334,6 +339,7 @@ internal fun LocalComposerPlanAction(
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val pulse = rememberHapticPulse()
+    val planAccent = colors.successInk
     val label = stringResource(
         when {
             waitingForApproval -> R.string.local_composer_plan_waiting_approval
@@ -342,14 +348,17 @@ internal fun LocalComposerPlanAction(
         },
     )
     SyComposerAction(
-        icon = FeatherIcons.List,
+        icon = FeatherIcons.CheckSquare,
+        iconSize = 20.dp,
         modifier = Modifier
             .testTag("local-composer-plan-toggle")
             .semantics { stateDescription = label },
         contentDescription = stringResource(R.string.local_composer_plan_title) + " · " + label,
         onClick = { pulse(); onToggle() },
         enabled = enabled && !waitingForApproval,
-        tint = if (selected) colors.primary else colors.textSecondary,
-        containerColor = if (selected) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
+        tint = planAccent,
+        disabledTint = planAccent.copy(alpha = 0.78f),
+        containerColor = colors.mint.copy(alpha = if (selected) 0.28f else 0.18f),
+        disabledContainerAlpha = 0.85f,
     )
 }

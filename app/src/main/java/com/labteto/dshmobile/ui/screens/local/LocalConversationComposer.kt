@@ -248,19 +248,13 @@ internal fun LocalConversationComposer(
     }
 
     @Composable
-    fun SendControl(queue: Boolean = false) {
+    fun SendControl() {
         SyComposerAction(
             icon = null,
             iconPainter = painterResource(R.drawable.ic_ui_button_send_glyph),
             iconSize = 32.dp,
             tint = if (canSend) colors.onPrimary else colors.text,
-            contentDescription = if (queue && state.queuedInputCount > 0) {
-                stringResource(R.string.local_queue_message_count, state.queuedInputCount)
-            } else if (queue) {
-                stringResource(R.string.local_queue_message)
-            } else {
-                stringResource(R.string.chat_composer_send)
-            },
+            contentDescription = stringResource(R.string.chat_composer_send),
             onClick = ::submit,
             enabled = canSend,
             containerColor = colors.primary,
@@ -280,6 +274,12 @@ internal fun LocalConversationComposer(
             containerColor = colors.primary,
             visualSize = 32.dp,
         )
+    }
+
+    // One fixed action in either layout; draft text is retained during a running turn.
+    @Composable
+    fun RunActionControl() {
+        if (state.running) StopControl() else SendControl()
     }
 
     SyConversationComposer(
@@ -415,13 +415,12 @@ internal fun LocalConversationComposer(
                 enter = expandHorizontally(composerRevealSpec) + fadeIn(composerFadeSpec),
                 exit = shrinkHorizontally(composerRevealSpec) + fadeOut(composerFadeSpec),
             ) {
-                if (state.running) StopControl() else SendControl()
+                RunActionControl()
             }
         }
 
         LocalConversationComposerExpandedRow(
             visible = expanded,
-            state = state,
             menuControl = { AttachmentControl() },
             replySuggestionsControl = { ReplySuggestionsControl() },
             planControl = {
@@ -455,8 +454,7 @@ internal fun LocalConversationComposer(
                     onReasoningModeChange = { if (!state.running) onReasoningModeChange(it) },
                 )
             },
-            stopControl = { StopControl() },
-            sendControl = { queue -> SendControl(queue) },
+            primaryControl = { RunActionControl() },
         )
     }
 }
