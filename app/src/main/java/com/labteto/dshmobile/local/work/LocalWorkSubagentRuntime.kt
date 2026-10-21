@@ -128,16 +128,8 @@ internal class LocalWorkSubagentRuntime(
         executePlan(binding, graphId, execution, goal?.id.orEmpty(), plan)
     }
 
-    private val openGraphProjections = java.util.WeakHashMap<
-        com.labteto.dshmobile.local.session.LocalSessionEventLog, LocalWorkOpenGraphProjection>()
-
-    private fun openGraphs(binding: LocalWorkRunBinding): List<LocalWorkTaskGraphRecoveryLedger.OpenGraph> {
-        val log = binding.eventLog
-        val projection = synchronized(openGraphProjections) {
-            openGraphProjections.getOrPut(log) { LocalWorkOpenGraphProjection() }
-        }
-        return synchronized(projection) { projection.unresolved(log) }
-    }
+    private fun openGraphs(binding: LocalWorkRunBinding): List<LocalWorkTaskGraphRecoveryLedger.OpenGraph> =
+        LocalWorkRecoveryProjections.forLog(binding.eventLog).unresolved(binding.eventLog)
 
     /** Called inside the admitted root run, before its next model request, including Goal-less research. */
     internal suspend fun resumePendingWorkflows(binding: LocalWorkRunBinding) = binding.workflowAdmission.withLock {
@@ -174,6 +166,7 @@ internal class LocalWorkSubagentRuntime(
     private suspend fun executePlan(binding: LocalWorkRunBinding, graphId: String, execution: String,
         goalId: String, plan: LocalWorkTaskGraphPlan): String {
         val log = binding.eventLog
+        val recovery = LocalWorkRecoveryProjections.forLog(log)
         val goalFingerprint = plan.value.getValue("goal_fingerprint").jsonPrimitive.content
         val authorization = log.latestMatching(setOf("taskgraph/resume-authorized")) {
             it["graph_execution_id"]?.jsonPrimitive?.contentOrNull == execution
@@ -194,10 +187,8 @@ internal class LocalWorkSubagentRuntime(
         val jobsByNode = java.util.concurrent.ConcurrentHashMap<String, String>()
         fun dependencyVersions(ids: List<String>): JsonObject = buildJsonObject {
             ids.forEach { id ->
-                val accepted = log.latestMatching(setOf("taskgraph/node-accepted")) {
-                    it["graph_execution_id"]?.jsonPrimitive?.contentOrNull == execution &&
-                        it["node_id"]?.jsonPrimitive?.contentOrNull == id
-                } ?: error("依赖缺少持久验收版本：$id")
+                val accepted = recovery.acceptedNode(log, execution, id)
+                    ?: error("依赖缺少持久验收版本：$id")
                 put(id, accepted.data.getValue("result_sequence"))
             }
         }
@@ -208,10 +199,8 @@ internal class LocalWorkSubagentRuntime(
                 val id = pending.removeFirst()
                 if (!checked.add(id)) continue
                 val node = plan.nodes.single { it.id == id }
-                val accepted = log.latestMatching(setOf("taskgraph/node-accepted")) {
-                    it["graph_execution_id"]?.jsonPrimitive?.contentOrNull == execution &&
-                        it["node_id"]?.jsonPrimitive?.contentOrNull == id
-                } ?: error("依赖缺少持久验收：$id")
+                val accepted = recovery.acceptedNode(log, execution, id)
+                    ?: error("依赖缺少持久验收：$id")
                 check(accepted.data["node_version"]?.jsonPrimitive?.contentOrNull == plan.nodeVersion(node)) {
                     "依赖节点定义已变化：$id"
                 }
@@ -251,13 +240,7 @@ internal class LocalWorkSubagentRuntime(
                     put("dependency_versions", dependencyVersions(ctx.node.dependsOn))
                     put("output_paths", buildJsonArray { plan.outputPaths(ctx.index).forEach { add(JsonPrimitive(it)) } })
                 }
-                val admissions = mutableListOf<JsonObject>()
-                log.forEachAfter(-1L) { event ->
-                    if (event.type == "taskgraph/job-admitted" &&
-                        event.data["graph_execution_id"]?.jsonPrimitive?.contentOrNull == execution &&
-                        event.data["node_id"]?.jsonPrimitive?.contentOrNull == ctx.node.id
-                    ) admissions += event.data
-                }
+                val admissions = recovery.nodeAdmissions(log, execution, ctx.node.id)
                 val jobId = workflowAdmittedJobId(plan, ctx.index, admissions, fence, proposedJobId)
                 jobsByNode[ctx.node.id] = jobId
                 persistentJobs.awaitWorkflowNode(jobId, prompt, plan.model, plan.route,
@@ -267,9 +250,8 @@ internal class LocalWorkSubagentRuntime(
             acceptNode = { ctx, _ ->
                 checkDependencies(ctx.node.dependsOn, ctx.dependencyOutputs)
                 val jobId = jobsByNode.getValue(ctx.node.id)
-                val actual = log.latestMatching(setOf("taskgraph/job-result")) {
-                    it["job_id"]?.jsonPrimitive?.contentOrNull == jobId
-                } ?: error("节点缺少持久结果证据")
+                val actual = recovery.jobResult(log, jobId)
+                    ?: error("节点缺少持久结果证据")
                 val before = actual.data["files"]?.jsonObject ?: error("节点缺少输入版本")
                 val now = plan.fileVersions(workspaceRoot, ctx.index)
                 val completedOutputs = actual.data["output_files"] as? JsonObject ?: error("缺少真实交付版本")
@@ -283,9 +265,8 @@ internal class LocalWorkSubagentRuntime(
             onResult = { result, dependencyOutputs ->
                 checkOwner()
                 val jobId = jobsByNode.getValue(result.node.id)
-                val evidence = log.latestMatching(setOf("taskgraph/job-result")) {
-                    it["job_id"]?.jsonPrimitive?.contentOrNull == jobId
-                } ?: error("节点缺少实际持久结果")
+                val evidence = recovery.jobResult(log, jobId)
+                    ?: error("节点缺少实际持久结果")
                 log.append("taskgraph/node-accepted", buildJsonObject {
                     put("graph_id", graphId); put("graph_execution_id", execution); put("goal_id", goalId)
                     put("goal_fingerprint", goalFingerprint); put("node_id", result.node.id)

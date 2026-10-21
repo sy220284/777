@@ -52,19 +52,7 @@ internal data class LocalWorkTaskGraphPlan(val value: JsonObject) {
 
     // FEATURE_TREE: {"id":"work.taskgraph.durable-acceptance","path":"第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 持久任务图与节点验收（未合并）","entry":"recoveredResults","owner":"WORK","test":"app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlanTest.kt#coldRestoreReusesCompletedNodeAndContinuesRemainingNode"}
     fun recoveredResults(log: LocalSessionEventLog, executionId: String, root: File): Map<String, TaskGraphNodeResult> {
-        val facts = linkedMapOf<String, JsonObject>()
-        val resultEvents = linkedMapOf<Long, JsonObject>()
-        log.forEachAfter(-1L) { event ->
-            if (event.type == "taskgraph/node-accepted" &&
-                event.data["graph_execution_id"]?.jsonPrimitive?.contentOrNull == executionId) {
-                facts[event.data.getValue("node_id").jsonPrimitive.content] = event.data
-            }
-        }
-        val references = facts.values.mapNotNull { it["result_sequence"]?.jsonPrimitive?.longOrNull }.toSet()
-        log.forEachAfter(-1L) { event ->
-            if (event.sequence in references && event.type == "taskgraph/job-result" &&
-                event.data["graph_execution_id"]?.jsonPrimitive?.contentOrNull == executionId) resultEvents[event.sequence] = event.data
-        }
+        val (facts, resultEvents) = LocalWorkRecoveryProjections.forLog(log).acceptedFor(log, executionId)
         val immutableNodes = nodes
         val currentFiles = immutableNodes.indices.associateWith { fileVersions(root, it) }
         val results = linkedMapOf<String, TaskGraphNodeResult>()
@@ -164,27 +152,8 @@ internal fun workflowCanCreateMissingJob(allowMutation: Boolean, admitted: Boole
     !allowMutation || !admitted || knownRejected
 
 /** Reuse the canonical settlement reducer; a model's final text cannot settle an unknown tool effect. */
-private fun workflowToolAttempts(log: LocalSessionEventLog, jobId: String): List<com.labteto.dshmobile.harness.session.ToolAttemptLedger.Attempt> {
-    val agentId = localPersistentSubagentId(jobId)
-    val runs = mutableSetOf<String>()
-    log.forEachAfter(-1L) { event ->
-        if (event.type == "agent/subagent-run-checkpoint" &&
-            event.data["agent_id"]?.jsonPrimitive?.contentOrNull == agentId) {
-            event.data["run_id"]?.jsonPrimitive?.contentOrNull?.let(runs::add)
-        }
-    }
-    val ledger = com.labteto.dshmobile.harness.session.ToolAttemptLedger()
-    log.forEachAfter(-1L) { event ->
-        if (event.type == "tool/execution-started" &&
-            (event.data["attributes"] as? JsonObject)?.get("run_id")?.jsonPrimitive?.contentOrNull in runs) {
-            ledger.observe(event.type, event.data)
-        } else if (event.type == "subagent/tool-result" &&
-            event.data["background_job_id"]?.jsonPrimitive?.contentOrNull == jobId) {
-            ledger.observe("tool/result", event.data)
-        }
-    }
-    return ledger.snapshot()
-}
+private fun workflowToolAttempts(log: LocalSessionEventLog, jobId: String): List<com.labteto.dshmobile.harness.session.ToolAttemptLedger.Attempt> =
+    LocalWorkRecoveryProjections.forLog(log).toolAttempts(log, jobId)
 
 internal fun workflowToolSettlementEvidence(log: LocalSessionEventLog, jobId: String): List<String> {
     val attempts = workflowToolAttempts(log, jobId)
@@ -198,18 +167,13 @@ internal fun workflowToolContinuationSafe(log: LocalSessionEventLog, jobId: Stri
     if (attempts.any { it.unresolvedExternalEffect }) return false
     val writes = attempts.filter { it.started && !it.verifiedReadOnly }
     if (writes.isEmpty()) return true
-    val checkpoint = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) {
-        it["background_job_id"]?.jsonPrimitive?.contentOrNull == jobId &&
-            it["agent_id"]?.jsonPrimitive?.contentOrNull == localPersistentSubagentId(jobId)
-    } ?: return false
+    val projection = LocalWorkRecoveryProjections.forLog(log)
+    val checkpoint = projection.historyCheckpoint(log, jobId) ?: return false
     if (decodeLocalSubagentHistoryCheckpoint(checkpoint.data) == null) return false
     return writes.all { attempt ->
         attempt.settled && attempt.executionId != null &&
-            log.latestMatching(setOf("subagent/tool-result")) {
-                it["background_job_id"]?.jsonPrimitive?.contentOrNull == jobId &&
-                    it["execution_id"]?.jsonPrimitive?.contentOrNull == attempt.executionId &&
-                    it["id"]?.jsonPrimitive?.contentOrNull == attempt.id
-            }?.sequence?.let { it < checkpoint.sequence } == true
+            projection.toolResult(log, jobId, attempt.executionId, attempt.id)
+                ?.sequence?.let { it < checkpoint.sequence } == true
     }
 }
 
