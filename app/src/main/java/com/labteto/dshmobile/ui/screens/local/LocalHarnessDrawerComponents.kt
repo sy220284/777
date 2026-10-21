@@ -105,17 +105,20 @@ internal fun localDrawerSessionSections(
     query: String,
     sessionTitleOverrides: Map<String, String>,
     includeOtherModes: Boolean = false,
+    preSortedByUpdatedAt: Boolean = false,
 ): LocalDrawerSessionSections {
     val normalizedQuery = query.trim()
-    val visible = sessions.asSequence()
+    val filtered = sessions.asSequence()
         .filter { !it.blank && (includeOtherModes || it.usageMode == usageMode) }
         .filter { session ->
             normalizedQuery.isEmpty() ||
                 (sessionTitleOverrides[session.id] ?: session.title)
                     .contains(normalizedQuery, ignoreCase = true)
         }
-        .sortedByDescending(LocalSessionSummary::updatedAt)
-        .toList()
+    // Sorting does not depend on typed search text. Callers with a cached ordering
+    // avoid sorting all sessions again on every keystroke.
+    val visible = if (preSortedByUpdatedAt) filtered.toList()
+        else filtered.sortedByDescending(LocalSessionSummary::updatedAt).toList()
     return LocalDrawerSessionSections(
         pinned = visible.filter { it.id in pinnedSessionIds },
         recent = visible.filterNot { it.id in pinnedSessionIds },
