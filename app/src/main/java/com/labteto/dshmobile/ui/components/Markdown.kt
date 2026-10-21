@@ -110,6 +110,7 @@ internal fun markdownParagraphDisplayText(lines: List<String>, preserveSoftLineB
 
 private val HEADING_REGEX = Regex("^(#{1,4})\\s+(.*)$")
 private val ORDERED_REGEX = Regex("^\\d+\\.\\s+")
+private val TABLE_SEPARATOR_CELL_REGEX = Regex("^:?-{3,}:?$")
 
 internal enum class TableAlignment { START, CENTER, END }
 
@@ -281,7 +282,7 @@ private fun isMarkdownTableRow(line: String): Boolean =
 internal fun isTableSeparator(line: String): Boolean {
     if (!isMarkdownTableRow(line)) return false
     val cells = splitTableRow(line)
-    return cells.isNotEmpty() && cells.all { it.trim().matches(Regex("^:?-{3,}:?$")) }
+    return cells.isNotEmpty() && cells.all { TABLE_SEPARATOR_CELL_REGEX.matches(it.trim()) }
 }
 
 internal fun parseTableAlignments(line: String, columns: Int): List<TableAlignment> {
