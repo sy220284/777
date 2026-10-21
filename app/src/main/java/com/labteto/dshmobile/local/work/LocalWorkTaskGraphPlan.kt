@@ -171,8 +171,9 @@ internal fun workflowToolContinuationSafe(log: LocalSessionEventLog, jobId: Stri
     val checkpoint = projection.historyCheckpoint(log, jobId) ?: return false
     if (decodeLocalSubagentHistoryCheckpoint(checkpoint.data) == null) return false
     return writes.all { attempt ->
-        attempt.settled && attempt.executionId != null &&
-            projection.toolResult(log, jobId, attempt.executionId, attempt.id)
+        val executionId = attempt.executionId
+        attempt.settled && executionId != null &&
+            projection.toolResult(log, jobId, executionId, attempt.id)
                 ?.sequence?.let { it < checkpoint.sequence } == true
     }
 }

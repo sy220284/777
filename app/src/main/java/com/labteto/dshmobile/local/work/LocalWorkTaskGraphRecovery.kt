@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import com.labteto.dshmobile.harness.session.SessionEvent
 import com.labteto.dshmobile.harness.session.ToolAttemptLedger
 import java.util.WeakHashMap
 import kotlinx.serialization.json.JsonObject
@@ -110,14 +109,14 @@ internal class LocalWorkOpenGraphProjection {
     private var generation = -1L
     private var throughSequence = -1L
     private var ledger = LocalWorkTaskGraphRecoveryLedger()
-    private val accepted = linkedMapOf<Pair<String, String>, SessionEvent>()
-    private val jobResultsBySequence = linkedMapOf<Long, SessionEvent>()
-    private val jobResultsById = linkedMapOf<String, SessionEvent>()
+    private val accepted = linkedMapOf<Pair<String, String>, LocalSessionEventLog.Event>()
+    private val jobResultsBySequence = linkedMapOf<Long, LocalSessionEventLog.Event>()
+    private val jobResultsById = linkedMapOf<String, LocalSessionEventLog.Event>()
     private val admissions = linkedMapOf<Pair<String, String>, MutableList<JsonObject>>()
     private val runsByAgent = linkedMapOf<String, MutableSet<String>>()
-    private val startsByRun = linkedMapOf<String, MutableList<SessionEvent>>()
-    private val resultsByJob = linkedMapOf<String, MutableList<SessionEvent>>()
-    private val historyCheckpoints = linkedMapOf<String, SessionEvent>()
+    private val startsByRun = linkedMapOf<String, MutableList<LocalSessionEventLog.Event>>()
+    private val resultsByJob = linkedMapOf<String, MutableList<LocalSessionEventLog.Event>>()
+    private val historyCheckpoints = linkedMapOf<String, LocalSessionEventLog.Event>()
 
     private fun reset() {
         throughSequence = -1L
@@ -201,7 +200,7 @@ internal class LocalWorkOpenGraphProjection {
     }
 
     @Synchronized
-    fun acceptedNode(log: LocalSessionEventLog, execution: String, nodeId: String): SessionEvent? {
+    fun acceptedNode(log: LocalSessionEventLog, execution: String, nodeId: String): LocalSessionEventLog.Event? {
         refresh(log)
         return accepted[execution to nodeId]
     }
@@ -213,7 +212,7 @@ internal class LocalWorkOpenGraphProjection {
     }
 
     @Synchronized
-    fun jobResult(log: LocalSessionEventLog, jobId: String): SessionEvent? {
+    fun jobResult(log: LocalSessionEventLog, jobId: String): LocalSessionEventLog.Event? {
         refresh(log)
         return jobResultsById[jobId]
     }
@@ -228,15 +227,15 @@ internal class LocalWorkOpenGraphProjection {
         val runs = runsByAgent[localPersistentSubagentId(jobId)].orEmpty()
         val events = runs.flatMap { startsByRun[it].orEmpty() } + resultsByJob[jobId].orEmpty()
         val attempts = ToolAttemptLedger()
-        events.sortedBy(SessionEvent::sequence).forEach { event ->
+        events.sortedBy(LocalSessionEventLog.Event::sequence).forEach { event ->
             if (event.type == "subagent/tool-result") attempts.observe("tool/result", event.data)
-            else attempts.observe(event)
+            else attempts.observe(event.type, event.data)
         }
         return attempts.snapshot()
     }
 
     @Synchronized
-    fun historyCheckpoint(log: LocalSessionEventLog, jobId: String): SessionEvent? {
+    fun historyCheckpoint(log: LocalSessionEventLog, jobId: String): LocalSessionEventLog.Event? {
         refresh(log)
         return historyCheckpoints[jobId]?.takeIf { checkpoint ->
             (checkpoint.data["agent_id"] as? JsonPrimitive)?.contentOrNull == localPersistentSubagentId(jobId)
@@ -244,7 +243,7 @@ internal class LocalWorkOpenGraphProjection {
     }
 
     @Synchronized
-    fun toolResult(log: LocalSessionEventLog, jobId: String, executionId: String, callId: String): SessionEvent? {
+    fun toolResult(log: LocalSessionEventLog, jobId: String, executionId: String, callId: String): LocalSessionEventLog.Event? {
         refresh(log)
         return resultsByJob[jobId]?.asReversed()?.firstOrNull { event ->
             (event.data["execution_id"] as? JsonPrimitive)?.contentOrNull == executionId &&
