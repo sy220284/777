@@ -284,7 +284,14 @@ class DeepSeekClient @Inject constructor(
                 var streamUsage: JsonObject? = null
                                 var sawStreamData = false
                 var sawTerminalFrame = false
-                val usefulProgress = LocalModelStreamProgressMonitor()
+                val usefulProgress = LocalModelStreamProgressMonitor(
+                    // DeepSeek officially keeps a pending inference alive for up to ten minutes.
+                    // Allow a small scheduling margin before useful progress starts; after that,
+                    // the normal eight-minute no-progress guard still applies.
+                    startupTimeoutNanos = TimeUnit.MINUTES.toNanos(
+                        if (officialDeepSeek) 11 else 8,
+                    ),
+                )
                 // Response 统一由 withCancellableModelResponse 收尾，避免成功后 reader.close()
                 // 的连接异常覆盖已完成结果并触发重复请求。
                 val reader = ModelStreamLineReader(responseBody.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_MODEL_RESPONSE_BYTES)
@@ -306,7 +313,7 @@ class DeepSeekClient @Inject constructor(
                         if (usefulProgress.isStalled()) {
                             throw modelPostAdmissionFailure(
                                 code = "MODEL_STREAM_STALLED_AFTER_ADMISSION",
-                                detail = "模型流仍有网络活动，但连续八分钟没有产生任何有效文本、推理或工具调用数据",
+                                detail = "模型流持续保活但没有开始或继续生成有效文本、推理或工具调用数据",
                                 requestId = requestId,
                             )
                         }
