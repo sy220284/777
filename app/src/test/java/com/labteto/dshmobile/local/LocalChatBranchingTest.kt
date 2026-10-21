@@ -549,10 +549,13 @@ class LocalChatBranchingTest {
             val node = if (existing == null) LocalChatBranchNode(
                 message = item, parentId = parent,
                 chatStateAfter = if (index == edited.lastIndex) character else null,
+                chatContextAfter = if (index == edited.lastIndex) ChatContextState() else null,
             ) else existing.copy(
                 message = item, parentId = existing.parentId ?: parent,
                 chatStateAfter = if (index == edited.lastIndex && existing.chatStateAfter == null)
                     character else existing.chatStateAfter,
+                chatContextAfter = if (index == edited.lastIndex && existing.chatContextAfter == null)
+                    ChatContextState() else existing.chatContextAfter,
             )
             reference = upsertChatBranchNode(reference, node, select = true)
             parent = item.id
