@@ -100,11 +100,11 @@ internal fun discoverLocalWorkSkills(
     if (task.isBlank() || limit <= 0) return emptyList()
     val delimiters = Regex("[，、。；;,|/\\s]+")
     val ignored = setOf("with", "from", "into", "using", "about", "that", "this", "your", "the", "and", "for")
-    fun matches(term: String): Boolean {
+    fun matches(term: String, allowShortTag: Boolean = false): Boolean {
         val value = term.trim().lowercase(Locale.ROOT)
         if (value.length < 2) return false
         if (value.all { it in 'a'..'z' || it in '0'..'9' || it == '-' }) {
-            if (value.length < 3 || value in ignored) return false
+            if ((!allowShortTag && value.length < 3) || value in ignored) return false
             return Regex("(?<![a-z0-9])" + Regex.escape(value) + "(?![a-z0-9])").containsMatchIn(task)
         }
         return task.contains(value)
@@ -116,8 +116,8 @@ internal fun discoverLocalWorkSkills(
         val exactWhen = metadata.whenToUse?.trim().orEmpty()
         val keywords = (metadata.displayName.orEmpty() + " " + metadata.description)
             .split(delimiters).filter { it.length >= 3 }.distinct()
-        return (if (matches(exactWhen)) 70 else 0) +
-            hints.count(::matches).coerceAtMost(3) * 30 +
+        return (if (matches(exactWhen, allowShortTag = true)) 70 else 0) +
+            hints.count { matches(it, allowShortTag = true) }.coerceAtMost(3) * 30 +
             keywords.count(::matches).coerceAtMost(3) * 8
     }
     return installed.asSequence().distinctBy { it.first }
