@@ -18,6 +18,30 @@ class LocalModelStreamProgressMonitorTest {
     }
 
     @Test
+    fun deepSeekQueueKeepaliveMayContinueBeforeGenerationButNotAfter() {
+        var nanos = 0L
+        val monitor = LocalModelStreamProgressMonitor(
+            timeoutNanos = 8L * 60L,
+            startupTimeoutNanos = 11L * 60L,
+            nanoTime = { nanos },
+        )
+        nanos = 10L * 60L
+        assertFalse(monitor.isStalled())
+        nanos = 10L * 60L + 1
+        monitor.recordProgress()
+        nanos += 8L * 60L - 1
+        assertFalse(monitor.isStalled())
+        nanos += 1
+        assertTrue(monitor.isStalled())
+        val another = LocalModelStreamProgressMonitor(
+            timeoutNanos = 8L * 60L,
+            startupTimeoutNanos = 11L * 60L,
+            nanoTime = { 11L * 60L },
+        )
+        assertFalse(another.isStalled())
+    }
+
+    @Test
     fun actualTextReasoningOrToolProgressResetsWindow() {
         var nanos = 0L
         val monitor = LocalModelStreamProgressMonitor(120L, nanoTime = { nanos })
