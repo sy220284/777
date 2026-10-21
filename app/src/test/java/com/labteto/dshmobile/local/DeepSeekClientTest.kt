@@ -32,8 +32,8 @@ class DeepSeekClientTest {
             seen += body
             val stream = Json.parseToJsonElement(body).jsonObject["stream"]?.jsonPrimitive?.content == "true"
             val responseBody = if (stream) {
-                "data: {\\"choices\\":[{\\"delta\\":{\\"content\\":\\"OK\\"},\\"finish_reason\\":\\"stop\\"}]}\\n" +
-                    "data: [DONE]\\n"
+                """data: {"choices":[{"delta":{"content":"OK"},"finish_reason":"stop"}]}""" + "\n" +
+                    "data: [DONE]\n"
             } else {
                 """{"choices":[{"message":{"role":"assistant","content":"OK"},"finish_reason":"stop"}]}"""
             }
