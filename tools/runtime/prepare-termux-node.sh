@@ -16,7 +16,7 @@ TERMUX_KEY_FINGERPRINT="CC72CF8BA7DBFA0182877D045A897D96E57CF20C"
 NODE_PACKAGE="nodejs"
 NODE_PACKAGE_VERSION="26.4.0-2"
 NODE_RUNTIME_VERSION="26.4.0"
-RUNTIME_PACKAGES=(nodejs libc++ openssl c-ares libicu libsqlite zlib libffi)
+RUNTIME_PACKAGES=(nodejs libc++ openssl c-ares libicu libsqlite zlib libffi ca-certificates)
 SYSTEM_LIBS=(
   libc.so libdl.so libm.so liblog.so libandroid.so libpthread.so librt.so
 )
@@ -288,6 +288,15 @@ prepare_arch() {
           chmod 0644 "$lib_dir/$name"
         done < <(find "$prefix/lib" -maxdepth 1 \( -type f -o -type l \) -name 'lib*.so*' -print0)
       fi
+    fi
+
+    if [ "$pkg" = "ca-certificates" ]; then
+      [ -s "$prefix/etc/tls/cert.pem" ] || {
+        echo "Node TLS 信任根证书未生成：$apt_arch" >&2
+        exit 1
+      }
+      mkdir -p "$OUT_ROOT/assets/runtime/node/$android_abi/tls"
+      cp "$prefix/etc/tls/cert.pem" "$OUT_ROOT/assets/runtime/node/$android_abi/tls/cert.pem"
     fi
 
     if [ "$apt_arch" = "aarch64" ] && [ -f "$prefix/share/doc/$pkg/copyright" ]; then
