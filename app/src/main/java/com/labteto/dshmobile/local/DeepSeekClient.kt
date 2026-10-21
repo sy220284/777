@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
 import com.labteto.dshmobile.local.model.ModelStreamLineReader
+import com.labteto.dshmobile.local.model.DeepSeekChatRequestPolicy
 import com.labteto.dshmobile.local.model.LocalModelStreamProgressMonitor
 import com.labteto.dshmobile.local.model.ModelStreamLimitException
 import com.labteto.dshmobile.local.model.ModelStreamLimitKind
@@ -77,16 +78,23 @@ class DeepSeekClient @Inject constructor(
         tools: JsonArray = LocalToolCatalog.specs,
         temperature: Double? = null,
         reasoningEffort: String? = null,
+        maxTokens: Int? = null,
     ): LocalModelReply = withContext(Dispatchers.IO) {
         val requestId = UUID.randomUUID().toString()
         val promptBreakdown = estimatePromptBreakdown(messages, tools)
         val toolCallingMode = resolveToolCallingMode(model, baseUrl, tools)
+        val officialDeepSeek = DeepSeekChatRequestPolicy.isOfficial(model, baseUrl)
         val payload = buildJsonObject {
             put("model", model)
             put("messages", JsonArray(messages))
             put("stream", false)
             // Official Kimi Code models use provider-fixed sampling parameters.
-            if (!LocalKimiPolicy.isOfficial(baseUrl)) temperature?.let { put("temperature", it) }
+            if (!LocalKimiPolicy.isOfficial(baseUrl) &&
+                (!officialDeepSeek || reasoningEffort == "none")) {
+                temperature?.let { put("temperature", it) }
+            }
+            DeepSeekChatRequestPolicy.checkedMaxTokens(model, baseUrl, maxTokens)
+                ?.let { put("max_tokens", it) }
             val miniMax = LocalMiniMaxPolicy.isOfficial(baseUrl)
             if (miniMax) {
                 if (LocalMiniMaxPolicy.needsLegacyReasoningSplit(model)) put("reasoning_split", true)
@@ -95,9 +103,6 @@ class DeepSeekClient @Inject constructor(
             if (LocalKimiPolicy.isOfficial(baseUrl)) {
                 LocalKimiPolicy.writeThinking(this, model, reasoningEffort)
             } else if (reasoningEffort != null && !miniMax) {
-                val officialDeepSeek = runCatching {
-                    URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.deepseek.com", true)
-                }.getOrDefault(false)
                 if (officialDeepSeek) {
                     put("thinking", buildJsonObject {
                         put("type", if (reasoningEffort == "none") "disabled" else "enabled")
@@ -192,17 +197,24 @@ class DeepSeekClient @Inject constructor(
         tools: JsonArray = LocalToolCatalog.specs,
         temperature: Double? = null,
         reasoningEffort: String? = null,
+        maxTokens: Int? = null,
         onDelta: (LocalModelDelta) -> Unit = { },
     ): LocalModelReply = withContext(Dispatchers.IO) {
         val requestId = UUID.randomUUID().toString()
         val promptBreakdown = estimatePromptBreakdown(messages, tools)
         val toolCallingMode = resolveToolCallingMode(model, baseUrl, tools)
+        val officialDeepSeek = DeepSeekChatRequestPolicy.isOfficial(model, baseUrl)
         val payload = buildJsonObject {
             put("model", model)
             put("messages", JsonArray(messages))
             put("stream", true)
             // Official Kimi Code models use provider-fixed sampling parameters.
-            if (!LocalKimiPolicy.isOfficial(baseUrl)) temperature?.let { put("temperature", it) }
+            if (!LocalKimiPolicy.isOfficial(baseUrl) &&
+                (!officialDeepSeek || reasoningEffort == "none")) {
+                temperature?.let { put("temperature", it) }
+            }
+            DeepSeekChatRequestPolicy.checkedMaxTokens(model, baseUrl, maxTokens)
+                ?.let { put("max_tokens", it) }
             put("stream_options", buildJsonObject { put("include_usage", true) })
             val miniMax = LocalMiniMaxPolicy.isOfficial(baseUrl)
             if (miniMax) {
@@ -212,9 +224,6 @@ class DeepSeekClient @Inject constructor(
             if (LocalKimiPolicy.isOfficial(baseUrl)) {
                 LocalKimiPolicy.writeThinking(this, model, reasoningEffort)
             } else if (reasoningEffort != null && !miniMax) {
-                val officialDeepSeek = runCatching {
-                    URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.deepseek.com", true)
-                }.getOrDefault(false)
                 if (officialDeepSeek) {
                     put("thinking", buildJsonObject {
                         put("type", if (reasoningEffort == "none") "disabled" else "enabled")
@@ -671,9 +680,7 @@ private fun requireCompleteFinishReason(reason: String) {
 }
 
 internal fun shouldSendToolChoice(baseUrl: String, model: String): Boolean {
-    val officialDeepSeek = normalizeModelBaseUrl(baseUrl)
-        .lowercase()
-        .contains("api.deepseek.com")
+    val officialDeepSeek = DeepSeekChatRequestPolicy.isOfficialOrigin(baseUrl)
     val thinkingModel = model.trim().lowercase() in setOf(
         "deepseek-flash",
         "deepseek-v4-pro",
