@@ -230,4 +230,21 @@ class LocalWorkOpenGraphProjectionTest {
         log.close()
     }
 
+
+    @Test fun malformedEventTailCannotBeMisreportedAsAClosedGraph() {
+        val file = File(temporary.root, "malformed-recovery.jsonl")
+        val log = LocalSessionEventLog(file, Json)
+        log.append("taskgraph/start", buildJsonObject {
+            put("graph_id", "graph"); put("graph_execution_id", "run"); put("goal_id", "goal")
+        })
+        val original = file.readText()
+        file.appendText("not-valid-json\\n".replace("\\\\n", "\\n"))
+        val projection = LocalWorkOpenGraphProjection()
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+            projection.unresolved(log)
+        }
+        file.writeText(original)
+        assertEquals(listOf("graph"), projection.unresolved(log).map { it.graphId })
+        log.close()
+    }
 }

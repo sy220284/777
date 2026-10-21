@@ -180,6 +180,8 @@ internal class LocalWorkOpenGraphProjection {
             reset()
         }
         if (latest == throughSequence) return
+        val diagnosticBefore = log.diagnostics()
+        try {
         log.forEachAfter(throughSequence) { event ->
             ledger.observe(event.type, event.data)
             val data = event.data
@@ -232,6 +234,18 @@ internal class LocalWorkOpenGraphProjection {
                 }
             }
             throughSequence = event.sequence
+        }
+        val diagnosticAfter = log.diagnostics()
+        check(diagnosticAfter.segmentReadFailures == diagnosticBefore.segmentReadFailures &&
+            diagnosticAfter.malformedRows == diagnosticBefore.malformedRows &&
+            (latest <= -1L || throughSequence >= latest)) {
+            "任务事件流读取不完整，禁止依据缺失事件恢复或授权。"
+        }
+        } catch (failure: Exception) {
+            // Never publish a partly folded view of the durable log as a safe state.
+            generation = -1L
+            reset()
+            throw failure
         }
     }
 
