@@ -131,6 +131,26 @@ class McpToolBridgePlugin(
     private val transportFactory: (String) -> McpTransport = { endpoint ->
         McpNegotiatingHttpTransport(endpoint, http, json)
     },
+    private val httpCredentialProvider: suspend (String, String) -> String? = { _, _ -> null },
+    private val authorizedTransportFactory: (String, String) -> McpTransport = { endpoint, bearer ->
+        val uri = URI(endpoint)
+        val scheme = uri.scheme?.lowercase()
+        val host = requireNotNull(uri.host)
+        require(scheme == "https" || scheme == "http" &&
+            host.lowercase() in setOf("localhost", "127.0.0.1", "::1", "[::1]")) {
+            "远程 MCP Bearer 认证仅允许 HTTPS"
+        }
+        val expectedPort = if (uri.port >= 0) uri.port else if (scheme == "https") 443 else 80
+        val authenticated = http.newBuilder().followRedirects(false).followSslRedirects(false)
+            .addInterceptor { chain ->
+                val target = chain.request().url
+                require(target.scheme == scheme && target.host.equals(host, true) &&
+                    target.port == expectedPort) { "MCP 认证请求偏离已授权服务地址" }
+                chain.proceed(chain.request().newBuilder()
+                    .header("Authorization", "Bearer $bearer").build())
+            }.build()
+        McpNegotiatingHttpTransport(endpoint, authenticated, json)
+    },
     private val stdioTransportFactory: (List<String>, File?) -> McpTransport = { command, workingDirectory ->
         McpNegotiatingStdioTransport(
             command = command,
@@ -147,7 +167,7 @@ class McpToolBridgePlugin(
         val id: String,
         val transport: String,
         val displayTarget: String,
-        val clientFactory: () -> McpClient,
+        val clientFactory: suspend () -> McpClient,
         val client: McpClient,
         val toolNames: List<String>,
         val definitionBytes: Int,
@@ -620,12 +640,17 @@ class McpToolBridgePlugin(
 
     private suspend fun connectHttp(context: HarnessContext, rawId: String, rawEndpoint: String): String {
         val endpoint = validateEndpoint(rawEndpoint)
+        val serverId = validateServerId(rawId)
         return connect(
             context = context,
-            rawId = rawId,
+            rawId = serverId,
             transport = "http",
             displayTarget = displayEndpoint(endpoint),
-            clientFactory = { McpClient(transportFactory(endpoint)) },
+            clientFactory = {
+                val bearer = httpCredentialProvider(serverId, endpoint)
+                McpClient(if (bearer == null) transportFactory(endpoint)
+                    else authorizedTransportFactory(endpoint, bearer))
+            },
         )
     }
 
@@ -652,7 +677,7 @@ class McpToolBridgePlugin(
         rawId: String,
         transport: String,
         displayTarget: String,
-        clientFactory: () -> McpClient,
+        clientFactory: suspend () -> McpClient,
         fromReconnect: Boolean = false,
     ): String {
         val serverId = validateServerId(rawId)

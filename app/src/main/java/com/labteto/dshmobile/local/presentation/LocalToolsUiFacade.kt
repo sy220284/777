@@ -11,6 +11,7 @@ class LocalToolsUiFacade @Inject internal constructor(
     private val tools: LocalToolsRuntime,
     private val gitHubSkillImporter: com.labteto.dshmobile.local.tools.LocalGitHubSkillImporter,
     private val gitHubBrowser: com.labteto.dshmobile.local.tools.LocalGitHubCredentialManager,
+    private val mcpCredentials: com.labteto.dshmobile.local.tools.LocalMcpCredentialStore,
 ) : com.labteto.dshmobile.uicontract.ToolsUiPort {
     override fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit> = tools.serverChanges()
 
@@ -148,6 +149,11 @@ class LocalToolsUiFacade @Inject internal constructor(
     override suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)
     override suspend fun setSkillModelInvocable(id: String, enabled: Boolean) = tools.setSkillModelInvocable(id, enabled)
     override suspend fun connectHttp(serverId: String, endpoint: String) = tools.connectHttp(serverId, endpoint)
+    suspend fun connectHttpWithCredential(serverId: String, endpoint: String, bearer: String): String {
+        if (bearer.isNotEmpty()) mcpCredentials.save(serverId, endpoint, bearer)
+        return tools.connectHttp(serverId, endpoint)
+    }
+    suspend fun clearMcpCredential(serverId: String) = mcpCredentials.clear(serverId)
     override suspend fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?) =
         tools.connectStdio(serverId, command, workingDirectory)
     override suspend fun disconnect(serverId: String) = tools.disconnect(serverId)

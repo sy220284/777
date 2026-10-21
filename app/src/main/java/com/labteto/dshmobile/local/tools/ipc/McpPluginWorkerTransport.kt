@@ -43,6 +43,7 @@ internal class McpPluginWorkerTransport(
     private val command: List<String> = emptyList(),
     private val cwd: File? = null,
     private val environment: Map<String, String> = emptyMap(),
+    private val bearerCredential: String? = null,
 ) : McpTransport, McpTerminationSource {
     private val token = UUID.randomUUID().toString()
     private val ids = AtomicInteger(1)
@@ -130,7 +131,10 @@ internal class McpPluginWorkerTransport(
         val request = Bundle().apply {
             putString("kind", kind)
             when (kind) {
-                "http" -> putString("endpoint", requireNotNull(endpoint))
+                "http" -> {
+                    putString("endpoint", requireNotNull(endpoint))
+                    bearerCredential?.let { putString("bearer_credential", it) }
+                }
                 "stdio" -> {
                     putStringArrayList("command", ArrayList(command))
                     putString("cwd", cwd?.absolutePath)

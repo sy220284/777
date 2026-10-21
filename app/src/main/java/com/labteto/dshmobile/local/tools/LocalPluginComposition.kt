@@ -59,6 +59,7 @@ class LocalPluginCompositionFactory @Inject constructor(
     private val modelGateway: LocalModelGateway,
     private val visionClient: VisionClient,
     private val githubCredentials: LocalGitHubCredentialStore,
+    private val mcpCredentials: LocalMcpCredentialStore,
     private val http: OkHttpClient,
     private val web: LocalWebProvider,
     private val json: Json,
@@ -91,6 +92,7 @@ class LocalPluginCompositionFactory @Inject constructor(
         modelGateway = modelGateway,
         visionClient = visionClient,
         githubCredentials = githubCredentials,
+        mcpCredentials = mcpCredentials,
         http = http,
         json = json,
         automationScheduler = automationScheduler,
@@ -118,6 +120,7 @@ internal class LocalPluginComposition(
     modelGateway: LocalModelGateway,
     visionClient: VisionClient,
     private val githubCredentials: LocalGitHubCredentialStore,
+    private val mcpCredentials: LocalMcpCredentialStore,
     http: OkHttpClient,
     json: Json,
     automationScheduler: HarnessAutomationScheduler,
@@ -152,11 +155,18 @@ internal class LocalPluginComposition(
         workspaceRoot = workspaceRoot,
         stdioCommandResolver = runtimeProcess::resolveCommand,
         stdioEnvironmentProvider = { runtimeProcess.processEnvironment() },
+        httpCredentialProvider = mcpCredentials::forEndpoint,
         // Mandatory process boundary. In-process MCP factories are test-only; Android
         // production uses this Binder transport or fails closed, never falls back.
         transportFactory = { endpoint ->
             com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerTransport(
                 context.applicationContext, kind = "http", endpoint = endpoint,
+            )
+        },
+        authorizedTransportFactory = { endpoint, bearer ->
+            com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerTransport(
+                context.applicationContext, kind = "http", endpoint = endpoint,
+                bearerCredential = bearer,
             )
         },
         stdioTransportFactory = { command, workingDirectory ->
