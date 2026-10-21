@@ -576,6 +576,9 @@ internal class LocalSubagentRunner(
                     onUsage(routeModel, reply, usageContext)
                     repliesByStep[activationStep] = reply
                     AgentModelReply(
+                        completionReason = reply.completionReason,
+                        rawStopReason = reply.rawStopReason,
+                        reportedUsage = com.labteto.dshmobile.local.model.agentReportedModelUsage(reply.usage),
                         content = reply.content.orEmpty(),
                         toolCalls = reply.toolCalls.map { call ->
                             AgentToolCall(
@@ -611,7 +614,7 @@ internal class LocalSubagentRunner(
                                 ?: error("缺少子代理第 $absoluteStep 步模型响应")
                             progressTracker.recordAssistant(reply.content.orEmpty(), reply.toolCalls.size)
                             history.append(reply.message)
-                            pendingTerminalOutput = if (reply.toolCalls.isEmpty()) {
+                            pendingTerminalOutput = if (reply.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED && reply.toolCalls.isEmpty()) {
                                 reply.content.orEmpty().ifBlank { "子代理已结束，但没有返回文字。" }
                             } else {
                                 null
@@ -838,6 +841,11 @@ internal class LocalSubagentRunner(
                 )
             }
 
+            if (result.stopReason != AgentStopReason.STEP_LIMIT) {
+                persistContinuationCheckpoint(step = addSubagentSteps(recoveredBaseStep, result.steps))
+                return LocalSubagentResult(LocalSubagentStatus.FAILED,
+                    result.answer, result.stopReason.name)
+            }
             val partial = progress.joinToString("\n")
             val output = buildString {
                 append(

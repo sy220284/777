@@ -33,4 +33,31 @@ class LocalModelReplyValidationTest {
     private fun reply(content: String?) = LocalModelReply(
         message = buildJsonObject {}, content = content, reasoning = null, toolCalls = emptyList(),
     )
+    @Test
+    fun emptyNoncompleteRepliesReachUsageOwnerButCompletedStillFails() {
+        LocalModelCompletionReason.entries.filter { it != LocalModelCompletionReason.COMPLETED }.forEach { reason ->
+            val partial = reply(null).copy(completionReason = reason, rawStopReason = "provider-reason",
+                usage = DeepSeekTokenUsage(promptTokens = 3, completionTokens = 8, reported = true))
+            validateUsableModelReply(partial)
+            assertEquals(8L, agentReportedModelUsage(partial.usage)?.completionTokens)
+            assertEquals(reason, partial.completionReason)
+        }
+    }
+
+    @Test
+    fun completeResultConsumersRejectPartialEvenWhenBodyIsValidStructuredJson() {
+        LocalModelCompletionReason.entries.filter { it != LocalModelCompletionReason.COMPLETED }.forEach { reason ->
+            val partial = reply("{\"name\":\"合法但未完成的人物或文档\"}").copy(
+                completionReason = reason, rawStopReason = "provider-stop", requestId = "partial-request",
+                usage = DeepSeekTokenUsage(completionTokens = 9, reported = true))
+            val reported = agentReportedModelUsage(partial.usage)
+            val failure = assertThrows(LocalModelException::class.java) { requireCompletedModelReply(partial) }
+            assertEquals(9L, reported?.completionTokens)
+            assertEquals("MODEL_${reason.name}", failure.code)
+            assertEquals("partial-request", failure.requestId)
+            assertFalse(failure.retryable)
+        }
+        requireCompletedModelReply(reply("{\"name\":\"完整结果\"}"))
+    }
+
 }

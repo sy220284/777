@@ -221,7 +221,7 @@ internal class LocalWorkTurnStarter(
             val continuation = requireNotNull(resumed.continuation) {
                 "已持久化的 Work 续接命令缺少原任务与检查点坐标"
             }
-            binding.automaticContinuationCount = continuation.index
+            if (continuation.failureCode != WORK_OUTPUT_LIMIT_CONTINUATION) binding.automaticContinuationCount = continuation.index
             binding.continuationParentRunId = continuation.sourceRunId
         }
         try {

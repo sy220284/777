@@ -258,7 +258,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 ),
             )
             val replyCards = LocalChatReplyUiDocuments()
-            val finalContent = chatReplyCoordinator.finalizeGroup(
+            val finalReply = chatReplyCoordinator.finalizeGroup(
                 snapshot = snapshot,
                 persona = persona,
                 member = member,
@@ -295,21 +295,16 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 },
             )
 
+            val finalContent = finalReply.content.orEmpty()
             eventLog.append("group/agent-latency", buildJsonObject {
                 put("gallery_id", member.galleryId)
                 put("index", index)
-                put("status", "success")
+                put("status", if (finalReply.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) "success"
+                    else finalReply.completionReason.name.lowercase())
                 put("elapsed_ms", (System.nanoTime() - startedAtNanos) / 1_000_000L)
             })
             replyCards.normalizeGroup(member.displayName, persona.name)
-            GroupGeneratedReply(
-                member = member,
-                persona = persona,
-                content = finalContent,
-                uiDefinition = replyCards.definitionFor(finalContent),
-                requestId = replyCards.requestIdFor(finalContent),
-                uiUsageReported = replyCards.reportedFor(finalContent),
-            )
+            groupGeneratedReplyFromFinalReply(member, persona, finalReply, replyCards.definitionFor(finalContent))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -931,6 +926,9 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         return@forEachIndexed
                     }
 
+                    delivery.observe(generated.completionReason)
+                    if (generated.completionReason != com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED)
+                        currentGroup = delivery.fail(generated.member.galleryId, currentGroup)
                     val content = generated.content
                     if (content == GROUP_CHAT_SILENT_TOKEN) {
                         // Listening is an intentional choice, never a failed delivery or
@@ -965,7 +963,10 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         },
                         listOf(transcript),
                     )
-                    val assistantEvent = eventLog.append("assistant/message", eventData)
+                    val assistantEvent = eventLog.append("assistant/message", JsonObject(eventData + buildJsonObject {
+                        put("_dsh_completion", generated.completionReason.name)
+                        generated.rawStopReason?.let { put("_dsh_stop_reason", it) }
+                    }))
                     replyDocuments.publish(generated.uiDefinition,
                         com.labteto.dshmobile.uicontract.UiDocumentSource(snapshot.sessionId, transcript.id,
                             snapshot.chat.chatContext.generation,
@@ -974,6 +975,8 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     val publicReply = buildJsonObject {
                         put("role", "assistant")
                         put("content", groupTranscriptLine(transcript))
+                        put("_dsh_completion", generated.completionReason.name)
+                        generated.rawStopReason?.let { put("_dsh_stop_reason", it) }
                     }
                     modelHistory.append(publicReply)
                     speakingHistory += publicReply
@@ -1100,11 +1103,11 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 }
             }
 
-            delivery.recordCompletedOutcome(eventLog, deliveredReplies)
+            delivery.recordOutcome(eventLog, deliveredReplies)
             if (hasChatBranchAlternatives(runtimeStateStore.state.value.chat.chatBranches)) {
                 persistChatBranchState("group/branch-completed")
             }
-            checkpointModelHistory("group/completed")
+            checkpointModelHistory("group/${delivery.terminalReason}")
             persistNow()
             projectGalleryState(runtimeStateStore.state.value.chat.groupChat, "turn-complete")
         } catch (cancelled: CancellationException) {

@@ -396,7 +396,7 @@ class DeepSeekClientTest {
                 .code(200).message("OK").body(responseBody).build()
         }.build()
         val observed = mutableListOf<String>()
-        val error = runCatching {
+        val reply = run {
             DeepSeekClient(http, Json { ignoreUnknownKeys = true }).completeStreaming(
                 apiKey = "test",
                 baseUrl = "https://example.com",
@@ -407,11 +407,10 @@ class DeepSeekClientTest {
                 tools = JsonArray(emptyList()),
                 onDelta = { observed += it.content },
             )
-        }.exceptionOrNull() as? LocalModelException
+        }
 
-        assertEquals("MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION", error?.code)
-        assertFalse(error?.retryable ?: true)
-        assertTrue(error?.continuationEligible == true)
+        assertEquals(com.labteto.dshmobile.local.model.LocalModelCompletionReason.INTERRUPTED, reply.completionReason)
+        assertEquals("半截", reply.content)
         assertEquals(listOf("半截"), observed)
         assertEquals(1, attempts)
     }
@@ -430,17 +429,17 @@ class DeepSeekClientTest {
         }.build()
         val streamingClient = DeepSeekClient(http, Json { ignoreUnknownKeys = true })
 
-        val error = runCatching {
+        val reply = run {
             streamingClient.completeStreaming(
                 apiKey = "test",
                 baseUrl = "https://example.com",
                 model = "deepseek-chat",
                 messages = listOf(buildJsonObject { put("role", "user"); put("content", "test") }),
             )
-        }.exceptionOrNull() as? LocalModelException
+        }
 
-        assertEquals("MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION", error?.code)
-        assertFalse(error?.retryable ?: true)
+        assertEquals(com.labteto.dshmobile.local.model.LocalModelCompletionReason.INTERRUPTED, reply.completionReason)
+        assertEquals("半截", reply.content)
     }
 
     @Test
@@ -548,6 +547,28 @@ class DeepSeekClientTest {
 
         assertEquals("MODEL_STREAM_PROTOCOL", error?.code)
         assertFalse(error?.retryable ?: true)
+    }
+
+    @Test
+    fun outputLimitRetainsTextAndReportedUsageWithoutParsingHalfTool() {
+        val reply = client.parse("""{"choices":[{"finish_reason":"length","message":{"role":"assistant","content":"第一段","tool_calls":[{"id":"c","type":"function","function":{"name":"write","arguments":"{"}}]}}],"usage":{"prompt_tokens":7,"completion_tokens":11,"total_tokens":18}}""")
+        assertEquals(com.labteto.dshmobile.local.model.LocalModelCompletionReason.OUTPUT_LIMIT, reply.completionReason)
+        assertEquals("length", reply.rawStopReason)
+        assertEquals("第一段", reply.content)
+        assertTrue(reply.toolCalls.isEmpty())
+        assertFalse(reply.message.containsKey("tool_calls"))
+        assertEquals(11L, reply.usage.completionTokens)
+        assertTrue(reply.usage.reported)
+    }
+
+    @Test
+    fun lengthWithOnlyHalfToolRetainsTerminalAndUsageWithoutFakeBody() {
+        val reply = client.parse("""{"choices":[{"finish_reason":"length","message":{"role":"assistant","content":null,"tool_calls":[{"id":"c","function":{"name":"write","arguments":"{"}}]}}],"usage":{"prompt_tokens":3,"completion_tokens":9}}""")
+        assertEquals(com.labteto.dshmobile.local.model.LocalModelCompletionReason.OUTPUT_LIMIT, reply.completionReason)
+        assertTrue(reply.content.isNullOrBlank())
+        assertTrue(reply.toolCalls.isEmpty())
+        assertEquals(9L, reply.usage.completionTokens)
+        assertTrue(reply.usage.reported)
     }
 
 }

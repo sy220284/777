@@ -244,7 +244,7 @@ class LocalWorkRunRegistry internal constructor(
                 val resume = requireNotNull(next.continuation) {
                     "已持久化的 Work 续接命令缺少原任务与检查点坐标"
                 }
-                binding.automaticContinuationCount = resume.index
+                if (resume.failureCode != WORK_OUTPUT_LIMIT_CONTINUATION) binding.automaticContinuationCount = resume.index
                 binding.continuationParentRunId = resume.sourceRunId
             } else {
                 binding.automaticContinuationCount = 0

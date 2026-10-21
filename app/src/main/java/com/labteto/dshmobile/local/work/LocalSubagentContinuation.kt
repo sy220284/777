@@ -61,7 +61,7 @@ internal fun encodeLocalSubagentHistoryCheckpoint(
     softStepLimit?.takeIf { it > 0 }?.let { put("soft_step_limit", it) }
     put("history", JsonArray(history))
     put("enabled_optional_tools", JsonArray(enabledOptionalTools.sorted().take(48).map(::JsonPrimitive)))
-    terminalOutput?.takeIf(String::isNotBlank)?.let {
+    terminalOutput?.takeIf { it.isNotBlank() && subagentHistoryAllowsCompletedResult(history) }?.let {
         put("terminal_output", it.takeLast(MAX_TERMINAL_OUTPUT_CHARS))
         resultId?.let { id -> put("result_id", id); put("result_first", resultFirst) }
     }
@@ -127,7 +127,7 @@ internal fun shouldSettleCompletedSubagentCheckpoint(
     checkpoint: LocalSubagentHistoryCheckpoint?,
     pendingMessageIds: Set<String>,
 ): Boolean {
-    if (checkpoint?.terminalOutput.isNullOrBlank()) return false
+    if (checkpoint?.terminalOutput.isNullOrBlank() || !subagentHistoryAllowsCompletedResult(checkpoint?.history.orEmpty())) return false
     return pendingMessageIds.none { messageId ->
         messageId !in checkpoint?.claimedMessageIds.orEmpty()
     }
@@ -137,7 +137,7 @@ internal fun shouldColdResumeCompletedSubagent(
     checkpoint: LocalSubagentHistoryCheckpoint?,
     pendingMessageIds: Set<String>,
 ): Boolean =
-    !checkpoint?.terminalOutput.isNullOrBlank() &&
+    !checkpoint?.terminalOutput.isNullOrBlank() && subagentHistoryAllowsCompletedResult(checkpoint?.history.orEmpty()) &&
         pendingMessageIds.any { messageId ->
             messageId !in checkpoint?.claimedMessageIds.orEmpty()
         }
@@ -205,7 +205,15 @@ internal fun decodeLocalSubagentHistoryCheckpoint(
         step = data["step"]?.jsonPrimitive?.intOrNull?.coerceAtLeast(0) ?: 0,
         softStepLimit = data["soft_step_limit"]?.jsonPrimitive?.intOrNull
             ?.takeIf { it > 0 },
-        terminalOutput = data["terminal_output"]?.jsonPrimitive?.contentOrNull,
+        terminalOutput = data["terminal_output"]?.jsonPrimitive?.contentOrNull
+            ?.takeIf { subagentHistoryAllowsCompletedResult(history) },
         enabledOptionalTools = enabledTools,
     )
+}
+
+/** Legacy checkpoints lack terminal metadata; explicit partial history always defeats completion. */
+internal fun subagentHistoryAllowsCompletedResult(history: List<JsonObject>): Boolean {
+    val last = history.lastOrNull { (it["role"] as? JsonPrimitive)?.contentOrNull == "assistant" } ?: return true
+    val reason = (last["_dsh_completion"] as? JsonPrimitive)?.contentOrNull ?: return true
+    return reason == "COMPLETED"
 }

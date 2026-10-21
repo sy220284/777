@@ -400,8 +400,10 @@ internal object ChatReplyContinuityGuard {
         mode: ChatContinuityGuardMode,
         contentOf: (T) -> String,
         retry: suspend (repairHint: String) -> T,
+        isComplete: (T) -> Boolean = { true },
         onEvent: (action: String, check: ChatContinuityCheck) -> Unit = { _, _ -> },
     ): T {
+        if (!isComplete(initial)) return initial
         val firstCheck = ChatSceneRuntime.inspectReply(
             previous = previous,
             userMessage = userMessage,
@@ -419,6 +421,7 @@ internal object ChatReplyContinuityGuard {
             onEvent("${mode.actionPrefix}repair-failed-returned-original", firstCheck)
             return initial
         }
+        if (!isComplete(retried)) return retried
         val retryCheck = ChatSceneRuntime.inspectReply(
             previous = previous,
             userMessage = userMessage,

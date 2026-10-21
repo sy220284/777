@@ -187,7 +187,7 @@ internal fun shouldDiscardWorkGoalContinuation(
 ): Boolean =
     input.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.WORK_CONTINUATION &&
         (!isCurrentWorkGoalContinuation(input.continuation, work, eventLog) ||
-            (input.continuation?.failureCode == WORK_GOAL_PROGRESS_CONTINUATION &&
+            (input.continuation?.failureCode in setOf(WORK_GOAL_PROGRESS_CONTINUATION, WORK_OUTPUT_LIMIT_CONTINUATION) &&
                 remaining.any { it.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.USER }))
 
 internal const val WORK_GOAL_PROGRESS_CONTINUATION = "WORK_GOAL_PROGRESS"

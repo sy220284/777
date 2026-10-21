@@ -89,4 +89,27 @@ class ChatReplyRepairBudgetTest {
         } catch (_: IllegalStateException) { }
         assertEquals(2, requests)
     }
+    @Test
+    fun partialTextRepairKeepsMediaButUsesRepairTerminalInReplyCanonicalAndHistory() {
+        val image = LocalCanonicalContent.Image("data:image/png;base64,AAAA")
+        val original = LocalModelReply(buildJsonObject { put("role", "assistant"); put("content", "旧正文") },
+            "旧正文", null, emptyList(), requestId = "original",
+            canonicalMessage = LocalCanonicalMessage(LocalCanonicalRole.ASSISTANT,
+                listOf(LocalCanonicalContent.Text("旧正文"), image)))
+        com.labteto.dshmobile.local.model.LocalModelCompletionReason.entries.filter { it.name != "COMPLETED" }.forEach { reason ->
+            val repaired = LocalModelReply(buildJsonObject { put("role", "assistant"); put("content", "半截新正文") },
+                "半截新正文", null, emptyList(), requestId = "repair-${reason.name}",
+                usage = com.labteto.dshmobile.local.model.DeepSeekTokenUsage(completionTokens = 7, reported = true),
+                completionReason = reason, rawStopReason = "provider-${reason.name}")
+            val merged = preserveLocalChatReplyMediaForTextRepair(original, repaired)
+            assertEquals(reason, merged.completionReason)
+            assertEquals(reason, merged.canonicalMessage?.completionReason)
+            assertEquals(reason.name, merged.message["_dsh_completion"]?.jsonPrimitive?.content)
+            assertEquals(repaired.rawStopReason, merged.message["_dsh_stop_reason"]?.jsonPrimitive?.content)
+            assertEquals(repaired.requestId, merged.requestId)
+            assertEquals(repaired.usage, merged.usage)
+            assertEquals(1, merged.canonicalMessage!!.content.count { it is LocalCanonicalContent.Image })
+        }
+    }
+
 }

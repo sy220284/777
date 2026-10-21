@@ -210,6 +210,7 @@ internal class LocalWorkAgentTurnExecutor(
                 )
             }
             val declaredToolEvents = mutableMapOf<String, Pair<Long, Long>>()
+            var outputLimitHasProgress = false
             val repliesByStep = mutableMapOf<Int, LocalModelReply>()
             val uiDefinitionsByStep = mutableMapOf<Int, String?>()
             val replyFormHandlingByStep = mutableMapOf<Int,
@@ -488,8 +489,10 @@ internal class LocalWorkAgentTurnExecutor(
                             step = modelStep + 1,
                         )
                     }
-                    val parts = com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.split(reply.content.orEmpty())
-                    val cleanReply = if (parts.text == reply.content) reply else
+                    val parts = com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.split(
+                        reply.content.orEmpty(),
+                    )
+                    val cleanReply = if (reply.completionReason != com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED || parts.text == reply.content) reply else
                         com.labteto.dshmobile.local.model.withLocalReplyContent(reply, parts.text).copy(providerContentForReplay = null)
                     val deliveryReply = guardWorkCompletionDelivery(cleanReply, runState.value, runEventLog, File(workspacePath))
                     modelStep += 1
@@ -501,11 +504,15 @@ internal class LocalWorkAgentTurnExecutor(
                     // Work turn will keep executing. Publish it only on a tool-free final reply
                     // so users never see a form while the agent is already moving ahead.
                     uiDefinitionsByStep[modelStep] = parts.definition.takeIf {
+                        deliveryReply.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED &&
                         deliveryReply.content == cleanReply.content &&
                             com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol
                                 .workFormMayBePublished(parts.definition, deliveryReply.toolCalls.size)
                     }
                     return@AgentModel AgentModelReply(
+                        completionReason = deliveryReply.completionReason,
+                        rawStopReason = deliveryReply.rawStopReason,
+                        reportedUsage = com.labteto.dshmobile.local.model.agentReportedModelUsage(deliveryReply.usage),
                         content = deliveryReply.content.orEmpty(),
                         toolCalls = if (runPolicy.allowToolExecution) {
                             deliveryReply.toolCalls.map { call ->
@@ -619,6 +626,16 @@ internal class LocalWorkAgentTurnExecutor(
                                         put("goal_revision", goal.revision)
                                     }
                                 })
+                            }
+                            if (reply.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.OUTPUT_LIMIT) {
+                                val priorTexts = runHistory.snapshot().filter {
+                                    (it["role"] as? JsonPrimitive)?.contentOrNull == "assistant"
+                                }.map { prior ->
+                                    com.labteto.dshmobile.local.model.LocalCanonicalModelCodec.message(prior).content
+                                        .filterIsInstance<com.labteto.dshmobile.local.model.LocalCanonicalContent.Text>()
+                                        .joinToString("") { it.text }
+                                }
+                                outputLimitHasProgress = hasNewOutputLimitText(priorTexts, reply.content.orEmpty())
                             }
                             runHistory.append(reply.message)
                             workModelHistoryRuntime.updateContextMetrics(binding)
@@ -760,41 +777,58 @@ internal class LocalWorkAgentTurnExecutor(
                             workModelHistoryRuntime.persist(binding)
                         }
                         is AgentEvent.TurnFailed -> {
-                            settlePendingTools("failed")
-                            val detail = event.reason.take(2_000)
-                            val continuationEligible =
-                                !waitingForReplyFormSubmission && shouldAutoContinueWorkFailure(
-                                    error = lastModelError,
-                                    automaticContinuationCount = binding.automaticContinuationCount,
-                                    pendingInputs = binding.runHandle.pendingInputs.size(),
-                                )
-                            if (continuationEligible) {
+                            if (event.completionReason != null) {
+                                foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
                                 runEventLog.append("turn/end", buildJsonObject {
                                     put("source_message_id", uiSourceMessageId)
-                                    put("reason", if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") {
-                                        "budget_exhausted_continuation"
-                                    } else {
-                                        "stream_interrupted_continuation"
-                                    })
-                                    put("detail", detail)
-                                    put("messages", runState.value.transcriptIndex.totalMessageCount)
+                                    put("reason", event.completionReason.name.lowercase())
+                                    put("detail", event.reason)
                                 })
-                                workModelHistoryRuntime.checkpointAtTurnBoundary(binding,
-                                    if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") "turn/budget-continuation"
-                                    else "turn/stream-interrupted")
+                                workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/model-partial")
+                                workModelHistoryRuntime.persist(binding)
+                                val queued = event.completionReason == com.labteto.dshmobile.harness.agent.AgentCompletionReason.OUTPUT_LIMIT &&
+                                    outputLimitHasProgress && !waitingForReplyFormSubmission &&
+                                    queueAutomaticWorkContinuation(binding, runContext.runId,
+                                        LocalModelException("MODEL_OUTPUT_LIMIT", "已保留部分正文，继续剩余内容。", false),
+                                        uiSourceMessageId, outputLimitProgress = true)
+                                if (!queued) binding.state.update { it.copy(error = "模型未完成：${event.reason}；已保留部分正文。") }
                             } else {
-                                val transcriptMessage = runTranscript.newMessage("system", "执行失败：$detail")
-                                val turnEnd = runEventLog.append("turn/end", buildJsonObject {
-                                    put("source_message_id", uiSourceMessageId)
-                                    put("reason", "error")
-                                    put("detail", detail)
-                                    put("messages", runState.value.transcriptIndex.totalMessageCount + 1L)
-                                    put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
-                                })
-                                runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
-                                workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/failed")
+                                settlePendingTools("failed")
+                                val detail = event.reason.take(2_000)
+                                val continuationEligible =
+                                    !waitingForReplyFormSubmission && shouldAutoContinueWorkFailure(
+                                        error = lastModelError,
+                                        automaticContinuationCount = binding.automaticContinuationCount,
+                                        pendingInputs = binding.runHandle.pendingInputs.size(),
+                                    )
+                                if (continuationEligible) {
+                                    runEventLog.append("turn/end", buildJsonObject {
+                                        put("source_message_id", uiSourceMessageId)
+                                        put("reason", if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") {
+                                            "budget_exhausted_continuation"
+                                        } else {
+                                            "stream_interrupted_continuation"
+                                        })
+                                        put("detail", detail)
+                                        put("messages", runState.value.transcriptIndex.totalMessageCount)
+                                    })
+                                    workModelHistoryRuntime.checkpointAtTurnBoundary(binding,
+                                        if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") "turn/budget-continuation"
+                                        else "turn/stream-interrupted")
+                                } else {
+                                    val transcriptMessage = runTranscript.newMessage("system", "执行失败：$detail")
+                                    val turnEnd = runEventLog.append("turn/end", buildJsonObject {
+                                        put("source_message_id", uiSourceMessageId)
+                                        put("reason", "error")
+                                        put("detail", detail)
+                                        put("messages", runState.value.transcriptIndex.totalMessageCount + 1L)
+                                        put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
+                                    })
+                                    runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
+                                    workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/failed")
+                                }
+                                workModelHistoryRuntime.persist(binding)
                             }
-                            workModelHistoryRuntime.persist(binding)
                         }
                         is AgentEvent.TurnCancelled -> {
                             settlePendingTools("cancelled")

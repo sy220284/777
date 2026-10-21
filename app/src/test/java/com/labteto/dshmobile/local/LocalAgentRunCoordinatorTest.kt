@@ -715,4 +715,21 @@ class LocalAgentRunCoordinatorTest {
             root.deleteRecursively()
         }
     }
+    @Test
+    fun partialNoToolObservationDoesNotBecomeCompletedDuringCrashRecovery() {
+        withCoordinator { coordinator, _ ->
+            val context = coordinator.start(
+                sessionId = "s1", usageMode = LocalUsageMode.WORK,
+                model = "deepseek-flash", baseUrl = "https://api.deepseek.com",
+                planMode = false, policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false, maxSteps = 16,
+                input = "写长文", memoryInput = "写长文",
+            )
+            coordinator.recordEvent(context, AgentEvent.AssistantObserved(context.runId, 1,
+                "第一段", emptyList(), com.labteto.dshmobile.harness.agent.AgentCompletionReason.OUTPUT_LIMIT, "length"))
+            val decision = coordinator.recoveryDecision("s1", SessionRepairResult())
+            assertNotNull(decision?.queuedInput)
+        }
+    }
+
 }

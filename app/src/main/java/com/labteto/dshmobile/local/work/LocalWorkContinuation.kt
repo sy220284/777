@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+internal const val WORK_OUTPUT_LIMIT_CONTINUATION = "MODEL_OUTPUT_LIMIT"
+
 internal const val INTERNAL_WORK_CONTINUATION_PROMPT =
     "恢复同一工作任务。只处理检查点之后尚未完成的部分；已记录的工具回执、审批和副作用不可重复执行。先核对实际进度，再继续。"
 
@@ -59,9 +61,10 @@ internal fun queueAutomaticWorkContinuation(
     sourceRunId: String,
     error: LocalModelException,
     sourceMessageId: String? = null,
+    outputLimitProgress: Boolean = false,
 ): Boolean {
     if (
-        !shouldAutoContinueWorkFailure(
+        !outputLimitProgress && !shouldAutoContinueWorkFailure(
             error = error,
             automaticContinuationCount = binding.automaticContinuationCount,
             pendingInputs = binding.runHandle.pendingInputs.size(),
@@ -70,12 +73,15 @@ internal fun queueAutomaticWorkContinuation(
         return false
     }
 
+    if (outputLimitProgress && (binding.runHandle.cancellationRequested || binding.runHandle.pendingInputs.size() != 0)) return false
     val command = LocalWorkResumeCommand(
         sourceRunId = sourceRunId,
         checkpointSequence = binding.eventLog.latestSequence(),
         failureCode = error.code,
         index = binding.automaticContinuationCount + 1,
         sourceMessageId = sourceMessageId,
+        prompt = if (outputLimitProgress) "上一响应因输出上限暂停，部分正文已保存在历史中。接续正文末尾，只生成尚未完成的内容，不重复已有正文、已执行工具或副作用。"
+            else INTERNAL_WORK_CONTINUATION_PROMPT,
     )
     val queued = command.toQueueInput()
     // The user may queue a new instruction after the earlier pending-count check.
@@ -105,7 +111,7 @@ internal fun queueAutomaticWorkContinuation(
         put("origin", "WORK_CONTINUATION")
     })
 
-    binding.automaticContinuationCount = command.index
+    if (!outputLimitProgress) binding.automaticContinuationCount = command.index
     binding.continuationParentRunId = command.sourceRunId
     binding.state.update {
         it.copy(

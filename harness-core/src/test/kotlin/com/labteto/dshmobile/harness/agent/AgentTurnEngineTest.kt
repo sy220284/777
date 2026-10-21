@@ -515,4 +515,21 @@ class AgentTurnEngineTest {
         assertEquals("完成", result.answer)
     }
 
+    @Test
+    fun partialRepliesPreserveHistoryWithoutExecutingToolsOrCompleting() = runTest {
+        AgentCompletionReason.entries.filter { it != AgentCompletionReason.COMPLETED }.forEach { reason ->
+            val events = mutableListOf<AgentEvent>()
+            val result = AgentTurnEngine(
+                model = AgentModel { AgentModelReply("第一段", listOf(AgentToolCall("c", "write", buildJsonObject {})), reason, "provider-reason") },
+                tools = AgentToolExecutor { error("部分响应不能执行工具") },
+                eventSink = AgentEventSink { events += it },
+            ).run("开始")
+            assertEquals(AgentStopReason.valueOf(reason.name), result.stopReason)
+            assertEquals("第一段", result.answer)
+            assertEquals(reason, result.messages.last().completionReason)
+            assertTrue(result.messages.last().toolCalls.isEmpty())
+            assertFalse(events.any { it is AgentEvent.TurnCompleted || it is AgentEvent.ToolStarted })
+        }
+    }
+
 }

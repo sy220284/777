@@ -926,6 +926,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 put("header_seq", requestHeader.sequence)
                                 put("step", step)
                                 put("request_id", reply.requestId)
+                                put("completion_reason", reply.completionReason.name)
+                                reply.rawStopReason?.let { put("provider_stop_reason", it) }
                                 put("reported", reply.usage.reported)
                                 put("prompt_tokens", reply.usage.promptTokens)
                                 put("cache_hit_tokens", reply.usage.cacheHitTokens)

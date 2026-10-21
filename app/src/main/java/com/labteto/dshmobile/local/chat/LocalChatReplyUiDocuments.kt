@@ -18,6 +18,7 @@ internal class LocalChatReplyUiDocuments {
         if (key !in ambiguous) definitions[key] = candidate
     }
     fun capture(reply: LocalModelReply): LocalModelReply {
+        if (reply.completionReason != com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) return reply
         val parts = LocalReplyUiDocumentProtocol.split(reply.content.orEmpty())
         register(parts.text, Candidate(parts.definition, reply.requestId, reply.usage.reported))
         if (parts.text == reply.content) return reply

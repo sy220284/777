@@ -61,4 +61,35 @@ class OpenAiResponsesStreamSnapshotTest {
     }
 
     private fun event(value: String) = Json.parseToJsonElement(value) as JsonObject
+    @Test
+    fun incompleteSnapshotKeepsMissingPartsAndDoesNotDuplicatePrefix() {
+        val stream = OpenAiResponsesStreamSnapshot()
+        stream.record(event("""{"type":"response.output_text.delta","output_index":0,"content_index":0,"delta":"第一段完整正文"}"""))
+        stream.record(event("""{"type":"response.output_text.delta","output_index":0,"content_index":1,"delta":"第二段"}"""))
+        val settled = stream.settledResponse(event("""{"status":"incomplete","output":[{"type":"message","content":[{"type":"output_text","text":"第一段"}]}]}"""))
+        val reply = OpenAiResponsesClient(okhttp3.OkHttpClient(), Json).parseCompleted(settled,
+            com.labteto.dshmobile.local.TokenPromptBreakdown())
+        assertEquals("第一段完整正文第二段", reply.content)
+        assertEquals(LocalModelCompletionReason.INTERRUPTED, reply.completionReason)
+    }
+
+    @Test
+    fun everyDoneSnapshotPreservesLongerAcceptedPrefixBeforeTerminalMerge() {
+        listOf(
+            """{"type":"response.output_text.done","output_index":0,"content_index":0,"text":"abc"}""",
+            """{"type":"response.content_part.done","output_index":0,"content_index":0,"part":{"type":"output_text","text":"abc"}}""",
+            """{"type":"response.output_item.done","output_index":0,"item":{"type":"message","content":[{"type":"output_text","text":"abc"}]}}""",
+        ).forEach { done ->
+            val stream = OpenAiResponsesStreamSnapshot()
+            stream.record(event("""{"type":"response.output_text.delta","output_index":0,"content_index":0,"delta":"abcdef"}"""))
+            stream.record(event(done))
+            assertEquals("abcdef", stream.content)
+            val settled = stream.settledResponse(event("""{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":[]}"""))
+            val reply = OpenAiResponsesClient(okhttp3.OkHttpClient(), Json).parseCompleted(settled,
+                com.labteto.dshmobile.local.TokenPromptBreakdown())
+            assertEquals("abcdef", reply.content)
+            assertEquals(LocalModelCompletionReason.OUTPUT_LIMIT, reply.completionReason)
+        }
+    }
+
 }

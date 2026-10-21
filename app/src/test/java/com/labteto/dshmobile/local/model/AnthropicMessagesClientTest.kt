@@ -274,7 +274,6 @@ class AnthropicMessagesClientTest {
             listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"private"}}""", """{"type":"content_block_stop","index":0}""", delta, stop) to "ANTHROPIC_PROTOCOL_ERROR",
             listOf(start, stop) to "MODEL_FINISH_null",
             listOf(start, """{"type":"error","error":{"type":"overloaded_error","message":"busy"}}""") to "ANTHROPIC_STREAM_ERROR",
-            listOf(start, """{"type":"message_delta","delta":{"stop_reason":"max_tokens"}}""", stop) to "MODEL_OUTPUT_TRUNCATED",
             listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t","name":"read","input":[]}}""", """{"type":"content_block_stop","index":0}""", """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""", stop) to "ANTHROPIC_PROTOCOL_ERROR",
         ).forEach { (frames, code) ->
             val error = runCatching {
@@ -350,4 +349,42 @@ class AnthropicMessagesClientTest {
         val totalError = runCatching { fixture(emptyList()).complete(route(), listOf(image, image, image, image), emptyList(), null, true) }.exceptionOrNull()
         assertEquals("MODEL_REQUEST_TOO_LARGE", (totalError as? com.labteto.dshmobile.local.LocalModelException)?.code)
     }
+    @Test
+    fun maxTokensAndEofPreserveTextUsageAndDiscardHalfTool() = runBlocking {
+        val start = """{"type":"message_start","message":{"id":"msg","usage":{"input_tokens":2}}}"""
+        val text = """{"type":"content_block_start","index":0,"content_block":{"type":"text","text":"第一段"}}"""
+        val textEnd = """{"type":"content_block_stop","index":0}"""
+        val tool = """{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"t","name":"write","input":{}}}"""
+        val half = """{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{"}}"""
+        val toolEnd = """{"type":"content_block_stop","index":1}"""
+        val limit = """{"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"output_tokens":9}}"""
+        val stop = """{"type":"message_stop"}"""
+        val reply = fixture(listOf(start, text, textEnd, tool, half, toolEnd, limit, stop)).complete(route(), emptyList(), emptyList(), null, true)
+        assertEquals(LocalModelCompletionReason.OUTPUT_LIMIT, reply.completionReason)
+        assertEquals("max_tokens", reply.rawStopReason)
+        assertEquals("第一段", reply.content)
+        assertEquals(9L, reply.usage.completionTokens)
+        assertTrue(reply.toolCalls.isEmpty())
+        val interrupted = fixture(listOf(start, text)).complete(route(), emptyList(), emptyList(), null, true)
+        assertEquals(LocalModelCompletionReason.INTERRUPTED, interrupted.completionReason)
+        assertEquals("第一段", interrupted.content)
+    }
+
+    @Test
+    fun noVisibleBodyMaxTokensStillRetainsReportedCostsAndPartialTerminal() = runBlocking {
+        val reply = fixture(listOf(
+            """{"type":"message_start","message":{"id":"empty-partial","usage":{"input_tokens":3}}}""",
+            """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"c","name":"write","input":{}}}""",
+            """{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{"}}""",
+            """{"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"output_tokens":9}}""",
+            """{"type":"message_stop"}""",
+        )).complete(route(), emptyList(), emptyList(), null, true)
+        validateUsableModelReply(reply)
+        assertEquals(LocalModelCompletionReason.OUTPUT_LIMIT, reply.completionReason)
+        assertTrue(reply.content.isNullOrBlank())
+        assertTrue(reply.toolCalls.isEmpty())
+        assertEquals(9L, reply.usage.completionTokens)
+        assertTrue(reply.usage.reported)
+    }
+
 }

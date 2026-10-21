@@ -45,7 +45,10 @@ class AgentTurnEngine(
                 execution?.requireCurrent()
                 val step = turn.startStep()
                 eventSink.append(AgentEvent.StepStarted(turn.turnId, step))
-                val reply = model.complete(turn.snapshot())
+                val observed = model.complete(turn.snapshot())
+                // Non-complete replies cannot authorize any tool side effects.
+                val reply = if (observed.completionReason == AgentCompletionReason.COMPLETED) observed
+                    else observed.copy(toolCalls = emptyList())
                 execution?.requireCurrent()
                 turn.acceptModelReply(reply)
                 eventSink.append(AgentEvent.AssistantObserved(
@@ -53,6 +56,8 @@ class AgentTurnEngine(
                     step = step,
                     content = reply.content,
                     toolCalls = reply.toolCalls,
+                    completionReason = reply.completionReason, rawStopReason = reply.rawStopReason,
+                    reportedUsage = reply.reportedUsage,
                 ))
                 if (reply.toolCalls.isNotEmpty()) {
                     toolDispatch.executeStep(turn, step, reply.toolCalls)
@@ -60,6 +65,11 @@ class AgentTurnEngine(
                 eventSink.append(AgentEvent.StepFinished(turn.turnId, step))
                 turn.closeStep()
 
+                if (reply.completionReason != AgentCompletionReason.COMPLETED) {
+                    eventSink.append(AgentEvent.TurnFailed(turn.turnId,
+                        reply.rawStopReason ?: reply.completionReason.name, reply.completionReason))
+                    return turn.result(AgentStopReason.valueOf(reply.completionReason.name))
+                }
                 if (reply.toolCalls.isEmpty()) {
                     eventSink.append(AgentEvent.TurnCompleted(turn.turnId, step, reply.content))
                     return turn.result(AgentStopReason.COMPLETED)

@@ -369,4 +369,21 @@ class LocalSubagentContinuationTest {
 
         assertNull(decodeLocalSubagentHistoryCheckpoint(encoded))
     }
+    @Test
+    fun partialCheckpointCannotRecoverAsCompletedEvenWithTerminalText() {
+        val history = listOf(buildJsonObject {
+            put("role", "assistant"); put("content", "第一段")
+            put("_dsh_completion", "OUTPUT_LIMIT"); put("_dsh_stop_reason", "max_tokens")
+        })
+        val encoded = encodeLocalSubagentHistoryCheckpoint("job-partial", "sa-partial", 1,
+            history, emptySet(), terminalOutput = "第一段")
+        assertFalse(encoded.containsKey("terminal_output"))
+        val recovered = requireNotNull(decodeLocalSubagentHistoryCheckpoint(encoded))
+        assertEquals(history, recovered.history)
+        assertFalse(shouldSettleCompletedSubagentCheckpoint(recovered, emptySet()))
+        val oldPartial = recovered.copy(terminalOutput = "第一段")
+        assertFalse(shouldSettleCompletedSubagentCheckpoint(oldPartial, emptySet()))
+        assertFalse(shouldColdResumeCompletedSubagent(oldPartial, setOf("new")))
+    }
+
 }

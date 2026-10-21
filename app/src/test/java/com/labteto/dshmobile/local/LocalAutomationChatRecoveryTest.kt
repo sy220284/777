@@ -87,4 +87,19 @@ class LocalAutomationChatRecoveryTest {
 
         assertEquals(null, recoverAutomationChatOutput(log, threshold))
     }
+    @Test
+    fun partialProactiveBodyCannotRecoverAsSuccessfulAutomation() {
+        val log = LocalSessionEventLog(File(temporary.root, "partial.events.jsonl"), json)
+        val threshold = System.currentTimeMillis() - 1_000L
+        log.append("turn/start", buildJsonObject { put("automation", true); put("proactive", true) })
+        val message = LocalHarnessMessage(id = "partial", role = "assistant", content = "半截", createdAt = System.currentTimeMillis(), proactive = true)
+        log.append("assistant/message", buildJsonObject {
+            put("_dsh_completion", "OUTPUT_LIMIT")
+            put("transcript", encodeTranscriptMessages(listOf(message)))
+        })
+        val failure = runCatching { recoverAutomationChatOutput(log, threshold) }.exceptionOrNull() as? LocalModelException
+        assertEquals("MODEL_PARTIAL_RESPONSE", failure?.code)
+        assertEquals("output_limit", log.latest("turn/end")?.data?.get("reason")?.jsonPrimitive?.content)
+    }
+
 }

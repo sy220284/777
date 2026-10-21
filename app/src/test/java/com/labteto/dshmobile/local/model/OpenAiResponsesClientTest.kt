@@ -1777,4 +1777,36 @@ class OpenAiResponsesClientTest {
             content[1].jsonObject["image_url"]?.jsonPrimitive?.content,
         )
     }
+    @Test
+    fun incompleteAndRefusalIgnoreEarlierHalfToolAndRetainReportedUsage() {
+        val limit = client.parseCompleted(Json.parseToJsonElement("""{"id":"partial","status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":[{"type":"function_call","arguments":"{"},{"type":"message","content":[{"type":"output_text","text":"第一段"}]}],"usage":{"input_tokens":3,"output_tokens":8}}""").jsonObject, com.labteto.dshmobile.local.TokenPromptBreakdown())
+        assertEquals(LocalModelCompletionReason.OUTPUT_LIMIT, limit.completionReason)
+        assertEquals("max_output_tokens", limit.rawStopReason)
+        assertEquals("第一段", limit.content)
+        assertEquals(8L, limit.usage.completionTokens)
+        assertTrue(limit.toolCalls.isEmpty())
+        val refused = client.parseCompleted(Json.parseToJsonElement("""{"status":"completed","output":[{"type":"function_call","arguments":"{"},{"type":"message","content":[{"type":"refusal","refusal":"不能执行"}]}]}""").jsonObject, com.labteto.dshmobile.local.TokenPromptBreakdown())
+        assertEquals(LocalModelCompletionReason.REFUSED, refused.completionReason)
+        assertTrue(refused.toolCalls.isEmpty())
+        assertEquals("不能执行", refused.content)
+    }
+
+    @Test
+    fun incompleteHalfToolOrReasoningOnlyRetainsUsageAtProviderCanonicalAndGatewayValidation() {
+        listOf(
+            """[{"type":"function_call","arguments":"{"}]""",
+            """[{"type":"reasoning","summary":[{"text":"thinking"}]}]""",
+        ).forEach { output ->
+            val response = Json.parseToJsonElement("""{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":$output,"usage":{"input_tokens":3,"output_tokens":9}}""").jsonObject
+            val reply = client.parseCompleted(response, com.labteto.dshmobile.local.TokenPromptBreakdown())
+            val accepted = LocalCanonicalModelCodec.canonicalizeReply(reply, LocalModelAdapterIds.OPENAI_RESPONSES, "route")
+            validateUsableModelReply(accepted)
+            assertEquals(LocalModelCompletionReason.OUTPUT_LIMIT, accepted.completionReason)
+            assertTrue(accepted.content.isNullOrBlank())
+            assertTrue(accepted.toolCalls.isEmpty())
+            assertEquals(9L, accepted.usage.completionTokens)
+            assertTrue(accepted.usage.reported)
+        }
+    }
+
 }
