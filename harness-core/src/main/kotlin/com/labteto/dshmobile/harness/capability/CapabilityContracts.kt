@@ -14,6 +14,8 @@ data class ProcessResult(
     val stderr: String = "",
     val timedOut: Boolean = false,
     val signal: String? = null,
+    /** stdin may fail after the child has already produced stdout/stderr. */
+    val stdinWriteFailed: Boolean = false,
 )
 
 interface HarnessFileSystem {

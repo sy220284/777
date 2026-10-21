@@ -38,6 +38,8 @@ import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.session.SessionProjectionCursorAheadException
+import com.labteto.dshmobile.local.session.requireSessionSnapshotCursorsWithinLog
 import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.session.projectionReplayCursor
 import com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy
@@ -117,11 +119,21 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             }
             return
         }
-        val repaired = log.repairInterruptedTail()
-        chatRestore.repairTimeline(log)
         val stored = loaded?.session ?: LocalHarnessSession(
             id = sessionId, usageMode = pendingSessions.modeFor(sessionId) ?: LocalUsageMode.WORK,
         )
+        // Preflight both cursors before timeline repairs or legacy baseline appends.
+        // A mismatch blocks automatic replay and leaves the persisted snapshot intact.
+        try {
+            requireSessionSnapshotCursorsWithinLog(stored, log.latestSequence())
+        } catch (mismatch: SessionProjectionCursorAheadException) {
+            runtimeStateStore.projection.update {
+                it.copy(loading = false, sessionId = sessionId, error = mismatch.message)
+            }
+            return
+        }
+        val repaired = log.repairInterruptedTail()
+        chatRestore.repairTimeline(log)
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
             log.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: log.append(
                 PROJECTION_BASELINE_EVENT,
@@ -135,13 +147,30 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             persistedSnapshotExists = loaded != null,
             legacyBaselineSequence = legacyProjectionBaseline,
         )
+        val durableLatest = log.latestSequence()
+        if (projectionCursor > durableLatest) {
+            runtimeStateStore.projection.update {
+                it.copy(
+                    loading = false, sessionId = sessionId,
+                    error = "会话控制游标 $projectionCursor 超过事件日志末尾 $durableLatest；原历史已保留，停止自动恢复",
+                )
+            }
+            return
+        }
         val controlTail = log.snapshotAfter(projectionCursor)
         val projectedChatControls = projectChatSessionControls(stored, controlTail)
         val projectedWorkControls = projectWorkSessionControls(stored, controlTail)
-        val restoredTranscript = coordinator.restoreTranscript(
-            stored = stored,
-            persistedSnapshotExists = loaded != null,
-        )
+        val restoredTranscript = try {
+            coordinator.restoreTranscript(
+                stored = stored,
+                persistedSnapshotExists = loaded != null,
+            )
+        } catch (mismatch: SessionProjectionCursorAheadException) {
+            runtimeStateStore.projection.update {
+                it.copy(loading = false, sessionId = sessionId, error = mismatch.message)
+            }
+            return
+        }
         runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor =
             restoredTranscript.projectedThroughSequence
         val restoredHistory = restoreLocalModelHistory(
