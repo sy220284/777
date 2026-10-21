@@ -199,15 +199,30 @@ internal class LocalRuntimeProjection(
         profiles: List<LocalModelProfile>,
         activeProfileId: String?,
         error: String?,
+        preferredSessionId: String? = null,
     ) {
         state.update { current ->
             val before = current.modelState
+            // Session choice outranks the application default. Only the initiating
+            // foreground session explicitly adopting a saved model may replace it.
+            val retained = profiles.firstOrNull { it.id == before.modelSelection.activeProfileId }
+            val default = profiles.firstOrNull { it.id == activeProfileId }
+            val chosen = if (current.sessionId.isBlank() ||
+                (preferredSessionId != null && current.sessionId == preferredSessionId)) {
+                default
+            } else {
+                retained ?: default
+            }
             current.copy(
                 modelState = before.copy(
-                    configured = configured,
-                    model = model,
-                    baseUrl = baseUrl,
-                    modelSelection = before.modelSelection.replaceProfiles(profiles, activeProfileId),
+                    configured = when {
+                        chosen == null -> false
+                        chosen.id == activeProfileId -> configured
+                        else -> before.configured
+                    },
+                    model = chosen?.model ?: model,
+                    baseUrl = chosen?.baseUrl ?: baseUrl,
+                    modelSelection = before.modelSelection.replaceProfiles(profiles, chosen?.id),
                 ),
                 error = error,
             )
