@@ -4,6 +4,7 @@ import java.io.InputStream
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.net.ssl.SSLPeerUnverifiedException
+import javax.net.ssl.SSLHandshakeException
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -38,6 +39,7 @@ class LocalWebHttpPolicyTest {
     fun retriesKeepDnsAndCertificateFailuresTerminal() {
         assertFalse(isRetryableWebTransportFailure(UnknownHostException()))
         assertFalse(isRetryableWebTransportFailure(SSLPeerUnverifiedException("untrusted")))
+        assertFalse(isRetryableWebTransportFailure(SSLHandshakeException("bad certificate")))
         assertTrue(isRetryableWebTransportFailure(SocketTimeoutException()))
     }
 }

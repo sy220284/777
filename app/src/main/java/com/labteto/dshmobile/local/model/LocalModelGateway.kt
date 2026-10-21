@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.core.net.withCancellableHttpResponse
+import com.labteto.dshmobile.local.io.readBoundedBody
+import java.util.concurrent.TimeUnit
 import java.net.URI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.contentOrNull
@@ -26,6 +28,13 @@ class LocalModelGateway @Inject constructor(
     private val routes: LocalModelRouteCatalog,
     private val http: OkHttpClient,
 ) {
+    // Provider catalogue is credential-bearing discovery; never forward its key via redirect.
+    private val catalogHttp = http.newBuilder()
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .callTimeout(30, TimeUnit.SECONDS)
+        .build()
+
     val activeProfileState = credentials.activeProfile
     val invalidatedChatGptAccounts = credentials.invalidatedChatGptAccounts
 
@@ -91,16 +100,14 @@ class LocalModelGateway @Inject constructor(
             .get()
             .build()
         return withContext(Dispatchers.IO) {
-            withCancellableHttpResponse(http.newCall(request)) { response ->
+            withCancellableHttpResponse(catalogHttp.newCall(request)) { response ->
                 check(response.isSuccessful) {
                     if (response.code == 401 && LocalMiniMaxPolicy.isOfficial(profile.baseUrl)) {
                         LocalMiniMaxPolicy.authenticationFailureHint()
                     } else "服务商模型目录查询失败（HTTP ${response.code}）"
                 }
                 val body = response.body ?: error("服务商模型目录没有响应体")
-                check(body.contentLength() <= 524288) { "服务商模型目录响应超过 512 KiB" }
-                val raw = response.peekBody(524289).string()
-                check(raw.length <= 524288) { "服务商模型目录响应超过 512 KiB" }
+                val raw = readBoundedBody(body, 524288)
                 val list = kotlinx.serialization.json.Json.parseToJsonElement(raw)
                     .jsonObject["data"]?.jsonArray
                     ?: error("服务商未返回标准 data 模型列表；请在设置中检查该服务商接口")

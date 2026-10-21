@@ -25,6 +25,14 @@ class BoundedNetworkInputTest {
     }
 
     @Test
+    fun responseBodyLimitsUtf8BytesNotCharacters() {
+        val value = "汉字".toResponseBody()
+        assertEquals("汉字", readBoundedBody(value, 6))
+        val error = runCatching { readBoundedBody("汉字".toResponseBody(), 5) }.exceptionOrNull()
+        assertTrue(error is NetworkInputTooLargeException)
+    }
+
+    @Test
     fun responseBodyReadsExactLimitAndRejectsOversize() {
         assertEquals("1234", readBoundedBody("1234".toResponseBody(), 4))
         val error = runCatching { readBoundedBody("12345".toResponseBody(), 4) }.exceptionOrNull()

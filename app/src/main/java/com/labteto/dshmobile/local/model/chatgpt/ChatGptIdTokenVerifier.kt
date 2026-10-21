@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.model.chatgpt
 
 import com.labteto.dshmobile.local.io.readBoundedBody
+import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 
 import java.math.BigInteger
 import java.security.KeyFactory
@@ -10,7 +11,6 @@ import java.util.Base64
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -89,7 +89,7 @@ class ChatGptIdTokenVerifier @Inject constructor(
 
     private suspend fun fetchJwks(): JsonObject = withContext(Dispatchers.IO) {
         val request = Request.Builder().url(CHATGPT_JWKS_URL).get().build()
-        runInterruptible { http.newCall(request).execute() }.use { response ->
+        withCancellableHttpResponse(http.newCall(request)) { response ->
             require(response.isSuccessful) { "读取 OpenAI JWKS 失败（HTTP ${response.code}）" }
             val body = readBoundedBody(response.body, MAX_AUTH_RESPONSE_BYTES)
             json.parseToJsonElement(body).jsonObject

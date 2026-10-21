@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Base64
 import com.labteto.dshmobile.core.net.withCancellableHttpResponse
+import com.labteto.dshmobile.local.io.readBoundedBody
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.UUID
@@ -128,6 +129,14 @@ internal class LocalMediaApiClient @Inject constructor(
         .readTimeout(10, TimeUnit.MINUTES)
         .writeTimeout(2, TimeUnit.MINUTES)
         .callTimeout(0, TimeUnit.SECONDS)
+        .build()
+
+    // Provider JSON requests carry credentials and may have billable effects. Never follow
+    // redirects or transparently replay them; CDN asset downloads retain their own client.
+    private val mediaRequestHttp = mediaHttp.newBuilder()
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .retryOnConnectionFailure(false)
         .build()
 
     /** Keep provider CDN images in durable app storage whenever the official result URL is accessible. */
@@ -516,9 +525,12 @@ internal class LocalMediaApiClient @Inject constructor(
             markMediaRequestStarted()
             request.newBuilder().post(localMediaOneShotBody(requireNotNull(request.body))).build()
         } else request
-        withCancellableHttpResponse(mediaHttp.newCall(admitted)) { response ->
+        withCancellableHttpResponse(mediaRequestHttp.newCall(admitted)) { response ->
             if (!response.isSuccessful) throwMediaHttpFailure("创作服务", response.code)
-            val payload = response.body?.string() ?: error("创作服务未返回数据")
+            val payload = readBoundedBody(
+                response.body ?: error("创作服务未返回数据"),
+                MAX_MEDIA_JSON_RESPONSE_BYTES,
+            )
             LocalMediaApiResponse.checked(json.parseToJsonElement(payload).jsonObject)
         }
     }
@@ -531,6 +543,12 @@ internal class LocalMediaApiClient @Inject constructor(
                 if (offer.provider == LocalMediaProvider.GEMINI) "x-goog-api-key" else "Authorization",
                 if (offer.provider == LocalMediaProvider.GEMINI) key else "Bearer $key",
             )
+    }
+
+    // Base64 image responses can be larger than their decoded image bytes.
+    // Enforce the ceiling during reading, not after the entire JSON is allocated.
+    private companion object {
+        const val MAX_MEDIA_JSON_RESPONSE_BYTES = 32 * 1024 * 1024
     }
 
     private fun outputFile(extension: String): File =

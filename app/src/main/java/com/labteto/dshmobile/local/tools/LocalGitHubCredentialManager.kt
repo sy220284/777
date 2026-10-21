@@ -2,6 +2,9 @@ package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.interop.github.GitHubConnectorPlugin
 import com.labteto.dshmobile.interop.github.GitHubConnectorStatus
+import com.labteto.dshmobile.core.net.withCancellableHttpResponse
+import com.labteto.dshmobile.local.io.readBoundedBody
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
@@ -29,6 +32,14 @@ internal class LocalGitHubCredentialManager @Inject constructor(
     private val http: OkHttpClient,
     private val json: Json,
 ) {
+    // Read-only browsing is short-lived; cancellation must close the actual socket.
+    // Disable redirects before attaching the account token.
+    private val browserHttp = http.newBuilder()
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .callTimeout(25, TimeUnit.SECONDS)
+        .build()
+
     private val validator = GitHubConnectorPlugin(
         http = http,
         json = json,
@@ -59,13 +70,9 @@ internal class LocalGitHubCredentialManager @Inject constructor(
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
             .header("Authorization", "Bearer $token").get().build()
-        http.newCall(request).execute().use { response ->
+        withCancellableHttpResponse(browserHttp.newCall(request)) { response ->
             require(response.isSuccessful) { "GitHub 读取失败（HTTP ${response.code}），请检查授权与网络" }
-            val body = response.body ?: error("GitHub 返回了空结果")
-            require(body.contentLength() <= 2_000_000 || body.contentLength() < 0) { "仓库列表过大" }
-            val content = body.string()
-            require(content.length <= 2_000_000) { "GitHub 响应超过限制" }
-            content
+            readBoundedBody(response.body, 2_000_000)
         }
     }
 
