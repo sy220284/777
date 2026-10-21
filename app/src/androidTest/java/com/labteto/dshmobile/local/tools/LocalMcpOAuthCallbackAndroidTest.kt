@@ -29,6 +29,7 @@ class LocalMcpOAuthCallbackAndroidTest {
                 }
             }
             assertTrue(request("/favicon.ico").contains("400"))
+            assertTrue(request("/mcp-callback?state=%ZZ&code=bad").contains("400"))
             assertTrue(request("/mcp-callback?state=wrong&code=interloper").contains("400"))
             assertTrue(request("/mcp-callback?state=correct-state&code=ok").contains("200"))
             assertEquals("ok", received.await()["code"])
