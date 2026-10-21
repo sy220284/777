@@ -177,7 +177,7 @@ class OpenAiResponsesClientTest {
             created + """data: {"type":"response.output_text.delta","delta":"partial"}""" + "\n\n",
             created + """data: {"type":"response.failed","response":{"error":{"code":"server_error","message":"failed"}}}""" + "\n\n",
         )
-        for (body in bodies) {
+        bodies.forEachIndexed { index, body ->
             var requests = 0
             val transport = OkHttpClient.Builder().addInterceptor { chain ->
                 requests++
@@ -185,14 +185,24 @@ class OpenAiResponsesClientTest {
                     .message("OK").header("x-request-id", "req-start")
                     .body(body.toResponseBody("text/event-stream".toMediaType())).build()
             }.build()
-            val failure = try {
+            val result = runCatching {
                 OpenAiResponsesClient(transport, Json).completeStreaming(
                     accessToken = "test", baseUrl = "https://api.openai.com/v1", model = "gpt-test",
                     messages = chatPostTurnModelMessages("test"), tools = JsonArray(emptyList()), planSharing = true,
                 )
-                error("expected failed stream")
-            } catch (error: LocalModelException) { error }
-            assertFalse(failure.retryable)
+            }
+            if (index == 1) {
+                val partial = result.getOrThrow()
+                assertEquals(LocalModelCompletionReason.INTERRUPTED, partial.completionReason)
+                assertEquals("partial", partial.content)
+                assertTrue(partial.toolCalls.isEmpty())
+                val denied = runCatching { requireCompletedModelReply(partial) }.exceptionOrNull()
+                assertEquals("MODEL_INTERRUPTED", (denied as? LocalModelException)?.code)
+            } else {
+                val failure = result.exceptionOrNull() as? LocalModelException
+                assertNotNull(failure)
+                assertFalse(failure!!.retryable)
+            }
             assertEquals(1, requests)
         }
     }
