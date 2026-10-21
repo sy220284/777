@@ -109,7 +109,7 @@ internal class LocalWorkOpenGraphProjection {
     private var generation = -1L
     private var throughSequence = -1L
     private var ledger = LocalWorkTaskGraphRecoveryLedger()
-    private val accepted = linkedMapOf<Pair<String, String>, LocalSessionEventLog.Event>()
+    private val accepted = linkedMapOf<String, MutableMap<String, LocalSessionEventLog.Event>>()
     private val jobResultsBySequence = linkedMapOf<Long, LocalSessionEventLog.Event>()
     private val jobResultsById = linkedMapOf<String, LocalSessionEventLog.Event>()
     private val admissions = linkedMapOf<Pair<String, String>, MutableList<JsonObject>>()
@@ -145,7 +145,7 @@ internal class LocalWorkOpenGraphProjection {
             val node = (data["node_id"] as? JsonPrimitive)?.contentOrNull
             when (event.type) {
                 "taskgraph/node-accepted" -> if (!execution.isNullOrBlank() && !node.isNullOrBlank()) {
-                    accepted[execution to node] = event
+                    accepted.getOrPut(execution) { linkedMapOf() }[node] = event
                 }
                 "taskgraph/job-result" -> {
                     jobResultsBySequence[event.sequence] = event
@@ -193,8 +193,7 @@ internal class LocalWorkOpenGraphProjection {
     @Synchronized
     fun acceptedFor(log: LocalSessionEventLog, execution: String): Pair<Map<String, JsonObject>, Map<Long, JsonObject>> {
         refresh(log)
-        val facts = accepted.asSequence().filter { it.key.first == execution }
-            .associate { it.key.second to it.value.data }
+        val facts = accepted[execution].orEmpty().mapValues { it.value.data }
         val results = facts.values.mapNotNull { (it["result_sequence"] as? JsonPrimitive)?.contentOrNull?.toLongOrNull() }
             .distinct().mapNotNull { sequence ->
                 jobResultsBySequence[sequence]?.takeIf { event ->
@@ -207,7 +206,7 @@ internal class LocalWorkOpenGraphProjection {
     @Synchronized
     fun acceptedNode(log: LocalSessionEventLog, execution: String, nodeId: String): LocalSessionEventLog.Event? {
         refresh(log)
-        return accepted[execution to nodeId]
+        return accepted[execution]?.get(nodeId)
     }
 
     @Synchronized
