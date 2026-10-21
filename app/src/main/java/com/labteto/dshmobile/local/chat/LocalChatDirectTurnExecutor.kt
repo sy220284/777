@@ -174,6 +174,22 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             val branchEligible = snapshot.transcriptIndex.branchingEligible
             val branchParentId = snapshot.transcriptIndex.latestUserMessageId
             val branchBase = snapshot.chat.chatBranches
+            // Rebuild from the selected prefix, not the cached history: the latter may
+            // contain a superseded answer in a previously compacted summary.
+            val regenerationHistory = replacingMessageId?.let { oldId ->
+                buildDurableChatModelHistory(
+                    eventLog = eventLog,
+                    messages = chatRegenerationSourceMessages(branchBase, oldId),
+                    systemPrompt = chatSystemPrompt(),
+                )
+            }
+            // Style/deduplication references are model inputs too, not just history messages.
+            val generationSnapshot = if (replacingMessageId == null) snapshot else snapshot.copy(
+                messages = snapshot.messages.filterNot { message ->
+                    message.id == replacingMessageId ||
+                        message.id == chatReasoningTranscriptId(replacingMessageId)
+                },
+            )
 
             chatMemory.captureAutoMemoryDirective(
                 memoryInput,
@@ -181,26 +197,25 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             )
             val relationshipMemory = chatMemory.relationshipContext(input)
             val preparedChat = chatTurnCoordinator.prepare(
-                snapshot = snapshot,
+                snapshot = generationSnapshot,
                 input = input,
                 relationshipMemory = relationshipMemory,
             )
             val turnContext = preparedChat.context
             val networkContext = webContext.forInput(input, turnContext.persona)
             val dynamicContext = networkContext + preparedChat.dynamicContext
-            check(
-                modelHistory.compactChatIfNeeded(
-                    expectedSessionId = sessionId,
-                    extraTokens = estimateModelTokens(turnContext.stablePrompt) +
-                        estimateModelTokens(dynamicContext),
-                ),
-            ) { "Chat 历史压缩时前台会话已切换" }
-
-            val durableHistory = if (replacingMessageId == null) {
-                modelHistory.history.snapshot()
-            } else {
-                modelHistory.history.snapshot().withoutLastCompletedAssistantReply()
+            // The normal cached history can be compacted in place. Regeneration instead
+            // uses the clean selected-prefix history and must never summarize the old reply.
+            if (regenerationHistory == null) {
+                check(
+                    modelHistory.compactChatIfNeeded(
+                        expectedSessionId = sessionId,
+                        extraTokens = estimateModelTokens(turnContext.stablePrompt) +
+                            estimateModelTokens(dynamicContext),
+                    ),
+                ) { "Chat 历史压缩时前台会话已切换" }
             }
+            val durableHistory = regenerationHistory ?: modelHistory.history.snapshot()
             val durableRequestMessages = withChatTurnContext(
                 history = boundedChatRequestHistory(
                     durableHistory,
@@ -245,12 +260,13 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 put("model", snapshot.modelState.model)
                 put("mode", "chat")
                 put("persona_id", turnContext.persona.id)
+                replacingMessageId?.let { put("replaces", it) }
             })
 
             val replyCards = LocalChatReplyUiDocuments()
             val rawReply = try {
                 modelRequests.complete(
-                    snapshot = snapshot,
+                    snapshot = generationSnapshot,
                     messages = requestMessages,
                     step = 1,
                     options = com.labteto.dshmobile.local.LocalModelRequestOptions(
@@ -294,7 +310,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             }
 
             val reply = replyCoordinator.finalizeDirect(
-                snapshot = snapshot,
+                snapshot = generationSnapshot,
                 reply = replyCards.capture(rawReply),
                 userMessage = input,
                 step = 1,
@@ -303,7 +319,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 ),
                 retryRaw = { repairHint ->
                     replyCards.capture(modelRequests.complete(
-                        snapshot = snapshot,
+                        snapshot = generationSnapshot,
                         messages = withEphemeralContext(requestMessages, repairHint),
                         step = 1,
                         options = com.labteto.dshmobile.local.LocalModelRequestOptions(
@@ -387,7 +403,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 check(
                     modelHistory.reset(
                         sessionId,
-                        modelHistory.history.snapshot().withoutLastCompletedAssistantReply(),
+                        requireNotNull(regenerationHistory),
                     ),
                 ) { "Chat 重生成替换模型历史时前台会话已切换" }
                 runtimeStateStore.projection.removeForegroundTranscriptMessage(
