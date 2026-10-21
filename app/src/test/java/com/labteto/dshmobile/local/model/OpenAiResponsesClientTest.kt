@@ -200,7 +200,7 @@ class OpenAiResponsesClientTest {
                 assertEquals("MODEL_INTERRUPTED", (denied as? LocalModelException)?.code)
             } else {
                 val failure = result.exceptionOrNull() as? LocalModelException
-                assertNotNull(failure)
+                assertTrue(failure != null)
                 assertFalse(failure!!.retryable)
             }
             assertEquals(1, requests)
