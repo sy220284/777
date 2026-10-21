@@ -172,7 +172,12 @@ internal class LocalWorkOpenGraphProjection {
                 }
                 LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT -> {
                     val jobId = (data["background_job_id"] as? JsonPrimitive)?.contentOrNull
-                    if (!jobId.isNullOrBlank()) historyCheckpoints[jobId] = event
+                    val agentId = (data["agent_id"] as? JsonPrimitive)?.contentOrNull
+                    // Match the authoritative reverse predicate: an unrelated checkpoint must
+                    // not hide an earlier valid checkpoint for this persistent Job.
+                    if (!jobId.isNullOrBlank() && agentId == localPersistentSubagentId(jobId)) {
+                        historyCheckpoints[jobId] = event
+                    }
                 }
             }
             throughSequence = event.sequence
