@@ -519,6 +519,29 @@ class DeepSeekClientTest {
     }
 
     @Test
+    fun doneWithoutFinishReasonIsInterruptedNotSuccessful() = runBlocking {
+        val body = listOf(
+            """data: {"choices":[{"delta":{"content":"仍在生成"}}]}""",
+            "data: [DONE]",
+        ).joinToString("\n")
+        var attempts = 0
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            attempts++
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(body.toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val reply = DeepSeekClient(http, Json { ignoreUnknownKeys = true }).completeStreaming(
+            apiKey = "test", baseUrl = "https://example.com", model = "deepseek-chat",
+            messages = listOf(buildJsonObject { put("role", "user"); put("content", "test") }),
+        )
+        assertEquals(com.labteto.dshmobile.local.model.LocalModelCompletionReason.INTERRUPTED, reply.completionReason)
+        assertEquals("仍在生成", reply.content)
+        assertTrue(reply.toolCalls.isEmpty())
+        assertEquals(1, attempts)
+    }
+
+    @Test
     fun terminalFinishReasonMayCloseStreamWithoutDoneMarker() = runBlocking {
         val body = listOf(
             "data: {\"choices\":[{\"delta\":{\"content\":\"完成\"}}]}",

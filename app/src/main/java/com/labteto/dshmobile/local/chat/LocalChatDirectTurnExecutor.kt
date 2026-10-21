@@ -490,6 +490,16 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 put("reason", "aborted")
                 put("mode", "chat")
             })
+            // Keep a durable, explicitly partial visible row if the admitted stream failed.
+            runCatching { recoverInterruptedChatReply(eventLog) }.onSuccess { partial ->
+                partial?.let { message ->
+                    runtimeStateStore.projection.appendForegroundTranscript(sessionId, listOf(message))
+                    runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor = maxOf(
+                        runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor ?: -1L,
+                        eventLog.latestSequence(),
+                    )
+                }
+            }
             modelHistory.checkpointAtTurnBoundary(sessionId, "chat/cancelled")
             sessionStorage.enqueueCurrentSnapshot(sessionId)
             throw cancelled
@@ -523,6 +533,16 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 put("detail", detail.take(2_000))
                 put("mode", "chat")
             })
+            // Keep a durable, explicitly partial visible row if the admitted stream failed.
+            runCatching { recoverInterruptedChatReply(eventLog) }.onSuccess { partial ->
+                partial?.let { message ->
+                    runtimeStateStore.projection.appendForegroundTranscript(sessionId, listOf(message))
+                    runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor = maxOf(
+                        runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor ?: -1L,
+                        eventLog.latestSequence(),
+                    )
+                }
+            }
             modelHistory.checkpointAtTurnBoundary(sessionId, "chat/failed")
             sessionStorage.enqueueCurrentSnapshot(sessionId)
         } finally {

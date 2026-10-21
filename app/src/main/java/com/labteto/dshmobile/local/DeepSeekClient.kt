@@ -283,7 +283,7 @@ class DeepSeekClient @Inject constructor(
                 val fallback = StringBuilder()
                 val toolCalls = linkedMapOf<Int, StreamToolCall>()
                 var streamUsage: JsonObject? = null
-                                var sawStreamData = false
+                var sawStreamData = false
                 var sawTerminalFrame = false
                 var rawStopReason: String? = null
                 var sawRefusal = false
@@ -451,7 +451,7 @@ class DeepSeekClient @Inject constructor(
                         throw streamProtocolError("模型响应无法解析", error)
                     }
                 }
-                if (!sawTerminalFrame && content.isBlank()) {
+                if ((!sawTerminalFrame || rawStopReason.isNullOrBlank()) && content.isBlank() && !sawRefusal) {
                     throw modelPostAdmissionFailure(
                         code = "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION",
                         detail = "模型流式响应提前结束，未收到完成标记",
@@ -459,8 +459,8 @@ class DeepSeekClient @Inject constructor(
                     )
                 }
                 currentCoroutineContext().ensureActive()
-                val completionReason = if (!sawTerminalFrame) com.labteto.dshmobile.local.model.LocalModelCompletionReason.INTERRUPTED
-                    else if (sawRefusal) com.labteto.dshmobile.local.model.LocalModelCompletionReason.REFUSED
+                val completionReason = if (sawRefusal) com.labteto.dshmobile.local.model.LocalModelCompletionReason.REFUSED
+                    else if (!sawTerminalFrame || rawStopReason.isNullOrBlank()) com.labteto.dshmobile.local.model.LocalModelCompletionReason.INTERRUPTED
                     else completionForFinishReason(rawStopReason)
                 val accumulated = if (completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED)
                     toolCalls.toSortedMap().values.toList() else emptyList()
