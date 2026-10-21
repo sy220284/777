@@ -19,12 +19,22 @@ internal data class LocalTranscriptHistoryLoadResult(
  * Raw runtime/history paging remains bounded by [LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES]. This
  * loader only decides how many bounded pages are needed to satisfy the separate foreground quota.
  */
+/** Narrow, cancellable history source for deterministic navigation ordering tests. */
+internal interface LocalTranscriptHistoryPageSource {
+    suspend fun bootstrap(sessionId: String): LocalTranscriptHistoryLoadResult?
+    suspend fun olderBatch(
+        sessionId: String,
+        olderMessages: List<LocalHarnessMessage>,
+        startCursor: LocalTranscriptPageCursor,
+    ): LocalTranscriptHistoryLoadResult?
+}
+
 internal class LocalTranscriptHistoryLoader(
     private val session: LocalSessionUiFacade,
     private val currentSessionId: () -> String,
     private val liveMessages: () -> List<LocalHarnessMessage>,
-) {
-    suspend fun bootstrap(sessionId: String): LocalTranscriptHistoryLoadResult? {
+) : LocalTranscriptHistoryPageSource {
+    override suspend fun bootstrap(sessionId: String): LocalTranscriptHistoryLoadResult? {
         var olderMessages = emptyList<LocalHarnessMessage>()
         var pageCursor: LocalTranscriptPageCursor? = null
         var nextCursor: LocalTranscriptPageCursor? = null
@@ -63,7 +73,7 @@ internal class LocalTranscriptHistoryLoader(
         )
     }
 
-    suspend fun olderBatch(
+    override suspend fun olderBatch(
         sessionId: String,
         olderMessages: List<LocalHarnessMessage>,
         startCursor: LocalTranscriptPageCursor,
