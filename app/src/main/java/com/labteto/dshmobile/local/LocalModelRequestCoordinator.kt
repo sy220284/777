@@ -15,6 +15,7 @@ import com.labteto.dshmobile.local.context.LocalRequestContextPolicyInput
 import com.labteto.dshmobile.local.context.LocalRequestContextProjection
 import com.labteto.dshmobile.local.context.historySummaryMode
 import com.labteto.dshmobile.local.context.projectLocalRequestContext
+import com.labteto.dshmobile.local.model.DeepSeekChatRequestPolicy
 import com.labteto.dshmobile.local.model.LocalAgentModelRequestRuntime
 import com.labteto.dshmobile.local.model.LocalModelAdmissionPort
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
@@ -732,6 +733,24 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             )
                         }).sequence
                     }
+                    val activePressure = LocalPromptPressureMeter.measure(
+                        messages = activeMessages,
+                        tools = tools,
+                        operationalLimitTokens = operationalLimit,
+                        modelContextWindowTokens = pressure.modelContextWindowTokens,
+                    )
+                    val deepSeekMaxTokens = if (
+                        runSurface.protocol == com.labteto.dshmobile.local.model.LocalModelProtocol.CHAT_COMPLETIONS
+                    ) {
+                        DeepSeekChatRequestPolicy.outputBudget(
+                            model = runSurface.model,
+                            baseUrl = runSurface.baseUrl,
+                            reasoningEffort = reasoningEffort,
+                            work = snapshot.usageMode == LocalUsageMode.WORK,
+                            estimatedInputTokens = activePressure.estimatedInputTokens,
+                            contextWindowTokens = pressure.modelContextWindowTokens,
+                        )
+                    } else null
                     val providerAttemptFingerprint = stableJsonSha256(buildJsonArray {
                         add(JsonPrimitive(routeFingerprint))
                         add(JsonPrimitive(activeEvidence.messageDigest))
@@ -739,6 +758,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                         add(JsonPrimitive(activeEvidence.contextDigest))
                         add(JsonPrimitive(effectiveTemperature?.toString() ?: "null"))
                         add(JsonPrimitive(reasoningEffort ?: "default"))
+                        add(JsonPrimitive(deepSeekMaxTokens?.toString() ?: "default"))
                         add(JsonPrimitive(cacheComparisonResponseId ?: "null"))
                         add(JsonPrimitive(promptCacheKey ?: "null"))
                         add(JsonPrimitive(promptCacheTtl ?: "null"))
@@ -762,6 +782,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             put("image_generation_enabled", effectiveImageGeneration)
                             put("native_tool_names", nativeTools)
                             effectiveTemperature?.let { put("temperature", it) }
+                            deepSeekMaxTokens?.let { put("max_tokens", it) }
                             cacheComparisonResponseId?.let {
                                 put("prompt_cache_comparison_response_id", it)
                             }
@@ -810,12 +831,6 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 ?.let { streamingPreviewStore.publishReasoning(it, preview) }
                         },
                     )
-                    val activePressure = LocalPromptPressureMeter.measure(
-                        messages = activeMessages,
-                        tools = tools,
-                        operationalLimitTokens = operationalLimit,
-                        modelContextWindowTokens = pressure.modelContextWindowTokens,
-                    )
                     pressureStore.record(
                         snapshot.sessionId,
                         activePressure,
@@ -829,6 +844,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 streaming = true,
                                 temperature = effectiveTemperature,
                                 reasoningEffort = reasoningEffort,
+                                maxTokens = deepSeekMaxTokens,
                                 promptCacheComparisonResponseId = cacheComparisonResponseId,
                                 promptCacheKey = promptCacheKey,
                             promptCacheTtl = promptCacheTtl,
