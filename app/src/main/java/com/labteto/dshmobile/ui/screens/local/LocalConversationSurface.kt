@@ -502,10 +502,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var olderDocumentSnapshots by remember(state.sessionId) {
         mutableStateOf<List<com.labteto.dshmobile.uicontract.UiDocumentSnapshot>>(emptyList())
     }
-    LaunchedEffect(state.sessionId, pagedOlderMessages, nativeDocuments) {
+    LaunchedEffect(state.sessionId, state.usageMode, pagedOlderMessages, nativeDocuments) {
         val ids = pagedOlderMessages.filter { it.role == "assistant" ||
             state.usageMode == LocalUsageMode.WORK && it.role == "user" }.map { it.id }.toSet()
-        olderDocumentSnapshots = if (nativeDocuments == null || ids.isEmpty()) emptyList()
+        olderDocumentSnapshots = if (state.usageMode != LocalUsageMode.WORK ||
+            nativeDocuments == null || ids.isEmpty()) emptyList()
             else nativeDocuments.olderDocuments(state.sessionId, ids)
     }
     // Media is a persistent chat/Work timeline projection, not an assistant text message.
@@ -904,7 +905,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             onTogglePin = onTogglePinSession,
                             onRenameSession = { renameSessionOpen = true },
                             onDeleteSession = onDeleteSession,
-                            onOpenDocuments = if (state.sessionId.isNotBlank() && !state.loading) onOpenNativeDocuments else null,
                         )
                     } else {
                         WorkSurfaceHeader(
@@ -1206,7 +1206,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 onConvertToWork = if (state.usageMode == LocalUsageMode.CHAT &&
                                     onUseWorkCapability != null && !state.loading && !state.running
                                 ) { message -> onUseWorkCapability(message.content) } else null,
-                                 onCreateDocument = if (nativeDocuments != null && messageActionsEnabled &&
+                                 onCreateDocument = if (state.usageMode == LocalUsageMode.WORK &&
+                                     nativeDocuments != null && messageActionsEnabled &&
                                     transcriptItem.message.role == "assistant" &&
                                     state.messages.any { it.id == transcriptItem.message.id }
                                 ) { message -> documentGenerationMessageId = message.id } else null,
@@ -1574,13 +1575,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
 
     }
 
-    documentGenerationMessageId?.let { sourceId ->
-        nativeDocuments?.let { documents ->
-            NativeV6DocumentGenerationDialog(
-                messageId = sourceId,
-                onDismiss = { documentGenerationMessageId = null },
-                onGenerate = documents::generate,
-            )
+    if (state.usageMode == LocalUsageMode.WORK) {
+        documentGenerationMessageId?.let { sourceId ->
+            nativeDocuments?.let { documents ->
+                NativeV6DocumentGenerationDialog(
+                    messageId = sourceId,
+                    onDismiss = { documentGenerationMessageId = null },
+                    onGenerate = documents::generate,
+                )
+            }
         }
     }
     V6LoadedConversationSearchHost(

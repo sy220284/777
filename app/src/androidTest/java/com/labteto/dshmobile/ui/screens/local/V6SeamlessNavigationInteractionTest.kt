@@ -121,7 +121,32 @@ class V6SeamlessNavigationInteractionTest {
         compose.onNodeWithText("完成构建", substring = true).performTouchInput { longClick() }
         compose.onNodeWithText("转为任务").assertDoesNotExist()
     }
-    @Test fun assistantMessageOverflowMenuKeepsGenerationWithoutInlineCard() {
+    @Test fun chatAssistantDoesNotExposeInteractiveDocumentGeneration() {
+        val message = LocalHarnessMessage(
+            id = "assistant-chat-1", role = "assistant",
+            content = "普通聊天回复", createdAt = 1L,
+        )
+        var generated = 0
+        compose.setContent {
+            DshTheme {
+                LocalMessageRow(
+                    message = message, chatMode = true, groupMode = false,
+                    canEdit = false, canRegenerate = false, canSelectVariant = false,
+                    branchInfo = null, onEdit = {}, onSelectVariant = { _, _ -> false },
+                    onRegenerate = { false },
+                    onCreateDocument = { generated++ },
+                )
+            }
+        }
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        compose.onNodeWithText("普通聊天回复").assertExists()
+        compose.onNodeWithContentDescription(context.getString(R.string.fluid_message_actions))
+            .assertDoesNotExist()
+        compose.onNodeWithText("为此回复生成交互文档").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(0, generated) }
+    }
+
+    @Test fun workAssistantStillOffersInteractiveDocumentGeneration() {
         val message = LocalHarnessMessage(
             id = "assistant-doc-1", role = "assistant",
             content = "这是一条等待整理的回复", createdAt = 1L,
@@ -130,7 +155,7 @@ class V6SeamlessNavigationInteractionTest {
         compose.setContent {
             DshTheme {
                 LocalMessageRow(
-                    message = message, chatMode = true, groupMode = false,
+                    message = message, chatMode = false, groupMode = false,
                     canEdit = false, canRegenerate = false, canSelectVariant = false,
                     branchInfo = null, onEdit = {}, onSelectVariant = { _, _ -> false },
                     onRegenerate = { false },
@@ -138,8 +163,6 @@ class V6SeamlessNavigationInteractionTest {
                 )
             }
         }
-        // Selectable assistant Markdown owns text long-press for native selection.
-        // Its compact overflow button is the reliable message-action entry.
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         compose.onNodeWithContentDescription(context.getString(R.string.fluid_message_actions))
             .performClick()

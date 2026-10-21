@@ -16,7 +16,7 @@ class NativeV6DocumentPlacementTest {
         UiDocumentProvenance(null, "", false, UiDocumentOrigin.LOCAL), emptyMap()
     )
 
-    @Test fun legacyProgressIsHiddenWhileReplyCardsStayAtTheirSource() {
+    @Test fun chatHidesAllDocumentsWhileWorkKeepsReplyCardsAtTheirSource() {
         val docs = listOf(snapshot("user-1", "work-live:user-1"),
             snapshot("user-1", "reply-ui:user-1"), snapshot("assistant-2", "reply-ui:assistant-2"))
         val user = nativeV6DocumentsForMessage("user-1", "user", true, docs)
@@ -25,6 +25,7 @@ class NativeV6DocumentPlacementTest {
             nativeV6DocumentsForMessage("assistant-2", "assistant", true, docs)
                 .map { it.document.documentId })
         assertTrue(nativeV6DocumentsForMessage("user-1", "user", false, docs).isEmpty())
+        assertTrue(nativeV6DocumentsForMessage("assistant-2", "assistant", false, docs).isEmpty())
         assertTrue(nativeV6DocumentsForMessage("tool-3", "tool", true, docs).isEmpty())
         assertTrue(nativeV6DocumentsForMessage("other", "user", true, docs).isEmpty())
     }

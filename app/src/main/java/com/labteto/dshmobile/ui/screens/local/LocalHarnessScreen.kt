@@ -1182,7 +1182,7 @@ fun LocalHarnessScreen(
         )
     }
 
-    if (showNativeDocuments && shell.sessionId.isNotBlank()) {
+    if (showNativeDocuments && shell.usageMode == LocalUsageMode.WORK && shell.sessionId.isNotBlank()) {
         NativeV6DocumentsSheet(
             port = viewModel.interactiveDocuments,
             forms = viewModel.documentForms,

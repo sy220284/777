@@ -308,7 +308,7 @@ internal fun LocalMessageRow(
             // Primary actions live on the toolbar; the overflow contains only secondary actions.
             // Long-press and the overflow button open this SAME set of actions.
             val secondaryActions = buildList {
-                if (!streaming) onCreateDocument?.let { create ->
+                if (!chatMode && !streaming) onCreateDocument?.let { create ->
                     add(SyMenuItem(
                         text = "为此回复生成交互文档",
                         icon = FeatherIcons.FileText,
