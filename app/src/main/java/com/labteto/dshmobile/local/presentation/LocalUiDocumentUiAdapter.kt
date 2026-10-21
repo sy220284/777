@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.LocalConversationUiPortComposition
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.model.LocalUiDocumentGeneration
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.session.LocalUiDocumentSessionStore
@@ -44,6 +45,26 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 
 /**
+ * One active session's message identities, used only for document visibility.
+ * Session projection publishes replacement message lists for append/edit/delete.
+ * Keep no cross-session history and never infer freshness from row count.
+ */
+internal class LocalVisibleMessageIdsCache {
+    private var sessionId: String? = null
+    private var source: List<LocalHarnessMessage>? = null
+    private var ids: Set<String> = emptySet()
+
+    fun get(session: String, messages: List<LocalHarnessMessage>): Set<String> {
+        if (sessionId == session && source === messages) return ids
+        val newIds = messages.mapTo(LinkedHashSet(messages.size)) { it.id }
+        sessionId = session
+        source = messages
+        ids = newIds
+        return newIds
+    }
+}
+
+/**
  * Shared foreground fence for an explicit document deletion. The first check protects
  * preflight; the SAME check must run again under the foreground lock immediately
  * before the durable tombstone, after any slow EventLog read has completed.
@@ -78,12 +99,13 @@ internal class LocalUiDocumentUiAdapter(
 ) : UiDocumentUiPort {
     private data class Context(val identity: UiSessionIdentity?, val workMode: Boolean, val messages: Set<String>,
         val phase: UiExecutionPhase, val queued: Int, val approvalTool: String?, val error: String?)
+    private val visibleMessageIds = LocalVisibleMessageIdsCache()
     private val contexts = state.state.map { synchronized(state.foregroundRunHandle.lock) {
         val current = state.state.value
         val facts = conversations.documentFactsSnapshot()
         // Only document facts and visible message IDs are required. Do not project
         // every chat/work message when a status or approval field changes.
-        Context(facts.identity, facts.workMode, current.messages.map { it.id }.toSet(),
+        Context(facts.identity, facts.workMode, visibleMessageIds.get(current.sessionId, current.messages),
             facts.phase, facts.queuedInputCount, facts.approval?.toolName, facts.error)
     } }.distinctUntilChanged()
     override val snapshots: StateFlow<UiDocumentsSceneSnapshot> = combine(contexts, store.revision, generation.generating) { context, _, busy ->
