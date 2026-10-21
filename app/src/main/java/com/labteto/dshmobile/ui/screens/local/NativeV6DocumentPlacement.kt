@@ -8,7 +8,7 @@ internal fun nativeV6DocumentsForMessage(
     role: String,
     workMode: Boolean,
     snapshots: List<UiDocumentSnapshot>,
-): List<UiDocumentSnapshot> = snapshots.filter { item ->
+): List<UiDocumentSnapshot> = if (!workMode) emptyList() else snapshots.filter { item ->
     item.document.source.messageId == messageId &&
         !item.document.documentId.startsWith("work-live:") &&
         (role == "assistant" || workMode && role == "user" &&
