@@ -171,6 +171,8 @@ internal class LocalWorkBackgroundToolExecutor(
         memoryTools: com.labteto.dshmobile.local.memory.LocalMemoryTools,
         enabledOptionalTools: MutableSet<String>,
     ): AgentToolResult {
+        val workflowFence = kotlinx.coroutines.currentCoroutineContext()[LocalWorkflowExecutionFence]
+        workflowFence?.requireCurrent?.invoke()
         val canonical = call.copy(name = LocalToolPolicy.canonical(call.name))
         // 文件类副作用由统一执行协调器序列化，Lead/成员使用同一把闸门。
         return executeUtility(canonical, sessionId, memoryTools, enabledOptionalTools)
@@ -179,6 +181,7 @@ internal class LocalWorkBackgroundToolExecutor(
                 sessionId = sessionId,
                 allowMutation = allowMutation,
                 planModeEnabled = false,
+                beforeExecution = { workflowFence?.requireCurrent?.invoke(); true },
                 approval = { normalized, tool, summary ->
                     if (sessionId == runtimeStateStore.currentSessionId) {
                         toolApproval.approve(normalized, tool, summary)

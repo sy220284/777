@@ -52,7 +52,7 @@ internal data class LocalWorkflowRunResult(
 }
 
 /**
- * Work-owned read-only delegated task workflow using the shared Kotlin DAG scheduler.
+ * Work-owned delegated task workflow using the shared Kotlin DAG scheduler.
  * Work still owns acceptance policy and subagent capabilities.
  */
 internal class LocalWorkflowCoordinator(
@@ -60,6 +60,12 @@ internal class LocalWorkflowCoordinator(
     private val pruneOutput: (String) -> String,
     private val onProgress: (TaskGraphProgress) -> Unit,
     maxParallelism: Int = 4,
+    private val executeNode: (suspend (com.labteto.dshmobile.harness.workflow.TaskGraphTaskContext, String) -> String)? = null,
+    private val acceptNode: suspend (com.labteto.dshmobile.harness.workflow.TaskGraphTaskContext, String) -> TaskGraphAcceptance =
+        { _, _ -> TaskGraphAcceptance(true) },
+    private val onResult: (com.labteto.dshmobile.harness.workflow.TaskGraphNodeResult, Map<String, String>) -> Unit = { _, _ -> },
+    private val retrySafe: Boolean = true,
+    private val onTerminal: (com.labteto.dshmobile.harness.workflow.TaskGraphNodeResult) -> Unit = {},
 ) {
     private val graph = TaskGraphExecutor(maxNodes = 128, maxParallelism = maxParallelism.coerceIn(1, 8))
 
@@ -116,13 +122,19 @@ internal class LocalWorkflowCoordinator(
     suspend fun run(plan: LocalPreparedWorkflow): String =
         runDetailed(plan).summary
 
-    suspend fun runDetailed(plan: LocalPreparedWorkflow): LocalWorkflowRunResult {
+    suspend fun runDetailed(
+        plan: LocalPreparedWorkflow,
+        initialResults: Map<String, com.labteto.dshmobile.harness.workflow.TaskGraphNodeResult> = emptyMap(),
+    ): LocalWorkflowRunResult {
         val pipeline = plan.pipeline
         val requiredEvidence = plan.evidence
         val results = graph.run(
             nodes = plan.nodes,
-            retrySafe = true, // Work delegates are explicitly read-only.
-            maxAttempts = 2,
+            initialResults = initialResults,
+            onResult = onResult,
+            onTerminal = onTerminal,
+            retrySafe = retrySafe,
+            maxAttempts = if (retrySafe) 2 else 1,
             execute = { context, prompt ->
                 val dependenciesText = context.dependencyOutputs.entries.joinToString("\n\n") {
                     (id, output) -> "$id 的已验收结果：\n${pruneOutput(output)}"
@@ -130,7 +142,7 @@ internal class LocalWorkflowCoordinator(
                 val actualPrompt = if (dependenciesText.isNotBlank()) {
                     "依赖任务的已验收结果：\n$dependenciesText\n\n当前任务：\n$prompt"
                 } else prompt
-                execute(actualPrompt)
+                executeNode?.invoke(context, actualPrompt) ?: execute(actualPrompt)
             },
             accept = { context, output ->
                 val evidence = requiredEvidence.getOrNull(context.index)?.trim().orEmpty()
@@ -138,7 +150,7 @@ internal class LocalWorkflowCoordinator(
                     output.isBlank() -> TaskGraphAcceptance(false, "子任务没有产出")
                     evidence.isNotEmpty() && !output.contains(evidence, ignoreCase = true) ->
                         TaskGraphAcceptance(false, "产出缺少验收证据：${evidence.take(120)}")
-                    else -> TaskGraphAcceptance(true)
+                    else -> acceptNode(context, output)
                 }
             },
             onProgress = onProgress,

@@ -122,6 +122,8 @@ internal class LocalWorkComposition @Inject constructor(
     }
     private val subagents by lazy {
         LocalWorkSubagentRuntime(
+            persistentJobs = persistentJobs,
+            workspaceRoot = File(sessionStorage.files.workspace.path),
             factory = subagentFactory,
             schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
                 tools.schemas.subagentSchemas(
@@ -138,6 +140,7 @@ internal class LocalWorkComposition @Inject constructor(
     }
     private val persistentJobs by lazy {
         LocalPersistentJobRecoveryCoordinator(
+            workspaceRoot = File(sessionStorage.files.workspace.path),
             scope = scope,
             jobs = runtimeStateStore.jobManager,
             json = json,
@@ -293,8 +296,9 @@ internal class LocalWorkComposition @Inject constructor(
         workToolResultRuntime = toolResultRuntime,
         workTurnToolRuntime = turnToolRuntime,
         replyDocuments = replyDocuments,
-        onRootExecutionSliceStarted = { sessionId ->
-            persistentJobs.schedule(sessionId, rootSliceAdmitted = true)
+        onRootExecutionSliceStarted = { binding ->
+            persistentJobs.schedule(binding.sessionId, rootSliceAdmitted = true)
+            subagents.resumePendingWorkflows(binding)
         },
     )
 

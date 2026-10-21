@@ -152,6 +152,14 @@ internal class LocalWorkAgentControlBuiltinRuntime(
             )
             "interrupt_agent" -> jobs.kill(args.string("agent_id"), run.sessionId)
             "workflow" -> subagents.runWorkflow(
+                resumeGraphId = args.optionalString("resume_graph_id"),
+                allowMutation = args.boolean("allow_mutation", false).also { requested ->
+                    require(!requested || allowMutation) { "当前执行范围不允许可写任务图" }
+                },
+                nodeInputFiles = args["node_input_files"]?.jsonArray?.map { row -> row.jsonArray.map { it.jsonPrimitive.content } }.orEmpty(),
+                nodeOutputFiles = args["node_output_files"]?.jsonArray?.map { row -> row.jsonArray.map { it.jsonPrimitive.content } }.orEmpty(),
+                inputFiles = args["input_files"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty(),
+                requiredFiles = args["required_files"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty(),
                 tasks = args["tasks"]
                     ?.jsonArray
                     ?.mapNotNull { it.jsonPrimitive.contentOrNull }
@@ -179,7 +187,6 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                 outputSchema = args.outputSchema(),
                 toolAllowlist = args.toolAllowlist(),
                 binding = run,
-                runner = runner,
             )
             else -> error("未覆盖的 Work 代理工具：${call.name}")
         }

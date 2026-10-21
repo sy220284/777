@@ -97,6 +97,10 @@ internal fun runSubagentTurnBoundaryCleanup(
     }
 }
 
+/** A persisted route uses its exact credential-checked context, even when Work's active model differs. */
+internal fun subagentModelSelection(modelOverride: String?, inheritedModel: String?, pinnedProfileId: String?): String? =
+    if (pinnedProfileId != null && modelOverride == pinnedProfileId) null else modelOverride ?: inheritedModel
+
 internal class LocalSubagentRunner(
     private val modelGateway: LocalModelGateway,
     private val state: StateFlow<LocalHarnessState>,
@@ -172,6 +176,7 @@ internal class LocalSubagentRunner(
         recoveredEnabledOptionalTools: Set<String> = emptySet(),
         resumeAfterCompletion: Boolean = false,
         onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)? = null,
+        executionFence: () -> Unit = {},
     ): LocalSubagentResult {
         val validated = validateLocalSubagentLaunchSpec(
             spec,
@@ -199,6 +204,7 @@ internal class LocalSubagentRunner(
                     recoveredEnabledOptionalTools = recoveredEnabledOptionalTools,
                     resumeAfterCompletion = resumeAfterCompletion,
                     onCheckpointProgress = onCheckpointProgress,
+                    executionFence = executionFence,
                 )
             } finally {
                 virtualScreenId?.let(releaseVirtualScreen)
@@ -216,6 +222,7 @@ internal class LocalSubagentRunner(
         recoveredEnabledOptionalTools: Set<String>,
         resumeAfterCompletion: Boolean,
         onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)?,
+        executionFence: () -> Unit,
     ): LocalSubagentResult {
         val task = spec.task
         val instructions = spec.instructions
@@ -248,7 +255,9 @@ internal class LocalSubagentRunner(
         val progressTracker = LocalAgentProgressTracker()
         val current = state.value
         val inheritedModel = current.modelState.modelSelection.activeProfileId
-        val runProfile = try { modelGateway.profileForRun(modelOverride ?: inheritedModel) } catch (error: Exception) {
+        val pinnedProfile = currentCoroutineContext()[LocalModelRunContext]?.profile
+        val selection = subagentModelSelection(modelOverride, inheritedModel, pinnedProfile?.id)
+        val runProfile = try { modelGateway.profileForRun(selection) } catch (error: Exception) {
             if (error is kotlinx.coroutines.CancellationException) throw error
             return LocalSubagentResult(LocalSubagentStatus.FAILED,
                 "[subagent][$subagentId] ${error.message}", (error as? LocalModelException)?.code ?: "NO_MODEL_CREDENTIAL")
@@ -471,6 +480,7 @@ internal class LocalSubagentRunner(
             val remainingSteps = totalBudgetLimit - recoveredBaseStep
             val loop = AgentTurnEngine(
                 model = AgentModel {
+                    executionFence()
                     currentCoroutineContext().ensureActive()
                     backgroundJobId?.let { jobId ->
                         val queuedMessages = jobs.peekMessages(jobId)
@@ -598,6 +608,7 @@ internal class LocalSubagentRunner(
                     )
                 },
                 tools = AgentToolExecutor { call ->
+                    executionFence()
                     currentCoroutineContext().ensureActive()
                     toolCallPolicy.rejection(call)
                         ?: if (capabilities.teamManaged && call.name == "capability_search") {
@@ -710,6 +721,8 @@ internal class LocalSubagentRunner(
                                 put("is_error", deliveryIsError)
                                 deliveryErrorCode?.let { put("error_code", it) }
                                 put("retryable", deliveryRetryable)
+                                event.executionId?.let { put("execution_id", it) }
+                                put("file_versions", JsonObject(event.fileVersions.mapValues { JsonPrimitive(it.value) }))
                                 put("side_effect", event.sideEffect.name.lowercase())
                                 event.recoveryHint?.let { put("recovery_hint", it) }
                             })
@@ -898,6 +911,9 @@ internal class LocalSubagentRunner(
                 if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
             }
             return LocalSubagentResult(LocalSubagentStatus.CANCELLED, output, "TASK_CANCELLED")
+        } catch (superseded: LocalWorkflowSuperseded) {
+            primaryFailure = superseded
+            throw superseded // The Jobs owner retains a recoverable slice after checking tool settlement.
         } catch (error: JobContinuationPersistenceException) {
             // The outer persistent Job owner is the authority for this failure. Converting it into
             // a normal subagent failure would permanently mark a safely resumable activation as failed.

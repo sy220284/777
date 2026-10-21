@@ -206,7 +206,7 @@ object LocalToolCatalog {
         add(tool("interrupt_agent", "停止正在运行的后台代理", properties(
             "agent_id" to string("后台代理编号"),
         ), listOf("agent_id")))
-        add(tool("workflow", "以 Kotlin DAG 调度只读子任务。支持 parallel、pipeline、graph 依赖模式；独立分支并发执行，失败传播到后继节点，证据不足才重新指派", properties(
+        add(tool("workflow", "以持久 Kotlin DAG 调度子任务，恢复已验收节点并继续剩余依赖。默认只读；可写需显式授权且未知副作用不重放。非空/字符串验收仅是窄文本检查，不证明通用交付", properties(
             "tasks" to buildJsonObject {
                 put("type", "array")
                 put("items", buildJsonObject { put("type", "string") })
@@ -228,6 +228,18 @@ object LocalToolCatalog {
                     put("items", buildJsonObject { put("type", "integer") })
                 })
             },
+            "allow_mutation" to boolean("仅在当前主代理拥有写授权时，显式授权本图节点使用原有受控写工具；中断且副作用未知时停止，不自动重放"),
+            "resume_graph_id" to string("可选；按未结算图编号显式恢复原完整不可变计划，不需要重传 tasks；新用户请求优先，恢复写图还需本次 allow_mutation=true"),
+            "node_input_files" to buildJsonObject {
+                put("type", "array"); put("description", "与 tasks 等长的逐节点输入文件路径数组；恢复时按节点内容版本校验")
+                put("items", buildJsonObject { put("type", "array"); put("items", buildJsonObject { put("type", "string") }) })
+            },
+            "node_output_files" to buildJsonObject {
+                put("type", "array"); put("description", "与 tasks 等长的逐节点交付文件路径数组；真实存在才验收；版本变化后可写节点阻塞等待核验")
+                put("items", buildJsonObject { put("type", "array"); put("items", buildJsonObject { put("type", "string") }) })
+            },
+            "input_files" to stringArray("可选；实际输入文件路径；内容版本变化使节点与依赖结果失效，可写节点须显式重新规划"),
+            "required_files" to stringArray("可选；每节点验收所需的工作区真实文件路径，同时持久内容版本用于恢复失效判断"),
             "required_evidence" to buildJsonObject {
                 put("type", "array")
                 put("description", "可选；与 tasks 逐项对应的产出中必须出现的可核对原文。不提供时仅检查产出非空。")
@@ -236,7 +248,7 @@ object LocalToolCatalog {
             "model" to string("可选；子任务使用的模型档案编号或模型名。留空时按 Worker 路由策略选择。"),
             "output_schema" to jsonSchemaObject("可选；要求每个 Workflow 子代理最终都返回符合该 JSON Schema 的对象"),
             "allowed_tools" to stringArray("可选；所有 Workflow 子任务共享的工具 allowlist"),
-        ), listOf("tasks")))
+        )))
         add(tool("team_members", "查看当前 Work Agent Team 的 Lead、成员、实时状态、进度与结果数量", properties()))
         add(tool("team_member_status", "查看一个 Team 成员的生命周期、运行状态、进度、当前任务与最近结果", properties(
             "target" to string("teammate 名称"),

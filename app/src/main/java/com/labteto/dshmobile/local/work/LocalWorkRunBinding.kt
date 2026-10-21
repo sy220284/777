@@ -49,6 +49,7 @@ internal class LocalWorkRunBinding(
     val executingToolCallIds = MutableStateFlow<Set<String>>(emptySet())
     val workState: LocalWorkStatePort = localWorkRunStatePort(state)
     val enabledOptionalTools = linkedSetOf<String>()
+    internal val workflowAdmission = kotlinx.coroutines.sync.Mutex()
     /** Not an extra queue: monotonic signal for committed, explicitly steered Work inputs. */
     val steeringRevision = MutableStateFlow(0L)
     /** Main Agent and every child spawned by this Work run share one admission budget and breaker. */
