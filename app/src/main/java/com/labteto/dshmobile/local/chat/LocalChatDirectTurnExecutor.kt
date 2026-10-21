@@ -19,7 +19,6 @@ import com.labteto.dshmobile.local.model.prepareLocalMultimodalMessages
 import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
 import com.labteto.dshmobile.local.model.withChatTurnContext
 import com.labteto.dshmobile.local.model.withEphemeralContext
-import com.labteto.dshmobile.local.model.withoutLastCompletedAssistantReply
 import com.labteto.dshmobile.local.model.chatSystemPrompt
 import com.labteto.dshmobile.local.runtime.CHAT_RECENT_HISTORY_MESSAGES
 import com.labteto.dshmobile.local.runtime.LocalExecutionService
