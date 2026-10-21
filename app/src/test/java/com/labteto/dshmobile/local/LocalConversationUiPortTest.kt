@@ -4,6 +4,9 @@ import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
 import com.labteto.dshmobile.local.chat.LocalChatExecutionRequest
 import com.labteto.dshmobile.local.chat.LocalChatExecutionResult
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
+import com.labteto.dshmobile.local.chat.LocalChatBranchNode
+import com.labteto.dshmobile.local.chat.LocalChatBranchState
+import com.labteto.dshmobile.local.chat.chatBranchInfo
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
@@ -15,6 +18,7 @@ import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalUserMessageEditResult
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.work.LocalWorkApprovalUiPort
 import com.labteto.dshmobile.local.work.LocalWorkExecutionPort
 import com.labteto.dshmobile.local.work.LocalWorkExecutionRequest
@@ -30,6 +34,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -300,4 +306,94 @@ class LocalConversationUiPortTest {
         assertTrue(f.chat.sent.isEmpty())
         assertTrue(f.work.sent.isEmpty())
     }
+    @Test fun documentFactsMatchFullSnapshotWithoutReadingTranscript() {
+        val f = Fixture(LocalUsageMode.CHAT)
+        val msgs = (0 until 1_000).map { idx ->
+            LocalHarnessMessage("m$idx", if (idx % 2 == 0) "user" else "assistant",
+                "content $idx", createdAt = idx.toLong())
+        }
+        f.state.value = f.state.value.copy(messages = msgs,
+            kernel = f.state.value.kernel.copy(running = true, queuedInputCount = 2))
+        val chat = f.port.chat.snapshot()
+        val facts = f.port.documentFactsSnapshot()
+        assertEquals(chat.identity, facts.identity)
+        assertEquals(chat.status, facts.status)
+        assertEquals(chat.phase, facts.phase)
+        assertEquals(chat.queuedInputCount, facts.queuedInputCount)
+        assertEquals(chat.error, facts.error)
+        assertFalse(facts.workMode)
+        assertNull(facts.approval)
+
+        f.state.value = f.state.value.copy(usageMode = LocalUsageMode.WORK)
+        val work = f.port.work.snapshot()
+        val workFacts = f.port.documentFactsSnapshot()
+        assertTrue(workFacts.workMode)
+        assertEquals(work.identity, workFacts.identity)
+        assertEquals(work.status, workFacts.status)
+        assertEquals(work.phase, workFacts.phase)
+        assertEquals(work.queuedInputCount, workFacts.queuedInputCount)
+        assertEquals(work.approval, workFacts.approval)
+        assertEquals(work.error, workFacts.error)
+    }
+
+    @Test fun projectedMessagesReuseOnlyStableCurrentSessionAndBranchInput() {
+        val projection = LocalConversationMessageProjectionCache()
+        val user = LocalHarnessMessage("u", "user", "first", createdAt = 1)
+        val first = LocalHarnessMessage("a1", "assistant", "one", createdAt = 2)
+        val second = LocalHarnessMessage("a2", "assistant", "two", createdAt = 3)
+        val nodes = listOf(
+            LocalChatBranchNode(user, parentId = null),
+            LocalChatBranchNode(first, parentId = "u"),
+            LocalChatBranchNode(second, parentId = "u"),
+        )
+        val branches = LocalChatBranchState(nodes = nodes)
+        val source = listOf(user, first)
+        val state = LocalHarnessState(sessionId = "a", usageMode = LocalUsageMode.CHAT,
+            loading = false, messages = source,
+            chat = com.labteto.dshmobile.local.chat.LocalChatState(chatBranches = branches))
+        val result = projection.project(state)
+        assertEquals(2, result.size)
+        assertEquals(0, result.last().branch?.index)
+        assertEquals(2, result.last().branch?.count)
+        assertSame(result, projection.project(state.copy(
+            kernel = state.kernel.copy(running = true, queuedInputCount = 5),
+            error = "unrelated failure",
+        )))
+        // Same number of rows with a changed value must never reuse the old projection.
+        val edited = state.copy(messages = listOf(user, first.copy(content = "edited")))
+        val editResult = projection.project(edited)
+        assertNotSame(result, editResult)
+        assertEquals("edited", editResult.last().text)
+        val branched = state.copy(chat = state.chat.copy(
+            chatBranches = branches.copy(selectedChildByParent = mapOf("u" to "a2"))))
+        assertNotSame(editResult, projection.project(branched))
+        // Session switches must invalidate even when the input list instance is shared.
+        val otherSession = branched.copy(sessionId = "b")
+        val otherResult = projection.project(otherSession)
+        assertNotSame(otherResult, projection.project(branched))
+        val work = branched.copy(usageMode = LocalUsageMode.WORK)
+        val workResult = projection.project(work)
+        assertNull(workResult.last().branch)
+        assertNotSame(workResult, projection.project(branched))
+    }
+
+    @Test fun projectedBranchBadgesMatchLegacyForLongMixedHistory() {
+        val messages = (0 until 1_500).map { idx ->
+            LocalHarnessMessage("m$idx", if (idx % 2 == 0) "user" else "assistant",
+                "text $idx", createdAt = idx.toLong())
+        }
+        val nodes = messages.take(180).mapIndexed { idx, msg ->
+            LocalChatBranchNode(msg, parentId = "parent-${idx / 3}")
+        }
+        val branches = LocalChatBranchState(nodes = nodes)
+        val state = LocalHarnessState(sessionId = "s", usageMode = LocalUsageMode.CHAT,
+            messages = messages, chat = com.labteto.dshmobile.local.chat.LocalChatState(chatBranches = branches))
+        val projected = LocalConversationMessageProjectionCache().project(state)
+        messages.forEachIndexed { idx, message ->
+            val legacy = chatBranchInfo(branches, message.id)
+            assertEquals("legacy badge for ${message.id}", legacy?.index, projected[idx].branch?.index)
+            assertEquals("legacy count for ${message.id}", legacy?.count, projected[idx].branch?.count)
+        }
+    }
+
 }
