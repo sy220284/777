@@ -82,7 +82,7 @@ import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.presentation.chatBranchInfo
+import com.labteto.dshmobile.local.chat.chatBranchInfoIndex
 import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalMediaRevisionDraft
@@ -669,6 +669,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     )
     val messageEditingEnabled = true
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT
+    // One branch lookup index per changed graph; row composition must stay O(1).
+    val branchInfoByMessageId = remember(state.chatBranches, messageBranchingEnabled, state.groupChat.enabled) {
+        if (messageBranchingEnabled && !state.groupChat.enabled) chatBranchInfoIndex(state.chatBranches)
+        else emptyMap()
+    }
     val messageActionsEnabled =
         state.configured &&
             !state.loading &&
@@ -1155,7 +1160,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     messageActionsEnabled &&
                                     !state.groupChat.enabled,
                                 branchInfo = if (messageBranchingEnabled && !state.groupChat.enabled) {
-                                    chatBranchInfo(state.chatBranches, transcriptItem.message.id)
+                                    branchInfoByMessageId[transcriptItem.message.id]
                                 } else {
                                     null
                                 },
