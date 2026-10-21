@@ -152,6 +152,7 @@
     <string name="local_saved_models">已配置模型：%1$s</string>
     <string name="local_saved_models_hint">输入模型名称并保存，可将同一接口下的模型加入主界面切换列表。更换接口地址时，列表会重新开始。</string>
     <string name="local_model_setup">设置模型与密钥</string>
+    <string name="local_session_documents">交互文档</string>
     <string name="local_queue_message">追加</string>
     <string name="local_work_next_turn">下轮追加</string>
     <string name="local_work_steer_now">立即调整</string>

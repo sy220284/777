@@ -396,6 +396,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val onOpenGlobalSearch = args.onOpenGlobalSearch
     val onOpenPersonaGallery = args.onOpenPersonaGallery
     val onOpenWorkspaceFiles = args.onOpenWorkspaceFiles
+    val onOpenNativeDocuments = args.onOpenNativeDocuments
     val onUseWorkCapability = args.onUseWorkCapability
     val usageRevision = args.usageRevision
     val loadTurnSummaries = args.loadTurnSummaries
@@ -895,6 +896,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             onTogglePin = onTogglePinSession,
                             onRenameSession = { renameSessionOpen = true },
                             onDeleteSession = onDeleteSession,
+                            onOpenDocuments = if (state.sessionId.isNotBlank() && !state.loading) onOpenNativeDocuments else null,
                         )
                     } else {
                         WorkSurfaceHeader(
@@ -910,6 +912,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             onRenameSession = { renameSessionOpen = true },
                             onDeleteSession = onDeleteSession,
                             onOpenWorkEvidence = workActions?.let { { showWorkEvidence = true } },
+                            onOpenDocuments = if (state.sessionId.isNotBlank() && !state.loading) onOpenNativeDocuments else null,
                         )
                     }
                 }
