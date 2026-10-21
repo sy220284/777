@@ -41,7 +41,7 @@ internal fun LocalWorkSteeringChoice(
     selected: Boolean,
     showSteering: Boolean,
     onToggle: () -> Unit,
-    onSubmit: () -> Unit,
+    onSubmit: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     val colors = LocalSyColors.current
@@ -63,7 +63,7 @@ internal fun LocalWorkSteeringChoice(
                     if (selected && showSteering) R.string.local_work_submit_steer
                     else R.string.local_work_submit_queue,
                 ),
-                selected = true,
+                selected = onSubmit != null,
                 onClick = onSubmit,
             )
             if (showSteering) {

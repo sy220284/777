@@ -299,7 +299,8 @@ internal fun LocalConversationComposer(
                 )
             }
         }
-        if (state.usageMode == LocalUsageMode.WORK && state.running && input.isNotBlank()) {
+        if (state.usageMode == LocalUsageMode.WORK && state.running &&
+            (input.isNotBlank() || attachments.isNotEmpty())) {
             LocalWorkSteeringChoice(
                 selected = steerCurrentRun,
                 showSteering = shouldShowWorkSteeringChoice(
@@ -310,7 +311,7 @@ internal fun LocalConversationComposer(
                     dismissed = steeringChoiceDismissed,
                 ),
                 onToggle = { steerCurrentRun = !steerCurrentRun },
-                onSubmit = ::submit,
+                onSubmit = if (canSend) ::submit else null,
                 onDismiss = {
                     steerCurrentRun = false // Closing always restores safe default next-turn queueing.
                     steeringChoiceDismissed = true
