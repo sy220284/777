@@ -64,4 +64,36 @@ class LocalStreamPreviewTest {
         assertEquals(listOf("6789"), published)
     }
 
+    @Test
+    fun circularBufferMatchesOriginalTailAndSurrogateRulesUnderRandomChunks() {
+        val random = kotlin.random.Random(20261021)
+        for (capacity in listOf(1, 2, 3, 4, 8, 17, 64)) {
+            val published = mutableListOf<String>()
+            val preview = LocalStreamPreview(capacity, 0, { 0L }, published::add)
+            val original = StringBuilder()
+            val fragments = listOf("a", "中文", "😀", "👩‍💻", "x", "\ud83d", "\ude00", "", "123456789")
+            val expected = mutableListOf<String>()
+            repeat(450) {
+                val delta = fragments[random.nextInt(fragments.size)]
+                if (delta.isEmpty()) return@repeat
+                if (delta.length >= capacity) {
+                    original.clear()
+                    original.append(
+                        com.labteto.dshmobile.local.model.takeLastWithoutSplittingSurrogatePair(delta, capacity),
+                    )
+                } else {
+                    var overflow = original.length + delta.length - capacity
+                    if (overflow > 0 && overflow < original.length &&
+                        Character.isHighSurrogate(original[overflow - 1]) &&
+                        Character.isLowSurrogate(original[overflow])) overflow++
+                    if (overflow > 0) original.delete(0, overflow.coerceAtMost(original.length))
+                    original.append(delta)
+                }
+                expected += original.toString()
+                preview.append(delta)
+            }
+            assertEquals("capacity=$capacity", expected, published)
+        }
+    }
+
 }
