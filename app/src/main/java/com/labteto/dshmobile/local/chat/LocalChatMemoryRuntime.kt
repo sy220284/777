@@ -96,6 +96,7 @@ internal class LocalChatMemoryRuntime @Inject constructor(
         viewerSubjectKey: String? = null,
         viewerName: String? = null,
         groupAudience: Boolean = snapshot.chat.groupChat.enabled,
+        excludedAssistantMessageIds: Set<String> = emptySet(),
     ): String {
         if (!snapshot.autoRecall) return ""
         val subjectKey = viewerSubjectKey ?: chatRelationshipSubjectKey(
@@ -195,7 +196,12 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                 experienceId = conversation.experienceId.ifBlank { snapshot.sessionId },
                 sourceSessionIds = (conversation.experienceSessionIds + snapshot.sessionId).toSet(),
             ).filter { entry ->
-                ChatUnifiedTurnContext.allowsHistoricalRecord(
+                // Superseded generated answers are retained for viewing, not recalled as facts
+                // while sampling another answer for the same user turn.
+                entry.sources.none { source ->
+                    source.sessionId == snapshot.sessionId &&
+                        source.assistantMessageId in excludedAssistantMessageIds
+                } && ChatUnifiedTurnContext.allowsHistoricalRecord(
                     query, conversation, renderRecalledChatDiary(entry, groupAudience),
                 )
             }
