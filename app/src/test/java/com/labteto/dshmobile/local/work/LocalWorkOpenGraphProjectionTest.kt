@@ -18,7 +18,7 @@ class LocalWorkOpenGraphProjectionTest {
         val log = LocalSessionEventLog(File(temporary.root, "facts.jsonl"), Json)
         val projection = LocalWorkOpenGraphProjection()
         fun fact(id: String) = buildJsonObject {
-            put("graph_id", id); put("graph_execution_id", "$"+"id-run"); put("goal_id", "goal")
+            put("graph_id", id); put("graph_execution_id", "$id-run"); put("goal_id", "goal")
         }
         assertTrue(projection.unresolved(log).isEmpty())
         log.append("taskgraph/start", fact("first"))
