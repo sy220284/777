@@ -118,9 +118,9 @@ internal fun MediaDeleteTarget(
     var confirming by remember(id) { mutableStateOf(false) }
     var deleting by remember(id) { mutableStateOf(false) }
     var error by remember(id) { mutableStateOf<String?>(null) }
-    val requestDelete: (() -> Unit)? = if (enabled) {{
-        if (!deleting) { error = null; confirming = true }
-    }} else null
+    val requestDelete: (() -> Unit)? = if (enabled) {
+        { if (!deleting) { error = null; confirming = true } }
+    } else null
     content(requestDelete)
     if (confirming) {
         ConfirmDialog(
@@ -138,8 +138,9 @@ internal fun MediaDeleteTarget(
                             confirming = false
                         } catch (cancelled: CancellationException) { throw cancelled }
                         catch (failure: Exception) {
-                            error = failure.message ?: resources.getString(R.string.media_chat_delete_failed)
-                            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                            val message = failure.message ?: resources.getString(R.string.media_chat_delete_failed)
+                            error = message
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                         } finally { deleting = false }
                     }
                 }
@@ -180,7 +181,7 @@ internal fun LocalCreationJobMessageRow(
         LocalMediaCreationPhase.FAILED, LocalMediaCreationPhase.SAVE_FAILED,
         LocalMediaCreationPhase.SUCCEEDED)
     MediaDeleteTarget(job.id, viewModel::dismissCreationJob, enabled = removable) { requestDelete ->
-    MediaMessageCard(
+        MediaMessageCard(
         title = resources.getString(phase),
         subtitle = if (inline) "" else resources.getString(
             if (job.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
@@ -237,7 +238,7 @@ internal fun LocalGeneratedMediaResultRow(
         else -> resources.getString(R.string.media_chat_generic_result)
     }
     MediaDeleteTarget(result.id, viewModel::removeResult) { requestDelete ->
-    MediaMessageCard(
+        MediaMessageCard(
         title = if (inline && result.kind == LocalMediaKind.IMAGE.name) "" else label,
         subtitle = if (inline) "" else resources.getString(
             if (result.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
@@ -419,7 +420,7 @@ internal fun LocalGeneratedVideoTaskRow(
     val removable = task.phase in setOf(LocalMediaVideoPhase.OUTCOME_UNKNOWN,
         LocalMediaVideoPhase.SUCCEEDED, LocalMediaVideoPhase.FAILED)
     MediaDeleteTarget(task.id, viewModel::removeResult, enabled = removable, isVideo = true) { requestDelete ->
-    MediaMessageCard(
+        MediaMessageCard(
         title = phase,
         subtitle = if (inline) "" else resources.getString(
             if (task.sourceMessageId.isNullOrBlank()) R.string.media_user_created else R.string.media_based_on_reply),
