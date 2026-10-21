@@ -197,21 +197,20 @@ class LocalWorkTaskGraphPlanTest {
         }
         assertTrue(started.accepted)
         val wait = backgroundScope.async {
-            awaitPersistedWorkflowJob(jobId, jobs,
+            runCatching { awaitPersistedWorkflowJob(jobId, jobs,
                 checkFence = { if (workflowAuthorizationSuperseded(log, authorization)) throw LocalWorkflowSuperseded() },
                 consumeResult = {
                     log.latestMatching(setOf("taskgraph/job-result")) {
                         it["job_id"]?.jsonPrimitive?.contentOrNull == jobId
                     }!!.data.getValue("output").jsonPrimitive.content
                 },
-            )
+            ) }
         }
         runCurrent()
         log.append("user/message", buildJsonObject { put("content", "新请求") })
         advanceTimeBy(101)
         runCurrent()
-        try { wait.await(); fail("USER 更新必须中断原等待") }
-        catch (_: LocalWorkflowSuperseded) { }
+        assertTrue(wait.await().exceptionOrNull() is LocalWorkflowSuperseded)
         assertNull(log.latestMatching(setOf("taskgraph/end")) { true })
         gate.complete(Unit)
         runCurrent()
@@ -242,7 +241,7 @@ class LocalWorkTaskGraphPlanTest {
         jobs.resumePersistent(jobId, ownerSessionId = "session-a") { _, _ -> "原 Job 已安全续跑" }
         runCurrent()
         assertEquals("原 Job 已安全续跑", awaitPersistedWorkflowJob(jobId, jobs,
-            checkFence = {}, consumeResult = { jobs.output(jobId, "session-a") }))
+            checkFence = {}, consumeResult = { jobs.snapshots().single { it.id == jobId }.output }))
         assertEquals(jobId, jobs.snapshots().single { it.id == jobId }.id)
     }
 
@@ -289,7 +288,7 @@ class LocalWorkTaskGraphPlanTest {
                     jobs.resumePersistent(readId, ownerSessionId = "session-a") { _, _ -> "同一 Job 恢复完成" }
                     runCurrent()
                     awaitPersistedWorkflowJob(readId, jobs,
-                        checkFence = {}, consumeResult = { jobs.output(readId, "session-a") })
+                        checkFence = {}, consumeResult = { jobs.snapshots().single { it.id == readId }.output })
                 } else {
                     assertEquals("同一 Job 恢复完成", context.dependencyOutputs.getValue("a"))
                     "依赖已接续"
@@ -298,7 +297,7 @@ class LocalWorkTaskGraphPlanTest {
         ).runDetailed(plan().prepared)
         assertTrue(resumed.nodes.all { it.succeeded })
         assertEquals(listOf("a", "b"), resumedNodes)
-        assertEquals("同一 Job 恢复完成", jobs.output(readId, "session-a"))
+        assertEquals("同一 Job 恢复完成", jobs.snapshots().single { it.id == readId }.output)
 
         val effectId = "job-graph-effect-before-checkpoint"
         log.append("agent/subagent-run-checkpoint", buildJsonObject {
@@ -462,7 +461,7 @@ class LocalWorkTaskGraphPlanTest {
                     assertTrue(jobs.startPersistentResult("子代理：新只读", "subagent_readonly", "{}",
                         ownerSessionId = "session-a", continuable = true, requestedId = id) { _, _ -> "新结果" }.accepted)
                     runCurrent()
-                    awaitPersistedWorkflowJob(id, jobs, checkFence = {}, consumeResult = { jobs.output(id, "session-a") })
+                    awaitPersistedWorkflowJob(id, jobs, checkFence = {}, consumeResult = { jobs.snapshots().single { it.id == id }.output })
                 }
             },
         )
