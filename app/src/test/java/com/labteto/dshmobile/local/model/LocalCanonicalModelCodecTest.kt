@@ -137,6 +137,30 @@ class LocalCanonicalModelCodecTest {
     }
 
     @Test
+    fun deepSeekReasoningWithoutToolCallsStillReplaysForNextToolBearingTurn() {
+        // DeepSeek requires reasoning_content on *all* earlier assistant turns when
+        // subsequent requests contain tools, even if this turn made no tool call.
+        val source = buildJsonObject {
+            put("role", "assistant")
+            put("content", "最终回答")
+            put("reasoning_content", "已检查约束")
+        }
+        val canonical = LocalCanonicalModelCodec.canonicalizeReply(
+            LocalModelReply(source, "最终回答", "已检查约束", emptyList()),
+            LocalModelAdapterIds.OPENAI_CHAT, "deepseek-session-route",
+        )
+        val history = LocalCanonicalModelCodec.message(canonical.message)
+        val same = LocalCanonicalModelCodec.toLegacyMessages(
+            listOf(history), LocalModelAdapterIds.OPENAI_CHAT, "deepseek-session-route",
+        ).single()
+        assertEquals("已检查约束", same["reasoning_content"]?.jsonPrimitive?.content)
+        val other = LocalCanonicalModelCodec.toLegacyMessages(
+            listOf(history), LocalModelAdapterIds.OPENAI_CHAT, "other-account-or-model",
+        ).single()
+        assertNull(other["reasoning_content"])
+    }
+
+    @Test
     fun routeBoundReplayIsDroppedWhenRouteChanges() {
         val replay = LocalModelReplayEnvelope(
             adapterId = LocalModelAdapterIds.OPENAI_RESPONSES,

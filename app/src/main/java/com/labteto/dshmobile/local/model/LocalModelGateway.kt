@@ -167,6 +167,7 @@ class LocalModelGateway @Inject constructor(
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
     allowImageGeneration: Boolean = false,
+    maxTokens: Int? = null,
     ): LocalModelReply =
         completeResolved(
             route = resolveRoute(model, baseUrl, profile),
@@ -180,6 +181,7 @@ class LocalModelGateway @Inject constructor(
             promptCacheKey = promptCacheKey,
             promptCacheTtl = promptCacheTtl,
         allowImageGeneration = allowImageGeneration,
+        maxTokens = maxTokens,
         )
 
     suspend fun completeStreaming(
@@ -195,6 +197,7 @@ class LocalModelGateway @Inject constructor(
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
     allowImageGeneration: Boolean = false,
+    maxTokens: Int? = null,
     ): LocalModelReply =
         completeResolved(
             route = resolveRoute(model, baseUrl, profile),
@@ -208,6 +211,7 @@ class LocalModelGateway @Inject constructor(
             promptCacheKey = promptCacheKey,
             promptCacheTtl = promptCacheTtl,
         allowImageGeneration = allowImageGeneration,
+        maxTokens = maxTokens,
         )
 
     suspend fun probeApiKey(
@@ -293,6 +297,7 @@ class LocalModelGateway @Inject constructor(
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
     allowImageGeneration: Boolean = false,
+    maxTokens: Int? = null,
     ): LocalModelReply {
         val prepared = prepareLocalModelAdapterRequest(
             route = route,
@@ -305,6 +310,7 @@ class LocalModelGateway @Inject constructor(
             promptCacheKey = promptCacheKey,
             promptCacheTtl = promptCacheTtl,
         allowImageGeneration = allowImageGeneration,
+        maxTokens = maxTokens,
         )
         return adapters.adapter(route.protocol).complete(
             request = prepared.request,
@@ -335,6 +341,7 @@ internal fun prepareLocalModelAdapterRequest(
     promptCacheKey: String? = null,
     promptCacheTtl: String? = null,
     allowImageGeneration: Boolean = false,
+    maxTokens: Int? = null,
 ): LocalPreparedModelRequest {
     val canonicalMessages = LocalCanonicalModelCodec.messages(messages).filterNot(::isEmptyCanonicalAssistant)
     validateCanonicalModelHistory(canonicalMessages)
@@ -388,6 +395,9 @@ internal fun prepareLocalModelAdapterRequest(
             tools = canonicalTools,
             temperature = routedTemperature,
             reasoningEffort = reasoningEffort,
+            maxTokens = if (route.protocol == LocalModelProtocol.CHAT_COMPLETIONS) {
+                DeepSeekChatRequestPolicy.checkedMaxTokens(route.model, route.baseUrl, maxTokens)
+            } else null,
             allowImageGeneration = allowImageGeneration && route.protocol == LocalModelProtocol.RESPONSES,
             promptCacheComparisonResponseId = promptCacheComparisonResponseId
                 ?.takeIf { route.protocol == LocalModelProtocol.RESPONSES && route.capabilities.promptCacheDiagnostics },

@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelConfigurationCoordinator
 import com.labteto.dshmobile.local.LocalModelConfigurationResult
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
@@ -36,6 +37,10 @@ class LocalModelRuntime @Inject constructor(
         gateway = gateway,
         state = state,
         isBusy = ::identityMutationLocked,
+        onCommitted = { result, error, recordSession, origin ->
+            if (origin != null && recordSession) pendingSelections.remove(origin)
+            commit(result, error, recordSession, origin)
+        },
     )
 
     init { accounts.observeInvalidations(scope) }
@@ -63,10 +68,23 @@ class LocalModelRuntime @Inject constructor(
         contextWindowTokensOverride: Int? = null,
         credentialSourceProfileId: String? = null,
     ) {
+        val originatingSessionId = runtimeStateStore.state.value.sessionId
         check(!identityMutationLocked()) { "请等待初始化完成或结束当前任务后再切换模型" }
-        val result = configuration.save(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride, credentialSourceProfileId)
-        runtimeStateStore.imageCapabilities.clearRoute(result.baseUrl, result.model)
-        commit(result)
+        configuration.save(
+            apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride,
+            credentialSourceProfileId,
+            onCommitted = { result ->
+                // Supersede queued clicks only after confirmed durable success.
+                // A failed save must not discard the user's earlier selection.
+                pendingSelections.remove(originatingSessionId)
+                commit(result, preferredSessionId = originatingSessionId)
+                runCatching {
+                    runtimeStateStore.imageCapabilities.clearRoute(result.baseUrl, result.model)
+                }.onFailure { failure ->
+                    AppLog.warn("ModelConfiguration", "image-route-cache-clear-failed", failure)
+                }
+            },
+        )
     }
 
     /**
@@ -90,14 +108,23 @@ class LocalModelRuntime @Inject constructor(
             modelSelectionMutex.withLock {
                 if (pendingSelections[originSessionId] != request) return@withLock
                 try {
-                    check(gateway.hasCredential(selected)) { "所选模型凭据不可用，请检查模型账户" }
-                    sessionStorage.eventLogs.get(originSessionId).recordLocalModelSelection(id)
-                    state.selectForSession(originSessionId, selected)
-                    // Compatibility for foreground features that query the active credential.
-                    // Each model request still freezes its own explicit route.
-                    if (runtimeStateStore.currentSessionId == originSessionId &&
-                        runtimeStateStore.state.value.sessionId == originSessionId) {
-                        gateway.activate(selected)
+                    // A saved route can disappear after the click but before this coroutine runs.
+                    // Take the same gate as durable mutations, re-read the current metadata and
+                    // finish the session projection before any delete/save may commit.
+                    LocalModelMutationGate.run {
+                        // A click can be superseded while waiting for the durable gate.
+                        if (pendingSelections[originSessionId] != request) return@run
+                        val current = configuration.readProfiles().firstOrNull { it.id == id }
+                            ?: error("所选模型已被删除，请重新选择")
+                        check(gateway.hasCredential(current)) { "所选模型凭据不可用，请检查模型账户" }
+                        if (pendingSelections[originSessionId] != request) return@run
+                        sessionStorage.eventLogs.get(originSessionId).recordLocalModelSelection(id)
+                        state.selectForSession(originSessionId, current)
+                        // In-flight requests already carry their frozen route.
+                        if (runtimeStateStore.currentSessionId == originSessionId &&
+                            runtimeStateStore.state.value.sessionId == originSessionId) {
+                            gateway.activate(current)
+                        }
                     }
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
@@ -112,11 +139,15 @@ class LocalModelRuntime @Inject constructor(
     }
 
     internal fun removeModel(id: String) {
+        val originatingSessionId = runtimeStateStore.state.value.sessionId
         scope.launch {
             if (identityMutationLocked()) return@launch
             val before = state.value.modelState
             try {
-                configuration.remove(id, before.model, before.baseUrl)?.let(::commit)
+                configuration.remove(id, before.model, before.baseUrl, onCommitted = {
+                    pendingSelections.remove(originatingSessionId)
+                    commit(it)
+                })
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -145,6 +176,7 @@ class LocalModelRuntime @Inject constructor(
         settings.configureImageInputMode(mode)
 
     internal fun clearCredential() {
+        val originatingSessionId = runtimeStateStore.state.value.sessionId
         scope.launch {
             if (identityMutationLocked()) {
                 state.publishError("请先结束当前任务再清除模型凭据")
@@ -152,7 +184,10 @@ class LocalModelRuntime @Inject constructor(
             }
             val before = state.value.modelState
             try {
-                commit(configuration.clearActive(before.model, before.baseUrl))
+                configuration.clearActive(before.model, before.baseUrl, onCommitted = {
+                    pendingSelections.remove(originatingSessionId)
+                    commit(it)
+                })
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -168,7 +203,10 @@ class LocalModelRuntime @Inject constructor(
         accountId: String,
         models: List<ChatGptModelOption>,
         selectFirst: Boolean = true,
-    ) = accounts.syncChatGptModels(accountId, models, selectFirst)
+    ) {
+        val origin = if (selectFirst) runtimeStateStore.state.value.sessionId else null
+        accounts.syncChatGptModels(accountId, models, selectFirst, origin)
+    }
 
     internal suspend fun retireChatGptAccountProfiles(accountId: String) =
         accounts.retireChatGptAccountProfiles(accountId)
@@ -184,22 +222,48 @@ class LocalModelRuntime @Inject constructor(
             LocalSessionRuntimeRegistry.hasAnyLiveOwner()
     }
 
-    private fun commit(result: LocalModelConfigurationResult) {
-        val visibleSessionId = runtimeStateStore.state.value.sessionId
-        result.activeProfileId?.let { id ->
-            if (visibleSessionId.isNotBlank() && !runtimeStateStore.sessionTransitioning) {
-                sessionStorage.eventLogs.get(visibleSessionId).recordLocalModelSelection(id)
+    private fun commit(
+        result: LocalModelConfigurationResult,
+        error: String? = null,
+        recordSessionSelection: Boolean = true,
+        preferredSessionId: String? = null,
+    ) {
+        val before = runtimeStateStore.state.value
+        // A configuration mutation changes the catalog for every session, but must
+        // not silently replace a different conversation's still-valid model choice.
+        state.commitConfiguration(
+            result.configured, result.model, result.baseUrl,
+            result.profiles, result.activeProfileId, error, preferredSessionId,
+        )
+        val after = runtimeStateStore.state.value
+        // Navigation can complete while a configuration transaction is running.
+        // Skip a transition in progress, but restore the foreground route even when
+        // another session became visible between the before/after snapshots.
+        if (runtimeStateStore.sessionTransitioning || after.loading) return
+
+        val active = after.modelState.modelSelection.activeProfile
+        if (recordSessionSelection && before.sessionId == after.sessionId &&
+            after.sessionId.isNotBlank() &&
+            active != null &&
+            before.modelState.modelSelection.activeProfileId != active.id) {
+            runCatching {
+                sessionStorage.eventLogs.get(after.sessionId).recordLocalModelSelection(active.id)
+            }.onFailure { failure ->
+                AppLog.warn("ModelConfiguration", "model/session-selection-record-failed", failure)
+                state.publishError("模型配置已保存，但会话模型选择记录失败，请重新选择模型")
             }
         }
-        val before = state.value.modelState
-        state.commit(
-            before.copy(
-                configured = result.configured,
-                model = result.model,
-                baseUrl = result.baseUrl,
-                modelSelection = before.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
-            ),
-            null,
-        )
+        // Durable defaults and session model selection are intentionally different
+        // owners. Restore the foreground route after persistence activates the default.
+        runCatching {
+            if (active == null) {
+                if (gateway.activeProfile() != null) gateway.clearActive()
+            } else if (gateway.activeProfile()?.id != active.id) {
+                gateway.activate(active)
+            }
+        }.onFailure { failure ->
+            AppLog.warn("ModelConfiguration", "model/foreground-route-restore-failed", failure)
+            state.publishError("模型配置已保存，但当前会话模型激活失败，请重新选择")
+        }
     }
 }

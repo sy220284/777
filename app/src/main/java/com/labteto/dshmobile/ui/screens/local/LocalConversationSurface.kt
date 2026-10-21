@@ -502,10 +502,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var olderDocumentSnapshots by remember(state.sessionId) {
         mutableStateOf<List<com.labteto.dshmobile.uicontract.UiDocumentSnapshot>>(emptyList())
     }
-    LaunchedEffect(state.sessionId, pagedOlderMessages, nativeDocuments) {
+    LaunchedEffect(state.sessionId, state.usageMode, pagedOlderMessages, nativeDocuments) {
         val ids = pagedOlderMessages.filter { it.role == "assistant" ||
             state.usageMode == LocalUsageMode.WORK && it.role == "user" }.map { it.id }.toSet()
-        olderDocumentSnapshots = if (nativeDocuments == null || ids.isEmpty()) emptyList()
+        olderDocumentSnapshots = if (state.usageMode != LocalUsageMode.WORK ||
+            nativeDocuments == null || ids.isEmpty()) emptyList()
             else nativeDocuments.olderDocuments(state.sessionId, ids)
     }
     // Media is a persistent chat/Work timeline projection, not an assistant text message.
@@ -636,9 +637,17 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             }
         }
     }
-    val showEmptyWorkbench = transcriptItems.isEmpty() &&
-        (state.usageMode == LocalUsageMode.WORK ||
-            (!state.groupChat.enabled && state.chatPersona.isUnboundChatPersona()))
+    val showEmptyWorkbench = shouldShowEmptyLocalHarness(
+        usageMode = state.usageMode,
+        transcriptEmpty = transcriptItems.isEmpty(),
+    )
+    val showChatPersonaWelcome = shouldShowChatPersonaWelcome(
+        usageMode = state.usageMode,
+        transcriptEmpty = transcriptItems.isEmpty(),
+        groupChatEnabled = state.groupChat.enabled,
+        personaUnbound = state.chatPersona.isUnboundChatPersona(),
+    )
+    val showEmptyGuide = showEmptyWorkbench || showChatPersonaWelcome
     val showEmptyGroupSetup = transcriptItems.isEmpty() &&
         state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled &&
         state.groupChat.members.size < 2
@@ -653,7 +662,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val transcriptLastListIndex = localTranscriptLastListIndex(
         transcriptItemCount = transcriptItems.size,
         showPagingRow = showTranscriptPagingRow,
-        showEmptyWorkbench = showEmptyWorkbench,
+        showEmptyWorkbench = showEmptyGuide,
         showEmptyGroupSetup = showEmptyGroupSetup,
         showPlanReview = planReview != null,
         showStreamingTail = showStreamingTail,
@@ -911,6 +920,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             onRenameSession = { renameSessionOpen = true },
                             onDeleteSession = onDeleteSession,
                             onOpenWorkEvidence = workActions?.let { { showWorkEvidence = true } },
+                            onOpenDocuments = if (state.sessionId.isNotBlank() && !state.loading) onOpenNativeDocuments else null,
                         )
                     }
                 }
@@ -929,12 +939,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             }
         }
 
-        Row(Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
-            horizontalArrangement = Arrangement.End) {
-            SyButton(text = "交互文档", onClick = onOpenNativeDocuments,
-                variant = SyButtonVariant.Ghost, size = SyButtonSize.Small,
-                enabled = state.sessionId.isNotBlank() && !state.loading)
-        }
         LocalModeIntroBanner(modeIntro)
 
         if (state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {
@@ -1062,11 +1066,22 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         )
                     }
                 }
-                if (showEmptyWorkbench) {
-                    item {
+                if (showEmptyGuide) {
+                    item(key = "local-empty-guide") {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                            EmptyLocalHarness { suggestion ->
-                                drafts.putBoundedLocalDraft(state.sessionId, suggestion)
+                            if (showChatPersonaWelcome) {
+                                Text(
+                                    stringResource(R.string.local_chat_persona_welcome_title),
+                                    style = DsType.large20.withReadingWeight(),
+                                    color = colors.text,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp)
+                                        .widthIn(max = 280.dp),
+                                )
+                            } else {
+                                EmptyLocalHarness { suggestion ->
+                                    drafts.putBoundedLocalDraft(state.sessionId, suggestion)
+                                }
                             }
                         }
                     }
@@ -1191,7 +1206,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 onConvertToWork = if (state.usageMode == LocalUsageMode.CHAT &&
                                     onUseWorkCapability != null && !state.loading && !state.running
                                 ) { message -> onUseWorkCapability(message.content) } else null,
-                                 onCreateDocument = if (nativeDocuments != null && messageActionsEnabled &&
+                                 onCreateDocument = if (state.usageMode == LocalUsageMode.WORK &&
+                                     nativeDocuments != null && messageActionsEnabled &&
                                     transcriptItem.message.role == "assistant" &&
                                     state.messages.any { it.id == transcriptItem.message.id }
                                 ) { message -> documentGenerationMessageId = message.id } else null,
@@ -1560,13 +1576,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
 
     }
 
-    documentGenerationMessageId?.let { sourceId ->
-        nativeDocuments?.let { documents ->
-            NativeV6DocumentGenerationDialog(
-                messageId = sourceId,
-                onDismiss = { documentGenerationMessageId = null },
-                onGenerate = documents::generate,
-            )
+    if (state.usageMode == LocalUsageMode.WORK) {
+        documentGenerationMessageId?.let { sourceId ->
+            nativeDocuments?.let { documents ->
+                NativeV6DocumentGenerationDialog(
+                    messageId = sourceId,
+                    onDismiss = { documentGenerationMessageId = null },
+                    onGenerate = documents::generate,
+                )
+            }
         }
     }
     V6LoadedConversationSearchHost(
@@ -1575,7 +1593,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         listState = listState,
         leadingRows = listOf(
             mediaPage.unavailable, mediaPage.hasMore, showTranscriptPagingRow,
-            showEmptyWorkbench, showEmptyGroupSetup, planReview != null,
+            showEmptyGuide, showEmptyGroupSetup, planReview != null,
         ).count { it },
         visible = state.usageMode == LocalUsageMode.CHAT,
         onSearchAll = onOpenGlobalSearch,
@@ -1940,6 +1958,21 @@ internal fun localComposerAttachmentDecision(
     }
     return LocalComposerAttachmentDecision.ACCEPT
 }
+
+/** The Work quick-start panel must never enter a Chat conversation, including unbound personas. */
+internal fun shouldShowEmptyLocalHarness(
+    usageMode: LocalUsageMode,
+    transcriptEmpty: Boolean,
+): Boolean = usageMode == LocalUsageMode.WORK && transcriptEmpty
+
+/** Unbound one-to-one Chat gets only the persona invitation, never Work quick-start actions. */
+internal fun shouldShowChatPersonaWelcome(
+    usageMode: LocalUsageMode,
+    transcriptEmpty: Boolean,
+    groupChatEnabled: Boolean,
+    personaUnbound: Boolean,
+): Boolean = usageMode == LocalUsageMode.CHAT && transcriptEmpty &&
+    !groupChatEnabled && personaUnbound
 
 @Composable
 private fun EmptyLocalHarness(

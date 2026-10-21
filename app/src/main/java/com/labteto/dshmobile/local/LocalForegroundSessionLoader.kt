@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelConfigContract
 import com.labteto.dshmobile.local.model.LocalModelExecutionSettings
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalModelMutationGate
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.model.LocalModelState
 import com.labteto.dshmobile.local.model.forPersistedSessionModel
@@ -38,6 +39,8 @@ import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.session.SessionProjectionCursorAheadException
+import com.labteto.dshmobile.local.session.requireSessionSnapshotCursorsWithinLog
 import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.session.projectionReplayCursor
 import com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy
@@ -117,11 +120,21 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             }
             return
         }
-        val repaired = log.repairInterruptedTail()
-        chatRestore.repairTimeline(log)
         val stored = loaded?.session ?: LocalHarnessSession(
             id = sessionId, usageMode = pendingSessions.modeFor(sessionId) ?: LocalUsageMode.WORK,
         )
+        // Preflight both cursors before timeline repairs or legacy baseline appends.
+        // A mismatch blocks automatic replay and leaves the persisted snapshot intact.
+        try {
+            requireSessionSnapshotCursorsWithinLog(stored, log.latestSequence())
+        } catch (mismatch: SessionProjectionCursorAheadException) {
+            runtimeStateStore.projection.update {
+                it.copy(loading = false, sessionId = sessionId, error = mismatch.message)
+            }
+            return
+        }
+        val repaired = log.repairInterruptedTail()
+        chatRestore.repairTimeline(log)
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
             log.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: log.append(
                 PROJECTION_BASELINE_EVENT,
@@ -135,13 +148,30 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             persistedSnapshotExists = loaded != null,
             legacyBaselineSequence = legacyProjectionBaseline,
         )
+        val durableLatest = log.latestSequence()
+        if (projectionCursor > durableLatest) {
+            runtimeStateStore.projection.update {
+                it.copy(
+                    loading = false, sessionId = sessionId,
+                    error = "会话控制游标 $projectionCursor 超过事件日志末尾 $durableLatest；原历史已保留，停止自动恢复",
+                )
+            }
+            return
+        }
         val controlTail = log.snapshotAfter(projectionCursor)
         val projectedChatControls = projectChatSessionControls(stored, controlTail)
         val projectedWorkControls = projectWorkSessionControls(stored, controlTail)
-        val restoredTranscript = coordinator.restoreTranscript(
-            stored = stored,
-            persistedSnapshotExists = loaded != null,
-        )
+        val restoredTranscript = try {
+            coordinator.restoreTranscript(
+                stored = stored,
+                persistedSnapshotExists = loaded != null,
+            )
+        } catch (mismatch: SessionProjectionCursorAheadException) {
+            runtimeStateStore.projection.update {
+                it.copy(loading = false, sessionId = sessionId, error = mismatch.message)
+            }
+            return
+        }
         runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor =
             restoredTranscript.projectedThroughSequence
         val restoredHistory = restoreLocalModelHistory(
@@ -199,7 +229,6 @@ internal class LocalForegroundSessionLoader @Inject constructor(
         val activeModelProfile = chosenSessionProfile ?: recoveryState.profile
             ?: modelConfiguration.activeProfile(model, baseUrl, modelProfiles)
         val modelConfigured = activeModelProfile != null && modelGateway.hasCredential(activeModelProfile)
-        activeModelProfile?.takeIf { modelConfigured }?.let(modelGateway::activate)
         val restoredModel = activeModelProfile?.model ?: model
         val restoredBaseUrl = activeModelProfile?.baseUrl ?: baseUrl
         val resources = runtimeStateStore.resourceSnapshot()
@@ -259,7 +288,31 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             ),
             error = recoveryState.error,
         )
-        runtimeStateStore.projection.update { restoredState }
+        // A session may be restoring while a model configuration transaction commits.
+        // The catalog collected earlier in this long-running load can be stale; reconcile
+        // against the durable model owner under the same mutation gate at publication time.
+        LocalModelMutationGate.run {
+            val latestProfiles = modelConfiguration.readProfiles()
+            val sessionChoice = log.selectedLocalModelProfileId()?.let { id ->
+                latestProfiles.firstOrNull { it.id == id }
+            }
+            val recoveredChoice = recoveryState.profile?.let { recovered ->
+                latestProfiles.firstOrNull { it.id == recovered.id }
+            }
+            val selected = sessionChoice ?: recoveredChoice
+                ?: modelConfiguration.activeProfile(model, baseUrl, latestProfiles)
+            val configuredNow = selected != null && modelGateway.hasCredential(selected)
+            if (configuredNow) modelGateway.activate(selected!!) else modelGateway.clearActive()
+            val refreshed = restoredState.modelState.copy(
+                configured = configuredNow,
+                model = selected?.model ?: model,
+                baseUrl = selected?.baseUrl ?: baseUrl,
+                modelSelection = LocalModelSelectionState.restored(
+                    latestProfiles, selected?.id, modelExecutionSettings.workerProfileId,
+                ),
+            )
+            runtimeStateStore.projection.update { restoredState.copy(modelState = refreshed) }
+        }
 
         LocalSessionRuntimeRegistry.submitWhenIdle(sessionId) {
             if (runtimeStateStore.state.value.usageMode == LocalUsageMode.WORK) {

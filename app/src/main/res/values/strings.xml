@@ -152,9 +152,12 @@
     <string name="local_saved_models">已配置模型：%1$s</string>
     <string name="local_saved_models_hint">输入模型名称并保存，可将同一接口下的模型加入主界面切换列表。更换接口地址时，列表会重新开始。</string>
     <string name="local_model_setup">设置模型与密钥</string>
+    <string name="local_session_documents">交互文档</string>
     <string name="local_queue_message">追加</string>
     <string name="local_work_next_turn">下轮追加</string>
     <string name="local_work_steer_now">立即调整</string>
+    <string name="local_work_submit_steer">提交调整</string>
+    <string name="local_work_submit_queue">加入队列</string>
     <string name="local_work_steer_boundary">只中断当前模型生成，不会撤销已执行操作</string>
     <string name="local_queue_message_count">追加 · 待处理 %1$d 条</string>
     <string name="local_queue_count">已排队 %1$d 条</string>
@@ -178,6 +181,7 @@
     <string name="local_approval_scope_hide">收起授权范围</string>
     <string name="local_device_approval_scope">当前代理回合中的普通界面点击、输入和滑动会直接执行；高权限、MCP、凭据和命令仍需逐次确认。</string>
     <string name="local_welcome_title">今天想做什么？</string>
+    <string name="local_chat_persona_welcome_title">今天翻谁的牌子呢？</string>
     <string name="local_welcome_hint">描述目标即可开始。需要改动文件或操作设备时，我会先请求你确认。</string>
     <string name="local_suggestions_title">试试这些</string>
     <string name="local_suggestion_files">整理工作区文件</string>
@@ -2103,6 +2107,7 @@
     <string name="media_studio_open_temporary_link">打开临时链接</string>
     <string name="media_studio_result_missing">本机文件已不存在</string>
     <string name="media_studio_delete_record">删除</string>
+    <string name="media_chat_delete_failed">删除失败，请重试</string>
     <string name="media_studio_confirm_delete">确定删除这项成果？本机文件会一并删除。</string>
     <string name="media_studio_delete_confirm">确认删除</string>
     <string name="media_studio_delete_cancel">取消</string>

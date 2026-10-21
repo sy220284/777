@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.harness.session
 
 import java.io.ByteArrayOutputStream
+import java.io.FileOutputStream
 import java.io.File
 import java.io.InputStream
 import java.io.RandomAccessFile
@@ -19,6 +20,12 @@ import java.util.zip.GZIPOutputStream
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+
+private fun syncSessionEventDirectory(parent: File) {
+    java.nio.channels.FileChannel.open(parent.toPath(), StandardOpenOption.READ).use { channel ->
+        channel.force(true)
+    }
+}
 
 @Serializable
 data class SessionEvent(
@@ -60,6 +67,8 @@ class SessionEventLog(
     private val clock: () -> Long = System::currentTimeMillis,
     private val diagnosticSink: (String, Throwable?) -> Unit = { _, _ -> },
     private val onSegmentRotated: () -> Unit = {},
+    /** Fault-injection seam: the archive must survive a directory-sync failure. */
+    private val directoryMetadataSync: (File) -> Unit = ::syncSessionEventDirectory,
 ) : AutoCloseable {
     init {
         require(maxBytes >= MIN_MAX_BYTES) { "事件日志分段上限至少为 $MIN_MAX_BYTES 字节" }
@@ -188,7 +197,14 @@ class SessionEventLog(
             rotateActiveSegment()
         }
         try {
-            file.appendText(encoded)
+            val createsActiveFile = !file.exists()
+            FileOutputStream(file, true).use { output ->
+                output.write(encoded.toByteArray(Charsets.UTF_8))
+                // Publish the append only after the authoritative event reaches storage.
+                output.fd.sync()
+            }
+            // The new filename itself also needs to survive a sudden power loss.
+            if (createsActiveFile) syncDirectoryUnsafe(requireNotNull(file.parentFile))
         } catch (error: Exception) {
             runCatching { repairTornActiveTailUnsafe() }
             throw error
@@ -985,6 +1001,8 @@ class SessionEventLog(
         } catch (_: AtomicMoveNotSupportedException) {
             Files.move(file.toPath(), target.toPath())
         }
+        // The rotated segment name must be committed before the active path is reused.
+        syncDirectoryUnsafe(parent)
         runCatching(onSegmentRotated)
             .onFailure { error -> reportArchiveFailure("archive-signal", error) }
     }
@@ -995,7 +1013,15 @@ class SessionEventLog(
         val temporary = File(source.path + ".gz.tmp")
         try {
             source.inputStream().buffered().use { input ->
-                GZIPOutputStream(temporary.outputStream().buffered()).use { output -> input.copyTo(output) }
+                FileOutputStream(temporary).use { raw ->
+                    GZIPOutputStream(raw.buffered()).use { output ->
+                        input.copyTo(output)
+                        output.finish()
+                        output.flush()
+                        // A valid gzip CRC is not a replacement for fsync before deleting raw data.
+                        raw.fd.sync()
+                    }
+                }
             }
             // Verify the whole stream and CRC before dropping the durable source.
             var decodedBytes = 0L
@@ -1013,11 +1039,20 @@ class SessionEventLog(
             } catch (_: AtomicMoveNotSupportedException) {
                 Files.move(temporary.toPath(), compressed.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
+            // Make the published archive filename durable before removing its only raw copy.
+            syncDirectoryUnsafe(requireNotNull(source.parentFile))
             check(source.delete()) { "事件原分片删除失败" }
+            syncDirectoryUnsafe(requireNotNull(source.parentFile))
         } finally {
             temporary.delete()
         }
     }
+
+    /**
+     * Sync directory-entry changes only when files are created, renamed or deleted.
+     * Regular event appends sync the file contents, not the parent directory on every row.
+     */
+    private fun syncDirectoryUnsafe(parent: File) = directoryMetadataSync(parent)
 
     private fun File.eventReader() =
         if (name.endsWith(COMPRESSED_SUFFIX)) GZIPInputStream(inputStream().buffered()).bufferedReader()
