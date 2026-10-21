@@ -83,7 +83,7 @@ class DeepSeekClient @Inject constructor(
         val requestId = UUID.randomUUID().toString()
         val promptBreakdown = estimatePromptBreakdown(messages, tools)
         val toolCallingMode = resolveToolCallingMode(model, baseUrl, tools)
-        val officialDeepSeek = DeepSeekChatRequestPolicy.isOfficial(model, baseUrl)
+        val officialDeepSeek = DeepSeekChatRequestPolicy.isOfficialOrigin(baseUrl)
         val payload = buildJsonObject {
             put("model", model)
             put("messages", JsonArray(messages))
@@ -203,7 +203,7 @@ class DeepSeekClient @Inject constructor(
         val requestId = UUID.randomUUID().toString()
         val promptBreakdown = estimatePromptBreakdown(messages, tools)
         val toolCallingMode = resolveToolCallingMode(model, baseUrl, tools)
-        val officialDeepSeek = DeepSeekChatRequestPolicy.isOfficial(model, baseUrl)
+        val officialDeepSeek = DeepSeekChatRequestPolicy.isOfficialOrigin(baseUrl)
         val payload = buildJsonObject {
             put("model", model)
             put("messages", JsonArray(messages))
