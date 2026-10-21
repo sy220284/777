@@ -20,6 +20,9 @@ private const val CHAT_PARTIAL_VISIBLE_EVENT = "assistant/partial-visible"
 internal fun recoverInterruptedChatReply(log: LocalSessionEventLog): LocalHarnessMessage? {
     val lastTurn = log.latest("turn/start") ?: return null
     if (lastTurn.data["mode"]?.jsonPrimitive?.contentOrNull != "chat") return null
+    // Failed regenerations retain the previously selected answer. Their provisional text
+    // must not appear as an independent reply after cancellation or process restart.
+    if (lastTurn.data["replaces"]?.jsonPrimitive?.contentOrNull != null) return null
     val turnEvents = log.snapshotAfter(lastTurn.sequence)
     // A retry can reuse request_uid and restart chunk_index from zero. Select ONLY the
     // last admitted provider attempt; never splice chunks across attempts or display
