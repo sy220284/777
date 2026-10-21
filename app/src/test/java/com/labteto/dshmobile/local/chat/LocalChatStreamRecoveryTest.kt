@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.session.CHAT_STREAM_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.decodeTranscriptMessages
 import java.nio.file.Files
