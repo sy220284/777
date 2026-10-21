@@ -130,6 +130,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Hide platform filesystem paths while preserving actionable validation errors. */
+internal fun localComposerAttachmentFailureMessage(error: Exception, fallback: String): String =
+    if (error is java.io.IOException || error is SecurityException) fallback
+    else error.message ?: fallback
+
 /** Optional introduction is wrapped so Compose never tracks a nullable enum via ordinal(). */
 internal data class LocalModeIntro(val usageMode: LocalUsageMode)
 internal data class LocalTranscriptJumpTarget(val sessionId: String, val messageId: String)
@@ -741,7 +746,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
-                    attachmentError = error.message ?: imageImportFailedMessage
+                    attachmentError = localComposerAttachmentFailureMessage(error, imageImportFailedMessage)
                 } finally {
                     release()
                 }
@@ -770,7 +775,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (error: Exception) {
-                        failure = error.message ?: imageImportFailedMessage
+                        failure = localComposerAttachmentFailureMessage(error, imageImportFailedMessage)
                     }
                 }
                 attachmentError = failure
@@ -793,7 +798,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
-                    attachmentError = error.message ?: fileImportFailedMessage
+                    attachmentError = localComposerAttachmentFailureMessage(error, fileImportFailedMessage)
                 }
             }
         }

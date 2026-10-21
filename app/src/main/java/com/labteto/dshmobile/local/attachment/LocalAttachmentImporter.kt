@@ -296,37 +296,41 @@ internal suspend fun copyAttachmentCancellably(
 }
 
 /**
- * Commit a content-addressed attachment without ever replacing an existing target. A private
- * temp file is fully written first; createLink atomically publishes a *complete* inode and
- * fails if another import has already published the same digest. This also prevents an Android
- * rename race from overwriting an existing attachment. If hard links are unsupported, refuse
- * the import rather than exposing a partially copied public target.
+ * Publish an already completed, hashed attachment by a same-directory rename.
  *
- * The caller owns and always cleans the source temporary file.
+ * Android app-private filesystems may reject hard links. No hard link is required here.
+ * A source is either moved into place or, for a duplicate digest, checked byte-for-byte
+ * against the existing file. Never request REPLACE_EXISTING.
  */
+private val attachmentPublishLock = Any()
+
 internal fun commitImportedAttachmentFile(source: File, target: File) {
     require(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS)) {
         "附件临时文件不存在或不是普通文件"
     }
-    val sameDirectory = source.parentFile.canonicalFile == target.parentFile.canonicalFile
-    val staged = if (sameDirectory) source
-        else File(target.parentFile, ".commit-${UUID.randomUUID()}")
-    try {
-        if (!sameDirectory) source.copyTo(staged, overwrite = false)
-        try {
-            Files.createLink(target.toPath(), staged.toPath())
-        } catch (_: FileAlreadyExistsException) {
-            // Shared hashes are immutable: a conflicting or symlinked destination is a
-            // failed import, never a silent acceptance or replacement.
+    require(source.parentFile.canonicalFile == target.parentFile.canonicalFile) {
+        "附件发布必须在同一目录完成"
+    }
+    synchronized(attachmentPublishLock) {
+        fun verifyExisting() {
             require(Files.isRegularFile(target.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-                sameImportedAttachmentContent(staged, target)) {
+                sameImportedAttachmentContent(source, target)) {
                 "同名附件内容不匹配或目标文件无效，已拒绝覆盖"
             }
         }
-    } finally {
-        if (!sameDirectory) staged.delete()
+        if (Files.exists(target.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            verifyExisting()
+            return
+        }
+        try {
+            // Same-directory move publishes completed bytes without replacing an existing path.
+            Files.move(source.toPath(), target.toPath())
+        } catch (_: FileAlreadyExistsException) {
+            verifyExisting()
+        }
     }
 }
+
 
 /** Compare existing duplicate bytes without trusting its name or loading the file into RAM. */
 private fun sameImportedAttachmentContent(first: File, second: File): Boolean {
