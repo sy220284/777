@@ -247,36 +247,23 @@ internal fun LocalConversationComposer(
         )
     }
 
+    // Keep one right-hand action across both composer layouts.
+    // Running Work draft submission lives above, not beside Stop.
     @Composable
-    fun SendControl(queue: Boolean = false) {
+    fun PrimaryActionControl() {
         SyComposerAction(
             icon = null,
-            iconPainter = painterResource(R.drawable.ic_ui_button_send_glyph),
+            iconPainter = painterResource(
+                if (state.running) R.drawable.ic_ui_button_stop_glyph
+                else R.drawable.ic_ui_button_send_glyph,
+            ),
             iconSize = 32.dp,
-            tint = if (canSend) colors.onPrimary else colors.text,
-            contentDescription = if (queue && state.queuedInputCount > 0) {
-                stringResource(R.string.local_queue_message_count, state.queuedInputCount)
-            } else if (queue) {
-                stringResource(R.string.local_queue_message)
-            } else {
-                stringResource(R.string.chat_composer_send)
-            },
-            onClick = ::submit,
-            enabled = canSend,
-            containerColor = colors.primary,
-            visualSize = 32.dp,
-        )
-    }
-
-    @Composable
-    fun StopControl() {
-        SyComposerAction(
-            icon = null,
-            iconPainter = painterResource(R.drawable.ic_ui_button_stop_glyph),
-            iconSize = 32.dp,
-            tint = colors.onPrimary,
-            contentDescription = stringResource(R.string.chat_composer_stop),
-            onClick = onStop,
+            tint = if (state.running || canSend) colors.onPrimary else colors.text,
+            contentDescription = stringResource(
+                if (state.running) R.string.chat_composer_stop else R.string.chat_composer_send,
+            ),
+            onClick = if (state.running) onStop else ::submit,
+            enabled = state.running || canSend,
             containerColor = colors.primary,
             visualSize = 32.dp,
         )
@@ -312,17 +299,19 @@ internal fun LocalConversationComposer(
                 )
             }
         }
-        if (shouldShowWorkSteeringChoice(
-                mode = state.usageMode,
-                running = state.running,
-                teamDispatchSelected = teamDispatchSelected,
-                hasDraft = input.isNotBlank(),
-                dismissed = steeringChoiceDismissed,
-            )
-        ) {
+        if (state.usageMode == LocalUsageMode.WORK && state.running &&
+            (input.isNotBlank() || attachments.isNotEmpty())) {
             LocalWorkSteeringChoice(
                 selected = steerCurrentRun,
+                showSteering = shouldShowWorkSteeringChoice(
+                    mode = state.usageMode,
+                    running = state.running,
+                    teamDispatchSelected = teamDispatchSelected,
+                    hasDraft = input.isNotBlank(),
+                    dismissed = steeringChoiceDismissed,
+                ),
                 onToggle = { steerCurrentRun = !steerCurrentRun },
+                onSubmit = if (canSend) ::submit else null,
                 onDismiss = {
                     steerCurrentRun = false // Closing always restores safe default next-turn queueing.
                     steeringChoiceDismissed = true
@@ -415,13 +404,12 @@ internal fun LocalConversationComposer(
                 enter = expandHorizontally(composerRevealSpec) + fadeIn(composerFadeSpec),
                 exit = shrinkHorizontally(composerRevealSpec) + fadeOut(composerFadeSpec),
             ) {
-                if (state.running) StopControl() else SendControl()
+                PrimaryActionControl()
             }
         }
 
         LocalConversationComposerExpandedRow(
             visible = expanded,
-            state = state,
             menuControl = { AttachmentControl() },
             replySuggestionsControl = { ReplySuggestionsControl() },
             planControl = {
@@ -455,8 +443,7 @@ internal fun LocalConversationComposer(
                     onReasoningModeChange = { if (!state.running) onReasoningModeChange(it) },
                 )
             },
-            stopControl = { StopControl() },
-            sendControl = { queue -> SendControl(queue) },
+            primaryAction = { PrimaryActionControl() },
         )
     }
 }

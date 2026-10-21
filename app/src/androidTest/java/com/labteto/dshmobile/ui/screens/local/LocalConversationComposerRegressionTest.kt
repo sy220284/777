@@ -4,6 +4,10 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -353,5 +357,144 @@ class LocalConversationComposerRegressionTest {
         compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).assertTextContains(draft)
     }
 
+
+    @Test
+    fun workComposerSwitchesOnePrimaryButtonAndPreservesQueuedDraft() {
+        val running = mutableStateOf(false)
+        var stopped = 0
+        val submissions = mutableListOf<String>()
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = false,
+                        configured = true,
+                        sessionId = "single-work-action",
+                        usageMode = LocalUsageMode.WORK,
+                        running = running.value,
+                    ),
+                    activeModelProfile = null,
+                    input = "下一条工作指令",
+                    attachments = emptyList(),
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = {},
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onSend = { text, _ ->
+                        submissions += text
+                        LocalSendResult.Empty
+                    },
+                    onStop = { stopped++ },
+                    onPlanModeChange = {},
+                )
+            }
+        }
+        compose.onNodeWithContentDescription(context.getString(R.string.chat_composer_send)).assertExists()
+        compose.onNodeWithContentDescription(context.getString(R.string.chat_composer_stop)).assertDoesNotExist()
+
+        compose.runOnIdle { running.value = true }
+        compose.onNodeWithContentDescription(context.getString(R.string.chat_composer_send)).assertDoesNotExist()
+        compose.onNodeWithContentDescription(context.getString(R.string.chat_composer_stop)).assertExists()
+        compose.onNodeWithTag("local-composer-plan-toggle").assertIsNotEnabled()
+        compose.onNodeWithContentDescription(
+            context.getString(
+                R.string.local_composer_reasoning_action,
+                context.getString(R.string.local_composer_reasoning_default),
+            ),
+        ).assertIsNotEnabled()
+        compose.onNodeWithText(context.getString(R.string.local_work_submit_queue)).performClick()
+        compose.onNodeWithContentDescription(context.getString(R.string.chat_composer_stop)).performClick()
+        compose.runOnIdle {
+            assertEquals(listOf("下一条工作指令"), submissions)
+            assertEquals(1, stopped)
+        }
+    }
+
+    @Test
+    fun runningChatCompactComposerOnlyShowsStop() {
+        var stopped = 0
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = false,
+                        configured = true,
+                        sessionId = "single-chat-action",
+                        usageMode = LocalUsageMode.CHAT,
+                        running = true,
+                    ),
+                    activeModelProfile = null,
+                    input = "",
+                    attachments = emptyList(),
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = {},
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onSend = { _, _ -> LocalSendResult.Empty },
+                    onStop = { stopped++ },
+                    onPlanModeChange = {},
+                )
+            }
+        }
+        compose.onNodeWithContentDescription(context.getString(R.string.chat_composer_send)).assertDoesNotExist()
+        compose.onNodeWithContentDescription(context.getString(R.string.chat_composer_stop)).performClick()
+        compose.runOnIdle { assertEquals(1, stopped) }
+    }
+
+
+    @Test
+    fun chatComposerRestoresSendAfterStopWithoutExtraAction() {
+        val running = mutableStateOf(false)
+        var sends = 0
+        var stops = 0
+        val send = context.getString(R.string.chat_composer_send)
+        val stop = context.getString(R.string.chat_composer_stop)
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = false,
+                        configured = true,
+                        sessionId = "chat-action-full-cycle",
+                        usageMode = LocalUsageMode.CHAT,
+                        running = running.value,
+                    ),
+                    activeModelProfile = null,
+                    input = "保留草稿",
+                    attachments = emptyList(),
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = {},
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onSend = { _, _ -> sends++; LocalSendResult.Empty },
+                    onStop = { stops++ },
+                    onPlanModeChange = {},
+                )
+            }
+        }
+
+        compose.onAllNodesWithContentDescription(send).assertCountEquals(1)
+        compose.onAllNodesWithContentDescription(stop).assertCountEquals(0)
+        compose.runOnIdle { running.value = true }
+        compose.waitForIdle()
+        compose.onAllNodesWithContentDescription(send).assertCountEquals(0)
+        compose.onAllNodesWithContentDescription(stop).assertCountEquals(1)
+        compose.onNodeWithContentDescription(stop).performClick()
+        compose.runOnIdle {
+            assertEquals(1, stops)
+            assertEquals(0, sends)
+            running.value = false
+        }
+        compose.waitForIdle()
+        compose.onAllNodesWithContentDescription(send).assertCountEquals(1)
+        compose.onAllNodesWithContentDescription(stop).assertCountEquals(0)
+        compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).assertTextContains("保留草稿")
+    }
 
 }
