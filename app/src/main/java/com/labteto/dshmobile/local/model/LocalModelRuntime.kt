@@ -47,6 +47,7 @@ class LocalModelRuntime @Inject constructor(
     internal val activeProfile = gateway.activeProfileState
 
     internal fun configure(apiKey: String, model: String, baseUrl: String) {
+        pendingSelections.remove(runtimeStateStore.state.value.sessionId)
         scope.launch {
             try {
                 saveConfiguration(apiKey, model, baseUrl)
@@ -68,6 +69,8 @@ class LocalModelRuntime @Inject constructor(
         credentialSourceProfileId: String? = null,
     ) {
         val originatingSessionId = runtimeStateStore.state.value.sessionId
+        // A later explicit configuration action supersedes queued picker clicks.
+        pendingSelections.remove(originatingSessionId)
         check(!identityMutationLocked()) { "请等待初始化完成或结束当前任务后再切换模型" }
         configuration.save(
             apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride,
@@ -108,9 +111,12 @@ class LocalModelRuntime @Inject constructor(
                     // Take the same gate as durable mutations, re-read the current metadata and
                     // finish the session projection before any delete/save may commit.
                     LocalModelMutationGate.run {
+                        // A click can be superseded while waiting for the durable gate.
+                        if (pendingSelections[originSessionId] != request) return@run
                         val current = configuration.readProfiles().firstOrNull { it.id == id }
                             ?: error("所选模型已被删除，请重新选择")
                         check(gateway.hasCredential(current)) { "所选模型凭据不可用，请检查模型账户" }
+                        if (pendingSelections[originSessionId] != request) return@run
                         sessionStorage.eventLogs.get(originSessionId).recordLocalModelSelection(id)
                         state.selectForSession(originSessionId, current)
                         // In-flight requests already carry their frozen route.
@@ -132,6 +138,7 @@ class LocalModelRuntime @Inject constructor(
     }
 
     internal fun removeModel(id: String) {
+        pendingSelections.remove(runtimeStateStore.state.value.sessionId)
         scope.launch {
             if (identityMutationLocked()) return@launch
             val before = state.value.modelState
@@ -165,6 +172,7 @@ class LocalModelRuntime @Inject constructor(
         settings.configureImageInputMode(mode)
 
     internal fun clearCredential() {
+        pendingSelections.remove(runtimeStateStore.state.value.sessionId)
         scope.launch {
             if (identityMutationLocked()) {
                 state.publishError("请先结束当前任务再清除模型凭据")
@@ -188,10 +196,11 @@ class LocalModelRuntime @Inject constructor(
         accountId: String,
         models: List<ChatGptModelOption>,
         selectFirst: Boolean = true,
-    ) = accounts.syncChatGptModels(
-        accountId, models, selectFirst,
-        if (selectFirst) runtimeStateStore.state.value.sessionId else null,
-    )
+    ) {
+        val origin = if (selectFirst) runtimeStateStore.state.value.sessionId else null
+        if (origin != null) pendingSelections.remove(origin)
+        accounts.syncChatGptModels(accountId, models, selectFirst, origin)
+    }
 
     internal suspend fun retireChatGptAccountProfiles(accountId: String) =
         accounts.retireChatGptAccountProfiles(accountId)
