@@ -21,6 +21,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
+private fun syncSessionEventDirectory(parent: File) {
+    java.nio.channels.FileChannel.open(parent.toPath(), StandardOpenOption.READ).use { channel ->
+        channel.force(true)
+    }
+}
+
 @Serializable
 data class SessionEvent(
     val sequence: Long,
@@ -61,6 +67,8 @@ class SessionEventLog(
     private val clock: () -> Long = System::currentTimeMillis,
     private val diagnosticSink: (String, Throwable?) -> Unit = { _, _ -> },
     private val onSegmentRotated: () -> Unit = {},
+    /** Fault-injection seam: the archive must survive a directory-sync failure. */
+    private val directoryMetadataSync: (File) -> Unit = ::syncSessionEventDirectory,
 ) : AutoCloseable {
     init {
         require(maxBytes >= MIN_MAX_BYTES) { "事件日志分段上限至少为 $MIN_MAX_BYTES 字节" }
@@ -1044,11 +1052,7 @@ class SessionEventLog(
      * Sync directory-entry changes only when files are created, renamed or deleted.
      * Regular event appends sync the file contents, not the parent directory on every row.
      */
-    private fun syncDirectoryUnsafe(parent: File) {
-        java.nio.channels.FileChannel.open(parent.toPath(), StandardOpenOption.READ).use { channel ->
-            channel.force(true)
-        }
-    }
+    private fun syncDirectoryUnsafe(parent: File) = directoryMetadataSync(parent)
 
     private fun File.eventReader() =
         if (name.endsWith(COMPRESSED_SUFFIX)) GZIPInputStream(inputStream().buffered()).bufferedReader()

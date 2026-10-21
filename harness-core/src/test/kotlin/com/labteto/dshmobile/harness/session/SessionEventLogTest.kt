@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.harness.session
 
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 import java.util.zip.GZIPInputStream
 import kotlinx.serialization.json.Json
@@ -8,6 +9,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -188,6 +191,37 @@ class SessionEventLogTest {
             assertTrue(File(raw.path + ".gz").isFile)
             assertEquals((0L..28L).toList(), restarted.snapshot().map(SessionEvent::sequence))
             assertEquals(listOf(26L, 27L, 28L), restarted.pageBeforeChronological(limit = 3).map(SessionEvent::sequence))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun archiveDirectorySyncFailureKeepsOriginalUncompressedSegmentForRecovery() {
+        val directory = Files.createTempDirectory("event-log-archive-sync-fault").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            var fault = false
+            val log = SessionEventLog(
+                file, json, maxBytes = 700,
+                directoryMetadataSync = { if (fault) throw IOException("injected-directory-sync-failure") },
+            )
+            repeat(14) { index ->
+                log.append("test/record", buildJsonObject { put("value", "row-$index-" + "x".repeat(72)) })
+            }
+            val original = directory.listFiles().orEmpty()
+                .first { it.name.matches(Regex("session\\.events\\.jsonl\\.part-[0-9]+")) }
+            fault = true
+            assertThrows(IOException::class.java) { log.archiveLegacySegments(limit = 1) }
+            assertTrue("raw source must not be deleted before archive metadata is durable", original.isFile)
+            fault = false
+            while (log.archiveLegacySegments(limit = 16) > 0) Unit
+            assertFalse(original.exists())
+            assertEquals((0L..13L).toList(), log.snapshot().map(SessionEvent::sequence))
+            log.close()
+            SessionEventLog(file, json, maxBytes = 700).use { restarted ->
+                assertEquals((0L..13L).toList(), restarted.snapshot().map(SessionEvent::sequence))
+            }
         } finally {
             directory.deleteRecursively()
         }

@@ -12,6 +12,24 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ManagedProcessStdinAndroidTest {
+    @Test fun zeroExitCannotClaimSuccessWhenStdinWasNotDelivered() = runBlocking {
+        val result = AndroidProcessRuntime().execute(
+            ProcessRequest(
+                command = listOf(
+                    "/system/bin/sh", "-c",
+                    "exec 0<&-; printf STARTED; exit 0",
+                ),
+                stdin = "z".repeat(1024 * 1024),
+                timeoutMillis = 5_000L,
+            ),
+        )
+        assertFalse(result.timedOut)
+        assertTrue(result.stdout.contains("STARTED"))
+        assertTrue("stdin must be reported incomplete", result.stdinWriteFailed)
+        assertEquals(-1, result.exitCode)
+        assertTrue(result.stderr.contains("STDIN_WRITE_FAILED"))
+    }
+
     @Test fun earlyStdinClosePreservesExitCodeAndProcessOutput() = runBlocking {
         val result = AndroidProcessRuntime().execute(
             ProcessRequest(
