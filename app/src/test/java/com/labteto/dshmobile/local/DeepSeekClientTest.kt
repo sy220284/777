@@ -25,6 +25,55 @@ class DeepSeekClientTest {
 
 
     @Test
+    fun deepSeekOutputBudgetReachesWireInStreamingAndNonStreaming() = runBlocking {
+        val seen = mutableListOf<String>()
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            val body = Buffer().also { chain.request().body?.writeTo(it) }.readUtf8()
+            seen += body
+            val stream = Json.parseToJsonElement(body).jsonObject["stream"]?.jsonPrimitive?.content == "true"
+            val responseBody = if (stream) {
+                "data: {\\"choices\\":[{\\"delta\\":{\\"content\\":\\"OK\\"},\\"finish_reason\\":\\"stop\\"}]}\\n" +
+                    "data: [DONE]\\n"
+            } else {
+                """{"choices":[{"message":{"role":"assistant","content":"OK"},"finish_reason":"stop"}]}"""
+            }
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(responseBody.toResponseBody(
+                    (if (stream) "text/event-stream" else "application/json").toMediaType(),
+                )).build()
+        }.build()
+        val transport = DeepSeekClient(http, Json { ignoreUnknownKeys = true })
+        val history = listOf(buildJsonObject { put("role", "user"); put("content", "test") })
+        transport.complete(
+            apiKey = "test", baseUrl = "https://api.deepseek.com",
+            model = "deepseek-flash", messages = history, tools = JsonArray(emptyList()),
+            reasoningEffort = "none", temperature = 0.7, maxTokens = 32_768,
+        )
+        val noThinking = Json.parseToJsonElement(seen.last()).jsonObject
+        assertEquals("32768", noThinking["max_tokens"]?.jsonPrimitive?.content)
+        assertEquals("0.7", noThinking["temperature"]?.jsonPrimitive?.content)
+        transport.completeStreaming(
+            apiKey = "test", baseUrl = "https://api.deepseek.com/v1",
+            model = "deepseek-v4-pro", messages = history, tools = JsonArray(emptyList()),
+            reasoningEffort = "high", temperature = 0.7, maxTokens = 131_072,
+        )
+        val thinking = Json.parseToJsonElement(seen.last()).jsonObject
+        assertEquals("131072", thinking["max_tokens"]?.jsonPrimitive?.content)
+        assertEquals("enabled", thinking["thinking"]?.jsonObject?.get("type")?.jsonPrimitive?.content)
+        assertFalse("temperature has no effect with DeepSeek thinking", thinking.containsKey("temperature"))
+        transport.complete(
+            apiKey = "test", baseUrl = "https://proxy.example/v1",
+            model = "deepseek-flash", messages = history, tools = JsonArray(emptyList()),
+            reasoningEffort = "high", maxTokens = 131_072,
+        )
+        val proxy = Json.parseToJsonElement(seen.last()).jsonObject
+        assertFalse(proxy.containsKey("max_tokens"))
+        assertFalse(proxy.containsKey("thinking"))
+        assertEquals("high", proxy["reasoning_effort"]?.jsonPrimitive?.content)
+    }
+
+    @Test
     fun reasoningOverrideMatchesEachProviderWireContract() = runBlocking {
         val requests = mutableListOf<String>()
         val http = OkHttpClient.Builder().addInterceptor { chain ->
