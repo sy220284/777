@@ -69,9 +69,13 @@ fun MarkdownText(
     allowCodeCopy: Boolean = true,
     bodyStyle: TextStyle = DsType.mdBody,
     preserveSoftLineBreaks: Boolean = false,
+    streaming: Boolean = false,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val blocks = remember(text) { parseMarkdown(text) }
+    val streamingCache = remember { StreamingMarkdownBlockCache() }
+    val blocks = remember(text, streaming) {
+        if (streaming) streamingCache.parse(text) else parseMarkdown(text)
+    }
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         blocks.forEach { block ->
             when (block) {
@@ -125,6 +129,50 @@ internal sealed interface MdBlock {
         val rows: List<List<String>>,
         val alignments: List<TableAlignment>,
     ) : MdBlock
+}
+
+/**
+ * A stream changes on every published chunk. Commit only complete block groups ending at
+ * blank lines outside fenced code. All undecided content keeps using the authoritative parser,
+ * so an open fence, growing table or partial list has exactly the old prefix rendering.
+ * When the stream is replaced/truncated, discard the cache rather than project stale content.
+ */
+internal class StreamingMarkdownBlockCache {
+    private var previousText = ""
+    private var stableLength = 0
+    private val stableBlocks = ArrayList<MdBlock>()
+
+    fun parse(source: String): List<MdBlock> {
+        val text = source.replace("\r\n", "\n")
+        if (!text.startsWith(previousText)) {
+            stableLength = 0
+            stableBlocks.clear()
+        }
+        val tail = text.substring(stableLength)
+        val cut = stableMarkdownCut(tail)
+        if (cut > 0) {
+            stableBlocks.addAll(parseMarkdown(tail.substring(0, cut)))
+            stableLength += cut
+        }
+        previousText = text
+        val changing = parseMarkdown(text.substring(stableLength))
+        return if (stableBlocks.isEmpty()) changing else stableBlocks + changing
+    }
+
+    private fun stableMarkdownCut(text: String): Int {
+        var lineStart = 0
+        var inFence = false
+        var lastSafe = 0
+        while (lineStart < text.length) {
+            val lineEnd = text.indexOf('\n', lineStart)
+            if (lineEnd < 0) break
+            val line = text.substring(lineStart, lineEnd).trimStart()
+            if (line.startsWith("```")) inFence = !inFence
+            if (!inFence && line.isBlank()) lastSafe = lineEnd + 1
+            lineStart = lineEnd + 1
+        }
+        return lastSafe
+    }
 }
 
 internal fun parseMarkdown(markdown: String): List<MdBlock> {
