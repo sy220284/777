@@ -20,9 +20,19 @@ private const val CHAT_PARTIAL_VISIBLE_EVENT = "assistant/partial-visible"
 internal fun recoverInterruptedChatReply(log: LocalSessionEventLog): LocalHarnessMessage? {
     val lastTurn = log.latest("turn/start") ?: return null
     if (lastTurn.data["mode"]?.jsonPrimitive?.contentOrNull != "chat") return null
-    val checkpoints = log.snapshotAfter(lastTurn.sequence)
-        .filter { it.type == CHAT_STREAM_CHECKPOINT_EVENT }
+    val turnEvents = log.snapshotAfter(lastTurn.sequence)
+    // A retry can reuse request_uid and restart chunk_index from zero. Select ONLY the
+    // last admitted provider attempt; never splice chunks across attempts or display
+    // an abandoned attempt after a later attempt produced no visible text.
+    val newestProviderAttempt = turnEvents.lastOrNull { it.type == "request/provider-attempt" }
+    val checkpoints = turnEvents.filter {
+        it.type == CHAT_STREAM_CHECKPOINT_EVENT &&
+            it.sequence > (newestProviderAttempt?.sequence ?: lastTurn.sequence)
+    }
     val last = checkpoints.lastOrNull() ?: return null
+    if (newestProviderAttempt != null &&
+        newestProviderAttempt.data["request_uid"]?.jsonPrimitive?.contentOrNull !=
+            last.data["request_uid"]?.jsonPrimitive?.contentOrNull) return null
     if ((log.latest("assistant/message")?.sequence ?: -1L) > last.sequence) return null
     if ((log.latest(CHAT_PARTIAL_VISIBLE_EVENT)?.sequence ?: -1L) > last.sequence) return null
     val uid = last.data["request_uid"]?.jsonPrimitive?.contentOrNull

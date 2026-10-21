@@ -68,6 +68,42 @@ class LocalChatStreamRecoveryTest {
     }
 
     @Test
+    fun modelRetryRestoresOnlyLastAcceptedAttemptNotStaleChunks() {
+        val directory = Files.createTempDirectory("chat-retry-stream").toFile()
+        try {
+            val log = LocalSessionEventLog(directory.resolve("events.jsonl"), Json)
+            log.append("turn/start", buildJsonObject { put("mode", "chat") })
+            log.append("request/provider-attempt", buildJsonObject { put("request_uid", "same") })
+            LocalChatStreamCheckpointWriter(log, "same").apply {
+                append("第一次"); flush()
+            }
+            log.append("request/provider-attempt", buildJsonObject { put("request_uid", "same") })
+            LocalChatStreamCheckpointWriter(log, "same").apply {
+                append("第二次有效回复"); flush()
+            }
+            val recovered = recoverInterruptedChatReply(log)
+            assertNotNull(recovered)
+            assertEquals("【部分回复 · 本轮未完成】\n第二次有效回复", recovered!!.content)
+            assertNull(recoverInterruptedChatReply(log))
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test
+    fun laterAdmittedAttemptWithoutTextCannotResurrectEarlierAttempt() {
+        val directory = Files.createTempDirectory("chat-retry-no-text").toFile()
+        try {
+            val log = LocalSessionEventLog(directory.resolve("events.jsonl"), Json)
+            log.append("turn/start", buildJsonObject { put("mode", "chat") })
+            log.append("request/provider-attempt", buildJsonObject { put("request_uid", "same") })
+            LocalChatStreamCheckpointWriter(log, "same").apply { append("旧回答"); flush() }
+            log.append("request/provider-attempt", buildJsonObject { put("request_uid", "same") })
+            assertNull(recoverInterruptedChatReply(log))
+            log.append("request/provider-attempt", buildJsonObject { put("request_uid", "different") })
+            assertNull(recoverInterruptedChatReply(log))
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test
     fun missingCheckpointChunkNeverProducesInventedAssistantText() {
         val directory = Files.createTempDirectory("chat-stream-torn").toFile()
         try {
