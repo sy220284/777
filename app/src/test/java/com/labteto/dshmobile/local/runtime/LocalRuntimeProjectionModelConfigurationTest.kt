@@ -31,6 +31,73 @@ class LocalRuntimeProjectionModelConfigurationTest {
     }
 
     @Test
+    fun globalSaveCannotOverwriteAnotherConversationModelChoice() {
+        val a = LocalModelProfile("route-a", "model-a", "https://a.example")
+        val b = LocalModelProfile("route-b", "model-b", "https://b.example")
+        val initial = LocalHarnessState(
+            loading = false,
+            sessionId = "session-b",
+        )
+        val state = MutableStateFlow(initial.copy(
+            modelState = initial.modelState.copy(
+                configured = true,
+                model = b.model,
+                baseUrl = b.baseUrl,
+                modelSelection = initial.modelState.modelSelection.copy(
+                    profiles = listOf(a, b),
+                    activeProfileId = b.id,
+                ),
+            ),
+        ))
+        val projection = LocalRuntimeProjection(state)
+        projection.projectModelConfiguration(
+            true, a.model, a.baseUrl, listOf(a, b), a.id, null,
+            preferredSessionId = "session-a",
+        )
+        assertEquals(b.id, state.value.modelState.modelSelection.activeProfileId)
+        assertEquals(b.model, state.value.modelState.model)
+        assertEquals(b.baseUrl, state.value.modelState.baseUrl)
+        projection.projectModelConfiguration(
+            true, a.model, a.baseUrl, listOf(a, b), a.id, null,
+            preferredSessionId = "session-b",
+        )
+        assertEquals(a.id, state.value.modelState.modelSelection.activeProfileId)
+        assertEquals(a.model, state.value.modelState.model)
+    }
+
+    @Test
+    fun backgroundSyncRetainsForegroundChoiceUnlessItIsRemoved() {
+        val a = LocalModelProfile("route-a", "model-a", "https://a.example")
+        val b = LocalModelProfile("route-b", "model-b", "https://b.example")
+        val initial = LocalHarnessState(
+            loading = false,
+            sessionId = "session-b",
+        )
+        val state = MutableStateFlow(initial.copy(
+            modelState = initial.modelState.copy(
+                configured = true,
+                model = b.model,
+                baseUrl = b.baseUrl,
+                modelSelection = initial.modelState.modelSelection.copy(
+                    profiles = listOf(a, b),
+                    activeProfileId = b.id,
+                ),
+            ),
+        ))
+        val projection = LocalRuntimeProjection(state)
+        projection.projectModelConfiguration(
+            true, a.model, a.baseUrl, listOf(a, b), a.id, null,
+        )
+        assertEquals(b.id, state.value.modelState.modelSelection.activeProfileId)
+        projection.projectModelConfiguration(
+            true, a.model, a.baseUrl, listOf(a), a.id, null,
+        )
+        assertEquals(a.id, state.value.modelState.modelSelection.activeProfileId)
+        assertEquals(a.model, state.value.modelState.model)
+        assertEquals(a.baseUrl, state.value.modelState.baseUrl)
+    }
+
+    @Test
     fun removingModelTrimsItsWorkerSelection() {
         val removed = LocalModelProfile("removed", "old", "https://old.example")
         val retained = LocalModelProfile("retained", "new", "https://new.example")
