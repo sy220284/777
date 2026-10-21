@@ -59,6 +59,8 @@ internal class LocalSubagentRunnerFactory(
     private val defaultState: StateFlow<LocalHarnessState>,
     private val defaultSessionId: () -> String,
     private val compactionPolicy: LocalSubagentCompactionPolicy,
+    private val teamSchemas: (() -> JsonArray)? = null,
+    private val executeTeamTool: (suspend (String, String, LocalToolCall) -> AgentToolResult)? = null,
     private val importToolImages: suspend (com.labteto.dshmobile.harness.tools.ToolRichContent?) -> List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = { emptyList() },
 ) {
     fun createBound(
@@ -130,6 +132,8 @@ internal class LocalSubagentRunnerFactory(
         modelAdmission: LocalModelAdmissionPort? = null,
     ): LocalSubagentRunner = LocalSubagentRunner(
         modelGateway = modelGateway,
+        teamSchemas = teamSchemas,
+        executeTeamTool = executeTeamTool?.let { executor -> { jobId, call -> executor(runSessionId(), jobId, call) } },
         importToolImages = importToolImages,
         state = runnerState,
         jobs = jobs,

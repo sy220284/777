@@ -90,6 +90,8 @@ internal fun encodeLocalSubagentInboxClaimEvent(
             messages.map { message ->
                 buildJsonObject {
                     put("id", message.id)
+                    put("kind", message.kind.name)
+                    message.agentSource?.let { put("agent_source", it) }
                     put("content", message.content)
                     put("memory_input", message.memoryInput)
                     message.modelMessage?.let { put("model_message", it) }
@@ -115,12 +117,19 @@ internal fun decodeLocalSubagentInboxClaimedMessages(
             ?: return@mapNotNull null
         QueuedAgentInput(
             id = id,
+            kind = message["kind"]?.jsonPrimitive?.contentOrNull?.let {
+                runCatching { com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.valueOf(it) }.getOrNull()
+                    ?: return@mapNotNull null
+            } ?: com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.USER,
+            agentSource = message["agent_source"] as? JsonObject,
             content = content,
             memoryInput = message["memory_input"]?.jsonPrimitive?.contentOrNull ?: content,
             modelMessage = message["model_message"] as? JsonObject,
         )
     }
-    return decoded.takeIf { it.size == rawMessages.size }
+    return decoded.takeIf { it.size == rawMessages.size }?.takeIf { messages ->
+        messages.all { runCatching { com.labteto.dshmobile.harness.jobs.JobInboxContract.normalize(it) }.isSuccess }
+    }
 }
 
 internal fun shouldSettleCompletedSubagentCheckpoint(

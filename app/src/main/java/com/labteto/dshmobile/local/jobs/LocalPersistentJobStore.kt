@@ -83,6 +83,8 @@ internal class LocalPersistentJobStore(
                             snapshot.inbox.also { require(it.size <= MAX_PERSISTED_INBOX_MESSAGES) { "后台代理消息队列超过容量" } }.map(JobInboxContract::normalize).forEach { message ->
                                 add(buildJsonObject {
                                     put("id", message.id)
+                                    put("kind", message.kind.name)
+                                    message.agentSource?.let { put("agent_source", it) }
                                     put("content", message.content)
                                     put(
                                         "memory_input",
@@ -139,6 +141,10 @@ internal class LocalPersistentJobStore(
                     ?: error("后台代理Inbox消息缺少 content")
                 QueuedAgentInput(
                     id = messageId,
+                    kind = message["kind"]?.jsonPrimitive?.contentOrNull?.let {
+                        com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.valueOf(it)
+                    } ?: com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.USER,
+                    agentSource = message["agent_source"] as? JsonObject,
                     content = content,
                     memoryInput = message["memory_input"]?.jsonPrimitive?.contentOrNull
                         ?: content,

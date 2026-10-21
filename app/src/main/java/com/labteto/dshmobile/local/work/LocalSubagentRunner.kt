@@ -106,6 +106,8 @@ internal class LocalSubagentRunner(
     private val eventLog: () -> LocalSessionEventLog,
     private val schemas: (Boolean, Boolean, MutableSet<String>) -> JsonArray,
     private val execute: suspend (LocalToolCall, Boolean, MutableSet<String>) -> AgentToolResult,
+    private val teamSchemas: (() -> JsonArray)? = null,
+    private val executeTeamTool: (suspend (String, LocalToolCall) -> AgentToolResult)? = null,
     private val spillToolOutput: (String, String) -> Boolean = { _, _ -> false },
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
     private val resolveImageMode: (LocalImageInputMode, String, String) -> LocalImageInputMode,
@@ -291,7 +293,12 @@ internal class LocalSubagentRunner(
             addAll(capabilities.toolAllowlist.orEmpty())
             addAll(capabilities.initialOptionalTools)
         }
-        val initialToolSchemas = schemas(
+        fun executionSchemas(mutation: Boolean, virtual: Boolean, enabled: MutableSet<String>): JsonArray {
+            val normal = schemas(mutation, virtual, enabled)
+            return if (capabilities.teamManaged && backgroundJobId != null)
+                JsonArray(normal + (teamSchemas?.invoke().orEmpty())) else normal
+        }
+        val initialToolSchemas = executionSchemas(
             allowMutation,
             virtualScreenId != null,
             enabledOptionalTools,
@@ -522,7 +529,7 @@ internal class LocalSubagentRunner(
                             tools = modelToolStepSurface.capture(
                                 runToolSurface.next(
                                     filterLocalSubagentSchemas(
-                                        schemas(
+                                        executionSchemas(
                                             allowMutation,
                                             virtualScreenId != null,
                                             enabledOptionalTools,
@@ -599,7 +606,11 @@ internal class LocalSubagentRunner(
                             )
                         } else withContext(LocalModelRunContext(runProfile)) {
                         currentCoroutineContext().ensureActive()
-                        execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
+                        if (capabilities.teamManaged && call.name in LocalAgentTeamContract.TOOL_NAMES) {
+                            requireNotNull(executeTeamTool) { "TEAM_CALLER_UNAVAILABLE" }(
+                                requireNotNull(backgroundJobId), call.toLocalToolCall(),
+                            )
+                        } else execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
                             .also { currentCoroutineContext().ensureActive() }
                     }
                 },
@@ -683,6 +694,7 @@ internal class LocalSubagentRunner(
                                     ),
                             )
                             eventLog().append("subagent/tool-result", buildJsonObject {
+                                backgroundJobId?.let { put("background_job_id", it) }
                                 put("agent_id", subagentId)
                                 put("step", absoluteStep)
                                 put("id", event.call.id)

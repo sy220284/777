@@ -322,7 +322,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 selectedInvocations = pinnedInvocations.current(),
                             ),
                         )
-                        workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
+                        if (memoryInput.isNotBlank()) workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                         requestPrepared = true
                     }
                     while (true) {

@@ -8,6 +8,11 @@ object JobInboxContract {
     const val MAX_ID_CHARS = 64
 
     fun normalize(input: QueuedAgentInput): QueuedAgentInput {
+        if (input.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.AGENT_MESSAGE) {
+            require(input.memoryInput.isEmpty() && input.agentSource != null && input.continuation == null) {
+                "代理消息必须携带来源且不得写入用户记忆"
+            }
+        } else require(input.agentSource == null) { "非代理消息不得携带代理来源" }
         val id = input.id.trim()
         val content = input.content.trim()
         require(id.isNotEmpty() && id.length <= MAX_ID_CHARS) { "后台代理消息编号长度无效" }

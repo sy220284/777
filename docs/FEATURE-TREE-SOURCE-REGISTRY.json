@@ -88,6 +88,14 @@
       "entry": "LocalFeatureCatalog",
       "owner": "SHELL",
       "test": "app/src/test/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalogTest.kt#everyRouteHasExactlyOneStableOwnerAndModuleRouteList"
+    },
+    {
+      "id": "work.agent-team.member-collaboration",
+      "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 真实成员身份与窄授权协作（未合并）",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "executeMember",
+      "owner": "WORK",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#trustedMembersSendPeerLeadAndReadOwnDurableMailbox"
     }
   ]
 }

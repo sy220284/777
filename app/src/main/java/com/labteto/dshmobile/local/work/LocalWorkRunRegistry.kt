@@ -85,6 +85,30 @@ class LocalWorkRunRegistry internal constructor(
 
     internal operator fun get(sessionId: String): LocalWorkRunBinding? = bindings[sessionId]
 
+    internal fun enqueueAgentMessage(
+        sessionId: String,
+        input: QueuedAgentInput,
+        eventLog: com.labteto.dshmobile.local.session.LocalSessionEventLog,
+    ): Boolean = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+        require(input.kind == QueuedAgentInputKind.AGENT_MESSAGE && input.memoryInput.isEmpty())
+        // Inbox admission survives the crash window before Team marks its mailbox delivered.
+        if (eventLog.latestMatching(setOf(LOCAL_AGENT_INBOX_EVENT_TYPE)) { data ->
+                (data["affected"] as? kotlinx.serialization.json.JsonArray).orEmpty().any { raw ->
+                    val item = raw as? kotlinx.serialization.json.JsonObject
+                    item?.get("id") == kotlinx.serialization.json.JsonPrimitive(input.id)
+                }
+            } != null) return@synchronized true
+        val binding = bindings[sessionId] ?: return@synchronized false
+        if (binding.runHandle.cancellationRequested) return@synchronized false
+        val pending = binding.runHandle.pendingInputs
+        if (pending.snapshot().any { it.id == input.id }) return@synchronized true
+        pending.offer(input) {
+            eventLog.append(LOCAL_AGENT_INBOX_EVENT_TYPE, encodeLocalAgentInboxEvent(
+                action = "agent-message-queued", pending = pending.snapshot(), affected = listOf(input),
+            ))
+        }
+    }
+
     internal fun state(sessionId: String): LocalHarnessState? = bindings[sessionId]?.aggregateSnapshot()
 
     internal fun live(sessionId: String): LocalWorkRunBinding? =
@@ -246,7 +270,7 @@ class LocalWorkRunRegistry internal constructor(
                 }
                 if (resume.failureCode != WORK_OUTPUT_LIMIT_CONTINUATION) binding.automaticContinuationCount = resume.index
                 binding.continuationParentRunId = resume.sourceRunId
-            } else {
+            } else if (next.kind == QueuedAgentInputKind.USER) {
                 binding.automaticContinuationCount = 0
                 binding.continuationParentRunId = null
             }

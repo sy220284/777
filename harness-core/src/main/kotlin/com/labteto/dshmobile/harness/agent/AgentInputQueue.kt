@@ -3,7 +3,7 @@ package com.labteto.dshmobile.harness.agent
 import kotlinx.serialization.json.JsonObject
 
 /** Execution origin is part of the durable queue contract, not encoded in ID prefixes. */
-enum class QueuedAgentInputKind { USER, WORK_CONTINUATION }
+enum class QueuedAgentInputKind { USER, WORK_CONTINUATION, AGENT_MESSAGE }
 
 /** Stable resume coordinates are persisted with the queue, not inferred from display IDs. */
 data class AgentContinuationRef(
@@ -30,6 +30,7 @@ data class QueuedAgentInput(
     val id: String = "",
     val kind: QueuedAgentInputKind = QueuedAgentInputKind.USER,
     val continuation: AgentContinuationRef? = null,
+    val agentSource: JsonObject? = null,
 )
 
 class AgentInputQueue(
@@ -48,7 +49,10 @@ class AgentInputQueue(
         if (input.id.isNotBlank() && items.any { it.id == input.id }) {
             error("输入队列存在重复编号：${input.id}")
         }
-        items.addLast(input)
+        if (input.kind == QueuedAgentInputKind.USER && items.any { it.kind == QueuedAgentInputKind.AGENT_MESSAGE }) {
+            val insertion = items.indexOfFirst { it.kind == QueuedAgentInputKind.AGENT_MESSAGE }
+            items.add(insertion, input)
+        } else items.addLast(input)
         try {
             commit()
             true

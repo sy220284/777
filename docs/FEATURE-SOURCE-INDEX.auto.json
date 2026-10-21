@@ -59,7 +59,7 @@
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt"
     }
   ],
-  "semantic_registration_count": 14,
+  "semantic_registration_count": 15,
   "production_file_fingerprints": [
     {
       "path": "app/src/main/java/com/github/sisong/HPatch.kt",
@@ -307,7 +307,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentInboxPersistence.kt",
-      "sha256": "2f084a8741418020"
+      "sha256": "d0420ec087a3aec4"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentModelStepRuntime.kt",
@@ -1083,7 +1083,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/jobs/LocalPersistentJobStore.kt",
-      "sha256": "0eb66ad6330d45fd"
+      "sha256": "e859955e555ceadc"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/lsp/LanguageServerCommand.kt",
@@ -2223,7 +2223,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolSchemaProjection.kt",
-      "sha256": "c74997ea272152c4"
+      "sha256": "bb0ca8f3300bbcff"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolScopeProjection.kt",
@@ -2343,7 +2343,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamContract.kt",
-      "sha256": "8ef98d002971b1d1"
+      "sha256": "233ec12ecc79658a"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamEventCodec.kt",
@@ -2359,11 +2359,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamReducer.kt",
-      "sha256": "ad01105a8eb0d0c7"
+      "sha256": "0b0cd3b0456409d6"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
-      "sha256": "6fee063973fe5d2e"
+      "sha256": "0bbe2edf30741df9"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalForegroundRecoveryCoordinator.kt",
@@ -2399,7 +2399,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentContinuation.kt",
-      "sha256": "a7e62efe1a9b9a07"
+      "sha256": "74d5ea3a9fd6d944"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentInboxRecoveryScan.kt",
@@ -2407,11 +2407,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunner.kt",
-      "sha256": "771629f70f1f2e05"
+      "sha256": "f162c053becf96fe"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunnerFactory.kt",
-      "sha256": "1ebd7b7629dbd587"
+      "sha256": "ca08fe0009c40c28"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalTeamRefreshQueue.kt",
@@ -2431,7 +2431,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-      "sha256": "14478864803a97d0"
+      "sha256": "19c1dd2f4be571bb"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkApprovalCoordinator.kt",
@@ -2487,7 +2487,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkComposition.kt",
-      "sha256": "3a33566db23734b1"
+      "sha256": "75b4584ab12980ac"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkContinuation.kt",
@@ -2579,7 +2579,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkModelHistoryRuntime.kt",
-      "sha256": "240c092fe2a656bc"
+      "sha256": "9490af294251bcbd"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkModelSteering.kt",
@@ -2631,7 +2631,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt",
-      "sha256": "5cb0f6b61df1612b"
+      "sha256": "97141fea94ff82ac"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunState.kt",
@@ -3783,7 +3783,7 @@
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentInputQueue.kt",
-      "sha256": "3192ce6eb884acfc"
+      "sha256": "a1ddb374fd0e80c1"
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentRequestExecutor.kt",
@@ -3791,7 +3791,7 @@
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentRunOwnership.kt",
-      "sha256": "b8cf65da5c08220a"
+      "sha256": "ec220d04e3a2a7f4"
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentToolDispatch.kt",
@@ -3823,7 +3823,7 @@
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/jobs/JobInboxContract.kt",
-      "sha256": "92052d9da9800947"
+      "sha256": "3da5360e430a6df7"
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/plugin/PluginCatalog.kt",
@@ -4015,13 +4015,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "07f3c40bad06",
+  "source_snapshot": "051cd13284c4",
   "observed_delta": {
-    "baseline": "9199cb79522a",
+    "baseline": "923795b4816c",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
@@ -4030,8 +4030,8 @@
     "removed_ui": []
   },
   "tracked_legacy_identities": 117,
-  "unproven_feature_count": 18,
-  "followup_investigated_descriptions": 18,
+  "unproven_feature_count": 19,
+  "followup_investigated_descriptions": 19,
   "workflow_evidence_features": 14,
   "declared_unexecuted_test_methods": 5,
   "verified_registrations": [
@@ -4045,7 +4045,8 @@
     "ui.conversation.ports",
     "ui.document.inline_reply",
     "ui.document.local_builder",
-    "ui.scene.catalog"
+    "ui.scene.catalog",
+    "work.agent-team.member-collaboration"
   ],
   "unverified_changes_count": 6,
   "obsolete_historical_evidence_count": 20,

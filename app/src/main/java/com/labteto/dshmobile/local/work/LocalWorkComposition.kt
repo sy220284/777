@@ -90,6 +90,10 @@ internal class LocalWorkComposition @Inject constructor(
     private val subagentFactory by lazy {
         LocalSubagentRunnerFactory(
             modelGateway = modelGateway,
+            teamSchemas = { tools.schemas.teamMemberSchemas() },
+            executeTeamTool = { sessionId, jobId, call ->
+                AgentToolResult(agentTeams.executeMember(sessionId, jobId, call))
+            },
             jobs = runtimeStateStore.jobManager,
             modelHistory = runtimeStateStore.foregroundRunHandle.modelHistory,
             toolOutputStore = tools.toolOutputStore,
@@ -259,6 +263,9 @@ internal class LocalWorkComposition @Inject constructor(
             projectionRegistry = sessionStorage.projectionRegistry,
             projectionScope = scope,
             onProjectionReady = { sessionId -> teamLifecycle.projectionReady(sessionId) },
+            sendToLead = { sessionId, input ->
+                workRunRegistry.enqueueAgentMessage(sessionId, input, sessionStorage.eventLogs.get(sessionId))
+            },
         )
     }
     private val agentControlBuiltins by lazy {
