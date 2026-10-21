@@ -897,6 +897,25 @@
         }
       ],
       "scope": "生产调用链和具名测试源码存在；尚未合并，编译及运行结果以当前提交CI为准，真实服务和设备专项验收未完成"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 全目录发现与运行中变更感知（未合并）",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivation.kt",
+          "symbols": [
+            "discoverLocalWorkSkills"
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivationTest.kt",
+          "method": "catalogReportsTailAndRefreshesPinnedBodyAndDisabledMetadata",
+          "references": "discoverLocalWorkSkills"
+        }
+      ],
+      "scope": "源码与具名回归测试存在；尚未合并，运行结果以最新提交CI为准，不代表设备与真实服务验收。"
     }
   ]
 }

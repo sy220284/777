@@ -59,7 +59,7 @@
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt"
     }
   ],
-  "semantic_registration_count": 19,
+  "semantic_registration_count": 20,
   "production_file_fingerprints": [
     {
       "path": "app/src/main/java/com/github/sisong/HPatch.kt",
@@ -2471,7 +2471,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-      "sha256": "4740fb35b2ab3606"
+      "sha256": "70e787682abc5818"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkApprovalCoordinator.kt",
@@ -2707,7 +2707,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivation.kt",
-      "sha256": "49dbff9aa2af98ed"
+      "sha256": "228b1ac2505eceb2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkState.kt",
@@ -4071,18 +4071,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "6c092fe988f5",
+  "source_snapshot": "98352e6fdb14",
   "observed_delta": {
-    "baseline": "f3058068c497",
+    "baseline": "4d7dc6720e39",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalFactsProjection.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSemanticSummary.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphRecovery.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
@@ -4094,7 +4089,7 @@
   "unproven_feature_count": 19,
   "followup_investigated_descriptions": 19,
   "workflow_evidence_features": 14,
-  "declared_unexecuted_test_methods": 9,
+  "declared_unexecuted_test_methods": 10,
   "verified_registrations": [
     "automation.management-receipts",
     "settings.memory.management-query",
@@ -4104,6 +4099,7 @@
     "tools.mcp.oauth-login",
     "tools.media.paged-history",
     "tools.media.transactional-recovery",
+    "tools.skill.live-catalog",
     "ui.conversation.ports",
     "ui.document.inline_reply",
     "ui.document.local_builder",

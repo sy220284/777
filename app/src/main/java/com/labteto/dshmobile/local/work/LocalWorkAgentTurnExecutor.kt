@@ -305,6 +305,7 @@ internal class LocalWorkAgentTurnExecutor(
                 }
             }
 
+            var effectiveSkillInput = input
             val loop = AgentTurnEngine(
                 model = AgentModel {
                     agentRunCoordinator.ensureCurrentOwner(runContext)
@@ -364,6 +365,7 @@ internal class LocalWorkAgentTurnExecutor(
                             .firstOrNull { (it["role"] as? JsonPrimitive)?.contentOrNull == "user" }
                             ?.get("content")?.let { it as? JsonPrimitive }?.contentOrNull
                             ?.takeIf(String::isNotBlank) ?: input
+                        effectiveSkillInput = effectiveInput
                         workPromptContext = contextComposer.composeWorkTurnContext(
                             input = effectiveInput,
                             snapshot = snapshot,
@@ -374,6 +376,14 @@ internal class LocalWorkAgentTurnExecutor(
                             ),
                         )
                         projectedSteeringRevision = observedSteer
+                    }
+                    val skillGuidance = resolveLocalWorkSkillGuidance(
+                        sessionStorage.files.workspace, effectiveSkillInput,
+                        selectedInvocations = pinnedInvocations.current(),
+                    )
+                    if (skillGuidance != workPromptContext.skill) {
+                        // Replace this request's layer, never append catalog updates to history.
+                        workPromptContext = workPromptContext.copy(skill = skillGuidance)
                     }
                     val tools = modelToolStepSurface.capture(
                         runToolSurface.next(workTurnToolRuntime.schemas(runPolicy, binding)),

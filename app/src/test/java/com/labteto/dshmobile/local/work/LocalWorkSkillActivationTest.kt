@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.files.LocalSkillMetadata
+import org.junit.Assert.assertEquals
 import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
 import java.nio.file.Files
 import org.junit.Assert.assertFalse
@@ -109,7 +111,7 @@ class LocalWorkSkillActivationTest {
                 "---\ndescription: unrelated action\n---\nDifferent task")
             val context = resolveLocalWorkSkillGuidance(workspace, "请帮我整理预算")
             assertTrue(context.contains("budget-planner：budget planning"))
-            assertFalse(context.contains("other-task"))
+            assertTrue(context.contains("other-task：unrelated action"))
             assertFalse(context.contains("Produce a budget table."))
         } finally {
             root.deleteRecursively()
@@ -141,9 +143,106 @@ class LocalWorkSkillActivationTest {
             assertTrue(relevantSkillIdsForTask("请检查这个 PR").contains("code-review"))
             assertTrue(context.contains("适用：PR analysis"))
             assertFalse(context.contains("Inspect call chains."))
-            assertFalse(resolveLocalWorkSkillGuidance(workspace, "今天天气不错").contains("本地技能"))
+            assertTrue(resolveLocalWorkSkillGuidance(workspace, "今天天气不错").contains("本地技能目录"))
         } finally {
             root.deleteRecursively()
         }
     }
+
+    @Test fun rankedMetadataDiscoveryWorksForNewCustomSkillsAndMultipleTriggers() {
+        val catalog = listOf(
+            "finance-audit" to LocalSkillMetadata("finance-audit", "specialist checks", whenToUse = "审查账单，核实费用"),
+            "visual-design" to LocalSkillMetadata("visual-design", "illustration generation", whenToUse = "绘制图标"),
+        )
+        assertEquals(listOf("finance-audit", "visual-design"),
+            discoverLocalWorkSkills("请核实费用是否异常", emptySet(), catalog).map { it.first })
+    }
+
+    @Test fun userRequestedSkillPrecedesMetadataAndDisabledSkillsRemainUnavailable() {
+        val catalog = listOf(
+            "alpha" to LocalSkillMetadata("alpha", "technical analysis"),
+            "private" to LocalSkillMetadata("private", "technical analysis", modelInvocable = false),
+            "manual" to LocalSkillMetadata("manual", "another subject"),
+        )
+        assertEquals(listOf("manual", "alpha"),
+            discoverLocalWorkSkills("technical analysis", setOf("manual", "private"), catalog).map { it.first })
+    }
+
+    @Test fun discoveryOrderAndLimitAreDeterministic() {
+        val catalog = listOf(
+            "skill-z" to LocalSkillMetadata("skill-z", "budget planning"),
+            "skill-a" to LocalSkillMetadata("skill-a", "budget planning"),
+            "noise" to LocalSkillMetadata("noise", "unrelated action"),
+        )
+        assertEquals(listOf("skill-a", "skill-z", "noise"),
+            discoverLocalWorkSkills("Budget planning this quarter", emptySet(), catalog).map { it.first })
+        assertEquals(listOf("skill-a"),
+            discoverLocalWorkSkills("budget planning", emptySet(), catalog, 1).map { it.first })
+        assertEquals(listOf("noise", "skill-a", "skill-z"),
+            discoverLocalWorkSkills("No matching topic", emptySet(), catalog).map { it.first })
+    }
+
+    @Test fun twoLetterWhenToUseTagsMatchWholeWordsButNeverSubstrings() {
+        val catalog = listOf(
+            "pull-request-helper" to LocalSkillMetadata("pull-request-helper", "specialized help", whenToUse = "PR"),
+            "interface-helper" to LocalSkillMetadata("interface-helper", "specialized help", whenToUse = "UI"),
+        )
+        assertEquals(listOf("pull-request-helper", "interface-helper"),
+            discoverLocalWorkSkills("Please review this PR", emptySet(), catalog).map { it.first })
+        assertEquals(listOf("interface-helper", "pull-request-helper"),
+            discoverLocalWorkSkills("Improve the UI", emptySet(), catalog).map { it.first })
+        assertEquals(listOf("interface-helper", "pull-request-helper"),
+            discoverLocalWorkSkills("Prepare printable forms", emptySet(), catalog).map { it.first })
+    }
+    @Test fun sentencePrepositionsCannotDisplaceRelevantSkills() {
+        val unrelated = (1..8).map { index ->
+            "invoice-$index" to LocalSkillMetadata("invoice-$index", "specialist checks",
+                whenToUse = "Use this skill to audit invoices")
+        }
+        val catalog = unrelated + ("icon-art" to LocalSkillMetadata("icon-art", "draw icons"))
+        assertEquals("icon-art", discoverLocalWorkSkills(
+            "Help me to draw icons", emptySet(), catalog).first().first)
+        for (word in listOf("to", "in", "on", "of")) {
+            val sentence = listOf("invoice-check" to LocalSkillMetadata("invoice-check",
+                "specialist checks", whenToUse = "Use this skill $word audit invoices"))
+            assertEquals("icon-art", discoverLocalWorkSkills("Help me $word draw icons", emptySet(),
+                sentence + ("icon-art" to LocalSkillMetadata("icon-art", "draw icons"))).first().first)
+        }
+    }
+
+    @Test fun shortTagsInSentencesRemainDiscoverable() {
+        val catalog = listOf("interface-helper" to LocalSkillMetadata("interface-helper",
+            "specialist checks", whenToUse = "Use this skill to review ui layouts"))
+        assertEquals(listOf("interface-helper"), discoverLocalWorkSkills(
+            "Improve the UI", emptySet(), catalog).map { it.first })
+    }
+
+    @Test fun catalogReportsTailAndRefreshesPinnedBodyAndDisabledMetadata() {
+        val root = Files.createTempDirectory("live-skill-catalog").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            fun write(name: String, body: String, disabled: Boolean = false) = workspace.write(
+                ".dsh/skills/$name/SKILL.md",
+                "---\ndescription: $name guide\ndisable-model-invocation: $disabled\n---\n$body")
+            repeat(10) { write("item-$it", "instructions $it") }
+            val first = resolveLocalWorkSkillGuidance(workspace, "继续")
+            assertTrue(first.contains("共 10 项"))
+            assertTrue(first.contains("skill(offset=0)"))
+            assertTrue(first.contains("query"))
+            assertFalse(first.contains("instructions 9"))
+            write("new-helper", "first body")
+            val pinned = listOf(LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "new-helper"))
+            val before = resolveLocalWorkSkillGuidance(workspace, "继续", pinned)
+            write("new-helper", "edited body")
+            val after = resolveLocalWorkSkillGuidance(workspace, "继续", pinned)
+            assertTrue(before.contains("first body"))
+            assertTrue(after.contains("edited body"))
+            assertFalse(after.contains("first body"))
+            write("item-0", "private", disabled = true)
+            val disabled = resolveLocalWorkSkillGuidance(workspace, "继续")
+            assertFalse(disabled.contains("item-0："))
+            assertEquals(disabled, resolveLocalWorkSkillGuidance(workspace, "继续"))
+        } finally { root.deleteRecursively() }
+    }
+
 }

@@ -1,12 +1,12 @@
 {
   "version": 1,
   "type": "independent_code_first_static_audit",
-  "source_snapshot": "6c092fe988f5",
+  "source_snapshot": "98352e6fdb14",
   "tree": {
-    "nodes_excluding_root": 542,
-    "leaf_descriptions": 447,
+    "nodes_excluding_root": 543,
+    "leaf_descriptions": 448,
     "leaves_by_layer": {
-      "第一层｜产品功能与界面": 306,
+      "第一层｜产品功能与界面": 307,
       "第三层｜平台与工程保障": 38,
       "第二层｜共享运行能力": 103
     }
@@ -839,9 +839,9 @@
       "no_code_entry": 19,
       "test_and_named_code_declaration": 1,
       "test_method_mapping": 120,
-      "unexecuted_instrumentation": 9
+      "unexecuted_instrumentation": 10
     },
-    "concrete_static_source_or_test_or_job_evidence": 350,
+    "concrete_static_source_or_test_or_job_evidence": 351,
     "weak_file_only_evidence": 78,
     "no_confirmed_entry": 19,
     "pending_source_migration": 0,
@@ -3459,6 +3459,18 @@
       "unrun_instrumentation_tests": 0
     },
     {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 全目录发现与运行中变更感知（未合并）",
+      "layer": "第一层｜产品功能与界面",
+      "evidence_level": "unexecuted_instrumentation",
+      "static_identity": null,
+      "source_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivation.kt"
+      ],
+      "test_references": 0,
+      "workflow_job_count": 0,
+      "unrun_instrumentation_tests": 1
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 文件读取和内容检索",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "test_method_mapping",
@@ -5970,5 +5982,5 @@
       "unrun_instrumentation_tests": 0
     }
   ],
-  "interpretation": "447项是功能树末级描述，不是已验收的独立产品功能总数。路由、工具和页面数量口径不同不能相加。"
+  "interpretation": "448项是功能树末级描述，不是已验收的独立产品功能总数。路由、工具和页面数量口径不同不能相加。"
 }

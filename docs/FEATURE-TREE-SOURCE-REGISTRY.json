@@ -66,6 +66,14 @@
       "test": "app/src/androidTest/java/com/labteto/dshmobile/local/model/LocalMediaStoreAndroidTest.kt#receiptAndResultCommitTogetherAndLateWriterCannotResurrectDeletion"
     },
     {
+      "id": "tools.skill.live-catalog",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 全目录发现与运行中变更感知（未合并）",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivation.kt",
+      "entry": "discoverLocalWorkSkills",
+      "owner": "WORK",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivationTest.kt#catalogReportsTailAndRefreshesPinnedBodyAndDisabledMetadata"
+    },
+    {
       "id": "ui.conversation.ports",
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送、分支与交互端口（迁移中）",
       "source": "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
