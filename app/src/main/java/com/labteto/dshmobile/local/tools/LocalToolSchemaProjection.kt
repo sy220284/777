@@ -13,6 +13,14 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
+/**
+ * Narrow team-member tool surface is a shared contract rather than a Work implementation detail.
+ * Work may depend on this list; model-facing Tools must never depend on Work internals.
+ */
+internal object LocalTeamMemberToolContract {
+    val NAMES = setOf("team_send_message", "team_messages", "team_task_list", "team_task_get", "team_task_update")
+}
+
 /** Pure model-visible projection of the registered tool catalog. */
 internal class LocalToolSchemaProjection(
     private val registry: ToolRegistry,
@@ -20,7 +28,7 @@ internal class LocalToolSchemaProjection(
 ) {
     fun teamMemberSchemas(): JsonArray {
         val memberTools = registry.names()
-            .filter { it in com.labteto.dshmobile.local.work.LocalAgentTeamContract.MEMBER_TOOL_NAMES }
+            .filter { it in LocalTeamMemberToolContract.NAMES }
             .mapNotNull(registry::get)
         val selected = LocalToolRouter.selectSchemas(memberTools, memberTools.map { it.name }.toSet()).schemas
         return JsonArray(selected.map { raw ->

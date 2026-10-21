@@ -19,7 +19,7 @@ internal object LocalAgentTeamContract {
             TEAM_MESSAGE_DELIVERED,
             TEAM_MESSAGE_DISCARDED,
         )
-        val MEMBER_TOOL_NAMES = setOf("team_send_message", "team_messages", "team_task_list", "team_task_get", "team_task_update")
+        val MEMBER_TOOL_NAMES = com.labteto.dshmobile.local.tools.LocalTeamMemberToolContract.NAMES
         val TOOL_NAMES = setOf(
             "team_members",
             "team_member_status",
