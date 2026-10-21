@@ -180,4 +180,16 @@ class LocalWorkSkillActivationTest {
             discoverLocalWorkSkills("budget planning", emptySet(), catalog, 1).map { it.first })
         assertTrue(discoverLocalWorkSkills("No matching topic", emptySet(), catalog).isEmpty())
     }
+
+    @Test fun twoLetterWhenToUseTagsMatchWholeWordsButNeverSubstrings() {
+        val catalog = listOf(
+            "pull-request-helper" to LocalSkillMetadata("pull-request-helper", "specialized help", whenToUse = "PR"),
+            "interface-helper" to LocalSkillMetadata("interface-helper", "specialized help", whenToUse = "UI"),
+        )
+        assertEquals(listOf("pull-request-helper"),
+            discoverLocalWorkSkills("Please review this PR", emptySet(), catalog).map { it.first })
+        assertEquals(listOf("interface-helper"),
+            discoverLocalWorkSkills("Improve the UI", emptySet(), catalog).map { it.first })
+        assertTrue(discoverLocalWorkSkills("Prepare printable forms", emptySet(), catalog).isEmpty())
+    }
 }
