@@ -238,7 +238,7 @@ class LocalWorkOpenGraphProjectionTest {
             put("graph_id", "graph"); put("graph_execution_id", "run"); put("goal_id", "goal")
         })
         val original = file.readText()
-        file.appendText("not-valid-json\\n".replace("\\\\n", "\\n"))
+        file.appendText("not-valid-json\\n")
         val projection = LocalWorkOpenGraphProjection()
         org.junit.Assert.assertThrows(IllegalStateException::class.java) {
             projection.unresolved(log)
