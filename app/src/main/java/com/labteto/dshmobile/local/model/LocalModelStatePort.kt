@@ -13,7 +13,7 @@ internal data class LocalModelProjectionSnapshot(
 internal interface LocalModelStatePort {
     val value: LocalModelProjectionSnapshot
     suspend fun awaitReady()
-    fun commitConfiguration(configured: Boolean, model: String, baseUrl: String, profiles: List<LocalModelProfile>, activeProfileId: String?, error: String?)
+    fun commitConfiguration(configured: Boolean, model: String, baseUrl: String, profiles: List<LocalModelProfile>, activeProfileId: String?, error: String?, preferredSessionId: String? = null)
     fun selectForSession(sessionId: String, profile: LocalModelProfile)
     fun publishError(message: String)
 }
@@ -34,8 +34,10 @@ internal fun localModelStatePort(
         runtimeStateStore.state.first { state -> !state.loading }
     }
 
-    override fun commitConfiguration(configured: Boolean, model: String, baseUrl: String, profiles: List<LocalModelProfile>, activeProfileId: String?, error: String?) {
-        runtimeStateStore.projection.projectModelConfiguration(configured, model, baseUrl, profiles, activeProfileId, error)
+    override fun commitConfiguration(configured: Boolean, model: String, baseUrl: String, profiles: List<LocalModelProfile>, activeProfileId: String?, error: String?, preferredSessionId: String?) {
+        runtimeStateStore.projection.projectModelConfiguration(
+            configured, model, baseUrl, profiles, activeProfileId, error, preferredSessionId,
+        )
     }
 
     override fun selectForSession(sessionId: String, profile: LocalModelProfile) {
