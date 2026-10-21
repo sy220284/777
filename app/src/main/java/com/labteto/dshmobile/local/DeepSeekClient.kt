@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
 import com.labteto.dshmobile.local.model.ModelStreamLineReader
 import com.labteto.dshmobile.local.model.DeepSeekChatRequestPolicy
 import com.labteto.dshmobile.local.model.LocalModelStreamProgressMonitor
+import com.labteto.dshmobile.local.model.LocalModelStreamWatchdog
 import com.labteto.dshmobile.local.model.ModelStreamLimitException
 import com.labteto.dshmobile.local.model.ModelStreamLimitKind
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
@@ -251,8 +252,12 @@ class DeepSeekClient @Inject constructor(
             .header("Content-Type", "application/json")
             .post(payload.toString().toRequestBody(JSON_MEDIA).withModelAdmissionTracking(admissionTracker))
             .build()
+        // Official DeepSeek may wait ten minutes before first output. Keep transport reads
+        // alive while an independent monotonic watcher enforces the useful-progress limit.
+        val modelCall = (if (officialDeepSeek) modelHttp.newBuilder()
+            .readTimeout(12, TimeUnit.MINUTES).build() else modelHttp).newCall(request)
         try {
-            withCancellableModelResponse(modelHttp.newCall(request), admissionTracker) { response ->
+            withCancellableModelResponse(modelCall, admissionTracker) { response ->
                 if (!response.isSuccessful) {
                     val body = response.readModelBodyBounded()
                     val detail = providerErrorDetail(body, json)
@@ -295,6 +300,9 @@ class DeepSeekClient @Inject constructor(
                         if (officialDeepSeek) 11 else 8,
                     ),
                 )
+                val streamWatchdog = if (officialDeepSeek)
+                    LocalModelStreamWatchdog(usefulProgress, modelCall::cancel) else null
+                try {
                 // Response 统一由 withCancellableModelResponse 收尾，避免成功后 reader.close()
                 // 的连接异常覆盖已完成结果并触发重复请求。
                 val reader = ModelStreamLineReader(responseBody.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_MODEL_RESPONSE_BYTES)
@@ -313,7 +321,15 @@ class DeepSeekClient @Inject constructor(
                                 retryable = false,
                             )
                         } catch (failure: java.io.IOException) {
-                            if (!(content.isNotBlank())) throw failure
+                            if (streamWatchdog?.timedOut() == true && content.isBlank()) {
+                                throw modelPostAdmissionFailure(
+                                    code = "MODEL_STREAM_STALLED_AFTER_ADMISSION",
+                                    detail = "模型在规定时间内未生成有效进度",
+                                    requestId = requestId,
+                                    cause = failure,
+                                )
+                            }
+                            if (content.isBlank()) throw failure
                             null
                         } ?: break
                         if (usefulProgress.isStalled()) {
@@ -510,6 +526,9 @@ class DeepSeekClient @Inject constructor(
                     requestId = requestId,
                     promptBreakdown = promptBreakdown,
                 )
+                } finally {
+                    streamWatchdog?.close()
+                }
             }
         } catch (error: LocalModelException) {
             throw error

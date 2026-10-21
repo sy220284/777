@@ -16,12 +16,12 @@ internal class LocalModelStreamProgressMonitor(
         require(timeoutNanos > 0)
         require(startupTimeoutNanos >= timeoutNanos)
     }
-    private var lastProgressNanos = nanoTime()
-    private var startedGenerating = false
+    @Volatile private var lastProgressNanos = nanoTime()
+    @Volatile private var startedGenerating = false
 
     fun recordProgress() {
-        startedGenerating = true
         lastProgressNanos = nanoTime()
+        startedGenerating = true
     }
 
     // The provider may legally send keepalive comments for ten minutes before
