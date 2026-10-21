@@ -280,7 +280,9 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                             val filter = com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPreview()
                             filter::append
                         },
-                    persistOverflowHistory = true,
+                    // Regeneration already uses an isolated rebuilt history. Never compact
+                    // the cached (old-answer) history through overflow recovery.
+                    persistOverflowHistory = regenerationHistory == null,
                     requestLog = eventLog,
                     temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(
                         snapshot.modelState.model, snapshot.modelState.baseUrl,
