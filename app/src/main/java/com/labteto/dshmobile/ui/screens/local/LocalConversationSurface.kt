@@ -577,23 +577,24 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             } while (true)
         }
     }
-    val transcriptItems = remember(transcriptMessages, state.usageMode, state.sessionId,
-        generatedMedia, videoMediaTasks, pendingMediaJobs, workArtifacts, workToolActivities, state.running) {
-        val mediaTimeline = mergeLocalMediaTimeline(
-            buildLocalTranscript(
-                transcriptMessages,
-                includeWorkProcess = state.usageMode == LocalUsageMode.WORK,
-            ),
-            state.sessionId,
-            generatedMedia,
-            videoMediaTasks,
-            pendingMediaJobs,
-        )
-        val withActivities = if (state.usageMode == LocalUsageMode.WORK) appendPendingWorkToolActivities(
-            appendWorkArtifactsToTranscript(mediaTimeline, workArtifacts), workToolActivities, state.running,
-        ) else mediaTimeline
-        composeLocalReplyAttachments(withActivities)
+    // Cache each projection stage independently: an active tool tick must not parse the
+    // historical transcript or sort the entire media timeline again.
+    val baseTranscript = remember(transcriptMessages, state.usageMode) {
+        buildLocalTranscript(transcriptMessages, includeWorkProcess = state.usageMode == LocalUsageMode.WORK)
     }
+    val mediaTimeline = remember(baseTranscript, state.sessionId, generatedMedia, videoMediaTasks, pendingMediaJobs) {
+        mergeLocalMediaTimeline(baseTranscript, state.sessionId, generatedMedia, videoMediaTasks, pendingMediaJobs)
+    }
+    val withArtifacts = remember(mediaTimeline, state.usageMode, workArtifacts) {
+        if (state.usageMode == LocalUsageMode.WORK) appendWorkArtifactsToTranscript(mediaTimeline, workArtifacts)
+        else mediaTimeline
+    }
+    val withActivities = remember(withArtifacts, state.usageMode, workToolActivities, state.running) {
+        if (state.usageMode == LocalUsageMode.WORK)
+            appendPendingWorkToolActivities(withArtifacts, workToolActivities, state.running)
+        else withArtifacts
+    }
+    val transcriptItems = remember(withActivities) { composeLocalReplyAttachments(withActivities) }
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
     val loadingOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
