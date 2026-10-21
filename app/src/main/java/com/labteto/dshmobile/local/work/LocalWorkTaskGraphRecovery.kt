@@ -126,8 +126,16 @@ internal class LocalWorkOpenGraphProjection {
 
     // Retain only sequence/identity indices, never complete output, arguments or history.
     // Closed graph/Job evidence remains addressable without truncating durable facts.
-    private fun eventAt(log: LocalSessionEventLog, sequence: Long): LocalSessionEventLog.Event? =
-        log.pageAfter(sequence - 1L, 1).firstOrNull()?.takeIf { it.sequence == sequence }
+    private fun eventAt(log: LocalSessionEventLog, sequence: Long): LocalSessionEventLog.Event =
+        checkNotNull(log.pageAfter(sequence - 1L, 1).firstOrNull()?.takeIf { it.sequence == sequence }) {
+            "任务执行记录读取不完整，无法确认执行结果。"
+        }
+
+    private fun eventsAt(log: LocalSessionEventLog, type: String, sequences: Set<Long>): Map<Long, LocalSessionEventLog.Event> {
+        val events = log.latestMatchingByKey(setOf(type), sequences) { it.sequence }
+        check(events.keys == sequences) { "任务执行记录读取不完整，无法确认执行结果。" }
+        return events
+    }
 
     private fun List<Long>.after(sequence: Long): List<Long> {
         val found = binarySearch(sequence)
@@ -223,14 +231,14 @@ internal class LocalWorkOpenGraphProjection {
     fun acceptedFor(log: LocalSessionEventLog, execution: String): Pair<Map<String, JsonObject>, Map<Long, JsonObject>> {
         refresh(log)
         val indices = accepted[execution].orEmpty()
-        val events = log.latestMatchingByKey(setOf("taskgraph/node-accepted"), indices.values.toSet()) { it.sequence }
+        val events = eventsAt(log, "taskgraph/node-accepted", indices.values.toSet())
         val facts = indices.mapNotNull { (node, sequence) ->
             events[sequence]?.let { node to it.data }
         }.toMap()
         val resultSequences = facts.values.mapNotNull {
             (it["result_sequence"] as? JsonPrimitive)?.contentOrNull?.toLongOrNull()
         }.filter { jobResultsBySequence[it] == execution }.toSet()
-        val results = log.latestMatchingByKey(setOf("taskgraph/job-result"), resultSequences) { it.sequence }
+        val results = eventsAt(log, "taskgraph/job-result", resultSequences)
             .mapValues { it.value.data }
         return facts to results
     }
@@ -245,7 +253,7 @@ internal class LocalWorkOpenGraphProjection {
     fun nodeAdmissions(log: LocalSessionEventLog, execution: String, nodeId: String): List<JsonObject> {
         refresh(log)
         val sequences = admissions[execution to nodeId].orEmpty()
-        val events = log.latestMatchingByKey(setOf("taskgraph/job-admitted"), sequences.toSet()) { it.sequence }
+        val events = eventsAt(log, "taskgraph/job-admitted", sequences.toSet())
         return sequences.mapNotNull { events[it]?.data }
     }
 

@@ -210,4 +210,24 @@ class LocalWorkOpenGraphProjectionTest {
         log.close()
     }
 
+    @Test fun unreadableAdmissionIsNotReportedAsAnUnadmittedNode() {
+        val file = File(temporary.root, "missing-admission.jsonl")
+        val log = LocalSessionEventLog(file, Json)
+        val projection = LocalWorkOpenGraphProjection()
+        log.append("taskgraph/job-admitted", buildJsonObject {
+            put("graph_execution_id", "execution"); put("node_id", "node"); put("job_id", "job")
+        })
+        log.append("other-event", buildJsonObject { put("note", "preserve latest sequence") })
+        assertEquals(1, projection.nodeAdmissions(log, "execution", "node").size)
+        val original = file.readText()
+        file.writeText(original.lineSequence().filterNot { it.contains("taskgraph/job-admitted") }
+            .filter { it.isNotBlank() }.joinToString("\n", postfix = "\n"))
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+            projection.nodeAdmissions(log, "execution", "node")
+        }
+        file.writeText(original)
+        assertEquals(1, projection.nodeAdmissions(log, "execution", "node").size)
+        log.close()
+    }
+
 }
