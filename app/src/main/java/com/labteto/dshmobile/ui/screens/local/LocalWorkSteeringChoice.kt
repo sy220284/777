@@ -39,7 +39,9 @@ internal fun shouldShowWorkSteeringChoice(
 @Composable
 internal fun LocalWorkSteeringChoice(
     selected: Boolean,
+    showSteering: Boolean,
     onToggle: () -> Unit,
+    onSubmit: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val colors = LocalSyColors.current
@@ -49,20 +51,32 @@ internal fun LocalWorkSteeringChoice(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (showSteering) {
+                SyPill(
+                    text = stringResource(R.string.local_work_steer_now),
+                    selected = selected,
+                    onClick = onToggle,
+                )
+            }
             SyPill(
-                text = stringResource(R.string.local_work_steer_now),
-                selected = selected,
-                onClick = onToggle,
+                text = stringResource(
+                    if (selected && showSteering) R.string.local_work_submit_steer
+                    else R.string.local_work_submit_queue,
+                ),
+                selected = true,
+                onClick = onSubmit,
             )
-            SyIconButton(
-                icon = FeatherIcons.X,
-                contentDescription = stringResource(R.string.common_close),
-                onClick = onDismiss,
-                tint = colors.textSecondary,
-                iconSize = 18.dp,
-            )
+            if (showSteering) {
+                SyIconButton(
+                    icon = FeatherIcons.X,
+                    contentDescription = stringResource(R.string.common_close),
+                    onClick = onDismiss,
+                    tint = colors.textSecondary,
+                    iconSize = 18.dp,
+                )
+            }
         }
-        if (selected) {
+        if (selected && showSteering) {
             Text(
                 text = stringResource(R.string.local_work_steer_boundary),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),

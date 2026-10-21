@@ -103,14 +103,14 @@ internal fun LocalComposerCapabilityActions(
                 ),
                 onClick = { onSelectPanel(if (openPanel == "reasoning") null else "reasoning") },
                 enabled = !running,
-                tint = colors.text,
-                containerColor = Color.Transparent,
+                tint = colors.primaryPressed,
+                containerColor = colors.primary.copy(alpha = 0.18f),
             )
             if (showLabels) {
                 Text(
                     text = stringResource(composerReasoningLabel(reasoningMode, modes, basicReasoning)),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.textSecondary,
+                    color = colors.text,
                 )
             }
 
@@ -349,7 +349,7 @@ internal fun LocalComposerPlanAction(
         contentDescription = stringResource(R.string.local_composer_plan_title) + " · " + label,
         onClick = { pulse(); onToggle() },
         enabled = enabled && !waitingForApproval,
-        tint = if (selected) colors.primary else colors.textSecondary,
-        containerColor = if (selected) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
+        tint = colors.primaryPressed,
+        containerColor = colors.primary.copy(alpha = if (selected) 0.26f else 0.18f),
     )
 }

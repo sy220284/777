@@ -155,6 +155,8 @@
     <string name="local_queue_message">追加</string>
     <string name="local_work_next_turn">下轮追加</string>
     <string name="local_work_steer_now">立即调整</string>
+    <string name="local_work_submit_steer">提交调整</string>
+    <string name="local_work_submit_queue">加入队列</string>
     <string name="local_work_steer_boundary">只中断当前模型生成，不会撤销已执行操作</string>
     <string name="local_queue_message_count">追加 · 待处理 %1$d 条</string>
     <string name="local_queue_count">已排队 %1$d 条</string>
