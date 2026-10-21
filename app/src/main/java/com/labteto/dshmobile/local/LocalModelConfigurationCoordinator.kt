@@ -103,7 +103,19 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         val selected = if (selectFirst) all.firstOrNull {
             it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == accountId
         } else null
-        val previous = gateway.activeProfile()?.let { old -> all.firstOrNull { it.id == old.id } }
+        // An explicit plan selection must have a usable account, as the previous
+        // select() transaction required. Never publish an unauthorized route.
+        if (selected != null) require(gateway.hasCredential(selected)) { credentialError(selected) }
+        // Foreground gateway activation is session-scoped; the saved default is not.
+        // Background catalog refresh must not promote another session's route to default.
+        val storedModel = preferences.getString(
+            LocalModelConfigContract.KEY_MODEL, LocalModelConfigContract.DEFAULT_MODEL,
+        ) ?: LocalModelConfigContract.DEFAULT_MODEL
+        val storedBaseUrl = preferences.getString(
+            LocalModelConfigContract.KEY_BASE_URL, LocalModelConfigContract.DEFAULT_BASE_URL,
+        ) ?: LocalModelConfigContract.DEFAULT_BASE_URL
+        val previous = profiles.active(storedModel, storedBaseUrl, all)
+            ?.takeIf { gateway.hasCredential(it) }
         val active = selected ?: previous
         val result = configurationResult(all, active)
         persistConfiguration(all, active, onCommitted = { onCommitted(result) })
