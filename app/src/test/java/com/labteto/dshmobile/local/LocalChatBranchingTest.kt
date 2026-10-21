@@ -579,4 +579,24 @@ class LocalChatBranchingTest {
         }
     }
 
+    @Test
+    fun branchIndexAgreesWithLegacyForRepeatedIdsAcrossDifferentParentsAndRoles() {
+        val nodes = listOf(
+            LocalChatBranchNode(message("repeat", "user", "first", 1), parentId = null),
+            LocalChatBranchNode(message("single", "assistant", "reply", 2), parentId = "root"),
+            LocalChatBranchNode(message("repeat", "assistant", "later", 3), parentId = "root"),
+            LocalChatBranchNode(message("next", "assistant", "sibling", 4), parentId = "root"),
+            LocalChatBranchNode(message("other", "user", "other", 5), parentId = null),
+        )
+        val graph = LocalChatBranchState(nodes = nodes)
+        val indexed = chatBranchInfoIndex(graph)
+        nodes.forEach { node ->
+            assertEquals("first occurrence must win for ${node.message.id}",
+                chatBranchInfo(graph, node.message.id), indexed[node.message.id])
+        }
+        // The duplicate is first found in the root-user group, not the later assistant group.
+        assertEquals(0, indexed["repeat"]?.index)
+        assertEquals(2, indexed["repeat"]?.count)
+    }
+
 }
