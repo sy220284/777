@@ -128,10 +128,15 @@ internal class LocalWorkSubagentRuntime(
         executePlan(binding, graphId, execution, goal?.id.orEmpty(), plan)
     }
 
+    private val openGraphProjections = java.util.WeakHashMap<
+        com.labteto.dshmobile.local.session.LocalSessionEventLog, LocalWorkOpenGraphProjection>()
+
     private fun openGraphs(binding: LocalWorkRunBinding): List<LocalWorkTaskGraphRecoveryLedger.OpenGraph> {
-        val ledger = LocalWorkTaskGraphRecoveryLedger()
-        binding.eventLog.forEachAfter(-1L) { ledger.observe(it.type, it.data) }
-        return ledger.unresolved()
+        val log = binding.eventLog
+        val projection = synchronized(openGraphProjections) {
+            openGraphProjections.getOrPut(log) { LocalWorkOpenGraphProjection() }
+        }
+        return synchronized(projection) { projection.unresolved(log) }
     }
 
     /** Called inside the admitted root run, before its next model request, including Goal-less research. */

@@ -94,3 +94,24 @@ internal fun hasUnsettledWorkGoalTaskGraphs(
     }
     return ledger.unresolvedForGoal(goal.id).isNotEmpty()
 }
+
+/** A disposable, read-only incremental fold of the authoritative Session log. */
+internal class LocalWorkOpenGraphProjection {
+    private var generation = -1L
+    private var throughSequence = -1L
+    private var ledger = LocalWorkTaskGraphRecoveryLedger()
+
+    fun unresolved(log: LocalSessionEventLog): List<LocalWorkTaskGraphRecoveryLedger.OpenGraph> {
+        val latest = log.latestSequence()
+        if (generation != log.resetGeneration || latest < throughSequence) {
+            generation = log.resetGeneration
+            throughSequence = -1L
+            ledger = LocalWorkTaskGraphRecoveryLedger()
+        }
+        log.forEachAfter(throughSequence) { event ->
+            ledger.observe(event.type, event.data)
+            throughSequence = event.sequence
+        }
+        return ledger.unresolved()
+    }
+}
