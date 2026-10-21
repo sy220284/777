@@ -34,6 +34,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.net.SocketTimeoutException
+import java.util.concurrent.TimeUnit
 import java.security.GeneralSecurityException
 import java.security.KeyStore
 import java.security.MessageDigest
@@ -332,15 +334,18 @@ class HarnessWebhookService : Service() {
 
     private suspend fun handle(socket: Socket) {
         socket.use { client ->
+            // An absolute monotonic deadline also covers clients trickling individual header bytes.
+            val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(REQUEST_DEADLINE_MILLIS)
             val token = tokenStore.getOrCreate()
-            client.soTimeout = 10_000
-            val request = try { readHttpRequest(client) } catch (_: WebhookPayloadTooLarge) {
-                return respond(client, 413, """{"error":"payload too large"}""")
-            }
-                ?: return respond(client, 400, """{"error":"bad request"}""")
-            val method = request.method
-            val path = request.path
-            val headers = request.headers
+            val reader = WebhookHttpRequestReader(client, deadlineNanos)
+            val head = try {
+                reader.readHead(MAX_HEADER_BYTES)
+            } catch (_: SocketTimeoutException) {
+                return respond(client, 408, """{"error":"request timeout"}""")
+            } ?: return respond(client, 400, """{"error":"bad request"}""")
+            val method = head.method
+            val path = head.path
+            val headers = head.headers
 
             val provided = headers["authorization"]
                 ?.removePrefix("Bearer ")
@@ -370,7 +375,18 @@ class HarnessWebhookService : Service() {
             if (headers["transfer-encoding"]?.contains("chunked", ignoreCase = true) == true) {
                 return respond(client, 400, """{"error":"chunked encoding unsupported"}""")
             }
-            val prompt = parsePrompt(request.body.toString(Charsets.UTF_8), headers["content-type"])
+            // Authorization precedes body reading: unauthenticated clients cannot hold a body slot.
+            val length = try {
+                webhookBodyLength(headers["content-length"], MAX_BODY_BYTES)
+            } catch (_: WebhookPayloadTooLarge) {
+                return respond(client, 413, """{"error":"payload too large"}""")
+            } ?: return respond(client, 400, """{"error":"bad request"}""")
+            val body = try {
+                reader.readBody(length)
+            } catch (_: SocketTimeoutException) {
+                return respond(client, 408, """{"error":"request timeout"}""")
+            } ?: return respond(client, 400, """{"error":"bad request"}""")
+            val prompt = parsePrompt(body.toString(Charsets.UTF_8), headers["content-type"])
             if (prompt.isBlank()) return respond(client, 400, """{"error":"empty prompt"}""")
 
             if (!executionLimiter.tryAcquire()) {
@@ -433,64 +449,6 @@ class HarnessWebhookService : Service() {
         }
     }
 
-    private fun readHttpRequest(socket: Socket): HttpRequest? {
-        val input = socket.getInputStream()
-        val headerBytes = ArrayList<Byte>(512)
-        var state = 0
-        while (headerBytes.size < MAX_HEADER_BYTES) {
-            val value = input.read()
-            if (value < 0) return null
-            val byte = value.toByte()
-            headerBytes += byte
-            state = when {
-                state == 0 && value == '\r'.code -> 1
-                state == 1 && value == '\n'.code -> 2
-                state == 2 && value == '\r'.code -> 3
-                state == 3 && value == '\n'.code -> 4
-                value == '\r'.code -> 1
-                else -> 0
-            }
-            if (state == 4) break
-        }
-        if (state != 4) return null
-
-        val headerText = headerBytes.toByteArray().toString(Charsets.US_ASCII)
-        val lines = headerText.split("\r\n")
-        val requestLine = lines.firstOrNull()?.split(' ') ?: return null
-        if (requestLine.size < 2) return null
-        val headers = linkedMapOf<String, String>()
-        lines.drop(1).forEach { line ->
-            if (line.isBlank()) return@forEach
-            val index = line.indexOf(':')
-            if (index > 0) {
-                headers[line.substring(0, index).trim().lowercase()] =
-                    line.substring(index + 1).trim()
-            }
-        }
-
-        val length = webhookBodyLength(headers["content-length"], MAX_BODY_BYTES) ?: return null
-        val body = ByteArray(length)
-        var offset = 0
-        while (offset < length) {
-            val read = input.read(body, offset, length - offset)
-            if (read < 0) return null
-            offset += read
-        }
-        return HttpRequest(
-            method = requestLine[0].uppercase(),
-            path = requestLine[1],
-            headers = headers,
-            body = body,
-        )
-    }
-
-    private data class HttpRequest(
-        val method: String,
-        val path: String,
-        val headers: Map<String, String>,
-        val body: ByteArray,
-    )
-
     private fun parsePrompt(body: String, contentType: String?): String {
         if (contentType?.contains("application/json", ignoreCase = true) == true) {
             return runCatching {
@@ -507,6 +465,7 @@ class HarnessWebhookService : Service() {
             400 -> "Bad Request"
             401 -> "Unauthorized"
             404 -> "Not Found"
+            408 -> "Request Timeout"
             413 -> "Payload Too Large"
             429 -> "Too Many Requests"
             else -> "Error"
@@ -536,6 +495,7 @@ class HarnessWebhookService : Service() {
         private const val NOTIFICATION_ID = 7711
         private const val MAX_HEADER_BYTES = 16 * 1024
         private const val MAX_BODY_BYTES = 64 * 1024
+        private const val REQUEST_DEADLINE_MILLIS = 5_000L
         private const val MAX_PENDING_RUNS = 32
     }
 }

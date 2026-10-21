@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.harness.session
 
 import java.io.ByteArrayOutputStream
+import java.io.FileOutputStream
 import java.io.File
 import java.io.InputStream
 import java.io.RandomAccessFile
@@ -188,7 +189,11 @@ class SessionEventLog(
             rotateActiveSegment()
         }
         try {
-            file.appendText(encoded)
+            FileOutputStream(file, true).use { output ->
+                output.write(encoded.toByteArray(Charsets.UTF_8))
+                // Publish the append only after the authoritative event reaches storage.
+                output.fd.sync()
+            }
         } catch (error: Exception) {
             runCatching { repairTornActiveTailUnsafe() }
             throw error

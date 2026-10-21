@@ -79,6 +79,10 @@ internal class LocalSessionCoordinator(
                 .takeLast(runtimeWindowMessages)
             else -> stored.messages.takeLast(runtimeWindowMessages)
         }
+        val durableLatest = eventLog.latestSequence()
+        check(cursor <= durableLatest) {
+            "会话投影游标 $cursor 超出事件日志末尾 $durableLatest；拒绝静默跳过历史事件"
+        }
         val tailEvents = eventLog.snapshotAfter(cursor)
         val projected = projectSessionTranscriptTail(
             snapshotMessages = baseWindow,

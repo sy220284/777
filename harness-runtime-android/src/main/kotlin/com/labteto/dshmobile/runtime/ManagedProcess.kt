@@ -6,6 +6,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -66,6 +67,16 @@ class ManagedProcess private constructor(val process: Process, private val group
     }
 }
 
+/** Preserve surrogate pairs when bounding UTF-16 process output. */
+internal fun truncateProcessOutput(text: String, maxChars: Int): String {
+    val end = maxChars.coerceIn(0, text.length)
+    val safeEnd = if (
+        end > 0 && end < text.length &&
+        text[end - 1].isHighSurrogate() && text[end].isLowSurrogate()
+    ) end - 1 else end
+    return text.substring(0, safeEnd)
+}
+
 suspend fun executeManagedProcess(
     builder: ProcessBuilder,
     stdin: String? = null,
@@ -106,13 +117,14 @@ suspend fun executeManagedProcess(
                     val keep = minOf(count, (maxChars * 4 - output.size()).coerceAtLeast(0))
                     output.write(buffer, 0, keep)
                     if (keep < count) truncated = true
-                    if (keep > 0) progress?.invoke(output.toString("UTF-8").take(maxChars))
+                    if (keep > 0) progress?.invoke(truncateProcessOutput(output.toString("UTF-8"), maxChars))
                 }
                 val text = output.toString("UTF-8")
-                return text.take(maxChars) + if (truncated || text.length > maxChars) "\n[输出已截断]" else ""
+                return truncateProcessOutput(text, maxChars) + if (truncated || text.length > maxChars) "\n[输出已截断]" else ""
             }
             val stdout = async { capture(process.inputStream, onProgress) }
             val stderr = async { capture(process.errorStream, null) }
+            val stdinFailure = AtomicReference<Throwable?>(null)
             val writer = async {
                 runCatching {
                     runInterruptible {
@@ -125,7 +137,9 @@ suspend fun executeManagedProcess(
                 val code = if (progressResetsTimeout) {
                     // Guard stdin startup too: a blocked pipe must never stall this task forever.
                     val wrote = withTimeoutOrNull(effectiveTimeoutMillis) {
-                        writer.await().getOrThrow()
+                        writer.await().exceptionOrNull()?.let { failure ->
+                            if (!stdin.isNullOrEmpty()) stdinFailure.compareAndSet(null, failure)
+                        }
                         true
                     } ?: false
                     if (!wrote) null else {
@@ -145,13 +159,23 @@ suspend fun executeManagedProcess(
                     }
                 } else {
                     withTimeoutOrNull(effectiveTimeoutMillis) {
-                        writer.await().getOrThrow()
+                        writer.await().exceptionOrNull()?.let { failure ->
+                            if (!stdin.isNullOrEmpty()) stdinFailure.compareAndSet(null, failure)
+                        }
                         runInterruptible { process.waitFor() }
                     }
                 }
                 teardownStarted.set(true)
                 managed.terminate()
-                ProcessResult(code ?: -1, stdout.await(), stderr.await(), timedOut = code == null)
+                val failedStdin = stdinFailure.get() != null
+                val stderrText = stderr.await() + if (failedStdin) {
+                    "\n[STDIN_WRITE_FAILED] 子进程未完整接收输入；结果不可视为成功"
+                } else ""
+                val reportedCode = if (failedStdin && code == 0) -1 else code ?: -1
+                ProcessResult(
+                    reportedCode, stdout.await(), stderrText, timedOut = code == null,
+                    stdinWriteFailed = failedStdin,
+                )
             } finally {
                 // Must run BEFORE coroutineScope waits for blocked child IO on cancellation.
                 teardownStarted.set(true)
