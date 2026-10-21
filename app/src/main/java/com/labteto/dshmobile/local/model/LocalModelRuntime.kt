@@ -129,7 +129,7 @@ class LocalModelRuntime @Inject constructor(
             if (identityMutationLocked()) return@launch
             val before = state.value.modelState
             try {
-                configuration.remove(id, before.model, before.baseUrl, onCommitted = ::commit)
+                configuration.remove(id, before.model, before.baseUrl, onCommitted = { commit(it) })
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -165,7 +165,7 @@ class LocalModelRuntime @Inject constructor(
             }
             val before = state.value.modelState
             try {
-                configuration.clearActive(before.model, before.baseUrl, onCommitted = ::commit)
+                configuration.clearActive(before.model, before.baseUrl, onCommitted = { commit(it) })
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
