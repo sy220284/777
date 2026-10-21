@@ -184,17 +184,21 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             }
             // Style/deduplication references are model inputs too, not just history messages.
             val generationSnapshot = if (replacingMessageId == null) snapshot else snapshot.copy(
-                messages = snapshot.messages.filterNot { message ->
-                    message.id == replacingMessageId ||
-                        message.id == chatReasoningTranscriptId(replacingMessageId)
-                },
+                messages = chatRegenerationReferenceMessages(snapshot.messages, replacingMessageId),
             )
+            val supersededAnswerIds = replacingMessageId?.let { oldId ->
+                chatRegenerationPreviousAnswerIds(branchBase, oldId)
+            }.orEmpty()
 
             chatMemory.captureAutoMemoryDirective(
                 memoryInput,
                 sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
             )
-            val relationshipMemory = chatMemory.relationshipContext(input)
+            val relationshipMemory = chatMemory.relationshipContext(
+                query = input,
+                snapshot = generationSnapshot,
+                excludedAssistantMessageIds = supersededAnswerIds,
+            )
             val preparedChat = chatTurnCoordinator.prepare(
                 snapshot = generationSnapshot,
                 input = input,
