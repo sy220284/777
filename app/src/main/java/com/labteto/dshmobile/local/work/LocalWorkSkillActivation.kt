@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.files.LocalSkillMetadata
+import java.util.Locale
 import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
 
 /** Selected skill instructions are loaded once per model step and never persisted in history. */
@@ -63,28 +65,20 @@ internal fun resolveLocalWorkSkillGuidance(
     }
 
     val requested = relevantSkillIdsForTask(input)
-    val task = input.lowercase()
-    val lines = workspace.skills().asSequence().mapNotNull { name ->
-        val meta = try {
+    val installed = workspace.skills().mapNotNull { name ->
+        val metadata = try {
             workspace.skillMetadata(name)
         } catch (error: Exception) {
-            if (name in requested) {
-                throw IllegalArgumentException("任务所需技能 $name 无法读取，请检查技能文件后重试。", error)
-            }
+            if (name in requested) throw IllegalArgumentException(
+                "任务所需技能 $name 无法读取，请检查技能文件后重试。", error)
             return@mapNotNull null
         }
-        if (!meta.modelInvocable) return@mapNotNull null
-        val trigger = meta.whenToUse.orEmpty().trim()
-        val keywords = (meta.displayName.orEmpty() + " " + meta.description)
-            .split(Regex("[，、。；;\\s]+"))
-            .map(String::trim).filter { it.length >= 3 }
-        val customMatch = (trigger.length >= 2 && task.contains(trigger.lowercase())) ||
-            keywords.any { task.contains(it.lowercase()) }
-        if (name !in requested && !customMatch) return@mapNotNull null
-        val details = meta.whenToUse?.takeIf(String::isNotBlank)?.let { "；适用：$it" }.orEmpty()
-        name to "$name：${meta.description}$details"
-    }.sortedByDescending { (name, _) -> name in requested }
-        .take(8).map { it.second }.toList()
+        name to metadata
+    }
+    val lines = discoverLocalWorkSkills(input, requested, installed).map { (name, metadata) ->
+        val details = metadata.whenToUse?.takeIf(String::isNotBlank)?.let { "；适用：$it" }.orEmpty()
+        "$name：" + metadata.description + details
+    }
     if (lines.isEmpty()) return pinnedNote
     return """
         [与本轮任务相关的本地技能]
@@ -93,6 +87,46 @@ internal fun resolveLocalWorkSkillGuidance(
         [目录结束]
         $pinnedNote
     """.trimIndent()
+}
+
+/** Select dynamic SKILL.md metadata once; never eagerly load unselected instructions. */
+internal fun discoverLocalWorkSkills(
+    input: String,
+    requested: Set<String>,
+    installed: List<Pair<String, LocalSkillMetadata>>,
+    limit: Int = 8,
+): List<Pair<String, LocalSkillMetadata>> {
+    val task = input.lowercase(Locale.ROOT)
+    if (task.isBlank() || limit <= 0) return emptyList()
+    val delimiters = Regex("[，、。；;,|/\\s]+")
+    val ignored = setOf("with", "from", "into", "using", "about", "that", "this", "your", "the", "and", "for")
+    fun matches(term: String): Boolean {
+        val value = term.trim().lowercase(Locale.ROOT)
+        if (value.length < 2) return false
+        if (value.all { it in 'a'..'z' || it in '0'..'9' || it == '-' }) {
+            if (value.length < 3 || value in ignored) return false
+            return Regex("(?<![a-z0-9])" + Regex.escape(value) + "(?![a-z0-9])").containsMatchIn(task)
+        }
+        return task.contains(value)
+    }
+    fun score(name: String, metadata: LocalSkillMetadata): Int {
+        if (!metadata.modelInvocable) return 0
+        if (name in requested) return 1_000
+        val hints = metadata.whenToUse.orEmpty().split(delimiters).filter { it.length >= 2 }
+        val exactWhen = metadata.whenToUse?.trim().orEmpty()
+        val keywords = (metadata.displayName.orEmpty() + " " + metadata.description)
+            .split(delimiters).filter { it.length >= 3 }.distinct()
+        return (if (matches(exactWhen)) 70 else 0) +
+            hints.count(::matches).coerceAtMost(3) * 30 +
+            keywords.count(::matches).coerceAtMost(3) * 8
+    }
+    return installed.asSequence().distinctBy { it.first }
+        .map { (name, meta) -> Triple(name, meta, score(name, meta)) }
+        .filter { it.third > 0 }
+        .sortedWith(compareByDescending<Triple<String, LocalSkillMetadata, Int>> { it.third }
+            .thenBy { it.first })
+        .take(limit)
+        .map { it.first to it.second }.toList()
 }
 
 /** Narrow intent routing prevents unrelated skills from entering every work request. */

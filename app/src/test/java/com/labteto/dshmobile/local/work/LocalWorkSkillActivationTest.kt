@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.files.LocalSkillMetadata
+import org.junit.Assert.assertEquals
 import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
 import java.nio.file.Files
 import org.junit.Assert.assertFalse
@@ -145,5 +147,37 @@ class LocalWorkSkillActivationTest {
         } finally {
             root.deleteRecursively()
         }
+    }
+
+    @Test fun rankedMetadataDiscoveryWorksForNewCustomSkillsAndMultipleTriggers() {
+        val catalog = listOf(
+            "finance-audit" to LocalSkillMetadata("finance-audit", "specialist checks", whenToUse = "审查账单，核实费用"),
+            "visual-design" to LocalSkillMetadata("visual-design", "illustration generation", whenToUse = "绘制图标"),
+        )
+        assertEquals(listOf("finance-audit"),
+            discoverLocalWorkSkills("请核实费用是否异常", emptySet(), catalog).map { it.first })
+    }
+
+    @Test fun userRequestedSkillPrecedesMetadataAndDisabledSkillsRemainUnavailable() {
+        val catalog = listOf(
+            "alpha" to LocalSkillMetadata("alpha", "technical analysis"),
+            "private" to LocalSkillMetadata("private", "technical analysis", modelInvocable = false),
+            "manual" to LocalSkillMetadata("manual", "another subject"),
+        )
+        assertEquals(listOf("manual", "alpha"),
+            discoverLocalWorkSkills("technical analysis", setOf("manual", "private"), catalog).map { it.first })
+    }
+
+    @Test fun discoveryOrderAndLimitAreDeterministic() {
+        val catalog = listOf(
+            "skill-z" to LocalSkillMetadata("skill-z", "budget planning"),
+            "skill-a" to LocalSkillMetadata("skill-a", "budget planning"),
+            "noise" to LocalSkillMetadata("noise", "unrelated action"),
+        )
+        assertEquals(listOf("skill-a", "skill-z"),
+            discoverLocalWorkSkills("Budget planning this quarter", emptySet(), catalog).map { it.first })
+        assertEquals(listOf("skill-a"),
+            discoverLocalWorkSkills("budget planning", emptySet(), catalog, 1).map { it.first })
+        assertTrue(discoverLocalWorkSkills("No matching topic", emptySet(), catalog).isEmpty())
     }
 }
