@@ -231,17 +231,20 @@ class LocalWorkOpenGraphProjectionTest {
     }
 
 
-    @Test fun malformedEventTailCannotBeMisreportedAsAClosedGraph() {
+    @Test fun corruptMidstreamFactMustNotBeSkippedAsSafeOnColdRecovery() {
         val file = File(temporary.root, "malformed-recovery.jsonl")
         val log = LocalSessionEventLog(file, Json)
         log.append("taskgraph/start", buildJsonObject {
             put("graph_id", "graph"); put("graph_execution_id", "run"); put("goal_id", "goal")
         })
+        log.append("other-event", buildJsonObject { put("note", "valid durable tail") })
         val original = file.readText()
         log.close()
-        // An out-of-band mutation cannot change the already-open append-only log's
-        // sequence cursor. Cold recovery must reject the corrupt durable archive.
-        file.appendText("not-valid-json\\n")
+        // A torn final line can be truncated safely by Session recovery, whereas
+        // an invalid row between two committed sequences must never be skipped.
+        val rows = original.lineSequence().filter(String::isNotBlank).toList()
+        assertEquals(2, rows.size)
+        file.writeText(rows.first() + "\nnot-valid-json\n" + rows.last() + "\n")
         val brokenLog = LocalSessionEventLog(file, Json)
         org.junit.Assert.assertThrows(IllegalStateException::class.java) {
             LocalWorkOpenGraphProjection().unresolved(brokenLog)
@@ -249,7 +252,8 @@ class LocalWorkOpenGraphProjectionTest {
         brokenLog.close()
         file.writeText(original)
         val repairedLog = LocalSessionEventLog(file, Json)
-        assertEquals(listOf("graph"), LocalWorkOpenGraphProjection().unresolved(repairedLog).map { it.graphId })
+        assertEquals(listOf("graph"),
+            LocalWorkOpenGraphProjection().unresolved(repairedLog).map { it.graphId })
         repairedLog.close()
     }
 }
