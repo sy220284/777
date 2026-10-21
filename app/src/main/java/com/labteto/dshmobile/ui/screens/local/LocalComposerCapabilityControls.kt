@@ -103,14 +103,17 @@ internal fun LocalComposerCapabilityActions(
                 ),
                 onClick = { onSelectPanel(if (openPanel == "reasoning") null else "reasoning") },
                 enabled = !running,
-                tint = colors.text,
-                containerColor = Color.Transparent,
+                iconSize = 20.dp,
+                tint = colors.primary,
+                disabledTint = colors.primary.copy(alpha = 0.72f),
+                containerColor = colors.primary.copy(alpha = 0.14f),
+                disabledContainerColor = colors.primary.copy(alpha = 0.09f),
             )
             if (showLabels) {
                 Text(
                     text = stringResource(composerReasoningLabel(reasoningMode, modes, basicReasoning)),
                     style = DsType.caption11.withReadingWeight(),
-                    color = colors.textSecondary,
+                    color = colors.text,
                 )
             }
 
@@ -342,14 +345,19 @@ internal fun LocalComposerPlanAction(
         },
     )
     SyComposerAction(
-        icon = FeatherIcons.List,
+        icon = FeatherIcons.CheckSquare,
+        iconSize = 20.dp,
         modifier = Modifier
             .testTag("local-composer-plan-toggle")
             .semantics { stateDescription = label },
         contentDescription = stringResource(R.string.local_composer_plan_title) + " · " + label,
         onClick = { pulse(); onToggle() },
         enabled = enabled && !waitingForApproval,
-        tint = if (selected) colors.primary else colors.textSecondary,
-        containerColor = if (selected) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
+        tint = if (selected) colors.primary else colors.text,
+        disabledTint = if (selected) colors.primary.copy(alpha = 0.72f)
+            else colors.text.copy(alpha = 0.72f),
+        containerColor = if (selected) colors.primary.copy(alpha = 0.17f) else colors.selected,
+        disabledContainerColor = if (selected) colors.primary.copy(alpha = 0.10f)
+            else colors.selected.copy(alpha = 0.70f),
     )
 }

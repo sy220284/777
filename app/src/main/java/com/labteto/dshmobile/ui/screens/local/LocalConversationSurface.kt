@@ -929,12 +929,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             }
         }
 
-        Row(Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
-            horizontalArrangement = Arrangement.End) {
-            SyButton(text = "交互文档", onClick = onOpenNativeDocuments,
-                variant = SyButtonVariant.Ghost, size = SyButtonSize.Small,
-                enabled = state.sessionId.isNotBlank() && !state.loading)
-        }
         LocalModeIntroBanner(modeIntro)
 
         if (state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {

@@ -2,6 +2,12 @@ package com.labteto.dshmobile.ui.screens.local
 
 
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertIsDisplayed
@@ -28,6 +34,72 @@ import org.junit.Test
 class LocalConversationComposerRegressionTest {
     @get:Rule val compose = createComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Test
+    fun workComposerHasOnlyOnePrimaryButtonAcrossRunTransition() {
+        verifySinglePrimaryAction(LocalUsageMode.WORK)
+    }
+
+    @Test
+    fun chatComposerHasOnlyOnePrimaryButtonAcrossRunTransition() {
+        verifySinglePrimaryAction(LocalUsageMode.CHAT)
+    }
+
+    private fun verifySinglePrimaryAction(mode: LocalUsageMode) {
+        var running by mutableStateOf(false)
+        var sendCount = 0
+        var stopCount = 0
+        val sendLabel = context.getString(R.string.chat_composer_send)
+        val stopLabel = context.getString(R.string.chat_composer_stop)
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = running,
+                        running = running,
+                        configured = true,
+                        sessionId = "single-action-${mode.name}",
+                        usageMode = mode,
+                    ),
+                    activeModelProfile = null,
+                    input = "保留的草稿",
+                    attachments = emptyList(),
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = {},
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onSend = { _, _ ->
+                        sendCount++
+                        LocalSendResult.Empty
+                    },
+                    onStop = { stopCount++ },
+                    onPlanModeChange = {},
+                )
+            }
+        }
+
+        compose.onAllNodesWithContentDescription(sendLabel).assertCountEquals(1)
+        compose.onAllNodesWithContentDescription(stopLabel).assertCountEquals(0)
+        compose.onNodeWithContentDescription(sendLabel).performClick()
+        compose.runOnIdle { assertEquals(1, sendCount); running = true }
+        compose.waitForIdle()
+
+        // No second queue/send action while a Work run remains active.
+        compose.onAllNodesWithContentDescription(stopLabel).assertCountEquals(1)
+        compose.onAllNodesWithContentDescription(sendLabel).assertCountEquals(0)
+        compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).assertTextContains("保留的草稿")
+        compose.onNodeWithContentDescription(stopLabel).performClick()
+        compose.runOnIdle {
+            assertEquals(1, stopCount)
+            assertEquals(1, sendCount)
+            running = false
+        }
+        compose.waitForIdle()
+        compose.onAllNodesWithContentDescription(sendLabel).assertCountEquals(1)
+        compose.onAllNodesWithContentDescription(stopLabel).assertCountEquals(0)
+    }
 
     @Test
     fun plusButtonOpensAttachmentPickerDirectly() {

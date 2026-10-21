@@ -247,36 +247,24 @@ internal fun LocalConversationComposer(
         )
     }
 
+    // One primary action: send before a run, stop while it is active.
+    // Drafts entered during an active Work run remain editable without a second queue button.
     @Composable
-    fun SendControl(queue: Boolean = false) {
+    fun PrimaryControl() {
+        val running = state.running
         SyComposerAction(
             icon = null,
-            iconPainter = painterResource(R.drawable.ic_ui_button_send_glyph),
+            iconPainter = painterResource(
+                if (running) R.drawable.ic_ui_button_stop_glyph
+                else R.drawable.ic_ui_button_send_glyph,
+            ),
             iconSize = 32.dp,
-            tint = if (canSend) colors.onPrimary else colors.text,
-            contentDescription = if (queue && state.queuedInputCount > 0) {
-                stringResource(R.string.local_queue_message_count, state.queuedInputCount)
-            } else if (queue) {
-                stringResource(R.string.local_queue_message)
-            } else {
-                stringResource(R.string.chat_composer_send)
-            },
-            onClick = ::submit,
-            enabled = canSend,
-            containerColor = colors.primary,
-            visualSize = 32.dp,
-        )
-    }
-
-    @Composable
-    fun StopControl() {
-        SyComposerAction(
-            icon = null,
-            iconPainter = painterResource(R.drawable.ic_ui_button_stop_glyph),
-            iconSize = 32.dp,
-            tint = colors.onPrimary,
-            contentDescription = stringResource(R.string.chat_composer_stop),
-            onClick = onStop,
+            tint = if (running || canSend) colors.onPrimary else colors.text,
+            contentDescription = stringResource(
+                if (running) R.string.chat_composer_stop else R.string.chat_composer_send,
+            ),
+            onClick = if (running) onStop else ::submit,
+            enabled = running || canSend,
             containerColor = colors.primary,
             visualSize = 32.dp,
         )
@@ -415,13 +403,12 @@ internal fun LocalConversationComposer(
                 enter = expandHorizontally(composerRevealSpec) + fadeIn(composerFadeSpec),
                 exit = shrinkHorizontally(composerRevealSpec) + fadeOut(composerFadeSpec),
             ) {
-                if (state.running) StopControl() else SendControl()
+                PrimaryControl()
             }
         }
 
         LocalConversationComposerExpandedRow(
             visible = expanded,
-            state = state,
             menuControl = { AttachmentControl() },
             replySuggestionsControl = { ReplySuggestionsControl() },
             planControl = {
@@ -455,8 +442,7 @@ internal fun LocalConversationComposer(
                     onReasoningModeChange = { if (!state.running) onReasoningModeChange(it) },
                 )
             },
-            stopControl = { StopControl() },
-            sendControl = { queue -> SendControl(queue) },
+            primaryControl = { PrimaryControl() },
         )
     }
 }
