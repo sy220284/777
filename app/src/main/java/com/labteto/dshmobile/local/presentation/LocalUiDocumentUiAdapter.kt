@@ -79,13 +79,12 @@ internal class LocalUiDocumentUiAdapter(
     private data class Context(val identity: UiSessionIdentity?, val workMode: Boolean, val messages: Set<String>,
         val phase: UiExecutionPhase, val queued: Int, val approvalTool: String?, val error: String?)
     private val contexts = state.state.map { synchronized(state.foregroundRunHandle.lock) {
-        val snapshot = state.state.value
-        val workMode = snapshot.usageMode == LocalUsageMode.WORK
-        val chat = conversations.chat.snapshot()
-        val work = conversations.work.snapshot()
-        Context(state.uiBindingIdentity(snapshot), workMode, snapshot.messages.map { it.id }.toSet(),
-            if (workMode) work.phase else chat.phase, if (workMode) work.queuedInputCount else chat.queuedInputCount,
-            work.approval?.toolName.takeIf { workMode }, if (workMode) work.error else chat.error)
+        val current = state.state.value
+        val facts = conversations.documentFactsSnapshot()
+        // Only document facts and visible message IDs are required. Do not project
+        // every chat/work message when a status or approval field changes.
+        Context(facts.identity, facts.workMode, current.messages.map { it.id }.toSet(),
+            facts.phase, facts.queuedInputCount, facts.approval?.toolName, facts.error)
     } }.distinctUntilChanged()
     override val snapshots: StateFlow<UiDocumentsSceneSnapshot> = combine(contexts, store.revision, generation.generating) { context, _, busy ->
         try {
@@ -106,7 +105,7 @@ internal class LocalUiDocumentUiAdapter(
                 UiDocumentSnapshot(document, record.provenance, document.actions.associate { action ->
                     val reason = when {
                         !current -> UiCommandRejection.STALE_IDENTITY
-                        action is UiDocumentAction.AnswerApproval && conversations.work.snapshot().approval?.pendingId != action.pendingId -> UiCommandRejection.APPROVAL_EXPIRED
+                        action is UiDocumentAction.AnswerApproval && conversations.documentFactsSnapshot().approval?.pendingId != action.pendingId -> UiCommandRejection.APPROVAL_EXPIRED
                         action is UiDocumentAction.OpenKnownScene && action.sceneId !in navigationScenes -> UiCommandRejection.UNSUPPORTED
                         else -> null
                     }
@@ -167,7 +166,7 @@ internal class LocalUiDocumentUiAdapter(
                         UiDocumentSource(command.identity.sessionId, message.id, command.identity.contextGeneration,
                             command.identity.profileId, command.identity.projectId, command.workMode),
                         message.content,
-                        conversations.work.snapshot().approval.takeIf { command.workMode },
+                        conversations.documentFactsSnapshot().approval.takeIf { command.workMode },
                     )
                 }
                 val data = when (command.template) {
@@ -187,16 +186,14 @@ internal class LocalUiDocumentUiAdapter(
                         )
                     }
                     com.labteto.dshmobile.uicontract.UiLocalDocumentTemplate.FACTS_TABLE -> {
-                        val chatSnapshot = conversations.chat.snapshot()
-                        val workSnapshot = conversations.work.snapshot()
-                        val active = if (command.workMode) workSnapshot else null
+                        val facts = conversations.documentFactsSnapshot()
                         com.labteto.dshmobile.uicontract.UiLocalDocumentData.TableData(
                             title = "会话事实（制作时快照）",
                             headers = listOf("字段", "Owner 读取值"),
                             rows = listOf(
-                                listOf("会话状态", (active?.status ?: chatSnapshot.status).name),
-                                listOf("执行阶段", (active?.phase ?: chatSnapshot.phase).name),
-                                listOf("排队输入", (active?.queuedInputCount ?: chatSnapshot.queuedInputCount).toString()),
+                                listOf("会话状态", facts.status.name),
+                                listOf("执行阶段", facts.phase.name),
+                                listOf("排队输入", facts.queuedInputCount.toString()),
                             ),
                         )
                     }
