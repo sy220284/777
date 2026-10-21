@@ -13,12 +13,6 @@ internal data class LocalTranscriptHistoryLoadResult(
     val loadedRawMessages: Int = 0,
 )
 
-/**
- * Reads event-backed transcript pages until a foreground-visible dialogue target is satisfied.
- *
- * Raw runtime/history paging remains bounded by [LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES]. This
- * loader only decides how many bounded pages are needed to satisfy the separate foreground quota.
- */
 /** Narrow, cancellable history source for deterministic navigation ordering tests. */
 internal interface LocalTranscriptHistoryPageSource {
     suspend fun bootstrap(sessionId: String): LocalTranscriptHistoryLoadResult?
@@ -29,6 +23,7 @@ internal interface LocalTranscriptHistoryPageSource {
     ): LocalTranscriptHistoryLoadResult?
 }
 
+/** Bounded Session Event paging and foreground-visible transcript projection. */
 internal class LocalTranscriptHistoryLoader(
     private val session: LocalSessionUiFacade,
     private val currentSessionId: () -> String,
@@ -66,7 +61,7 @@ internal class LocalTranscriptHistoryLoader(
             loadedRawMessages < LOCAL_TRANSCRIPT_HISTORY_MAX_RAW_MESSAGES_PER_LOAD
         )
 
-        return LocalTranscriptHistoryLoadResult(
+        LocalTranscriptHistoryLoadResult(
             olderMessages = olderMessages,
             nextCursor = nextCursor,
             loadedRawMessages = loadedRawMessages,
@@ -115,7 +110,7 @@ internal class LocalTranscriptHistoryLoader(
             loadedRawMessages < LOCAL_TRANSCRIPT_HISTORY_MAX_RAW_MESSAGES_PER_LOAD
         )
 
-        return LocalTranscriptHistoryLoadResult(
+        LocalTranscriptHistoryLoadResult(
             olderMessages = accumulated,
             nextCursor = nextCursor,
             loadedRawMessages = loadedRawMessages,
