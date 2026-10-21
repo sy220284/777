@@ -344,7 +344,8 @@ internal fun LocalComposerPlanAction(
         },
     )
     SyComposerAction(
-        icon = FeatherIcons.List,
+        icon = if (selected) FeatherIcons.CheckSquare else FeatherIcons.List,
+        iconSize = 20.dp,
         modifier = Modifier
             .testTag("local-composer-plan-toggle")
             .semantics { stateDescription = label },
