@@ -411,15 +411,22 @@ internal fun hasChatBranchAlternatives(state: LocalChatBranchState): Boolean =
         .values
         .any { siblings -> siblings.groupBy { it.message.role }.values.any { it.size > 1 } }
 
-/** Build branch badges once for a rendered transcript instead of scanning all siblings per row. */
+/** Build branch badges in one pass per node, preserving legacy first-ID semantics. */
 internal fun chatBranchInfoIndex(state: LocalChatBranchState): Map<String, LocalChatBranchInfo> {
     if (state.nodes.isEmpty()) return emptyMap()
-    val siblings = state.nodes.groupBy { it.parentId to it.message.role }
+    val groupSizes = state.nodes.groupingBy { it.parentId to it.message.role }.eachCount()
+    val groupPositions = HashMap<Pair<String?, String>, Int>()
+    val seenIds = HashSet<String>()
     val index = HashMap<String, LocalChatBranchInfo>()
-    siblings.values.forEach { group ->
-        if (group.size > 1) group.forEachIndexed { position, node ->
-            // The legacy lookup always selected the first occurrence of a message ID.
-            index.putIfAbsent(node.message.id, LocalChatBranchInfo(position, group.size))
+    state.nodes.forEach { node ->
+        val key = node.parentId to node.message.role
+        val position = groupPositions[key] ?: 0
+        groupPositions[key] = position + 1
+        // If a malformed legacy graph repeats an ID, the original lookup resolves
+        // the *first node in transcript order*, even when that group has no siblings.
+        if (seenIds.add(node.message.id)) {
+            val count = groupSizes.getValue(key)
+            if (count > 1) index[node.message.id] = LocalChatBranchInfo(position, count)
         }
     }
     return index
