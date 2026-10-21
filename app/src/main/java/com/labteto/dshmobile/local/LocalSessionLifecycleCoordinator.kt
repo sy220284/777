@@ -257,7 +257,8 @@ internal class LocalSessionLifecycleCoordinator(
             return
         }
         navigationInbox.offer(LocalSessionNavigationRequest.ChatDomain(command))
-        continueQueuedNavigation()
+        // Admission may read an older session snapshot; never do that disk work on the tap thread.
+        scope.launch { continueQueuedNavigation() }
     }
 
     private fun startChatDomainModeSwitch(command: LocalSessionDomainModeCommand): Boolean {
@@ -294,7 +295,8 @@ internal class LocalSessionLifecycleCoordinator(
 
     fun switchUsageMode(mode: LocalUsageMode) {
         navigationInbox.offer(LocalSessionNavigationRequest.Mode(mode))
-        continueQueuedNavigation()
+        // Resolve the latest destination on Session's IO owner, not Compose's main thread.
+        scope.launch { continueQueuedNavigation() }
     }
 
     private fun startUsageModeSwitch(mode: LocalUsageMode): Boolean {
@@ -338,7 +340,7 @@ internal class LocalSessionLifecycleCoordinator(
         // before the UI summary index has refreshed.
         if (sessionId != currentSessionId() && !isKnownSession(sessionId)) return false
         navigationInbox.offer(LocalSessionNavigationRequest.Session(sessionId))
-        continueQueuedNavigation()
+        scope.launch { continueQueuedNavigation() }
         return true
     }
 
