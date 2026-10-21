@@ -2106,6 +2106,7 @@
     <string name="media_studio_open_temporary_link">打开临时链接</string>
     <string name="media_studio_result_missing">本机文件已不存在</string>
     <string name="media_studio_delete_record">删除</string>
+    <string name="media_chat_delete_failed">删除失败，请重试</string>
     <string name="media_studio_confirm_delete">确定删除这项成果？本机文件会一并删除。</string>
     <string name="media_studio_delete_confirm">确认删除</string>
     <string name="media_studio_delete_cancel">取消</string>
