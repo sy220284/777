@@ -24,6 +24,8 @@ class McpBearerTransportTest {
     fun bearerIsAttachedToAllMcpDiscoveryRequestsWithoutEnteringToolArguments() = runBlocking {
         val seen = mutableListOf<Pair<String, String?>>()
         val token = "secret-only-for-this-origin"
+        // A local response stub also verifies interceptor ordering: auth runs before
+        // an existing caller-provided interceptor that can short-circuit the network.
         val http = OkHttpClient.Builder().addInterceptor { chain ->
             val request = chain.request()
             val json = Buffer().also { request.body?.writeTo(it) }.readUtf8()

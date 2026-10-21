@@ -29,6 +29,8 @@ class LocalMcpCredentialStoreAndroidTest {
                 store.forEndpoint(id, "https://mcp.example.com/v1/mcp"))
             assertNull(store.forEndpoint(id, "https://another.example.com/v1/mcp"))
             assertNull(store.forEndpoint(id, "https://mcp.example.com:8443/v1/mcp"))
+            assertNull(store.forEndpoint(id, "https://mcp.example.com/another/mcp"))
+            assertNull(store.forEndpoint(id, "https://mcp.example.com/v1/mcp?tenant=other"))
             val persisted = preferences.data.first().asMap().values.joinToString(",")
             assertFalse(persisted.contains("confidential-bearer-123"))
             store.clear(id)

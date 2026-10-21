@@ -45,6 +45,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 
 /** Accepted transport results remain lossless until the app's durable output store projects them. */
@@ -141,14 +142,17 @@ class McpToolBridgePlugin(
             "远程 MCP Bearer 认证仅允许 HTTPS"
         }
         val expectedPort = if (uri.port >= 0) uri.port else if (scheme == "https") 443 else 80
-        val authenticated = http.newBuilder().followRedirects(false).followSslRedirects(false)
-            .addInterceptor { chain ->
-                val target = chain.request().url
-                require(target.scheme == scheme && target.host.equals(host, true) &&
-                    target.port == expectedPort) { "MCP 认证请求偏离已授权服务地址" }
-                chain.proceed(chain.request().newBuilder()
-                    .header("Authorization", "Bearer $bearer").build())
-            }.build()
+        val builder = http.newBuilder().followRedirects(false).followSslRedirects(false)
+        // Run before caller-provided interceptors, which may implement mock transports
+        // or additional request routing. Never expose an unauthenticated first hop.
+        builder.interceptors().add(0, Interceptor { chain ->
+            val target = chain.request().url
+            require(target.scheme == scheme && target.host.equals(host, true) &&
+                target.port == expectedPort) { "MCP 认证请求偏离已授权服务地址" }
+            chain.proceed(chain.request().newBuilder()
+                .header("Authorization", "Bearer $bearer").build())
+        })
+        val authenticated = builder.build()
         McpNegotiatingHttpTransport(endpoint, authenticated, json)
     },
     private val stdioTransportFactory: (List<String>, File?) -> McpTransport = { command, workingDirectory ->
