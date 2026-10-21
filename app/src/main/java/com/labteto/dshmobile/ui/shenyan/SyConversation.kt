@@ -161,12 +161,12 @@ fun SyComposerAction(
     enabled: Boolean = true,
     tint: Color = LocalSyColors.current.textSecondary,
     containerColor: Color = Color.Transparent,
-    disabledTint: Color = LocalSyColors.current.textTertiary,
-    disabledContainerColor: Color = containerColor.copy(alpha = .38f),
     visualSize: Dp = SyComposerMetrics.actionVisualSize,
     iconSize: Dp = SyComposerMetrics.actionIconSize,
     content: (@Composable () -> Unit)? = null,
     iconPainter: Painter? = null,
+    disabledTint: Color = LocalSyColors.current.textTertiary,
+    disabledContainerColor: Color = containerColor.copy(alpha = .38f),
 ) {
     Surface(
         onClick = onClick, enabled = enabled,
