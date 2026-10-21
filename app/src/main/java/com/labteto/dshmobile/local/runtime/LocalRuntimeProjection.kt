@@ -4,7 +4,6 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.model.LocalImageInputMode
-import com.labteto.dshmobile.local.model.LocalModelState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.forSessionModel
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
@@ -193,9 +192,25 @@ internal class LocalRuntimeProjection(
         }
     }
 
-    internal fun projectModelState(modelState: LocalModelState, error: String?) {
+    internal fun projectModelConfiguration(
+        configured: Boolean,
+        model: String,
+        baseUrl: String,
+        profiles: List<LocalModelProfile>,
+        activeProfileId: String?,
+        error: String?,
+    ) {
         state.update { current ->
-            current.copy(modelState = modelState, error = error)
+            val before = current.modelState
+            current.copy(
+                modelState = before.copy(
+                    configured = configured,
+                    model = model,
+                    baseUrl = baseUrl,
+                    modelSelection = before.modelSelection.replaceProfiles(profiles, activeProfileId),
+                ),
+                error = error,
+            )
         }
     }
 
