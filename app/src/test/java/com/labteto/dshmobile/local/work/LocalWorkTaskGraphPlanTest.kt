@@ -369,7 +369,7 @@ class LocalWorkTaskGraphPlanTest {
         jobs.resumePersistent(checkpointedWriteId, ownerSessionId = "session-a") { _, _ -> "从写入之后继续" }
         runCurrent()
         assertEquals("从写入之后继续", awaitPersistedWorkflowJob(checkpointedWriteId, jobs,
-            checkFence = {}, consumeResult = { jobs.output(checkpointedWriteId, "session-a") }))
+            checkFence = {}, consumeResult = { jobs.snapshots().single { it.id == checkpointedWriteId }.output }))
         log.close()
     }
 

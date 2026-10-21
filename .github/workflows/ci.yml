@@ -248,24 +248,6 @@ jobs:
       - name: Unit tests and Harness conformance
         run: |
           ./gradlew             :core:test             :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :app:testDebugUnitTest             :reference-validation:test             --continue --stacktrace
-      - name: Report failing JVM test assertions
-        if: failure()
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import xml.etree.ElementTree as ET
-          for path in Path('.').glob('**/build/test-results/**/TEST-*.xml'):
-              try:
-                  root = ET.parse(path).getroot()
-              except ET.ParseError:
-                  continue
-              for case in root.iter('testcase'):
-                  for result in list(case):
-                      if result.tag not in ('failure', 'error'):
-                          continue
-                      print(f"{path}: {case.get('classname')}.{case.get('name')}")
-                      print((result.get('message') or result.text or '')[:1600])
-          PY
       - name: Verify JVM 21 bytecode output
         run: python3 .github/scripts/check-jvm21-bytecode.py
 
