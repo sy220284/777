@@ -179,7 +179,7 @@ fun SyComposerAction(
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Box(
                 Modifier.size(visualSize).background(
-                    if (enabled) containerColor else containerColor.copy(alpha = disabledContainerAlpha),
+                    if (enabled) containerColor else containerColor.copy(alpha = containerColor.alpha * disabledContainerAlpha),
                     CircleShape,
                 ),
                 contentAlignment = Alignment.Center,
