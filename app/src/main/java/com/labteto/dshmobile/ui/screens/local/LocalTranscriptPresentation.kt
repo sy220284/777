@@ -98,19 +98,43 @@ internal fun isRepeatedWorkPollingTool(name: String?): Boolean {
  * Keep the original tool declaration order without combining independent operations.
  */
 private fun orderedWorkSteps(messages: List<LocalHarnessMessage>): List<LocalTranscriptItem.WorkStep> {
-    val ordered = messages.filter { it.role != "reasoning" }.toMutableList()
-    val completed = ordered.filter { it.role == "tool" && it.toolDeclaredAt != null }
+    val base = messages.filter { it.role != "reasoning" &&
+        !(it.role == "tool" && it.toolDeclaredAt != null) }
+    val completed = messages.filter { it.role == "tool" && it.toolDeclaredAt != null }
         .sortedWith(compareBy<LocalHarnessMessage> { it.toolDeclaredAt ?: Long.MAX_VALUE }
             .thenBy { it.toolDeclaredSequence ?: Long.MAX_VALUE })
-    ordered.removeAll { it.role == "tool" && it.toolDeclaredAt != null }
+    // Original insertion semantics: each completed tool precedes the first base row whose
+    // timestamp is strictly greater. Earlier inserted tools cannot be greater because tools
+    // are processed in timestamp order. Prefix maxima preserve this even for out-of-order
+    // legacy rows, without repeatedly scanning and inserting into an expanding ArrayList.
+    val prefixMax = LongArray(base.size)
+    var maximum = Long.MIN_VALUE
+    base.forEachIndexed { index, message ->
+        val timestamp = if (message.role == "tool") message.toolDeclaredAt ?: message.createdAt
+            else message.createdAt
+        maximum = maxOf(maximum, timestamp)
+        prefixMax[index] = maximum
+    }
+    val inserts = arrayOfNulls<MutableList<LocalHarnessMessage>>(base.size + 1)
     completed.forEach { tool ->
-        val at = tool.toolDeclaredAt ?: Long.MAX_VALUE
-        val target = ordered.indexOfFirst { other ->
-            val otherAt = if (other.role == "tool") other.toolDeclaredAt ?: other.createdAt
-                else other.createdAt
-            otherAt > at
+        val timestamp = tool.toolDeclaredAt ?: Long.MAX_VALUE
+        var low = 0
+        var high = base.size
+        while (low < high) {
+            val mid = (low + high) ushr 1
+            if (prefixMax[mid] > timestamp) high = mid else low = mid + 1
         }
-        ordered.add(if (target < 0) ordered.size else target, tool)
+        val bucket = inserts[low] ?: mutableListOf<LocalHarnessMessage>().also {
+            inserts[low] = it
+        }
+        bucket += tool
+    }
+    val ordered = buildList(base.size + completed.size) {
+        base.forEachIndexed { index, message ->
+            inserts[index]?.let(::addAll)
+            add(message)
+        }
+        inserts[base.size]?.let(::addAll)
     }
     return ordered.mapNotNull { message ->
         when (message.role) {
