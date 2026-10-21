@@ -61,7 +61,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         profiles::transactionId, ::restoreJournal,
         { failure -> AppLog.warn("ModelConfiguration", "model/configuration-journal-cleanup-pending", failure) },
     )
-    internal suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null, credentialSourceProfileId: String? = null): LocalModelConfigurationResult =
+    internal suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null, credentialSourceProfileId: String? = null, onCommitted: (LocalModelConfigurationResult) -> Unit = {}): LocalModelConfigurationResult =
         LocalModelMutationGate.run {
             transactions.recover()
             require(model.isNotBlank()) { "模型名称不能为空" }
@@ -82,19 +82,32 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
                 existingProfiles, apiKeys::getFor, profileId, contextWindowTokensOverride)
             val profile = draft.profile
             val all = existingProfiles.filterNot { it.id == profile.id } + profile
-            persistConfiguration(all, profile, if (suppliedKey.isNotBlank()) mapOf(profile.id to draft.key) else emptyMap())
-            LocalModelConfigurationResult(true, profile.model, profile.baseUrl, all, profile.id)
+            val result = LocalModelConfigurationResult(true, profile.model, profile.baseUrl, all, profile.id)
+            persistConfiguration(
+                all, profile,
+                if (suppliedKey.isNotBlank()) mapOf(profile.id to draft.key) else emptyMap(),
+                onCommitted = { onCommitted(result) },
+            )
+            result
         }
 
+    /** Catalog replacement and optional account selection are one durable decision. */
     internal suspend fun saveChatGptModels(
         accountId: String,
         models: List<ChatGptModelOption>,
-    ): List<LocalModelProfile> = LocalModelMutationGate.run {
+        selectFirst: Boolean = false,
+        onCommitted: (LocalModelConfigurationResult) -> Unit = {},
+    ): LocalModelConfigurationResult = LocalModelMutationGate.run {
         transactions.recover()
         val all = com.labteto.dshmobile.local.model.chatgpt.refreshChatGptPlanProfiles(profiles.read(), accountId, models)
-        val active = gateway.activeProfile()?.let { previous -> all.firstOrNull { it.id == previous.id } }
-        persistConfiguration(all, active)
-        all
+        val selected = if (selectFirst) all.firstOrNull {
+            it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == accountId
+        } else null
+        val previous = gateway.activeProfile()?.let { old -> all.firstOrNull { it.id == old.id } }
+        val active = selected ?: previous
+        val result = configurationResult(all, active)
+        persistConfiguration(all, active, onCommitted = { onCommitted(result) })
+        result
     }
 
     internal suspend fun select(
@@ -113,19 +126,22 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         id: String,
         currentModel: String,
         currentBaseUrl: String,
+        onCommitted: (LocalModelConfigurationResult) -> Unit = {},
     ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
         transactions.recover()
         val all = profiles.read()
         val removed = all.firstOrNull { it.id == id } ?: return@run null
         val activeRemoved = profiles.active(currentModel, currentBaseUrl, all)?.id == id
         finishRemoval(all.filterNot { it.id == id }, activeRemoved, currentModel, currentBaseUrl,
-            if (removed.authKind == LocalModelAuthKind.API_KEY) mapOf(id to null) else emptyMap())
+            if (removed.authKind == LocalModelAuthKind.API_KEY) mapOf(id to null) else emptyMap(),
+            onCommitted = onCommitted)
     }
 
     internal suspend fun removeChatGptAccount(
         accountId: String,
         currentModel: String,
         currentBaseUrl: String,
+        onCommitted: (LocalModelConfigurationResult) -> Unit = {},
     ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
         transactions.recover()
         val all = profiles.read()
@@ -140,18 +156,21 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
             activeId != null && activeId in removedIds,
             currentModel,
             currentBaseUrl,
+            onCommitted = onCommitted,
         )
     }
 
     internal suspend fun clearActive(
         currentModel: String,
         currentBaseUrl: String,
+        onCommitted: (LocalModelConfigurationResult) -> Unit = {},
     ): LocalModelConfigurationResult = LocalModelMutationGate.run {
         transactions.recover()
         val all = profiles.read()
         val active = profiles.active(currentModel, currentBaseUrl, all)
         finishRemoval(all.filterNot { it.id == active?.id }, true, currentModel, currentBaseUrl,
-            if (active?.authKind == LocalModelAuthKind.API_KEY) mapOf(active.id to null) else emptyMap())
+            if (active?.authKind == LocalModelAuthKind.API_KEY) mapOf(active.id to null) else emptyMap(),
+            onCommitted = onCommitted)
     }
 
     internal suspend fun prepareStartup(model: String, baseUrl: String) = LocalModelMutationGate.run {
@@ -216,25 +235,33 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         currentModel: String,
         currentBaseUrl: String,
         credentialChanges: Map<String, String?> = emptyMap(),
+        onCommitted: (LocalModelConfigurationResult) -> Unit = {},
     ): LocalModelConfigurationResult {
         val candidate = if (activeRemoved) remaining.firstOrNull()
             else profiles.active(currentModel, currentBaseUrl, remaining)
         val next = candidate?.takeIf { gateway.hasCredential(it) }
-        persistConfiguration(remaining, next, credentialChanges)
-        return LocalModelConfigurationResult(
-            configured = next != null,
-            model = next?.model ?: LocalModelConfigContract.DEFAULT_MODEL,
-            baseUrl = next?.baseUrl ?: LocalModelConfigContract.DEFAULT_BASE_URL,
-            profiles = remaining,
-            activeProfileId = next?.id,
-        )
+        val result = configurationResult(remaining, next)
+        persistConfiguration(remaining, next, credentialChanges, onCommitted = { onCommitted(result) })
+        return result
     }
+
+    private fun configurationResult(
+        all: List<LocalModelProfile>,
+        active: LocalModelProfile?,
+    ) = LocalModelConfigurationResult(
+        configured = active != null,
+        model = active?.model ?: LocalModelConfigContract.DEFAULT_MODEL,
+        baseUrl = active?.baseUrl ?: LocalModelConfigContract.DEFAULT_BASE_URL,
+        profiles = all,
+        activeProfileId = active?.id,
+    )
 
     /** Journal before secret changes; one confirmed metadata commit is the transaction decision. */
     private suspend fun persistConfiguration(
         all: List<LocalModelProfile>,
         active: LocalModelProfile?,
         credentialChanges: Map<String, String?> = emptyMap(),
+        onCommitted: () -> Unit = {},
     ) = withContext(Dispatchers.IO + NonCancellable) {
         transactions.recover()
         val token = UUID.randomUUID().toString()
@@ -258,6 +285,9 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
                 apiKeys.activate(modelProfileId(LocalModelConfigContract.DEFAULT_MODEL, LocalModelConfigContract.DEFAULT_BASE_URL))
             }
         })
+        // Projection belongs to the same mutation gate and cannot be overtaken by a newer write.
+        // NonCancellable also closes the cancellation gap after the durable decision.
+        onCommitted()
     }
 
     private suspend fun restoreJournal(journal: JsonObject) {

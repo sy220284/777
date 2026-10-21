@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelConfigurationCoordinator
 import com.labteto.dshmobile.local.LocalModelConfigurationResult
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
@@ -36,6 +37,7 @@ class LocalModelRuntime @Inject constructor(
         gateway = gateway,
         state = state,
         isBusy = ::identityMutationLocked,
+        onCommitted = { result, error, recordSession -> commit(result, error, recordSession) },
     )
 
     init { accounts.observeInvalidations(scope) }
@@ -64,9 +66,14 @@ class LocalModelRuntime @Inject constructor(
         credentialSourceProfileId: String? = null,
     ) {
         check(!identityMutationLocked()) { "请等待初始化完成或结束当前任务后再切换模型" }
-        val result = configuration.save(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride, credentialSourceProfileId)
-        runtimeStateStore.imageCapabilities.clearRoute(result.baseUrl, result.model)
-        commit(result)
+        configuration.save(
+            apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride,
+            credentialSourceProfileId,
+            onCommitted = { result ->
+                commit(result)
+                runtimeStateStore.imageCapabilities.clearRoute(result.baseUrl, result.model)
+            },
+        )
     }
 
     /**
@@ -90,14 +97,20 @@ class LocalModelRuntime @Inject constructor(
             modelSelectionMutex.withLock {
                 if (pendingSelections[originSessionId] != request) return@withLock
                 try {
-                    check(gateway.hasCredential(selected)) { "所选模型凭据不可用，请检查模型账户" }
-                    sessionStorage.eventLogs.get(originSessionId).recordLocalModelSelection(id)
-                    state.selectForSession(originSessionId, selected)
-                    // Compatibility for foreground features that query the active credential.
-                    // Each model request still freezes its own explicit route.
-                    if (runtimeStateStore.currentSessionId == originSessionId &&
-                        runtimeStateStore.state.value.sessionId == originSessionId) {
-                        gateway.activate(selected)
+                    // A saved route can disappear after the click but before this coroutine runs.
+                    // Take the same gate as durable mutations, re-read the current metadata and
+                    // finish the session projection before any delete/save may commit.
+                    LocalModelMutationGate.run {
+                        val current = configuration.readProfiles().firstOrNull { it.id == id }
+                            ?: error("所选模型已被删除，请重新选择")
+                        check(gateway.hasCredential(current)) { "所选模型凭据不可用，请检查模型账户" }
+                        sessionStorage.eventLogs.get(originSessionId).recordLocalModelSelection(id)
+                        state.selectForSession(originSessionId, current)
+                        // In-flight requests already carry their frozen route.
+                        if (runtimeStateStore.currentSessionId == originSessionId &&
+                            runtimeStateStore.state.value.sessionId == originSessionId) {
+                            gateway.activate(current)
+                        }
                     }
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
@@ -116,7 +129,7 @@ class LocalModelRuntime @Inject constructor(
             if (identityMutationLocked()) return@launch
             val before = state.value.modelState
             try {
-                configuration.remove(id, before.model, before.baseUrl)?.let(::commit)
+                configuration.remove(id, before.model, before.baseUrl, onCommitted = ::commit)
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -152,7 +165,7 @@ class LocalModelRuntime @Inject constructor(
             }
             val before = state.value.modelState
             try {
-                commit(configuration.clearActive(before.model, before.baseUrl))
+                configuration.clearActive(before.model, before.baseUrl, onCommitted = ::commit)
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -184,13 +197,20 @@ class LocalModelRuntime @Inject constructor(
             LocalSessionRuntimeRegistry.hasAnyLiveOwner()
     }
 
-    private fun commit(result: LocalModelConfigurationResult) {
+    private fun commit(
+        result: LocalModelConfigurationResult,
+        error: String? = null,
+        recordSessionSelection: Boolean = true,
+    ) {
         val visibleSessionId = runtimeStateStore.state.value.sessionId
-        result.activeProfileId?.let { id ->
-            if (visibleSessionId.isNotBlank() && !runtimeStateStore.sessionTransitioning) {
-                sessionStorage.eventLogs.get(visibleSessionId).recordLocalModelSelection(id)
-            }
-        }
+        val eventFailure = if (recordSessionSelection && result.activeProfileId != null &&
+            visibleSessionId.isNotBlank() && !runtimeStateStore.sessionTransitioning) {
+            runCatching {
+                sessionStorage.eventLogs.get(visibleSessionId)
+                    .recordLocalModelSelection(result.activeProfileId)
+            }.exceptionOrNull()
+        } else null
+        // Session-log I/O failure must not suppress a successfully persisted model projection.
         val before = state.value.modelState
         state.commit(
             before.copy(
@@ -199,7 +219,11 @@ class LocalModelRuntime @Inject constructor(
                 baseUrl = result.baseUrl,
                 modelSelection = before.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
             ),
-            null,
+            error,
         )
+        if (eventFailure != null) {
+            AppLog.warn("ModelConfiguration", "model/session-selection-record-failed", eventFailure)
+            state.publishError("模型配置已保存，但会话模型选择记录失败，请重新选择模型")
+        }
     }
 }
