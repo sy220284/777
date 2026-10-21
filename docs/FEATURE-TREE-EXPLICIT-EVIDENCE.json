@@ -794,6 +794,26 @@
         }
       ],
       "scope": "恢复 V6 原生界面后的静态源码定位；具体交互、状态及设备效果以本 PR 最新 Head 的运行测试为准。"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享工具执行 / MCP资源分页与完整内容",
+      "sources": [
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpClient.kt",
+          "symbols": [
+            "listResources",
+            "listResourceTemplates",
+            "readResource"
+          ]
+        },
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
+          "symbols": [
+            "resourceToolDefinitions"
+          ]
+        }
+      ],
+      "scope": "R2未合并：正式连接共享审批、身份和取消；资源分页与完整内容源码存在，测试尚未执行，不代表主线交付或行为验收。"
     }
   ]
 }

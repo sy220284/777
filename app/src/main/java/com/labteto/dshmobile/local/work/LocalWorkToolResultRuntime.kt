@@ -13,12 +13,15 @@ import kotlinx.serialization.json.jsonPrimitive
 internal class LocalWorkToolResultRuntime(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val toolOutputStore: LocalToolOutputStore,
+    val importToolImages: suspend (com.labteto.dshmobile.harness.tools.ToolRichContent?) -> List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = { emptyList() },
 ) {
     internal fun retain(
         binding: LocalWorkRunBinding,
         callId: String?,
         result: String,
         retention: ToolResultRetention = ToolResultRetention.DURABLE,
+        requireStored: Boolean = false,
+        preview: String? = null,
     ): String {
         val history = binding.runHandle.modelHistory
         // Reference protection is derived from existing Work history/checkpoints, never a
@@ -38,6 +41,8 @@ internal class LocalWorkToolResultRuntime(
         )
         return projectRecoverableToolResult(
             value = result,
+            requireStored = requireStored,
+            preview = preview ?: result,
             retention = retention,
             usageMode = LocalUsageMode.WORK,
             budget = budget,

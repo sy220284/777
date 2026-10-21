@@ -51,7 +51,6 @@ import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.model.durableModelHistorySnapshot
 import com.labteto.dshmobile.local.model.durableToolResultContent
-import com.labteto.dshmobile.local.model.hasLocalImageRefs
 import com.labteto.dshmobile.local.model.hasMaterializedImageUrls
 import com.labteto.dshmobile.local.model.imageInputUnsupported
 import com.labteto.dshmobile.local.model.localToolHistoryMessage
@@ -123,6 +122,7 @@ internal class LocalSubagentRunner(
     private val runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
     private val modelAdmission: LocalModelAdmissionPort? = null,
     private val compactionPolicy: LocalSubagentCompactionPolicy,
+    private val importToolImages: suspend (com.labteto.dshmobile.harness.tools.ToolRichContent?) -> List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = { emptyList() },
 ) {
     private val historyPolicy = com.labteto.dshmobile.local.agent.LocalSubagentHistoryPolicy(
         spillToolOutput = spillToolOutput,
@@ -504,10 +504,10 @@ internal class LocalSubagentRunner(
                     modelStep = addSubagentSteps(recoveredBaseStep, activationStep)
                     val durableHistory = history.snapshot()
                     val selectedMode = resolveImageMode(snapshot.modelState.imageInputMode, snapshot.modelState.baseUrl, routeModel)
-                    if (hasLocalImageRefs(durableHistory) &&
-                        resolveImageMode(LocalImageInputMode.AUTO, snapshot.modelState.baseUrl, routeModel) == LocalImageInputMode.TOOL) {
-                        throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
-                    }
+                    com.labteto.dshmobile.local.model.requireLocalImageInputSupported(
+                        durableHistory,
+                        unsupported = resolveImageMode(LocalImageInputMode.AUTO, snapshot.modelState.baseUrl, routeModel) == LocalImageInputMode.TOOL,
+                    )
                     val preparedHistory = prepareMessages(
                         durableHistory,
                         selectedMode,
@@ -648,16 +648,30 @@ internal class LocalSubagentRunner(
                         is AgentEvent.ToolFinished -> {
                             val absoluteStep = addSubagentSteps(recoveredBaseStep, event.step)
                             progressTracker.recordToolResult(event.call, event.output, event.isError)
-                            val boundedContent = historyPolicy.retainToolResult(
-                                event.call.id,
-                                event.output,
-                                event.retention,
+                            val delivery = com.labteto.dshmobile.local.model.deliverLocalToolResult(
+                                retain = {
+                                    historyPolicy.retainToolResult(
+                                        event.call.id,
+                                        event.output,
+                                        event.retention,
+                                        requireStored = event.richContent != null,
+                                        preview = event.richContent?.modelPreview(),
+                                    )
+                                },
+                                materialize = { importToolImages(event.richContent) },
                             )
+                            currentCoroutineContext().ensureActive()
+                            if (runContext != null && runCoordinator?.isCurrentOwner(runContext) == false) return@AgentEventSink
+                            val boundedContent = delivery.content
+                            val toolImages = delivery.images
+                            val deliveryIsError = event.isError || delivery.failed
+                            val deliveryErrorCode = if (delivery.failed) "TOOL_RESULT_DELIVERY_FAILED" else event.errorCode
+                            val deliveryRetryable = !delivery.failed && event.retryable
                             val modelOutput = AgentToolResult(
                                 content = boundedContent,
-                                isError = event.isError,
-                                errorCode = event.errorCode,
-                                retryable = event.retryable,
+                                isError = deliveryIsError,
+                                errorCode = deliveryErrorCode,
+                                retryable = deliveryRetryable,
                                 sideEffect = event.sideEffect,
                                 recoveryHint = event.recoveryHint,
                             ).modelVisibleContent()
@@ -680,13 +694,14 @@ internal class LocalSubagentRunner(
                                     ),
                                 )
                                 put("model_content", durableToolResultContent(modelOutput, event.retention))
-                                put("is_error", event.isError)
-                                event.errorCode?.let { put("error_code", it) }
-                                put("retryable", event.retryable)
+                                put("tool_images", com.labteto.dshmobile.local.model.toolImageReferences(toolImages))
+                                put("is_error", deliveryIsError)
+                                deliveryErrorCode?.let { put("error_code", it) }
+                                put("retryable", deliveryRetryable)
                                 put("side_effect", event.sideEffect.name.lowercase())
                                 event.recoveryHint?.let { put("recovery_hint", it) }
                             })
-                            history.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention))
+                            history.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention, toolImages))
                         }
                         is AgentEvent.StepFinished -> {
                             if (pendingTerminalOutput == null) {

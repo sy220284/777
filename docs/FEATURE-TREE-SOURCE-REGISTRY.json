@@ -26,6 +26,14 @@
       "test": "app/src/test/java/com/labteto/dshmobile/local/model/MiniMaxProviderQuotaTest.kt#legacyRemainingCountAndNewUsedCountAreResolvedByProviderPercent"
     },
     {
+      "id": "shared.tools.mcp-resources",
+      "path": "第二层｜共享运行能力 / 共享工具执行 / MCP资源分页与完整内容",
+      "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpClient.kt",
+      "entry": "listResources",
+      "owner": "TOOLS",
+      "test": "harness-interop/src/test/kotlin/com/labteto/dshmobile/interop/mcp/McpClientTest.kt#resourceRequestsPreservePagesAndContents"
+    },
+    {
       "id": "skills.minimax-official-bundles",
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 预置技能目录",
       "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",

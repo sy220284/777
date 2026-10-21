@@ -269,6 +269,7 @@ private fun applyModelHistoryEvent(
                 buildJsonObject {
                     put("role", "tool")
                     put("tool_call_id", callId)
+                    (event.data["tool_images"] as? JsonArray)?.let { put("_dsh_tool_images", it) }
                     put(
                         "content",
                         event.data["model_content"]?.jsonPrimitive?.contentOrNull

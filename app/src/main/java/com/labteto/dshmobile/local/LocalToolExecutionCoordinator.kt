@@ -521,6 +521,7 @@ internal class LocalToolExecutionCoordinator(
                 retention = result.retention,
                 processExitCode = result.processExitCode,
                 fileVersions = result.fileVersions,
+                richContent = result.richContent,
                 executionId = executionIdentity.executionId.takeIf { executionStarted },
                 sideEffect = if (executionStarted && !readLike) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
             )
@@ -561,6 +562,7 @@ internal class LocalToolExecutionCoordinator(
             retention = result.retention,
             processExitCode = result.processExitCode,
             fileVersions = result.fileVersions,
+            richContent = result.richContent,
             executionId = executionIdentity.executionId.takeIf { executionStarted },
         )
     }

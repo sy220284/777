@@ -27,6 +27,54 @@ import org.junit.Test
 
 class LocalMultimodalTest {
     @Test
+    fun toolReceiptImagesParticipateInSharedForegroundAndSubagentCapabilityGate() = runTest {
+        val image = kotlinx.serialization.json.buildJsonObject {
+            put("type", LOCAL_IMAGE_REF); put("path", ".dsh/attachments/mcp.png")
+        }
+        val history = listOf(kotlinx.serialization.json.buildJsonObject {
+            put("role", "tool"); put("tool_call_id", "original-call"); put("content", "[图片通过附件提供]")
+            put("_dsh_tool_images", JsonArray(listOf(image)))
+        })
+        val registry = LocalImageCapabilityRegistry().apply { markUnsupported("https://test", "text-only") }
+        val unsupportedMode = resolveLocalImageInputMode(LocalImageInputMode.AUTO, registry, "https://test", "text-only")
+        assertEquals(LocalImageInputMode.TOOL, unsupportedMode)
+        assertTrue(com.labteto.dshmobile.local.model.hasLocalImageRefs(history))
+        // Both production loops call this same gate before their prepare entry.
+        val error = runCatching {
+            com.labteto.dshmobile.local.model.requireLocalImageInputSupported(history,
+                unsupported = unsupportedMode == LocalImageInputMode.TOOL)
+        }.exceptionOrNull()
+        assertTrue(error is IllegalStateException)
+        assertTrue(error?.message.orEmpty().contains("切换支持图片的模型"))
+    }
+
+    @Test
+    fun explicitToolModeRetainsMcpPathAndSourceThroughActualPreparation() = runTest {
+        val root = kotlin.io.path.createTempDirectory("mcp-tool-path-").toFile()
+        try {
+            val image = kotlinx.serialization.json.buildJsonObject {
+                put("type", LOCAL_IMAGE_REF); put("path", ".dsh/attachments/mcp.png")
+            }
+            val receipt = kotlinx.serialization.json.buildJsonObject {
+                put("role", "tool"); put("tool_call_id", "original-call"); put("content", "saved preview")
+                put("_dsh_tool_images", JsonArray(listOf(image)))
+            }
+            com.labteto.dshmobile.local.model.requireLocalImageInputSupported(listOf(receipt), unsupported = false)
+            val prepared = prepareLocalMultimodalMessages(listOf(receipt), root, LocalImageInputMode.TOOL)
+            assertEquals("tool", prepared.first()["role"]!!.jsonPrimitive.content)
+            assertEquals("user", prepared.last()["role"]!!.jsonPrimitive.content)
+            val toolContext = prepared.last()["content"] as JsonArray
+            assertTrue(toolContext.toString().contains("original-call"))
+            assertTrue(toolContext.toString().contains(".dsh/attachments/mcp.png"))
+            assertTrue(toolContext.toString().contains("vision_analyze_file"))
+            assertTrue(toolContext.toString().contains("未发送像素"))
+            assertFalse(prepared.toString().contains(LOCAL_IMAGE_REF))
+            assertFalse(prepared.toString().contains("image_url"))
+            assertFalse(prepared.toString().contains("_dsh_tool_images"))
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
     fun providerLimitRejectsOversizedImageBeforeReadingOrEncodingPixels() = runTest {
         val root = java.nio.file.Files.createTempDirectory("provider-image-limit-").toFile()
         try {

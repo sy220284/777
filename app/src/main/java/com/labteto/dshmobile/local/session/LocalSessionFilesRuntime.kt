@@ -66,6 +66,20 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment =
         withContext(Dispatchers.IO) { attachmentImporter.import(uri) }
 
+    internal suspend fun importToolImages(content: com.labteto.dshmobile.harness.tools.ToolRichContent?): List<LocalImportedAttachment> =
+        withContext(Dispatchers.IO) {
+            content?.images.orEmpty().map { image ->
+                val mediaType = (image["mimeType"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+                    ?: error("MCP 图片缺少 mimeType")
+                val data = (image["data"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+                    ?: error("MCP 图片缺少 data")
+                require(data.length <= com.labteto.dshmobile.local.attachment.LocalMessageMediaPolicy.MAX_GENERATED_IMAGE_BASE64_CHARS) {
+                    "MCP 图片超过附件容量"
+                }
+                attachmentImporter.importImageBytes(java.util.Base64.getDecoder().decode(data), mediaType)
+            }
+        }
+
     internal suspend fun inspectAttachment(item: LocalImportedAttachment): UiAttachmentInspectionReceipt =
         withContext(Dispatchers.IO) { inspectImportedAttachmentFile(File(workspace.path), item) }
 

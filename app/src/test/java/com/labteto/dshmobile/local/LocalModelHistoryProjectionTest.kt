@@ -21,6 +21,27 @@ class LocalModelHistoryProjectionTest {
     private val codec = ModelHistoryCheckpointCodec()
 
     @Test
+    fun mcpImagesRecoverWithOriginalReceiptAndRemainGcReferenced() {
+        val image = buildJsonObject {
+            put("type", LOCAL_IMAGE_REF); put("path", ".dsh/attachments/image.png"); put("attachmentId", "image")
+        }
+        val events = listOf(
+            event(0L, "assistant/message", assistantCall("mcp-call")),
+            event(1L, "tool/result", buildJsonObject {
+                put("id", "mcp-call"); put("model_content", "saved preview")
+                put("tool_images", JsonArray(listOf(image)))
+            }),
+        )
+        val restored = restoreLocalModelHistory(events, emptyList(), codec)
+        val receipt = restored.messages.last()
+        assertEquals("mcp-call", receipt["tool_call_id"].toString().trim('"'))
+        assertEquals(JsonArray(listOf(image)), receipt["_dsh_tool_images"])
+        val references = com.labteto.dshmobile.local.attachment.collectLocalImageAttachmentReferences(events.asSequence())
+        assertTrue(".dsh/attachments/image.png" in references.paths)
+        assertTrue("image" in references.attachmentIds)
+    }
+
+    @Test
     fun usesLatestValidCheckpointAndReplaysSemanticTail() {
         val old = listOf(message("system", "系统"), message("user", "旧问题"))
         val events = listOf(

@@ -55,6 +55,7 @@ data class AgentToolResult(
     val processExitCode: Int? = null,
     val fileVersions: Map<String, String> = emptyMap(),
     val executionId: String? = null,
+    val richContent: com.labteto.dshmobile.harness.tools.ToolRichContent? = null,
 )
 
 fun AgentToolResult.modelVisibleContent(): String {
@@ -128,6 +129,7 @@ sealed interface AgentEvent {
         val processExitCode: Int? = null,
         val fileVersions: Map<String, String> = emptyMap(),
         val executionId: String? = null,
+        val richContent: com.labteto.dshmobile.harness.tools.ToolRichContent? = null,
     ) : AgentEvent
 
     data class StepFinished(

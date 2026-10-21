@@ -77,6 +77,7 @@ internal class LocalWorkComposition @Inject constructor(
     private val toolResultRuntime = LocalWorkToolResultRuntime(
         runtimeStateStore = runtimeStateStore,
         toolOutputStore = tools.toolOutputStore,
+        importToolImages = sessionStorage.files::importToolImages,
     )
     private val turnToolRuntime = LocalWorkTurnToolRuntime(
         registry = tools.registry,
@@ -92,6 +93,7 @@ internal class LocalWorkComposition @Inject constructor(
             jobs = runtimeStateStore.jobManager,
             modelHistory = runtimeStateStore.foregroundRunHandle.modelHistory,
             toolOutputStore = tools.toolOutputStore,
+            importToolImages = sessionStorage.files::importToolImages,
             workspacePath = sessionStorage.files.workspace.path,
             imageRequestBudget = {
                 localImageRequestBudgetForModelConcurrency(

@@ -31,7 +31,6 @@ import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.model.durableToolResultContent
 import com.labteto.dshmobile.local.model.estimateModelTokens
-import com.labteto.dshmobile.local.model.hasLocalImageRefs
 import com.labteto.dshmobile.local.model.hasMaterializedImageUrls
 import com.labteto.dshmobile.local.model.imageInputUnsupported
 import com.labteto.dshmobile.local.model.localImageRequestBudgetForModelConcurrency
@@ -60,6 +59,7 @@ import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
 import com.labteto.dshmobile.local.tools.LocalRunToolSurface
 import com.labteto.dshmobile.local.tools.pendingToolSettlements
 import java.io.File
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -399,10 +399,10 @@ internal class LocalWorkAgentTurnExecutor(
                         snapshot.modelState.baseUrl,
                         snapshot.modelState.model,
                     )
-                    if (hasLocalImageRefs(durableRequestMessages) &&
-                        imageCapabilities.state(snapshot.modelState.baseUrl, snapshot.modelState.model) == LocalImageCapability.UNSUPPORTED) {
-                        throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
-                    }
+                    com.labteto.dshmobile.local.model.requireLocalImageInputSupported(
+                        durableRequestMessages,
+                        unsupported = imageCapabilities.state(snapshot.modelState.baseUrl, snapshot.modelState.model) == LocalImageCapability.UNSUPPORTED,
+                    )
                     val requestMessages = prepareLocalMultimodalMessages(
                         messages = durableRequestMessages,
                         workspaceRoot = File(workspacePath),
@@ -657,17 +657,31 @@ internal class LocalWorkAgentTurnExecutor(
                         }
                         is AgentEvent.ToolFinished -> {
                             progressTracker.recordToolResult(event.call, event.output, event.isError)
-                            val boundedContent = workToolResultRuntime.retain(
-                                binding = binding,
-                                callId = event.call.id,
-                                result = event.output,
-                                retention = event.retention,
+                            val delivery = com.labteto.dshmobile.local.model.deliverLocalToolResult(
+                                retain = {
+                                    workToolResultRuntime.retain(
+                                        binding = binding,
+                                        callId = event.call.id,
+                                        result = event.output,
+                                        retention = event.retention,
+                                        requireStored = event.richContent != null,
+                                        preview = event.richContent?.modelPreview(),
+                                    )
+                                },
+                                materialize = { workToolResultRuntime.importToolImages(event.richContent) },
                             )
+                            agentRunCoordinator.ensureCurrentOwner(runContext)
+                            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                            val boundedContent = delivery.content
+                            val toolImages = delivery.images
+                            val deliveryIsError = event.isError || delivery.failed
+                            val deliveryErrorCode = if (delivery.failed) "TOOL_RESULT_DELIVERY_FAILED" else event.errorCode
+                            val deliveryRetryable = !delivery.failed && event.retryable
                             val modelOutput = AgentToolResult(
                                 content = boundedContent,
-                                isError = event.isError,
-                                errorCode = event.errorCode,
-                                retryable = event.retryable,
+                                isError = deliveryIsError,
+                                errorCode = deliveryErrorCode,
+                                retryable = deliveryRetryable,
                                 sideEffect = event.sideEffect,
                                 recoveryHint = event.recoveryHint,
                             ).modelVisibleContent()
@@ -676,14 +690,19 @@ internal class LocalWorkAgentTurnExecutor(
                                 role = "tool",
                                 content = durableToolResultContent(boundedContent, event.retention),
                                 toolName = event.call.name,
+                                blocks = toolImages.map { image -> com.labteto.dshmobile.local.session.LocalMessageBlock.Image(
+                                    relativePath = image.relativePath, mediaType = image.mediaType, name = image.name,
+                                    bytes = image.bytes, attachmentId = image.attachmentId, width = image.width, height = image.height,
+                                    source = com.labteto.dshmobile.local.session.LocalMessageMediaSource.TOOL,
+                                ) },
                                 contentAlreadyBounded = true,
-                                toolIsError = event.isError,
-                                toolErrorCode = event.errorCode,
+                                toolIsError = deliveryIsError,
+                                toolErrorCode = deliveryErrorCode,
                                 toolCallId = event.call.id,
                                 toolDeclaredAt = declaredToolEvent?.first,
                                 toolDeclaredSequence = declaredToolEvent?.second,
                             )
-                            val artifactVersion = if (!event.isError) localWorkArtifactFileVersion(
+                            val artifactVersion = if (!deliveryIsError) localWorkArtifactFileVersion(
                                 java.io.File(sessionStorage.files.workspace.path), event.call.name, event.output,
                             ) else null
                             val toolEvent = runEventLog.append("tool/result", buildJsonObject {
@@ -701,22 +720,23 @@ internal class LocalWorkAgentTurnExecutor(
                                     ),
                                 )
                                 put("model_content", durableToolResultContent(modelOutput, event.retention))
-                                put("is_error", event.isError)
+                                put("tool_images", com.labteto.dshmobile.local.model.toolImageReferences(toolImages))
+                                put("is_error", deliveryIsError)
                                 artifactVersion?.let {
                                     put("artifact_path", it.path)
                                     put("artifact_sha256", it.sha256)
                                     put("artifact_bytes", it.bytes)
                                 }
                                 put("retention", event.retention.name.lowercase())
-                                event.errorCode?.let { put("error_code", it) }
-                                put("retryable", event.retryable)
+                                deliveryErrorCode?.let { put("error_code", it) }
+                                put("retryable", deliveryRetryable)
                                 put("side_effect", event.sideEffect.name.lowercase())
                                 event.recoveryHint?.let { put("recovery_hint", it) }
                                 put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                             })
-                            runHistory.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention))
+                            runHistory.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention, toolImages))
                             completedToolCallIds += event.call.id
-                            if (!event.isError && event.call.name == "exit_plan_mode" &&
+                            if (!deliveryIsError && event.call.name == "exit_plan_mode" &&
                                 event.output == APPROVED_PLAN_TOOL_RESULT
                             ) {
                                 approvedPlanPromptPending = true
@@ -730,7 +750,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 approvedPlanPromptPending = false
                             }
                             // Count only real tool receipts after their authoritative event is durable.
-                            if (event.isError) hadToolFailure = true else hadSuccessfulToolReceipt = true
+                            if (deliveryIsError) hadToolFailure = true else hadSuccessfulToolReceipt = true
                             workModelHistoryRuntime.updateContextMetrics(binding)
                             runTranscript.applyMessages(listOf(transcriptMessage), toolEvent.sequence)
                             workModelHistoryRuntime.persist(binding)

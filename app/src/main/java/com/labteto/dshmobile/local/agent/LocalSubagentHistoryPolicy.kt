@@ -20,8 +20,12 @@ internal class LocalSubagentHistoryPolicy(
         callId: String,
         output: String,
         retention: com.labteto.dshmobile.harness.tools.ToolResultRetention,
+        requireStored: Boolean = false,
+        preview: String? = null,
     ): String = projectRecoverableToolResult(
         value = output,
+        requireStored = requireStored,
+            preview = preview ?: output,
         retention = retention,
         usageMode = LocalUsageMode.WORK,
         callId = callId,

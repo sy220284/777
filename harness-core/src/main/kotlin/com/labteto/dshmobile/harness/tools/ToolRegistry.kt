@@ -48,6 +48,7 @@ data class ToolResult(
     /** Captured by the process executor, never parsed from stdout. */
     val processExitCode: Int? = null,
     val fileVersions: Map<String, String> = emptyMap(),
+    val richContent: com.labteto.dshmobile.harness.tools.ToolRichContent? = null,
 )
 
 data class ToolInvocationResult internal constructor(

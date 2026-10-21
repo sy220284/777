@@ -24,16 +24,19 @@ internal fun projectRecoverableToolResult(
     budget: LocalHistoryBudget? = null,
     callId: String?,
     spill: (String, String) -> Boolean,
+    requireStored: Boolean = false,
+    preview: String = value,
 ): LocalRecoverableToolResultProjection {
     val stored = retention == ToolResultRetention.DURABLE &&
         callId?.let { spill(it, value) } == true
+    check(!requireStored || stored) { "MCP 完整结果未能保存：本机存储容量不足或写入失败，请缩小查询或分页；本次结果不可回查。" }
     val retained = when (usageMode) {
-        LocalUsageMode.WORK -> retainWorkToolResultForModel(value)
+        LocalUsageMode.WORK -> retainWorkToolResultForModel(preview)
         LocalUsageMode.CHAT -> {
             val resolvedBudget = requireNotNull(budget) {
                 "Chat tool-result projection requires a history budget"
             }
-            retainToolResultForModel(value, usageMode, resolvedBudget)
+            retainToolResultForModel(preview, usageMode, resolvedBudget)
         }
     }
     if (!retained.truncated) {
