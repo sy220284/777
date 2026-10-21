@@ -178,35 +178,50 @@ internal fun appendPendingWorkToolActivities(
     if (pending.isEmpty()) return compactRepeatedWorkStatusChecks(enriched)
     // Insert at the call's original time instead of appending below newer narration,
     // completed replies or deliverables. Never reorder existing durable messages.
-    val result = enriched.toMutableList()
-    pending.forEach { activity ->
-        val timestamp = activity.declaredAt ?: Long.MAX_VALUE
-        val index = result.indexOfFirst { item ->
-            when (item) {
-                is LocalTranscriptItem.Message -> item.message.createdAt > timestamp
-                is LocalTranscriptItem.WorkStep -> {
-                    val at = item.message.toolDeclaredAt ?: item.message.createdAt
-                    at > timestamp || (at == timestamp && item.message.role == "tool" &&
-                        (item.message.toolDeclaredSequence ?: Long.MAX_VALUE) >
-                        (activity.declaredSequence ?: Long.MAX_VALUE))
-                }
-                is LocalTranscriptItem.Thinking -> item.messages.first().createdAt > timestamp
-                is LocalTranscriptItem.WorkPendingTool -> {
-                    val at = item.activity.declaredAt ?: Long.MAX_VALUE
-                    at > timestamp || (at == timestamp &&
-                        (item.activity.declaredSequence ?: Long.MAX_VALUE) >
-                        (activity.declaredSequence ?: Long.MAX_VALUE))
-                }
-                is LocalTranscriptItem.MediaResult -> item.result.createdAtMillis > timestamp
-                is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis > timestamp
-                is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis > timestamp
-                is LocalTranscriptItem.WorkArtifact -> true
-                else -> false
-            }
+    // Both streams have a stable order: pending declarations are sorted by (time, sequence).
+    // Walk original rows once and drain declarations that belong before each row. This
+    // reproduces the previous indexOfFirst + ArrayList.add semantics even when durable
+    // timestamps are out of order, without rescanning/shifting for every pending tool.
+    val result = ArrayList<LocalTranscriptItem>(enriched.size + pending.size)
+    var nextPending = 0
+    for (item in enriched) {
+        while (nextPending < pending.size && pendingToolPrecedes(item, pending[nextPending])) {
+            result += LocalTranscriptItem.WorkPendingTool(pending[nextPending++])
         }
-        result.add(if (index < 0) result.size else index, LocalTranscriptItem.WorkPendingTool(activity))
+        result += item
+    }
+    while (nextPending < pending.size) {
+        result += LocalTranscriptItem.WorkPendingTool(pending[nextPending++])
     }
     return compactRepeatedWorkStatusChecks(result)
+}
+
+/** Legacy row precedence for an uncompleted declaration; ties keep declared sequence. */
+private fun pendingToolPrecedes(
+    item: LocalTranscriptItem,
+    activity: LocalToolActivityUiItem,
+): Boolean {
+    val timestamp = activity.declaredAt ?: Long.MAX_VALUE
+    return when (item) {
+        is LocalTranscriptItem.Message -> item.message.createdAt > timestamp
+        is LocalTranscriptItem.WorkStep -> {
+            val at = item.message.toolDeclaredAt ?: item.message.createdAt
+            at > timestamp || (at == timestamp && item.message.role == "tool" &&
+                (item.message.toolDeclaredSequence ?: Long.MAX_VALUE) >
+                (activity.declaredSequence ?: Long.MAX_VALUE))
+        }
+        is LocalTranscriptItem.Thinking -> item.messages.first().createdAt > timestamp
+        is LocalTranscriptItem.WorkPendingTool -> {
+            val at = item.activity.declaredAt ?: Long.MAX_VALUE
+            at > timestamp || (at == timestamp &&
+                (item.activity.declaredSequence ?: Long.MAX_VALUE) >
+                (activity.declaredSequence ?: Long.MAX_VALUE))
+        }
+        is LocalTranscriptItem.MediaResult -> item.result.createdAtMillis > timestamp
+        is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis > timestamp
+        is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis > timestamp
+        is LocalTranscriptItem.WorkArtifact -> true
+    }
 }
 
 /**
