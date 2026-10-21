@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelConfigContract
 import com.labteto.dshmobile.local.model.LocalModelExecutionSettings
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalModelMutationGate
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.model.LocalModelState
 import com.labteto.dshmobile.local.model.forPersistedSessionModel
@@ -199,7 +200,6 @@ internal class LocalForegroundSessionLoader @Inject constructor(
         val activeModelProfile = chosenSessionProfile ?: recoveryState.profile
             ?: modelConfiguration.activeProfile(model, baseUrl, modelProfiles)
         val modelConfigured = activeModelProfile != null && modelGateway.hasCredential(activeModelProfile)
-        activeModelProfile?.takeIf { modelConfigured }?.let(modelGateway::activate)
         val restoredModel = activeModelProfile?.model ?: model
         val restoredBaseUrl = activeModelProfile?.baseUrl ?: baseUrl
         val resources = runtimeStateStore.resourceSnapshot()
@@ -259,7 +259,31 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             ),
             error = recoveryState.error,
         )
-        runtimeStateStore.projection.update { restoredState }
+        // A session may be restoring while a model configuration transaction commits.
+        // The catalog collected earlier in this long-running load can be stale; reconcile
+        // against the durable model owner under the same mutation gate at publication time.
+        LocalModelMutationGate.run {
+            val latestProfiles = modelConfiguration.readProfiles()
+            val sessionChoice = log.selectedLocalModelProfileId()?.let { id ->
+                latestProfiles.firstOrNull { it.id == id }
+            }
+            val recoveredChoice = recoveryState.profile?.let { recovered ->
+                latestProfiles.firstOrNull { it.id == recovered.id }
+            }
+            val selected = sessionChoice ?: recoveredChoice
+                ?: modelConfiguration.activeProfile(model, baseUrl, latestProfiles)
+            val configuredNow = selected != null && modelGateway.hasCredential(selected)
+            if (configuredNow) modelGateway.activate(selected!!) else modelGateway.clearActive()
+            val refreshed = restoredState.modelState.copy(
+                configured = configuredNow,
+                model = selected?.model ?: model,
+                baseUrl = selected?.baseUrl ?: baseUrl,
+                modelSelection = LocalModelSelectionState.restored(
+                    latestProfiles, selected?.id, modelExecutionSettings.workerProfileId,
+                ),
+            )
+            runtimeStateStore.projection.update { restoredState.copy(modelState = refreshed) }
+        }
 
         LocalSessionRuntimeRegistry.submitWhenIdle(sessionId) {
             if (runtimeStateStore.state.value.usageMode == LocalUsageMode.WORK) {
