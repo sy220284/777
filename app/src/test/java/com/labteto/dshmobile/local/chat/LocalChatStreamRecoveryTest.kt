@@ -56,6 +56,28 @@ class LocalChatStreamRecoveryTest {
     }
 
     @Test
+    fun failedRegenerationCannotRestoreAnExtraPartialAnswer() {
+        val directory = Files.createTempDirectory("chat-regeneration-partial").toFile()
+        try {
+            val log = LocalSessionEventLog(directory.resolve("events.jsonl"), Json)
+            log.append("turn/start", buildJsonObject {
+                put("mode", "chat")
+                put("replaces", "existing-answer")
+            })
+            LocalChatStreamCheckpointWriter(log, "regeneration").apply {
+                append("未完成的新版本")
+                flush()
+            }
+            log.append("turn/end", buildJsonObject {
+                put("mode", "chat")
+                put("reason", "error")
+            })
+            assertNull(recoverInterruptedChatReply(log))
+            assertNull(log.latest("assistant/partial-visible"))
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test
     fun checkpointFromPreviousTurnCannotLeakIntoNextTurn() {
         val directory = Files.createTempDirectory("chat-stream-stale").toFile()
         try {
