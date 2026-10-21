@@ -215,15 +215,9 @@ class LocalModelRuntime @Inject constructor(
             }.exceptionOrNull()
         } else null
         // Session-log I/O failure must not suppress a successfully persisted model projection.
-        val before = state.value.modelState
-        state.commit(
-            before.copy(
-                configured = result.configured,
-                model = result.model,
-                baseUrl = result.baseUrl,
-                modelSelection = before.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
-            ),
-            error,
+        state.commitConfiguration(
+            result.configured, result.model, result.baseUrl,
+            result.profiles, result.activeProfileId, error,
         )
         if (eventFailure != null) {
             AppLog.warn("ModelConfiguration", "model/session-selection-record-failed", eventFailure)
