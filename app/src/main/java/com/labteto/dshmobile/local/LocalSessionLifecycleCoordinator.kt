@@ -336,9 +336,11 @@ internal class LocalSessionLifecycleCoordinator(
             sessionCoordinator.summaries().any { it.id == sessionId }
 
     fun switchSession(sessionId: String): Boolean {
-        // Visible history stays in memory; deep links may target a persisted session
-        // before the UI summary index has refreshed.
-        if (sessionId != currentSessionId() && !isKnownSession(sessionId)) return false
+        if (sessionId.isBlank()) return false
+        // This synchronous UI/SessionUiPort entrypoint only queues the desired identity.
+        // Validating a cold deep link may scan session JSON and must run on the Session IO
+        // owner with the rest of navigation, never while the UI command lock is held.
+        // A queued receipt means "will be resolved", not that the session exists.
         navigationInbox.offer(LocalSessionNavigationRequest.Session(sessionId))
         scope.launch { continueQueuedNavigation() }
         return true
