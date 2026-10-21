@@ -797,11 +797,12 @@ internal class LocalWorkAgentTurnExecutor(
                             workModelHistoryRuntime.persist(binding)
                         }
                         is AgentEvent.TurnFailed -> {
-                            if (event.completionReason != null) {
+                            val completionReason = event.completionReason
+                            if (completionReason != null) {
                                 foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
                                 runEventLog.append("turn/end", buildJsonObject {
                                     put("source_message_id", uiSourceMessageId)
-                                    put("reason", event.completionReason.name.lowercase())
+                                    put("reason", completionReason.name.lowercase())
                                     put("detail", event.reason)
                                 })
                                 workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/model-partial")

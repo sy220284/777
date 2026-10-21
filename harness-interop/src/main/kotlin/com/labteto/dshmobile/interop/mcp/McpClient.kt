@@ -410,7 +410,10 @@ internal suspend fun <T> Call.executeCancellable(block: (Response) -> T): T =
         enqueue(
             object : Callback {
                 override fun onFailure(call: Call, error: IOException) {
-                    if (continuation.isActive) continuation.resumeWithException(error)
+                    // OkHttp wraps an interceptor's CancellationException in IOException
+                    // and attaches the original as suppressed. Preserve cancellation semantics.
+                    val cancellation = error.suppressed.firstOrNull { it is CancellationException }
+                    if (continuation.isActive) continuation.resumeWithException(cancellation ?: error)
                 }
 
                 override fun onResponse(call: Call, response: Response) {
