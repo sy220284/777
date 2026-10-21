@@ -124,11 +124,11 @@ class LocalChatEditSupportTest {
     @Test
     fun regenerationRebuildsModelHistoryWithoutSupersededRepliesOrOldSummary() {
         withLog { log ->
-            val initialUser = LocalHarnessMessage("u0", "user", "先前提问", 1L)
-            val initialAnswer = LocalHarnessMessage("a0", "assistant", "先前有效回答", 2L)
-            val currentUser = LocalHarnessMessage("u1", "user", "重新回答这个问题", 3L)
-            val obsoleteAnswer = LocalHarnessMessage("a1", "assistant", "第一版应被隔离", 4L)
-            val oldAlternative = LocalHarnessMessage("a2", "assistant", "第二版应被隔离", 5L)
+            val initialUser = LocalHarnessMessage(id = "u0", role = "user", content = "先前提问", createdAt = 1L)
+            val initialAnswer = LocalHarnessMessage(id = "a0", role = "assistant", content = "先前有效回答", createdAt = 2L)
+            val currentUser = LocalHarnessMessage(id = "u1", role = "user", content = "重新回答这个问题", createdAt = 3L)
+            val obsoleteAnswer = LocalHarnessMessage(id = "a1", role = "assistant", content = "第一版应被隔离", createdAt = 4L)
+            val oldAlternative = LocalHarnessMessage(id = "a2", role = "assistant", content = "第二版应被隔离", createdAt = 5L)
             log.append("user/message", buildJsonObject {
                 put("role", "user")
                 put("content", "先前提问")
