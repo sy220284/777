@@ -3,7 +3,6 @@ package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
