@@ -355,8 +355,7 @@ internal fun LocalComposerPlanAction(
         tint = if (selected) colors.primary else colors.text,
         disabledTint = if (selected) colors.primary.copy(alpha = 0.72f)
             else colors.text.copy(alpha = 0.72f),
-        containerColor = if (selected) colors.primary.copy(alpha = 0.17f) else colors.selected,
-        disabledContainerColor = if (selected) colors.primary.copy(alpha = 0.10f)
-            else colors.selected.copy(alpha = 0.70f),
+        containerColor = colors.primary.copy(alpha = if (selected) 0.17f else 0.10f),
+        disabledContainerColor = colors.primary.copy(alpha = if (selected) 0.10f else 0.07f),
     )
 }
