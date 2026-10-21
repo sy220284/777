@@ -81,9 +81,14 @@ internal class LocalMcpOAuthCoordinator @Inject constructor(
                                 target.substringBefore('?') == path && target.contains('?')
                             if (wellFormed) {
                                 for (item in target.substringAfter('?').split('&').filter(String::isNotBlank)) {
-                                    val key = URLDecoder.decode(item.substringBefore('='), "UTF-8")
-                                    val value = URLDecoder.decode(item.substringAfter('=', ""), "UTF-8")
-                                    if (values.put(key, value) != null) wellFormed = false
+                                    val pair = runCatching {
+                                        URLDecoder.decode(item.substringBefore('='), "UTF-8") to
+                                            URLDecoder.decode(item.substringAfter('=', ""), "UTF-8")
+                                    }.getOrNull()
+                                    if (pair == null || values.put(pair.first, pair.second) != null) {
+                                        wellFormed = false
+                                        break
+                                    }
                                 }
                             }
                             val valid = wellFormed && values["state"] == expectedState
