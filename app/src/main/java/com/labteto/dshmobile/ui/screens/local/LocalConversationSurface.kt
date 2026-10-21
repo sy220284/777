@@ -636,9 +636,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             }
         }
     }
-    val showEmptyWorkbench = transcriptItems.isEmpty() &&
-        (state.usageMode == LocalUsageMode.WORK ||
-            (!state.groupChat.enabled && state.chatPersona.isUnboundChatPersona()))
+    val showEmptyWorkbench = shouldShowEmptyLocalHarness(
+        usageMode = state.usageMode,
+        transcriptEmpty = transcriptItems.isEmpty(),
+    )
     val showEmptyGroupSetup = transcriptItems.isEmpty() &&
         state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled &&
         state.groupChat.members.size < 2
@@ -1935,6 +1936,12 @@ internal fun localComposerAttachmentDecision(
     }
     return LocalComposerAttachmentDecision.ACCEPT
 }
+
+/** The Work quick-start panel must never enter a Chat conversation, including unbound personas. */
+internal fun shouldShowEmptyLocalHarness(
+    usageMode: LocalUsageMode,
+    transcriptEmpty: Boolean,
+): Boolean = usageMode == LocalUsageMode.WORK && transcriptEmpty
 
 @Composable
 private fun EmptyLocalHarness(
