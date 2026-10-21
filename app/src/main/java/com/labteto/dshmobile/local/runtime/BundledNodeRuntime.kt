@@ -29,6 +29,9 @@ class BundledNodeRuntime @Inject constructor(
     private var activeLibraryDir: File? = null
 
     @Volatile
+    private var activeCertFile: File? = null
+
+    @Volatile
     private var runtimeVersion: String? = null
 
     @Volatile
@@ -45,7 +48,21 @@ class BundledNodeRuntime @Inject constructor(
 
             val versionRoot = File(runtimeHome, "$version/$abi")
             val libraryDir = File(versionRoot, "lib")
-            BundledRuntimeInstallation.prepareVersion(context, "node", versionRoot, version, abi)
+            val certFile = File(versionRoot, "tls/cert.pem")
+            BundledRuntimeInstallation.prepareVersion(
+                context = context,
+                runtime = "node",
+                versionRoot = versionRoot,
+                version = version,
+                abi = abi,
+                initialize = {
+                    BundledRuntimeInstallation.copyAssetDirectory(
+                        context, "$ASSET_ROOT/$abi/tls", File(versionRoot, "tls"),
+                    )
+                },
+                extraReady = { certFile.isFile && certFile.length() > 0L },
+            )
+            check(certFile.isFile && certFile.length() > 0L) { "内置 Node TLS 信任根证书未准备好" }
 
             val nativeNode = File(context.applicationInfo.nativeLibraryDir, NATIVE_NODE_NAME)
             require(nativeNode.isFile && nativeNode.canExecute()) {
@@ -57,6 +74,7 @@ class BundledNodeRuntime @Inject constructor(
             BundledRuntimeInstallation.removeOldVersions(runtimeHome, version)
 
             activeLibraryDir = libraryDir
+            activeCertFile = certFile
             runtimeVersion = version
             prepared = true
         }
@@ -66,9 +84,11 @@ class BundledNodeRuntime @Inject constructor(
 
     fun environment(): Map<String, String> {
         val libraryDir = activeLibraryDir ?: return emptyMap()
+        val certFile = activeCertFile ?: return emptyMap()
         val nativeDir = context.applicationInfo.nativeLibraryDir
         return mapOf(
             "LD_LIBRARY_PATH" to listOf(libraryDir.path, nativeDir).joinToString(File.pathSeparator),
+            "NODE_EXTRA_CA_CERTS" to certFile.path,
             "HOME" to context.filesDir.path,
             "TMPDIR" to context.cacheDir.path,
         )
