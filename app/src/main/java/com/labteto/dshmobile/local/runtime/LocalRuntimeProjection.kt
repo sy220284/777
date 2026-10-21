@@ -4,7 +4,6 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.model.LocalImageInputMode
-import com.labteto.dshmobile.local.model.LocalModelState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.forSessionModel
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
@@ -193,9 +192,40 @@ internal class LocalRuntimeProjection(
         }
     }
 
-    internal fun projectModelState(modelState: LocalModelState, error: String?) {
+    internal fun projectModelConfiguration(
+        configured: Boolean,
+        model: String,
+        baseUrl: String,
+        profiles: List<LocalModelProfile>,
+        activeProfileId: String?,
+        error: String?,
+        preferredSessionId: String? = null,
+    ) {
         state.update { current ->
-            current.copy(modelState = modelState, error = error)
+            val before = current.modelState
+            // Session choice outranks the application default. Only the initiating
+            // foreground session explicitly adopting a saved model may replace it.
+            val retained = profiles.firstOrNull { it.id == before.modelSelection.activeProfileId }
+            val default = profiles.firstOrNull { it.id == activeProfileId }
+            val chosen = if (current.sessionId.isBlank() ||
+                (preferredSessionId != null && current.sessionId == preferredSessionId)) {
+                default
+            } else {
+                retained ?: default
+            }
+            current.copy(
+                modelState = before.copy(
+                    configured = when {
+                        chosen == null -> false
+                        chosen.id == activeProfileId -> configured
+                        else -> before.configured
+                    },
+                    model = chosen?.model ?: model,
+                    baseUrl = chosen?.baseUrl ?: baseUrl,
+                    modelSelection = before.modelSelection.replaceProfiles(profiles, chosen?.id),
+                ),
+                error = error,
+            )
         }
     }
 

@@ -1,6 +1,13 @@
 package com.labteto.dshmobile.local.model
 
 import android.content.Context
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.runtime.LocalRuntimeProjection
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.MutableStateFlow
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.util.UUID
@@ -174,6 +181,45 @@ class LocalModelProfileStoreAndroidTest {
         assertEquals(LocalModelAuthKind.CHATGPT_PLAN, reloaded.authKind)
         assertEquals(LocalModelProtocol.RESPONSES, reloaded.protocol)
         assertEquals(legacy.id, reloaded.id)
+    }
+
+    @Test
+    fun durableMetadataAndUiProjectionCannotBeOvertakenByLaterSave() = runBlocking {
+        val preferences = context.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
+        val store = LocalModelProfileStore(preferences, Json)
+        val visible = MutableStateFlow(LocalHarnessState())
+        val projection = LocalRuntimeProjection(visible)
+        val routeA = LocalModelProfile("route-a", "model-a", "https://a.example")
+        val routeB = LocalModelProfile("route-b", "model-b", "https://b.example")
+        val firstPersisted = CompletableDeferred<Unit>()
+        val finishFirstProjection = CompletableDeferred<Unit>()
+        val first = async(Dispatchers.Default) {
+            LocalModelMutationGate.run {
+                store.commitConfiguration(listOf(routeA), routeA, "txn-a")
+                firstPersisted.complete(Unit)
+                // Pause AFTER durable metadata, BEFORE projection, while retaining the gate.
+                finishFirstProjection.await()
+                projection.projectModelConfiguration(
+                    true, routeA.model, routeA.baseUrl, listOf(routeA), routeA.id, null,
+                )
+            }
+        }
+        firstPersisted.await()
+        val second = async(Dispatchers.Default) {
+            LocalModelMutationGate.run {
+                store.commitConfiguration(listOf(routeA, routeB), routeB, "txn-b")
+                projection.projectModelConfiguration(
+                    true, routeB.model, routeB.baseUrl, listOf(routeA, routeB), routeB.id, null,
+                )
+            }
+        }
+        finishFirstProjection.complete(Unit)
+        first.await()
+        second.await()
+        assertEquals("txn-b", store.transactionId())
+        assertEquals(store.read(), visible.value.modelState.modelSelection.profiles)
+        assertEquals(routeB.id, visible.value.modelState.modelSelection.activeProfileId)
+        assertEquals(routeB.id, store.active(routeB.model, routeB.baseUrl)?.id)
     }
 
     private fun planProfile(accountId: String) = LocalModelProfile(
