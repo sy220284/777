@@ -334,4 +334,53 @@ class LocalWorkReplyPresentationTest {
         val output = buildLocalTranscript(listOf(narration))
         assertEquals("work-step:narration", output.single().key)
     }
+    @Test
+    fun pendingToolLinearMergeMatchesLegacyInsertionAcrossOutOfOrderTimestamps() {
+        val random = kotlin.random.Random(812)
+        repeat(140) { trial ->
+            val rows = (0 until 65).map { n ->
+                LocalTranscriptItem.WorkStep(
+                    LocalHarnessMessage(
+                        id = "row-$trial-$n", role = "progress", content = "step",
+                        createdAt = random.nextLong(0L, 160L),
+                    ),
+                )
+            }
+            val activities = (0 until 45).map { n ->
+                com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
+                    callId = "call-$trial-$n", name = "read",
+                    phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING,
+                    declaredAt = random.nextLong(0L, 160L),
+                    declaredSequence = random.nextLong(0L, 30L),
+                )
+            }.shuffled(random)
+            val pending = activities.sortedWith(
+                compareBy<com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem> {
+                    it.declaredAt ?: Long.MAX_VALUE
+                }.thenBy { it.declaredSequence ?: Long.MAX_VALUE },
+            )
+            val legacy = rows.toMutableList<LocalTranscriptItem>()
+            pending.forEach { activity ->
+                val ts = activity.declaredAt ?: Long.MAX_VALUE
+                val at = legacy.indexOfFirst { item ->
+                    when (item) {
+                        is LocalTranscriptItem.WorkStep -> item.message.createdAt > ts
+                        is LocalTranscriptItem.WorkPendingTool ->
+                            (item.activity.declaredAt ?: Long.MAX_VALUE) > ts ||
+                                (item.activity.declaredAt == ts &&
+                                    (item.activity.declaredSequence ?: Long.MAX_VALUE) >
+                                    (activity.declaredSequence ?: Long.MAX_VALUE))
+                        else -> false
+                    }
+                }
+                legacy.add(if (at < 0) legacy.size else at, LocalTranscriptItem.WorkPendingTool(activity))
+            }
+            assertEquals(
+                "trial=$trial",
+                legacy.map { it.key },
+                appendPendingWorkToolActivities(rows, activities, running = true).map { it.key },
+            )
+        }
+    }
+
 }
