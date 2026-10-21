@@ -37,7 +37,9 @@ class LocalModelRuntime @Inject constructor(
         gateway = gateway,
         state = state,
         isBusy = ::identityMutationLocked,
-        onCommitted = { result, error, recordSession -> commit(result, error, recordSession) },
+        onCommitted = { result, error, recordSession, origin ->
+            commit(result, error, recordSession, origin)
+        },
     )
 
     init { accounts.observeInvalidations(scope) }
@@ -65,12 +67,13 @@ class LocalModelRuntime @Inject constructor(
         contextWindowTokensOverride: Int? = null,
         credentialSourceProfileId: String? = null,
     ) {
+        val originatingSessionId = runtimeStateStore.state.value.sessionId
         check(!identityMutationLocked()) { "请等待初始化完成或结束当前任务后再切换模型" }
         configuration.save(
             apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride,
             credentialSourceProfileId,
             onCommitted = { result ->
-                commit(result)
+                commit(result, preferredSessionId = originatingSessionId)
                 runCatching {
                     runtimeStateStore.imageCapabilities.clearRoute(result.baseUrl, result.model)
                 }.onFailure { failure ->
@@ -185,7 +188,10 @@ class LocalModelRuntime @Inject constructor(
         accountId: String,
         models: List<ChatGptModelOption>,
         selectFirst: Boolean = true,
-    ) = accounts.syncChatGptModels(accountId, models, selectFirst)
+    ) = accounts.syncChatGptModels(
+        accountId, models, selectFirst,
+        if (selectFirst) runtimeStateStore.state.value.sessionId else null,
+    )
 
     internal suspend fun retireChatGptAccountProfiles(accountId: String) =
         accounts.retireChatGptAccountProfiles(accountId)
@@ -205,23 +211,40 @@ class LocalModelRuntime @Inject constructor(
         result: LocalModelConfigurationResult,
         error: String? = null,
         recordSessionSelection: Boolean = true,
+        preferredSessionId: String? = null,
     ) {
-        val visibleSessionId = runtimeStateStore.state.value.sessionId
-        val eventFailure = if (recordSessionSelection && result.activeProfileId != null &&
-            visibleSessionId.isNotBlank() && !runtimeStateStore.sessionTransitioning) {
-            runCatching {
-                sessionStorage.eventLogs.get(visibleSessionId)
-                    .recordLocalModelSelection(result.activeProfileId)
-            }.exceptionOrNull()
-        } else null
-        // Session-log I/O failure must not suppress a successfully persisted model projection.
+        val before = runtimeStateStore.state.value
+        // A configuration mutation changes the catalog for every session, but must
+        // not silently replace a different conversation's still-valid model choice.
         state.commitConfiguration(
             result.configured, result.model, result.baseUrl,
-            result.profiles, result.activeProfileId, error,
+            result.profiles, result.activeProfileId, error, preferredSessionId,
         )
-        if (eventFailure != null) {
-            AppLog.warn("ModelConfiguration", "model/session-selection-record-failed", eventFailure)
-            state.publishError("模型配置已保存，但会话模型选择记录失败，请重新选择模型")
+        val after = runtimeStateStore.state.value
+        if (before.sessionId != after.sessionId || runtimeStateStore.sessionTransitioning) return
+
+        val active = after.modelState.modelSelection.activeProfile
+        if (recordSessionSelection && after.sessionId.isNotBlank() &&
+            active != null &&
+            before.modelState.modelSelection.activeProfileId != active.id) {
+            runCatching {
+                sessionStorage.eventLogs.get(after.sessionId).recordLocalModelSelection(active.id)
+            }.onFailure { failure ->
+                AppLog.warn("ModelConfiguration", "model/session-selection-record-failed", failure)
+                state.publishError("模型配置已保存，但会话模型选择记录失败，请重新选择模型")
+            }
+        }
+        // Durable defaults and session model selection are intentionally different
+        // owners. Restore the foreground route after persistence activates the default.
+        runCatching {
+            if (active == null) {
+                if (gateway.activeProfile() != null) gateway.clearActive()
+            } else if (gateway.activeProfile()?.id != active.id) {
+                gateway.activate(active)
+            }
+        }.onFailure { failure ->
+            AppLog.warn("ModelConfiguration", "model/foreground-route-restore-failed", failure)
+            state.publishError("模型配置已保存，但当前会话模型激活失败，请重新选择")
         }
     }
 }
