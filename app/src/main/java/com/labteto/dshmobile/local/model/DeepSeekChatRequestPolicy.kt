@@ -13,9 +13,12 @@ internal object DeepSeekChatRequestPolicy {
     const val MAX_OUTPUT_TOKENS = 393_216
     private const val CONTEXT_HEADROOM_TOKENS = 8_192
 
-    fun isOfficial(model: String, baseUrl: String): Boolean {
-        if (model.trim().lowercase() !in setOf("deepseek-flash", "deepseek-v4-pro")) return false
-        return runCatching {
+    fun isOfficial(model: String, baseUrl: String): Boolean =
+        model.trim().lowercase() in setOf("deepseek-flash", "deepseek-v4-pro") &&
+            isOfficialOrigin(baseUrl)
+
+    fun isOfficialOrigin(baseUrl: String): Boolean =
+        runCatching {
             val uri = URI(normalizeModelBaseUrl(baseUrl))
             uri.scheme.equals("https", ignoreCase = true) &&
                 uri.host.equals("api.deepseek.com", ignoreCase = true) &&
