@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertExists
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -396,6 +397,13 @@ class LocalConversationComposerRegressionTest {
         compose.runOnIdle { running.value = true }
         compose.onNodeWithContentDescription(context.getString(R.string.chat_composer_send)).assertDoesNotExist()
         compose.onNodeWithContentDescription(context.getString(R.string.chat_composer_stop)).assertExists()
+        compose.onNodeWithTag("local-composer-plan-toggle").assertIsNotEnabled()
+        compose.onNodeWithContentDescription(
+            context.getString(
+                R.string.local_composer_reasoning_action,
+                context.getString(R.string.local_composer_reasoning_default),
+            ),
+        ).assertIsNotEnabled()
         compose.onNodeWithText(context.getString(R.string.local_work_submit_queue)).performClick()
         compose.onNodeWithContentDescription(context.getString(R.string.chat_composer_stop)).performClick()
         compose.runOnIdle {

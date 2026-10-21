@@ -105,6 +105,8 @@ internal fun LocalComposerCapabilityActions(
                 enabled = !running,
                 tint = colors.primaryPressed,
                 containerColor = colors.primary.copy(alpha = 0.18f),
+                disabledTint = colors.primaryPressed,
+                disabledContainerColor = colors.primary.copy(alpha = 0.18f),
             )
             if (showLabels) {
                 Text(
@@ -351,5 +353,7 @@ internal fun LocalComposerPlanAction(
         enabled = enabled && !waitingForApproval,
         tint = colors.primaryPressed,
         containerColor = colors.primary.copy(alpha = if (selected) 0.26f else 0.18f),
+        disabledTint = colors.primaryPressed,
+        disabledContainerColor = colors.primary.copy(alpha = if (selected) 0.26f else 0.18f),
     )
 }
