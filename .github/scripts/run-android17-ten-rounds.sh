@@ -11,8 +11,23 @@ case "$api" in
 esac
 # API level 36/37 is the instrumentation label; release numbers are 16/17.
 # These artifact paths must match the workflow upload paths exactly.
-out=".ci/android${platform}-ten-rounds"
+page_kb="${2:-}"
+case "$page_kb" in
+  "") out=".ci/android${platform}-ten-rounds" ;;
+  4|16) out=".ci/android${platform}-${page_kb}k-ten-rounds" ;;
+  *) echo "expected page size 4, 16 or empty (legacy output)" >&2; exit 2 ;;
+esac
 mkdir -p "$out"
+actual_api="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
+actual_page="$(adb shell getconf PAGESIZE | tr -d '\r')"
+if [[ "$actual_api" != "$api" ]]; then
+  echo "::error::Android API mismatch: expected $api, got $actual_api" >&2
+  exit 1
+fi
+if [[ -n "$page_kb" && "$actual_page" != "$((page_kb * 1024))" ]]; then
+  echo "::error::Page size mismatch: expected ${page_kb}KB, got $actual_page bytes" >&2
+  exit 1
+fi
 component="com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner"
 classes="com.labteto.dshmobile.local.DevicePerformanceBaselineTest,com.labteto.dshmobile.local.tools.LocalMcpOAuthProtocolEndToEndAndroidTest,com.labteto.dshmobile.automation.AutomationDispatchEndToEndAndroidTest,com.labteto.dshmobile.ui.screens.local.DeviceScrollFrameAndMemoryTest"
 {
