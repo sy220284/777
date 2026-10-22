@@ -979,6 +979,13 @@ usage_analytics = strip_comments(read(
 ))
 if "import com.labteto.dshmobile.local.model." in usage_arithmetic or "DeepSeekTokenUsage" in usage_arithmetic:
     die("Shared Usage arithmetic must not depend on provider-specific model types")
+for usage_path, usage_source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "usage"):
+    for imported in local_references(usage_source):
+        if imported.startswith("com.labteto.dshmobile.local.model."):
+            die(
+                str(usage_path.relative_to(ROOT))
+                + " creates a Shared Usage -> Model reverse dependency: " + imported
+            )
 if "data class ReportedTokenUsage" not in usage_contract:
     die("Shared Usage lost provider-neutral reported token contract")
 if "DeepSeekUsageTracker" in usage_analytics:
