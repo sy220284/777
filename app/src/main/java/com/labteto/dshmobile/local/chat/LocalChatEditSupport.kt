@@ -292,6 +292,18 @@ private fun loadDurableAssistantModelMessages(
         if (page.isEmpty()) break
 
         page.forEach { event ->
+            if (event.type == "chat/active-transcript") {
+                // Regeneration commits only this complete projection event; keep its structured
+                // assistant payload available when an older variant is selected again.
+                val id = (event.data["regenerated_assistant_id"] as? JsonPrimitive)
+                    ?.content?.takeIf(remaining::contains)
+                val modelMessage = event.data["regenerated_assistant_message"] as? JsonObject
+                if (id != null && modelMessage != null) {
+                    result[id] = modelMessage
+                    remaining.remove(id)
+                }
+                return@forEach
+            }
             if (event.type != "assistant/message") return@forEach
             val transcriptAssistants = decodeTranscriptMessages(event.data)
                 .orEmpty()
