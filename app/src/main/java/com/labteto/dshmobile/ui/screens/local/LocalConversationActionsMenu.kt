@@ -12,6 +12,7 @@ import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyIconButton
 import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.ConversationMenuIcons
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 
 /** Session actions remain anchored beside the tapped icon, matching the context-menu surface. */
@@ -42,25 +43,25 @@ internal fun ConversationActionsMenu(
             // Match the attachment + menu: paint the aligned chat scene, not an opaque L4 plate.
             seamlessBackground = true,
             items = onOpenWorkEvidence?.let { open -> listOf(SyMenuItem(
-                text = stringResource(R.string.work_evidence_title), icon = FeatherIcons.FileText, onClick = open,
+                text = stringResource(R.string.work_evidence_title), icon = ConversationMenuIcons.WorkEvidence, onClick = open,
             )) }.orEmpty() + onOpenDocuments?.let { open -> listOf(SyMenuItem(
                 text = stringResource(R.string.local_session_documents),
-                icon = FeatherIcons.FileText,
+                icon = ConversationMenuIcons.InteractiveDocument,
                 onClick = open,
             )) }.orEmpty() + listOf(
                 SyMenuItem(
                     text = stringResource(R.string.common_rename),
-                    icon = FeatherIcons.Edit3,
+                    icon = ConversationMenuIcons.Rename,
                     onClick = onRename,
                 ),
                 SyMenuItem(
                     text = stringResource(if (pinned) R.string.local_unpin_session else R.string.advanced_pin),
-                    icon = FeatherIcons.Pin,
+                    icon = ConversationMenuIcons.Pin,
                     onClick = onTogglePin,
                 ),
                 SyMenuItem(
                     text = stringResource(R.string.local_delete_session),
-                    icon = FeatherIcons.Trash2,
+                    icon = ConversationMenuIcons.Delete,
                     danger = true,
                     onClick = {
                         expanded = false
