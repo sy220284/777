@@ -78,6 +78,11 @@ for path in paths:
         row["support_references"] = re.findall(r"project\([\"'](:[\w-]+)[\"']\)", content)
 
 file_index = {r["path"]: r for r in records}
+def visible_targets(row, candidates):
+    # 生产源码的静态依赖目标只能是生产源码；测试代码可依赖生产与测试。
+    if row["kind"] == "production":
+        return {p for p in candidates if file_index[p]["kind"] == "production"}
+    return set(candidates)
 unresolved = []
 incoming = collections.Counter()
 edges = collections.defaultdict(set)
@@ -88,7 +93,7 @@ for row in records:
     import_names = {}
     for imp in row["imports"]:
         if imp.endswith(".*"):
-            for target in by_pkg.get(imp[:-2], []):
+            for target in visible_targets(row, by_pkg.get(imp[:-2], [])):
                 if target != row["path"]:
                     edges[row["path"]].add(target)
             continue
@@ -98,6 +103,7 @@ for row in records:
             parts = imp.split(".")
             for n in range(len(parts)-1, 3, -1):
                 candidates |= by_symbol.get(".".join(parts[:n]), set()) - {row["path"]}
+        candidates = visible_targets(row, candidates)
         if candidates:
             import_names[imp.split(".")[-1]] = candidates
             edges[row["path"]].update(candidates)
@@ -111,6 +117,7 @@ for row in records:
         if not count or name in import_names:
             continue
         candidates = by_symbol.get(row["package"] + "." + name, set()) - {row["path"]}
+        candidates = visible_targets(row, candidates)
         if len(candidates) == 1:
             call_edges[row["path"]].update(candidates)
     row["import_edges"] = sorted(edges[row["path"]])
