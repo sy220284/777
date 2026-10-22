@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.shenyan.designsystem.components.SyIconBox
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -99,7 +98,20 @@ internal fun AppSettingsRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
     ) {
-        icon?.let { SyIconBox(icon = it) }
+        icon?.let { settingsIcon ->
+            // V6 paper-ink glyph with no tinted tile; keep the former 32dp alignment slot.
+            Box(
+                modifier = Modifier.size(32.dp).testTag("settingsRowIcon"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = settingsIcon,
+                    contentDescription = null,
+                    tint = colors.textSecondary,
+                    modifier = Modifier.size(23.dp),
+                )
+            }
+        }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
             Text(
                 title,
