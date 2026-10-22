@@ -26,6 +26,10 @@ class LegacyUsageProjectionTest {
             updatedAt = 1000,
         )
         val gap = legacyUsageOffset(legacy, before)
+        val audited = before.withLegacyUnattributedGap(gap)
+        assertEquals(100L, audited.inputTokens)
+        assertEquals(10L, audited.requestCount)
+        assertTrue(gap.hasUnattributedGap())
         assertEquals(10L, gap.inputTokens)
         assertEquals(1L, gap.requestCount)
         val initial = lifetimeUsageProjection(before, gap, 8, 1000)
