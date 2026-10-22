@@ -81,4 +81,42 @@ class LegacyUsageBridgeAndroidTest {
             context.deleteDatabase(dbName)
         }
     }
+    @Test fun conflictingOldCacheSnapshotCannotOverrideCommittedSqlitePartition() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val dbName = "usage-cache-partition-" + UUID.randomUUID() + ".db"
+        val json = Json { ignoreUnknownKeys = true }
+        try {
+            TokenUsageDatabase(context, json, dbName).use { db ->
+                assertTrue(db.append(TokenUsageRecord(
+                    requestId = "sqlite-fact",
+                    timestamp = System.currentTimeMillis(),
+                    model = "provider",
+                    inputTokens = 10,
+                    cacheHitTokens = 5,
+                    cacheMissTokens = 5,
+                    cacheWriteTokens = 2,
+                    reported = true,
+                )).inserted)
+                val migrated = db.adoptLegacyUsageOnce(LegacyUsageCounters(
+                    inputTokens = 10,
+                    cacheHitTokens = 10,
+                    cacheMissTokens = 0,
+                ))
+                assertEquals(10L, migrated.inputTokens)
+                assertEquals(5L, migrated.cacheHitTokens)
+                assertEquals(5L, migrated.cacheMissTokens)
+                assertEquals(2L, migrated.cacheWriteTokens)
+            }
+            TokenUsageDatabase(context, json, dbName).use { db ->
+                val totals = db.lifetimeTotals().tracked
+                assertEquals(10L, totals.inputTokens)
+                assertEquals(5L, totals.cacheHitTokens)
+                assertEquals(5L, totals.cacheMissTokens)
+                assertEquals(2L, totals.cacheWriteTokens)
+            }
+        } finally {
+            context.deleteDatabase(dbName)
+        }
+    }
+
 }
