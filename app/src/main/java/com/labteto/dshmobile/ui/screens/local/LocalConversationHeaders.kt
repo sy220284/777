@@ -165,6 +165,7 @@ internal fun ChatSurfaceHeader(
             contentDescription = stringResource(R.string.chatlist_new_session),
             onClick = onNewSession,
             tint = colors.textSecondary,
+            bare = true,
         )
         ConversationActionsMenu(
             pinned = sessionPinned,
@@ -230,6 +231,7 @@ internal fun WorkSurfaceHeader(
             contentDescription = stringResource(R.string.chatlist_new_session),
             onClick = onNewSession,
             tint = colors.textSecondary,
+            bare = true,
         )
         ConversationActionsMenu(
             pinned = sessionPinned,

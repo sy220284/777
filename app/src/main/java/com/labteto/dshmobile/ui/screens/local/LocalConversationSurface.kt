@@ -876,8 +876,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     icon = FeatherIcons.Menu,
                     contentDescription = stringResource(R.string.app_open_navigation),
                     onClick = onOpenDrawer,
-                    containerColor = com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L4_OVERLAY),
                     tint = colors.text,
+                    bare = true,
                 )
                 Column(Modifier.weight(1f)) {
                     if (state.usageMode == LocalUsageMode.CHAT) {

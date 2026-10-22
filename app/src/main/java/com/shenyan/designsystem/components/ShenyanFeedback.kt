@@ -67,6 +67,7 @@ fun SyIconButton(
     shadowElevation: Dp = 0.dp,
     selected: Boolean = false,
     iconPainter: Painter? = null,
+    bare: Boolean = false,
 ) {
     val p = LocalSyColors.current
     val motion = LocalSyReduceMotion.current
@@ -80,6 +81,7 @@ fun SyIconButton(
         label = "syIconPress",
     )
     val resolved = when {
+        bare -> Color.Transparent
         selected -> syMaterialColor(SyMaterialTier.L3_CARD)
         pressed -> syMaterialColor(SyMaterialTier.L2_BAR)
         hovered -> syMaterialColor(SyMaterialTier.L1_SECTION)
@@ -89,12 +91,13 @@ fun SyIconButton(
         resolved, animationSpec = tween(SyMotion.duration(SyMotion.selectMs, motion, tempo)),
         label = "syIconSurface",
     )
-    val entryTone = if (iconPainter == null) syEntryTileTone(icon?.name.orEmpty()) else null
+    val entryTone = if (!bare && iconPainter == null) syEntryTileTone(icon?.name.orEmpty()) else null
     val tile = entryTone?.let { if (p.text.luminance() > .5f) p.materialL4 else it }
     val foreground = if (selected) p.text else tint ?: if (tile != null) p.text else p.textSecondary
     Surface(
         onClick = onClick, enabled = enabled, modifier = modifier.size(SyMetric.touch),
-        interactionSource = interaction, color = fill, shadowElevation = shadowElevation,
+        interactionSource = interaction, color = fill,
+        shadowElevation = if (bare) 0.dp else shadowElevation,
         shape = if (tile != null) RoundedCornerShape(12.dp) else CircleShape,
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

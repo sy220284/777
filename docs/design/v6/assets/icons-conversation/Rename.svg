@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="Rename" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5 5 H14 L18 9 V12"/>
+  <path d="M14 5 V9 H18"/>
+  <path d="M5 5 V18.5 Q5 20 6.5 20 H10"/>
+  <path d="M11.8 18 L17.7 12.1 Q18.5 11.3 19.3 12.1 L20.5 13.3 Q21.3 14.1 20.5 14.9 L14.6 20.8 L11 21.5 Z"/>
+  <path d="M16.5 13.3 L19.3 16.1"/>
+</svg>
