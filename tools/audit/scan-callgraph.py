@@ -8,6 +8,7 @@ import json
 import pathlib
 import re
 import subprocess
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "build" / "callgraph-audit"
@@ -143,6 +144,7 @@ def strong(v):
         if len(block) > 1:
             components.append(sorted(block))
 
+sys.setrecursionlimit(max(10000, len(records) * 5))
 for row in records:
     if row["kind"] in ("production", "test") and row["path"] not in indices:
         strong(row["path"])
