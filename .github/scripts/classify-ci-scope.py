@@ -50,6 +50,10 @@ FULL_VALIDATION_SCRIPTS = {
     ".github/scripts/wait-android-device-artifacts.sh",
     ".github/scripts/smoke-test-android-startup.sh",
     ".github/scripts/check-apk-runtime-layout.py",
+    ".github/scripts/run-android17-ten-rounds.sh",
+    ".github/scripts/analyze-android17-ten-rounds.py",
+    ".github/scripts/run-android-page-matrix.sh",
+    ".github/scripts/compare-android-page-matrix.py",
 }
 FIXTURE_PROVENANCE_PATHS = {
     "upstream/deepseek-harness.lock.json",
@@ -67,6 +71,7 @@ FIXTURE_PROVENANCE_PREFIXES = (
 
 CI_CONTROL_FILES = {
     ".github/workflows/ci.yml",
+    ".github/workflows/android-page-matrix.yml",
     ".github/scripts/classify-ci-scope.py",
     ".github/scripts/check-ci-repository-integrity.py",
     ".github/scripts/check-android-security-boundaries.py",
@@ -79,6 +84,7 @@ ARCHITECTURE_AUTHORITY_FILES = {
 }
 ARCHITECTURE_3_CONTROL_FILES = ARCHITECTURE_AUTHORITY_FILES | {
     ".github/workflows/ci.yml",
+    ".github/workflows/android-page-matrix.yml",
     ".github/scripts/classify-ci-scope.py",
     ".github/scripts/check-ci-repository-integrity.py",
     ".github/scripts/check-local-architecture-boundaries.py",
@@ -192,6 +198,7 @@ ANDROID_UI_ENTRYPOINTS = {
 }
 CORE_CI_CONTROLS = {
     ".github/workflows/ci.yml",
+    ".github/workflows/android-page-matrix.yml",
     ".github/workflows/release.yml",
     ".github/scripts/classify-ci-scope.py",
     ".github/scripts/check-ci-repository-integrity.py",
