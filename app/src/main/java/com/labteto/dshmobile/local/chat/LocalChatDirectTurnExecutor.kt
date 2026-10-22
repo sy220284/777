@@ -204,10 +204,12 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 chatRegenerationPreviousAnswerIds(branchBase, oldId)
             }.orEmpty()
 
-            chatMemory.captureAutoMemoryDirective(
-                memoryInput,
-                sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
-            )
+            if (replacingMessageId == null) {
+                chatMemory.captureAutoMemoryDirective(
+                    memoryInput,
+                    sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
+                )
+            }
             val relationshipMemory = chatMemory.relationshipContext(
                 query = input,
                 snapshot = generationSnapshot,
