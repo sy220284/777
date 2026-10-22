@@ -106,7 +106,11 @@ if [[ "${1:-}" == "--cell" ]]; then
   exit 0
 fi
 
-bash .github/scripts/wait-android-device-artifacts.sh
+# The independent matrix workflow builds all three APKs on this same runner.
+# Keep the previous same-run artifact mode for explicit backward compatibility.
+if [[ "${1:-}" != "--local-apks" ]]; then
+  bash .github/scripts/wait-android-device-artifacts.sh
+fi
 for apk in app-debug.apk app-debug-androidTest.apk app-optimized.apk; do
   test -s ".ci/device-apks/$apk" || { echo "::error::Missing $apk" >&2; exit 1; }
 done
