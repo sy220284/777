@@ -1,185 +1,183 @@
-<h1 align="center">神言神语</h1>
-
-> **当前使用恢复后的 V6 原生界面。** Chat、Work、工具、人物与设置沿用现行本机业务内核；功能是否可用以对应模型、权限与实际配置为准。旧版“仅后端、没有图形界面”说明已经失效。
+<h1 align="center">神言神语 · 777</h1>
 
 <p align="center">
-  一款开源的 Android 端侧 Agent 平台。<b>一部手机，就是一台 Agent 主机。</b>
+  <strong>一部 Android 手机，一个能对话、能调用工具、能持续处理任务的 AI 工作台。</strong>
+</p>
+
+<p align="center">
+  原生界面 · 本机 Agent 内核 · 多模型接入 · 聊天与工作双模式
 </p>
 
 <p align="center">
   <a href="https://github.com/sy220284/777/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/sy220284/777/ci.yml?branch=main&style=flat-square"></a>
-  <a href="https://github.com/sy220284/777/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/sy220284/777?style=flat-square"></a>
+  <a href="https://github.com/sy220284/777/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/sy220284/777?style=flat-square"></a>
   <img alt="Android 16+" src="https://img.shields.io/badge/Android-16%2B-3DDC84?style=flat-square">
-  <img alt="arm64" src="https://img.shields.io/badge/ABI-arm64--v8a-6E4C9B?style=flat-square">
-  <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square"></a>
+  <img alt="arm64-v8a" src="https://img.shields.io/badge/ABI-arm64--v8a-6E4C9B?style=flat-square">
+  <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/License-MIT-blue?style=flat-square"></a>
 </p>
 
-> **血统与许可**：本仓库 fork 自
-> [`sorsama/deepseek-harness-mobile@e5f8c2f`](https://github.com/sorsama/deepseek-harness-mobile/commit/e5f8c2f)
-> （DSH Mobile 时代），现以独立应用标识 `com.sy220284.dshmobile` 发行，可与上游同时安装。
-> 上游 MIT 许可证与第三方声明完整保留。本机原生 Harness 的官方语义参考由
-> `upstream/deepseek-harness.lock.json` 钉定；当前发行版只提供 Android 本机模式。
+<p align="center">
+  <a href="https://github.com/sy220284/777/releases/latest"><strong>下载 Android APK</strong></a>
+  · <a href="docs/FEATURE-TREE.zh-CN.md">查看完整功能树</a>
+  · <a href="docs/README.md">阅读项目文档</a>
+  · <a href="CHANGELOG.md">更新记录</a>
+</p>
 
 ---
 
-## 神言神语是什么
+## 这是什么
 
-模型负责思考，其余一切——任务循环、工具执行、文件系统、终端、子代理、记忆、人物、创作——都在手机上完成编排。APK 自带完整 Harness 内核与 Node / Python / Git 运行环境：安装即用，无需 root，无需电脑在线，没有云中继，API 密钥只留在 Android Keystore。
+**神言神语（777）**是一款开源的 Android 本机 AI 应用。它把聊天、人物记忆、任务规划、工具执行和成果展示放在同一个原生界面中。
 
-它同时是三样东西，共用同一个内核：
+你可以用它与有持续经历的人物聊天，也可以把文件处理、代码检查、资料检索等任务交给工作模式。AI 负责理解和决策；会话、工具调度、工作区、状态记录与恢复由手机上的 Harness 内核管理。
 
-- **一个长期角色伙伴**：聊天模式下的人物有记忆、经历和成长；
-- **一个真正干活的 Agent**：读写文件、跑命令、用 Git、调 MCP / LSP、操作设备，直到交付；
-- **一个随身创作台**：图片、视频、配音、转写直接生成在会话里。
+**不需要 root，也不要求电脑或自建云中继持续在线。** 但模型推理和部分外部工具需要网络与相应服务商授权；端侧运行不等于模型完全离线。
 
-## 系统组成
+## 从使用场景认识 777
 
-```text
-界面层    V6 原生界面 · Chat / Work 会话 · 人物与工具 · 设置与交互文档
-记忆层    人物主档案 · 故事线 · 关系记忆 · 世界书 · 日记与披露边界
-内核层    Agent 循环 · 主 / 子代理 · 任务与技能 · 审批闸门 · 事件账本与恢复
-能力层    文件 / Git · 持久终端 · Node / Python / LSP · MCP · Web · Vision · 设备能力
-模型层    统一能力合同 · 多协议路由 · API Key / ChatGPT 套餐 · Keystore 加密
-工程层    差分验证 · CI 门禁 · 架构 3.0 · 功能树 · 增量更新哈希链
-```
+| 想做的事 | 对应能力 |
+| --- | --- |
+| **日常聊天与角色互动** | 人物图集、人物档案、多故事线、关系与经历记忆、日记、单聊与群聊 |
+| **让 AI 实际完成工作** | 任务规划、多轮执行、文件与 Git、终端命令、工具调用、结果与执行过程回看 |
+| **处理复杂任务** | 子代理、Agent 团队、并行协作、任务状态、权限审批、中断恢复 |
+| **扩展可用工具** | MCP、LSP、网页检索与读取、设备能力、技能及工作区工具 |
+| **在对话中创作** | 在符合模型和账户条件时，使用图片、视频、配音、语音转写等多模态能力 |
+| **掌握模型和消耗** | 多模型配置、模型能力路由、聊天/工作模式预算、Token 用量与历史记录 |
 
-每一层只做自己的事：界面投影事件账本，记忆按归属隔离，内核不信任模型的自述，能力全部经过闸门，模型身份一次任务一个，工程层负责证明以上都是真的。
+这里列的是**当前主分支登记的能力范围**，不代表每项功能在任何手机、模型和权限组合下都可用。具体入口与代码位置见[功能树](docs/FEATURE-TREE.zh-CN.md)，已知测试范围与限制见[验证说明](docs/VALIDATION.md)。
 
-## 两种用法，一个内核
+### 聊天模式：人物与故事持续下去
 
-### 聊天：让"这个人"始终认识你
+创建或选用人物，设定其背景与故事线，随后在单聊或群聊中互动。人物的关系、经历和日记按身份与场景管理，避免不同角色之间直接混用私有记忆。
 
-每次回复前，内核装配上下文：人物设定、关系、共同经历、场景、故事线、最近对话，然后才轮到模型。人物图集负责"这个人是谁"，故事线和关系记忆负责"你们经历过什么"。
+会话支持历史查看、消息编辑与重发、回复重新生成、分支等操作。人物状态随实际对话更新；能否主动互动、何时触发，由对应设置和运行条件决定。
 
-人物运行时按生命与对话模式模型工作：人物卡只保留少量长期底色，每一轮的思维、互动与表达模式由当前话题、注意力、身体与情绪、关系状态、生活进展和你的调节动态形成——不是固定性格关键词到固定话术的映射，也不靠滑杆改写事实。
+### 工作模式：从要求到可检查的结果
 
-记忆有明确归属：人物关系记忆按 Gallery / Persona 身份隔离，不同角色之间不串记忆。日记支持跨场景连续性，但群聊只允许公开日记进入 Prompt，私人与可分享日记被挡在外面；单聊条目要有明确公开授权证据才能标记为公开。
+把目标交给 Agent，它可以按任务需要规划步骤、请求权限、使用工具、读取结果并继续处理。工作过程、工具输出、待办和成果与会话关联，便于判断任务走到了哪一步。
 
-群聊沿用同一套机制：公开事件共享，每个角色的身份、关系和隐藏状态彼此隔离。消息可以修改重发，人物可以定时主动找你，回复风格有硬门禁过滤"AI 味"短语——像模型的，不如像人的。
+例如，你可以提出：
 
-### 工作：把事做完，并证明做完了
+> 检查这个项目的代码，列出能复现的问题，修复后运行相关测试，并把修改和验证结果交给我。
 
-Agent 理解目标、规划步骤、调用真实工具、根据结果继续判断，直到交付。运行语义与 Codex 核心机制对齐：用户指令在优先级链最上层，助手建议不会升格为决定，旧约束不会在恢复后复活。
+工具能执行哪些操作，取决于当前模型、设备权限、工具配置和审批策略。**“已经尝试执行”不自动等于“任务已完成”**；涉及外部服务、真实设备或第三方账户的任务仍需对应环境验证。
 
-任务闭环统一：授权精确到具体操作，完成绑定真实验收与交付证据——执行步数不冒充任务完成率，Agent Team 的进度按真实任务状态计算；取消与恢复语义明确，长任务有配额保护。
+### 多模态：成果直接回到会话
 
-子代理有独立身份：稳定身份指令与本轮任务分离，不默认继承父历史（未授权不可见），输出截断对父代理可见，任务归属可追踪到父子执行关系。
-
-工具原文跨上下文压缩保留可引用 ID，恢复分页按字节对齐返回。长任务有运行 checkpoint 与 Agent inbox，中断后恢复时不重放结果未知的危险副作用。生成的成果同步进入会话时间线：在聊天里直接预览、分享，文件更新后卡片原位跟进。
-
-### 创作：在会话里生成，在会话里交付
-
-模型负责想，端侧负责落地。聊天输入区的加号面板接入 MiniMax 原生多模态：图片生成、视频任务、配音与语音转写。入口按模型能力声明显示——只有会话使用官方 MiniMax 模型时才出现。
-
-创作是会话内的一等公民：提交即在聊天时间线显示阶段卡，完成后原位转换为成果——图片按原图比例呈现、轻触查看，音频带进度条原位播放，视频自动下载保存、播放并分享。提交后关闭弹窗不取消已提交的任务，付费任务持久化并防止重复扣费，删除成果同步清理任务回执。
-
-语音转写使用应用私有暂存、流式上传、结束后清理。设置侧边栏在选中 MiniMax 模型时提供官方套餐额度与账户余额查询。
-
-## 一次"发消息"的完整链路
-
-```text
-你发消息
-↓
-装配上下文：人物 / 记忆 / 故事线 / 任务状态（按模型预算分配）
-↓
-能力合同选定模型与执行策略（一次任务一个身份）
-↓
-模型推理
-↓
-需要动手时：工具闸门（存在性 → 模式边界 → 数据边界 → 审批）→ 真实执行 → 结果回填
-↓
-继续推理，直到给出结果
-↓
-全过程写入事件账本：可恢复、可回放、可审计
-```
-
-模型能力与执行策略来自一份统一的能力合同：运行路由、聊天控件与工作模式读取同一份快照。模型列表可通过 API 自动获取，也可查询安全的官方模型目录；既支持 API Key，也支持通过 OpenAI 的 **Continue with ChatGPT** 授权使用符合条件的套餐模型，两种认证身份分别保存和路由。
-
-一次任务开始后，模型档案固定下来。即使你随后在界面切换到其他模型或账户，已启动的任务、子代理、Vision 和后续处理仍沿用原来的运行身份，避免串账户、串 API Key 或串上下文。
-
-上下文预算按模型分配，工作与聊天各自计算；真实边界（单请求上下文窗口、并发待发送预算、请求次数、超时与路由熔断）始终生效。
-
-用户消息、模型回复、推理过程、工具调用与结果、任务步骤、计划和恢复信息都写入 Session Event Log。会话分支、重新生成、修改重发、长历史分页、中断恢复、模型重放证据与团队隔离，都建立在同一份事实记录上——界面快照只是为了显示更快，不是另一套历史。
-
-## 设计原则
-
-这四条原则写在工程规范（[AGENTS.md](AGENTS.md)）里，也决定了你用到的每一个行为：
-
-1. **端侧自治**——内核、工具、记忆、执行环境都在手机上；电脑与云中继不是依赖项。
-2. **结果必须被证明**——"模型说它做了"与"工具真的执行成功"是两件事；工具闸门、交付证据和事件账本为此存在。
-3. **身份与记忆完整**——模型一次任务一个身份，人物记忆有明确归属；串账户、串上下文、角色串记忆都被结构性阻止。
-4. **复杂度从第一行开始成立**——架构门禁、禁止伪拆分、功能树随代码同步；工程纪律最终兑现为产品可靠性。
-
-## 工程如何自证
-
-1. **差分验证体系**——`upstream/deepseek-harness.lock.json` 钉定官方 Harness 基线 commit，官方产物产出黄金结果，原生实现逐项比对，CI 一致性门禁拦截语义漂移。
-2. **功能树随代码同步**——全功能中文树（[FEATURE-TREE](docs/FEATURE-TREE.zh-CN.md)）登记模块、功能、代码定位与未合并 PR 标记，配套源码扫描工具核对文档与实现。
-3. **多层 CI 门禁**——单测、Android 16 / 17 兼容、架构门禁（禁止伪拆分与复杂度搬家）、性能基线；UI 变更附带明暗主题截图归档。
-4. **架构 3.0**——Feature 所有权、Shared Capability 与极薄 Runtime Kernel（[ARCHITECTURE.md](docs/ARCHITECTURE.md)）：应用由 Feature 模块组合，跨 Feature 能力共享，内核层保持极薄。
-5. **可信增量更新**——应用内更新走带哈希校验的分发链，减少重复下载完整 APK。
-
-## 能力速览
-
-| 域 | 能做到 |
-|---|---|
-| 执行内核 | 完整 Agent 循环：计划、目标、任务、技能、主 / 子代理、并行与流水线；持久终端、托管进程、内置 Node / Python / Git（无需 root）；MCP HTTP / stdio、网页搜索与获取、Vision、LSP 按需安装与本地复用 |
-| 设备能力 | 无障碍服务、通知读取、VirtualDisplay，在隔离虚拟屏中持续完成设备任务 |
-| 聊天模式 | 人物主档案 + 多故事线；逐轮动态形成思维 / 互动 / 表达模式；世界书；日记披露边界；多角色群聊与主动点名；消息修改重发；定时互动；"AI 味"短语硬门禁 |
-| 工作模式 | 授权精确、验收真实、交付证据绑定；运行语义对齐 Codex 机制；子代理独立身份；Agent Team 进度按任务状态；审批默认 / 手动 / 全自动三档；checkpoint 与恢复；成果同步进聊天 |
-| 多模态创作 | 聊天加号面板提交，阶段卡原位转换成果；图片查看、音频原位播放、视频保存与分享；付费任务持久化防重复扣费；官方额度查询；入口按模型能力显示 |
-| 可观测性 | 聊天 / 工作独立 Token 统计并保留本机累计；全部模型与已配置模型切换；7 / 30 / 90 天趋势；单次调用 requestId 全链路追踪；事件账本与会话导出 |
-| 通用体验 | 前台服务与系统通知（完成 / 审批 / 提问）；会话搜索、轨迹账本与导出；明暗主题、背景图与自适应阅读层（流体玻璃设计语言）；带哈希校验的应用内增量更新 |
-
-## 安全与边界
-
-- API 密钥由 Android Keystore 加密。
-- 写文件、编辑文件、执行高风险命令受审批和能力边界约束。
-- 本机文件工具受规范化路径边界约束：包含应用私有工作区与获准的用户共享存储根目录。Shell 以工作区作为默认目录，可执行应用权限允许的命令；Webhook 只监听回环地址。
-- Agent 可以实际执行文件、命令与设备操作；请只启用你理解并信任的能力。
-
-## 环境要求
-
-- Android 16+（minSdk 36，targetSdk 36，compileSdk 37）。
-- 默认内置运行时按 `arm64-v8a` 打包。
-- 模拟器 / x86_64 设备可用 `DSH_RUNTIME_ABIS=x86_64` 自行构建。
+支持的 MiniMax 模型可在聊天输入区的「+」入口提供图片、视频、配音、转写等能力。生成任务在会话中显示进度，完成后可查看或分享对应成果。具体功能依赖所选官方模型、服务可用性和账户额度；部分调用可能产生费用。
 
 ## 快速开始
 
-1. 从 [Releases](https://github.com/sy220284/777/releases/latest) 安装 APK。
-2. 进入模型设置：配置 API Key，或通过 **Continue with ChatGPT** 连接 ChatGPT 账户并使用符合条件的套餐模型；API Key 使用 Android Keystore 加密存储。
-3. 聊天模式直接开聊；工作模式直接派任务；多模态创作在聊天输入区加号面板提交，进度与成果都显示在会话里。
+1. 打开 [GitHub Releases](https://github.com/sy220284/777/releases/latest)，下载并安装适合设备的 APK。
+2. 进入应用的**模型设置**，配置所需服务商的 API Key；如果账户与授权条件满足，也可使用 **Continue with ChatGPT** 登录符合条件的套餐模型。
+3. 选择**聊天**或**工作**模式。聊天可先创建/选择人物；工作可以直接描述目标，在需要时确认工具权限。
+4. 按实际需要启用文件、通知、相机、无障碍等权限。未授权的设备能力不会因此自动获得系统权限。
 
-## 构建
+首次使用建议先发送一条普通消息，确认模型可响应；再在工作模式尝试一个无需高风险权限的小任务。模型接入和工具接入是两回事：模型能聊天，不代表已经配置了所有执行工具。
 
-```sh
-./gradlew :app:assembleDebug
-./gradlew :app:assembleRelease
+**系统要求**
+
+- Android **16 及以上**（minSdk 36；targetSdk 36；compileSdk 37）。
+- 官方默认 APK 面向 **arm64-v8a** 设备；x86_64 主要用于自行构建及模拟器验证。
+- 当前界面以 Android 手机为主要目标，部分能力还会受到屏幕、系统版本和厂商策略影响。
+- 正式版版本号与安装包以 [Releases](https://github.com/sy220284/777/releases/latest) 为准，不能用源码目录中的回退版本号判断最新发行版。
+
+完整兼容性说明：[COMPATIBILITY.md](docs/COMPATIBILITY.md)。
+
+## 本机运行、数据和权限边界
+
+777 的 Agent 内核、会话与人物数据、工具编排、工作区及运行记录在 Android 本机工作；当前发行版不需要远程 Harness 中继。
+
+- **模型与外部服务**：调用云端模型、搜索、MCP 或多模态服务时，相关请求会按所选服务的接口发送至外部。请自行确认服务商的数据政策和计费规则。
+- **凭据**：模型密钥与本机账户凭据使用 Android Keystore 加密保存；ChatGPT 登录不意味着应用可以读取你在 ChatGPT 中的历史会话或记忆。
+- **工具执行**：文件、终端、网络和设备操作分别受工具规则、审批与 Android 系统权限限制。默认、手动、自动三种审批档位的风险不同，自动档位应谨慎使用。
+- **恢复与记录**：会话事件、运行状态及部分任务检查点在本机持久化；对结果未知的高风险副作用不会在恢复时直接盲目重放。
+- **平台限制**：Android 无法保证任意后台进程永久存活；本项目不承诺完整桌面浏览器、Windows/PowerShell 或任意桌面插件环境。
+
+更多细节请阅读[安全边界](docs/SECURITY.md)与[原生 Harness 状态](docs/ANDROID-HARNESS-STATUS.zh-CN.md)。
+
+## 它如何工作
+
+```text
+你在 Chat / Work 发起请求
+        ↓
+装配对应会话、人物或任务上下文
+        ↓
+按已配置的模型、身份和能力路由请求
+        ↓
+模型回复 ── 或提出工具调用
+                  ↓
+            工具校验与审批
+                  ↓
+            本机/外部能力执行
+                  ↓
+            执行结果返回模型
+        ↓
+把消息、过程、结果和必要的恢复信息写入会话记录
+        ↓
+在原生界面展示回复与交付成果
 ```
 
-工具链：
+聊天和工作共用底层会话、模型、工具和事件能力，但各自管理业务状态。系统按**架构 3.0**组织为产品 Feature、Shared Capability、平台基础设施及极薄的进程运行内核；UI 展示的是业务运行结果，不自行充当第二份任务事实源。
 
-- AGP 9.4.0
-- Kotlin 2.4.20
-- Jetpack Compose BOM 2026.09.00
-- Hilt 2.60.1
-- Kotlin 单一源码语言 / JVM 21（构建 JDK 27+）
+架构与协议详情：[ARCHITECTURE.md](docs/ARCHITECTURE.md) · [PROTOCOL.md](docs/PROTOCOL.md)。
 
-当前正式版本以 GitHub Releases 的最新标签为准。
+## 开发与构建
 
-发布版本号来自 git 标签：发布工作流导出 `DSH_VERSION_NAME`，`versionCode` 由版本名推导；本地构建回退到 `.github/release-version`。
+仓库采用 **Kotlin、Jetpack Compose、Gradle**。标准开发环境为 **Linux / WSL2 Ubuntu x86_64**；构建使用 JDK 27+，生成 JVM 21 目标字节码。当前 Android 工具链与依赖版本以[开发文档](docs/DEVELOPMENT.md)和 Gradle 配置为准。
 
-开发与合并规则见 [AGENTS.md](AGENTS.md)，贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+项目的标准本地开发流程使用 GitHub Actions 生成并校验的工具链 Artifact，按需安装缺失组件，然后**离线构建**。请先阅读[工具链下载及安装步骤](docs/DEVELOPMENT.md)：
 
-## 文档
+```bash
+git clone https://github.com/sy220284/777.git
+cd 777
 
-- [文档入口](docs/README.md)
-- [功能树](docs/FEATURE-TREE.zh-CN.md)：全功能中文树，模块、功能、代码定位与未合并 PR 标记，随代码同步维护
-- [架构](docs/ARCHITECTURE.md) · [协议](docs/PROTOCOL.md) · [兼容性](docs/COMPATIBILITY.md) · [安全](docs/SECURITY.md)
-- [Android 原生 Harness 当前状态](docs/ANDROID-HARNESS-STATUS.zh-CN.md) · [后续路线](docs/ANDROID-HARNESS-ROADMAP.zh-CN.md)
-- [验证体系](docs/VALIDATION.md) · [UI / UX](docs/UI-UX.zh-CN.md) · [效果图](docs/UI-ARTIFACTS.md)
+# 查看本机还缺哪些构建组件
+bash tools/dev/ai-toolchain.sh plan --profile build
 
-## 许可证
+# 从 main 最新成功的「开发工具链」工作流下载缺失 Artifact，
+# 解压到同一目录后安装
+bash tools/dev/ai-toolchain.sh bootstrap \
+  --profile build \
+  --artifacts-dir /tmp/777-artifacts
 
-[MIT](LICENSE)。第三方材料见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+# 检查环境并离线构建 Debug APK
+bash tools/dev/ai-toolchain.sh check
+bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug
+```
 
-DeepSeek Harness 及其品牌归各自所有者所有；本项目是独立的社区构建，并已沿自己的产品与架构路径持续演化。
+已有符合要求的工具和缓存会被复用。**不要把常规联网 Gradle 构建当作本仓库规定的工具链安装路径。** 构建 x86_64 模拟器包时，可以设置 `DSH_RUNTIME_ABIS=x86_64`；完整测试环境的额外 Artifact、Android 16/17 模拟器与 optimized APK 构建见[开发文档](docs/DEVELOPMENT.md)。
+
+### 仓库结构
+
+| 目录 | 职责 |
+| --- | --- |
+| `app/` | Android 应用、原生 UI、业务 Feature 与应用组合 |
+| `core/` | 多模块共用的基础数据与网络工具 |
+| `harness-core/` | 平台无关的 Agent、工具和会话核心契约 |
+| `harness-runtime-android/` | Android 运行时、进程与终端能力 |
+| `harness-interop/` | MCP、LSP、GitHub 等互通适配 |
+| `harness-device-android/` | Android 设备能力 |
+| `reference-validation/` | Harness 语义对照与回归验证 |
+| `docs/` | 架构、功能、兼容、安全和验收文档 |
+| `tools/`、`.github/` | 本地工具链、构建脚本与 CI / 发布流程 |
+
+### 质量与验收
+
+CI 根据改动风险选择对应门禁：文档检查、静态与架构规则、单元测试、ARM64/x86 构建以及 Android 16/17 模拟器验证。**某条 CI 成功记录只能证明该次提交运行的检查通过**，不能替代外部账户、真实设备与完整端到端验收。正式 APK 的发布资格单独受完整主分支验证约束。
+
+权威说明：[VALIDATION.md](docs/VALIDATION.md) · [贡献指南](CONTRIBUTING.md) · [工程规则](AGENTS.md)。
+
+## 文档导航
+
+- [功能树与代码定位](docs/FEATURE-TREE.zh-CN.md) · [功能审计](docs/FUNCTION-AUDIT.zh-CN.md)
+- [系统架构](docs/ARCHITECTURE.md) · [原生 Harness 当前状态](docs/ANDROID-HARNESS-STATUS.zh-CN.md)
+- [UI / UX 规范](docs/UI-UX.zh-CN.md) · [开发工具链](docs/DEVELOPMENT.md)
+- [安全说明](docs/SECURITY.md) · [兼容性](docs/COMPATIBILITY.md) · [验证规则](docs/VALIDATION.md)
+- [完整文档目录](docs/README.md) · [变更记录](CHANGELOG.md)
+
+## 开源与来源
+
+本仓库起源于 [`sorsama/deepseek-harness-mobile` 的 `e5f8c2f` 提交](https://github.com/sorsama/deepseek-harness-mobile/commit/e5f8c2f)，后续独立演进为 Android 应用 **`com.sy220284.dshmobile`**。官方 Harness 语义参考由 [`upstream/deepseek-harness.lock.json`](upstream/deepseek-harness.lock.json) 锁定，供差分验证使用；它不代表本应用是上游官方发行版。
+
+项目采用 [MIT 许可证](LICENSE)；第三方许可及声明参见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。安全问题请按 [SECURITY.md](SECURITY.md) 中的方式私下反馈。
