@@ -731,7 +731,7 @@ private fun ChatAutomationPolicySheet(
             SyButton(
                 text = stringResource(R.string.tasks_save),
                 onClick = {
-                    val saved = viewModel.updateChatPolicy(
+                    viewModel.saveChatPolicyAsync(
                         task = task,
                         quietHoursEnabled = quietEnabled,
                         quietStartHour = quietStartMinute / 60,
@@ -741,11 +741,8 @@ private fun ChatAutomationPolicySheet(
                         proactiveMinGapMinutes = minGapMinutes,
                         proactiveMaxUnanswered = maxUnanswered,
                         notify = notify,
-                    )
-                    if (saved) {
-                        onDismiss()
-                    } else {
-                        saveError = saveFailedMessage
+                    ) { saved ->
+                        if (saved) onDismiss() else saveError = saveFailedMessage
                     }
                 },
                 size = SyButtonSize.Small,

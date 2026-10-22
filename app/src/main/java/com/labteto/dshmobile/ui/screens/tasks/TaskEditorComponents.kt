@@ -32,6 +32,7 @@ import com.shenyan.designsystem.components.SyTextField
 import com.shenyan.designsystem.components.SySwitchControl
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
+import com.labteto.dshmobile.automation.validAutomationCommandSchedule
 import com.labteto.dshmobile.local.presentation.LocalAutomationPolicyProjection
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
@@ -59,6 +60,7 @@ internal fun ColumnScope.TaskEditorPane(
     state: TaskEditorStateRefs,
     viewModel: TasksViewModel,
     createInvalidMessage: String,
+    saving: Boolean,
     onReset: () -> Unit,
 ) {
     var editingTaskId by state.editingTaskId
@@ -195,6 +197,7 @@ internal fun ColumnScope.TaskEditorPane(
                 SyButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = onReset,
+                    enabled = !saving,
                     variant = SyButtonVariant.Info,
                     modifier = Modifier.weight(1f),
                     size = SyButtonSize.Large,
@@ -219,37 +222,23 @@ internal fun ColumnScope.TaskEditorPane(
                             AutomationCadence.MONTHLY -> AutomationScheduleType.MONTHLY
                             AutomationCadence.CUSTOM -> AutomationScheduleType.INTERVAL
                         }
-                        val ok = editingTaskId?.let { id ->
-                            viewModel.updateTask(
-                                id = id,
-                                prompt = prompt,
-                                firstRunAt = firstRunAt,
-                                recurringMinutes = recurringMinutes,
-                                scheduleType = scheduleType,
-                                silenceMinutes = null,
-                                windowStartMinuteOfDay = null,
-                                windowEndMinuteOfDay = null,
-                                quietHoursEnabled = false,
-                                quietStartHour = LocalAutomationPolicyProjection.defaults.quietStartHour,
-                                quietStartMinute = LocalAutomationPolicyProjection.defaults.quietStartMinute,
-                                quietEndHour = LocalAutomationPolicyProjection.defaults.quietEndHour,
-                                quietEndMinute = LocalAutomationPolicyProjection.defaults.quietEndMinute,
-                                proactiveMinGapMinutes = LocalAutomationPolicyProjection.defaults.proactiveMinGapMinutes,
-                                proactiveMaxUnanswered = LocalAutomationPolicyProjection.defaults.proactiveMaxUnanswered,
-                                notify = notify,
-                            )
-                        } ?: viewModel.createAt(
-                            prompt = prompt,
-                            firstRunAt = firstRunAt,
-                            recurringMinutes = recurringMinutes,
-                            mode = AutomationMode.WORK,
-                            scheduleType = scheduleType,
-                            notify = notify,
-                        )
-                        if (ok) onReset() else createError = createInvalidMessage
+                        if (!validAutomationCommandSchedule(
+                                AutomationMode.WORK, scheduleType, firstRunAt, recurringMinutes,
+                                System.currentTimeMillis())) {
+                            createError = createInvalidMessage
+                        } else {
+                            viewModel.saveManualWorkTask(
+                                editingId = editingTaskId, prompt = prompt,
+                                firstRunAt = firstRunAt, recurringMinutes = recurringMinutes,
+                                scheduleType = scheduleType, notify = notify,
+                            ) { ok ->
+                                if (ok) onReset() else createError = createInvalidMessage
+                            }
+                        }
                     },
                     modifier = Modifier.weight(1f),
                     size = SyButtonSize.Large,
+                    enabled = !saving,
 
                 )
             }

@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal class AutomationPlannerUiController(
     private val scope: CoroutineScope,
@@ -59,7 +61,8 @@ internal class AutomationPlannerUiController(
                         }
                         return@onSuccess
                     }
-                    val saved = save(draft, editingTaskId, expectedSessionId)
+                    val saved = withContext(Dispatchers.IO) { save(draft, editingTaskId, expectedSessionId) }
+                    if (request != revision) return@onSuccess
                     _state.update {
                         if (saved) {
                             it.copy(

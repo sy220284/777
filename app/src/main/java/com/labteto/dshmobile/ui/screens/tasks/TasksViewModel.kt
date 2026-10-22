@@ -146,6 +146,52 @@ class TasksViewModel @Inject constructor(
             proactiveMaxUnanswered = existing.proactiveMaxUnanswered,
         )
     }
+    /** The manual editor owns no disk work: the existing scheduler remains the sole commit owner. */
+    fun saveManualWorkTask(
+        editingId: String?,
+        prompt: String,
+        firstRunAt: Long,
+        recurringMinutes: Long?,
+        scheduleType: AutomationScheduleType,
+        notify: Boolean,
+        onComplete: (Boolean) -> Unit,
+    ) {
+        if (_state.value.savingEditor) return
+        val expectedGeneration = editingId?.let { id ->
+            _state.value.tasks.firstOrNull { it.id == id && it.mode == AutomationMode.WORK }?.scheduleGeneration
+        }
+        _state.update { it.copy(savingEditor = true) }
+        viewModelScope.launch {
+            try {
+                val result = runTaskManagementOperation(
+                    operation = {
+                        if (editingId == null) {
+                            createAt(prompt, firstRunAt, recurringMinutes, AutomationMode.WORK,
+                                scheduleType, notify = notify)
+                        } else if (expectedGeneration == null || !validAutomationCommandSchedule(
+                                AutomationMode.WORK, scheduleType, firstRunAt,
+                                recurringMinutes, System.currentTimeMillis())) {
+                            false
+                        } else {
+                            scheduler.updateTask(
+                                id = editingId, prompt = prompt, firstRunAtMillis = firstRunAt,
+                                recurringMinutes = recurringMinutes, scheduleType = scheduleType,
+                                quietHoursEnabled = false, notify = notify,
+                                expectedGeneration = expectedGeneration,
+                            )
+                        }
+                    },
+                    readTasks = scheduler::list,
+                )
+                _state.update { it.copy(tasks = observedTasks?.value ?: result.tasks ?: it.tasks,
+                    managementFailed = result.failed) }
+                onComplete(result.accepted && !result.failed)
+            } finally {
+                _state.update { it.copy(savingEditor = false) }
+            }
+        }
+    }
+
     fun updateTask(
         id: String,
         prompt: String,
@@ -250,6 +296,44 @@ class TasksViewModel @Inject constructor(
         }.onFailure { AppLog.failure("TaskScheduling", "create_scheduled_task", it) }
             .isSuccess
     }
+    /** A rejected policy update must not close the editor or overwrite a newer generation. */
+    fun saveChatPolicyAsync(
+        task: AutomationTask,
+        quietHoursEnabled: Boolean,
+        quietStartHour: Int,
+        quietStartMinute: Int,
+        quietEndHour: Int,
+        quietEndMinute: Int,
+        proactiveMinGapMinutes: Long,
+        proactiveMaxUnanswered: Int,
+        notify: Boolean,
+        onComplete: (Boolean) -> Unit,
+    ) {
+        if (task.id in _state.value.busyIds) return
+        _state.update { it.copy(busyIds = it.busyIds + task.id) }
+        viewModelScope.launch {
+            try {
+                val result = runTaskManagementOperation(
+                    operation = {
+                        scheduler.updateChatInteractionPolicy(
+                            id = task.id, quietHoursEnabled = quietHoursEnabled,
+                            quietStartHour = quietStartHour, quietStartMinute = quietStartMinute,
+                            quietEndHour = quietEndHour, quietEndMinute = quietEndMinute,
+                            proactiveMinGapMinutes = proactiveMinGapMinutes,
+                            proactiveMaxUnanswered = proactiveMaxUnanswered, notify = notify,
+                            expectedGeneration = task.scheduleGeneration,
+                        )
+                    }, readTasks = scheduler::list,
+                )
+                _state.update { it.copy(tasks = observedTasks?.value ?: result.tasks ?: it.tasks,
+                    managementFailed = result.failed) }
+                onComplete(result.accepted && !result.failed)
+            } finally {
+                _state.update { it.copy(busyIds = it.busyIds - task.id) }
+            }
+        }
+    }
+
     fun updateChatPolicy(
         task: AutomationTask,
         quietHoursEnabled: Boolean,
