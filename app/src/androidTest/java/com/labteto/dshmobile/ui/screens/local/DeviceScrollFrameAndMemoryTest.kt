@@ -6,10 +6,7 @@ import android.os.Bundle
 import android.os.Debug
 import android.os.Handler
 import android.os.HandlerThread
-import android.os.SystemClock
 import android.view.FrameMetrics
-import android.view.InputDevice
-import android.view.MotionEvent
 import android.view.Window
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeUp
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
@@ -106,18 +106,17 @@ class DeviceScrollFrameAndMemoryTest {
         }
         var peakPssKb = pssKb()
         var peakJavaKb = (heap.totalMemory() - heap.freeMemory()) / 1024L
-        val ui = instrumentation.uiAutomation
         var maxVisibleIndex = 0
         fun realSwipe(downwards: Boolean) {
-            // UiAutomation uses display coordinates; decorView.width/height are not
-            // necessarily the Compose list's touch bounds after system insets.
-            val x = viewport.center.x
-            val from = viewport.top + viewport.height * (if (downwards) 0.25f else 0.80f)
-            val to = viewport.top + viewport.height * (if (downwards) 0.80f else 0.25f)
-            val started = SystemClock.uptimeMillis()
-            fun event(action: Int, y: Float) {
-                val t = MotionEvent.obtain(started, SystemClock.uptimeMillis(), action, x, y, 0)
-                try {
+            // Inject through the tested Compose root so the gesture reaches the
+            // LazyColumn, rather than another emulator window or system overlay.
+            // The listener below still measures real Android Window frame metrics.
+            compose.onNodeWithTag("perf-real-work-timeline").performTouchInput {
+                if (downwards) swipeDown(durationMillis = 480)
+                else swipeUp(durationMillis = 480)
+            }
+        }
+        try {
                     t.source = InputDevice.SOURCE_TOUCHSCREEN
                     check(ui.injectInputEvent(t, true)) { "Real emulator touch injection failed" }
                 } finally { t.recycle() }
