@@ -142,6 +142,18 @@ jobs:
                 ;;
             esac
           done < changed-files.txt
+      - name: 全仓静态调用关系审计
+        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'audit/777-full-callgraph-20261022' }}
+        run: |
+          python3 tools/audit/scan-callgraph.py
+          sed -n '1,120p' build/callgraph-audit/callgraph.md >> "$GITHUB_STEP_SUMMARY"
+      - name: 上传全仓逐文件调用关系结果
+        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'audit/777-full-callgraph-20261022' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 777-callgraph-full-scan
+          path: build/callgraph-audit/
+          if-no-files-found: error
 
   static-gates:
     needs: scope
