@@ -92,7 +92,10 @@ if [[ "${1:-}" == "--cell" ]]; then
   bash .github/scripts/verify-android-test-viewport.sh 412 400
   adb install -r .ci/device-apks/app-debug.apk
   adb install -r .ci/device-apks/app-debug-androidTest.apk
-  bash .github/scripts/run-android-instrumentation.sh "$component"
+  # The 210-test Android 16/17 suites remain mandatory in their dedicated
+  # CI lanes. Repeating them four more times on this one runner consumes OS
+  # JobScheduler quota and contaminates the later performance samples.
+  # These ten rounds still execute real UI, MCP OAuth, and WorkManager tests.
   bash .github/scripts/run-android17-ten-rounds.sh "$api" "$page_kb"
   adb shell am force-stop "$app" || true
   bash .github/scripts/smoke-test-android-startup.sh "$app"
