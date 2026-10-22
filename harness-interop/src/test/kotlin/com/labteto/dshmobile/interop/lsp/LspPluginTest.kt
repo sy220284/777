@@ -471,7 +471,9 @@ class LspPluginTest {
         )
         plugin.install(context)
         try {
-            withTimeout(7_000) {
+            // The LSP has its own 4s publish budget; CI may spend additional time
+            // starting a real child process. Do not turn that into a false failure.
+            withTimeout(15_000) {
                 val result = context.tools.execute(
                     "lsp_diagnostics",
                     buildJsonObject { put("path", "waiting.ts") },

@@ -44,6 +44,8 @@ internal class McpPluginWorkerTransport(
     private val cwd: File? = null,
     private val environment: Map<String, String> = emptyMap(),
     private val bearerCredential: String? = null,
+    private val credentialProvider: (suspend () -> String?)? = null,
+    private val authChallenge: ((String?, String?) -> Unit)? = null,
 ) : McpTransport, McpTerminationSource {
     private val token = UUID.randomUUID().toString()
     private val ids = AtomicInteger(1)
@@ -54,6 +56,20 @@ internal class McpPluginWorkerTransport(
     private val closed = AtomicBoolean(false)
     private val bound = AtomicBoolean(false)
     private var opened = false
+    private val credentialMutex = Mutex()
+    private var transmittedCredential: String? = bearerCredential
+
+    private suspend fun refreshCredential() {
+        val provider = credentialProvider ?: return
+        credentialMutex.withLock {
+            val current = provider()
+            if (current == null && transmittedCredential != null)
+                error("MCP 认证已清除，请重新连接。")
+            if (current == transmittedCredential) return@withLock
+            rpc(McpWorkerWire.UPDATE_AUTH, Bundle().apply { putString("bearer_credential", current) })
+            transmittedCredential = current
+        }
+    }
     internal var workerPid: Int? = null
         private set
     private val events = MutableSharedFlow<Throwable>(replay = 1, extraBufferCapacity = 1)
@@ -181,7 +197,12 @@ internal class McpPluginWorkerTransport(
             val error = response.getString("error")
             if (error != null) {
                 val status = response.getInt("http_status", 0)
-                if (status != 0) throw McpHttpException(status, "Remote MCP HTTP failure")
+                if (status != 0) {
+                    val metadata = response.getString("auth_resource_metadata")
+                    val scope = response.getString("auth_scope")
+                    if (status == 401 || status == 403) authChallenge?.invoke(metadata, scope)
+                    throw McpHttpException(status, "Remote MCP HTTP failure", metadata, scope)
+                }
                 if (response.getBoolean("transport_error"))
                     throw IOException("MCP worker transport failed ($error); outcome unknown")
                 throw IllegalStateException("MCP worker refused request ($error)")
@@ -206,6 +227,7 @@ internal class McpPluginWorkerTransport(
         val encoded = Json.encodeToString(JsonObject.serializer(), params)
         require(McpWorkerWire.validRequestSize(encoded)) { "MCP request exceeds Binder budget" }
         ensureOpened()
+        refreshCredential()
         val replyBundle = rpc(McpWorkerWire.REQUEST, Bundle().apply {
             putString("method", method)
             putString("params", encoded)

@@ -55,6 +55,8 @@ class OnDemandLanguageServerAndroidTest {
                 processEnvironment = { runtime.processEnvironment() },
             )
             assertTrue(runtime.isCommandAvailable("node"))
+            assertTrue("Node 必须带有可信 TLS 根证书",
+                File(runtime.processEnvironment().getValue("NODE_EXTRA_CA_CERTS")).isFile)
             assertTrue(manager.installedCommand("probe.ts").isEmpty())
             val command = manager.ensureInstalled("probe.ts")
             assertTrue(command.isNotEmpty())

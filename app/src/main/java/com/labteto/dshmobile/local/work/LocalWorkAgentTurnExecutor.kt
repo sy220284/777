@@ -102,6 +102,7 @@ internal class LocalWorkAgentTurnExecutor(
     private val replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
     private val onRootExecutionSliceStarted: suspend (LocalWorkRunBinding) -> Unit = {},
 ) {
+    init { LocalWorkSummarySettings.attach(context) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val resourceScheduler
         get() = runtimeStateStore.resourceScheduler
@@ -304,6 +305,7 @@ internal class LocalWorkAgentTurnExecutor(
                 }
             }
 
+            var effectiveSkillInput = input
             val loop = AgentTurnEngine(
                 model = AgentModel {
                     agentRunCoordinator.ensureCurrentOwner(runContext)
@@ -363,6 +365,7 @@ internal class LocalWorkAgentTurnExecutor(
                             .firstOrNull { (it["role"] as? JsonPrimitive)?.contentOrNull == "user" }
                             ?.get("content")?.let { it as? JsonPrimitive }?.contentOrNull
                             ?.takeIf(String::isNotBlank) ?: input
+                        effectiveSkillInput = effectiveInput
                         workPromptContext = contextComposer.composeWorkTurnContext(
                             input = effectiveInput,
                             snapshot = snapshot,
@@ -374,6 +377,14 @@ internal class LocalWorkAgentTurnExecutor(
                         )
                         projectedSteeringRevision = observedSteer
                     }
+                    val skillGuidance = resolveLocalWorkSkillGuidance(
+                        sessionStorage.files.workspace, effectiveSkillInput,
+                        selectedInvocations = pinnedInvocations.current(),
+                    )
+                    if (skillGuidance != workPromptContext.skill) {
+                        // Replace this request's layer, never append catalog updates to history.
+                        workPromptContext = workPromptContext.copy(skill = skillGuidance)
+                    }
                     val tools = modelToolStepSurface.capture(
                         runToolSurface.next(workTurnToolRuntime.schemas(runPolicy, binding)),
                     )
@@ -382,10 +393,51 @@ internal class LocalWorkAgentTurnExecutor(
                             estimateModelTokens(workPromptContext.dynamic) +
                             estimateModelTokens(workPromptContext.skill)
                     if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep)) {
-                        workModelHistoryRuntime.compactIfNeeded(
-                            binding = binding,
-                            extraTokens = productContextTokens + estimateModelTokens(tools.toString()),
-                        )
+                        LocalWorkSummarySettings.attach(context)
+                        val extra = productContextTokens + estimateModelTokens(tools.toString())
+                        if (LocalWorkSummarySettings.state.value) {
+                            val outcome = sampleUntilWorkSteered(binding.steeringRevision, observedSteer) {
+                                workModelHistoryRuntime.compactSemanticallyBeforeStep(binding, extra) { request ->
+                                    try {
+                                        agentRunCoordinator.ensureCurrentOwner(runContext)
+                                        val reply = modelRequests.complete(snapshot, request.messages, modelStep + 1,
+                                            com.labteto.dshmobile.local.LocalModelRequestOptions(
+                                                toolsOverride = kotlinx.serialization.json.JsonArray(emptyList()),
+                                                publishPreviewEnabled = false, allowContextOverflowRecovery = false,
+                                                requestLog = runEventLog,
+                                                profile = snapshot.modelState.modelSelection.activeProfile,
+                                                admission = binding.executionControl.asModelAdmissionPort()))
+                                        usageTracker.recordForeground(snapshot, reply,
+                                            action = TokenUsageAction.WORK_SUMMARY,
+                                            turnId = sourceMessageId ?: runContext.runId,
+                                            runId = runContext.runId, taskRunId = taskRunId,
+                                            taskLabel = "工作历史背景摘要", step = modelStep + 1)
+                                        agentRunCoordinator.ensureCurrentOwner(runContext)
+                                        com.labteto.dshmobile.local.model.requireCompletedModelReply(reply)
+                                        check(reply.toolCalls.isEmpty()) { "摘要不能包含工具调用" }
+                                        reply.content
+                                    } catch (cancelled: CancellationException) { throw cancelled }
+                                    catch (failure: Exception) {
+                                        runEventLog.append("work/semantic-summary-skipped", buildJsonObject {
+                                            put("reason", "summary_not_completed"); put("error_type", failure::class.java.simpleName)
+                                        })
+                                        null
+                                    }
+                                }
+                            }
+                            if (outcome is LocalWorkSamplingOutcome.Steered) continue
+                            // Optional remote background generation must never disable the existing
+                            // local, bounded and evidence-preserving compactor when it produces no
+                            // admissible history replacement. Revalidate steering and ownership
+                            // before touching the history after the auxiliary provider request.
+                            if (outcome is LocalWorkSamplingOutcome.Completed && !outcome.value) {
+                                agentRunCoordinator.ensureCurrentOwner(runContext)
+                                if (binding.steeringRevision.value != observedSteer) continue
+                                workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
+                            }
+                        } else {
+                            workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
+                        }
                     }
                     val durableRequestMessages = withWorkTurnContext(
                         withLocalWorkExecutionMode(runHistory.snapshot()),

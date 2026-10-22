@@ -103,7 +103,10 @@ internal class LocalSessionTranscriptPager(
 
             for (event in events) {
                 if (event.type == "assistant/message") {
-                    replacedMessageId(event)?.let(suppressed::add)
+                    replacedMessageId(event)?.let { oldId ->
+                        suppressed.add(oldId)
+                        suppressed.add(chatReasoningTranscriptId(oldId))
+                    }
                 }
 
                 val decoded = decodeTranscriptMessages(event.data)

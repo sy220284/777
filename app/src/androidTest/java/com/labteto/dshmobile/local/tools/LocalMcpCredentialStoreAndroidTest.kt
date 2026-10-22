@@ -49,6 +49,38 @@ class LocalMcpCredentialStoreAndroidTest {
         }
     }
 
+
+    @Test fun oauthTokensAreEncryptedBoundAndRevokedLocallyWhenNoRemoteEndpointExists() = runBlocking {
+        withCredentialStore { store, preferences, id ->
+            val endpoint = "https://mcp.example.com/tenant/mcp"
+            val credential = LocalMcpOAuthCredential("https://issuer.example.com", "client", "https://issuer.example.com/token",
+                endpoint, accessToken = "oauth-access-secret", refreshToken = "oauth-refresh-secret",
+                expiresAt = System.currentTimeMillis() + 60_000)
+            store.saveOAuth(id, endpoint, credential)
+            assertEquals("oauth-access-secret", store.forEndpoint(id, endpoint))
+            assertNull(store.forEndpoint(id, "https://mcp.example.com/other/mcp"))
+            assertNull(store.forEndpoint("other-$id".take(24), endpoint))
+            val persisted = preferences.data.first().asMap().values.joinToString(",")
+            assertFalse(persisted.contains("oauth-access-secret"))
+            assertFalse(persisted.contains("oauth-refresh-secret"))
+            assertFalse(store.revoke(id, endpoint))
+            assertNull(store.forEndpoint(id, endpoint))
+        }
+    }
+
+    @Test fun expiredTokenWithoutRefreshRequiresLoginAndPreservesClientIdentity() = runBlocking {
+        withCredentialStore { store, _, id ->
+            val endpoint = "https://mcp.example.com/mcp"
+            store.saveOAuth(id, endpoint, LocalMcpOAuthCredential("https://issuer.example.com", "original-client",
+                "https://issuer.example.com/token", endpoint, accessToken = "expired", expiresAt = 0L))
+            val failure = runCatching { store.forEndpoint(id, endpoint) }.exceptionOrNull()
+            assertTrue(failure is LocalMcpOAuthFailure)
+            assertEquals("original-client", store.oauthForEndpoint(id, endpoint)?.clientId)
+            store.save(id, endpoint, "oauth:valid-manual-bearer")
+            assertEquals("oauth:valid-manual-bearer", store.forEndpoint(id, endpoint))
+        }
+    }
+
     private suspend fun withCredentialStore(
         block: suspend (LocalMcpCredentialStore,
             androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>,

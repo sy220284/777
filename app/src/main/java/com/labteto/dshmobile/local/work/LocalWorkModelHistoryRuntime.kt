@@ -18,6 +18,7 @@ import com.labteto.dshmobile.local.model.stableJsonSha256
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -203,6 +204,46 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
         persist(binding)
     }
 
+    /** Runs before the foreground request acquires its model slot; never called from overflow. */
+    internal suspend fun compactSemanticallyBeforeStep(
+        binding: LocalWorkRunBinding,
+        extraTokens: Int,
+        summarize: suspend (LocalWorkSummaryRequest) -> String?,
+    ): Boolean {
+        val history = binding.runHandle.modelHistory
+        val source = history.snapshot()
+        val snapshot = binding.aggregateSnapshot()
+        val steering = binding.steeringRevision.value
+        val generation = binding.eventLog.resetGeneration
+        val budget = workSteadyStateHistoryBudget(
+            runtimeStateStore.historyBudgetFor(snapshot, runtimeStateStore.resourceSnapshot()),
+            history.estimatedTokens, extraTokens, snapshot)
+        val candidate = semanticWorkCompaction(source, budget, extraTokens,
+            structuredWorkState(snapshot, binding.eventLog, workSessionProjection), summarize) ?: return false
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        // The auxiliary request's own request/usage events may advance EventLog. Compare the
+        // actual source history and Work state, rather than treating those events as edits.
+        if (binding.runHandle.cancellationRequested || binding.eventLog.isClosed ||
+            binding.eventLog.resetGeneration != generation || binding.steeringRevision.value != steering ||
+            history.snapshot() != source || binding.state.value.work != snapshot.work ||
+            !LocalWorkSummarySettings.state.value) return false
+        val sourceSequence = binding.eventLog.latestSequence()
+        history.reset(candidate.messages)
+        runtimeStateStore.requestPressureStore.advanceGeneration(binding.sessionId, candidate.estimatedTokensAfter)
+        binding.eventLog.append("session/compaction", buildJsonObject {
+            put("version", 2); put("trigger", "semantic-background")
+            put("source_as_of_sequence", sourceSequence); put("source_message_count", source.size)
+            put("result_message_count", candidate.messages.size); put("omitted_messages", candidate.omittedMessages)
+            put("summary", candidate.summary); put("summary_digest", stableJsonSha256(JsonPrimitive(candidate.summary)))
+            put("estimated_tokens_before", candidate.estimatedTokensBefore)
+            put("estimated_tokens_after", candidate.estimatedTokensAfter)
+        })
+        checkpoint(binding, "session/semantic-compaction")
+        updateContextMetrics(binding)
+        persist(binding)
+        return true
+    }
+
     internal fun persistOverflowCompaction(
         snapshot: com.labteto.dshmobile.local.LocalHarnessState,
         summaryMode: LocalHistorySummaryMode,
@@ -260,7 +301,7 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
         binding: LocalWorkRunBinding,
         reason: String,
     ) {
-        compactIfNeeded(binding)
+        if (!LocalWorkSummarySettings.state.value) compactIfNeeded(binding)
         binding.runHandle.turnsSinceModelHistoryCheckpoint += 1
         if (
             binding.runHandle.turnsSinceModelHistoryCheckpoint >=

@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.tools.LocalToolsRuntime
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
+import kotlinx.coroutines.ensureActive
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -12,6 +13,7 @@ class LocalToolsUiFacade @Inject internal constructor(
     private val gitHubSkillImporter: com.labteto.dshmobile.local.tools.LocalGitHubSkillImporter,
     private val gitHubBrowser: com.labteto.dshmobile.local.tools.LocalGitHubCredentialManager,
     private val mcpCredentials: com.labteto.dshmobile.local.tools.LocalMcpCredentialStore,
+    private val mcpOAuth: com.labteto.dshmobile.local.tools.LocalMcpOAuthCoordinator,
 ) : com.labteto.dshmobile.uicontract.ToolsUiPort {
     override fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit> = tools.serverChanges()
 
@@ -150,10 +152,39 @@ class LocalToolsUiFacade @Inject internal constructor(
     override suspend fun setSkillModelInvocable(id: String, enabled: Boolean) = tools.setSkillModelInvocable(id, enabled)
     override suspend fun connectHttp(serverId: String, endpoint: String) = tools.connectHttp(serverId, endpoint)
     suspend fun connectHttpWithCredential(serverId: String, endpoint: String, bearer: String): String {
-        if (bearer.isNotEmpty()) mcpCredentials.save(serverId, endpoint, bearer)
+        if (bearer.isNotEmpty()) {
+            disconnectMcpIfConnected(serverId)
+            mcpCredentials.save(serverId, endpoint, bearer)
+        }
         return tools.connectHttp(serverId, endpoint)
     }
-    suspend fun clearMcpCredential(serverId: String) = mcpCredentials.clear(serverId)
+    private suspend fun disconnectMcpIfConnected(serverId: String) {
+        if (tools.servers().any { it.id == serverId }) tools.disconnect(serverId)
+    }
+    suspend fun loginMcp(serverId: String, endpoint: String, clientId: String?) {
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        disconnectMcpIfConnected(serverId)
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        mcpOAuth.authorize(serverId, endpoint, clientId)
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        tools.connectHttp(serverId, endpoint)
+    }
+    fun cancelMcpLogin(serverId: String) = mcpOAuth.cancel(serverId)
+    suspend fun refreshMcpLogin(serverId: String, endpoint: String) {
+        disconnectMcpIfConnected(serverId)
+        mcpCredentials.refresh(serverId, endpoint)
+        tools.connectHttp(serverId, endpoint)
+    }
+    suspend fun revokeMcpLogin(serverId: String, endpoint: String): Boolean {
+        mcpOAuth.cancel(serverId)
+        disconnectMcpIfConnected(serverId)
+        return mcpCredentials.revoke(serverId, endpoint)
+    }
+    suspend fun clearMcpCredential(serverId: String) {
+        mcpOAuth.cancel(serverId)
+        disconnectMcpIfConnected(serverId)
+        mcpCredentials.clear(serverId)
+    }
     override suspend fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?) =
         tools.connectStdio(serverId, command, workingDirectory)
     override suspend fun disconnect(serverId: String) = tools.disconnect(serverId)

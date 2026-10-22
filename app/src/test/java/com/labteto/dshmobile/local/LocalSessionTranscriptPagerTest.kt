@@ -65,7 +65,10 @@ class LocalSessionTranscriptPagerTest {
     @Test
     fun replacementStateCrossesPageBoundariesAndSuppressesOldBubble() {
         withLog { log ->
-            log.append("assistant/message", transcript(message("old", "assistant", "旧回答")))
+            log.append("assistant/message", transcript(
+                message("reasoning:old", "reasoning", "旧思考"),
+                message("old", "assistant", "旧回答"),
+            ))
             log.append("user/message", transcript(message("middle", "user", "中间消息")))
             log.append("assistant/message", buildJsonObject {
                 put("replaces", "old")
@@ -84,6 +87,7 @@ class LocalSessionTranscriptPagerTest {
 
             assertEquals(listOf("latest", "new", "middle"), ids)
             assertTrue("old" !in ids)
+            assertTrue("reasoning:old" !in ids)
         }
     }
 

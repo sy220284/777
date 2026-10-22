@@ -156,6 +156,14 @@ internal class LocalPluginComposition(
         stdioCommandResolver = runtimeProcess::resolveCommand,
         stdioEnvironmentProvider = { runtimeProcess.processEnvironment() },
         httpCredentialProvider = mcpCredentials::forEndpoint,
+        credentialAwareHttpTransportFactory = { serverId, endpoint, bearer ->
+            com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerTransport(
+                context.applicationContext, kind = "http", endpoint = endpoint,
+                bearerCredential = bearer,
+                credentialProvider = { mcpCredentials.forEndpoint(serverId, endpoint) },
+                authChallenge = { metadata, scope -> mcpCredentials.recordChallenge(serverId, endpoint, metadata, scope) },
+            )
+        },
         // Mandatory process boundary. In-process MCP factories are test-only; Android
         // production uses this Binder transport or fails closed, never falls back.
         transportFactory = { endpoint ->

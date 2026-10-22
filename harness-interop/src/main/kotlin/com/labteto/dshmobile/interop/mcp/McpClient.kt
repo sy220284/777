@@ -47,7 +47,24 @@ const val LEGACY_SSE_MCP_PROTOCOL_VERSION = "2024-11-05"
 class McpHttpException(
     val statusCode: Int,
     val responseBody: String,
+    val resourceMetadata: String? = null,
+    val requiredScope: String? = null,
 ) : IllegalStateException("MCP HTTP $statusCode：${responseBody.take(2_000)}")
+
+/** Non-secret authorization hints only; credentials and remote error bodies never cross IPC. */
+fun parseMcpAuthorizationChallenge(header: String): Pair<String?, String?> {
+    val bearer = Regex("""(?i)(?:^|,)\s*Bearer\s+""").find(header) ?: return null to null
+    val values = Regex("""([a-zA-Z_]+)\s*=\s*["]((?:\\.|[^"])*)["]""")
+        .findAll(header.substring(bearer.range.last + 1)).associate {
+            it.groupValues[1].lowercase() to it.groupValues[2].replace("\\\"", "\"").replace("\\\\", "\\")
+        }
+    return values["resource_metadata"] to values["scope"]
+}
+
+internal fun Response.mcpHttpFailure(body: String): McpHttpException {
+    val hints = parseMcpAuthorizationChallenge(headers.values("WWW-Authenticate").joinToString(","))
+    return McpHttpException(code, body, hints.first, hints.second)
+}
 
 class McpRpcException(val code: Int) : IllegalStateException("MCP RPC 错误（$code）")
 
@@ -219,7 +236,7 @@ class McpStreamableHttpTransport(
 
             nonReplayHttp.newCall(builder.build()).executeCancellable { response ->
                 if (!response.isSuccessful) {
-                    throw McpHttpException(response.code, response.readMcpBodyBounded())
+                    throw response.mcpHttpFailure(response.readMcpBodyBounded())
                 }
                 response.readMcpRpcResponse(id, json)
             }

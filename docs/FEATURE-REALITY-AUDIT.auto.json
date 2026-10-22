@@ -1,18 +1,18 @@
 {
   "version": 1,
   "type": "independent_code_first_static_audit",
-  "source_snapshot": "74352b1e714f",
+  "source_snapshot": "98352e6fdb14",
   "tree": {
-    "nodes_excluding_root": 533,
-    "leaf_descriptions": 440,
+    "nodes_excluding_root": 543,
+    "leaf_descriptions": 448,
     "leaves_by_layer": {
-      "第一层｜产品功能与界面": 300,
+      "第一层｜产品功能与界面": 307,
       "第三层｜平台与工程保障": 38,
-      "第二层｜共享运行能力": 102
+      "第二层｜共享运行能力": 103
     }
   },
   "code": {
-    "production_files": 999,
+    "production_files": 1002,
     "module_count": 6,
     "module_names": [
       "SHELL",
@@ -669,6 +669,11 @@
       },
       {
         "provider": "mcp_management",
+        "name": "mcp_lifecycle_events",
+        "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+      },
+      {
+        "provider": "mcp_management",
         "name": "mcp_reconnect",
         "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
       },
@@ -763,14 +768,14 @@
         "source": "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt"
       }
     ],
-    "builtin_tool_count": 136,
+    "builtin_tool_count": 137,
     "plugin_counts": {
       "automation": 4,
       "device": 31,
       "github": 3,
       "local_builtin_catalog": 67,
       "lsp": 10,
-      "mcp_management": 5,
+      "mcp_management": 6,
       "runtime": 7,
       "vision": 4,
       "webhook": 5
@@ -819,10 +824,10 @@
     "third_party_dynamic_mcp_tools_not_included": true
   },
   "tests": {
-    "mapped_tree_leaves": 125,
-    "unique_test_method_refs": 133,
-    "android_test_methods_in_matrix": 25,
-    "unit_test_methods_in_matrix": 108,
+    "mapped_tree_leaves": 121,
+    "unique_test_method_refs": 115,
+    "android_test_methods_in_matrix": 9,
+    "unit_test_methods_in_matrix": 106,
     "source_present_does_not_mean_executed": true
   },
   "comparison": {
@@ -830,17 +835,16 @@
       "candidate_file_only": 3,
       "ci_workflow_configuration": 14,
       "historical_file_only": 75,
-      "named_code_declaration": 199,
-      "no_code_entry": 17,
-      "stale_production_source": 1,
-      "test_and_named_code_declaration": 3,
-      "test_method_mapping": 122,
-      "unexecuted_instrumentation": 6
+      "named_code_declaration": 206,
+      "no_code_entry": 19,
+      "test_and_named_code_declaration": 1,
+      "test_method_mapping": 120,
+      "unexecuted_instrumentation": 10
     },
-    "concrete_static_source_or_test_or_job_evidence": 344,
+    "concrete_static_source_or_test_or_job_evidence": 351,
     "weak_file_only_evidence": 78,
-    "no_confirmed_entry": 17,
-    "pending_source_migration": 1,
+    "no_confirmed_entry": 19,
+    "pending_source_migration": 0,
     "stable_static_identities": 117,
     "stale_legacy_identity_count": 9,
     "stale_legacy_identity_ids": [
@@ -855,7 +859,8 @@
       "existing.0095"
     ],
     "unproven_paths": [
-      "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / UI 场景覆盖清单与兼容性检查（迁移中）",
+      "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生首页：唯一新建入口，未开始编辑器不生成正式会话记录，未发送草稿独立保留与恢复",
+      "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生功能路由与页面恢复校验",
       "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送、分支与交互端口（迁移中）",
       "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
       "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 原回复内交互卡片（迁移中）",
@@ -863,6 +868,7 @@
       "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 历史调参兼容读取，退出反应控制",
       "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与采样设置分离",
       "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 用户与作者表达偏好及重复诊断",
+      "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 真实成员身份与窄授权协作（未合并）",
       "第二层｜共享运行能力 / 共享工具执行 / 工具输出格式和结构化验证",
       "第三层｜平台与工程保障 / Android 本机运行时 / Node／Python／Git 工具运行环境",
       "第三层｜平台与工程保障 / 测试与语义验证 / 团队任务与 UI 回归",
@@ -884,7 +890,7 @@
       "evidence_level": "test_method_mapping",
       "static_identity": null,
       "source_files": [],
-      "test_references": 9,
+      "test_references": 1,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
@@ -896,6 +902,16 @@
       "source_files": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt"
       ],
+      "test_references": 0,
+      "workflow_job_count": 0,
+      "unrun_instrumentation_tests": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生首页：唯一新建入口，未开始编辑器不生成正式会话记录，未发送草稿独立保留与恢复",
+      "layer": "第一层｜产品功能与界面",
+      "evidence_level": "no_code_entry",
+      "static_identity": null,
+      "source_files": [],
       "test_references": 0,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
@@ -915,10 +931,12 @@
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 页面返回、抽屉和浮层管理",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "test_method_mapping",
+      "evidence_level": "named_code_declaration",
       "static_identity": null,
-      "source_files": [],
-      "test_references": 1,
+      "source_files": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
+      ],
+      "test_references": 0,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
@@ -928,7 +946,8 @@
       "evidence_level": "named_code_declaration",
       "static_identity": null,
       "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt"
       ],
       "test_references": 0,
       "workflow_job_count": 0,
@@ -940,14 +959,15 @@
       "evidence_level": "named_code_declaration",
       "static_identity": "existing.0102",
       "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureNavigation.kt"
       ],
       "test_references": 0,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
     {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / UI 场景覆盖清单与兼容性检查（迁移中）",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生功能路由与页面恢复校验",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "no_code_entry",
       "static_identity": null,
@@ -1020,7 +1040,8 @@
       "evidence_level": "named_code_declaration",
       "static_identity": "existing.0097",
       "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt"
       ],
       "test_references": 0,
       "workflow_job_count": 0,
@@ -1119,9 +1140,11 @@
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 统一按钮、输入框与列表组件",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "stale_production_source",
+      "evidence_level": "named_code_declaration",
       "static_identity": "existing.0100",
-      "source_files": [],
+      "source_files": [
+        "app/src/main/java/com/shenyan/designsystem/components/ShenyanBasics.kt"
+      ],
       "test_references": 0,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
@@ -1141,10 +1164,12 @@
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 触控、无障碍与输入法适配",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "test_method_mapping",
+      "evidence_level": "named_code_declaration",
       "static_identity": null,
-      "source_files": [],
-      "test_references": 1,
+      "source_files": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
+      ],
+      "test_references": 0,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
@@ -1154,7 +1179,8 @@
       "evidence_level": "named_code_declaration",
       "static_identity": null,
       "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+        "app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt"
       ],
       "test_references": 0,
       "workflow_job_count": 0,
@@ -1622,7 +1648,7 @@
       "evidence_level": "test_method_mapping",
       "static_identity": null,
       "source_files": [],
-      "test_references": 5,
+      "test_references": 3,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
@@ -2313,6 +2339,19 @@
       "unrun_instrumentation_tests": 0
     },
     {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 持久任务图与节点验收（未合并）",
+      "layer": "第一层｜产品功能与界面",
+      "evidence_level": "unexecuted_instrumentation",
+      "static_identity": null,
+      "source_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlan.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt"
+      ],
+      "test_references": 0,
+      "workflow_job_count": 0,
+      "unrun_instrumentation_tests": 1
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 创建团队和启动助手",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "named_code_declaration",
@@ -2664,7 +2703,7 @@
       "evidence_level": "named_code_declaration",
       "static_identity": null,
       "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt",
+        "app/src/main/java/com/labteto/dshmobile/uicontract/WorkReadUiPort.kt",
         "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkUiState.kt"
       ],
       "test_references": 0,
@@ -2674,13 +2713,13 @@
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "test_and_named_code_declaration",
+      "evidence_level": "named_code_declaration",
       "static_identity": null,
       "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt",
+        "app/src/main/java/com/labteto/dshmobile/uicontract/WorkReadUiPort.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjection.kt"
       ],
-      "test_references": 1,
+      "test_references": 0,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
@@ -2700,7 +2739,7 @@
       "evidence_level": "test_method_mapping",
       "static_identity": null,
       "source_files": [],
-      "test_references": 3,
+      "test_references": 2,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
@@ -2713,7 +2752,7 @@
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalRequirementEvidence.kt",
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt"
       ],
-      "test_references": 2,
+      "test_references": 1,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
@@ -2822,6 +2861,30 @@
       "unrun_instrumentation_tests": 0
     },
     {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 目标事实增量判断与恢复（未合并）",
+      "layer": "第一层｜产品功能与界面",
+      "evidence_level": "unexecuted_instrumentation",
+      "static_identity": null,
+      "source_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalFactsProjection.kt"
+      ],
+      "test_references": 0,
+      "workflow_job_count": 0,
+      "unrun_instrumentation_tests": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 可选模型背景摘要（未合并）",
+      "layer": "第一层｜产品功能与界面",
+      "evidence_level": "unexecuted_instrumentation",
+      "static_identity": null,
+      "source_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSemanticSummary.kt"
+      ],
+      "test_references": 0,
+      "workflow_job_count": 0,
+      "unrun_instrumentation_tests": 1
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 自动化与工作联动 / 自动工作任务执行入口",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "named_code_declaration",
@@ -2896,12 +2959,12 @@
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "test_and_named_code_declaration",
+      "evidence_level": "named_code_declaration",
       "static_identity": null,
       "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperation.kt"
+        "app/src/main/java/com/labteto/dshmobile/uicontract/AutomationUiPort.kt"
       ],
-      "test_references": 2,
+      "test_references": 0,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
@@ -3396,6 +3459,18 @@
       "unrun_instrumentation_tests": 0
     },
     {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 全目录发现与运行中变更感知（未合并）",
+      "layer": "第一层｜产品功能与界面",
+      "evidence_level": "unexecuted_instrumentation",
+      "static_identity": null,
+      "source_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivation.kt"
+      ],
+      "test_references": 0,
+      "workflow_job_count": 0,
+      "unrun_instrumentation_tests": 1
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 文件读取和内容检索",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "test_method_mapping",
@@ -3604,6 +3679,18 @@
       "test_references": 0,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 浏览器登录与授权刷新撤销（未合并）",
+      "layer": "第一层｜产品功能与界面",
+      "evidence_level": "unexecuted_instrumentation",
+      "static_identity": null,
+      "source_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalMcpOAuthProtocol.kt"
+      ],
+      "test_references": 0,
+      "workflow_job_count": 0,
+      "unrun_instrumentation_tests": 1
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 网页搜索",
@@ -4096,15 +4183,14 @@
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度",
       "layer": "第一层｜产品功能与界面",
-      "evidence_level": "unexecuted_instrumentation",
+      "evidence_level": "named_code_declaration",
       "static_identity": null,
       "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSettingsUiContribution.kt",
         "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MiniMaxQuotaPage.kt"
       ],
       "test_references": 0,
       "workflow_job_count": 0,
-      "unrun_instrumentation_tests": 1
+      "unrun_instrumentation_tests": 0
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆空间和分类浏览",
@@ -4356,6 +4442,16 @@
       "source_files": [
         "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalDiagnosticsRuntime.kt"
       ],
+      "test_references": 0,
+      "workflow_job_count": 0,
+      "unrun_instrumentation_tests": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 真实成员身份与窄授权协作（未合并）",
+      "layer": "第一层｜产品功能与界面",
+      "evidence_level": "no_code_entry",
+      "static_identity": null,
+      "source_files": [],
       "test_references": 0,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
@@ -5135,6 +5231,19 @@
       "unrun_instrumentation_tests": 0
     },
     {
+      "path": "第二层｜共享运行能力 / 共享工具执行 / MCP资源分页与完整内容",
+      "layer": "第二层｜共享运行能力",
+      "evidence_level": "named_code_declaration",
+      "static_identity": null,
+      "source_files": [
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpClient.kt",
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+      ],
+      "test_references": 0,
+      "workflow_job_count": 0,
+      "unrun_instrumentation_tests": 0
+    },
+    {
       "path": "第二层｜共享运行能力 / 共享记忆 / 记忆存储与检索",
       "layer": "第二层｜共享运行能力",
       "evidence_level": "test_method_mapping",
@@ -5308,7 +5417,7 @@
       "evidence_level": "test_method_mapping",
       "static_identity": null,
       "source_files": [],
-      "test_references": 6,
+      "test_references": 5,
       "workflow_job_count": 0,
       "unrun_instrumentation_tests": 0
     },
@@ -5873,5 +5982,5 @@
       "unrun_instrumentation_tests": 0
     }
   ],
-  "interpretation": "440项是功能树末级描述，不是已验收的独立产品功能总数。路由、工具和页面数量口径不同不能相加。"
+  "interpretation": "448项是功能树末级描述，不是已验收的独立产品功能总数。路由、工具和页面数量口径不同不能相加。"
 }

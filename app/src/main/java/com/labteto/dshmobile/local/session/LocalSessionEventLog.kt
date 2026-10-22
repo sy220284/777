@@ -66,42 +66,35 @@ class LocalSessionEventLog(
             .joinToString("") { "%02x".format(it) }.also { checkpointIdentity = it }
     }
 
-    @Synchronized
-    internal fun readProjectionCheckpoint(name: String, version: Int): LocalSessionProjectionCheckpoint? =
+    internal fun readProjectionCheckpoint(name: String, version: Int): LocalSessionProjectionCheckpoint? = if (isClosed) null else withWriterLease {
         if (isClosed) null else checkpoints.read(name)?.takeIf {
             it.version == version && it.identity == projectionIdentity() &&
                 it.throughSequence in -1L..latestSequence()
         }
-
-    @Synchronized
-    internal fun writeProjectionCheckpoint(name: String, version: Int, throughSequence: Long,
-        payload: String, generation: Long) {
-        if (isClosed || generation != resetGeneration) return
-        delegate.withWriterLease {
-            if (isClosed || generation != resetGeneration ||
-                throughSequence > latestSequence()) return@withWriterLease
-            checkpoints.write(name,
-                LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload))
-        }
     }
 
-    @Synchronized
+    internal fun writeProjectionCheckpoint(name: String, version: Int, throughSequence: Long,
+        payload: String, generation: Long) = if (isClosed) Unit else withWriterLease {
+        if (isClosed || generation != resetGeneration || throughSequence > latestSequence()) return@withWriterLease
+        checkpoints.write(name,
+            LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload))
+    }
+
     internal fun writeProjectionCheckpointIfFits(name: String, version: Int, throughSequence: Long,
-        payload: String, generation: Long) {
+        payload: String, generation: Long) = if (isClosed) Unit else withWriterLease {
+        if (isClosed || generation != resetGeneration) return@withWriterLease
         val value = LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload)
-        if (!checkpoints.fits(value)) return
+        if (!checkpoints.fits(value)) return@withWriterLease
         try {
             writeProjectionCheckpoint(name, version, throughSequence, payload, generation)
         } catch (failure: java.io.IOException) {
-            // This optional acceleration must never turn a successful authoritative read
-            // into a failed history load (for example when storage fills during fsync).
             AppLog.warn("SessionProjection", "派生检查点写入失败，保留原事件日志读取结果 name=$name", failure)
         }
     }
 
-    /** Shares the native Session Owner's compare/append lock with every adapter for this path. */
+    /** Native writer first, then adapter state; callers already holding the writer may reenter. */
     internal fun <T> withWriterLease(block: () -> T): T =
-        delegate.withWriterLease(block)
+        delegate.withWriterLease { synchronized(this) { block() } }
 
     fun append(type: String, data: JsonObject): Event {
         val committed = delegate.append(type, data).toLocalEvent()
@@ -120,13 +113,22 @@ class LocalSessionEventLog(
     @Volatile internal var isClosed: Boolean = false
         private set
 
-    @Synchronized
     fun close() {
-        if (isClosed) return
-        isClosed = true
-        resetGeneration += 1L
-        delegate.close()
-        mutableChanges.update { it + 1L }
+        // No writer is acquired while holding this monitor: readers consistently enter
+        // native writer -> adapter state. Release adapter state before core registration close.
+        val release = synchronized(this) {
+            if (isClosed) false else {
+                isClosed = true
+                resetGeneration += 1L
+                true
+            }
+        }
+        if (release) {
+            // Core close releases path registration; never hold its writer while taking
+            // the core registry lock, whose own close path acquires the writer internally.
+            delegate.close()
+            mutableChanges.update { it + 1L }
+        }
     }
 
     fun snapshotAfter(sequenceExclusive: Long): List<Event> = delegate.snapshotAfter(sequenceExclusive).map { event ->
@@ -253,14 +255,12 @@ class LocalSessionEventLog(
     @Volatile internal var resetGeneration: Long = 0L
         private set
 
-    fun clear() = synchronized(this) {
-        delegate.withWriterLease {
-            delegate.clear()
-            resetGeneration += 1L
-            checkpointIdentity = null
-            checkpoints.clear()
-            mutableChanges.update { it + 1L }
-        }
+    fun clear() = withWriterLease {
+        delegate.clear()
+        resetGeneration += 1L
+        checkpointIdentity = null
+        checkpoints.clear()
+        mutableChanges.update { it + 1L }
     }
 
     private fun com.labteto.dshmobile.harness.session.SessionEvent.toLocalEvent() = Event(

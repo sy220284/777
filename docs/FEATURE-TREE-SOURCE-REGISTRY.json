@@ -42,6 +42,14 @@
       "test": "app/src/test/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillBundleTest.kt#installsOnlyMobileMediaSkillsAndUpdatesBuiltIns"
     },
     {
+      "id": "tools.mcp.oauth-login",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 浏览器登录与授权刷新撤销（未合并）",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalMcpOAuthProtocol.kt",
+      "entry": "LocalMcpOAuthProtocol",
+      "owner": "TOOLS",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/tools/LocalMcpOAuthProtocolTest.kt#discoveryRegistrationTokenRotationAndRevocationUseBoundResource"
+    },
+    {
       "id": "tools.media.paged-history",
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体档案分页与会话隔离",
       "source": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStore.kt",
@@ -56,6 +64,14 @@
       "entry": "LocalMediaStore",
       "owner": "TOOLS",
       "test": "app/src/androidTest/java/com/labteto/dshmobile/local/model/LocalMediaStoreAndroidTest.kt#receiptAndResultCommitTogetherAndLateWriterCannotResurrectDeletion"
+    },
+    {
+      "id": "tools.skill.live-catalog",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 全目录发现与运行中变更感知（未合并）",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivation.kt",
+      "entry": "discoverLocalWorkSkills",
+      "owner": "WORK",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivationTest.kt#catalogReportsTailAndRefreshesPinnedBodyAndDisabledMetadata"
     },
     {
       "id": "ui.conversation.ports",
@@ -96,6 +112,22 @@
       "entry": "executeMember",
       "owner": "WORK",
       "test": "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#trustedMembersSendPeerLeadAndReadOwnDurableMailbox"
+    },
+    {
+      "id": "work.goal.incremental-facts",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 目标事实增量判断与恢复（未合并）",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalFactsProjection.kt",
+      "entry": "LocalWorkGoalFactsProjection",
+      "owner": "WORK",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalFactsProjectionTest.kt#repeatedAssessmentAppliesOnlyNewEventsAndMatchesFullRebuild"
+    },
+    {
+      "id": "work.history.semantic-background",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 可选模型背景摘要（未合并）",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSemanticSummary.kt",
+      "entry": "semanticWorkCompaction",
+      "owner": "WORK",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkSemanticSummaryTest.kt#semanticBackgroundPreservesStructuredAuthorityAndVerbatimTail"
     },
     {
       "id": "work.taskgraph.durable-acceptance",

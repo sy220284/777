@@ -19,8 +19,9 @@ import com.labteto.dshmobile.local.model.prepareLocalMultimodalMessages
 import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
 import com.labteto.dshmobile.local.model.withChatTurnContext
 import com.labteto.dshmobile.local.model.withEphemeralContext
-import com.labteto.dshmobile.local.model.withoutLastCompletedAssistantReply
 import com.labteto.dshmobile.local.model.chatSystemPrompt
+import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
+import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.runtime.CHAT_RECENT_HISTORY_MESSAGES
 import com.labteto.dshmobile.local.runtime.LocalExecutionService
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -28,6 +29,7 @@ import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
 import com.labteto.dshmobile.local.session.chatReasoningTranscriptId
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -87,12 +89,14 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
         memoryInput: String = input,
         sourceMessageId: String? = null,
         replacingMessageId: String? = null,
+        regenerationPreparation: LocalChatRegenerationPreparation? = null,
     ): Job = scope.launch(start = CoroutineStart.LAZY) {
         run(
             input = input,
             memoryInput = memoryInput,
             sourceMessageId = sourceMessageId,
             replacingMessageId = replacingMessageId,
+            regenerationPreparation = regenerationPreparation,
         )
     }
 
@@ -101,13 +105,14 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
         memoryInput: String = input,
         sourceMessageId: String? = null,
         replacingMessageId: String? = null,
+        regenerationPreparation: LocalChatRegenerationPreparation? = null,
     ) {
         val admittedSessionId = runtimeStateStore.currentSessionId
         try {
             LocalSessionRuntimeRegistry.withOwner(
                 admittedSessionId, LocalSessionRuntimeKind.FOREGROUND,
             ) {
-                runUnderSessionOwner(admittedSessionId, input, memoryInput, sourceMessageId, replacingMessageId)
+                runUnderSessionOwner(admittedSessionId, input, memoryInput, sourceMessageId, replacingMessageId, regenerationPreparation)
             }
         } finally {
             queue.finishTurnAndStartNext(currentCoroutineContext()[Job])
@@ -121,6 +126,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
         memoryInput: String = input,
         sourceMessageId: String? = null,
         replacingMessageId: String? = null,
+        regenerationPreparation: LocalChatRegenerationPreparation? = null,
     ) {
         if (runtimeStateStore.currentSessionId != sessionId) throw CancellationException("会话已切换")
         LocalExecutionService.withTurn(
@@ -128,7 +134,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             sessionId = sessionId,
             error = { runtimeStateStore.state.value.error },
             onRejected = { runtimeStateStore.projection.publishError("系统拒绝前台执行，聊天回合未启动") },
-        ) { runOwned(sessionId, input, memoryInput, sourceMessageId, replacingMessageId) }
+        ) { runOwned(sessionId, input, memoryInput, sourceMessageId, replacingMessageId, regenerationPreparation) }
     }
 
     private suspend fun runOwned(
@@ -137,6 +143,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
         memoryInput: String,
         sourceMessageId: String?,
         replacingMessageId: String?,
+        regenerationPreparation: LocalChatRegenerationPreparation?,
     ) {
         LocalChatPostTurnJobOwner.cancel()
         runtimeStateStore.foregroundInteractions.cancelAll()
@@ -147,6 +154,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
         )
 
         val eventLog = sessionStorage.eventLogs.get(sessionId)
+        var regenerationCommitted = false
         try {
             check(modelHistory.ensureSystemPrompt(sessionId, chatSystemPrompt())) {
                 "Chat system prompt 写入时前台会话已切换"
@@ -173,39 +181,68 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
 
             val branchEligible = snapshot.transcriptIndex.branchingEligible
             val branchParentId = snapshot.transcriptIndex.latestUserMessageId
-            val branchBase = snapshot.chat.chatBranches
-
-            chatMemory.captureAutoMemoryDirective(
-                memoryInput,
-                sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
+            val branchBase = regenerationPreparation?.branches ?: snapshot.chat.chatBranches
+            // Rebuild from the selected prefix, not the cached history: the latter may
+            // contain a superseded answer in a previously compacted summary.
+            val regenerationHistory = replacingMessageId?.let { oldId ->
+                buildDurableChatModelHistory(
+                    eventLog = eventLog,
+                    messages = chatRegenerationSourceMessages(branchBase, oldId),
+                    systemPrompt = chatSystemPrompt(),
+                )
+            }
+            val supersededAnswerIds = replacingMessageId?.let { oldId ->
+                chatRegenerationPreviousAnswerIds(branchBase, oldId)
+            }.orEmpty()
+            // Exclude all sibling versions from recent style, context and recall references.
+            val generationSnapshot = if (replacingMessageId == null) snapshot else snapshot.copy(
+                messages = chatRegenerationReferenceMessages(
+                    snapshot.messages, replacingMessageId, supersededAnswerIds,
+                ),
+                chat = snapshot.chat.copy(
+                    chatState = requireNotNull(regenerationPreparation).baseState,
+                    chatContext = regenerationPreparation.baseContext,
+                    replySuggestions = emptyList(),
+                    chatBranches = branchBase,
+                ),
             )
-            val relationshipMemory = chatMemory.relationshipContext(input)
+
+            if (replacingMessageId == null) {
+                chatMemory.captureAutoMemoryDirective(
+                    memoryInput,
+                    sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
+                )
+            }
+            val relationshipMemory = chatMemory.relationshipContext(
+                query = input,
+                snapshot = generationSnapshot,
+                excludedAssistantMessageIds = supersededAnswerIds,
+            )
             val preparedChat = chatTurnCoordinator.prepare(
-                snapshot = snapshot,
+                snapshot = generationSnapshot,
                 input = input,
                 relationshipMemory = relationshipMemory,
             )
             val turnContext = preparedChat.context
             val networkContext = webContext.forInput(input, turnContext.persona)
             val dynamicContext = networkContext + preparedChat.dynamicContext
-            check(
-                modelHistory.compactChatIfNeeded(
-                    expectedSessionId = sessionId,
-                    extraTokens = estimateModelTokens(turnContext.stablePrompt) +
-                        estimateModelTokens(dynamicContext),
-                ),
-            ) { "Chat 历史压缩时前台会话已切换" }
-
-            val durableHistory = if (replacingMessageId == null) {
-                modelHistory.history.snapshot()
-            } else {
-                modelHistory.history.snapshot().withoutLastCompletedAssistantReply()
+            // The normal cached history can be compacted in place. Regeneration instead
+            // uses the clean selected-prefix history and must never summarize the old reply.
+            if (regenerationHistory == null) {
+                check(
+                    modelHistory.compactChatIfNeeded(
+                        expectedSessionId = sessionId,
+                        extraTokens = estimateModelTokens(turnContext.stablePrompt) +
+                            estimateModelTokens(dynamicContext),
+                    ),
+                ) { "Chat 历史压缩时前台会话已切换" }
             }
+            val durableHistory = regenerationHistory ?: modelHistory.history.snapshot()
             val durableRequestMessages = withChatTurnContext(
                 history = boundedChatRequestHistory(
                     durableHistory,
                     recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
-                    currentFacts = snapshot.chat.chatContext.canonicalFactLines(),
+                    currentFacts = generationSnapshot.chat.chatContext.canonicalFactLines(),
                 ),
                 stableContext = turnContext.stablePrompt,
                 dynamicContext = dynamicContext + "\n" + com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
@@ -245,12 +282,13 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 put("model", snapshot.modelState.model)
                 put("mode", "chat")
                 put("persona_id", turnContext.persona.id)
+                replacingMessageId?.let { put("replaces", it) }
             })
 
             val replyCards = LocalChatReplyUiDocuments()
             val rawReply = try {
                 modelRequests.complete(
-                    snapshot = snapshot,
+                    snapshot = generationSnapshot,
                     messages = requestMessages,
                     step = 1,
                     options = com.labteto.dshmobile.local.LocalModelRequestOptions(
@@ -261,7 +299,9 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                             val filter = com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPreview()
                             filter::append
                         },
-                    persistOverflowHistory = true,
+                    // Regeneration already uses an isolated rebuilt history. Never compact
+                    // the cached (old-answer) history through overflow recovery.
+                    persistOverflowHistory = regenerationHistory == null,
                     requestLog = eventLog,
                     temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(
                         snapshot.modelState.model, snapshot.modelState.baseUrl,
@@ -294,7 +334,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             }
 
             val reply = replyCoordinator.finalizeDirect(
-                snapshot = snapshot,
+                snapshot = generationSnapshot,
                 reply = replyCards.capture(rawReply),
                 userMessage = input,
                 step = 1,
@@ -303,7 +343,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 ),
                 retryRaw = { repairHint ->
                     replyCards.capture(modelRequests.complete(
-                        snapshot = snapshot,
+                        snapshot = generationSnapshot,
                         messages = withEphemeralContext(requestMessages, repairHint),
                         step = 1,
                         options = com.labteto.dshmobile.local.LocalModelRequestOptions(
@@ -326,6 +366,8 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 appendEvent = { type, data -> eventLog.append(type, data) },
             )
 
+            // Reject an incomplete replacement before it can materialize new media files.
+            requireCompleteChatRegeneration(replacingMessageId, reply)
             val materializedReply = materializeLocalChatReplyMedia(
                 reply = reply,
                 workspaceRoot = File(sessionStorage.files.workspace.path),
@@ -365,54 +407,100 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                         ("transcript" to encodeTranscriptMessages(transcriptMessages)),
                 )
             }
-            val assistantEvent = eventLog.append(
-                "assistant/message",
-                if (replacingMessageId == null) {
-                    assistantData
-                } else {
-                    JsonObject(assistantData + ("replaces" to JsonPrimitive(replacingMessageId)))
-                },
-            )
+            // Only complete candidate replies can reach the durable replacement commit.
+
+            val assistantEvent = if (replacingMessageId == null) {
+                eventLog.append("assistant/message", assistantData)
+            } else {
+                // One durable commit is the authority for transcript, selection, state and model
+                // history. A crash before it leaves the old answer selected; after it the
+                // three projections all replay from this same event.
+                val assistant = requireNotNull(assistantTranscript)
+                val branches = upsertChatBranchNode(
+                    branchBase,
+                    LocalChatBranchNode(
+                        message = assistant,
+                        parentId = requireNotNull(branchParentId),
+                        chatStateAfter = generationSnapshot.chat.chatState,
+                        chatContextAfter = generationSnapshot.chat.chatContext,
+                    ),
+                    select = true,
+                )
+                val visibleThinking = LocalSessionTranscriptPager(eventLog).all()
+                    .filter { it.role == "reasoning" }
+                    .associateBy { it.id }
+                val activePrefix = activeChatBranchMessages(branches).dropLast(1)
+                val activeTranscript = activePrefix.flatMap { previous ->
+                    listOfNotNull(
+                        if (previous.role == "assistant") {
+                            visibleThinking[chatReasoningTranscriptId(previous.id)]
+                        } else null,
+                        previous,
+                    )
+                } + listOfNotNull(reasoningTranscript, assistantTranscript)
+                val modelAfter = requireNotNull(regenerationHistory) + durableReply.message
+                val committed = appendChatProjectionCommit(
+                    eventLog = eventLog,
+                    reason = "assistant-regenerated",
+                    activeTranscript = activeTranscript,
+                    modelHistory = modelAfter,
+                    state = LocalTimelineRewriteState(
+                        chatState = generationSnapshot.chat.chatState,
+                        chatContext = generationSnapshot.chat.chatContext,
+                        chatBranches = branches,
+                        groupChat = generationSnapshot.chat.groupChat,
+                        replySuggestions = emptyList(),
+                    ),
+                    regeneratedAssistantId = assistant.id,
+                    regeneratedAssistantMessage = durableReply.message,
+                )
+                regenerationCommitted = true
+                check(modelHistory.reset(sessionId, modelAfter)) {
+                    "Chat 新版本已持久化，但模型历史尚未同步；请重新打开会话恢复"
+                }
+                chatState.update { current ->
+                    if (current.sessionId != sessionId) current else current.copy(
+                        messages = activeTranscript.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
+                        transcriptIndex = buildLocalTranscriptRuntimeIndex(activeTranscript),
+                        chat = current.chat.copy(
+                            chatState = generationSnapshot.chat.chatState,
+                            chatContext = generationSnapshot.chat.chatContext,
+                            chatBranches = branches,
+                            replySuggestions = emptyList(),
+                        ),
+                    )
+                }
+                committed
+            }
 
             assistantTranscript?.let { message ->
                 replyDocuments.publish(replyCards.definitionFor(reply.content.orEmpty()),
                     com.labteto.dshmobile.uicontract.UiDocumentSource(sessionId, message.id,
-                        snapshot.chat.chatContext.generation,
+                        generationSnapshot.chat.chatContext.generation,
                         snapshot.modelState.modelSelection.activeProfileId, snapshot.projectId, false),
                     replyCards.requestIdFor(reply.content.orEmpty()), snapshot.modelState.model,
                     replyCards.reportedFor(reply.content.orEmpty()))
             }
 
-            if (replacingMessageId != null) {
-                check(
-                    modelHistory.reset(
-                        sessionId,
-                        modelHistory.history.snapshot().withoutLastCompletedAssistantReply(),
-                    ),
-                ) { "Chat 重生成替换模型历史时前台会话已切换" }
-                runtimeStateStore.projection.removeForegroundTranscriptMessage(
-                    sessionId,
-                    replacingMessageId,
-                )
-                runtimeStateStore.projection.removeForegroundTranscriptMessage(
-                    sessionId,
-                    chatReasoningTranscriptId(replacingMessageId),
-                )
+            if (replacingMessageId == null) {
+                modelHistory.history.append(durableReply.message)
             }
-            modelHistory.history.append(durableReply.message)
             check(modelHistory.refreshMetrics(sessionId)) {
                 "Chat 回复提交后前台会话已切换"
             }
-            runtimeStateStore.projection.appendForegroundTranscript(
-                sessionId = sessionId,
-                messages = transcriptMessages,
-            )
+            if (replacingMessageId == null) {
+                runtimeStateStore.projection.appendForegroundTranscript(
+                    sessionId = sessionId,
+                    messages = transcriptMessages,
+                )
+            }
             runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor = maxOf(
                 runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor ?: -1L,
                 assistantEvent.sequence,
             )
 
             if (
+                replacingMessageId == null &&
                 branchEligible &&
                 branchBase.nodes.isNotEmpty() &&
                 assistantTranscript != null &&
@@ -435,11 +523,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 if (hasChatBranchAlternatives(branches)) {
                     branchCoordinator.persistCurrentProjection(
                         expectedSessionId = sessionId,
-                        reason = if (replacingMessageId != null) {
-                            "assistant-regenerated"
-                        } else {
-                            "assistant-branch-completed"
-                        },
+                        reason = "assistant-branch-completed",
                     )
                 }
             }
@@ -504,27 +588,11 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             sessionStorage.enqueueCurrentSnapshot(sessionId)
             throw cancelled
         } catch (error: Exception) {
-            if (replacingMessageId != null) {
-                val oldNode = runtimeStateStore.state.value.chat.chatBranches.nodes
-                    .firstOrNull { it.message.id == replacingMessageId }
-                oldNode?.chatStateAfter?.let { restoredState ->
-                    chatState.update { current ->
-                        if (current.sessionId != sessionId) current else current.copy(
-                            chat = current.chat.copy(
-                                chatState = restoredState,
-                                chatContext = restoreBranchContext(
-                                    snapshot = oldNode.chatContextAfter,
-                                    legacyState = oldNode.chatStateAfter,
-                                    previousGeneration = current.chat.chatContext.generation,
-                                    experienceContext = current.chat.chatContext,
-                                ).boundDurablePending(eventLog),
-                                replySuggestions = oldNode.replySuggestionsAfter,
-                            ),
-                        )
-                    }
-                }
+            val detail = if (regenerationCommitted) {
+                "新回复已经保存，但运行态同步失败；请重新打开会话恢复：${error.message ?: "未知错误"}"
+            } else {
+                error.message ?: "聊天请求失败"
             }
-            val detail = error.message ?: "聊天请求失败"
             chatState.update { current ->
                 if (current.sessionId != sessionId) current else current.copy(error = detail)
             }

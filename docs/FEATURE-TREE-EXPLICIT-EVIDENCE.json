@@ -7,11 +7,16 @@
       "sources": [
         {
           "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlan.kt",
-          "symbols": ["recoveredResults"]
+          "symbols": [
+            "recoveredResults"
+          ]
         },
         {
           "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt",
-          "symbols": ["runWorkflow", "resumePendingWorkflows"]
+          "symbols": [
+            "runWorkflow",
+            "resumePendingWorkflows"
+          ]
         }
       ],
       "tests": [
@@ -835,6 +840,82 @@
         }
       ],
       "scope": "R2未合并：正式连接共享审批、身份和取消；资源分页与完整内容源码存在，测试尚未执行，不代表主线交付或行为验收。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 目标事实增量判断与恢复（未合并）",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalFactsProjection.kt",
+          "symbols": [
+            "LocalWorkGoalFactsProjection"
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalFactsProjectionTest.kt",
+          "method": "repeatedAssessmentAppliesOnlyNewEventsAndMatchesFullRebuild",
+          "references": "LocalWorkGoalFactsProjection"
+        }
+      ],
+      "scope": "生产调用链和具名测试源码存在；尚未合并，编译及运行结果以当前提交CI为准，真实服务和设备专项验收未完成"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 可选模型背景摘要（未合并）",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSemanticSummary.kt",
+          "symbols": [
+            "semanticWorkCompaction"
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkSemanticSummaryTest.kt",
+          "method": "semanticBackgroundPreservesStructuredAuthorityAndVerbatimTail",
+          "references": "semanticWorkCompaction"
+        }
+      ],
+      "scope": "生产调用链和具名测试源码存在；尚未合并，编译及运行结果以当前提交CI为准，真实服务和设备专项验收未完成"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 浏览器登录与授权刷新撤销（未合并）",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalMcpOAuthProtocol.kt",
+          "symbols": [
+            "LocalMcpOAuthProtocol"
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/tools/LocalMcpOAuthProtocolTest.kt",
+          "method": "discoveryRegistrationTokenRotationAndRevocationUseBoundResource",
+          "references": "LocalMcpOAuthProtocol"
+        }
+      ],
+      "scope": "生产调用链和具名测试源码存在；尚未合并，编译及运行结果以当前提交CI为准，真实服务和设备专项验收未完成"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 全目录发现与运行中变更感知（未合并）",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivation.kt",
+          "symbols": [
+            "discoverLocalWorkSkills"
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivationTest.kt",
+          "method": "catalogReportsTailAndRefreshesPinnedBodyAndDisabledMetadata",
+          "references": "discoverLocalWorkSkills"
+        }
+      ],
+      "scope": "源码与具名回归测试存在；尚未合并，运行结果以最新提交CI为准，不代表设备与真实服务验收。"
     }
   ]
 }

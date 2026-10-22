@@ -7,6 +7,8 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import javax.net.ssl.TrustManagerFactory
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,6 +23,15 @@ class BundledNodeRuntimeTest {
 
         val node = File(runtime.binDir, "node")
         assertTrue("node command link is missing", node.exists())
+        val caPath = runtime.environment()["NODE_EXTRA_CA_CERTS"]
+        assertTrue("Node must reuse Android trusted CA roots", !caPath.isNullOrBlank())
+        val caFile = File(requireNotNull(caPath))
+        assertTrue("Node CA file missing", caFile.isFile)
+        val pem = caFile.readText()
+        assertTrue("Node CA file must contain platform certificates", pem.contains("-----BEGIN CERTIFICATE-----"))
+        assertFalse("Never disable Node TLS verification", runtime.environment().containsKey("NODE_TLS_REJECT_UNAUTHORIZED"))
+        assertTrue("Android trust manager must be available",
+            TrustManagerFactory.getDefaultAlgorithm().isNotBlank())
 
         val process = ProcessBuilder(
             node.absolutePath,

@@ -38,6 +38,7 @@ class McpPluginWorkerService : Service() {
     private class Instance(
         val transport: McpTransport,
         val owner: Messenger,
+        val credential: java.util.concurrent.atomic.AtomicReference<String?>? = null,
         val calls: McpWorkerCallLedger = McpWorkerCallLedger(),
     ) {
         @Volatile var terminalObserver: Job? = null
@@ -49,7 +50,7 @@ class McpPluginWorkerService : Service() {
     private val incoming = Messenger(object : Handler(Looper.getMainLooper()) {
         override fun handleMessage(message: Message) {
             if (message.what !in setOf(McpWorkerWire.OPEN, McpWorkerWire.REQUEST,
-                    McpWorkerWire.CLOSE)) return
+                    McpWorkerWire.CLOSE, McpWorkerWire.UPDATE_AUTH)) return
             val sender = message.replyTo ?: return
             val requestId = message.arg1
             val operation = message.what
@@ -62,35 +63,30 @@ class McpPluginWorkerService : Service() {
                         McpWorkerWire.OPEN -> {
                             check(!instances.containsKey(token)) { "IPC transport identity already exists" }
                             check(instances.size < 24) { "IPC transport budget exhausted" }
+                            var credential: java.util.concurrent.atomic.AtomicReference<String?>? = null
                             val transport = when (fields.getString("kind")) {
                                 "http" -> {
                                     val endpoint = requireNotNull(fields.getString("endpoint"))
-                                    val bearer = fields.getString("bearer_credential")
-                                    val client = if (bearer == null) http else {
-                                        val uri = java.net.URI(endpoint)
-                                        val host = requireNotNull(uri.host)
-                                        val scheme = uri.scheme?.lowercase()
-                                        require(scheme == "https" || scheme == "http" &&
-                                            host.lowercase() in
-                                                setOf("localhost", "127.0.0.1", "::1", "[::1]")) {
-                                            "远程 MCP Bearer 认证仅允许 HTTPS"
-                                        }
-                                        require(bearer.length in 1..4096 &&
-                                            bearer.all { it.code in 0x21..0x7e })
-                                        val expectedPort = if (uri.port != -1) uri.port
-                                            else if (scheme == "https") 443 else 80
-                                        http.newBuilder().followRedirects(false).followSslRedirects(false)
-                                            .addInterceptor { chain ->
+                                    val reference = java.util.concurrent.atomic.AtomicReference(fields.getString("bearer_credential"))
+                                    credential = reference
+                                    reference.get()?.let(::validateBearer)
+                                    val uri = java.net.URI(endpoint)
+                                    val host = requireNotNull(uri.host)
+                                    val scheme = uri.scheme?.lowercase()
+                                    val expectedPort = if (uri.port != -1) uri.port else if (scheme == "https") 443 else 80
+                                    val client = http.newBuilder().followRedirects(false).followSslRedirects(false)
+                                        .addInterceptor { chain ->
+                                            val bearer = reference.get()
+                                            if (bearer == null) chain.proceed(chain.request()) else {
                                                 val target = chain.request().url
-                                                require(target.scheme == scheme &&
-                                                    target.host.equals(host, true) &&
-                                                    target.port == expectedPort) {
+                                                require((scheme == "https" || scheme == "http" &&
+                                                    host.lowercase() in setOf("localhost", "127.0.0.1", "::1", "[::1]")) &&
+                                                    target.scheme == scheme && target.host.equals(host, true) && target.port == expectedPort) {
                                                     "MCP 认证请求偏离已授权服务地址"
                                                 }
-                                                chain.proceed(chain.request().newBuilder()
-                                                    .header("Authorization", "Bearer $bearer").build())
-                                            }.build()
-                                    }
+                                                chain.proceed(chain.request().newBuilder().header("Authorization", "Bearer $bearer").build())
+                                            }
+                                        }.build()
                                     McpNegotiatingHttpTransport(endpoint, client, json)
                                 }
                                 "stdio" -> {
@@ -111,7 +107,7 @@ class McpPluginWorkerService : Service() {
                                 }
                                 else -> error("unknown worker transport")
                             }
-                            val instance = Instance(transport, sender)
+                            val instance = Instance(transport, sender, credential)
                             check(instances.putIfAbsent(token, instance) == null) {
                                 transport.close()
                                 "IPC duplicate transport"
@@ -165,6 +161,18 @@ class McpPluginWorkerService : Service() {
                                 }
                             } finally { instance.calls.abandon(ticket) }
                         }
+                        McpWorkerWire.UPDATE_AUTH -> {
+                            val instance = instances[token] ?: throw IOException("MCP worker connection closed")
+                            val bearer = fields.getString("bearer_credential")
+                            bearer?.let(::validateBearer)
+                            synchronized(instance) {
+                                require(instance.owner.binder == sender.binder && instances[token] === instance) {
+                                    "MCP worker owner identity mismatch"
+                                }
+                                checkNotNull(instance.credential) { "MCP stdio has no HTTP credential" }.set(bearer)
+                            }
+                            send(sender, McpWorkerWire.RESPONSE, requestId, token, result = "{}")
+                        }
                         McpWorkerWire.CLOSE -> {
                             val instance = instances[token]
                             if (instance != null && instance.owner.binder != sender.binder)
@@ -181,11 +189,19 @@ class McpPluginWorkerService : Service() {
                         error = failure.javaClass.simpleName,
                         transportError = transportFailure,
                         httpStatus = (failure as? com.labteto.dshmobile.interop.mcp.McpHttpException)
-                            ?.statusCode ?: 0)
+                            ?.statusCode ?: 0,
+                        authResourceMetadata = (failure as? com.labteto.dshmobile.interop.mcp.McpHttpException)?.resourceMetadata,
+                        authScope = (failure as? com.labteto.dshmobile.interop.mcp.McpHttpException)?.requiredScope)
                 }
             }
         }
     })
+
+    private fun validateBearer(value: String) {
+        require(value.isNotEmpty() && value.all { it.code in 0x21..0x7e } && McpWorkerWire.validRequestSize(value)) {
+            "MCP credential format or Binder budget invalid"
+        }
+    }
 
     private fun invalidate(token: String, reason: String? = null) {
         val instance = instances.remove(token) ?: return
@@ -204,7 +220,7 @@ class McpPluginWorkerService : Service() {
 
     private fun send(to: Messenger, kind: Int, requestId: Int, token: String,
         result: String? = null, error: String? = null, transportError: Boolean = false,
-        httpStatus: Int = 0) {
+        httpStatus: Int = 0, authResourceMetadata: String? = null, authScope: String? = null) {
         val bytes = result?.toByteArray(Charsets.UTF_8)
         val pipe = if (bytes != null && bytes.size > McpWorkerWire.MAX_INLINE_RESPONSE_BYTES) {
             try { ParcelFileDescriptor.createPipe() }
@@ -226,6 +242,8 @@ class McpPluginWorkerService : Service() {
                 error?.let { putString("error", it.take(120)) }
                 putBoolean("transport_error", transportError)
                 if (httpStatus > 0) putInt("http_status", httpStatus)
+                authResourceMetadata?.let { putString("auth_resource_metadata", it) }
+                authScope?.let { putString("auth_scope", it) }
             }
         }
         try {
