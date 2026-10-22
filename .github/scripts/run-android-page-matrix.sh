@@ -37,6 +37,14 @@ if [[ "${1:-}" == "--cell" ]]; then
     adb emu kill >/dev/null 2>&1 || true
     kill "$emulator_pid" >/dev/null 2>&1 || true
     wait "$emulator_pid" >/dev/null 2>&1 || true
+    # AVDs are independent; reclaim SDK image space before the next case.
+    "$avdm" delete avd -n "$avd" >/dev/null 2>&1 || true
+    "$sdk" --uninstall "$package" >/dev/null 2>&1 || true
+    for attempt in $(seq 1 20); do
+      state="$(adb get-state 2>/dev/null || true)"
+      [[ "$state" != device ]] && break
+      sleep 1
+    done
   }
   trap cleanup EXIT
   booted=false
