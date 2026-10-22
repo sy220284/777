@@ -19,7 +19,7 @@ internal fun requiresAndroid17LocalNetworkPermission(
 
 internal fun isLikelyLocalNetworkEndpoint(endpoint: String): Boolean {
     val host = runCatching { URI(endpoint.trim()).host }.getOrNull()
-        ?.lowercase(Locale.ROOT)?.trim('[', ']') ?: return false
+        ?.lowercase(Locale.ROOT)?.trim('[', ']')?.removeSuffix(".") ?: return false
     if (host == "localhost" || host == "::1" || host.startsWith("127.")) return false
     if (host.endsWith(".local") || host.endsWith(".lan") ||
         host.endsWith(".home.arpa") || '.' !in host && ':' !in host) return true
@@ -27,7 +27,7 @@ internal fun isLikelyLocalNetworkEndpoint(endpoint: String): Boolean {
     if (':' in host) {
         // IPv4-mapped IPv6 literals must receive the same LAN treatment as IPv4.
         // For example, ::ffff:192.168.1.5 reaches the LAN on Android 17.
-        if (host.startsWith("::ffff:") && '.' in host) {
+        if ((host.startsWith("::ffff:") || host.startsWith("0:0:0:0:0:ffff:")) && '.' in host) {
             return isLikelyLocalNetworkEndpoint("http://" + host.substringAfterLast(':'))
         }
         // Only classify IPv6 unique-local (fc00::/7), link-local (fe80::/10),
