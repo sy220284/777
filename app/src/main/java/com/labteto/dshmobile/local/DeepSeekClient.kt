@@ -767,20 +767,6 @@ internal fun providerErrorDetail(body: String, json: Json): String? = runCatchin
         .firstOrNull(String::isNotBlank)
 }.getOrNull()
 
-internal class LocalModelException(
-    val code: String,
-    message: String,
-    val retryable: Boolean,
-    cause: Throwable? = null,
-    val status: Int? = null,
-    val providerRetryAfterMs: Long? = null,
-    val requestId: String? = null,
-    val providerCode: String? = null,
-    val providerParam: String? = null,
-    val admissionState: LocalModelAdmissionState = LocalModelAdmissionState.NOT_APPLICABLE,
-    val continuationEligible: Boolean = false,
-) : Exception(message, cause)
-
 internal fun contextWindowExceeded(error: Throwable): Boolean {
     val modelError = error as? LocalModelException ?: return false
     if (modelError.code == "MODEL_CONTEXT_BUDGET_EXCEEDED") return true
