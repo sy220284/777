@@ -70,6 +70,17 @@ internal class TokenUsageDatabase(
         return lifetimeUsageProjection(totals(db).tracked, bridge.offset, bridge.unpricedTokens, bridge.updatedAt)
     }
 
+    private fun projectedTotals(
+        db: SQLiteDatabase,
+        original: UsageLifetimeTotals = totals(db),
+    ): UsageLifetimeTotals {
+        val missing = legacyBridge(db)?.offset ?: return original
+        return original.copy(
+            tracked = original.tracked.withLegacyUnattributedGap(missing),
+            modelHistoryPartial = original.modelHistoryPartial || missing.hasUnattributedGap(),
+        )
+    }
+
     private fun legacyBridge(db: SQLiteDatabase): LegacyUsageBridge? =
         metadata(db, LEGACY_BRIDGE_KEY)?.let {
             json.decodeFromString(LegacyUsageBridge.serializer(), it)
@@ -80,7 +91,7 @@ internal class TokenUsageDatabase(
         val db = writableDatabase
         return transaction(db) {
             val before = totals(db)
-            if (!insert(db, record)) return@transaction AppendResult(false, false, before)
+            if (!insert(db, record)) return@transaction AppendResult(false, false, projectedTotals(db, before))
             val after = before.add(record)
             putMetadata(db, "totals", json.encodeToString(UsageLifetimeTotals.serializer(), after))
             legacyBridge(db)?.let { bridge ->
@@ -92,7 +103,7 @@ internal class TokenUsageDatabase(
                 )
                 putMetadata(db, LEGACY_BRIDGE_KEY, json.encodeToString(LegacyUsageBridge.serializer(), updated))
             }
-            AppendResult(true, prune(db), after)
+            AppendResult(true, prune(db), projectedTotals(db, after))
         }
     }
 
@@ -109,7 +120,7 @@ internal class TokenUsageDatabase(
         if (!cursor.moveToFirst()) null else json.decodeFromString(TokenUsageRecord.serializer(), cursor.getString(0))
     }
     fun enforceRetention(): Boolean = transaction(writableDatabase) { prune(writableDatabase) }
-    fun lifetimeTotals(): UsageLifetimeTotals = totals(readableDatabase)
+    fun lifetimeTotals(): UsageLifetimeTotals = projectedTotals(readableDatabase)
 
     /** Older installations kept only a cross-model lifetime total. Restore everything that is
      * still retained, and flag the pre-retention portion as unattributable rather than guessing. */
