@@ -1376,8 +1376,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 target = scrollHint.target ?: ConversationScrollTarget.LATEST.takeIf {
                     state.usageMode == LocalUsageMode.WORK && workReaderPaused.value && listState.canScrollForward
                 },
-                modifier = Modifier.align(Alignment.BottomEnd)
-                    .padding(end = SyMetric.gapLg, bottom = SyMetric.gapMd),
+                modifier = Modifier.align(Alignment.BottomCenter)
+                    .padding(bottom = SyMetric.gapMd),
                 onClick = { target ->
                     scrollHint.hide()
                     if (state.usageMode == LocalUsageMode.WORK) workReaderPaused.value = true
