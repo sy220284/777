@@ -29,7 +29,7 @@ class SettingsRowIconVisualTest {
                 )
             }
         }
-        compose.onNodeWithTag("settingsRowIcon")
+        compose.onNodeWithTag("settingsRowIcon", useUnmergedTree = true)
             .assertWidthIsEqualTo(32.dp)
             .assertHeightIsEqualTo(32.dp)
         compose.onNodeWithText("外观与阅读").performClick()
