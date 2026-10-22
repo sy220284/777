@@ -8,11 +8,8 @@ import com.labteto.dshmobile.local.LocalUsageMode
  * provider-owned; UTF-8 bytes / 3 deliberately errs toward earlier compaction for mixed Chinese,
  * JSON and code without adding a heavyweight tokenizer to the APK.
  */
-internal fun estimateModelTokens(value: String): Int {
-    if (value.isEmpty()) return 0
-    val bytes = value.toByteArray(Charsets.UTF_8).size
-    return (bytes + 2) / 3
-}
+internal fun estimateModelTokens(value: String): Int =
+    com.labteto.dshmobile.local.usage.estimateRequestTokens(value)
 
 /** Character-budget truncation that never leaves half of a UTF-16 surrogate pair at the cut. */
 internal fun truncateWithoutSplittingSurrogatePair(value: String, maxChars: Int): String {
