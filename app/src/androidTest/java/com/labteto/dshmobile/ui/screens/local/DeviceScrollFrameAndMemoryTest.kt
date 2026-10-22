@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.SystemClock
 import android.view.FrameMetrics
+import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.Window
 import androidx.compose.foundation.layout.fillMaxSize
@@ -96,6 +97,7 @@ class DeviceScrollFrameAndMemoryTest {
             fun event(action: Int, y: Float) {
                 val t = MotionEvent.obtain(started, SystemClock.uptimeMillis(), action, x, y, 0)
                 try {
+                    t.source = InputDevice.SOURCE_TOUCHSCREEN
                     check(ui.injectInputEvent(t, true)) { "Real emulator touch injection failed" }
                 } finally { t.recycle() }
             }
