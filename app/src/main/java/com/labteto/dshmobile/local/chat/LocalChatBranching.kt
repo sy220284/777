@@ -437,9 +437,15 @@ internal fun chatRegenerationPreviousAnswerIds(
 internal fun chatRegenerationReferenceMessages(
     messages: List<LocalHarnessMessage>,
     replacingMessageId: String,
-): List<LocalHarnessMessage> = messages.filterNot { message ->
-    message.id == replacingMessageId ||
-        message.id == com.labteto.dshmobile.local.session.chatReasoningTranscriptId(replacingMessageId)
+    excludedAssistantMessageIds: Set<String> = emptySet(),
+): List<LocalHarnessMessage> {
+    val excluded = excludedAssistantMessageIds + replacingMessageId
+    val excludedReasoning = excluded.mapTo(hashSetOf()) {
+        com.labteto.dshmobile.local.session.chatReasoningTranscriptId(it)
+    }
+    return messages.filterNot { message ->
+        message.id in excluded || message.id in excludedReasoning
+    }
 }
 
 internal fun hasChatBranchAlternatives(state: LocalChatBranchState): Boolean =
