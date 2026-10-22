@@ -56,7 +56,7 @@ class LocalMcpOAuthProtocolEndToEndAndroidTest {
                     val body = request.body as FormBody
                     val values = (0 until body.size).associate { body.name(it) to body.value(it) }
                     assertEquals("https://mcp.perf.invalid/mcp", values["resource"])
-                    if (calls == 1) {
+                    if (calls % 2 == 1) {
                         assertEquals("authorization_code", values["grant_type"])
                         assertEquals("oauth-code", values["code"])
                     } else {
