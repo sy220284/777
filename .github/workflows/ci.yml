@@ -489,13 +489,13 @@ jobs:
     needs: [scope, static-gates, architecture-3-gates]
     if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android16 == 'true' && needs.scope.outputs.run_android17 == 'true' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools emulator'
-      - name: Four-way Android 16/17 4KB/16KB device and ten-round comparison
+      - name: Four-way Android 16/17 4KB/16KB ten-round performance and startup comparison
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
