@@ -39,7 +39,7 @@ class AutomationDispatchEndToEndAndroidTest {
                     triggerAtMillis = System.currentTimeMillis(),
                     notify = false, mode = AutomationMode.CHAT, targetSessionId = null,
                 )
-                val task = withTimeout(60_000L) {
+                val task = withTimeout<AutomationTask>(60_000L) {
                     while (true) {
                         val current = store.get(id)
                         if (current?.status == AutomationStatus.FAILED &&
