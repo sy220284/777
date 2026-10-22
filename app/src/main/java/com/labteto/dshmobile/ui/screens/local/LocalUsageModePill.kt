@@ -22,13 +22,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.text.font.FontWeight
+import com.shenyan.designsystem.foundation.LocalSySceneBackdrop
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsTheme
-import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
-import androidx.compose.ui.graphics.compositeOver
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -37,13 +38,24 @@ internal fun localHarnessModeSwitchEnabled(
     running: Boolean,
 ): Boolean = !running || current == LocalUsageMode.WORK
 
+/** Borrow the wallpaper's hue while keeping both black mode labels legible. */
+internal fun drawerModeSurfaceColors(wallpaperTone: Color?): Pair<Color, Color> {
+    val neutral = Color(0xFFF1EDE7)
+    val track = if (wallpaperTone == null) neutral else lerp(neutral, wallpaperTone, 0.22f)
+    return track to lerp(track, Color.White, 0.28f)
+}
+
 @Composable
 internal fun LocalUsageModePill(
     selected: LocalUsageMode,
     enabled: Boolean,
     onSelect: (LocalUsageMode) -> Unit,
 ) {
-    val sy = LocalSyPalette.current
+    val scene = LocalSySceneBackdrop.current
+    val hasWallpaper = scene?.image != null
+    val (track, thumb) = drawerModeSurfaceColors(
+        if (hasWallpaper) scene.regionColors.firstOrNull() else null,
+    )
     val pulse = com.labteto.dshmobile.ui.components.rememberHapticPulse()
     Surface(
         modifier = Modifier
@@ -51,7 +63,7 @@ internal fun LocalUsageModePill(
             .widthIn(max = 216.dp)
             .height(48.dp),
         shape = DsShapes.row,
-        color = sy.l2.compositeOver(sy.canvas),
+        color = track.copy(alpha = if (hasWallpaper) 0.92f else 1f),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
@@ -75,7 +87,7 @@ internal fun LocalUsageModePill(
                     .width(segmentWidth)
                     .fillMaxHeight(),
                 shape = DsShapes.row,
-                color = sy.l4.compositeOver(sy.canvas),
+                color = thumb.copy(alpha = if (hasWallpaper) 0.96f else 1f),
                 tonalElevation = 0.dp,
                 shadowElevation = 0.dp,
             ) {}
@@ -98,12 +110,12 @@ internal fun LocalUsageModePill(
                     ) {
                         Text(
                             stringResource(labelRes),
-                            style = DsType.navigationSupporting.withReadingWeight(),
-                            color = when {
-                                !enabled -> sy.tertiaryText
-                                selected == mode -> sy.text
-                                else -> sy.secondaryText
-                            },
+                            style = DsType.navigationSupporting.copy(
+                                fontSize = 18.sp,
+                                lineHeight = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                            ).withReadingWeight(),
+                            color = Color.Black,
                         )
                     }
                 }
