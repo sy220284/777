@@ -44,7 +44,7 @@ class AutomationDispatchEndToEndAndroidTest {
                         val current = store.get(id)
                         if (current?.status == AutomationStatus.FAILED &&
                             current.runReceipts.lastOrNull()?.status == AutomationStatus.FAILED) {
-                            break@withTimeout current
+                            return@withTimeout current
                         }
                         delay(100)
                     }
