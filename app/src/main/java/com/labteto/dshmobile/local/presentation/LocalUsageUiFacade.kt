@@ -4,25 +4,25 @@ import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageGroupKind
 import com.labteto.dshmobile.local.TokenUsageRecord
-import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.TokenUsageAnalyticsStore
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.StateFlow
 
 /** Read-only access to the same retained request ledger used by Settings usage details. */
 @Singleton
-class LocalUsageUiFacade @Inject constructor(private val usage: DeepSeekUsageTracker) : com.labteto.dshmobile.uicontract.UsageUiPort {
-    override val revision: StateFlow<Long> = usage.analyticsRevision
-    override fun snapshot() = usage.analyticsSnapshot()
+class LocalUsageUiFacade @Inject constructor(private val usage: TokenUsageAnalyticsStore) : com.labteto.dshmobile.uicontract.UsageUiPort {
+    override val revision: StateFlow<Long> = usage.revision
+    override fun snapshot() = usage.snapshot()
     override fun groupDetail(kind: TokenUsageGroupKind, key: String, modelFilter: String?) =
-        usage.analyticsGroupDetail(kind, key, modelFilter = modelFilter)
-    override fun sessionSnapshot(sessionId: String): TokenUsageAnalyticsSnapshot = usage.analyticsSessionSnapshot(sessionId)
-    override fun taskDetail(runId: String): TokenUsageGroupDetail? = usage.analyticsGroupDetail(TokenUsageGroupKind.TASK, runId)
-    override fun turnSummaries(sessionId: String) = usage.analyticsTurnSummaries(sessionId)
-    override fun turnDetail(sessionId: String, turnId: String) = usage.analyticsTurnDetail(sessionId, turnId)
-    override fun requestDetail(requestId: String): TokenUsageRecord? = usage.analyticsRecord(requestId)
+        usage.groupDetail(kind, key, modelFilter = modelFilter)
+    override fun sessionSnapshot(sessionId: String): TokenUsageAnalyticsSnapshot = usage.sessionSnapshot(sessionId)
+    override fun taskDetail(runId: String): TokenUsageGroupDetail? = usage.groupDetail(TokenUsageGroupKind.TASK, runId)
+    override fun turnSummaries(sessionId: String) = usage.turnSummaries(sessionId)
+    override fun turnDetail(sessionId: String, turnId: String) = usage.groupDetail(TokenUsageGroupKind.TURN, turnId, sessionId = sessionId)
+    override fun requestDetail(requestId: String): TokenUsageRecord? = usage.recordById(requestId)
     override fun historyPage(model: String?, sinceMillis: Long?, cursor: String?, limit: Int) =
-        usage.analyticsHistoryPage(model, sinceMillis, cursor, limit)
+        usage.historyPage(model, sinceMillis, cursor, limit)
 }
 
 @dagger.Module

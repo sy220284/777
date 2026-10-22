@@ -20,7 +20,7 @@ import com.labteto.dshmobile.uicontract.PricingUiReceipt
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.CancellationException
-import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.TokenUsageAnalyticsStore
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.StateFlow
@@ -32,13 +32,13 @@ class LocalSettingsDataFacade @Inject internal constructor(
     private val memoryManager: MemoryManager,
     private val chatMemoryProjection: LocalChatMemoryProjectionPort,
     private val pricing: DeepSeekPricingRepository,
-    private val usage: DeepSeekUsageTracker,
+    private val usage: TokenUsageAnalyticsStore,
 ) : com.labteto.dshmobile.uicontract.MemoryUiPort, PricingUiPort {
     internal val deepSeekPricing: StateFlow<DeepSeekPricingState> = pricing.state
-    internal val usageRevision: StateFlow<Long> = usage.analyticsRevision
-    internal fun usageSnapshot(): TokenUsageAnalyticsSnapshot = usage.analyticsSnapshot()
-    internal fun usageGroupDetail(kind: TokenUsageGroupKind, key: String, modelFilter: String?): TokenUsageGroupDetail? = usage.analyticsGroupDetail(kind, key, modelFilter = modelFilter)
-    internal fun usageRecord(requestId: String): TokenUsageRecord? = usage.analyticsRecord(requestId)
+    internal val usageRevision: StateFlow<Long> = usage.revision
+    internal fun usageSnapshot(): TokenUsageAnalyticsSnapshot = usage.snapshot()
+    internal fun usageGroupDetail(kind: TokenUsageGroupKind, key: String, modelFilter: String?): TokenUsageGroupDetail? = usage.groupDetail(kind, key, modelFilter = modelFilter)
+    internal fun usageRecord(requestId: String): TokenUsageRecord? = usage.recordById(requestId)
     override val snapshots: Flow<UiProviderPricingSnapshot> = pricing.state.map {
         it.asUiProviderPricing()
     }

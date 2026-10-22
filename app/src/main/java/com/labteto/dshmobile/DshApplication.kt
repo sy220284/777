@@ -6,6 +6,7 @@ import android.app.UiModeManager
 import android.content.Context
 import android.os.LocaleList
 import com.labteto.dshmobile.connection.HostsStore
+import com.labteto.dshmobile.connection.ThemeBootstrapPreferences
 import androidx.work.WorkManager
 import com.labteto.dshmobile.local.runtime.LocalRuntimeKernel
 import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
@@ -98,9 +99,6 @@ class DshApplication : Application() {
         internal fun isMcpWorkerProcess(processName: String, appId: String): Boolean =
             processName == "$appId:mcp_worker"
 
-        private const val UI_PREFS = "ui_prefs"
-        private const val KEY_THEME = "theme_preference"
-
         /**
          * A synchronously-readable copy of the Appearance preference.
          *
@@ -111,16 +109,11 @@ class DshApplication : Application() {
          * [com.labteto.dshmobile.connection.HostsStore] writes it whenever the preference changes;
          * an absent value means the default, which is to follow the system.
          */
-        fun storedThemePreference(context: Context): String? =
-            context.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE).getString(KEY_THEME, null)
+        fun storedThemePreference(context: Context): String? = ThemeBootstrapPreferences.read(context)
 
         /** Mirror [themePreference] so the next process start can read it before any activity. */
-        fun storeThemePreference(context: Context, themePreference: String) {
-            context.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
-                .edit()
-                .putString(KEY_THEME, themePreference)
-                .apply()
-        }
+        fun storeThemePreference(context: Context, themePreference: String) =
+            ThemeBootstrapPreferences.store(context, themePreference)
 
         /**
          * Application-local night mode used by the platform resource layer.

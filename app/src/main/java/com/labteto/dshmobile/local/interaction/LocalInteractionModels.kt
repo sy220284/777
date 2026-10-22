@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.interaction
 
-import com.labteto.dshmobile.local.runtime.canAutoApproveSafely
 
 enum class LocalApprovalImpact {
     LOW,

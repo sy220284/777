@@ -8,7 +8,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import com.labteto.dshmobile.DshApplication
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.security.KeyStore
 import javax.inject.Inject
@@ -146,6 +145,6 @@ class HostsStore @Inject constructor(
         // activity exists, and DataStore cannot be read from there. Mirror only after the
         // transactional write succeeds so a failed DataStore update cannot leave startup theme
         // state ahead of the durable settings.
-        DshApplication.storeThemePreference(context, checkNotNull(committed).themePreference)
+        ThemeBootstrapPreferences.store(context, checkNotNull(committed).themePreference)
     }
 }

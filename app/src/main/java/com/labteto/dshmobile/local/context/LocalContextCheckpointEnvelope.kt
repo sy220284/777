@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.context
 
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -9,6 +8,12 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 internal enum class LocalContextCheckpointKind {
+    WORK,
+    CHAT,
+}
+
+/** Shared mode for history policies. Old model imports are Kotlin typealiases. */
+internal enum class LocalHistorySummaryMode {
     WORK,
     CHAT,
 }

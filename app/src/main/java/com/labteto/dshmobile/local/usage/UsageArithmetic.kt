@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.usage
 
 import com.labteto.dshmobile.local.TokenUsageRecord
-import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
 
 
 internal fun nonNegativeUsageDifference(total: Long, part: Long): Long {
@@ -21,23 +20,6 @@ internal fun saturatingUsageCostProduct(tokens: Long, rate: Double): Double {
     val safeRate = rate.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0
     val value = safeTokens * safeRate
     return if (value.isFinite() && value >= 0.0) value else Double.MAX_VALUE
-}
-
-internal fun DeepSeekTokenUsage.normalizedForAccounting(): DeepSeekTokenUsage {
-    val prompt = promptTokens.coerceAtLeast(0L)
-    val hit = cacheHitTokens.coerceAtLeast(0L).coerceAtMost(prompt)
-    val availableMiss = nonNegativeUsageDifference(prompt, hit)
-    val miss = (cacheMissTokens.coerceAtLeast(0L)
-        .takeIf { it > 0L } ?: availableMiss).coerceAtMost(availableMiss)
-    val write = cacheWriteTokens.coerceAtLeast(0L).coerceAtMost(miss)
-    return copy(
-        promptTokens = prompt,
-        cacheHitTokens = hit,
-        cacheMissTokens = miss,
-        cacheWriteTokens = write,
-        completionTokens = completionTokens.coerceAtLeast(0L),
-        reasoningTokens = reasoningTokens.coerceAtLeast(0L),
-    )
 }
 
 internal fun TokenUsageRecord.normalizedForAccounting(): TokenUsageRecord {

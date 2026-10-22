@@ -15,24 +15,6 @@ import kotlinx.serialization.json.jsonPrimitive
  * API-reported usage remains the accounting source of truth. This estimate is only a preflight
  * pressure signal used for context compaction, concurrency admission and diagnostics.
  */
-internal data class LocalPromptPressure(
-    val contextChars: Int,
-    val estimatedInputTokens: Int,
-    val systemTokens: Int,
-    val historyTokens: Int,
-    val currentUserTokens: Int,
-    val toolDefinitionTokens: Int,
-    val operationalLimitTokens: Int,
-    val modelContextWindowTokens: Int? = null,
-) {
-    val remainingOperationalTokens: Int
-        get() = (operationalLimitTokens - estimatedInputTokens).coerceAtLeast(0)
-
-    val usageRatio: Double
-        get() = if (operationalLimitTokens <= 0) 1.0
-        else estimatedInputTokens.toDouble() / operationalLimitTokens.toDouble()
-}
-
 internal object LocalPromptPressureMeter {
     fun measure(
         messages: List<JsonObject>,

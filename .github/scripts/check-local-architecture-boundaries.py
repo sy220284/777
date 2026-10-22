@@ -928,6 +928,101 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
             "platform provider construction belongs to the plugin composition root"
         )
 
+# ---- Architecture 3.0: shared Model/Usage/Context ownership regression gates ----
+
+model_error_contract = "app/src/main/java/com/labteto/dshmobile/local/LocalModelException.kt"
+web_error_contract = "app/src/main/java/com/labteto/dshmobile/local/LocalWebException.kt"
+model_transport = "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt"
+web_provider = "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt"
+if "class LocalModelException(" not in strip_comments(read(model_error_contract)):
+    die("Shared Model error contract was removed")
+if "class LocalWebException(" not in strip_comments(read(web_error_contract)):
+    die("Shared Web error contract was removed")
+if "class LocalModelException(" in strip_comments(read(model_transport)):
+    die("Model transport reintroduced ownership of the shared error type")
+if "class LocalWebException(" in strip_comments(read(web_provider)):
+    die("Web provider reintroduced ownership of the shared error type")
+
+context_contract = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/context/LocalContextCheckpointEnvelope.kt"
+))
+context_projection = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/context/LocalRequestContextProjection.kt"
+))
+pressure_contract = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/context/LocalPromptPressure.kt"
+))
+history_compactor = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/model/LocalHistoryCompactor.kt"
+))
+if "enum class LocalHistorySummaryMode" not in context_contract or "data class LocalPromptPressure" not in pressure_contract:
+    die("Shared Context lost neutral mode/pressure ownership")
+if "import com.labteto.dshmobile.local.model.LocalHistorySummaryMode" in context_contract:
+    die("Shared Context checkpoint contract must not import Model policy mode")
+if "import com.labteto.dshmobile.local.model.LocalPromptPressure" in context_projection:
+    die("Shared Context projection must not import Model pressure value")
+if "enum class LocalHistorySummaryMode" in history_compactor or "data class LocalPromptPressure" in strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptPressure.kt"
+)):
+    die("Shared Context values must not be redefined under Model")
+if "history_compactor_v1" not in context_contract or "history_compactor_v2" not in context_contract:
+    die("History checkpoint backward compatibility was removed")
+
+usage_arithmetic = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/usage/UsageArithmetic.kt"
+))
+usage_contract = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/usage/ReportedTokenUsage.kt"
+))
+usage_analytics = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
+))
+if "import com.labteto.dshmobile.local.model." in usage_arithmetic or "DeepSeekTokenUsage" in usage_arithmetic:
+    die("Shared Usage arithmetic must not depend on provider-specific model types")
+for usage_path, usage_source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "usage"):
+    for imported in local_references(usage_source):
+        if imported.startswith("com.labteto.dshmobile.local.model."):
+            die(
+                str(usage_path.relative_to(ROOT))
+                + " creates a Shared Usage -> Model reverse dependency: " + imported
+            )
+if "data class ReportedTokenUsage" not in usage_contract:
+    die("Shared Usage lost provider-neutral reported token contract")
+if "DeepSeekUsageTracker" in usage_analytics:
+    die("Usage analytics store must not depend on provider tracker or adapters")
+if "TokenUsageDatabase" not in usage_analytics:
+    die("Usage analytics lost its sole SQLite request/totals owner")
+if "DshApplication" in strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/connection/HostsStore.kt"
+)):
+    die("Settings persistence must not depend on Application entrypoint")
+if "ThemeBootstrapPreferences.store(context" not in read(
+    "app/src/main/java/com/labteto/dshmobile/connection/HostsStore.kt"
+):
+    die("DataStore->bootstrap theme mirror ordering was removed")
+
+# Usage must never reintroduce a second mutable lifetime ledger.
+usage_tracker = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/model/DeepSeekBilling.kt"
+))
+usage_tracker_part = usage_tracker.split("class DeepSeekUsageTracker ", 1)[-1].split(
+    "internal fun parseDeepSeekPricingPage", 1,
+)[0]
+if "persist(next)" in usage_tracker_part or "preferences.edit()" in usage_tracker_part:
+    die("DeepSeekUsageTracker must not write a second SharedPreferences usage ledger")
+if "adoptLegacyUsageOnce" not in usage_analytics:
+    die("SQLite Usage legacy baseline migration path was removed")
+if "legacy_usage_bridge_v1" not in read(
+    "app/src/main/java/com/labteto/dshmobile/local/usage/TokenUsageDatabase.kt"
+):
+    die("SQLite usage legacy offset metadata was removed")
+for relative in (
+    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUsageUiFacade.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsDataFacade.kt",
+):
+    if "DeepSeekUsageTracker" in strip_comments(read(relative)):
+        die(relative + " must consume Shared Usage ledger, not provider tracker")
+
 # ---- R4 genuine isolated MCP process + standalone V6 boot --------------------
 # These are production wiring invariants, not claims that device tests passed.
 worker_manifest = read("app/src/main/AndroidManifest.xml")

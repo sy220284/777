@@ -14,7 +14,6 @@ import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.record
 import com.labteto.dshmobile.local.tools.string
 import com.labteto.dshmobile.local.usage.nonNegativeUsageDifference
-import com.labteto.dshmobile.local.usage.normalizedForAccounting
 import com.labteto.dshmobile.local.usage.saturatingUsageAdd
 import com.labteto.dshmobile.local.usage.saturatingUsageCostAdd
 import com.labteto.dshmobile.local.usage.saturatingUsageCostProduct
@@ -338,8 +337,22 @@ class DeepSeekUsageTracker @Inject constructor(
     private val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val lock = Any()
     private val _state = MutableStateFlow(load())
+    private var legacyAdopted = false
     val state: StateFlow<DeepSeekUsageSnapshot> = _state.asStateFlow()
     val analyticsRevision: StateFlow<Long> = analyticsStore.revision
+
+    /**
+     * Copy only the missing pre-SQLite lifetime balance into DB metadata. Safe across process
+     * crashes: a persisted bridge is never installed twice. The old prefs remain a read-only
+     * rollback backup; all subsequent usage commits belong to SQLite.
+     */
+    fun reconcileLegacyUsage() = synchronized(lock) {
+        if (!legacyAdopted) {
+            val projected = analyticsStore.adoptLegacyUsageOnce(_state.value.toLegacyUsageCounters())
+            _state.value = projected.asDeepSeekUsageSnapshot()
+            legacyAdopted = true
+        }
+    }
 
     fun record(
         model: String,
@@ -364,6 +377,7 @@ class DeepSeekUsageTracker @Inject constructor(
             null
         }
         synchronized(lock) {
+            reconcileLegacyUsage()
             if (!analyticsStore.append(
                 TokenUsageRecord(
                     requestId = requestId,
@@ -381,17 +395,9 @@ class DeepSeekUsageTracker @Inject constructor(
                     reported = usage.reported,
                     promptBreakdown = promptBreakdown,
                 ),
+                unpricedTokens = if (usage.reported && cost == null) normalized.totalTokens else 0L,
             )) return
-            val next = accumulateDeepSeekUsage(
-                current = _state.value,
-                model = model,
-                usage = normalized,
-                pricing = pricingRepository.state.value,
-                epochMillis = epochMillis,
-                pricingEligible = pricingEligible,
-            )
-            persist(next)
-            _state.value = next
+            _state.value = analyticsStore.legacyUsageProjection().asDeepSeekUsageSnapshot()
         }
     }
 
@@ -430,22 +436,6 @@ class DeepSeekUsageTracker @Inject constructor(
         unpricedTokens = preferences.getLong(KEY_UNPRICED, 0L),
         updatedAt = preferences.getLong(KEY_UPDATED_AT, 0L),
     )
-
-    private fun persist(value: DeepSeekUsageSnapshot) {
-        preferences.edit()
-            .putLong(KEY_INPUT, value.inputTokens)
-            .putLong(KEY_CACHE_HIT, value.cacheHitTokens)
-            .putLong(KEY_CACHE_MISS, value.cacheMissTokens)
-            .putLong(KEY_CACHE_WRITE, value.cacheWriteTokens)
-            .putLong(KEY_OUTPUT, value.outputTokens)
-            .putLong(KEY_REASONING, value.reasoningTokens)
-            .putLong(KEY_REQUESTS, value.requestCount)
-            .putLong(KEY_UNREPORTED_REQUESTS, value.unreportedRequestCount)
-            .putString(KEY_COST, value.estimatedCostCny.toString())
-            .putLong(KEY_UNPRICED, value.unpricedTokens)
-            .putLong(KEY_UPDATED_AT, value.updatedAt)
-            .apply()
-    }
 
     companion object {
         private const val PREFS = "deepseek_usage"

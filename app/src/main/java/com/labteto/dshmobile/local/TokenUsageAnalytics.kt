@@ -1,16 +1,14 @@
 package com.labteto.dshmobile.local
 
 import android.content.Context
-import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
-import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.model.LocalModelRouteIdentity
 import com.labteto.dshmobile.local.runtime.LOCAL_AGENT_RUN_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.runtime.LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.runtime.LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import com.labteto.dshmobile.local.usage.PromptTokenEstimateCache
 import com.labteto.dshmobile.local.usage.TokenUsageDatabase
+import com.labteto.dshmobile.local.usage.LegacyUsageCounters
 import com.labteto.dshmobile.local.usage.UsageLifetimeTotals
 import com.labteto.dshmobile.local.usage.boundedForStorage
 import com.labteto.dshmobile.local.usage.distinctForAccounting
@@ -42,236 +40,6 @@ import kotlinx.serialization.json.jsonPrimitive
 private const val RECENT_TOKEN_LOG_RECORDS = 200
 
 
-internal fun TokenPromptBreakdown.calibratedToReportedInput(reportedInputTokens: Long): TokenPromptBreakdown {
-        if (reportedInputTokens <= 0L || estimatedInputTokens <= 0L) return this
-        val target = reportedInputTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-        val factor = target.toDouble() / estimatedInputTokens.toDouble()
-        fun scaled(value: Int): Int = (value.toDouble() * factor).toInt().coerceAtLeast(0)
-        val base = copy(
-            systemBaseTokens = scaled(systemBaseTokens),
-            personaStateTokens = scaled(personaStateTokens),
-            memoryRuleTokens = scaled(memoryRuleTokens),
-            historyTokens = scaled(historyTokens),
-            currentUserTokens = scaled(currentUserTokens),
-            toolDefinitionTokens = scaled(toolDefinitionTokens),
-            otherSystemTokens = scaled(otherSystemTokens),
-        )
-        val remainder = (target - base.estimatedInputTokens.toInt()).coerceAtLeast(0)
-        return base.copy(otherSystemTokens = base.otherSystemTokens + remainder)
-    }
-
-
-
-internal fun buildTokenUsageContext(
-    snapshot: LocalHarnessState,
-    action: TokenUsageAction,
-    turnId: String? = null,
-    runId: String? = null,
-    parentRunId: String? = null,
-    runKind: LocalAgentRunKind? = null,
-    agentId: String? = null,
-    taskLabel: String? = null,
-    step: Int? = null,
-    taskRunId: String? = null,
-): TokenUsageContext = TokenUsageContext(
-    mode = snapshot.usageMode,
-    sessionId = snapshot.sessionId.takeIf(String::isNotBlank),
-    sessionTitle = snapshot.sessions.firstOrNull { it.id == snapshot.sessionId }?.title
-        ?.takeIf(String::isNotBlank),
-    turnId = turnId?.takeIf(String::isNotBlank),
-    runId = runId?.takeIf(String::isNotBlank),
-    parentRunId = parentRunId?.takeIf(String::isNotBlank),
-    runKind = runKind?.name?.lowercase(),
-    agentId = agentId?.takeIf(String::isNotBlank),
-    taskLabel = taskLabel?.trim()?.takeIf(String::isNotBlank)?.take(120),
-    step = step,
-    action = action,
-    taskRunId = taskRunId?.takeIf(String::isNotBlank),
-)
-
-internal fun DeepSeekUsageTracker.record(
-    model: String,
-    reply: LocalModelReply,
-    context: TokenUsageContext,
-) = record(
-    model = model,
-    usage = reply.usage,
-    requestId = reply.requestId,
-    context = context,
-    promptBreakdown = if (reply.usage.reported) {
-        reply.promptBreakdown.calibratedToReportedInput(reply.usage.promptTokens)
-    } else {
-        reply.promptBreakdown
-    },
-    route = reply.routeIdentity,
-)
-
-internal fun DeepSeekUsageTracker.record(
-    snapshot: LocalHarnessState,
-    reply: LocalModelReply,
-    context: TokenUsageContext,
-) {
-    record(
-        model = snapshot.modelState.model,
-        usage = reply.usage,
-        requestId = reply.requestId,
-        context = context,
-        promptBreakdown = if (reply.usage.reported) {
-            reply.promptBreakdown.calibratedToReportedInput(reply.usage.promptTokens)
-        } else {
-            reply.promptBreakdown
-        },
-        route = reply.routeIdentity,
-    )
-}
-
-internal fun DeepSeekUsageTracker.record(
-    snapshot: LocalHarnessState,
-    reply: LocalModelReply,
-    action: TokenUsageAction,
-    turnId: String? = null,
-    runId: String? = null,
-    parentRunId: String? = null,
-    runKind: LocalAgentRunKind? = null,
-    agentId: String? = null,
-    taskLabel: String? = null,
-    step: Int? = null,
-    taskRunId: String? = null,
-) {
-    record(
-        snapshot = snapshot,
-        reply = reply,
-        context = buildTokenUsageContext(
-            snapshot = snapshot,
-            action = action,
-            turnId = turnId,
-            runId = runId,
-            parentRunId = parentRunId,
-            runKind = runKind,
-            agentId = agentId,
-            taskLabel = taskLabel,
-            step = step,
-            taskRunId = taskRunId,
-        ),
-    )
-}
-
-internal fun buildForegroundTokenUsageContext(
-    snapshot: LocalHarnessState,
-    action: TokenUsageAction,
-    turnId: String? = null,
-    runId: String? = null,
-    taskLabel: String? = null,
-    step: Int? = null,
-): TokenUsageContext = buildTokenUsageContext(
-    snapshot = snapshot,
-    action = action,
-    turnId = turnId,
-    runId = runId,
-    runKind = LocalAgentRunKind.FOREGROUND,
-    taskLabel = taskLabel,
-    step = step,
-)
-
-internal fun DeepSeekUsageTracker.recordForeground(
-    snapshot: LocalHarnessState,
-    reply: LocalModelReply,
-    action: TokenUsageAction,
-    turnId: String? = null,
-    runId: String? = null,
-    taskLabel: String? = null,
-    step: Int? = null,
-    taskRunId: String? = null,
-) = record(
-    snapshot = snapshot,
-    reply = reply,
-    action = action,
-    turnId = turnId,
-    runId = runId,
-    runKind = LocalAgentRunKind.FOREGROUND,
-    taskLabel = taskLabel,
-    step = step,
-    taskRunId = taskRunId,
-)
-
-internal fun buildAutomationTokenUsageContext(
-    snapshot: LocalHarnessState,
-    action: TokenUsageAction,
-    taskLabel: String,
-    runId: String,
-): TokenUsageContext {
-    require(runId.isNotBlank()) { "自动化用量必须关联真实运行身份" }
-    return buildTokenUsageContext(
-        snapshot = snapshot,
-        action = action,
-        turnId = runId,
-        runId = runId,
-        taskRunId = runId,
-        runKind = LocalAgentRunKind.AUTOMATION,
-        taskLabel = taskLabel,
-    )
-}
-
-internal fun DeepSeekUsageTracker.recordAutomation(
-    snapshot: LocalHarnessState,
-    reply: LocalModelReply,
-    action: TokenUsageAction,
-    taskLabel: String,
-    runId: String,
-) = record(
-    snapshot = snapshot,
-    reply = reply,
-    context = buildAutomationTokenUsageContext(snapshot, action, taskLabel, runId),
-)
-
-internal fun estimatePromptBreakdown(
-    messages: List<JsonObject>,
-    tools: JsonArray,
-): TokenPromptBreakdown {
-    if (messages.isEmpty() && tools.isEmpty()) return TokenPromptBreakdown()
-    val latestUser = messages.indexOfLast { message ->
-        message["role"]?.jsonPrimitive?.contentOrNull == "user"
-    }
-    var systemBase = 0
-    var personaState = 0
-    var memoryRule = 0
-    var history = 0
-    var currentUser = 0
-    var otherSystem = 0
-
-    messages.forEachIndexed { index, message ->
-        val role = message["role"]?.jsonPrimitive?.contentOrNull.orEmpty()
-        val estimate = PromptTokenEstimateCache.message(
-            value = message,
-            memoryClassifier = ::containsMemoryMarkers,
-            personaClassifier = ::containsPersonaMarkers,
-        )
-        when {
-            role == "user" && index == latestUser -> currentUser += estimate.tokens
-            role != "system" -> history += estimate.tokens
-            estimate.memory -> memoryRule += estimate.tokens
-            estimate.persona -> personaState += estimate.tokens
-            index == 0 -> systemBase += estimate.tokens
-            else -> otherSystem += estimate.tokens
-        }
-    }
-    return TokenPromptBreakdown(
-        systemBaseTokens = systemBase,
-        personaStateTokens = personaState,
-        memoryRuleTokens = memoryRule,
-        historyTokens = history,
-        currentUserTokens = currentUser,
-        toolDefinitionTokens = PromptTokenEstimateCache.tools(tools),
-        otherSystemTokens = otherSystem,
-    )
-}
-
-private fun containsMemoryMarkers(content: String): Boolean =
-    MEMORY_MARKERS.any(content::contains)
-
-private fun containsPersonaMarkers(content: String): Boolean =
-    PERSONA_MARKERS.any(content::contains)
-
 @Singleton
 class TokenUsageAnalyticsStore @Inject constructor(
     @ApplicationContext context: Context,
@@ -288,17 +56,38 @@ class TokenUsageAnalyticsStore @Inject constructor(
     private val _revision = MutableStateFlow(0L)
     val revision: StateFlow<Long> = _revision.asStateFlow()
 
-    fun append(record: TokenUsageRecord): Boolean = synchronized(lock) {
+    /** SQLite owns all post-migration usage facts; the unpriced delta commits atomically. */
+    fun append(record: TokenUsageRecord, unpricedTokens: Long = 0L): Boolean = synchronized(lock) {
         ensureLoaded()
         val safe = record.boundedForStorage()
         val normalized = if (safe.requestId.isBlank()) safe.copy(requestId = UUID.randomUUID().toString()) else safe
-        val result = database.append(normalized)
+        val result = database.append(normalized, unpricedTokens)
         if (!result.inserted) return@synchronized false
         lifetime = result.totals
         retainedDay = System.currentTimeMillis() / 86_400_000L
         if (result.pruned) rebuildAccumulator() else checkNotNull(accumulator).add(normalized)
         _revision.value = _revision.value + 1L
         true
+    }
+
+    /**
+     * Freeze the historical pre-SQLite gap once in database metadata, never repeatedly merge
+     * old SharedPreferences counters with new requests. Safe to retry after process death.
+     */
+    internal fun adoptLegacyUsageOnce(legacy: LegacyUsageCounters): LegacyUsageCounters = synchronized(lock) {
+        ensureLoaded()
+        val result = database.adoptLegacyUsageOnce(legacy)
+        val projected = database.lifetimeTotals()
+        if (projected != lifetime) {
+            lifetime = projected
+            _revision.value = _revision.value + 1L
+        }
+        result
+    }
+
+    internal fun legacyUsageProjection(): LegacyUsageCounters = synchronized(lock) {
+        ensureLoaded()
+        database.legacyUsageProjection()
     }
 
     fun snapshot(): TokenUsageAnalyticsSnapshot = synchronized(lock) {
@@ -745,22 +534,6 @@ private fun Map<TokenUsageAction, MutableTokenAggregate>.freezeActions(): List<T
 private fun average(value: Long, count: Int): Long =
     if (count <= 0) 0L else value / count.toLong()
 
-
-private val MEMORY_MARKERS = listOf(
-    "【用户长期规则】",
-    "【相关长期记忆】",
-    "【上一会话交接】",
-)
-
-private val PERSONA_MARKERS = listOf(
-    "【角色】",
-    "【用户纠正｜最高优先】",
-    "【当前状态】",
-    "【近期表现去重】",
-    "【连续性摘要",
-    "【本轮相关背景】",
-    "【群聊身份】",
-)
 
 /** A turn is identified by both its source session and user message, including late background usage. */
 internal fun aggregateChatTurnUsage(records: Sequence<TokenUsageRecord>, sessionId: String): Map<String, TokenUsageAggregate> {
