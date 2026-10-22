@@ -453,8 +453,3 @@ data class LocalWebFetchResult(
     val truncated: Boolean,
 )
 
-class LocalWebException(
-    val code: String,
-    message: String,
-    cause: Throwable? = null,
-) : Exception("[$code] $message", cause)
