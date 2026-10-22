@@ -25,6 +25,11 @@ internal fun isLikelyLocalNetworkEndpoint(endpoint: String): Boolean {
         host.endsWith(".home.arpa") || '.' !in host && ':' !in host) return true
 
     if (':' in host) {
+        // IPv4-mapped IPv6 literals must receive the same LAN treatment as IPv4.
+        // For example, ::ffff:192.168.1.5 reaches the LAN on Android 17.
+        if (host.startsWith("::ffff:") && '.' in host) {
+            return isLikelyLocalNetworkEndpoint("http://" + host.substringAfterLast(':'))
+        }
         // Only classify IPv6 unique-local (fc00::/7), link-local (fe80::/10),
         // site-local (deprecated fec0::/10) and local multicast (ff0x::/16).
         // Public global IPv6 must not trigger an unnecessary permission prompt.
