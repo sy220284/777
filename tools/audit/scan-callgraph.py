@@ -56,7 +56,7 @@ for path in paths:
         ))
         # 仅登记零缩进 Kotlin 顶层属性/扩展属性，避免把局部变量误认作外部符号。
         row["properties"] = sorted(set(re.findall(
-            r"(?m)^(?:(?:internal|private|public|protected|lateinit|const)\\s+)*(?:val|var)\\s+(?:[\\w?.<>]+\\.)?([A-Za-z_]\\w*)\\b",
+            r"(?m)^(?:(?:internal|private|public|protected|lateinit|const)\s+)*(?:val|var)\s+(?:[\w?.<>]+\.)?([A-Za-z_]\w*)\b",
             content,
         )))
         row["call_tokens"] = collections.Counter(re.findall(r"\b([A-Za-z_]\w*)\s*\(", content))
