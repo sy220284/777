@@ -14,6 +14,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
+import android.os.Build
 import android.media.MediaMetadataRetriever
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -56,6 +57,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
@@ -68,6 +70,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -885,6 +890,11 @@ private fun MediaVideoPoster(file: File?, onPlay: () -> Unit,
     }
 }
 
+/** Only Android 17 suppresses background audio in this inline, UI-owned player.
+ * Android 16 must keep the behavior of the existing non-service player.
+ */
+internal fun shouldSuspendInlineSpeechOnBackground(api: Int): Boolean = api >= 37
+
 @Composable
 internal fun InlineSpeechPlayer(file: File) {
     val resources = LocalResources.current
@@ -892,10 +902,24 @@ internal fun InlineSpeechPlayer(file: File) {
     var preparing by remember(file.absolutePath) { mutableStateOf(false) }
     var error by remember(file.absolutePath) { mutableStateOf<String?>(null) }
     var player by remember(file.absolutePath) { mutableStateOf<MediaPlayer?>(null) }
+    val currentPlayer by rememberUpdatedState(player)
+    val lifecycleOwner = LocalLifecycleOwner.current
     var durationMs by remember(file.absolutePath) { mutableStateOf(0) }
     var positionMs by remember(file.absolutePath) { mutableStateOf(0) }
+    // The effect must release the latest player, not the null initial composition snapshot.
     DisposableEffect(file.absolutePath) {
-        onDispose { player?.release(); player = null }
+        onDispose { currentPlayer?.release(); player = null }
+    }
+    DisposableEffect(lifecycleOwner, file.absolutePath) {
+        val listener = LifecycleEventObserver { _, event ->
+            if (shouldSuspendInlineSpeechOnBackground(Build.VERSION.SDK_INT) &&
+                event == Lifecycle.Event.ON_STOP) {
+                runCatching { currentPlayer?.pause() }
+                playing = false
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(listener)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(listener) }
     }
     LaunchedEffect(file.absolutePath) {
         durationMs = withContext(Dispatchers.IO) {
@@ -936,6 +960,13 @@ internal fun InlineSpeechPlayer(file: File) {
                         created.setOnPreparedListener { ready ->
                             preparing = false
                             durationMs = ready.duration.coerceAtLeast(0)
+                            // Async preparation can complete after the app leaves the foreground.
+                            // Do not start silent background playback on Android 17.
+                            if (shouldSuspendInlineSpeechOnBackground(Build.VERSION.SDK_INT) &&
+                                !lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                                playing = false
+                                return@setOnPreparedListener
+                            }
                             runCatching { ready.start() }
                                 .onSuccess { playing = true }
                                 .onFailure { failure ->

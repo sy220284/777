@@ -79,6 +79,9 @@ private fun formatProcessExitRecord(
     append("：")
     append(processExitReasonLabel(reason))
     append(if (isExpectedProcessExit(reason)) "（正常/预期）" else "（需关注）")
+    if (isAndroid17MemoryLimiterExit(description)) {
+        append("，Android 17 内存限制触发；检查后台执行与资源预算")
+    }
     append("，系统原因码 ")
     append(reason)
     append("，状态码 ")
@@ -126,6 +129,12 @@ internal fun processExitReasonLabel(reason: Int): String = when (reason) {
     16 -> "应用更新"
     else -> "系统原因 $reason"
 }
+
+/** Android 17 reports anonymous/swap memory limit termination in process exit description.
+ * Keep the classifier platform-independent so Android 16 diagnostics and tests work unchanged.
+ */
+internal fun isAndroid17MemoryLimiterExit(description: String?): Boolean =
+    description?.contains("MemoryLimiter:AnonSwap", ignoreCase = true) == true
 
 internal fun isExpectedProcessExit(reason: Int): Boolean =
     reason in setOf(1, 10, 11, 15, 16)
