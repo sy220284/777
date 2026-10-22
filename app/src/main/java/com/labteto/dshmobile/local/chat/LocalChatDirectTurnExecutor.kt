@@ -20,6 +20,8 @@ import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
 import com.labteto.dshmobile.local.model.withChatTurnContext
 import com.labteto.dshmobile.local.model.withEphemeralContext
 import com.labteto.dshmobile.local.model.chatSystemPrompt
+import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
+import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.runtime.CHAT_RECENT_HISTORY_MESSAGES
 import com.labteto.dshmobile.local.runtime.LocalExecutionService
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -398,54 +400,97 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                         ("transcript" to encodeTranscriptMessages(transcriptMessages)),
                 )
             }
-            val assistantEvent = eventLog.append(
-                "assistant/message",
-                if (replacingMessageId == null) {
-                    assistantData
-                } else {
-                    JsonObject(assistantData + ("replaces" to JsonPrimitive(replacingMessageId)))
-                },
-            )
+            // Do not supersede a complete reply with an incomplete regenerated candidate.
+            if (replacingMessageId != null) {
+                check(durableReply.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) {
+                    "重新生成未完成，原回复和会话状态保持不变：${durableReply.rawStopReason ?: durableReply.completionReason.name}"
+                }
+            }
+
+            val assistantEvent = if (replacingMessageId == null) {
+                eventLog.append("assistant/message", assistantData)
+            } else {
+                // One durable commit is the authority for transcript, selection, state and model
+                // history. A crash before it leaves the old answer selected; after it the
+                // three projections all replay from this same event.
+                val assistant = requireNotNull(assistantTranscript)
+                val branches = upsertChatBranchNode(
+                    branchBase,
+                    LocalChatBranchNode(
+                        message = assistant,
+                        parentId = requireNotNull(branchParentId),
+                        chatStateAfter = generationSnapshot.chat.chatState,
+                        chatContextAfter = generationSnapshot.chat.chatContext,
+                    ),
+                    select = true,
+                )
+                val activeTranscript = activeChatBranchMessages(branches).dropLast(1) +
+                    listOfNotNull(reasoningTranscript, assistantTranscript)
+                val modelAfter = requireNotNull(regenerationHistory) + durableReply.message
+                val committed = appendChatProjectionCommit(
+                    eventLog = eventLog,
+                    reason = "assistant-regenerated",
+                    activeTranscript = activeTranscript,
+                    modelHistory = modelAfter,
+                    state = LocalTimelineRewriteState(
+                        chatState = generationSnapshot.chat.chatState,
+                        chatContext = generationSnapshot.chat.chatContext,
+                        chatBranches = branches,
+                        groupChat = generationSnapshot.chat.groupChat,
+                        replySuggestions = emptyList(),
+                    ),
+                    regeneratedAssistantId = assistant.id,
+                    regeneratedAssistantMessage = durableReply.message,
+                )
+                regenerationCommitted = true
+                check(modelHistory.reset(sessionId, modelAfter)) {
+                    "Chat 新版本已持久化，但模型历史尚未同步；请重新打开会话恢复"
+                }
+                chatState.update { current ->
+                    if (current.sessionId != sessionId) current else current.copy(
+                        messages = activeTranscript.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
+                        transcriptIndex = buildLocalTranscriptRuntimeIndex(activeTranscript),
+                        chat = current.chat.copy(
+                            chatState = generationSnapshot.chat.chatState,
+                            chatContext = generationSnapshot.chat.chatContext,
+                            chatBranches = branches,
+                            replySuggestions = emptyList(),
+                        ),
+                    )
+                }
+                committed
+            }
 
             assistantTranscript?.let { message ->
-                replyDocuments.publish(replyCards.definitionFor(reply.content.orEmpty()),
-                    com.labteto.dshmobile.uicontract.UiDocumentSource(sessionId, message.id,
-                        snapshot.chat.chatContext.generation,
-                        snapshot.modelState.modelSelection.activeProfileId, snapshot.projectId, false),
-                    replyCards.requestIdFor(reply.content.orEmpty()), snapshot.modelState.model,
-                    replyCards.reportedFor(reply.content.orEmpty()))
+                runCatching {
+                    replyDocuments.publish(replyCards.definitionFor(reply.content.orEmpty()),
+                        com.labteto.dshmobile.uicontract.UiDocumentSource(sessionId, message.id,
+                            generationSnapshot.chat.chatContext.generation,
+                            snapshot.modelState.modelSelection.activeProfileId, snapshot.projectId, false),
+                        replyCards.requestIdFor(reply.content.orEmpty()), snapshot.modelState.model,
+                        replyCards.reportedFor(reply.content.orEmpty()))
+                }
             }
 
-            if (replacingMessageId != null) {
-                check(
-                    modelHistory.reset(
-                        sessionId,
-                        requireNotNull(regenerationHistory),
-                    ),
-                ) { "Chat 重生成替换模型历史时前台会话已切换" }
-                runtimeStateStore.projection.removeForegroundTranscriptMessage(
-                    sessionId,
-                    replacingMessageId,
-                )
-                runtimeStateStore.projection.removeForegroundTranscriptMessage(
-                    sessionId,
-                    chatReasoningTranscriptId(replacingMessageId),
-                )
+            if (replacingMessageId == null) {
+                modelHistory.history.append(durableReply.message)
             }
-            modelHistory.history.append(durableReply.message)
             check(modelHistory.refreshMetrics(sessionId)) {
                 "Chat 回复提交后前台会话已切换"
             }
-            runtimeStateStore.projection.appendForegroundTranscript(
-                sessionId = sessionId,
-                messages = transcriptMessages,
-            )
+            if (replacingMessageId == null) {
+                runtimeStateStore.projection.appendForegroundTranscript(
+                    sessionId = sessionId,
+                    messages = transcriptMessages,
+                )
+            }
             runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor = maxOf(
                 runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor ?: -1L,
                 assistantEvent.sequence,
             )
 
             if (
+                replacingMessageId == null &&
                 branchEligible &&
                 branchBase.nodes.isNotEmpty() &&
                 assistantTranscript != null &&
@@ -468,11 +513,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 if (hasChatBranchAlternatives(branches)) {
                     branchCoordinator.persistCurrentProjection(
                         expectedSessionId = sessionId,
-                        reason = if (replacingMessageId != null) {
-                            "assistant-regenerated"
-                        } else {
-                            "assistant-branch-completed"
-                        },
+                        reason = "assistant-branch-completed",
                     )
                 }
             }
