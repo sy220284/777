@@ -1,4 +1,4 @@
-<h1 align="center">神言神语 · 777</h1>
+<h1 align="center">神言神语</h1>
 
 <p align="center">
   <strong>一部 Android 手机，一个能对话、能调用工具、能持续处理任务的 AI 工作台。</strong>
@@ -27,13 +27,13 @@
 
 ## 这是什么
 
-**神言神语（777）**是一款开源的 Android 本机 AI 应用。它把聊天、人物记忆、任务规划、工具执行和成果展示放在同一个原生界面中。
+**神言神语**是一款开源的 Android 本机 AI 应用。它把聊天、人物记忆、任务规划、工具执行和成果展示放在同一个原生界面中。
 
 你可以用它与有持续经历的人物聊天，也可以把文件处理、代码检查、资料检索等任务交给工作模式。AI 负责理解和决策；会话、工具调度、工作区、状态记录与恢复由手机上的 Harness 内核管理。
 
 **不需要 root，也不要求电脑或自建云中继持续在线。** 但模型推理和部分外部工具需要网络与相应服务商授权；端侧运行不等于模型完全离线。
 
-## 从使用场景认识 777
+## 你可以用它做什么
 
 | 想做的事 | 对应能力 |
 | --- | --- |
@@ -86,7 +86,7 @@
 
 ## 本机运行、数据和权限边界
 
-777 的 Agent 内核、会话与人物数据、工具编排、工作区及运行记录在 Android 本机工作；当前发行版不需要远程 Harness 中继。
+神言神语的 Agent 内核、会话与人物数据、工具编排、工作区及运行记录在 Android 本机工作；当前发行版不需要远程 Harness 中继。
 
 - **模型与外部服务**：调用云端模型、搜索、MCP 或多模态服务时，相关请求会按所选服务的接口发送至外部。请自行确认服务商的数据政策和计费规则。
 - **凭据**：模型密钥与本机账户凭据使用 Android Keystore 加密保存；ChatGPT 登录不意味着应用可以读取你在 ChatGPT 中的历史会话或记忆。
@@ -129,8 +129,8 @@
 项目的标准本地开发流程使用 GitHub Actions 生成并校验的工具链 Artifact，按需安装缺失组件，然后**离线构建**。请先阅读[工具链下载及安装步骤](docs/DEVELOPMENT.md)：
 
 ```bash
-git clone https://github.com/sy220284/777.git
-cd 777
+git clone https://github.com/sy220284/777.git shenyan-shenyu
+cd shenyan-shenyu
 
 # 查看本机还缺哪些构建组件
 bash tools/dev/ai-toolchain.sh plan --profile build
@@ -139,7 +139,7 @@ bash tools/dev/ai-toolchain.sh plan --profile build
 # 解压到同一目录后安装
 bash tools/dev/ai-toolchain.sh bootstrap \
   --profile build \
-  --artifacts-dir /tmp/777-artifacts
+  --artifacts-dir /tmp/shenyan-artifacts
 
 # 检查环境并离线构建 Debug APK
 bash tools/dev/ai-toolchain.sh check
