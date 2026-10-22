@@ -31,6 +31,12 @@ class AndroidLocalNetworkPermissionPolicyTest {
             "http://[fe80::1]:9000",
             "http://[fc00:1234::2]",
             "http://[ff02::fb]:5353",
+            "http://[ff08::abcd]:5353",
+            "http://[ff0e::1]:8080",
+            "http://224.0.0.251:5353",
+            "http://239.255.255.250:1900",
+            "http://255.255.255.255:9000",
+            "http://[::ffff:224.0.0.251]:5353",
             "http://[::ffff:192.168.1.5]:8080",
             "http://[::ffff:10.2.3.4]:8080",
             "http://[0:0:0:0:0:ffff:192.168.1.5]:8080",
@@ -55,6 +61,9 @@ class AndroidLocalNetworkPermissionPolicyTest {
             "https://[2606:4700:4700::1111]",
             "https://[2001:db8::1]",
             "https://192.167.1.1",
+            "http://223.255.255.255",
+            "http://240.0.0.1",
+            "http://255.255.255.254",
             "not a URL",
         ).forEach { endpoint ->
             assertFalse(endpoint, isLikelyLocalNetworkEndpoint(endpoint))
