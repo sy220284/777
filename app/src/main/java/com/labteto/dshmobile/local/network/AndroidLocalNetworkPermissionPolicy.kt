@@ -30,14 +30,15 @@ internal fun isLikelyLocalNetworkEndpoint(endpoint: String): Boolean {
         if ((host.startsWith("::ffff:") || host.startsWith("0:0:0:0:0:ffff:")) && '.' in host) {
             return isLikelyLocalNetworkEndpoint("http://" + host.substringAfterLast(':'))
         }
-        // Only classify IPv6 unique-local (fc00::/7), link-local (fe80::/10),
-        // site-local (deprecated fec0::/10) and local multicast (ff0x::/16).
-        // Public global IPv6 must not trigger an unnecessary permission prompt.
+        // IPv6 unique-local (fc00::/7), link-local (fe80::/10),
+        // site-local (deprecated fec0::/10), and ALL multicast (ff00::/8).
+        // Android's LNP also restricts multicast beyond the link-local scope.
+        // Public global unicast IPv6 must not trigger a permission prompt.
         val firstHextet = host.substringBefore(':').toIntOrNull(16) ?: return false
         return firstHextet in 0xfc00..0xfdff ||
             firstHextet in 0xfe80..0xfebf ||
             firstHextet in 0xfec0..0xfeff ||
-            firstHextet in 0xff01..0xff05
+            firstHextet in 0xff00..0xffff
     }
 
     val segments = host.split('.')
@@ -50,5 +51,9 @@ internal fun isLikelyLocalNetworkEndpoint(endpoint: String): Boolean {
         first == 172 && second in 16..31 ||
         first == 192 && second == 168 ||
         first == 169 && second == 254 ||
-        first == 100 && second in 64..127
+        first == 100 && second in 64..127 ||
+        // All IPv4 multicast (224.0.0.0/4) and limited broadcast are LAN
+        // traffic under Android Local Network Protection.
+        first in 224..239 ||
+        host == "255.255.255.255"
 }
