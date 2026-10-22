@@ -50,6 +50,10 @@ FULL_VALIDATION_SCRIPTS = {
     ".github/scripts/wait-android-device-artifacts.sh",
     ".github/scripts/smoke-test-android-startup.sh",
     ".github/scripts/check-apk-runtime-layout.py",
+    ".github/scripts/run-android17-ten-rounds.sh",
+    ".github/scripts/analyze-android17-ten-rounds.py",
+    ".github/scripts/run-android-page-matrix.sh",
+    ".github/scripts/compare-android-page-matrix.py",
 }
 FIXTURE_PROVENANCE_PATHS = {
     "upstream/deepseek-harness.lock.json",
