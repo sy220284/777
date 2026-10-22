@@ -73,6 +73,15 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
                 runtimeStateStore.projection.update { it.copy(usage = usage) }
             }
         }
+        // Do not block Application startup with legacy SQLite migration. Foreground usage
+        // writes perform the same idempotent adoption synchronously before their first append.
+        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { usageTracker.reconcileLegacyUsage() }.onFailure {
+                com.labteto.dshmobile.observability.AppLog.error(
+                    "UsageMigration", "legacy usage reconciliation failed", it,
+                )
+            }
+        }
     }
 
     override suspend fun prepareAndRestore(scope: CoroutineScope, initialSessionId: String) {
