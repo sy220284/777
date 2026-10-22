@@ -4,8 +4,14 @@ set -euo pipefail
 # Android 16 or 17, same shared x86_64 APK build and ten instrumented rounds.
 # Historical script name retained for existing CI callers.
 api="${1:-37}"
-if [[ "$api" != 36 && "$api" != 37 ]]; then echo "expected Android API 36 or 37" >&2; exit 2; fi
-out=".ci/android${api}-ten-rounds"
+case "$api" in
+  36) platform="16" ;;
+  37) platform="17" ;;
+  *) echo "expected Android API 36 or 37" >&2; exit 2 ;;
+esac
+# API level 36/37 is the instrumentation label; release numbers are 16/17.
+# These artifact paths must match the workflow upload paths exactly.
+out=".ci/android${platform}-ten-rounds"
 mkdir -p "$out"
 component="com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner"
 classes="com.labteto.dshmobile.local.DevicePerformanceBaselineTest,com.labteto.dshmobile.local.tools.LocalMcpOAuthProtocolEndToEndAndroidTest,com.labteto.dshmobile.automation.AutomationDispatchEndToEndAndroidTest,com.labteto.dshmobile.ui.screens.local.DeviceScrollFrameAndMemoryTest"
