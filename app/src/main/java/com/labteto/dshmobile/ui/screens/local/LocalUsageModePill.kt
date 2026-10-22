@@ -54,7 +54,7 @@ internal fun LocalUsageModePill(
     val scene = LocalSySceneBackdrop.current
     val hasWallpaper = scene?.image != null
     val (track, thumb) = drawerModeSurfaceColors(
-        if (hasWallpaper) scene.regionColors.firstOrNull() else null,
+        scene?.takeIf { it.image != null }?.regionColors?.firstOrNull(),
     )
     val pulse = com.labteto.dshmobile.ui.components.rememberHapticPulse()
     Surface(
