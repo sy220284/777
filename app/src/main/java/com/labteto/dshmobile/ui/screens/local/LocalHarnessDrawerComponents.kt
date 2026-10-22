@@ -236,7 +236,7 @@ internal fun DrawerQuickAction(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
-        SyIconBox(icon = icon)
+        SyIconBox(icon = icon, adaptivePlate = true)
         Text(
             title,
             style = DsType.drawerItem.withReadingWeight(),
