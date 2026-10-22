@@ -34,7 +34,32 @@ if [[ "${1:-}" == "--cell" ]]; then
   package="$(image_package "$api" "$page_kb")"
   avd="dsh_${api}_${page_kb}"
   echo "CELL_START android=$release api=$api page_kb=$page_kb image=$package"
-  "$sdk" --channel=3 --install "$package"
+  # The experimental 16 KB SDK CDN sometimes cuts downloads short
+  # ('Premature EOF'). A successful exit code alone is insufficient: verify
+  # all payloads before AVD creation. Never substitute a 4 KB system image.
+  IFS=';' read -r _sys_img image_api image_tag image_abi <<< "$package"
+  image_dir="$ANDROID_SDK_ROOT/system-images/$image_api/$image_tag/$image_abi"
+  image_ready() {
+    [[ -s "$image_dir/source.properties" && -s "$image_dir/system.img" &&
+       -s "$image_dir/ramdisk.img" ]]
+  }
+  image_installed=false
+  for attempt in 1 2 3 4; do
+    echo "SDK_IMAGE_ATTEMPT api=$api page_kb=$page_kb attempt=$attempt"
+    if "$sdk" --channel=3 --install "$package" && image_ready; then
+      image_installed=true
+      break
+    fi
+    echo "SDK_IMAGE_RETRY image=$package attempt=$attempt reason=download_or_incomplete" >&2
+    if (( attempt < 4 )); then
+      rm -rf "$image_dir"
+      sleep $((attempt * 3))
+    fi
+  done
+  if [[ "$image_installed" != true ]]; then
+    echo "CELL_ERROR SDK image unavailable or incomplete after four attempts: $package" >&2
+    exit 1
+  fi
   printf 'no\n' | "$avdm" create avd --force -n "$avd" -d pixel_6 --package "$package"
   echo "AVD_HOME=$ANDROID_AVD_HOME"
   echo "Registered AVDs:"
