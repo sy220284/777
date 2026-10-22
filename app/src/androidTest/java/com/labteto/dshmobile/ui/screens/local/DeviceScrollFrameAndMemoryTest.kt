@@ -16,6 +16,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -48,15 +51,32 @@ class DeviceScrollFrameAndMemoryTest {
             )
         }
         lateinit var listState: LazyListState
+        var listBoundsOnScreen: Rect? = null
         compose.setContent {
             listState = rememberLazyListState()
             DshTheme {
-                LazyColumn(Modifier.fillMaxSize().testTag("perf-real-work-timeline"), state = listState) {
+                LazyColumn(
+                    Modifier.fillMaxSize()
+                        .testTag("perf-real-work-timeline")
+                        .onGloballyPositioned { coordinates ->
+                            val topLeft = coordinates.positionOnScreen()
+                            val size = coordinates.size
+                            listBoundsOnScreen = Rect(
+                                topLeft.x, topLeft.y,
+                                topLeft.x + size.width, topLeft.y + size.height,
+                            )
+                        },
+                    state = listState,
+                ) {
                     items(rows, key = { it.id }) { row -> WorkTimelineStepRow(row) }
                 }
             }
         }
         compose.waitForIdle()
+        val viewport = requireNotNull(listBoundsOnScreen) {
+            "Work list must be laid out before injecting a real touch gesture"
+        }
+        assertTrue("Work list must be long enough to scroll", listState.canScrollForward)
 
         lateinit var activity: Activity
         instrumentation.runOnMainSync {
@@ -89,10 +109,11 @@ class DeviceScrollFrameAndMemoryTest {
         val ui = instrumentation.uiAutomation
         var maxVisibleIndex = 0
         fun realSwipe(downwards: Boolean) {
-            val size = activity.window.decorView
-            val x = size.width * 0.5f
-            val from = size.height * (if (downwards) 0.25f else 0.80f)
-            val to = size.height * (if (downwards) 0.80f else 0.25f)
+            // UiAutomation uses display coordinates; decorView.width/height are not
+            // necessarily the Compose list's touch bounds after system insets.
+            val x = viewport.center.x
+            val from = viewport.top + viewport.height * (if (downwards) 0.25f else 0.80f)
+            val to = viewport.top + viewport.height * (if (downwards) 0.80f else 0.25f)
             val started = SystemClock.uptimeMillis()
             fun event(action: Int, y: Float) {
                 val t = MotionEvent.obtain(started, SystemClock.uptimeMillis(), action, x, y, 0)
@@ -124,7 +145,7 @@ class DeviceScrollFrameAndMemoryTest {
             thread.join(2_000)
         }
         val frames = synchronized(metrics) { metrics.toList() }
-        assertTrue("Real scrolling never advanced the Work list", maxVisibleIndex > 2)
+        assertTrue("Real scrolling never advanced the Work list: viewport=$viewport maxVisibleIndex=$maxVisibleIndex", maxVisibleIndex > 2)
         assertTrue("Too few actual rendered frames for a reliable performance report", frames.size >= 60)
         val longFrames = frames.count { it.first > refreshNs * 1.5 }
         val timing = frames.map { it.second }.filter { it > 0L }.sorted()
