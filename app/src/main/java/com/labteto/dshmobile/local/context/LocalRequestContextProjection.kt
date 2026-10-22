@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local.context
 
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalPromptCachePolicy
-import com.labteto.dshmobile.local.model.LocalPromptPressure
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
