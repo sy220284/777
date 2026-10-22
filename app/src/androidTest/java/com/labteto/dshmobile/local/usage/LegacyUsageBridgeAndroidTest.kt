@@ -81,4 +81,121 @@ class LegacyUsageBridgeAndroidTest {
             context.deleteDatabase(dbName)
         }
     }
+    @Test fun conflictingOldCacheSnapshotCannotOverrideCommittedSqlitePartition() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val dbName = "usage-cache-partition-" + UUID.randomUUID() + ".db"
+        val json = Json { ignoreUnknownKeys = true }
+        try {
+            TokenUsageDatabase(context, json, dbName).use { db ->
+                assertTrue(db.append(TokenUsageRecord(
+                    requestId = "sqlite-fact",
+                    timestamp = System.currentTimeMillis(),
+                    model = "provider",
+                    inputTokens = 10,
+                    cacheHitTokens = 5,
+                    cacheMissTokens = 5,
+                    cacheWriteTokens = 2,
+                    reported = true,
+                )).inserted)
+                val migrated = db.adoptLegacyUsageOnce(LegacyUsageCounters(
+                    inputTokens = 10,
+                    cacheHitTokens = 10,
+                    cacheMissTokens = 0,
+                ))
+                assertEquals(10L, migrated.inputTokens)
+                assertEquals(5L, migrated.cacheHitTokens)
+                assertEquals(5L, migrated.cacheMissTokens)
+                assertEquals(2L, migrated.cacheWriteTokens)
+            }
+            TokenUsageDatabase(context, json, dbName).use { db ->
+                val totals = db.lifetimeTotals().tracked
+                assertEquals(10L, totals.inputTokens)
+                assertEquals(5L, totals.cacheHitTokens)
+                assertEquals(5L, totals.cacheMissTokens)
+                assertEquals(2L, totals.cacheWriteTokens)
+            }
+        } finally {
+            context.deleteDatabase(dbName)
+        }
+    }
+
+    @Test fun interruptedLegacyBridgeInstallationIsAtomicAndRetryable() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val dbName = "usage-bridge-rollback-" + UUID.randomUUID() + ".db"
+        val json = Json { ignoreUnknownKeys = true }
+        try {
+            TokenUsageDatabase(context, json, dbName).use { db ->
+                val row = TokenUsageRecord(
+                    requestId = "before-upgrade",
+                    timestamp = System.currentTimeMillis(),
+                    model = "provider",
+                    inputTokens = 12,
+                    cacheHitTokens = 4,
+                    cacheMissTokens = 8,
+                    reported = true,
+                )
+                assertTrue(db.append(row).inserted)
+                db.writableDatabase.execSQL(
+                    "CREATE TRIGGER fail_bridge BEFORE INSERT ON metadata " +
+                        "WHEN NEW.id = 'legacy_usage_bridge_v1' " +
+                        "BEGIN SELECT RAISE(ABORT, 'injected bridge failure'); END",
+                )
+                val historical = LegacyUsageCounters(
+                    inputTokens = 20, cacheHitTokens = 6, cacheMissTokens = 14,
+                    requestCount = 2, unpricedTokens = 3,
+                )
+                assertTrue(runCatching { db.adoptLegacyUsageOnce(historical) }.isFailure)
+                assertEquals(12L, db.lifetimeTotals().tracked.inputTokens)
+                assertEquals(1L, db.lifetimeTotals().tracked.requestCount)
+                db.writableDatabase.execSQL("DROP TRIGGER fail_bridge")
+                val migrated = db.adoptLegacyUsageOnce(historical)
+                assertEquals(20L, migrated.inputTokens)
+                assertEquals(2L, migrated.requestCount)
+                assertEquals(3L, migrated.unpricedTokens)
+                assertEquals(20L, db.lifetimeTotals().tracked.inputTokens)
+            }
+        } finally {
+            context.deleteDatabase(dbName)
+        }
+    }
+
+    @Test fun bridgeWriteFailureRollsBackNewRequestLifetimeAndUnpricedCounters() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val dbName = "usage-bridge-append-rollback-" + UUID.randomUUID() + ".db"
+        val json = Json { ignoreUnknownKeys = true }
+        try {
+            TokenUsageDatabase(context, json, dbName).use { db ->
+                db.adoptLegacyUsageOnce(LegacyUsageCounters(
+                    inputTokens = 50, requestCount = 1, unpricedTokens = 6,
+                ))
+                val request = TokenUsageRecord(
+                    requestId = "retry-after-bridge-error",
+                    timestamp = System.currentTimeMillis(),
+                    model = "provider",
+                    inputTokens = 10,
+                    outputTokens = 2,
+                    reported = true,
+                )
+                db.writableDatabase.execSQL(
+                    "CREATE TRIGGER fail_bridge_append BEFORE INSERT ON metadata " +
+                        "WHEN NEW.id = 'legacy_usage_bridge_v1' " +
+                        "BEGIN SELECT RAISE(ABORT, 'injected append failure'); END",
+                )
+                assertTrue(runCatching { db.append(request, unpricedTokens = 12) }.isFailure)
+                assertEquals(null, db.recordById(request.requestId))
+                assertEquals(50L, db.lifetimeTotals().tracked.inputTokens)
+                assertEquals(1L, db.lifetimeTotals().tracked.requestCount)
+                assertEquals(6L, db.legacyUsageProjection().unpricedTokens)
+                db.writableDatabase.execSQL("DROP TRIGGER fail_bridge_append")
+                assertTrue(db.append(request, unpricedTokens = 12).inserted)
+                assertFalse(db.append(request, unpricedTokens = 12).inserted)
+                assertEquals(60L, db.lifetimeTotals().tracked.inputTokens)
+                assertEquals(2L, db.lifetimeTotals().tracked.requestCount)
+                assertEquals(18L, db.legacyUsageProjection().unpricedTokens)
+            }
+        } finally {
+            context.deleteDatabase(dbName)
+        }
+    }
+
 }
