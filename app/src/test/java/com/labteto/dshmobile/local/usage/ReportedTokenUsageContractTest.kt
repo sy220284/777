@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.usage
 
 import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
+import com.labteto.dshmobile.local.model.normalizedForAccounting
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
