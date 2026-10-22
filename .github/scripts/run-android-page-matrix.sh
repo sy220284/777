@@ -25,7 +25,7 @@ if [[ "$1" == "--cell" ]]; then
   api="$2"; page_kb="$3"
   case "$api" in 36) release=16 ;; 37) release=17 ;; *) exit 2 ;; esac
   package="$(image_package "$api" "$page_kb")"
-  avd="dsh_$api_$page_kb"
+  avd="dsh_${api}_${page_kb}"
   echo "CELL_START android=$release api=$api page_kb=$page_kb image=$package"
   "$sdk" --channel=3 --install "$package"
   printf 'no\n' | "$avdm" create avd --force -n "$avd" -d pixel_6 --package "$package"
