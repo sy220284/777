@@ -21,11 +21,6 @@ internal data class LocalHistoryCompaction(
     val estimatedTokensAfter: Int = 0,
 )
 
-internal enum class LocalHistorySummaryMode {
-    WORK,
-    CHAT,
-}
-
 internal fun applyOverflowCompaction(
     history: MutableList<JsonObject>,
     compactor: LocalHistoryCompactor,
