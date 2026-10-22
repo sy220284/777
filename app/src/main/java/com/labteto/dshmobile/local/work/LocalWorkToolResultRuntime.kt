@@ -60,7 +60,9 @@ internal class LocalWorkToolResultRuntime(
  */
 internal fun referencedWorkToolCallIds(snapshot: List<kotlinx.serialization.json.JsonObject>): List<String> {
     val recent = snapshot.takeLast(80).mapNotNull { message ->
-        message["tool_call_id"]?.jsonPrimitive?.contentOrNull
+        message["content"]?.jsonPrimitive?.contentOrNull?.let {
+            com.labteto.dshmobile.local.model.retainedToolOutputReference(it)
+        } ?: message["tool_call_id"]?.jsonPrimitive?.contentOrNull
     }
     val checkpoint = LocalWorkCheckpoint.latestFrom(snapshot)
     val checkpointIds = if (checkpoint?.hasTypedToolReferences == true) {

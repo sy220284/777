@@ -751,6 +751,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 toolIsError = deliveryIsError,
                                 toolErrorCode = deliveryErrorCode,
                                 toolCallId = event.call.id,
+                                toolExecutionId = event.executionId,
                                 toolDeclaredAt = declaredToolEvent?.first,
                                 toolDeclaredSequence = declaredToolEvent?.second,
                             )
@@ -758,6 +759,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 java.io.File(sessionStorage.files.workspace.path), event.call.name, event.output,
                             ) else null
                             val toolEvent = runEventLog.append("tool/result", buildJsonObject {
+                                declaredToolEvent?.second?.let { put("tool_declared_sequence", it) }
                                 put("source_message_id", uiSourceMessageId)
                                 event.executionId?.let { put("execution_id", it) }
                                 event.processExitCode?.let { put("process_exit_code", it) }
@@ -772,6 +774,7 @@ internal class LocalWorkAgentTurnExecutor(
                                     ),
                                 )
                                 put("model_content", durableToolResultContent(modelOutput, event.retention))
+                                com.labteto.dshmobile.local.model.retainedToolOutputReference(boundedContent)?.let { put("tool_output_ref", it) }
                                 put("tool_images", com.labteto.dshmobile.local.model.toolImageReferences(toolImages))
                                 put("is_error", deliveryIsError)
                                 artifactVersion?.let {

@@ -32,6 +32,7 @@ internal fun projectLocalWorkArtifacts(
                 reference = raw,
                 category = kind,
                 sourceCallId = callId,
+                sourceExecutionId = (data["execution_id"] as? JsonPrimitive)?.contentOrNull,
                 asOfSequence = event.sequence,
                 versionAtCreation = (data["artifact_sha256"] as? JsonPrimitive)?.contentOrNull
                     ?.takeIf { sha -> sha.matches(Regex("[a-fA-F0-9]{64}")) &&

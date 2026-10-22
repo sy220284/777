@@ -15,6 +15,21 @@ class LocalWorkGoalFactsProjectionTest {
     @get:Rule val temporary = TemporaryFolder()
     private val goal = LocalGoal(description = "交付", id = "goal", startedAtSequence = -1L)
 
+    @Test fun evictedIndicesRebuildExactResultsWithoutRetainingClosedJobHistory() {
+        val log = LocalSessionEventLog(File(temporary.root, "eviction.jsonl"), Json)
+        try {
+            repeat(12) { n -> log.append("taskgraph/job-result", buildJsonObject {
+                put("job_id", "job-$n"); put("graph_execution_id", "graph-$n")
+            }) }
+            val projection = LocalWorkOpenGraphProjection(maxCachedFacts = 4)
+            val first = projection.jobResult(log, "job-0")!!
+            assertTrue(projection.cachedFactCount() <= 4)
+            assertEquals(first, projection.jobResult(log, "job-0"))
+            assertEquals(11L, projection.jobResult(log, "job-11")!!.sequence)
+            assertTrue(projection.cachedFactCount() <= 4)
+        } finally { log.close() }
+    }
+
     @Test fun repeatedAssessmentAppliesOnlyNewEventsAndMatchesFullRebuild() {
         val log = LocalSessionEventLog(File(temporary.root, "goal.jsonl"), Json)
         repeat(2_000) { log.append("note", buildJsonObject { put("text", "history") }) }

@@ -9,6 +9,10 @@ import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -74,7 +78,7 @@ internal class LocalToolActivityProjectionRuntime @Inject constructor(
     private val projection: RegisteredSessionProjection<LocalToolActivityState> =
         sessionStorage.projectionRegistry.register(
             name = "tool.activity",
-            stateVersion = 3,
+            stateVersion = 4,
             initial = { LocalToolActivityState() },
             reducer = SessionReducer(::reduceLocalToolActivity),
         )
@@ -106,7 +110,21 @@ internal fun reduceLocalToolActivity(
     val callId = event.data["id"]?.jsonPrimitive?.contentOrNull
         ?.takeIf(String::isNotBlank)
         ?: return state
-    val previous = state.activities.lastOrNull { it.callId == callId }
+    val execution = event.data["execution_id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+    val declaration = (event.data["tool_declared_sequence"] as? JsonPrimitive)?.longOrNull
+        ?: (event.data["transcript"] as? JsonArray)?.mapNotNull {
+            ((it as? JsonObject)?.get("tool_declared_sequence") as? JsonPrimitive)?.longOrNull
+        }?.singleOrNull()
+    val candidates = state.activities.filter { it.callId == callId }
+    val previous = when {
+        event.type == "tool/call" -> candidates.singleOrNull { it.declaredSequence == event.sequence }
+        declaration != null -> candidates.singleOrNull { it.declaredSequence == declaration }
+        execution != null -> candidates.lastOrNull { it.executionId == execution }
+            ?: candidates.lastOrNull { it.executionId == null && it.finishedSequence == null }
+        else -> candidates.singleOrNull()
+    }
+    // An unscoped legacy receipt cannot settle one of several modern executions.
+    if (event.type == "tool/result" && execution == null && declaration == null && candidates.size > 1) return state
     val name = event.data["name"]?.jsonPrimitive?.contentOrNull
         ?.takeIf(String::isNotBlank)
         ?: previous?.name
@@ -123,14 +141,14 @@ internal fun reduceLocalToolActivity(
             } else {
                 LocalToolActivityPhase.DECLARED
             },
-            executionId = previous?.executionId,
+            executionId = null,
             argumentsPreview = event.data["arguments"]?.toString()?.let { truncateWithoutSplittingSurrogatePair(it, 2_000) },
             declaredSequence = event.sequence,
             declaredAt = event.createdAt,
-            startedSequence = previous?.startedSequence,
-            authorizationGranted = previous?.authorizationGranted,
-            authorizationExecutionId = previous?.authorizationExecutionId,
-            authorizationSequence = previous?.authorizationSequence,
+            startedSequence = null,
+            authorizationGranted = null,
+            authorizationExecutionId = null,
+            authorizationSequence = null,
         )
         "tool/authorization-decision" -> {
             val execution = event.data["execution_id"]?.jsonPrimitive?.contentOrNull
@@ -138,6 +156,7 @@ internal fun reduceLocalToolActivity(
             val granted = event.data["approved"]?.jsonPrimitive?.booleanOrNull ?: return state
             (previous ?: LocalToolActivity(callId, name, localToolActivityKind(name),
                 LocalToolActivityPhase.DECLARED)).copy(
+                executionId = execution,
                 authorizationGranted = granted,
                 authorizationExecutionId = execution,
                 authorizationSequence = event.sequence,
@@ -177,6 +196,7 @@ internal fun reduceLocalToolActivity(
                 name = name,
                 kind = localToolActivityKind(name),
                 phase = phase,
+                executionId = execution ?: previous?.executionId,
                 errorCode = errorCode,
                 sideEffect = event.data["side_effect"]?.jsonPrimitive?.contentOrNull,
                 finishedSequence = event.sequence,
@@ -186,7 +206,7 @@ internal fun reduceLocalToolActivity(
         }
         else -> return state
     }
-    val updated = state.activities.filterNot { it.callId == callId } + next
+    val updated = state.activities.filterNot { it === previous } + next
     // Retain all unresolved calls even if a large batch completes other tools.
     val unfinished = updated.filter {
         it.phase == LocalToolActivityPhase.DECLARED || it.phase == LocalToolActivityPhase.RUNNING

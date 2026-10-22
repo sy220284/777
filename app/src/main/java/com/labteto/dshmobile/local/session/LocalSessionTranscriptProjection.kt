@@ -46,6 +46,7 @@ private fun encodeTranscriptMessage(message: LocalHarnessMessage): JsonObject =
             message.toolName?.let { put("tool_name", JsonPrimitive(it)) }
             message.toolIsError?.let { put("tool_is_error", JsonPrimitive(it)) }
             message.toolErrorCode?.let { put("tool_error_code", JsonPrimitive(it)) }
+            message.toolExecutionId?.let { put("tool_execution_id", JsonPrimitive(it)) }
             message.toolCallId?.let { put("tool_call_id", JsonPrimitive(it)) }
             message.toolDeclaredAt?.let { put("tool_declared_at", JsonPrimitive(it)) }
             message.toolDeclaredSequence?.let { put("tool_declared_sequence", JsonPrimitive(it)) }
@@ -250,6 +251,8 @@ internal fun decodeTranscriptMessages(data: JsonObject): List<LocalHarnessMessag
             toolErrorCode = optionalString("tool_error_code")
                 ?: (data["error_code"] as? JsonPrimitive)?.contentOrNull,
             toolCallId = optionalString("tool_call_id"),
+            toolExecutionId = optionalString("tool_execution_id")
+                ?: (data["execution_id"] as? JsonPrimitive)?.contentOrNull,
             toolDeclaredAt = (item["tool_declared_at"] as? JsonPrimitive)?.longOrNull,
             toolDeclaredSequence = (item["tool_declared_sequence"] as? JsonPrimitive)?.longOrNull,
             speakerId = speakerId,

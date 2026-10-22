@@ -44,7 +44,7 @@ internal fun projectStaleToolResults(
         if (content.length <= maxChars) return@forEach
         val retained = retainTextForModel(content, maxTokens = maxTokens, maxChars = maxChars)
         if (!retained.truncated) return@forEach
-        val callId = message["tool_call_id"]?.jsonPrimitive?.contentOrNull
+        val callId = retainedToolOutputReference(content) ?: message["tool_call_id"]?.jsonPrimitive?.contentOrNull
         projected[index] = buildJsonObject {
             message.forEach { (key, value) ->
                 if (key != "content") put(key, value)
@@ -60,6 +60,9 @@ internal fun projectStaleToolResults(
                         append(") 分段读取")
                     }
                     append("]")
+                    retainedToolOutputReference(content)?.let {
+                        append("\n[工具原文引用：tool_output_read(call_id=$it)]")
+                    }
                 },
             )
         }

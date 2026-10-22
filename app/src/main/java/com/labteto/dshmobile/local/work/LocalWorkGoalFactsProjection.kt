@@ -89,8 +89,14 @@ internal class LocalWorkGoalFactsProjection {
         if (applied > 0) log.writeProjectionCheckpointIfFits(NAME, VERSION, through,
             Json.encodeToString(GoalFactsCheckpoint.serializer(), GoalFactsCheckpoint(
                 goal.id, from, tools.checkpoint(), graphs.unresolved())), generation)
-        LocalWorkGoalFacts(goal.id, through, tools.snapshot(),
+        val result = LocalWorkGoalFacts(goal.id, through, tools.snapshot(),
             graphs.unresolvedForGoal(goal.id).isNotEmpty(), applied)
+        if (result.attempts.size + graphs.unresolved().size > 4_096) {
+            generation = -1L
+            tools = ToolAttemptLedger()
+            graphs = LocalWorkTaskGraphRecoveryLedger()
+        }
+        result
     } }
 
     private companion object {

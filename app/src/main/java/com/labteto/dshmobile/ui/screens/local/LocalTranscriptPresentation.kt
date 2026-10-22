@@ -75,15 +75,24 @@ internal sealed interface LocalTranscriptItem {
         val groupedMessages: List<LocalHarnessMessage> = emptyList(),
     ) : LocalTranscriptItem {
         override val key: String =
-            message.toolCallId?.takeIf { message.role == "tool" }?.let { "work-tool:$it" }
-                ?: "work-step:${message.id}"
+            if (message.role == "tool" && message.toolCallId != null) workToolRowKey(message.toolCallId, message.toolDeclaredSequence,
+                message.toolExecutionId, message.id) else "work-step:${message.id}"
     }
 
     /** In-flight Tool-owned event. Replaced by the completion row with the same stable key. */
     data class WorkPendingTool(val activity: LocalToolActivityUiItem) : LocalTranscriptItem {
-        override val key: String = "work-tool:${activity.callId}"
+        override val key: String = workToolRowKey(activity.callId, activity.declaredSequence,
+            activity.executionId, "pending:${activity.startedSequence}:${activity.callId}")
     }
 }
+
+/** A declaration stays stable from pending to receipt; legacy rows keep their durable message ID. */
+private fun workToolRowKey(callId: String?, declaration: Long?, execution: String?, fallback: String): String =
+    when {
+        declaration != null -> "work-tool:$callId:declaration:$declaration"
+        execution != null -> "work-tool:execution:$execution"
+        else -> "work-tool:message:$fallback"
+    }
 
 /** Only recurring status polls are compacted; ordinary identical-looking calls stay distinct. */
 internal fun isRepeatedWorkPollingTool(name: String?): Boolean {
@@ -154,24 +163,46 @@ internal fun appendPendingWorkToolActivities(
     running: Boolean,
 ): List<LocalTranscriptItem> {
     // The declaration has the true command arguments. Attach them to the durable completion
-    // by callId so a completed step retains the same natural-language description as in flight.
-    val byCallId = activities.associateBy { it.callId }
+    // by declaration/admission so a reused provider ID cannot inherit another execution.
+    val messages = transcript.filterIsInstance<LocalTranscriptItem.WorkStep>()
+        .flatMap { listOf(it.message) + it.groupedMessages }
+    val messageCounts = messages.groupingBy { it.toolCallId }.eachCount()
+    val activitiesByCall = activities.groupBy { it.callId }
+    val activitiesByExecution = activities.filter { it.executionId != null }.groupBy { it.executionId }
+    val activitiesByDeclaration = activities.filter { it.declaredSequence != null }.groupBy { it.callId to it.declaredSequence }
+    fun activityFor(message: LocalHarnessMessage): LocalToolActivityUiItem? = when {
+        message.toolExecutionId != null -> activitiesByExecution[message.toolExecutionId]?.singleOrNull()
+        message.toolDeclaredSequence != null && message.toolCallId != null ->
+            activitiesByDeclaration[message.toolCallId to message.toolDeclaredSequence]?.singleOrNull()
+        messageCounts[message.toolCallId] == 1 -> activitiesByCall[message.toolCallId]?.singleOrNull()
+            ?.takeIf { it.executionId == null && it.declaredSequence == null }
+        else -> null
+    }
     val enriched = transcript.map { item ->
         if (item is LocalTranscriptItem.WorkStep && item.message.role == "tool") {
-            item.copy(activity = item.message.toolCallId?.let(byCallId::get) ?: item.activity)
+            item.copy(activity = activityFor(item.message) ?: item.activity)
         } else item
     }
     if (!running) return compactRepeatedWorkStatusChecks(enriched)
-    val completedIds = enriched.filterIsInstance<LocalTranscriptItem.WorkStep>()
-        .flatMap { step ->
-            (listOf(step.message) + step.groupedMessages).mapNotNull { it.toolCallId }
-        }.toSet()
+    val completedExecutions = messages.mapNotNull { it.toolExecutionId }.toSet()
+    val completedDeclarations = messages.filter { it.toolDeclaredSequence != null }
+        .map { it.toolCallId to it.toolDeclaredSequence }.toSet()
+    val completedLegacy = messages.filter { it.toolExecutionId == null && it.toolDeclaredSequence == null &&
+        messageCounts[it.toolCallId] == 1 }.mapNotNull { it.toolCallId }.toSet()
     val lastUserAt = transcript.filterIsInstance<LocalTranscriptItem.Message>()
         .lastOrNull { it.message.role == "user" }?.message?.createdAt ?: Long.MIN_VALUE
     val pending = activities.filter {
         it.phase == LocalToolUiPhase.DECLARED || it.phase == LocalToolUiPhase.RUNNING
-    }.filter { it.callId !in completedIds && (it.declaredAt ?: Long.MIN_VALUE) >= lastUserAt }
-        .distinctBy { it.callId }.sortedWith(
+    }.filter { activity ->
+        val completed = when {
+            activity.declaredSequence != null -> (activity.callId to activity.declaredSequence) in completedDeclarations ||
+                activity.executionId != null && activity.executionId in completedExecutions
+            activity.executionId != null -> activity.executionId in completedExecutions
+            else -> activity.callId in completedLegacy && activitiesByCall[activity.callId]?.size == 1
+        }
+        !completed && (activity.declaredAt ?: Long.MIN_VALUE) >= lastUserAt
+    }
+        .distinctBy { workToolRowKey(it.callId, it.declaredSequence, it.executionId, "pending:${it.startedSequence}:${it.callId}") }.sortedWith(
             compareBy<LocalToolActivityUiItem> { it.declaredAt ?: Long.MAX_VALUE }
                 .thenBy { it.declaredSequence ?: Long.MAX_VALUE }
         )
@@ -463,9 +494,11 @@ internal fun composeLocalReplyAttachments(
     val messageOwners = timeline.filterIsInstance<LocalTranscriptItem.Message>()
         .filter { it.message.role == "assistant" || it.message.role == "user" }
         .associate { it.message.id to it.key }
-    val toolOwners = timeline.filterIsInstance<LocalTranscriptItem.WorkStep>()
+    val toolSteps = timeline.filterIsInstance<LocalTranscriptItem.WorkStep>()
         .filter { it.message.role == "tool" && it.message.toolCallId != null }
-        .associate { it.message.toolCallId!! to it.key }
+    val toolOwners = toolSteps.groupBy { it.message.toolCallId }
+    val executionOwners = toolSteps.filter { it.message.toolExecutionId != null }
+        .associate { it.message.toolExecutionId!! to it.key }
     if (messageOwners.isEmpty() && toolOwners.isEmpty()) return timeline
 
     val attachments = linkedMapOf<String, MutableList<LocalTranscriptItem>>()
@@ -475,7 +508,9 @@ internal fun composeLocalReplyAttachments(
             is LocalTranscriptItem.MediaResult -> item.result.sourceMessageId?.let(messageOwners::get)
             is LocalTranscriptItem.CreationJob -> item.job.sourceMessageId?.let(messageOwners::get)
             is LocalTranscriptItem.VideoTask -> item.task.sourceMessageId?.let(messageOwners::get)
-            is LocalTranscriptItem.WorkArtifact -> item.artifact.sourceCallId?.let(toolOwners::get)
+            is LocalTranscriptItem.WorkArtifact -> if (item.artifact.sourceExecutionId != null)
+                executionOwners[item.artifact.sourceExecutionId] else
+                toolOwners[item.artifact.sourceCallId]?.singleOrNull()?.key
             else -> null
         }
         if (ownerKey == null) {

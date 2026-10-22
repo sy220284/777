@@ -7,6 +7,40 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LocalToolActivityProjectionTest {
+    @Test fun deniedReplacementSettlesItsDeclarationWithoutClaimingExecutionStarted() {
+        var state = reduceLocalToolActivity(LocalToolActivityState(), event(1, "tool/call") { put("id", "same") })
+        state = reduceLocalToolActivity(state, event(2, "tool/result") { put("id", "same") })
+        state = reduceLocalToolActivity(state, event(3, "tool/call") { put("id", "same") })
+        state = reduceLocalToolActivity(state, event(4, "tool/authorization-decision") {
+            put("id", "same"); put("execution_id", "denied"); put("approved", false)
+        })
+        state = reduceLocalToolActivity(state, event(5, "tool/result") {
+            put("id", "same"); put("tool_declared_sequence", 3L)
+            put("is_error", true); put("error_code", "TOOL_DENIED")
+        })
+        val denied = state.activities.single { it.declaredSequence == 3L }
+        assertEquals(LocalToolActivityPhase.FAILED, denied.phase)
+        assertEquals(null, denied.startedSequence)
+    }
+
+    @Test fun reusedCallIdAndLateReceiptKeepDistinctExecutionFacts() {
+        var state = LocalToolActivityState()
+        for ((sequence, execution) in listOf(1L to "old", 3L to "new")) {
+            state = reduceLocalToolActivity(state, event(sequence, "tool/call") { put("id", "same") })
+            state = reduceLocalToolActivity(state, event(sequence + 1, "tool/execution-started") {
+                put("id", "same"); put("execution_id", execution)
+            })
+        }
+        state = reduceLocalToolActivity(state, event(5, "tool/result") {
+            put("id", "same"); put("execution_id", "old"); put("is_error", false)
+        })
+        assertEquals(2, state.activities.size)
+        assertEquals(LocalToolActivityPhase.COMPLETED, state.activities.single { it.executionId == "old" }.phase)
+        assertEquals(LocalToolActivityPhase.RUNNING, state.activities.single { it.executionId == "new" }.phase)
+        state = reduceLocalToolActivity(state, event(6, "tool/result") { put("id", "same") })
+        assertEquals(LocalToolActivityPhase.RUNNING, state.activities.single { it.executionId == "new" }.phase)
+    }
+
     @Test fun authorizationIsPerExecutionAndDoesNotBecomePermissionForAReplacementCall() {
         var state = reduceLocalToolActivity(LocalToolActivityState(), event(1, "tool/authorization-decision") {
             put("id", "call"); put("name", "mcp_write"); put("execution_id", "exec-original"); put("approved", true)
@@ -15,8 +49,9 @@ class LocalToolActivityProjectionTest {
         state = reduceLocalToolActivity(state, event(2, "tool/execution-started") {
             put("id", "call"); put("name", "mcp_write"); put("execution_id", "exec-replacement")
         })
-        assertEquals(null, state.activities.single().authorizationGranted)
-        assertEquals("exec-replacement", state.activities.single().executionId)
+        val replacement = state.activities.single { it.executionId == "exec-replacement" }
+        assertEquals(null, replacement.authorizationGranted)
+        assertEquals(true, state.activities.single { it.executionId == "exec-original" }.authorizationGranted)
     }
 
     @Test

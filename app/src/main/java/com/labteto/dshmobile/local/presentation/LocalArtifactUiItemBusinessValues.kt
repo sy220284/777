@@ -13,4 +13,5 @@ data class LocalArtifactUiItem(
     val fileObservation: String? = null,
     val logIdentity: String? = null,
     val logGeneration: Long? = null,
+    val sourceExecutionId: String? = null,
 )

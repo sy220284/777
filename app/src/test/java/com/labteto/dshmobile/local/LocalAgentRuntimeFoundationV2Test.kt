@@ -73,7 +73,7 @@ class LocalAgentRuntimeFoundationV2Test {
             callId = "call-1",
             spill = { id, value ->
                 spills += 1
-                id == "call-1" && value == output
+                id == com.labteto.dshmobile.local.model.toolOutputReference("call-1", output) && value == output
             },
         )
         val ephemeral = projectRecoverableToolResult(
@@ -90,7 +90,8 @@ class LocalAgentRuntimeFoundationV2Test {
         assertTrue(durable.truncated)
         assertTrue(durable.stored)
         assertTrue(durable.text.contains("tool_output_read"))
-        assertTrue(durable.text.contains("call_id=call-1"))
+        assertEquals(com.labteto.dshmobile.local.model.toolOutputReference("call-1", output),
+            com.labteto.dshmobile.local.model.retainedToolOutputReference(durable.text))
         assertTrue(ephemeral.truncated)
         assertFalse(ephemeral.stored)
         assertTrue(ephemeral.text.contains("本机私有保留上限"))
