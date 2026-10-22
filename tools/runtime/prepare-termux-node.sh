@@ -16,6 +16,20 @@ TERMUX_KEY_FINGERPRINT="CC72CF8BA7DBFA0182877D045A897D96E57CF20C"
 NODE_PACKAGE="nodejs"
 NODE_PACKAGE_VERSION="26.4.0-2"
 NODE_RUNTIME_VERSION="26.4.0"
+# Opt-in benchmark-only x86_64 variant. This is NEVER enabled in the release
+# build; normal arm64-v8a and x86_64 packages retain their 26.4.0-2 lock.
+# This strict override permits one signed newer x86 Termux snapshot for the
+# four-way test when the former x86 version disappears from the public index.
+if [[ -n "${DSH_BENCHMARK_NODE_PACKAGE_VERSION:-}" || -n "${DSH_BENCHMARK_NODE_RUNTIME_VERSION:-}" ]]; then
+  if [[ "$RUNTIME_ABIS" != "x86_64" ||
+        "${DSH_BENCHMARK_NODE_PACKAGE_VERSION:-}" != "26.12.1" ||
+        "${DSH_BENCHMARK_NODE_RUNTIME_VERSION:-}" != "26.12.1" ]]; then
+    echo "Only the pinned x86_64 26.12.1 benchmark override is allowed" >&2
+    exit 1
+  fi
+  NODE_PACKAGE_VERSION="26.12.1"
+  NODE_RUNTIME_VERSION="26.12.1"
+fi
 RUNTIME_PACKAGES=(nodejs libc++ openssl c-ares libicu libsqlite zlib libffi)
 SYSTEM_LIBS=(
   libc.so libdl.so libm.so liblog.so libandroid.so libpthread.so librt.so
