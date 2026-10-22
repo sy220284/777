@@ -96,7 +96,21 @@ if [[ "${1:-}" == "--cell" ]]; then
   # CI lanes. Repeating them four more times on this one runner consumes OS
   # JobScheduler quota and contaminates the later performance samples.
   # These ten rounds still execute real UI, MCP OAuth, and WorkManager tests.
-  bash .github/scripts/run-android17-ten-rounds.sh "$api" "$page_kb"
+  # Retain platform crash evidence before EXIT cleanup shuts this AVD down.
+  # The Android 16 / 16KB test previously only said 'Process crashed',
+  # leaving no Java/native stack in the uploaded artifact.
+  if ! bash .github/scripts/run-android17-ten-rounds.sh "$api" "$page_kb"; then
+    echo "CELL_ERROR Android $release $page_kb KB performance instrumentation failed" >&2
+    adb logcat -d -v threadtime -b main -b system -b crash \
+      > "$root/logcat-$release-$page_kb-k.txt" 2>&1 || true
+    adb shell dumpsys activity exit-info "$app" \
+      > "$root/exit-info-$release-$page_kb-k.txt" 2>&1 || true
+    adb shell dumpsys dropbox --print \
+      > "$root/dropbox-$release-$page_kb-k.txt" 2>&1 || true
+    grep -E -A 22 -B 4 'FATAL EXCEPTION|Fatal signal|signal 11|SIGABRT|Process .* has died|INSTRUMENTATION_RESULT' \
+      "$root/logcat-$release-$page_kb-k.txt" | tail -n 130 || true
+    exit 1
+  fi
   adb shell am force-stop "$app" || true
   bash .github/scripts/smoke-test-android-startup.sh "$app"
   adb shell am force-stop "$app" || true
