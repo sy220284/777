@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Validate ten Android 17 rounds and write reproducible per-run/aggregate evidence."""
+"""Analyze Android 16/17 ten-round data without fabricating insufficient frame metrics."""
 import csv
 import json
 import statistics
 import sys
 from pathlib import Path
 
-FIELDS = ("round", "scenario", "api", "samples", "p50_ms", "p95_ms",
-          "max_ms", "refresh_hz", "observed_fps_p50", "jank_pct",
-          "peak_pss_kib", "peak_java_used_kib")
+FIELDS = ("round", "scenario", "api", "samples", "p50_ms", "p95_ms", "max_ms",
+          "refresh_hz", "observed_fps_p50", "jank_pct", "peak_pss_kib",
+          "peak_java_used_kib", "sample_quality", "valid_vsync_intervals",
+          "max_visible_index")
 EXPECTED = {
     "work_2000_events_cold_projection",
     "work_2000_events_incremental_projection",
@@ -19,34 +20,57 @@ EXPECTED = {
 }
 
 
-def parse(path, number):
+def parse(path, round_number, api):
     rows = {}
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        start = "INSTRUMENTATION_STATUS: stream=ANDROID_PERF "
-        if start not in line:
+        prefix = "INSTRUMENTATION_STATUS: stream=ANDROID_PERF "
+        if prefix not in line:
             continue
-        part = line.split(start, 1)[1].strip()
+        part = line.split(prefix, 1)[1].strip()
         values = dict(pair.split("=", 1) for pair in part.split() if "=" in pair)
         scenario = values.get("scenario")
         if scenario in rows:
-            raise ValueError(f"round {number}: duplicate metric {scenario}")
-        if values.get("api") != "37":
-            raise ValueError(f"round {number}: wrong Android API {values.get('api')}")
-        rows[scenario] = {"round": number, **values}
+            raise ValueError(f"round {round_number}: duplicate metric {scenario}")
+        if values.get("api") != str(api):
+            raise ValueError(f"round {round_number}: wrong Android API {values.get('api')}")
+        rows[scenario] = {"round": round_number, **values}
     if set(rows) != EXPECTED:
-        raise ValueError(f"round {number}: metric mismatch missing={EXPECTED-set(rows)} unexpected={set(rows)-EXPECTED}")
+        raise ValueError(
+            f"round {round_number}: metric mismatch missing={EXPECTED-set(rows)} "
+            f"unexpected={set(rows)-EXPECTED}"
+        )
     for scenario, row in rows.items():
-        for field in ("samples", "p50_ms", "p95_ms"):
-            if scenario != "work_timeline_scroll_frames" and field not in row:
-                raise ValueError(f"round {number}: missing {field} in {scenario}")
-        if scenario == "work_timeline_scroll_frames":
-            if int(row.get("samples", 0)) < 60 or float(row.get("observed_fps_p50", 0)) <= 0:
-                raise ValueError(f"round {number}: insufficient actual frame samples")
+        if scenario != "work_timeline_scroll_frames":
+            for field in ("samples", "p50_ms", "p95_ms"):
+                if field not in row:
+                    raise ValueError(f"round {round_number}: missing {field} in {scenario}")
+            continue
+        quality = row.get("sample_quality")
+        frames = int(row.get("samples", -1))
+        intervals = int(row.get("valid_vsync_intervals", -1))
+        if quality not in {"valid", "insufficient"} or frames < 0 or intervals < 0:
+            raise ValueError(f"round {round_number}: invalid sample quality data")
+        expected_valid = frames >= 60 and intervals >= 40
+        if (quality == "valid") != expected_valid:
+            raise ValueError(f"round {round_number}: quality inconsistent with real frame counts")
+        if int(row.get("max_visible_index", -1)) <= 2:
+            raise ValueError(f"round {round_number}: real scrolling did not advance")
+        if int(row.get("peak_pss_kib", 0)) <= 0:
+            raise ValueError(f"round {round_number}: invalid PSS")
+        if quality == "valid":
+            if float(row.get("observed_fps_p50", 0)) <= 0:
+                raise ValueError(f"round {round_number}: invalid FPS")
+            if not 0 <= float(row.get("jank_pct", -1)) <= 100:
+                raise ValueError(f"round {round_number}: invalid jank")
+        elif row.get("observed_fps_p50") != "NA" or row.get("jank_pct") != "NA":
+            raise ValueError(f"round {round_number}: insufficient frames must report NA")
     return list(rows.values())
 
 
 def summarize(rows, metric):
     data = [float(item[metric]) for item in rows]
+    if len(data) < 2:
+        return None
     mean = statistics.mean(data)
     return {
         "metric": metric,
@@ -62,41 +86,84 @@ def summarize(rows, metric):
 
 
 def main():
+    if len(sys.argv) != 3 or sys.argv[2] not in {"36", "37"}:
+        raise SystemExit("usage: analyze-android17-ten-rounds.py <folder> <36|37>")
     root = Path(sys.argv[1])
+    api = int(sys.argv[2])
     records = []
-    for run in range(1, 11):
-        filename = root / f"round-{run:02d}.log"
+    for round_number in range(1, 11):
+        filename = root / f"round-{round_number:02d}.log"
         if not filename.is_file():
-            raise SystemExit(f"missing run {run}: {filename}")
-        records.extend(parse(filename, run))
-    with (root / "metrics-10-rounds.csv").open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDS, extrasaction="ignore")
+            raise SystemExit(f"missing round {round_number}: {filename}")
+        records.extend(parse(filename, round_number, api))
+
+    with (root / "metrics-10-rounds.csv").open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=FIELDS, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(records)
 
     by_scenario = {}
     table = [
-        "| 场景 | 十轮 P50中位值 | 最快/最慢轮 P50 | P50变异系数 | 首末变化 |",
+        "| 场景 | 十轮 P50 中位值 | 最快/最慢轮 P50 | P50 变异系数 | 首末变化 |",
         "| --- | ---: | ---: | ---: | ---: |",
     ]
     for scenario in sorted(EXPECTED):
-        subset = sorted((r for r in records if r["scenario"] == scenario), key=lambda r: r["round"])
-        fields = ("observed_fps_p50", "jank_pct", "peak_pss_kib", "peak_java_used_kib") if scenario == "work_timeline_scroll_frames" else ("p50_ms", "p95_ms")
-        by_scenario[scenario] = {field: summarize(subset, field) for field in fields}
-        metric = by_scenario[scenario][fields[0]]
-        unit = "fps" if scenario == "work_timeline_scroll_frames" else "ms"
-        table.append(f"| {scenario} | {metric['median']:.3f} {unit} | {metric['min']:.3f}–{metric['max']:.3f} {unit} | {metric['cv_percent']:.2f}% | {metric['last_vs_first_percent']:+.2f}% |")
+        subset = sorted((r for r in records if r["scenario"] == scenario),
+                        key=lambda r: r["round"])
+        if scenario == "work_timeline_scroll_frames":
+            valid = [r for r in subset if r["sample_quality"] == "valid"]
+            by_scenario[scenario] = {
+                "sample_quality_by_round": [r["sample_quality"] for r in subset],
+                "valid_frame_rounds": len(valid),
+                "insufficient_frame_rounds": len(subset) - len(valid),
+                "frames_by_round": [int(r["samples"]) for r in subset],
+                "observed_fps_p50": summarize(valid, "observed_fps_p50"),
+                "jank_pct": summarize(valid, "jank_pct"),
+                "peak_pss_kib": summarize(subset, "peak_pss_kib"),
+                "peak_java_used_kib": summarize(subset, "peak_java_used_kib"),
+            }
+            metric = by_scenario[scenario]["observed_fps_p50"]
+            unit = "fps"
+            if metric is None:
+                table.append(f"| {scenario} | 不可评估（有效 {len(valid)}/10） | — | — | — |")
+                continue
+        else:
+            by_scenario[scenario] = {
+                field: summarize(subset, field) for field in ("p50_ms", "p95_ms")
+            }
+            metric = by_scenario[scenario]["p50_ms"]
+            unit = "ms"
+        cv = f"{metric['cv_percent']:.2f}%" if metric["cv_percent"] is not None else "—"
+        change = metric["last_vs_first_percent"]
+        change_label = f"{change:+.2f}%" if change is not None else "—"
+        table.append(
+            f"| {scenario} | {metric['median']:.3f} {unit} | "
+            f"{metric['min']:.3f}–{metric['max']:.3f} {unit} | {cv} | {change_label} |"
+        )
 
+    scroll = by_scenario["work_timeline_scroll_frames"]
     summary = {
-        "android_api": 37,
+        "android_api": api,
         "rounds": 10,
-        "performance_metrics": 60,
-        "host_environment": (root / "environment.txt").read_text(encoding="utf-8") if (root / "environment.txt").exists() else None,
+        "performance_metrics": len(records),
+        "frame_rate_verified": scroll["valid_frame_rounds"] >= 2,
+        "frame_rate_note": (
+            "Insufficient emulator FrameMetrics never become FPS/jank numbers; "
+            "even valid SwiftShader samples are not physical-device benchmarks."
+        ),
+        "host_environment": (
+            (root / "environment.txt").read_text(encoding="utf-8")
+            if (root / "environment.txt").exists() else None
+        ),
         "by_scenario": by_scenario,
     }
-    (root / "summary-10-rounds.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
-    (root / "summary-10-rounds.md").write_text("\n".join(table) + "\n", encoding="utf-8")
-    print("ANDROID17_TEN_ROUNDS_SUMMARY")
+    (root / "summary-10-rounds.json").write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    (root / "summary-10-rounds.md").write_text(
+        "\n".join(table) + "\n", encoding="utf-8"
+    )
+    print(f"ANDROID{api}_TEN_ROUNDS_SUMMARY")
     print("\n".join(table))
 
 
