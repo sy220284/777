@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# One Android 17 emulator + one x86_64 APK build, ten instrumented rounds.
-out=".ci/android17-ten-rounds"
+# Android 16 or 17, same shared x86_64 APK build and ten instrumented rounds.
+# Historical script name retained for existing CI callers.
+api="${1:-37}"
+if [[ "$api" != 36 && "$api" != 37 ]]; then echo "expected Android API 36 or 37" >&2; exit 2; fi
+out=".ci/android${api}-ten-rounds"
 mkdir -p "$out"
 component="com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner"
 classes="com.labteto.dshmobile.local.DevicePerformanceBaselineTest,com.labteto.dshmobile.local.tools.LocalMcpOAuthProtocolEndToEndAndroidTest,com.labteto.dshmobile.automation.AutomationDispatchEndToEndAndroidTest,com.labteto.dshmobile.ui.screens.local.DeviceScrollFrameAndMemoryTest"
 {
   echo "git_sha=$GITHUB_SHA"
+  echo "requested_api=$api"
   echo "runner_name=$RUNNER_NAME"
   echo "runner_os=$RUNNER_OS"
   echo "runner_arch=$RUNNER_ARCH"
@@ -22,7 +26,7 @@ classes="com.labteto.dshmobile.local.DevicePerformanceBaselineTest,com.labteto.d
 cat "$out/environment.txt"
 
 for round in $(seq 1 10); do
-  printf 'ANDROID17_TEN_ROUNDS_BEGIN round=%02d\n' "$round"
+  printf 'ANDROID%s_TEN_ROUNDS_BEGIN round=%02d\n' "$api" "$round"
   echo "host_load_before=$(cat /proc/loadavg)" >> "$out/environment.txt"
   log="$out/round-$(printf '%02d' "$round").log"
   # New instrumentation test process, but the same AVD and host every round.
@@ -31,16 +35,16 @@ for round in $(seq 1 10); do
       tr -d '\r' | tee "$log"
   if grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|INSTRUMENTATION_STATUS_CODE: -[12]|Process crashed' "$log" ||
       ! grep -Eq '^OK \(5 tests\)' "$log"; then
-    echo "::error::Android 17 performance round $round failed" >&2
+    echo "::error::Android $api performance round $round failed" >&2
     exit 1
   fi
-  count="$(grep -c 'INSTRUMENTATION_STATUS: stream=ANDROID_PERF api=37 ' "$log" || true)"
+  count="$(grep -c 'INSTRUMENTATION_STATUS: stream=ANDROID_PERF api=${api} ' "$log" || true)"
   if [[ "$count" -ne 6 ]]; then
-    echo "::error::Android 17 round $round emitted $count metrics; expected exactly 6" >&2
+    echo "::error::Android $api round $round emitted $count metrics; expected exactly 6" >&2
     exit 1
   fi
-  grep 'INSTRUMENTATION_STATUS: stream=ANDROID_PERF api=37 ' "$log" |
-      sed "s/^/ANDROID17_TEN_ROUNDS round=$round /"
-  printf 'ANDROID17_TEN_ROUNDS_END round=%02d\n' "$round"
+  grep "INSTRUMENTATION_STATUS: stream=ANDROID_PERF api=${api} " "$log" |
+      sed "s/^/ANDROID${api}_TEN_ROUNDS round=$round /"
+  printf 'ANDROID%s_TEN_ROUNDS_END round=%02d\n' "$api" "$round"
 done
-python3 .github/scripts/analyze-android17-ten-rounds.py "$out"
+python3 .github/scripts/analyze-android17-ten-rounds.py "$out" "$api"
