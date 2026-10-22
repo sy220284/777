@@ -67,3 +67,25 @@ internal data class LegacyUsageBridge(
     val unpricedTokens: Long = 0L,
     val updatedAt: Long = 0L,
 )
+
+/**
+ * The historical gap is unattributable to model, Chat/Work mode or request ID.
+ * Project it into global lifetime totals only; never invent provider/session attribution.
+ */
+internal fun TokenUsageAggregate.withLegacyUnattributedGap(offset: LegacyUsageCounters): TokenUsageAggregate = copy(
+    inputTokens = saturatingUsageAdd(inputTokens, offset.inputTokens),
+    cacheHitTokens = saturatingUsageAdd(cacheHitTokens, offset.cacheHitTokens),
+    cacheMissTokens = saturatingUsageAdd(cacheMissTokens, offset.cacheMissTokens),
+    cacheWriteTokens = saturatingUsageAdd(cacheWriteTokens, offset.cacheWriteTokens),
+    outputTokens = saturatingUsageAdd(outputTokens, offset.outputTokens),
+    reasoningTokens = saturatingUsageAdd(reasoningTokens, offset.reasoningTokens),
+    requestCount = saturatingUsageAdd(requestCount, offset.requestCount),
+    unreportedRequestCount = saturatingUsageAdd(unreportedRequestCount, offset.unreportedRequestCount),
+    estimatedCostCny = saturatingUsageCostAdd(estimatedCostCny, offset.estimatedCostCny),
+)
+
+internal fun LegacyUsageCounters.hasUnattributedGap(): Boolean =
+    inputTokens > 0L || cacheHitTokens > 0L || cacheMissTokens > 0L ||
+        cacheWriteTokens > 0L || outputTokens > 0L || reasoningTokens > 0L ||
+        requestCount > 0L || unreportedRequestCount > 0L || estimatedCostCny > 0.0
+
