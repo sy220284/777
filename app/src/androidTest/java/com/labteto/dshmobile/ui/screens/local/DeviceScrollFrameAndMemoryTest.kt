@@ -8,16 +8,17 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.SystemClock
 import android.view.FrameMetrics
+import android.view.MotionEvent
 import android.view.Window
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeUp
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
@@ -45,9 +46,11 @@ class DeviceScrollFrameAndMemoryTest {
                 toolCallId = "scroll-call-$index",
             )
         }
+        lateinit var listState: LazyListState
         compose.setContent {
+            listState = rememberLazyListState()
             DshTheme {
-                LazyColumn(Modifier.fillMaxSize().testTag("perf-real-work-timeline")) {
+                LazyColumn(Modifier.fillMaxSize().testTag("perf-real-work-timeline"), state = listState) {
                     items(rows, key = { it.id }) { row -> WorkTimelineStepRow(row) }
                 }
             }
@@ -82,10 +85,34 @@ class DeviceScrollFrameAndMemoryTest {
         }
         var peakPssKb = pssKb()
         var peakJavaKb = (heap.totalMemory() - heap.freeMemory()) / 1024L
+        val ui = instrumentation.uiAutomation
+        var maxVisibleIndex = 0
+        fun realSwipe(downwards: Boolean) {
+            val size = activity.window.decorView
+            val x = size.width * 0.5f
+            val from = size.height * (if (downwards) 0.25f else 0.80f)
+            val to = size.height * (if (downwards) 0.80f else 0.25f)
+            val started = SystemClock.uptimeMillis()
+            fun event(action: Int, y: Float) {
+                val t = MotionEvent.obtain(started, SystemClock.uptimeMillis(), action, x, y, 0)
+                try {
+                    check(ui.injectInputEvent(t, true)) { "Real emulator touch injection failed" }
+                } finally { t.recycle() }
+            }
+            event(MotionEvent.ACTION_DOWN, from)
+            repeat(32) { index ->
+                SystemClock.sleep(16L)
+                event(MotionEvent.ACTION_MOVE, from + (to - from) * (index + 1) / 32f)
+            }
+            event(MotionEvent.ACTION_UP, to)
+        }
         try {
-            repeat(12) {
-                compose.onNodeWithTag("perf-real-work-timeline").performTouchInput { swipeUp() }
+            repeat(16) { index ->
+                realSwipe(downwards = index % 2 == 1)
                 compose.waitForIdle()
+                compose.runOnIdle {
+                    maxVisibleIndex = maxOf(maxVisibleIndex, listState.firstVisibleItemIndex)
+                }
                 peakPssKb = maxOf(peakPssKb, pssKb())
                 peakJavaKb = maxOf(peakJavaKb, (heap.totalMemory() - heap.freeMemory()) / 1024L)
             }
@@ -95,11 +122,13 @@ class DeviceScrollFrameAndMemoryTest {
             thread.join(2_000)
         }
         val frames = synchronized(metrics) { metrics.toList() }
-        assertTrue("FrameMetrics listener did not capture actual rendered frames", frames.size >= 20)
+        assertTrue("Real scrolling never advanced the Work list", maxVisibleIndex > 2)
+        assertTrue("Too few actual rendered frames for a reliable performance report", frames.size >= 60)
         val longFrames = frames.count { it.first > refreshNs * 1.5 }
         val timing = frames.map { it.second }.filter { it > 0L }.sorted()
         val intervals = timing.zipWithNext { a, b -> b - a }
             .filter { it > 0L && it < 250_000_000L }
+        assertTrue("Insufficient valid vsync timestamps", intervals.size >= 40)
         val observedFps = if (intervals.isNotEmpty()) {
             1_000_000_000.0 / intervals.sorted()[intervals.size / 2]
         } else 0.0
