@@ -7,6 +7,39 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalWorkReplyPresentationTest {
+    @Test fun deniedReceiptRemovesPendingByDeclarationEvenWithoutExecutionId() {
+        val denied = message("denied", "tool", "拒绝", "write", true)
+            .copy(toolCallId = "same", toolDeclaredSequence = 3L)
+        val pending = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
+            callId = "same", name = "write",
+            phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.DECLARED,
+            executionId = "admission-only", declaredSequence = 3L)
+        val rows = appendPendingWorkToolActivities(buildLocalTranscript(listOf(denied)), listOf(pending), true)
+        assertEquals(1, rows.size)
+        assertTrue(rows.single() is LocalTranscriptItem.WorkStep)
+    }
+
+    @Test fun reusedCallIdsKeepDistinctRowsPendingExecutionsAndArtifactOwners() {
+        val old = message("old", "tool", "first", "write", false)
+            .copy(toolCallId = "same", toolExecutionId = "old-execution", toolDeclaredSequence = 1L)
+        val newer = old.copy(id = "new", toolExecutionId = "new-execution", toolDeclaredSequence = 4L)
+        val rows = buildLocalTranscript(listOf(old, newer))
+        assertEquals(2, rows.map { it.key }.toSet().size)
+        val pending = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
+            callId = "same", name = "write",
+            phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING,
+            executionId = "third-execution", declaredSequence = 7L)
+        assertEquals(3, appendPendingWorkToolActivities(rows, listOf(pending), true).size)
+        val artifact = LocalTranscriptItem.WorkArtifact(
+            com.labteto.dshmobile.local.presentation.LocalArtifactUiItem("out.txt", "file", "same", 6L,
+                sourceExecutionId = "old-execution"))
+        val composed = composeLocalReplyAttachments(rows + artifact)
+        assertEquals(rows.first().key, (composed[1] as LocalTranscriptItem.WorkArtifact).attachedTo)
+        val legacy = old.copy(id = "legacy", toolExecutionId = null, toolDeclaredSequence = null)
+        assertEquals(2, buildLocalTranscript(listOf(legacy, legacy.copy(id = "legacy-2")))
+            .map { it.key }.toSet().size)
+    }
+
     @Test fun workFailureAndStopRemainVisibleAfterReopeningHistory() {
         val failure = LocalHarnessMessage("failure", "system", "执行失败：网络连接中断", createdAt = 2L)
         val stopped = failure.copy(id = "stop", content = "本轮已停止。")
@@ -41,7 +74,7 @@ class LocalWorkReplyPresentationTest {
         )
         val visible = appendPendingWorkToolActivities(listOf(row), listOf(activity), running = false)
             .single() as LocalTranscriptItem.WorkStep
-        assertEquals("work-tool:call-1", visible.key)
+        assertEquals("work-tool:message:result", visible.key)
         assertEquals(command, visible.activity?.argumentsPreview)
         assertEquals("检查 curl、wget 是否可用",
             naturalWorkCommandAction(visible.activity?.argumentsPreview))
@@ -56,7 +89,7 @@ class LocalWorkReplyPresentationTest {
             phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING,
             declaredAt = 120L, declaredSequence = 5L)
         val output = appendPendingWorkToolActivities(listOf(user, completed), listOf(first), true)
-        assertEquals(listOf("message:u", "work-tool:first", "work-tool:second"), output.map { it.key })
+        assertEquals(listOf("message:u", "work-tool:declaration:5", "work-tool:declaration:6"), output.map { it.key })
     }
 
     @Test fun repeatedIdenticalStatusChecksCompactButRetainEveryReceipt() {
@@ -192,14 +225,15 @@ class LocalWorkReplyPresentationTest {
         val activity = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
             callId = "call-1", name = "mcp__GitHub__fetch_file",
             phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.DECLARED,
+            declaredSequence = 3L,
         )
         val pending = appendPendingWorkToolActivities(emptyList(), listOf(activity), running = true)
-        assertEquals(listOf("work-tool:call-1"), pending.map { it.key })
+        assertEquals(listOf("work-tool:declaration:3"), pending.map { it.key })
         assertTrue(pending.single() is LocalTranscriptItem.WorkPendingTool)
 
         val completed = LocalTranscriptItem.WorkStep(
             message("result", "tool", "ok", "mcp__GitHub__fetch_file", false)
-                .copy(toolCallId = "call-1"),
+                .copy(toolCallId = "call-1", toolDeclaredSequence = 3L),
         )
         assertEquals(pending.single().key, completed.key)
         val settled = appendPendingWorkToolActivities(
@@ -216,7 +250,7 @@ class LocalWorkReplyPresentationTest {
             message("n", "progress", "已发现风险点").copy(createdAt = 140L))
         val result = LocalTranscriptItem.WorkStep(
             message("r", "tool", "ok", "mcp__GitHub__fetch_file", false)
-                .copy(createdAt = 155L, toolCallId = "finished"))
+                .copy(createdAt = 155L, toolCallId = "finished", toolDeclaredSequence = 7L))
         val answer = LocalTranscriptItem.Message(message("a", "assistant", "最终结论").copy(createdAt = 190L))
         val one = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
             callId = "one", name = "mcp__GitHub__fetch_file",
@@ -228,8 +262,8 @@ class LocalWorkReplyPresentationTest {
             listOf(user, narrative, result, answer),
             listOf(two, done, one), running = true)
         assertEquals(
-            listOf("message:u", "work-tool:one", "work-tool:two", "work-step:n",
-                "work-tool:finished", "message:a"),
+            listOf("message:u", "work-tool:declaration:5", "work-tool:declaration:6", "work-step:n",
+                "work-tool:declaration:7", "message:a"),
             visible.map { it.key })
     }
 
@@ -242,8 +276,8 @@ class LocalWorkReplyPresentationTest {
         }
         val entries = appendPendingWorkToolActivities(emptyList(), activities.reversed(), running = true)
         assertEquals(48, entries.size)
-        assertEquals("work-tool:c1", entries.first().key)
-        assertEquals("work-tool:c48", entries.last().key)
+        assertEquals("work-tool:declaration:1", entries.first().key)
+        assertEquals("work-tool:declaration:48", entries.last().key)
     }
 
     @Test fun toolOutcomeDoesNotMislabelCancellationOrUnknownAsSuccess() {
@@ -265,9 +299,9 @@ class LocalWorkReplyPresentationTest {
         val user = message("user", "user", "检查").copy(createdAt = 100L)
         val narration = message("progress", "progress", "正在检查文件").copy(createdAt = 140L)
         val tool = message("completed", "tool", "ok", "mcp__GitHub__fetch_file", false)
-            .copy(createdAt = 170L, toolCallId = "call-5", toolDeclaredAt = 120L)
+            .copy(createdAt = 170L, toolCallId = "call-5", toolDeclaredAt = 120L, toolDeclaredSequence = 3L)
         val items = buildLocalTranscript(listOf(user, narration, tool))
-        assertEquals(listOf("message:user", "work-tool:call-5", "work-step:progress"),
+        assertEquals(listOf("message:user", "work-tool:declaration:3", "work-step:progress"),
             items.map { it.key })
         val inFlight = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
             callId = "call-5", name = "mcp__GitHub__fetch_file",
@@ -291,7 +325,7 @@ class LocalWorkReplyPresentationTest {
             declaredAt = 120L, declaredSequence = 2L)
         val visible = appendPendingWorkToolActivities(listOf(user, media), listOf(pending), true)
         assertEquals(
-            listOf("message:u", "work-tool:read-2", "media-result:image-2"),
+            listOf("message:u", "work-tool:declaration:2", "media-result:image-2"),
             visible.map { it.key })
     }
 
@@ -309,7 +343,7 @@ class LocalWorkReplyPresentationTest {
         val combined = mergeLocalMediaTimeline(
             transcript, "session", listOf(media), emptyList())
         assertEquals(
-            listOf("message:u", "work-tool:read-1", "work-step:p", "media-result:image-1"),
+            listOf("message:u", "work-tool:message:t", "work-step:p", "media-result:image-1"),
             combined.map { it.key })
     }
 
@@ -322,7 +356,7 @@ class LocalWorkReplyPresentationTest {
             .copy(createdAt = 190L, toolCallId = "first", toolDeclaredAt = 120L, toolDeclaredSequence = 5L)
         val items = buildLocalTranscript(
             listOf(user, progress, completedLater, completedFirst))
-        assertEquals(listOf("message:u", "work-tool:first", "work-tool:second", "work-step:n"),
+        assertEquals(listOf("message:u", "work-tool:declaration:5", "work-tool:declaration:6", "work-step:n"),
             items.map { it.key })
     }
 

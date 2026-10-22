@@ -107,7 +107,7 @@ internal fun hasUnsettledWorkGoalTaskGraphs(
  * cursor. No duplicate persistence, no inferred success, and no replay of unknown mutations.
  * Each query still validates current file/dependency versions at the execution owner.
  */
-internal class LocalWorkOpenGraphProjection {
+internal class LocalWorkOpenGraphProjection(private val maxCachedFacts: Int = 4_096) {
     private val goalFacts = LocalWorkGoalFactsProjection()
 
     fun goalAssessment(log: LocalSessionEventLog, goal: LocalGoal): LocalWorkGoalFacts =
@@ -116,7 +116,13 @@ internal class LocalWorkOpenGraphProjection {
     private fun <T> query(log: LocalSessionEventLog, read: () -> T): T =
         log.withWriterLease {
             check(!log.isClosed) { "会话已关闭，无法读取任务执行事实。" }
-            synchronized(this) { read() }
+            synchronized(this) {
+                try { read() } finally {
+                    // Drop disposable acceleration only, never durable facts or unresolved effects.
+                    // The next query rebuilds from EventLog under the same owner lease.
+                    if (cachedFactCount() > maxCachedFacts) reset()
+                }
+            }
         }
 
     private var generation = -1L
@@ -156,6 +162,13 @@ internal class LocalWorkOpenGraphProjection {
         val from = if (found >= 0) found + 1 else -found - 1
         return subList(from, size)
     }
+
+    internal fun cachedFactCount(): Int = ledger.unresolved().size + accepted.values.sumOf { it.size } +
+        jobResultsBySequence.size + jobResultsById.size + admissions.values.sumOf { it.size } +
+        runsByAgent.values.sumOf { it.size } + startsByRun.values.sumOf { it.size } +
+        resultsByJob.values.sumOf { it.size } + historyCheckpoints.size +
+        callsByAgent.values.sumOf { it.size } + toolResults.size +
+        toolsByJob.values.sumOf { it.ledger.snapshot().size }
 
     private fun reset() {
         throughSequence = -1L

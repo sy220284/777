@@ -717,6 +717,7 @@ internal class LocalSubagentRunner(
                                     ),
                                 )
                                 put("model_content", durableToolResultContent(modelOutput, event.retention))
+                                com.labteto.dshmobile.local.model.retainedToolOutputReference(boundedContent)?.let { put("tool_output_ref", it) }
                                 put("tool_images", com.labteto.dshmobile.local.model.toolImageReferences(toolImages))
                                 put("is_error", deliveryIsError)
                                 deliveryErrorCode?.let { put("error_code", it) }

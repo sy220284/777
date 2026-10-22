@@ -11,17 +11,33 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class LocalToolOutputStoreTest {
+    @Test fun repeatedCallIdRetainsBothOriginalsInTheRealOutputStore() {
+        val store = LocalToolOutputStore(temporary.newFolder("reused-call"))
+        fun save(body: String): String {
+            val result = com.labteto.dshmobile.local.model.projectRecoverableToolResult(
+                body, com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE,
+                LocalUsageMode.WORK, callId = "same", spill = { id, text -> store.store("work", id, text) != null })
+            return com.labteto.dshmobile.local.model.retainedToolOutputReference(result.text)!!
+        }
+        val old = save("old full output")
+        val newer = save("new full output")
+        assertFalse(old == newer)
+        assertTrue(store.read("work", old).contains("old full output"))
+        assertTrue(store.read("work", newer).contains("new full output"))
+    }
+
     @Test
     fun acceptedMcpEnvelopeKeepsReadableMiddleAfterPreviewProjection() {
         val store = LocalToolOutputStore(temporary.newFolder("mcp-full"))
         val raw = "{\"content\":\"" + "a".repeat(300_000) + "MCP_MIDDLE_SENTINEL" + "z".repeat(300_000) + "\"}"
-        com.labteto.dshmobile.local.model.projectRecoverableToolResult(
+        val projection = com.labteto.dshmobile.local.model.projectRecoverableToolResult(
             value = raw, retention = com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE,
             usageMode = LocalUsageMode.WORK, callId = "mcp-call", requireStored = true,
             spill = { id, content -> store.store("original-session", id, content) != null },
         )
-        assertTrue(store.read("original-session", "mcp-call", startByte = 300_010).contains("MCP_MIDDLE_SENTINEL"))
-        assertFalse(store.read("other-session", "mcp-call").contains("MCP_MIDDLE_SENTINEL"))
+        val reference = com.labteto.dshmobile.local.model.retainedToolOutputReference(projection.text)!!
+        assertTrue(store.read("original-session", reference, startByte = 300_010).contains("MCP_MIDDLE_SENTINEL"))
+        assertFalse(store.read("other-session", reference).contains("MCP_MIDDLE_SENTINEL"))
     }
 
     @Test

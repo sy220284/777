@@ -112,7 +112,8 @@ internal fun structuredWorkState(
                     val errorCode = event.data.stringValue("error_code") ?: event.data.stringValue("code")
                     val isError = event.data.stringValue("is_error")
                     name?.let(tools::add)
-                    callId?.let(toolCallIds::add)
+                    (event.data.stringValue("tool_output_ref")
+                        ?.takeIf { it.matches(Regex("output-[a-f0-9]{64}")) } ?: callId)?.let(toolCallIds::add)
                     buildString {
                         append("工具结果")
                         name?.let { append(" tool=").append(it) }

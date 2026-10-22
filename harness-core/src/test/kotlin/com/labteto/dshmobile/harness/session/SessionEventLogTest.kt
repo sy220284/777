@@ -17,6 +17,43 @@ import org.junit.Test
 class SessionEventLogTest {
     private val json = Json { ignoreUnknownKeys = true }
 
+    @Test fun warmTailReadsDecodeOnlyTheNewEventsAndSurviveResetAndRotation() {
+        val root = Files.createTempDirectory("tail-offset").toFile()
+        try {
+            val log = SessionEventLog(File(root, "events.jsonl"), json, maxBytes = 1_048_576)
+            try {
+                repeat(1_000) { log.append("note", buildJsonObject { put("n", it) }) }
+                val cursor = log.latestSequence()
+                log.append("new", buildJsonObject { put("unicode", "中文🙂") })
+                val before = log.diagnostics().decodedRows
+                assertEquals(listOf(cursor + 1), log.snapshotAfter(cursor).map { it.sequence })
+                assertTrue(log.diagnostics().decodedRows - before <= 4)
+                assertEquals(listOf(cursor + 1), log.pageAfter(cursor, 1).map { it.sequence })
+                log.clear()
+                log.append("reset", buildJsonObject { put("n", 0) })
+                assertEquals(listOf(0L), log.snapshotAfter(-1).map { it.sequence })
+                repeat(3) { log.append("large", buildJsonObject { put("text", "x".repeat(600_000)) }) }
+                assertEquals((0L..3L).toList(), log.snapshotAfter(-1).map { it.sequence })
+            } finally { log.close() }
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun tailOffsetsAreSharedByAdaptersButDoNotSurviveARewrittenFile() {
+        val root = Files.createTempDirectory("tail-offset-rewrite").toFile()
+        val file = File(root, "events.jsonl")
+        try {
+            val first = SessionEventLog(file, json)
+            val second = SessionEventLog(file, json)
+            try {
+                repeat(5) { first.append("old", buildJsonObject { put("n", it) }) }
+                assertEquals(listOf(4L), second.pageAfter(3, 1).map { it.sequence })
+                first.clear()
+                repeat(5) { second.append("replacement", buildJsonObject { put("n", "changed-$it") }) }
+                assertEquals("replacement", first.pageAfter(3, 1).single().type)
+            } finally { first.close(); second.close() }
+        } finally { root.deleteRecursively() }
+    }
+
     @Test
     fun rotatesWithoutDiscardingRowsAndContinuesSequenceAfterRestart() {
         val directory = Files.createTempDirectory("harness-event-log").toFile()

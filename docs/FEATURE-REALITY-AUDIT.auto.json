@@ -1,7 +1,7 @@
 {
   "version": 1,
   "type": "independent_code_first_static_audit",
-  "source_snapshot": "98352e6fdb14",
+  "source_snapshot": "faae4175b55e",
   "tree": {
     "nodes_excluding_root": 543,
     "leaf_descriptions": 448,
@@ -12,7 +12,7 @@
     }
   },
   "code": {
-    "production_files": 1002,
+    "production_files": 1003,
     "module_count": 6,
     "module_names": [
       "SHELL",

@@ -50,6 +50,7 @@ data class SessionEventLogDiagnostics(
     val malformedRows: Long,
     val segmentReadFailures: Long,
     val archiveFailures: Long,
+    val decodedRows: Long = 0L,
 )
 
 /**
@@ -91,6 +92,7 @@ class SessionEventLog(
     private val malformedRows = AtomicLong()
     private val segmentReadFailures = AtomicLong()
     private val archiveFailures = AtomicLong()
+    private val decodedRows = AtomicLong()
     private val nextSequence = pathState.nextSequence
 
     init {
@@ -135,10 +137,14 @@ class SessionEventLog(
                 // not an unbounded scan of the archived session.
                 if (nextSequence.get() == UNINITIALIZED_SEQUENCE ||
                     pathState.headStamp != durableHeadStamp()) {
+                    pathState.tailOffsets.clear()
                     repairTornActiveTailUnsafe()
                 }
                 val committedNext = readActiveTailNextSequence()
-                if (nextSequence.get() != committedNext) nextSequence.set(committedNext)
+                if (nextSequence.get() != committedNext) {
+                    pathState.tailOffsets.clear()
+                    nextSequence.set(committedNext)
+                }
                 pathState.fileLeaseDepth = 1
                 try { block() }
                 finally {
@@ -158,7 +164,7 @@ class SessionEventLog(
         )
         check(attributes.isRegularFile) { "会话事件日志不是普通文件" }
         return DurableHeadStamp(
-            attributes.fileKey()?.toString(), attributes.size(), attributes.lastModifiedTime().toMillis(),
+            attributes.fileKey()?.toString(), attributes.size(), attributes.lastModifiedTime(),
         )
     }
 
@@ -177,6 +183,7 @@ class SessionEventLog(
         malformedRows = malformedRows.get(),
         segmentReadFailures = segmentReadFailures.get(),
         archiveFailures = archiveFailures.get(),
+        decodedRows = decodedRows.get(),
     )
 
     fun append(type: String, data: JsonObject): SessionEvent = synchronized(lock) {
@@ -198,6 +205,7 @@ class SessionEventLog(
         }
         try {
             val createsActiveFile = !file.exists()
+            val startsAt = file.length()
             FileOutputStream(file, true).use { output ->
                 output.write(encoded.toByteArray(Charsets.UTF_8))
                 // Publish the append only after the authoritative event reaches storage.
@@ -205,6 +213,9 @@ class SessionEventLog(
             }
             // The new filename itself also needs to survive a sudden power loss.
             if (createsActiveFile) syncDirectoryUnsafe(requireNotNull(file.parentFile))
+            // Only offsets established by a successful durable append are reusable.
+            pathState.tailOffsets[event.sequence - 1L] = startsAt
+            while (pathState.tailOffsets.size > MAX_TAIL_OFFSETS) pathState.tailOffsets.pollFirstEntry()
         } catch (error: Exception) {
             runCatching { repairTornActiveTailUnsafe() }
             throw error
@@ -229,8 +240,8 @@ class SessionEventLog(
      * source of truth while snapshots remain disposable acceleration checkpoints.
      */
     fun snapshotAfter(sequenceExclusive: Long): List<SessionEvent> = synchronized(lock) {
-        buildList {
-            forEachAfterUnsafe(sequenceExclusive, ::add)
+        withProcessWriterLease {
+            buildList { forEachAfterUnsafe(sequenceExclusive, ::add) }
         }
     }
 
@@ -292,7 +303,7 @@ class SessionEventLog(
         }
         for (source in relevant) {
             try {
-                source.eventReader().use { reader ->
+                source.eventReaderAfter(sequenceExclusive).use { reader ->
                     while (result.size < wanted) {
                         val line = reader.readLine() ?: break
                         val event = decodeEventOrNull(line) ?: continue
@@ -320,7 +331,7 @@ class SessionEventLog(
         sequenceExclusive: Long,
         visitor: (SessionEvent) -> Unit,
     ) = synchronized(lock) {
-        forEachAfterUnsafe(sequenceExclusive, visitor)
+        withProcessWriterLease { forEachAfterUnsafe(sequenceExclusive, visitor) }
     }
 
     fun search(
@@ -556,6 +567,7 @@ class SessionEventLog(
             file.parentFile?.mkdirs()
             file.writeText("")
             nextSequence.set(0L)
+            pathState.tailOffsets.clear()
             CompressedEventSegmentCache.invalidate(pathKey)
             }
         }
@@ -924,15 +936,21 @@ class SessionEventLog(
         }
 
         relevant.forEach { source ->
-            source.forEachEventLine { line ->
-                val event = decodeEventOrNull(line) ?: return@forEachEventLine
-                if (event.sequence > sequenceExclusive) visitor(event)
-            }
+            try {
+                source.eventReaderAfter(sequenceExclusive).useLines { lines ->
+                    lines.forEach { line ->
+                        val event = decodeEventOrNull(line)
+                        if (event != null && event.sequence > sequenceExclusive) visitor(event)
+                    }
+                }
+            } catch (future: UnsupportedSessionEventSchemaVersion) { throw future }
+            catch (error: Exception) { reportSegmentReadFailure(source, error) }
         }
     }
 
-    private fun decodeEventOrNull(line: String): SessionEvent? =
-        try {
+    private fun decodeEventOrNull(line: String): SessionEvent? {
+        decodedRows.incrementAndGet()
+        return try {
             SessionEventSchemaCodec.decode(json, line)
         } catch (future: UnsupportedSessionEventSchemaVersion) {
             // A newer writer could have committed commands this reader cannot
@@ -943,6 +961,7 @@ class SessionEventLog(
             reportDiagnostic("malformed-row", error)
             null
         }
+    }
 
     private fun reportSegmentReadFailure(source: File, error: Throwable) {
         segmentReadFailures.incrementAndGet()
@@ -987,6 +1006,7 @@ class SessionEventLog(
 
     private fun rotateActiveSegment() {
         if (!file.isFile || file.length() == 0L) return
+        pathState.tailOffsets.clear()
         val parent = file.parentFile ?: error("事件日志缺少父目录")
         parent.mkdirs()
         val prefix = "${file.name}.part-"
@@ -1054,6 +1074,31 @@ class SessionEventLog(
      */
     private fun syncDirectoryUnsafe(parent: File) = directoryMetadataSync(parent)
 
+    /** A bounded, process-local acceleration. Archives still use the original streaming reader. */
+    private fun File.eventReaderAfter(sequence: Long): java.io.BufferedReader {
+        if (this != file || name.endsWith(COMPRESSED_SUFFIX)) return eventReader()
+        val anchor = pathState.tailOffsets.floorEntry(sequence) ?: return eventReader()
+        val offset = anchor.value
+        // Defend against replacement/truncation even when filesystem timestamps collide.
+        val valid = offset in 0L until length() && RandomAccessFile(this, "r").use { active ->
+            if (offset > 0L) {
+                active.seek(offset - 1L)
+                if (active.read() != '\n'.code) return@use false
+            }
+            active.seek(offset)
+            val raw = active.readLine() ?: return@use false
+            val line = String(raw.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8)
+            try { SessionEventSchemaCodec.decode(json, line).sequence == anchor.key + 1L }
+            catch (future: UnsupportedSessionEventSchemaVersion) { throw future }
+            catch (_: Exception) { false }
+        }
+        if (!valid) {
+            pathState.tailOffsets.clear()
+            return eventReader()
+        }
+        return inputStream().also { it.channel.position(offset) }.bufferedReader()
+    }
+
     private fun File.eventReader() =
         if (name.endsWith(COMPRESSED_SUFFIX)) GZIPInputStream(inputStream().buffered()).bufferedReader()
         else bufferedReader()
@@ -1069,7 +1114,7 @@ class SessionEventLog(
     }
 
     private data class DurableHeadStamp(
-        val fileKey: String?, val bytes: Long, val lastModifiedMillis: Long,
+        val fileKey: String?, val bytes: Long, val lastModified: java.nio.file.attribute.FileTime,
     )
 
     private class SharedPathState {
@@ -1077,10 +1122,12 @@ class SessionEventLog(
         val nextSequence = AtomicLong(UNINITIALIZED_SEQUENCE)
         var headStamp: DurableHeadStamp? = null
         var fileLeaseDepth: Int = 0
+        val tailOffsets = java.util.TreeMap<Long, Long>()
         var references: Int = 0
     }
 
     private companion object {
+        const val MAX_TAIL_OFFSETS = 256
         const val UNINITIALIZED_SEQUENCE = Long.MIN_VALUE
         val PATH_STATES = ConcurrentHashMap<String, SharedPathState>()
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L
