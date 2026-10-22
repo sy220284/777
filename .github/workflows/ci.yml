@@ -483,6 +483,40 @@ jobs:
           if-no-files-found: warn
           retention-days: 2
 
+  android-page-size-four-way:
+    # Experimental full factorial: same host/APK, four emulator OS/page-size cases.
+    # Keep the existing 16/4KB and 17/16KB merge gates intact.
+    needs: [scope, static-gates, architecture-3-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android16 == 'true' && needs.scope.outputs.run_android17 == 'true' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/setup-android-cached
+        with:
+          packages: 'platform-tools emulator'
+      - name: Four-way Android 16/17 4KB/16KB device and ten-round comparison
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          bash -n .github/scripts/run-android-page-matrix.sh
+          python3 -m py_compile .github/scripts/compare-android-page-matrix.py
+          bash .github/scripts/run-android-page-matrix.sh
+      - name: Upload page size matrix logs and original measurements
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android16-17-page-size-four-way
+          path: |
+            .ci/android-page-matrix/
+            .ci/android16-4k-ten-rounds/
+            .ci/android16-16k-ten-rounds/
+            .ci/android17-4k-ten-rounds/
+            .ci/android17-16k-ten-rounds/
+          if-no-files-found: error
+          retention-days: 7
+
   merge-gate:
     if: always()
     needs:
