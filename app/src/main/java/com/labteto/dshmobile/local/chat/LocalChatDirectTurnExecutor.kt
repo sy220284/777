@@ -578,27 +578,11 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             sessionStorage.enqueueCurrentSnapshot(sessionId)
             throw cancelled
         } catch (error: Exception) {
-            if (replacingMessageId != null) {
-                val oldNode = runtimeStateStore.state.value.chat.chatBranches.nodes
-                    .firstOrNull { it.message.id == replacingMessageId }
-                oldNode?.chatStateAfter?.let { restoredState ->
-                    chatState.update { current ->
-                        if (current.sessionId != sessionId) current else current.copy(
-                            chat = current.chat.copy(
-                                chatState = restoredState,
-                                chatContext = restoreBranchContext(
-                                    snapshot = oldNode.chatContextAfter,
-                                    legacyState = oldNode.chatStateAfter,
-                                    previousGeneration = current.chat.chatContext.generation,
-                                    experienceContext = current.chat.chatContext,
-                                ).boundDurablePending(eventLog),
-                                replySuggestions = oldNode.replySuggestionsAfter,
-                            ),
-                        )
-                    }
-                }
+            val detail = if (regenerationCommitted) {
+                "新回复已经保存，但运行态同步失败；请重新打开会话恢复：${error.message ?: "未知错误"}"
+            } else {
+                error.message ?: "聊天请求失败"
             }
-            val detail = error.message ?: "聊天请求失败"
             chatState.update { current ->
                 if (current.sessionId != sessionId) current else current.copy(error = detail)
             }
