@@ -343,7 +343,7 @@ jobs:
     needs: [scope, static-gates, architecture-3-gates]
     if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android16 == 'true' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 65
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-android-cached
@@ -373,6 +373,8 @@ jobs:
             adb install -r .ci/device-apks/app-debug.apk
             adb install -r .ci/device-apks/app-debug-androidTest.apk
             bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
+            # Same ten scenarios as Android 17, same x86_64 test APK, no production-code fork.
+            bash .github/scripts/run-android17-ten-rounds.sh 36
             # The emulator runner executes script lines in individual shells; an EXIT
             # trap on its own line fires before instrumentation writes screenshots.
 
@@ -381,6 +383,15 @@ jobs:
             adb shell am force-stop com.sy220284.dshmobile.debug || true
             adb install -r .ci/device-apks/app-optimized.apk
             bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
+
+      - name: Upload Android 16 ten-round performance data
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android16-ten-rounds
+          path: .ci/android16-ten-rounds/
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload Work timeline screenshots
         if: always()
@@ -447,7 +458,7 @@ jobs:
           adb install -r .ci/device-apks/app-debug-androidTest.apk
           bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
           # Ten repeatable performance rounds on the SAME Android 17 emulator/CI host.
-          bash .github/scripts/run-android17-ten-rounds.sh
+          bash .github/scripts/run-android17-ten-rounds.sh 37
           adb shell am force-stop com.sy220284.dshmobile.debug || true
           bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
           adb shell am force-stop com.sy220284.dshmobile.debug || true
