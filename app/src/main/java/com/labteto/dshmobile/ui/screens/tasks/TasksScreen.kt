@@ -276,6 +276,7 @@ private fun WorkTasksScreen(
                             state = editorState,
                             viewModel = viewModel,
                             createInvalidMessage = createInvalidMessage,
+                            saving = state.savingEditor,
                             onReset = ::resetEditor,
                         )
                         visibleTasks.isEmpty() -> TaskEmptyState(

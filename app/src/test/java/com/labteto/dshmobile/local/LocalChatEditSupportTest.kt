@@ -6,6 +6,12 @@ import com.labteto.dshmobile.local.chat.buildDurableChatModelHistory
 import com.labteto.dshmobile.local.chat.persistActiveChatTranscript
 import com.labteto.dshmobile.local.chat.persistRewrittenChatTranscript
 import com.labteto.dshmobile.local.chat.withEditedChatUserBlocks
+import com.labteto.dshmobile.local.chat.LocalChatBranchNode
+import com.labteto.dshmobile.local.chat.LocalChatBranchState
+import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.chatRegenerationSourceMessages
+import com.labteto.dshmobile.local.chat.syncChatBranchState
+import com.labteto.dshmobile.local.chat.upsertChatBranchNode
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
@@ -25,6 +31,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalChatEditSupportTest {
@@ -110,6 +118,64 @@ class LocalChatEditSupportTest {
             assertEquals("assistant-structured", history[1]["marker"]?.jsonPrimitive?.content)
             val content = history[1]["content"]!!.jsonArray
             assertEquals("local_image_ref", content[1].jsonObject["type"]?.jsonPrimitive?.content)
+        }
+    }
+
+    @Test
+    fun regenerationRebuildsModelHistoryWithoutSupersededRepliesOrOldSummary() {
+        withLog { log ->
+            val initialUser = LocalHarnessMessage(id = "u0", role = "user", content = "先前提问", createdAt = 1L)
+            val initialAnswer = LocalHarnessMessage(id = "a0", role = "assistant", content = "先前有效回答", createdAt = 2L)
+            val currentUser = LocalHarnessMessage(id = "u1", role = "user", content = "重新回答这个问题", createdAt = 3L)
+            val obsoleteAnswer = LocalHarnessMessage(id = "a1", role = "assistant", content = "第一版应被隔离", createdAt = 4L)
+            val oldAlternative = LocalHarnessMessage(id = "a2", role = "assistant", content = "第二版应被隔离", createdAt = 5L)
+            log.append("user/message", buildJsonObject {
+                put("role", "user")
+                put("content", "先前提问")
+                put("transcript", encodeTranscriptMessages(listOf(initialUser)))
+            })
+            log.append("assistant/message", buildJsonObject {
+                put("role", "assistant")
+                put("content", "先前有效回答")
+                put("transcript", encodeTranscriptMessages(listOf(initialAnswer)))
+            })
+            log.append("user/message", buildJsonObject {
+                put("role", "user")
+                put("content", "重新回答这个问题")
+                put("transcript", encodeTranscriptMessages(listOf(currentUser)))
+            })
+            log.append("assistant/message", buildJsonObject {
+                put("role", "assistant")
+                put("content", "第一版应被隔离")
+                put("transcript", encodeTranscriptMessages(listOf(obsoleteAnswer)))
+            })
+            log.append("session/compaction", buildJsonObject {
+                put("summary", "之前错误摘要中的第一版应被隔离")
+            })
+            log.append("assistant/message", buildJsonObject {
+                put("role", "assistant")
+                put("content", "第二版应被隔离")
+                put("replaces", "a1")
+                put("transcript", encodeTranscriptMessages(listOf(oldAlternative)))
+            })
+            val oldBranch = syncChatBranchState(
+                LocalChatBranchState(),
+                listOf(initialUser, initialAnswer, currentUser, obsoleteAnswer),
+                ChatCharacterState(), emptyList(),
+            )
+            val selected = upsertChatBranchNode(
+                oldBranch, LocalChatBranchNode(oldAlternative, parentId = currentUser.id),
+                select = true,
+            )
+            val source = chatRegenerationSourceMessages(selected, "a2")
+            val rebuilt = buildDurableChatModelHistory(log, source, "system")
+            val contents = rebuilt.map { it["content"]?.jsonPrimitive?.content }
+            assertEquals(listOf("system", "先前提问", "先前有效回答", "重新回答这个问题"), contents)
+            val serialized = rebuilt.toString()
+            assertFalse(serialized.contains("第一版应被隔离"))
+            assertFalse(serialized.contains("第二版应被隔离"))
+            assertFalse(serialized.contains("之前错误摘要"))
+            assertTrue(source.none { it.id == "a1" || it.id == "a2" })
         }
     }
 

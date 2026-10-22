@@ -6,6 +6,8 @@ import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
+import com.labteto.dshmobile.automation.validAutomationCommandSchedule
+import com.labteto.dshmobile.automation.newAutomationTaskId
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.automation.AutomationPlanDraft
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
@@ -34,6 +36,7 @@ data class TasksUiState(
     val busyIds: Set<String> = emptySet(),
     val loading: Boolean = false,
     val managementFailed: Boolean = false,
+    val savingEditor: Boolean = false,
 )
 @HiltViewModel
 class TasksViewModel @Inject constructor(
@@ -143,6 +146,52 @@ class TasksViewModel @Inject constructor(
             proactiveMaxUnanswered = existing.proactiveMaxUnanswered,
         )
     }
+    /** The manual editor owns no disk work: the existing scheduler remains the sole commit owner. */
+    fun saveManualWorkTask(
+        editingId: String?,
+        prompt: String,
+        firstRunAt: Long,
+        recurringMinutes: Long?,
+        scheduleType: AutomationScheduleType,
+        notify: Boolean,
+        onComplete: (Boolean) -> Unit,
+    ) {
+        if (_state.value.savingEditor) return
+        val expectedGeneration = editingId?.let { id ->
+            _state.value.tasks.firstOrNull { it.id == id && it.mode == AutomationMode.WORK }?.scheduleGeneration
+        }
+        _state.update { it.copy(savingEditor = true) }
+        viewModelScope.launch {
+            try {
+                val result = runTaskManagementOperation(
+                    operation = {
+                        if (editingId == null) {
+                            createAt(prompt, firstRunAt, recurringMinutes, AutomationMode.WORK,
+                                scheduleType, notify = notify)
+                        } else if (expectedGeneration == null || !validAutomationCommandSchedule(
+                                AutomationMode.WORK, scheduleType, firstRunAt,
+                                recurringMinutes, System.currentTimeMillis())) {
+                            false
+                        } else {
+                            scheduler.updateTask(
+                                id = editingId, prompt = prompt, firstRunAtMillis = firstRunAt,
+                                recurringMinutes = recurringMinutes, scheduleType = scheduleType,
+                                quietHoursEnabled = false, notify = notify,
+                                expectedGeneration = expectedGeneration,
+                            )
+                        }
+                    },
+                    readTasks = scheduler::list,
+                )
+                _state.update { it.copy(tasks = observedTasks?.value ?: result.tasks ?: it.tasks,
+                    managementFailed = result.failed) }
+                onComplete(result.accepted && !result.failed)
+            } finally {
+                _state.update { it.copy(savingEditor = false) }
+            }
+        }
+    }
+
     fun updateTask(
         id: String,
         prompt: String,
@@ -161,6 +210,10 @@ class TasksViewModel @Inject constructor(
         proactiveMaxUnanswered: Int,
         notify: Boolean? = null,
     ): Boolean = runCatching {
+        require(validAutomationCommandSchedule(
+            AutomationMode.CHAT, scheduleType, firstRunAt, recurringMinutes,
+            System.currentTimeMillis(), silenceMinutes, windowStartMinuteOfDay, windowEndMinuteOfDay,
+        )) { "任务排程参数无效" }
         scheduler.updateTask(
             id, prompt, firstRunAt, recurringMinutes, scheduleType, silenceMinutes,
             windowStartMinuteOfDay, windowEndMinuteOfDay, quietHoursEnabled,
@@ -188,7 +241,10 @@ class TasksViewModel @Inject constructor(
         notify: Boolean = true,
     ): Boolean {
         val now = System.currentTimeMillis()
-        if (prompt.isBlank()) return false
+        if (prompt.isBlank() || !validAutomationCommandSchedule(
+            mode, scheduleType, firstRunAt, recurringMinutes, now,
+            silenceMinutes, windowStartMinuteOfDay, windowEndMinuteOfDay,
+        )) return false
         if (scheduleType !in setOf(AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW) &&
             firstRunAt <= now
         ) return false
@@ -206,7 +262,7 @@ class TasksViewModel @Inject constructor(
         val snapshot = localRuntime.snapshot()
         if (mode == AutomationMode.CHAT && !canPlanChat(snapshot)) return false
         return runCatching {
-            val id = "ui-" + System.currentTimeMillis()
+            val id = newAutomationTaskId()
             val targetSessionId = snapshot.sessionId.takeIf { mode == AutomationMode.CHAT }
             val actorName = snapshot.chatPersona.name.takeIf {
                 mode == AutomationMode.CHAT && it.isNotBlank()
@@ -234,13 +290,50 @@ class TasksViewModel @Inject constructor(
                     targetSessionId, actorName, quietHoursEnabled, quietStartHour,
                     quietStartMinute, quietEndHour, quietEndMinute, proactiveMinGapMinutes,
                     proactiveMaxUnanswered,
-                    if (mode == AutomationMode.CHAT) scheduleType else AutomationScheduleType.LEGACY,
+                    scheduleType,
                 )
             }
-            refresh()
         }.onFailure { AppLog.failure("TaskScheduling", "create_scheduled_task", it) }
             .isSuccess
     }
+    /** A rejected policy update must not close the editor or overwrite a newer generation. */
+    fun saveChatPolicyAsync(
+        task: AutomationTask,
+        quietHoursEnabled: Boolean,
+        quietStartHour: Int,
+        quietStartMinute: Int,
+        quietEndHour: Int,
+        quietEndMinute: Int,
+        proactiveMinGapMinutes: Long,
+        proactiveMaxUnanswered: Int,
+        notify: Boolean,
+        onComplete: (Boolean) -> Unit,
+    ) {
+        if (task.id in _state.value.busyIds) return
+        _state.update { it.copy(busyIds = it.busyIds + task.id) }
+        viewModelScope.launch {
+            try {
+                val result = runTaskManagementOperation(
+                    operation = {
+                        scheduler.updateChatInteractionPolicy(
+                            id = task.id, quietHoursEnabled = quietHoursEnabled,
+                            quietStartHour = quietStartHour, quietStartMinute = quietStartMinute,
+                            quietEndHour = quietEndHour, quietEndMinute = quietEndMinute,
+                            proactiveMinGapMinutes = proactiveMinGapMinutes,
+                            proactiveMaxUnanswered = proactiveMaxUnanswered, notify = notify,
+                            expectedGeneration = task.scheduleGeneration,
+                        )
+                    }, readTasks = scheduler::list,
+                )
+                _state.update { it.copy(tasks = observedTasks?.value ?: result.tasks ?: it.tasks,
+                    managementFailed = result.failed) }
+                onComplete(result.accepted && !result.failed)
+            } finally {
+                _state.update { it.copy(busyIds = it.busyIds - task.id) }
+            }
+        }
+    }
+
     fun updateChatPolicy(
         task: AutomationTask,
         quietHoursEnabled: Boolean,

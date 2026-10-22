@@ -5,6 +5,8 @@ import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.AutomationUiDefaults
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
+import com.labteto.dshmobile.automation.validAutomationCommandSchedule
+import com.labteto.dshmobile.automation.newAutomationTaskId
 import com.labteto.dshmobile.local.automation.AutomationPlanningService
 import com.labteto.dshmobile.local.presentation.LocalAutomationPolicyProjection
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -54,6 +56,13 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
         synchronized(state.foregroundRunHandle.lock) {
             val applied = when (command) {
                 is AutomationUiCommand.Create -> {
+                    if (!validAutomationCommandSchedule(
+                            command.schedule.mode, command.schedule.scheduleType,
+                            command.schedule.firstRunAt, command.schedule.recurringMinutes,
+                            System.currentTimeMillis(), command.schedule.silenceMinutes,
+                            command.schedule.windowStartMinuteOfDay,
+                            command.schedule.windowEndMinuteOfDay,
+                        )) return AutomationUiReceipt.Rejected(UiAutomationRejection.INVALID_INPUT)
                     if (command.schedule.mode == AutomationMode.CHAT &&
                         (state.sessionTransitioning || state.uiBindingIdentity(state.state.value) != command.identity ||
                             !context(state.state.value).canPlanChat)) {
@@ -62,6 +71,13 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
                     create(command.schedule)
                 }
                 is AutomationUiCommand.Update -> {
+                    if (!validAutomationCommandSchedule(
+                            command.schedule.mode, command.schedule.scheduleType,
+                            command.schedule.firstRunAt, command.schedule.recurringMinutes,
+                            System.currentTimeMillis(), command.schedule.silenceMinutes,
+                            command.schedule.windowStartMinuteOfDay,
+                            command.schedule.windowEndMinuteOfDay,
+                        )) return AutomationUiReceipt.Rejected(UiAutomationRejection.INVALID_INPUT)
                     val task = scheduler.list().firstOrNull { it.id == command.id }
                         ?: return AutomationUiReceipt.Rejected(UiAutomationRejection.MISSING)
                     if (task.scheduleGeneration != command.expectedGeneration || task.mode != command.schedule.mode)
@@ -192,7 +208,7 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
         val snapshot = state.state.value
         if (mode == AutomationMode.CHAT && !canPlanChat(snapshot)) return false
         return runCatching {
-            val id = "ui-" + java.util.UUID.randomUUID().toString()
+            val id = newAutomationTaskId()
             val targetSessionId = snapshot.sessionId.takeIf { mode == AutomationMode.CHAT }
             val actorName = snapshot.chat.chatPersona.name.takeIf {
                 mode == AutomationMode.CHAT && it.isNotBlank()
@@ -220,7 +236,7 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
                     targetSessionId, actorName, quietHoursEnabled, quietStartHour,
                     quietStartMinute, quietEndHour, quietEndMinute, proactiveMinGapMinutes,
                     proactiveMaxUnanswered,
-                    if (mode == AutomationMode.CHAT) scheduleType else AutomationScheduleType.LEGACY,
+                    scheduleType,
                 )
             }
             Unit
