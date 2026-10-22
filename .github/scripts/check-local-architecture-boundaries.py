@@ -1001,6 +1001,28 @@ if "ThemeBootstrapPreferences.store(context" not in read(
 ):
     die("DataStore->bootstrap theme mirror ordering was removed")
 
+# Usage must never reintroduce a second mutable lifetime ledger.
+usage_tracker = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/model/DeepSeekBilling.kt"
+))
+usage_tracker_part = usage_tracker.split("class DeepSeekUsageTracker ", 1)[-1].split(
+    "internal fun parseDeepSeekPricingPage", 1,
+)[0]
+if "persist(next)" in usage_tracker_part or "preferences.edit()" in usage_tracker_part:
+    die("DeepSeekUsageTracker must not write a second SharedPreferences usage ledger")
+if "adoptLegacyUsageOnce" not in usage_analytics:
+    die("SQLite Usage legacy baseline migration path was removed")
+if "legacy_usage_bridge_v1" not in read(
+    "app/src/main/java/com/labteto/dshmobile/local/usage/TokenUsageDatabase.kt"
+):
+    die("SQLite usage legacy offset metadata was removed")
+for relative in (
+    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUsageUiFacade.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsDataFacade.kt",
+):
+    if "DeepSeekUsageTracker" in strip_comments(read(relative)):
+        die(relative + " must consume Shared Usage ledger, not provider tracker")
+
 # ---- R4 genuine isolated MCP process + standalone V6 boot --------------------
 # These are production wiring invariants, not claims that device tests passed.
 worker_manifest = read("app/src/main/AndroidManifest.xml")
