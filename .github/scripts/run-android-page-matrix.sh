@@ -5,6 +5,12 @@ set -euo pipefail
 # Never infer the page size from an image label: verify with getconf PAGESIZE.
 root=".ci/android-page-matrix"
 mkdir -p "$root"
+# avdmanager and emulator must resolve the SAME Android user/AVD directory.
+# Mixed sdkmanager and CLI versions previously created AVDs that the emulator
+# could not discover, producing four 'Unknown AVD name' boot timeouts.
+export ANDROID_USER_HOME="$PWD/$root/android-user"
+export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+mkdir -p "$ANDROID_AVD_HOME"
 # setup-android-cached pins command-line tools 22.0, not cmdline-tools/latest.
 sdk="$(command -v sdkmanager)"
 avdm="$(command -v avdmanager)"
@@ -30,6 +36,15 @@ if [[ "${1:-}" == "--cell" ]]; then
   echo "CELL_START android=$release api=$api page_kb=$page_kb image=$package"
   "$sdk" --channel=3 --install "$package"
   printf 'no\n' | "$avdm" create avd --force -n "$avd" -d pixel_6 --package "$package"
+  echo "AVD_HOME=$ANDROID_AVD_HOME"
+  echo "Registered AVDs:"
+  "$avdm" list avd
+  "$emu" -list-avds
+  if ! "$emu" -list-avds | grep -Fxq "$avd"; then
+    echo "CELL_ERROR Created AVD is invisible to emulator: $avd" >&2
+    ls -la "$ANDROID_AVD_HOME" || true
+    exit 1
+  fi
   "$emu" -avd "$avd" -no-window -gpu swiftshader_indirect \
     -no-snapshot -noaudio -no-boot-anim -memory 3072 -cores 4 \
     > "$root/emulator-$release-$page_kb-k.log" 2>&1 &
