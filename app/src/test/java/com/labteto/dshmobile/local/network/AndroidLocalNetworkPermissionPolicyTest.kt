@@ -24,6 +24,8 @@ class AndroidLocalNetworkPermissionPolicyTest {
             "http://printer.local:80",
             "http://nas.home.arpa",
             "http://router.lan",
+            "http://printer.local.",
+            "http://nas.home.arpa.",
             "http://nas",
             "http://[fd00::1234]:9000",
             "http://[fe80::1]:9000",
@@ -31,6 +33,7 @@ class AndroidLocalNetworkPermissionPolicyTest {
             "http://[ff02::fb]:5353",
             "http://[::ffff:192.168.1.5]:8080",
             "http://[::ffff:10.2.3.4]:8080",
+            "http://[0:0:0:0:0:ffff:192.168.1.5]:8080",
         ).forEach { endpoint ->
             assertTrue(endpoint, isLikelyLocalNetworkEndpoint(endpoint))
         }
@@ -46,6 +49,8 @@ class AndroidLocalNetworkPermissionPolicyTest {
             "http://[::1]:33200",
             "http://[::ffff:127.0.0.1]:8888",
             "http://[::ffff:8.8.8.8]:8888",
+            "http://[0:0:0:0:0:ffff:8.8.8.8]:8888",
+            "http://localhost.",
             "https://[2001:4860:4860::8888]/dns-query",
             "https://[2606:4700:4700::1111]",
             "https://[2001:db8::1]",
