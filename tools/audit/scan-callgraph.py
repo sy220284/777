@@ -54,9 +54,14 @@ for path in paths:
             re.findall(r"\bfun\s+(?:<[^>\n]+>\s*)?(?:[\w?.<>]+\.)?([A-Za-z_]\w*)\s*\(", content) +
             re.findall(r"\b(?:enum|annotation|data|sealed|value)\s+class\s+([A-Za-z_]\w*)", content)
         ))
+        # 仅登记零缩进 Kotlin 顶层属性/扩展属性，避免把局部变量误认作外部符号。
+        row["properties"] = sorted(set(re.findall(
+            r"(?m)^(?:(?:internal|private|public|protected|lateinit|const)\\s+)*(?:val|var)\\s+(?:[\\w?.<>]+\\.)?([A-Za-z_]\\w*)\\b",
+            content,
+        )))
         row["call_tokens"] = collections.Counter(re.findall(r"\b([A-Za-z_]\w*)\s*\(", content))
         by_pkg[row["package"]].add(path)
-        for name in row["declarations"]:
+        for name in row["declarations"] + row["properties"]:
             by_symbol[row["package"] + "." + name].add(path)
         # Kotlin/Java 文件名对应的常规顶层类型（含 Java 类和跨文件构造），作为补充候选。
         by_symbol[row["package"] + "." + pathlib.Path(path).stem].add(path)
