@@ -401,11 +401,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 )
             }
             // Do not supersede a complete reply with an incomplete regenerated candidate.
-            if (replacingMessageId != null) {
-                check(durableReply.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) {
-                    "重新生成未完成，原回复和会话状态保持不变：${durableReply.rawStopReason ?: durableReply.completionReason.name}"
-                }
-            }
+            requireCompleteChatRegeneration(replacingMessageId, durableReply)
 
             val assistantEvent = if (replacingMessageId == null) {
                 eventLog.append("assistant/message", assistantData)
