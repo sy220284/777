@@ -18,11 +18,20 @@ class Android17LocalNetworkCompatibilityTest {
         // The runtime request alone cannot work after targetSdk moves to 37.
         // Keep targetSdk 36 free of this permission, per Android guidance;
         // on 37+, require the matching manifest declaration.
-        val declaresLanPermission = context.packageManager.getPackageInfo(
+        val packageInfo = context.packageManager.getPackageInfo(
             context.packageName, PackageManager.GET_PERMISSIONS
-        ).requestedPermissions?.contains("android.permission.ACCESS_LOCAL_NETWORK") == true
-        assertEquals("ACCESS_LOCAL_NETWORK manifest declaration must match targetSdk",
-            target >= 37, declaresLanPermission)
+        )
+        val requested = packageInfo.requestedPermissions.orEmpty()
+        val index = requested.indexOf("android.permission.ACCESS_LOCAL_NETWORK")
+        // Android 17 may auto-add this as a split/implicit permission for targetSdk 36.
+        // Only an explicitly declared uses-permission meets the targetSdk 37 contract.
+        val explicitlyDeclared = index >= 0 && (
+            packageInfo.requestedPermissionsFlags?.getOrNull(index)?.and(
+                android.content.pm.PackageInfo.REQUESTED_PERMISSION_IMPLICIT
+            ) ?: 0
+        ) == 0
+        assertEquals("ACCESS_LOCAL_NETWORK must be explicitly declared only from targetSdk 37",
+            target >= 37, explicitlyDeclared)
         assertEquals(
             api >= 37 && target >= 37,
             requiresAndroid17LocalNetworkPermission(api, target, "http://192.168.1.5:8080/mcp"),
