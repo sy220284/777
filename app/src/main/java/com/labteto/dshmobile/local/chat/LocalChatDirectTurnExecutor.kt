@@ -29,6 +29,7 @@ import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
 import com.labteto.dshmobile.local.session.chatReasoningTranscriptId
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -424,8 +425,18 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     ),
                     select = true,
                 )
-                val activeTranscript = activeChatBranchMessages(branches).dropLast(1) +
-                    listOfNotNull(reasoningTranscript, assistantTranscript)
+                val visibleThinking = LocalSessionTranscriptPager(eventLog).all()
+                    .filter { it.role == "reasoning" }
+                    .associateBy { it.id }
+                val activePrefix = activeChatBranchMessages(branches).dropLast(1)
+                val activeTranscript = activePrefix.flatMap { previous ->
+                    listOfNotNull(
+                        if (previous.role == "assistant") {
+                            visibleThinking[chatReasoningTranscriptId(previous.id)]
+                        } else null,
+                        previous,
+                    )
+                } + listOfNotNull(reasoningTranscript, assistantTranscript)
                 val modelAfter = requireNotNull(regenerationHistory) + durableReply.message
                 val committed = appendChatProjectionCommit(
                     eventLog = eventLog,
