@@ -74,7 +74,7 @@ class TokenUsageAnalyticsStore @Inject constructor(
      * Freeze the historical pre-SQLite gap once in database metadata, never repeatedly merge
      * old SharedPreferences counters with new requests. Safe to retry after process death.
      */
-    fun adoptLegacyUsageOnce(legacy: LegacyUsageCounters): LegacyUsageCounters = synchronized(lock) {
+    internal fun adoptLegacyUsageOnce(legacy: LegacyUsageCounters): LegacyUsageCounters = synchronized(lock) {
         ensureLoaded()
         val result = database.adoptLegacyUsageOnce(legacy)
         val projected = database.lifetimeTotals()
@@ -85,7 +85,7 @@ class TokenUsageAnalyticsStore @Inject constructor(
         result
     }
 
-    fun legacyUsageProjection(): LegacyUsageCounters = synchronized(lock) {
+    internal fun legacyUsageProjection(): LegacyUsageCounters = synchronized(lock) {
         ensureLoaded()
         database.legacyUsageProjection()
     }
