@@ -25,10 +25,14 @@ internal fun isLikelyLocalNetworkEndpoint(endpoint: String): Boolean {
         host.endsWith(".home.arpa") || '.' !in host && ':' !in host) return true
 
     if (':' in host) {
-        // Include unique-local, link-local and multicast literal IPv6 addresses.
-        // Public literal IPv6 is also conservatively offered the permission path;
-        // this classifier is only used before an explicitly requested connection.
-        return true
+        // Only classify IPv6 unique-local (fc00::/7), link-local (fe80::/10),
+        // site-local (deprecated fec0::/10) and local multicast (ff0x::/16).
+        // Public global IPv6 must not trigger an unnecessary permission prompt.
+        val firstHextet = host.substringBefore(':').toIntOrNull(16) ?: return false
+        return firstHextet in 0xfc00..0xfdff ||
+            firstHextet in 0xfe80..0xfebf ||
+            firstHextet in 0xfec0..0xfeff ||
+            firstHextet in 0xff01..0xff05
     }
 
     val segments = host.split('.')
