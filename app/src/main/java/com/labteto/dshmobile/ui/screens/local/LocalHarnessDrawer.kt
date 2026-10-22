@@ -42,6 +42,11 @@ import androidx.compose.ui.platform.LocalConfiguration
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import com.shenyan.designsystem.components.SyMaterialTier
+import com.shenyan.designsystem.components.syMaterialColor
+import com.shenyan.designsystem.foundation.LocalSySceneBackdrop
 import androidx.compose.ui.graphics.compositeOver
 import com.labteto.dshmobile.ui.shenyan.SyDimensions
 import androidx.compose.ui.focus.FocusRequester
@@ -76,6 +81,26 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
+
+/** Reuse the existing touch target but replace its fixed icon tile with wallpaper-aware material. */
+@Composable
+private fun DrawerAdaptiveIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    tint: Color,
+) {
+    val material = syMaterialColor(SyMaterialTier.L3_CARD)
+    SyIconButton(
+        icon = icon,
+        iconPainter = rememberVectorPainter(icon),
+        contentDescription = contentDescription,
+        onClick = onClick,
+        tint = tint,
+        containerColor = material.copy(alpha = material.alpha.coerceAtLeast(.68f)),
+        shadowElevation = 0.dp,
+    )
+}
 
 /** Narrow rail uses the same mode-dependent destination as the expanded drawer. */
 internal fun localCollapsedRailPrimaryEntry(mode: LocalUsageMode): LocalFeatureDrawerEntry =
@@ -126,6 +151,8 @@ internal fun LocalModeDrawer(
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val sy = LocalSyPalette.current
+    val hasWallpaper = LocalSySceneBackdrop.current?.image != null
+    val drawerMaterial = if (hasWallpaper) syMaterialColor(SyMaterialTier.L2_BAR) else Color.Transparent
     // The drawer has its own visual backing: raw L2 on the scene looked fully transparent.
     // Wallpaper mode retains a faint view of the user's image without sacrificing legibility.
     val expandLabel = stringResource(R.string.sy_v5_nav_expand)
@@ -148,20 +175,20 @@ internal fun LocalModeDrawer(
                 contentDescription = expandLabel,
                 onClick = { syRailCollapsed = false }, tint = sy.text,
             )
-            SyIconButton(icon = SyEntryIcons.NewSession, contentDescription = stringResource(R.string.sy_v5_new_session),
+            DrawerAdaptiveIconButton(icon = SyEntryIcons.NewSession, contentDescription = stringResource(R.string.sy_v5_new_session),
                 onClick = onNewSession, tint = sy.text)
             when (localCollapsedRailPrimaryEntry(usageMode)) {
                 LocalFeatureDrawerEntry.PERSONA_GALLERY ->
-                    SyIconButton(icon = SyEntryIcons.Persona, contentDescription = stringResource(R.string.persona_gallery_title),
+                    DrawerAdaptiveIconButton(icon = SyEntryIcons.Persona, contentDescription = stringResource(R.string.persona_gallery_title),
                         onClick = onOpenPersonaGallery, tint = sy.text)
                 LocalFeatureDrawerEntry.WORKSPACE ->
-                    SyIconButton(icon = SyEntryIcons.WorkspaceFiles, contentDescription = stringResource(R.string.chatlist_workspace_files),
+                    DrawerAdaptiveIconButton(icon = SyEntryIcons.WorkspaceFiles, contentDescription = stringResource(R.string.chatlist_workspace_files),
                         onClick = onWorkspaceFiles, tint = sy.text)
                 else -> error("Unexpected collapsed rail primary destination")
             }
-            SyIconButton(icon = SyEntryIcons.Tasks, contentDescription = stringResource(localCollapsedRailTaskTitle(usageMode)),
+            DrawerAdaptiveIconButton(icon = SyEntryIcons.Tasks, contentDescription = stringResource(localCollapsedRailTaskTitle(usageMode)),
                 onClick = onTasks, tint = sy.text)
-            SyIconButton(icon = SyEntryIcons.Settings, contentDescription = stringResource(R.string.sy_v5_settings),
+            DrawerAdaptiveIconButton(icon = SyEntryIcons.Settings, contentDescription = stringResource(R.string.sy_v5_settings),
                 onClick = onSettings, tint = sy.text)
         }
         }
@@ -321,7 +348,11 @@ internal fun LocalModeDrawer(
             modifier = Modifier.fillMaxHeight(),
             shape = androidx.compose.ui.graphics.RectangleShape,
         ) {
-        Column(Modifier.fillMaxHeight().safeDrawingPadding()) {
+        Column(
+            Modifier.fillMaxHeight()
+                .background(drawerMaterial.copy(alpha = if (hasWallpaper) drawerMaterial.alpha.coerceAtLeast(.48f) else 0f))
+                .safeDrawingPadding()
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -349,7 +380,7 @@ internal fun LocalModeDrawer(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    SyIconButton(
+                    DrawerAdaptiveIconButton(
                         icon = SyEntryIcons.Search,
                         contentDescription = stringResource(R.string.common_search),
                         onClick = {
@@ -361,7 +392,7 @@ internal fun LocalModeDrawer(
                         },
                         tint = sy.text,
                     )
-                    SyIconButton(
+                    DrawerAdaptiveIconButton(
                         icon = SyEntryIcons.NewSession,
                         contentDescription = stringResource(R.string.chatlist_new_session),
                         onClick = onNewSession,
