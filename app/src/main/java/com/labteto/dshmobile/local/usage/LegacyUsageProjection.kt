@@ -88,4 +88,3 @@ internal fun LegacyUsageCounters.hasUnattributedGap(): Boolean =
     inputTokens > 0L || cacheHitTokens > 0L || cacheMissTokens > 0L ||
         cacheWriteTokens > 0L || outputTokens > 0L || reasoningTokens > 0L ||
         requestCount > 0L || unreportedRequestCount > 0L || estimatedCostCny > 0.0
-
