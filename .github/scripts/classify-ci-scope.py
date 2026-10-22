@@ -71,6 +71,7 @@ FIXTURE_PROVENANCE_PREFIXES = (
 
 CI_CONTROL_FILES = {
     ".github/workflows/ci.yml",
+    ".github/workflows/android-page-matrix.yml",
     ".github/scripts/classify-ci-scope.py",
     ".github/scripts/check-ci-repository-integrity.py",
     ".github/scripts/check-android-security-boundaries.py",
@@ -83,6 +84,7 @@ ARCHITECTURE_AUTHORITY_FILES = {
 }
 ARCHITECTURE_3_CONTROL_FILES = ARCHITECTURE_AUTHORITY_FILES | {
     ".github/workflows/ci.yml",
+    ".github/workflows/android-page-matrix.yml",
     ".github/scripts/classify-ci-scope.py",
     ".github/scripts/check-ci-repository-integrity.py",
     ".github/scripts/check-local-architecture-boundaries.py",
@@ -196,6 +198,7 @@ ANDROID_UI_ENTRYPOINTS = {
 }
 CORE_CI_CONTROLS = {
     ".github/workflows/ci.yml",
+    ".github/workflows/android-page-matrix.yml",
     ".github/workflows/release.yml",
     ".github/scripts/classify-ci-scope.py",
     ".github/scripts/check-ci-repository-integrity.py",
