@@ -41,6 +41,9 @@ class LegacyUsageBridgeAndroidTest {
                 assertEquals(100L, migrated.inputTokens)
                 assertEquals(2L, migrated.requestCount)
                 assertEquals(9L, migrated.unpricedTokens)
+                assertEquals(100L, db.lifetimeTotals().tracked.inputTokens)
+                assertEquals(90L, db.lifetimeTotals().models.getValue("deepseek-chat").tracked.inputTokens)
+                assertTrue(db.lifetimeTotals().modelHistoryPartial)
             }
             TokenUsageDatabase(context, json, dbName).use { db ->
                 // Reboot with stale preference values: the one-time bridge must not be reinstalled.
@@ -65,6 +68,9 @@ class LegacyUsageBridgeAndroidTest {
                 assertEquals(120L, projected.inputTokens)
                 assertEquals(3L, projected.requestCount)
                 assertEquals(33L, projected.unpricedTokens)
+                assertEquals(120L, db.lifetimeTotals().tracked.inputTokens)
+                assertEquals(20L, db.lifetimeTotals().models.getValue("provider-b").tracked.inputTokens)
+                assertTrue(db.lifetimeTotals().modelHistoryPartial)
             }
             TokenUsageDatabase(context, json, dbName).use { db ->
                 assertEquals(120L, db.legacyUsageProjection().inputTokens)
