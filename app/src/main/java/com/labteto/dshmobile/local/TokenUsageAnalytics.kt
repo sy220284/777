@@ -76,7 +76,13 @@ class TokenUsageAnalyticsStore @Inject constructor(
      */
     fun adoptLegacyUsageOnce(legacy: LegacyUsageCounters): LegacyUsageCounters = synchronized(lock) {
         ensureLoaded()
-        database.adoptLegacyUsageOnce(legacy)
+        val result = database.adoptLegacyUsageOnce(legacy)
+        val projected = database.lifetimeTotals()
+        if (projected != lifetime) {
+            lifetime = projected
+            _revision.value = _revision.value + 1L
+        }
+        result
     }
 
     fun legacyUsageProjection(): LegacyUsageCounters = synchronized(lock) {
