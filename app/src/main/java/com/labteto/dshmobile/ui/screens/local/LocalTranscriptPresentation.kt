@@ -172,7 +172,8 @@ internal fun appendPendingWorkToolActivities(
     val activitiesByDeclaration = activities.filter { it.declaredSequence != null }.groupBy { it.callId to it.declaredSequence }
     fun activityFor(message: LocalHarnessMessage): LocalToolActivityUiItem? = when {
         message.toolExecutionId != null -> activitiesByExecution[message.toolExecutionId]?.singleOrNull()
-        message.toolDeclaredSequence != null -> activitiesByDeclaration[message.toolCallId to message.toolDeclaredSequence]?.singleOrNull()
+        message.toolDeclaredSequence != null && message.toolCallId != null ->
+            activitiesByDeclaration[message.toolCallId to message.toolDeclaredSequence]?.singleOrNull()
         messageCounts[message.toolCallId] == 1 -> activitiesByCall[message.toolCallId]?.singleOrNull()
             ?.takeIf { it.executionId == null && it.declaredSequence == null }
         else -> null
