@@ -117,18 +117,6 @@ class DeviceScrollFrameAndMemoryTest {
             }
         }
         try {
-                    t.source = InputDevice.SOURCE_TOUCHSCREEN
-                    check(ui.injectInputEvent(t, true)) { "Real emulator touch injection failed" }
-                } finally { t.recycle() }
-            }
-            event(MotionEvent.ACTION_DOWN, from)
-            repeat(32) { index ->
-                SystemClock.sleep(16L)
-                event(MotionEvent.ACTION_MOVE, from + (to - from) * (index + 1) / 32f)
-            }
-            event(MotionEvent.ACTION_UP, to)
-        }
-        try {
             repeat(16) { index ->
                 realSwipe(downwards = index % 2 == 1)
                 compose.waitForIdle()
