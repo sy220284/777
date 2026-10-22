@@ -21,7 +21,7 @@ image_package() {
   esac
 }
 
-if [[ "$1" == "--cell" ]]; then
+if [[ "${1:-}" == "--cell" ]]; then
   api="$2"; page_kb="$3"
   case "$api" in 36) release=16 ;; 37) release=17 ;; *) exit 2 ;; esac
   package="$(image_package "$api" "$page_kb")"
