@@ -14,6 +14,7 @@ import com.labteto.dshmobile.local.chat.chatBranchInfoIndex
 import com.labteto.dshmobile.local.chat.chatRegenerationSourceMessages
 import com.labteto.dshmobile.local.chat.chatRegenerationPreviousAnswerIds
 import com.labteto.dshmobile.local.chat.chatRegenerationReferenceMessages
+import com.labteto.dshmobile.local.chat.chatInactiveAssistantAnswerIds
 import com.labteto.dshmobile.local.chat.chatBranchLastContext
 import com.labteto.dshmobile.local.chat.chatBranchingEligible
 import com.labteto.dshmobile.local.chat.decodeChatBranchStateEvent
@@ -97,6 +98,7 @@ class LocalChatBranchingTest {
         )
         assertEquals(3, chatBranchInfo(branches, "a3")!!.count)
         assertEquals(setOf("a1", "a2", "a3"), chatRegenerationPreviousAnswerIds(branches, "a3"))
+        assertEquals(setOf("a1", "a2"), chatInactiveAssistantAnswerIds(branches))
         val referenceMessages = listOf(
             earlierReply,
             message("reasoning:a2", "reasoning", "更早版本思考", 5),
@@ -111,6 +113,7 @@ class LocalChatBranchingTest {
             ).map { it.id },
         )
         val selectedOld = selectChatBranchVariant(branches, "a3", 0)!!
+        assertEquals(setOf("a2", "a3"), chatInactiveAssistantAnswerIds(selectedOld))
         assertEquals(
             listOf("u0", "a0", "u1"),
             chatRegenerationSourceMessages(selectedOld, "a1").map { it.id },
