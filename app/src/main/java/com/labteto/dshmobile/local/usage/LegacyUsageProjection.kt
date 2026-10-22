@@ -27,19 +27,39 @@ internal data class LegacyUsageCounters(
 internal fun legacyUsageOffset(
     legacy: LegacyUsageCounters,
     current: TokenUsageAggregate,
-): LegacyUsageCounters = LegacyUsageCounters(
-    inputTokens = nonNegativeUsageDifference(legacy.inputTokens, current.inputTokens),
-    cacheHitTokens = nonNegativeUsageDifference(legacy.cacheHitTokens, current.cacheHitTokens),
-    cacheMissTokens = nonNegativeUsageDifference(legacy.cacheMissTokens, current.cacheMissTokens),
-    cacheWriteTokens = nonNegativeUsageDifference(legacy.cacheWriteTokens, current.cacheWriteTokens),
-    outputTokens = nonNegativeUsageDifference(legacy.outputTokens, current.outputTokens),
-    reasoningTokens = nonNegativeUsageDifference(legacy.reasoningTokens, current.reasoningTokens),
-    requestCount = nonNegativeUsageDifference(legacy.requestCount, current.requestCount),
-    unreportedRequestCount = nonNegativeUsageDifference(legacy.unreportedRequestCount, current.unreportedRequestCount),
-    estimatedCostCny = (legacy.estimatedCostCny.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0).let { old ->
-        (old - current.estimatedCostCny.coerceAtLeast(0.0)).coerceAtLeast(0.0)
-    },
-)
+): LegacyUsageCounters {
+    // Old SharedPreferences and SQLite can cover overlapping but non-identical requests.
+    // The SQLite input/cache counters are already committed facts. Only newly recovered
+    // input tokens can carry additional cache categories; otherwise fieldwise maxima
+    // could produce more cache-hit + cache-miss tokens than total input tokens.
+    val missingInput = nonNegativeUsageDifference(legacy.inputTokens, current.inputTokens)
+    val missingCacheHit = minOf(
+        nonNegativeUsageDifference(legacy.cacheHitTokens, current.cacheHitTokens),
+        missingInput,
+    )
+    val remainingInput = nonNegativeUsageDifference(missingInput, missingCacheHit)
+    val missingCacheMiss = minOf(
+        nonNegativeUsageDifference(legacy.cacheMissTokens, current.cacheMissTokens),
+        remainingInput,
+    )
+    val missingCacheWrite = minOf(
+        nonNegativeUsageDifference(legacy.cacheWriteTokens, current.cacheWriteTokens),
+        missingCacheMiss,
+    )
+    return LegacyUsageCounters(
+        inputTokens = missingInput,
+        cacheHitTokens = missingCacheHit,
+        cacheMissTokens = missingCacheMiss,
+        cacheWriteTokens = missingCacheWrite,
+        outputTokens = nonNegativeUsageDifference(legacy.outputTokens, current.outputTokens),
+        reasoningTokens = nonNegativeUsageDifference(legacy.reasoningTokens, current.reasoningTokens),
+        requestCount = nonNegativeUsageDifference(legacy.requestCount, current.requestCount),
+        unreportedRequestCount = nonNegativeUsageDifference(legacy.unreportedRequestCount, current.unreportedRequestCount),
+        estimatedCostCny = (legacy.estimatedCostCny.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0).let { old ->
+            (old - current.estimatedCostCny.coerceAtLeast(0.0)).coerceAtLeast(0.0)
+        },
+    )
+}
 
 /** Read-only compatibility projection, not a second persisted usage account. */
 internal fun lifetimeUsageProjection(
