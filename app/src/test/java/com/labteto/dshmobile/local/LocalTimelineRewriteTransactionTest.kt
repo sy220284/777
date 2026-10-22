@@ -17,6 +17,10 @@ import com.labteto.dshmobile.local.chat.LocalTimelineRewriteProjectionInput
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.LocalTimelineRewriteState
 import com.labteto.dshmobile.local.chat.appendChatProjectionCommit
+import com.labteto.dshmobile.local.chat.buildDurableChatModelHistory
+import com.labteto.dshmobile.local.chat.LocalChatBranchNode
+import com.labteto.dshmobile.local.chat.syncChatBranchState
+import com.labteto.dshmobile.local.chat.upsertChatBranchNode
 import com.labteto.dshmobile.local.chat.appendTimelineRewriteCommit
 import com.labteto.dshmobile.local.chat.recoverPendingTimelineRewriteProjection
 import com.labteto.dshmobile.local.chat.sourceEventSequenceForMessage
@@ -129,6 +133,59 @@ class LocalTimelineRewriteTransactionTest {
             assertEquals("安心", projected.chatState.mood)
             assertEquals(9L, projected.chatContext.generation)
             assertEquals(suggestions, projected.replySuggestions)
+        }
+    }
+
+    @Test
+    fun regenerationCommitsOneReplayableEventWithoutLosingOldVariantsOrStructuredMedia() {
+        withStores { log, _, _, _, _ ->
+            val user = LocalHarnessMessage("u1", "user", "生成图片", createdAt = 1L)
+            val old = LocalHarnessMessage("a1", "assistant", "旧答案", createdAt = 2L)
+            val updated = LocalHarnessMessage("a2", "assistant", "新答案", createdAt = 3L)
+            val originalHistory = listOf(
+                buildJsonObject { put("role", "system"); put("content", "system") },
+                buildJsonObject { put("role", "user"); put("content", "生成图片") },
+                buildJsonObject { put("role", "assistant"); put("content", "旧答案") },
+            )
+            val structuredReply = buildJsonObject {
+                put("role", "assistant")
+                put("content", "新答案")
+                put("structured-marker", "preserved-on-switch")
+            }
+            val originalBranches = syncChatBranchState(
+                LocalChatBranchState(), listOf(user, old), ChatCharacterState(), emptyList(),
+            )
+            val branches = upsertChatBranchNode(
+                originalBranches,
+                LocalChatBranchNode(updated, parentId = user.id),
+                select = true,
+            )
+            val event = appendChatProjectionCommit(
+                eventLog = log,
+                reason = "assistant-regenerated",
+                activeTranscript = listOf(user, updated),
+                modelHistory = originalHistory.dropLast(1) + structuredReply,
+                state = LocalTimelineRewriteState(
+                    chatState = ChatCharacterState(mood = "平静"),
+                    chatContext = ChatContextState(generation = 4L),
+                    chatBranches = branches,
+                    groupChat = LocalGroupChatState(),
+                ),
+                regeneratedAssistantId = updated.id,
+                regeneratedAssistantMessage = structuredReply,
+            )
+
+            // No independent assistant/message event is needed to make this new version visible.
+            assertEquals(listOf("u1", "a2"), LocalSessionTranscriptPager(log).all().map { it.id })
+            assertEquals(originalHistory.dropLast(1) + structuredReply,
+                restoreLocalModelHistory(listOf(event), emptyList(), ModelHistoryCheckpointCodec()).messages)
+            val state = projectChatSessionControls(LocalHarnessSession(id = "session"), listOf(event))
+            assertEquals(4L, state.chatContext.generation)
+            assertEquals(setOf("a1", "a2"), state.chatBranches.nodes
+                .filter { it.message.role == "assistant" }.map { it.message.id }.toSet())
+            assertEquals("preserved-on-switch",
+                buildDurableChatModelHistory(log, listOf(user, updated), "system")[2]
+                    ["structured-marker"]?.let { it.toString().trim('"') })
         }
     }
 

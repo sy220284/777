@@ -32,6 +32,17 @@ internal fun requireVisibleLocalChatReply(blocks: List<LocalMessageBlock>) {
     check(blocks.isNotEmpty()) { "模型没有返回可用回复" }
 }
 
+/** Partial provider output is only a preview, never a replacement for a committed answer. */
+internal fun requireCompleteChatRegeneration(
+    replacingMessageId: String?,
+    reply: LocalModelReply,
+) {
+    if (replacingMessageId == null) return
+    check(reply.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) {
+        "重新生成未完成，原回复和会话状态保持不变：${reply.rawStopReason ?: reply.completionReason.name}"
+    }
+}
+
 internal data class LocalMaterializedChatReply(
     val reply: LocalModelReply,
     val blocks: List<LocalMessageBlock>,

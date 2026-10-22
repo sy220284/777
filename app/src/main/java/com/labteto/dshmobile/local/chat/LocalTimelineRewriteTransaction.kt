@@ -75,9 +75,13 @@ internal fun appendChatProjectionCommit(
     activeTranscript: List<LocalHarnessMessage>,
     modelHistory: List<JsonObject>,
     state: LocalTimelineRewriteState,
+    regeneratedAssistantId: String? = null,
+    regeneratedAssistantMessage: JsonObject? = null,
 ): LocalSessionEventLog.Event = eventLog.append("chat/active-transcript", buildJsonObject {
     put("reason", reason)
     put("transcript", encodeTranscriptMessages(activeTranscript))
+    regeneratedAssistantId?.let { put("regenerated_assistant_id", it) }
+    regeneratedAssistantMessage?.let { put("regenerated_assistant_message", it) }
     put(LOCAL_TIMELINE_REWRITE_MODEL_HISTORY_KEY, JsonArray(modelHistory))
     put(
         LOCAL_TIMELINE_REWRITE_STATE_KEY,
