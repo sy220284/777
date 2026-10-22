@@ -22,6 +22,13 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
+/** Immutable request-only context: regeneration must not modify committed Chat state before sampling. */
+internal data class LocalChatRegenerationPreparation(
+    val branches: LocalChatBranchState,
+    val baseState: ChatCharacterState,
+    val baseContext: ChatContextState,
+)
+
 /**
  * Chat-owned timeline mutation and regeneration entry.
  *
@@ -396,7 +403,7 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
                 ) return@synchronized rejectRegeneration("模型历史尚未完整恢复，无法安全重新生成这条回复")
 
                 LocalChatPostTurnJobOwner.cancel()
-                if (state.transcriptIndex.branchingEligible) {
+                val regenerationPreparation = if (state.transcriptIndex.branchingEligible) {
                     val branches = if (state.chat.chatBranches.nodes.isNotEmpty()) {
                         state.chat.chatBranches
                     } else {
@@ -425,22 +432,18 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
                         previousGeneration = state.chat.chatContext.generation,
                         experienceContext = state.chat.chatContext,
                     ).boundDurablePending(eventLog, "direct")
-                    chatState.update { current ->
-                        if (current.sessionId != state.sessionId) current else current.copy(
-                            chat = current.chat.copy(
-                                chatState = baseState.withoutLegacyConversationContext(),
-                                chatContext = baseContext,
-                                replySuggestions = emptyList(),
-                                chatBranches = branches,
-                            ),
-                        )
-                    }
-                }
+                    LocalChatRegenerationPreparation(
+                        branches = branches,
+                        baseState = baseState.withoutLegacyConversationContext(),
+                        baseContext = baseContext,
+                    )
+                } else null
 
                 started = directTurn.start(
                     input = promptMessage.content,
                     sourceMessageId = promptMessage.id,
                     replacingMessageId = messageId,
+                    regenerationPreparation = regenerationPreparation,
                 ).also { handle.job = it }
                 true
             } finally {
