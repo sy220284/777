@@ -34,10 +34,14 @@ class AutomationDispatchEndToEndAndroidTest {
         val store = owner.automationStore()
         val scheduler = owner.automationScheduler()
         val manager = WorkManager.getInstance(context)
+        // Ten independent instrumentation rounds still collect 30 real WorkManager
+        // receipts per emulator. Submitting 100+ immediate jobs within one test run
+        // may trigger OS JobScheduler quotas and contaminate later rounds.
+        val samplesPerInvocation = 3
         val measurements = mutableListOf<Double>()
         val prefix = "perf-e2e-" + UUID.randomUUID().toString().take(8)
         try {
-            repeat(10) { index ->
+            repeat(samplesPerInvocation) { index ->
                 val id = "$prefix-$index"
                 val start = SystemClock.elapsedRealtimeNanos()
                 scheduler.scheduleOnce(
@@ -100,7 +104,7 @@ class AutomationDispatchEndToEndAndroidTest {
             check(dir.isDirectory || dir.mkdirs())
             File(dir, "automation-dispatch-api${Build.VERSION.SDK_INT}.txt").writeText(line + "\n")
         } finally {
-            (0 until 10).forEach { scheduler.cancel("$prefix-$it") }
+            (0 until samplesPerInvocation).forEach { scheduler.cancel("$prefix-$it") }
         }
     }
 }
