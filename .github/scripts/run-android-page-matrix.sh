@@ -5,8 +5,9 @@ set -euo pipefail
 # Never infer the page size from an image label: verify with getconf PAGESIZE.
 root=".ci/android-page-matrix"
 mkdir -p "$root"
-sdk="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-avdm="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager"
+# setup-android-cached pins command-line tools 22.0, not cmdline-tools/latest.
+sdk="$(command -v sdkmanager)"
+avdm="$(command -v avdmanager)"
 emu="$ANDROID_SDK_ROOT/emulator/emulator"
 component="com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner"
 app="com.sy220284.dshmobile.debug"
