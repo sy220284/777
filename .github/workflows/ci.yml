@@ -390,7 +390,7 @@ jobs:
         with:
           name: android16-ten-rounds
           path: .ci/android16-ten-rounds/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 7
 
       - name: Upload Work timeline screenshots
@@ -471,7 +471,7 @@ jobs:
         with:
           name: android17-ten-rounds
           path: .ci/android17-ten-rounds/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 7
 
       - name: Upload Work timeline screenshots
