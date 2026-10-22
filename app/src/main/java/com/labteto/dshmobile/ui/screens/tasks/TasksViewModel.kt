@@ -6,6 +6,8 @@ import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
+import com.labteto.dshmobile.automation.validAutomationCommandSchedule
+import com.labteto.dshmobile.automation.newAutomationTaskId
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.automation.AutomationPlanDraft
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
@@ -34,6 +36,7 @@ data class TasksUiState(
     val busyIds: Set<String> = emptySet(),
     val loading: Boolean = false,
     val managementFailed: Boolean = false,
+    val savingEditor: Boolean = false,
 )
 @HiltViewModel
 class TasksViewModel @Inject constructor(
@@ -161,6 +164,10 @@ class TasksViewModel @Inject constructor(
         proactiveMaxUnanswered: Int,
         notify: Boolean? = null,
     ): Boolean = runCatching {
+        require(validAutomationCommandSchedule(
+            AutomationMode.CHAT, scheduleType, firstRunAt, recurringMinutes,
+            System.currentTimeMillis(), silenceMinutes, windowStartMinuteOfDay, windowEndMinuteOfDay,
+        )) { "任务排程参数无效" }
         scheduler.updateTask(
             id, prompt, firstRunAt, recurringMinutes, scheduleType, silenceMinutes,
             windowStartMinuteOfDay, windowEndMinuteOfDay, quietHoursEnabled,
@@ -188,7 +195,10 @@ class TasksViewModel @Inject constructor(
         notify: Boolean = true,
     ): Boolean {
         val now = System.currentTimeMillis()
-        if (prompt.isBlank()) return false
+        if (prompt.isBlank() || !validAutomationCommandSchedule(
+            mode, scheduleType, firstRunAt, recurringMinutes, now,
+            silenceMinutes, windowStartMinuteOfDay, windowEndMinuteOfDay,
+        )) return false
         if (scheduleType !in setOf(AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW) &&
             firstRunAt <= now
         ) return false
@@ -206,7 +216,7 @@ class TasksViewModel @Inject constructor(
         val snapshot = localRuntime.snapshot()
         if (mode == AutomationMode.CHAT && !canPlanChat(snapshot)) return false
         return runCatching {
-            val id = "ui-" + System.currentTimeMillis()
+            val id = newAutomationTaskId()
             val targetSessionId = snapshot.sessionId.takeIf { mode == AutomationMode.CHAT }
             val actorName = snapshot.chatPersona.name.takeIf {
                 mode == AutomationMode.CHAT && it.isNotBlank()
@@ -234,10 +244,9 @@ class TasksViewModel @Inject constructor(
                     targetSessionId, actorName, quietHoursEnabled, quietStartHour,
                     quietStartMinute, quietEndHour, quietEndMinute, proactiveMinGapMinutes,
                     proactiveMaxUnanswered,
-                    if (mode == AutomationMode.CHAT) scheduleType else AutomationScheduleType.LEGACY,
+                    scheduleType,
                 )
             }
-            refresh()
         }.onFailure { AppLog.failure("TaskScheduling", "create_scheduled_task", it) }
             .isSuccess
     }
