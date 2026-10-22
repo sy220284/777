@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.runtime.LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.usage.TokenUsageDatabase
+import com.labteto.dshmobile.local.usage.LegacyUsageCounters
 import com.labteto.dshmobile.local.usage.UsageLifetimeTotals
 import com.labteto.dshmobile.local.usage.boundedForStorage
 import com.labteto.dshmobile.local.usage.distinctForAccounting
@@ -55,17 +56,32 @@ class TokenUsageAnalyticsStore @Inject constructor(
     private val _revision = MutableStateFlow(0L)
     val revision: StateFlow<Long> = _revision.asStateFlow()
 
-    fun append(record: TokenUsageRecord): Boolean = synchronized(lock) {
+    /** SQLite owns all post-migration usage facts; the unpriced delta commits atomically. */
+    fun append(record: TokenUsageRecord, unpricedTokens: Long = 0L): Boolean = synchronized(lock) {
         ensureLoaded()
         val safe = record.boundedForStorage()
         val normalized = if (safe.requestId.isBlank()) safe.copy(requestId = UUID.randomUUID().toString()) else safe
-        val result = database.append(normalized)
+        val result = database.append(normalized, unpricedTokens)
         if (!result.inserted) return@synchronized false
         lifetime = result.totals
         retainedDay = System.currentTimeMillis() / 86_400_000L
         if (result.pruned) rebuildAccumulator() else checkNotNull(accumulator).add(normalized)
         _revision.value = _revision.value + 1L
         true
+    }
+
+    /**
+     * Freeze the historical pre-SQLite gap once in database metadata, never repeatedly merge
+     * old SharedPreferences counters with new requests. Safe to retry after process death.
+     */
+    fun adoptLegacyUsageOnce(legacy: LegacyUsageCounters): LegacyUsageCounters = synchronized(lock) {
+        ensureLoaded()
+        database.adoptLegacyUsageOnce(legacy)
+    }
+
+    fun legacyUsageProjection(): LegacyUsageCounters = synchronized(lock) {
+        ensureLoaded()
+        database.legacyUsageProjection()
     }
 
     fun snapshot(): TokenUsageAnalyticsSnapshot = synchronized(lock) {
