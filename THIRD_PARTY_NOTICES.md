@@ -40,7 +40,7 @@ SOFTWARE.
 
 ## Bundled Node.js runtime
 
-The Android Harness bundles Node.js 26.4.0 from the official Termux `termux-main`
+The Android Harness bundles Node.js 26.12.1 from the official Termux `termux-main`
 `nodejs` package. The build verifies Termux's signed package index and each package
 SHA-256 before packaging. Node.js core is distributed under the MIT license and includes
 additional notices for its bundled dependencies.
