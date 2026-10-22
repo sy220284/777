@@ -106,6 +106,10 @@ internal class LocalChatMemoryRuntime @Inject constructor(
         if (subjectKey.isNullOrBlank()) return ""
         if (viewerSubjectKey == null && snapshot.chat.chatPersona.isUnboundChatPersona()) return ""
 
+        // Retired assistant variants are display-only even on later ordinary turns.
+        // Only diary entries sourced from the selected branch can become recall context.
+        val excludedReplies = excludedAssistantMessageIds +
+            chatInactiveAssistantAnswerIds(snapshot.chat.chatBranches)
         val conversation = if (snapshot.chat.groupChat.enabled) snapshot.chat.groupChat.context
             else snapshot.chat.chatContext
         val recallQuery = ChatMemorySelector.recallQuery(query, conversation) ?: return ""
@@ -200,7 +204,7 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                 // while sampling another answer for the same user turn.
                 entry.sources.none { source ->
                     source.sessionId == snapshot.sessionId &&
-                        source.assistantMessageId in excludedAssistantMessageIds
+                        source.assistantMessageId in excludedReplies
                 } && ChatUnifiedTurnContext.allowsHistoricalRecord(
                     query, conversation, renderRecalledChatDiary(entry, groupAudience),
                 )
