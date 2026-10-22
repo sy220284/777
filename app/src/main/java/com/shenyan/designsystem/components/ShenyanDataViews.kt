@@ -138,11 +138,15 @@ internal fun syEntryTileTone(name: String): Color? {
  */
 @Composable
 fun SyIconBox(icon: ImageVector? = null, iconPainter: Painter? = null, modifier: Modifier = Modifier,
-    contentDescription: String? = null, active: Boolean = false) {
+    contentDescription: String? = null, active: Boolean = false, adaptivePlate: Boolean = false) {
     val p = LocalSyColors.current
     val alpha = syLiveAlpha(active)
     val tileTone = syEntryTileTone(icon?.name.orEmpty())
-    val tile = tileTone?.let { if (p.text.luminance() > .5f) p.materialL4 else it }
+    val tile = tileTone?.let { fixedTone ->
+        if (adaptivePlate) syMaterialColor(SyMaterialTier.L3_CARD).let { material ->
+            material.copy(alpha = material.alpha.coerceAtLeast(.68f))
+        } else if (p.text.luminance() > .5f) p.materialL4 else fixedTone
+    }
 
     Box(
         modifier.size(if (tile != null) 32.dp else 30.dp).then(
