@@ -47,14 +47,51 @@ internal class TokenUsageDatabase(
         legacy.clear()
     }
 
+    /** Install only once, under the same SQLite transaction as the lifetime totals read. */
+    fun adoptLegacyUsageOnce(legacy: LegacyUsageCounters): LegacyUsageCounters = transaction(writableDatabase) {
+        val db = writableDatabase
+        val previous = legacyBridge(db)
+        val bridge = previous ?: run {
+            val lastTimestamp = DatabaseUtils.longForQuery(
+                db, "SELECT COALESCE(MAX(timestamp), 0) FROM records", null,
+            )
+            LegacyUsageBridge(
+                offset = legacyUsageOffset(legacy, totals(db).tracked),
+                unpricedTokens = legacy.unpricedTokens.coerceAtLeast(0L),
+                updatedAt = maxOf(legacy.updatedAt, lastTimestamp),
+            ).also { putMetadata(db, LEGACY_BRIDGE_KEY, json.encodeToString(LegacyUsageBridge.serializer(), it)) }
+        }
+        lifetimeUsageProjection(totals(db).tracked, bridge.offset, bridge.unpricedTokens, bridge.updatedAt)
+    }
+
+    fun legacyUsageProjection(): LegacyUsageCounters {
+        val db = readableDatabase
+        val bridge = legacyBridge(db) ?: LegacyUsageBridge()
+        return lifetimeUsageProjection(totals(db).tracked, bridge.offset, bridge.unpricedTokens, bridge.updatedAt)
+    }
+
+    private fun legacyBridge(db: SQLiteDatabase): LegacyUsageBridge? =
+        metadata(db, LEGACY_BRIDGE_KEY)?.let {
+            json.decodeFromString(LegacyUsageBridge.serializer(), it)
+        }
+
     data class AppendResult(val inserted: Boolean, val pruned: Boolean, val totals: UsageLifetimeTotals)
-    fun append(record: TokenUsageRecord): AppendResult {
+    fun append(record: TokenUsageRecord, unpricedTokens: Long = 0L): AppendResult {
         val db = writableDatabase
         return transaction(db) {
             val before = totals(db)
             if (!insert(db, record)) return@transaction AppendResult(false, false, before)
             val after = before.add(record)
             putMetadata(db, "totals", json.encodeToString(UsageLifetimeTotals.serializer(), after))
+            legacyBridge(db)?.let { bridge ->
+                val updated = bridge.copy(
+                    unpricedTokens = saturatingUsageAdd(
+                        bridge.unpricedTokens, unpricedTokens.coerceAtLeast(0L),
+                    ),
+                    updatedAt = maxOf(bridge.updatedAt, record.timestamp),
+                )
+                putMetadata(db, LEGACY_BRIDGE_KEY, json.encodeToString(LegacyUsageBridge.serializer(), updated))
+            }
             AppendResult(true, prune(db), after)
         }
     }
@@ -137,6 +174,7 @@ internal class TokenUsageDatabase(
         } finally { db.endTransaction() }
     }
     internal companion object {
+        private const val LEGACY_BRIDGE_KEY = "legacy_usage_bridge_v1"
         const val MAX_RECORDS = 10_000L
         const val RETAIN_AFTER_PRUNE = 9_000
         const val MAX_RECORD_BYTES = 4 * 1024
