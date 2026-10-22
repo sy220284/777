@@ -38,7 +38,7 @@ for round in $(seq 1 10); do
     echo "::error::Android $api performance round $round failed" >&2
     exit 1
   fi
-  count="$(grep -c 'INSTRUMENTATION_STATUS: stream=ANDROID_PERF api=${api} ' "$log" || true)"
+  count="$(grep -c "INSTRUMENTATION_STATUS: stream=ANDROID_PERF api=${api} " "$log" || true)"
   if [[ "$count" -ne 6 ]]; then
     echo "::error::Android $api round $round emitted $count metrics; expected exactly 6" >&2
     exit 1
