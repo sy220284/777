@@ -421,6 +421,17 @@ internal fun chatRegenerationSourceMessages(
     return selected.dropLast(1)
 }
 
+/** Inactive reply variants remain selectable but must not be recalled as current facts. */
+internal fun chatInactiveAssistantAnswerIds(state: LocalChatBranchState): Set<String> {
+    if (state.nodes.isEmpty()) return emptySet()
+    val active = activeChatBranchMessages(state).mapTo(hashSetOf()) { it.id }
+    return state.nodes.asSequence()
+        .map { it.message }
+        .filter { it.role == "assistant" && it.id !in active }
+        .map { it.id }
+        .toSet()
+}
+
 /** All alternative answers to this user turn are display-only during regeneration. */
 internal fun chatRegenerationPreviousAnswerIds(
     state: LocalChatBranchState,
