@@ -89,7 +89,7 @@ class LocalWorkReplyPresentationTest {
             phase = com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING,
             declaredAt = 120L, declaredSequence = 5L)
         val output = appendPendingWorkToolActivities(listOf(user, completed), listOf(first), true)
-        assertEquals(listOf("message:u", "work-tool:declaration:5", "work-tool:declaration:6"), output.map { it.key })
+        assertEquals(listOf("message:u", "work-tool:first:declaration:5", "work-tool:second:declaration:6"), output.map { it.key })
     }
 
     @Test fun repeatedIdenticalStatusChecksCompactButRetainEveryReceipt() {
@@ -228,7 +228,7 @@ class LocalWorkReplyPresentationTest {
             declaredSequence = 3L,
         )
         val pending = appendPendingWorkToolActivities(emptyList(), listOf(activity), running = true)
-        assertEquals(listOf("work-tool:declaration:3"), pending.map { it.key })
+        assertEquals(listOf("work-tool:call-1:declaration:3"), pending.map { it.key })
         assertTrue(pending.single() is LocalTranscriptItem.WorkPendingTool)
 
         val completed = LocalTranscriptItem.WorkStep(
@@ -262,8 +262,8 @@ class LocalWorkReplyPresentationTest {
             listOf(user, narrative, result, answer),
             listOf(two, done, one), running = true)
         assertEquals(
-            listOf("message:u", "work-tool:declaration:5", "work-tool:declaration:6", "work-step:n",
-                "work-tool:declaration:7", "message:a"),
+            listOf("message:u", "work-tool:one:declaration:5", "work-tool:two:declaration:6", "work-step:n",
+                "work-tool:finished:declaration:7", "message:a"),
             visible.map { it.key })
     }
 
@@ -276,8 +276,8 @@ class LocalWorkReplyPresentationTest {
         }
         val entries = appendPendingWorkToolActivities(emptyList(), activities.reversed(), running = true)
         assertEquals(48, entries.size)
-        assertEquals("work-tool:declaration:1", entries.first().key)
-        assertEquals("work-tool:declaration:48", entries.last().key)
+        assertEquals("work-tool:c1:declaration:1", entries.first().key)
+        assertEquals("work-tool:c48:declaration:48", entries.last().key)
     }
 
     @Test fun toolOutcomeDoesNotMislabelCancellationOrUnknownAsSuccess() {
@@ -301,7 +301,7 @@ class LocalWorkReplyPresentationTest {
         val tool = message("completed", "tool", "ok", "mcp__GitHub__fetch_file", false)
             .copy(createdAt = 170L, toolCallId = "call-5", toolDeclaredAt = 120L, toolDeclaredSequence = 3L)
         val items = buildLocalTranscript(listOf(user, narration, tool))
-        assertEquals(listOf("message:user", "work-tool:declaration:3", "work-step:progress"),
+        assertEquals(listOf("message:user", "work-tool:call-5:declaration:3", "work-step:progress"),
             items.map { it.key })
         val inFlight = com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem(
             callId = "call-5", name = "mcp__GitHub__fetch_file",
@@ -325,7 +325,7 @@ class LocalWorkReplyPresentationTest {
             declaredAt = 120L, declaredSequence = 2L)
         val visible = appendPendingWorkToolActivities(listOf(user, media), listOf(pending), true)
         assertEquals(
-            listOf("message:u", "work-tool:declaration:2", "media-result:image-2"),
+            listOf("message:u", "work-tool:read-2:declaration:2", "media-result:image-2"),
             visible.map { it.key })
     }
 
@@ -356,7 +356,7 @@ class LocalWorkReplyPresentationTest {
             .copy(createdAt = 190L, toolCallId = "first", toolDeclaredAt = 120L, toolDeclaredSequence = 5L)
         val items = buildLocalTranscript(
             listOf(user, progress, completedLater, completedFirst))
-        assertEquals(listOf("message:u", "work-tool:declaration:5", "work-tool:declaration:6", "work-step:n"),
+        assertEquals(listOf("message:u", "work-tool:first:declaration:5", "work-tool:second:declaration:6", "work-step:n"),
             items.map { it.key })
     }
 

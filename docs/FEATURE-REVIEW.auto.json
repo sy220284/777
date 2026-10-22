@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "faae4175b55e",
+  "snapshot": "7eebda7d5fc5",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1652,
   "production_sources_scanned": 1003,
@@ -9478,12 +9478,10 @@
   "followup_production_or_compatibility": 12,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "3d5bb5b9da05",
+    "baseline": "faae4175b55e",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolActivityProjection.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptPresentation.kt"
     ],
     "moved_unchanged_files": [],

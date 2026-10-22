@@ -75,21 +75,21 @@ internal sealed interface LocalTranscriptItem {
         val groupedMessages: List<LocalHarnessMessage> = emptyList(),
     ) : LocalTranscriptItem {
         override val key: String =
-            if (message.role == "tool" && message.toolCallId != null) workToolRowKey(message.toolDeclaredSequence,
+            if (message.role == "tool" && message.toolCallId != null) workToolRowKey(message.toolCallId, message.toolDeclaredSequence,
                 message.toolExecutionId, message.id) else "work-step:${message.id}"
     }
 
     /** In-flight Tool-owned event. Replaced by the completion row with the same stable key. */
     data class WorkPendingTool(val activity: LocalToolActivityUiItem) : LocalTranscriptItem {
-        override val key: String = workToolRowKey(activity.declaredSequence,
+        override val key: String = workToolRowKey(activity.callId, activity.declaredSequence,
             activity.executionId, "pending:${activity.startedSequence}:${activity.callId}")
     }
 }
 
 /** A declaration stays stable from pending to receipt; legacy rows keep their durable message ID. */
-private fun workToolRowKey(declaration: Long?, execution: String?, fallback: String): String =
+private fun workToolRowKey(callId: String?, declaration: Long?, execution: String?, fallback: String): String =
     when {
-        declaration != null -> "work-tool:declaration:$declaration"
+        declaration != null -> "work-tool:$callId:declaration:$declaration"
         execution != null -> "work-tool:execution:$execution"
         else -> "work-tool:message:$fallback"
     }
@@ -169,10 +169,10 @@ internal fun appendPendingWorkToolActivities(
     val messageCounts = messages.groupingBy { it.toolCallId }.eachCount()
     val activitiesByCall = activities.groupBy { it.callId }
     val activitiesByExecution = activities.filter { it.executionId != null }.groupBy { it.executionId }
-    val activitiesByDeclaration = activities.filter { it.declaredSequence != null }.groupBy { it.declaredSequence }
+    val activitiesByDeclaration = activities.filter { it.declaredSequence != null }.groupBy { it.callId to it.declaredSequence }
     fun activityFor(message: LocalHarnessMessage): LocalToolActivityUiItem? = when {
         message.toolExecutionId != null -> activitiesByExecution[message.toolExecutionId]?.singleOrNull()
-        message.toolDeclaredSequence != null -> activitiesByDeclaration[message.toolDeclaredSequence]?.singleOrNull()
+        message.toolDeclaredSequence != null -> activitiesByDeclaration[message.toolCallId to message.toolDeclaredSequence]?.singleOrNull()
         messageCounts[message.toolCallId] == 1 -> activitiesByCall[message.toolCallId]?.singleOrNull()
             ?.takeIf { it.executionId == null && it.declaredSequence == null }
         else -> null
@@ -184,7 +184,8 @@ internal fun appendPendingWorkToolActivities(
     }
     if (!running) return compactRepeatedWorkStatusChecks(enriched)
     val completedExecutions = messages.mapNotNull { it.toolExecutionId }.toSet()
-    val completedDeclarations = messages.mapNotNull { it.toolDeclaredSequence }.toSet()
+    val completedDeclarations = messages.filter { it.toolDeclaredSequence != null }
+        .map { it.toolCallId to it.toolDeclaredSequence }.toSet()
     val completedLegacy = messages.filter { it.toolExecutionId == null && it.toolDeclaredSequence == null &&
         messageCounts[it.toolCallId] == 1 }.mapNotNull { it.toolCallId }.toSet()
     val lastUserAt = transcript.filterIsInstance<LocalTranscriptItem.Message>()
@@ -193,14 +194,14 @@ internal fun appendPendingWorkToolActivities(
         it.phase == LocalToolUiPhase.DECLARED || it.phase == LocalToolUiPhase.RUNNING
     }.filter { activity ->
         val completed = when {
-            activity.declaredSequence != null -> activity.declaredSequence in completedDeclarations ||
+            activity.declaredSequence != null -> (activity.callId to activity.declaredSequence) in completedDeclarations ||
                 activity.executionId != null && activity.executionId in completedExecutions
             activity.executionId != null -> activity.executionId in completedExecutions
             else -> activity.callId in completedLegacy && activitiesByCall[activity.callId]?.size == 1
         }
         !completed && (activity.declaredAt ?: Long.MIN_VALUE) >= lastUserAt
     }
-        .distinctBy { workToolRowKey(it.declaredSequence, it.executionId, "pending:${it.startedSequence}:${it.callId}") }.sortedWith(
+        .distinctBy { workToolRowKey(it.callId, it.declaredSequence, it.executionId, "pending:${it.startedSequence}:${it.callId}") }.sortedWith(
             compareBy<LocalToolActivityUiItem> { it.declaredAt ?: Long.MAX_VALUE }
                 .thenBy { it.declaredSequence ?: Long.MAX_VALUE }
         )
