@@ -8,14 +8,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,10 +29,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.theme.BackgroundRegion
-import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 
@@ -100,17 +95,6 @@ fun ConversationScrollShortcut(
     modifier: Modifier = Modifier,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val backgroundState = LocalAppBackgroundState.current
-    val surfaceColor = colors.wallpaperSurface(
-        level = WallpaperSurfaceLevel.FLOATING,
-        region = BackgroundRegion.BOTTOM,
-        base = colors.materialL3,
-    )
-    val borderColor = if (backgroundState.hasImage && backgroundState.adaptiveContrast) {
-        colors.border.copy(alpha = 0.72f)
-    } else {
-        colors.border
-    }
 
     AnimatedContent(
         targetState = target,
@@ -132,24 +116,19 @@ fun ConversationScrollShortcut(
                     .clickable { onClick(direction) },
                 contentAlignment = Alignment.Center,
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = surfaceColor,
-                    border = BorderStroke(1.dp, borderColor),
-                    shadowElevation = 2.dp,
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .border(1.dp, colors.border.copy(alpha = 0.28f), CircleShape),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(
-                        modifier = Modifier.size(40.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            if (direction == ConversationScrollTarget.START) FeatherIcons.ArrowUp
-                            else FeatherIcons.ArrowDown,
-                            contentDescription = label,
-                            tint = colors.text,
-                            modifier = Modifier.size(19.dp),
-                        )
-                    }
+                    Icon(
+                        if (direction == ConversationScrollTarget.START) FeatherIcons.ArrowUp
+                        else FeatherIcons.ArrowDown,
+                        contentDescription = label,
+                        tint = colors.text,
+                        modifier = Modifier.size(19.dp),
+                    )
                 }
             }
         }
