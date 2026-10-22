@@ -473,14 +473,12 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             }
 
             assistantTranscript?.let { message ->
-                runCatching {
-                    replyDocuments.publish(replyCards.definitionFor(reply.content.orEmpty()),
-                        com.labteto.dshmobile.uicontract.UiDocumentSource(sessionId, message.id,
-                            generationSnapshot.chat.chatContext.generation,
-                            snapshot.modelState.modelSelection.activeProfileId, snapshot.projectId, false),
-                        replyCards.requestIdFor(reply.content.orEmpty()), snapshot.modelState.model,
-                        replyCards.reportedFor(reply.content.orEmpty()))
-                }
+                replyDocuments.publish(replyCards.definitionFor(reply.content.orEmpty()),
+                    com.labteto.dshmobile.uicontract.UiDocumentSource(sessionId, message.id,
+                        generationSnapshot.chat.chatContext.generation,
+                        snapshot.modelState.modelSelection.activeProfileId, snapshot.projectId, false),
+                    replyCards.requestIdFor(reply.content.orEmpty()), snapshot.modelState.model,
+                    replyCards.reportedFor(reply.content.orEmpty()))
             }
 
             if (replacingMessageId == null) {
