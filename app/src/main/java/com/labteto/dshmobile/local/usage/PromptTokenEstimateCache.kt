@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.usage
 
-import com.labteto.dshmobile.local.model.estimateModelTokens
 import java.util.LinkedHashMap
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -82,7 +81,7 @@ internal object PromptTokenEstimateCache {
             })
             val content = lightweight["content"].toString()
             return MessageEstimate(
-                tokens = (estimateModelTokens(lightweight.toString()) +
+                tokens = (estimateRequestTokens(lightweight.toString()) +
                     images * 1_024 + videos * 16_384 + files * 2_048).coerceAtMost(Int.MAX_VALUE),
                 memory = memoryClassifier(content),
                 persona = personaClassifier(content),
@@ -92,7 +91,7 @@ internal object PromptTokenEstimateCache {
         val encoded = value.toString()
         val content = value["content"]?.toString().orEmpty()
         return MessageEstimate(
-            tokens = estimateModelTokens(encoded),
+            tokens = estimateRequestTokens(encoded),
             memory = memoryClassifier(content),
             persona = personaClassifier(content),
         ).also { messageCache[value] = it }
@@ -102,7 +101,7 @@ internal object PromptTokenEstimateCache {
     fun tools(value: JsonArray): Int {
         if (value.isEmpty()) return 0
         toolCache[value]?.let { return it }
-        return estimateModelTokens(value.toString()).also { toolCache[value] = it }
+        return estimateRequestTokens(value.toString()).also { toolCache[value] = it }
     }
 
     private const val MAX_MESSAGE_ESTIMATES = 2_048
