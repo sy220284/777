@@ -11,7 +11,6 @@ import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -25,8 +24,15 @@ import org.junit.Test
 class AutomationDispatchEndToEndAndroidTest {
     @Test fun scheduledTaskDispatchAndPersistedFailureReceiptLatency() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val store = AutomationStore(context, Json { ignoreUnknownKeys = true; encodeDefaults = true })
-        val scheduler = HarnessAutomationScheduler(context, store)
+        // Use the exact Hilt-owned singleton Store and Scheduler that the real
+        // WorkManager Worker uses. A second Store instance violates the single
+        // durable owner contract and races its WAL/read-write transactions.
+        val owner = dagger.hilt.android.EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            HarnessAutomationWorker.WorkerEntryPoint::class.java,
+        )
+        val store = owner.automationStore()
+        val scheduler = owner.automationScheduler()
         val manager = WorkManager.getInstance(context)
         val measurements = mutableListOf<Double>()
         val prefix = "perf-e2e-" + UUID.randomUUID().toString().take(8)
@@ -39,18 +45,37 @@ class AutomationDispatchEndToEndAndroidTest {
                     triggerAtMillis = System.currentTimeMillis(),
                     notify = false, mode = AutomationMode.CHAT, targetSessionId = null,
                 )
-                val task: AutomationTask = withTimeout(60_000L) {
-                    var settled: AutomationTask? = null
-                    while (settled == null) {
-                        val current = store.get(id)
-                        if (current?.status == AutomationStatus.FAILED &&
-                            current.runReceipts.lastOrNull()?.status == AutomationStatus.FAILED) {
-                            settled = current
-                        } else {
-                            delay(100)
+                val workName = HarnessAutomationScheduler.workName(
+                    id, requireNotNull(store.get(id)).scheduleGeneration
+                )
+                val task: AutomationTask = try {
+                    withTimeout(60_000L) {
+                        var settled: AutomationTask? = null
+                        while (settled == null) {
+                            val current = store.get(id)
+                            if (current?.status == AutomationStatus.FAILED &&
+                                current.runReceipts.lastOrNull()?.status == AutomationStatus.FAILED) {
+                                settled = current
+                            } else {
+                                delay(100)
+                            }
                         }
+                        requireNotNull(settled)
                     }
-                    requireNotNull(settled)
+                } catch (timedOut: kotlinx.coroutines.TimeoutCancellationException) {
+                    // Differentiate scheduling delays from Worker/settlement defects.
+                    // Never turn a timeout into a synthetic successful measurement.
+                    val snapshot = store.get(id)
+                    val infos = manager.getWorkInfosForUniqueWork(workName).get()
+                    throw AssertionError(
+                        "Real WorkManager did not settle after 60s: " +
+                            "taskStatus=${snapshot?.status} receipts=${snapshot?.runReceipts?.size} " +
+                            "lastError=${snapshot?.lastError?.take(160)} " +
+                            "workStates=${infos.map { it.state }} " +
+                            "attempts=${infos.map { it.runAttemptCount }} " +
+                            "workerIds=${infos.map { it.id }}",
+                        timedOut,
+                    )
                 }
                 assertEquals(1, task.runReceipts.size)
                 assertNotNull(task.lastError)
