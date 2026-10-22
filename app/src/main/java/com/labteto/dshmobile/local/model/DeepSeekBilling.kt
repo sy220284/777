@@ -14,7 +14,6 @@ import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.record
 import com.labteto.dshmobile.local.tools.string
 import com.labteto.dshmobile.local.usage.nonNegativeUsageDifference
-import com.labteto.dshmobile.local.usage.normalizedForAccounting
 import com.labteto.dshmobile.local.usage.saturatingUsageAdd
 import com.labteto.dshmobile.local.usage.saturatingUsageCostAdd
 import com.labteto.dshmobile.local.usage.saturatingUsageCostProduct
