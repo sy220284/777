@@ -39,15 +39,18 @@ class AutomationDispatchEndToEndAndroidTest {
                     triggerAtMillis = System.currentTimeMillis(),
                     notify = false, mode = AutomationMode.CHAT, targetSessionId = null,
                 )
-                val task = withTimeout<AutomationTask>(60_000L) {
-                    while (true) {
+                val task: AutomationTask = withTimeout(60_000L) {
+                    var settled: AutomationTask? = null
+                    while (settled == null) {
                         val current = store.get(id)
                         if (current?.status == AutomationStatus.FAILED &&
                             current.runReceipts.lastOrNull()?.status == AutomationStatus.FAILED) {
-                            return@withTimeout current
+                            settled = current
+                        } else {
+                            delay(100)
                         }
-                        delay(100)
                     }
+                    requireNotNull(settled)
                 }
                 assertEquals(1, task.runReceipts.size)
                 assertNotNull(task.lastError)
