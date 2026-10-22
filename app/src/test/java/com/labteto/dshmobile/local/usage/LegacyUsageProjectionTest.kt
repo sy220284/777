@@ -73,4 +73,43 @@ class LegacyUsageProjectionTest {
         assertEquals(40L, result.requestCount)
         assertTrue(result.estimatedCostCny >= backup.estimatedCostCny)
     }
+    @Test fun conflictingLegacyCacheCategoriesNeverOvercountExistingSqliteInput() {
+        val sqlite = TokenUsageAggregate(
+            inputTokens = 10, cacheHitTokens = 5, cacheMissTokens = 5, cacheWriteTokens = 2,
+        )
+        // Both snapshots are independently valid, but they disagree on classification.
+        val legacy = LegacyUsageCounters(
+            inputTokens = 10, cacheHitTokens = 10, cacheMissTokens = 0,
+        )
+        val gap = legacyUsageOffset(legacy, sqlite)
+        val result = sqlite.withLegacyUnattributedGap(gap)
+        assertEquals(0L, gap.inputTokens)
+        assertEquals(0L, gap.cacheHitTokens)
+        assertEquals(10L, result.inputTokens)
+        assertEquals(5L, result.cacheHitTokens)
+        assertEquals(5L, result.cacheMissTokens)
+        assertTrue(result.cacheHitTokens + result.cacheMissTokens <= result.inputTokens)
+    }
+
+    @Test fun legacyCacheDifferenceIsBoundedByActualMissingInputTokens() {
+        val sqlite = TokenUsageAggregate(
+            inputTokens = 90, cacheHitTokens = 20, cacheMissTokens = 70, cacheWriteTokens = 10,
+        )
+        val legacy = LegacyUsageCounters(
+            inputTokens = 100, cacheHitTokens = 31, cacheMissTokens = 69, cacheWriteTokens = 19,
+        )
+        val gap = legacyUsageOffset(legacy, sqlite)
+        val result = sqlite.withLegacyUnattributedGap(gap)
+        assertEquals(10L, gap.inputTokens)
+        assertEquals(10L, gap.cacheHitTokens)
+        assertEquals(0L, gap.cacheMissTokens)
+        assertEquals(0L, gap.cacheWriteTokens)
+        assertEquals(100L, result.inputTokens)
+        assertEquals(30L, result.cacheHitTokens)
+        assertEquals(70L, result.cacheMissTokens)
+        assertEquals(10L, result.cacheWriteTokens)
+        assertTrue(result.cacheHitTokens + result.cacheMissTokens <= result.inputTokens)
+        assertTrue(result.cacheWriteTokens <= result.cacheMissTokens)
+    }
+
 }
