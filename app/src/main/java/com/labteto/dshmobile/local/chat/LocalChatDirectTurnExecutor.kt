@@ -86,12 +86,14 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
         memoryInput: String = input,
         sourceMessageId: String? = null,
         replacingMessageId: String? = null,
+        regenerationPreparation: LocalChatRegenerationPreparation? = null,
     ): Job = scope.launch(start = CoroutineStart.LAZY) {
         run(
             input = input,
             memoryInput = memoryInput,
             sourceMessageId = sourceMessageId,
             replacingMessageId = replacingMessageId,
+            regenerationPreparation = regenerationPreparation,
         )
     }
 
@@ -100,13 +102,14 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
         memoryInput: String = input,
         sourceMessageId: String? = null,
         replacingMessageId: String? = null,
+        regenerationPreparation: LocalChatRegenerationPreparation? = null,
     ) {
         val admittedSessionId = runtimeStateStore.currentSessionId
         try {
             LocalSessionRuntimeRegistry.withOwner(
                 admittedSessionId, LocalSessionRuntimeKind.FOREGROUND,
             ) {
-                runUnderSessionOwner(admittedSessionId, input, memoryInput, sourceMessageId, replacingMessageId)
+                runUnderSessionOwner(admittedSessionId, input, memoryInput, sourceMessageId, replacingMessageId, regenerationPreparation)
             }
         } finally {
             queue.finishTurnAndStartNext(currentCoroutineContext()[Job])
@@ -120,6 +123,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
         memoryInput: String = input,
         sourceMessageId: String? = null,
         replacingMessageId: String? = null,
+        regenerationPreparation: LocalChatRegenerationPreparation? = null,
     ) {
         if (runtimeStateStore.currentSessionId != sessionId) throw CancellationException("会话已切换")
         LocalExecutionService.withTurn(
@@ -127,7 +131,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             sessionId = sessionId,
             error = { runtimeStateStore.state.value.error },
             onRejected = { runtimeStateStore.projection.publishError("系统拒绝前台执行，聊天回合未启动") },
-        ) { runOwned(sessionId, input, memoryInput, sourceMessageId, replacingMessageId) }
+        ) { runOwned(sessionId, input, memoryInput, sourceMessageId, replacingMessageId, regenerationPreparation) }
     }
 
     private suspend fun runOwned(
@@ -136,6 +140,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
         memoryInput: String,
         sourceMessageId: String?,
         replacingMessageId: String?,
+        regenerationPreparation: LocalChatRegenerationPreparation?,
     ) {
         LocalChatPostTurnJobOwner.cancel()
         runtimeStateStore.foregroundInteractions.cancelAll()
@@ -146,6 +151,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
         )
 
         val eventLog = sessionStorage.eventLogs.get(sessionId)
+        var regenerationCommitted = false
         try {
             check(modelHistory.ensureSystemPrompt(sessionId, chatSystemPrompt())) {
                 "Chat system prompt 写入时前台会话已切换"
@@ -172,7 +178,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
 
             val branchEligible = snapshot.transcriptIndex.branchingEligible
             val branchParentId = snapshot.transcriptIndex.latestUserMessageId
-            val branchBase = snapshot.chat.chatBranches
+            val branchBase = regenerationPreparation?.branches ?: snapshot.chat.chatBranches
             // Rebuild from the selected prefix, not the cached history: the latter may
             // contain a superseded answer in a previously compacted summary.
             val regenerationHistory = replacingMessageId?.let { oldId ->
@@ -185,6 +191,12 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             // Style/deduplication references are model inputs too, not just history messages.
             val generationSnapshot = if (replacingMessageId == null) snapshot else snapshot.copy(
                 messages = chatRegenerationReferenceMessages(snapshot.messages, replacingMessageId),
+                chat = snapshot.chat.copy(
+                    chatState = requireNotNull(regenerationPreparation).baseState,
+                    chatContext = regenerationPreparation.baseContext,
+                    replySuggestions = emptyList(),
+                    chatBranches = branchBase,
+                ),
             )
             val supersededAnswerIds = replacingMessageId?.let { oldId ->
                 chatRegenerationPreviousAnswerIds(branchBase, oldId)
@@ -223,7 +235,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 history = boundedChatRequestHistory(
                     durableHistory,
                     recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
-                    currentFacts = snapshot.chat.chatContext.canonicalFactLines(),
+                    currentFacts = generationSnapshot.chat.chatContext.canonicalFactLines(),
                 ),
                 stableContext = turnContext.stablePrompt,
                 dynamicContext = dynamicContext + "\n" + com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
