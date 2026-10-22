@@ -63,7 +63,7 @@ class LocalMcpOAuthProtocolEndToEndAndroidTest {
                         assertEquals("refresh_token", values["grant_type"])
                         assertEquals("refresh-one", values["refresh_token"])
                     }
-                    """{"token_type":"Bearer","access_token":"access-$calls","refresh_token":"refresh-${if (calls == 1) "one" else "two"}","expires_in":3600}"""
+                    """{"token_type":"Bearer","access_token":"access-$calls","refresh_token":"refresh-${if (calls % 2 == 1) "one" else "two"}","expires_in":3600}"""
                 }
                 "/revoke" -> "{}"
                 else -> { status = 404; "{}" }
