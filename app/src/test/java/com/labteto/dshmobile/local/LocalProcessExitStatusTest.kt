@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.runtime.formatProcessExitStatus
+import com.labteto.dshmobile.local.runtime.isAndroid17MemoryLimiterExit
 import com.labteto.dshmobile.local.runtime.isExpectedProcessExit
 import com.labteto.dshmobile.local.runtime.processExitReasonLabel
 import org.junit.Assert.assertFalse
@@ -25,8 +26,18 @@ class LocalProcessExitStatusTest {
         assertTrue(text.contains("系统原因码 13"))
         assertTrue(text.contains("状态码 9"))
         assertTrue(text.contains("MemoryLimiter:AnonSwap"))
+        assertTrue(text.contains("Android 17 内存限制触发"))
         assertTrue(text.contains("PSS 12345 KiB"))
         assertTrue(text.contains("RSS 67890 KiB"))
+    }
+
+    @Test
+    fun classifierDoesNotRelabelOrdinaryAndroid16Exits() {
+        assertTrue(isAndroid17MemoryLimiterExit("MemoryLimiter:AnonSwap reached hard limit"))
+        assertTrue(isAndroid17MemoryLimiterExit("memorylimiter:anonswap"))
+        assertFalse(isAndroid17MemoryLimiterExit(null))
+        assertFalse(isAndroid17MemoryLimiterExit("Low memory kill"))
+        assertFalse(isAndroid17MemoryLimiterExit("native crash"))
     }
 
     @Test
