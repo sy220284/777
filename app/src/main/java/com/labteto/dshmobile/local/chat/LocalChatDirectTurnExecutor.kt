@@ -366,6 +366,8 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 appendEvent = { type, data -> eventLog.append(type, data) },
             )
 
+            // Reject an incomplete replacement before it can materialize new media files.
+            requireCompleteChatRegeneration(replacingMessageId, reply)
             val materializedReply = materializeLocalChatReplyMedia(
                 reply = reply,
                 workspaceRoot = File(sessionStorage.files.workspace.path),
@@ -405,8 +407,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                         ("transcript" to encodeTranscriptMessages(transcriptMessages)),
                 )
             }
-            // Do not supersede a complete reply with an incomplete regenerated candidate.
-            requireCompleteChatRegeneration(replacingMessageId, durableReply)
+            // Only complete candidate replies can reach the durable replacement commit.
 
             val assistantEvent = if (replacingMessageId == null) {
                 eventLog.append("assistant/message", assistantData)
