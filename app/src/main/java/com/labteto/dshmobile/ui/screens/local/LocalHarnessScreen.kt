@@ -968,38 +968,64 @@ fun LocalHarnessScreen(
                 (shell.sessionId != it || shell.loading)
         }
         if (waitingForSession != null) {
-            // The old session must never remain interactive or visually masquerade
-            // as the pending target. Only a cheap, session-identified shell is shown.
+            // Cheap, read-only rendering of the selected session's SQLite tail.
+            // This page is never connected to the outgoing Chat/Work send handlers.
             Surface(modifier = Modifier.fillMaxSize()) {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
+                Column(modifier = Modifier.fillMaxSize()) {
                     Text(
-                        shell.sessions.firstOrNull { it.id == waitingForSession }?.title
+                        text = shell.sessions.firstOrNull { it.id == waitingForSession }?.title
                             ?.ifBlank { "会话" } ?: "会话",
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
                         style = DsType.headline17,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(Modifier.height(12.dp))
-                    if (pendingDrawerPreview.isEmpty()) {
-                        Text("正在打开会话…", style = DsType.std14)
-                    } else {
-                        pendingDrawerPreview.takeLast(6).forEach { message ->
-                            if (message.role == "user" || message.role == "assistant") {
-                                Spacer(Modifier.height(8.dp))
-                                Text(
-                                    text = (if (message.role == "user") "我：" else "助手：") +
-                                        message.content.take(240),
-                                    style = DsType.std14,
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
+                    val previewItems = pendingDrawerPreview
+                        .filter { it.role == "user" || it.role == "assistant" }
+                        .takeLast(12)
+                    val previewScroll = rememberLazyListState()
+                    LaunchedEffect(waitingForSession, previewItems.lastOrNull()?.id) {
+                        if (previewItems.isNotEmpty()) {
+                            previewScroll.scrollToItem(previewItems.lastIndex)
+                        }
+                    }
+                    LazyColumn(
+                        state = previewScroll,
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        if (previewItems.isEmpty()) {
+                            item(key = "loading-conversation") {
+                                Text("正在读取最近消息…", style = DsType.std14)
                             }
                         }
-                        Spacer(Modifier.height(12.dp))
-                        Text("正在恢复会话运行状态…", style = DsType.std14)
+                        items(previewItems, key = { it.id }) { message ->
+                            val fromUser = message.role == "user"
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = if (fromUser)
+                                    Arrangement.End else Arrangement.Start,
+                            ) {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(0.92f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    tonalElevation = if (fromUser) 2.dp else 0.dp,
+                                ) {
+                                    Text(
+                                        text = message.content.take(1_500),
+                                        modifier = Modifier.padding(12.dp),
+                                        style = DsType.std14,
+                                    )
+                                }
+                            }
+                        }
                     }
+                    Text(
+                        text = "正在恢复会话运行状态…",
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        style = DsType.std14,
+                    )
                 }
             }
         } else {
