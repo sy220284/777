@@ -18,6 +18,7 @@ import kotlinx.serialization.json.contentOrNull
  */
 internal data class WorkImprovementAdvice(
     val id: String, val sourceSession: String, val sourceRunId: String,
+    val sourceTaskRunId: String,
     val goalSignature: String, val projectId: String, val model: String, val profileId: String,
     val category: String, val cue: String, val guidance: String,
     val baselineToolCalls: Int, val baselineToolErrors: Int,
@@ -55,6 +56,7 @@ internal class LocalWorkImprovementArchive(
         val receipts: List<GoalReceipt>,
         val proposals: List<Proposal>,
         val trialIds: Set<String>,
+        val trialGoalIds: Map<String, Set<String>>,
         val adoptedIds: Set<String>,
         val retiredIds: Set<String>,
         val evaluations: List<Evaluation>,
@@ -72,6 +74,8 @@ internal class LocalWorkImprovementArchive(
         if (goal.status != "active" || goal.id.isBlank()) return null
         val signature = workGoalComparisonKey(goal)
         val used = cached.values.flatMap { it.trialIds + it.retiredIds }.toSet()
+        val usedForThisGoal = cached.values.flatMap { it.trialGoalIds.entries }
+            .filter { goal.id in it.value }.map { it.key }.toSet()
         val active = cached.values.flatMap { it.adoptedIds }.toSet()
         val matches = cached.values.flatMap(Facts::proposals)
             .asSequence().map(Proposal::advice)
@@ -80,7 +84,9 @@ internal class LocalWorkImprovementArchive(
             .filter { it.id !in cached.values.flatMap { facts -> facts.retiredIds } }
             .distinctBy(WorkImprovementAdvice::id).toList()
         val adopted = matches.firstOrNull { it.id in active }
-        return adopted?.copy(active = true) ?: matches.firstOrNull { it.id !in used }?.copy(active = false)
+        return adopted?.copy(active = true) ?: matches.firstOrNull {
+            it.id !in used || it.id in usedForThisGoal
+        }?.copy(active = false)
     }
 
     /** Create only missing files. The user's notes are never overwritten. */
@@ -288,6 +294,7 @@ internal class LocalWorkImprovementArchive(
         val receipts = ArrayDeque<GoalReceipt>()
         val proposals = ArrayDeque<Proposal>()
         val trialIds = linkedSetOf<String>()
+        val trialGoalIds = linkedMapOf<String, MutableSet<String>>()
         val adoptedIds = linkedSetOf<String>()
         val retiredIds = linkedSetOf<String>()
         val evaluations = ArrayDeque<Evaluation>()
@@ -338,6 +345,7 @@ internal class LocalWorkImprovementArchive(
                         val advice = WorkImprovementAdvice(
                             id = candidateId, sourceSession = session,
                             sourceRunId = data.text("source_run_id").orEmpty(),
+                            sourceTaskRunId = data.text("source_task_run_id").orEmpty(),
                             goalSignature = data.text("goal_signature").orEmpty(),
                             projectId = data.text("project_id").orEmpty(),
                             model = data.text("model").orEmpty(),
@@ -355,7 +363,11 @@ internal class LocalWorkImprovementArchive(
                             data.text("reason").orEmpty().take(300), advice))
                     }
                 }
-                "work/improvement-trial" -> data.text("candidate_id")?.let(trialIds::add)
+                "work/improvement-trial" -> data.text("candidate_id")?.let { candidateId ->
+                    trialIds.add(candidateId)
+                    val goalId = data.text("goal_id").orEmpty()
+                    if (goalId.isNotBlank()) trialGoalIds.getOrPut(candidateId, ::linkedSetOf).add(goalId)
+                }
                 "work/improvement-adopted" -> data.text("candidate_id")?.let(adoptedIds::add)
                 "work/improvement-evaluation" -> {
                     val candidateId = data.text("candidate_id").orEmpty()
@@ -380,7 +392,7 @@ internal class LocalWorkImprovementArchive(
         }
         return Facts(end, fileSize, modifiedAt, turns, toolReceipts, failedTools, goals.size,
             machineEvidenceGoals, problemsCount, problems.toList(), receipts.toList(), proposals.toList(),
-            trialIds, adoptedIds, retiredIds, evaluations.toList())
+            trialIds, trialGoalIds, adoptedIds, retiredIds, evaluations.toList())
     }
 
     private fun proposalLines(items: List<Proposal>): String =
