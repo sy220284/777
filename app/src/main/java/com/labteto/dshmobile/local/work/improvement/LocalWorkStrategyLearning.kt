@@ -184,12 +184,48 @@ internal fun workGoalComparisonKey(goal: LocalGoal): String {
         .joinToString("") { "%02x".format(it) }
 }
 
+/**
+ * Read facts owned by this completed Goal only. A later Goal or resumed different Goal
+ * must never influence this Goal's learning baseline or adoption comparison.
+ * Both bounds are durable goal/state events; reads stay cursor-paged.
+ */
+internal fun forEachCompletedGoalEvent(
+    log: com.labteto.dshmobile.local.session.LocalSessionEventLog,
+    goal: LocalGoal,
+    visit: (com.labteto.dshmobile.local.session.LocalSessionEventLog.Event) -> Unit,
+) {
+    if (goal.status != "completed" || goal.id.isBlank() || goal.startedAtSequence < 0L) return
+    val completed = log.latestMatching(setOf("goal/state")) { data ->
+        (data["id"] as? JsonPrimitive)?.contentOrNull == goal.id &&
+            (data["revision"] as? JsonPrimitive)?.contentOrNull == goal.revision.toString() &&
+            (data["status"] as? JsonPrimitive)?.contentOrNull == "completed" &&
+            (data["startedAtSequence"] as? JsonPrimitive)?.contentOrNull == goal.startedAtSequence.toString()
+    } ?: return
+    if (completed.sequence <= goal.startedAtSequence) return
+    var cursor = goal.startedAtSequence - 1L
+    var ownsGoal = false
+    while (cursor < completed.sequence) {
+        val page = log.pageAfter(cursor, limit = 80)
+        if (page.isEmpty()) break
+        for (event in page) {
+            if (event.sequence > completed.sequence) return
+            if (event.type == "goal/state") {
+                val stateId = (event.data["id"] as? JsonPrimitive)?.contentOrNull
+                if (stateId != null) ownsGoal = stateId == goal.id
+            } else if (ownsGoal && event.sequence > goal.startedAtSequence) {
+                visit(event)
+            }
+        }
+        cursor = page.last().sequence
+    }
+}
+
 internal fun workGoalToolMetrics(
     log: com.labteto.dshmobile.local.session.LocalSessionEventLog, goal: LocalGoal,
 ): Pair<Int, Int> {
     var calls = 0
     var failures = 0
-    log.forEachAfter(goal.startedAtSequence) { event ->
+    forEachCompletedGoalEvent(log, goal) { event ->
         if (event.type == "tool/result") {
             calls++
             if ((event.data["is_error"] as? JsonPrimitive)?.contentOrNull == "true") failures++
