@@ -47,6 +47,9 @@ internal class LocalWorkImprovementArchive(
         val lastSequence: Long,
         val fileSize: Long,
         val modifiedAt: Long,
+        val fileIdentity: String,
+        val workMode: Boolean,
+        val seenGoalKeys: Set<String>,
         val workTurns: Int,
         val toolReceipts: Int,
         val failedTools: Int,
@@ -128,10 +131,21 @@ internal class LocalWorkImprovementArchive(
                 val end = log.latestSequence()
                 val size = file.length()
                 val modified = file.lastModified()
+                val identity = runCatching {
+                    Files.readAttributes(file.toPath(), java.nio.file.attribute.BasicFileAttributes::class.java,
+                        java.nio.file.LinkOption.NOFOLLOW_LINKS).fileKey()?.toString().orEmpty()
+                }.getOrDefault("")
                 val existing = cached[id]
                 if (existing == null || existing.lastSequence != end ||
-                    existing.fileSize != size || existing.modifiedAt != modified) {
-                    cached[id] = readFacts(id, log, end, size, modified)
+                    existing.fileSize != size || existing.modifiedAt != modified ||
+                    existing.fileIdentity != identity) {
+                    // Only append-only growth on the SAME file identity may reuse the
+                    // projection cursor; replacements, rotations and truncation rebuild.
+                    val prior = existing?.takeIf {
+                        it.fileIdentity == identity && end > it.lastSequence &&
+                            size >= it.fileSize && modified >= it.modifiedAt
+                    }
+                    cached[id] = readFacts(id, log, end, size, modified, identity, prior)
                 }
             }
         }
@@ -289,23 +303,27 @@ internal class LocalWorkImprovementArchive(
         ensureInitialized()
     }
 
-    private fun readFacts(session: String, log: SessionEventLog, end: Long, fileSize: Long, modifiedAt: Long): Facts {
-        var isWork = false
-        var turns = 0
-        var toolReceipts = 0
-        var failedTools = 0
-        var problemsCount = 0
-        val problems = ArrayDeque<Problem>()
-        val goals = linkedSetOf<String>()
-        var machineEvidenceGoals = 0
-        val receipts = ArrayDeque<GoalReceipt>()
-        val proposals = ArrayDeque<Proposal>()
-        val trialIds = linkedSetOf<String>()
+    private fun readFacts(session: String, log: SessionEventLog, end: Long, fileSize: Long,
+        modifiedAt: Long, fileIdentity: String, previous: Facts?): Facts {
+        var isWork = previous?.workMode ?: false
+        var turns = previous?.workTurns ?: 0
+        var toolReceipts = previous?.toolReceipts ?: 0
+        var failedTools = previous?.failedTools ?: 0
+        var problemsCount = previous?.problemsCount ?: 0
+        val problems = ArrayDeque<Problem>().apply { addAll(previous?.problems.orEmpty()) }
+        val goals = previous?.seenGoalKeys?.toMutableSet() ?: linkedSetOf()
+        var machineEvidenceGoals = previous?.machineEvidenceGoals ?: 0
+        val receipts = ArrayDeque<GoalReceipt>().apply { addAll(previous?.receipts.orEmpty()) }
+        val proposals = ArrayDeque<Proposal>().apply { addAll(previous?.proposals.orEmpty()) }
+        val trialIds = previous?.trialIds?.toMutableSet() ?: linkedSetOf()
         val trialGoalIds = linkedMapOf<String, MutableSet<String>>()
-        val adoptedIds = linkedSetOf<String>()
-        val retiredIds = linkedSetOf<String>()
-        val evaluations = ArrayDeque<Evaluation>()
-        log.forEachAfter(-1L) { e ->
+        previous?.trialGoalIds?.forEach { (id, targets) ->
+            trialGoalIds[id] = targets.toMutableSet()
+        }
+        val adoptedIds = previous?.adoptedIds?.toMutableSet() ?: linkedSetOf()
+        val retiredIds = previous?.retiredIds?.toMutableSet() ?: linkedSetOf()
+        val evaluations = ArrayDeque<Evaluation>().apply { addAll(previous?.evaluations.orEmpty()) }
+        log.forEachAfter(previous?.lastSequence ?: -1L) { e ->
             val data = e.data
             when (e.type) {
                 "agent/run-checkpoint" -> {
@@ -398,7 +416,8 @@ internal class LocalWorkImprovementArchive(
                 }
             }
         }
-        return Facts(end, fileSize, modifiedAt, turns, toolReceipts, failedTools, goals.size,
+        return Facts(end, fileSize, modifiedAt, fileIdentity, isWork, goals.toSet(),
+            turns, toolReceipts, failedTools, goals.size,
             machineEvidenceGoals, problemsCount, problems.toList(), receipts.toList(), proposals.toList(),
             trialIds, trialGoalIds, adoptedIds, retiredIds, evaluations.toList())
     }
