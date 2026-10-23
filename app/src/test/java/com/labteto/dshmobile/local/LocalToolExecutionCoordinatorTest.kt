@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.tools.LocalToolCatalog
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
+import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
 import com.labteto.dshmobile.local.work.LocalWorkState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -1371,6 +1372,42 @@ class LocalToolExecutionCoordinatorTest {
         )
         assertEquals(visible, detachedEnabled)
         assertFalse("process_exec" in visible)
+    }
+
+    @Test
+    fun registeredOptionalCommandBecomesExecutableAfterModelDiscovery() = runBlocking {
+        var executed = 0
+        val registry = ToolRegistry().apply {
+            register(tool("process_exec", ToolAccess.PROCESS, ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL, family = "运行时",
+                keywords = setOf("运行命令")) {
+                executed++
+                ToolResult("real-execution-receipt")
+            })
+        }
+        val executor = coordinator(registry)
+        val projection = LocalToolSchemaProjection(registry, executor)
+        val surface = LocalModelToolStepSurface()
+        val policy = localAgentRunPolicy(LocalUsageMode.WORK)
+        val state = com.labteto.dshmobile.local.model.LocalModelState()
+
+        surface.capture(projection.modelSchemas(policy, state, false, emptyList()))
+        assertFalse(surface.allows("process_exec"))
+
+        val discovered = executor.searchCapabilities("process_exec")
+        assertTrue(discovered.contains("process_exec"))
+        surface.capture(projection.modelSchemas(
+            policy, state, false, emptyList(), executor.enabledOptionalSnapshot(),
+        ))
+        assertTrue(surface.allows("process_exec"))
+        val result = executor.executeScoped(
+            LocalToolCall("dynamic-call", "process_exec", JsonObject(emptyMap()), "{}"),
+            sessionId = "work", allowMutation = true, planModeEnabled = false,
+            approval = { _, _, _ -> true },
+        )
+        assertFalse(result.isError)
+        assertEquals("real-execution-receipt", result.content)
+        assertEquals(1, executed)
     }
 
     @Test
