@@ -293,6 +293,36 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun explicitlyDiscoveredCapabilitySurvivesLaterWorkStepHeuristicRefresh() {
+        val registry = ToolRegistry().apply {
+            register(tool(name = "process_exec", access = ToolAccess.PROCESS,
+                approval = ToolApprovalPolicy.ALWAYS, exposure = ToolExposure.OPTIONAL,
+                family = "运行时", keywords = setOf("执行命令")) { ToolResult("ok") })
+            repeat(300) { index ->
+                register(tool(name = "search_batch_$index", access = ToolAccess.READ_ONLY,
+                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                    family = "搜索扩展", keywords = setOf("代码搜索")) { ToolResult("ok") })
+            }
+        }
+        val coordinator = coordinator(registry)
+        // User task heuristics may select many expensive optional tool definitions first.
+        coordinator.enableTaskRelevantOptionalTools("代码搜索")
+        assertFalse("process_exec" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
+        coordinator.searchCapabilities("process_exec")
+        assertTrue("process_exec" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
+
+        // A later Work model step must append task-relevant registered tools without
+        // moving the explicit capability_search choice behind hundreds of heuristic hits.
+        coordinator.enableTaskRelevantOptionalTools("代码搜索", prioritize = false)
+        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
+        assertTrue("process_exec" in visible)
+        assertEquals("process_exec", visible.first())
+        // A new user turn deliberately gets to reorder relevance again.
+        coordinator.enableTaskRelevantOptionalTools("代码搜索", prioritize = true)
+        assertEquals("search_batch_0", coordinator.enabledOptionalSnapshot().first())
+    }
+
+    @Test
     fun currentTaskReordersPreviouslySelectedToolsAheadOfOlderWork() {
         val registry = ToolRegistry().apply {
             repeat(200) { index ->
