@@ -87,6 +87,9 @@ class LocalSessionStorageRuntime @Inject internal constructor(
         )
     }
 
+    internal fun previewMessages(sessionId: String, limit: Int = 12): List<com.labteto.dshmobile.local.session.LocalHarnessMessage> =
+        repository.preview(sessionId, limit)
+
     internal fun enqueueSnapshot(snapshot: LocalHarnessSession) {
         coordinator.enqueue(snapshot)
     }

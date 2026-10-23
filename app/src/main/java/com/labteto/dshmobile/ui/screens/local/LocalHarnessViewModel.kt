@@ -158,6 +158,8 @@ class LocalHarnessViewModel @Inject constructor(
         scope = viewModelScope,
     )
     internal val transcriptHistory = transcriptHistoryController.history
+    internal suspend fun previewSession(sessionId: String): List<com.labteto.dshmobile.local.session.LocalHarnessMessage> =
+        sessionUi.previewMessages(sessionId)
     private val conversationUiState = LocalConversationUiStateStore(appContext)
     val pinnedSessionIds = conversationUiState.pinnedSessionIds
     val sessionTitleOverrides = conversationUiState.sessionTitleOverrides

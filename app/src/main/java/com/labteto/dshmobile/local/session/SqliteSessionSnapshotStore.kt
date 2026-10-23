@@ -58,6 +58,12 @@ internal class SqliteSessionSnapshotStore(
                 "project_id TEXT, lineage_id TEXT)"
         )
         db.execSQL("CREATE INDEX session_summaries_recent ON session_summaries(updated_at DESC, id)")
+        db.execSQL(
+            "CREATE TABLE session_message_tail (" +
+                "session_id TEXT NOT NULL REFERENCES session_snapshots(id) ON DELETE CASCADE, " +
+                "ordinal INTEGER NOT NULL, payload TEXT NOT NULL, " +
+                "PRIMARY KEY(session_id, ordinal))"
+        )
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -96,6 +102,8 @@ internal class SqliteSessionSnapshotStore(
         }
         val snapshot = json.decodeFromJsonElement(LocalHarnessSession.serializer(), payload)
         val summary = projectLocalSessionSummary(snapshot, domainCodecs)
+        val preview = snapshot.transcriptWindow.ifEmpty { snapshot.messages }
+            .takeLast(MAX_PREVIEW_MESSAGES)
         val db = writableDatabase
         db.beginTransactionNonExclusive()
         try {
@@ -132,6 +140,14 @@ internal class SqliteSessionSnapshotStore(
             check(db.insertWithOnConflict(
                 "session_summaries", null, summaryValues, SQLiteDatabase.CONFLICT_REPLACE,
             ) >= 0L) { "SQLite 会话摘要保存失败：$id" }
+            db.delete("session_message_tail", "session_id=?", arrayOf(id))
+            preview.forEachIndexed { ordinal, message ->
+                check(db.insertOrThrow("session_message_tail", null, ContentValues().apply {
+                    put("session_id", id)
+                    put("ordinal", ordinal)
+                    put("payload", json.encodeToString(LocalHarnessMessage.serializer(), message))
+                }) >= 0L) { "SQLite 最近消息索引写入失败：$id" }
+            }
             db.setTransactionSuccessful()
             return SessionDocument(version, id, updatedAt, payload)
         } finally {
@@ -171,6 +187,22 @@ internal class SqliteSessionSnapshotStore(
         }
     }
 
+    override fun recentMessages(id: String, limit: Int): List<LocalHarnessMessage> {
+        validateId(id)
+        require(limit in 1..MAX_PREVIEW_MESSAGES) { "消息预览数量越界" }
+        return readableDatabase.rawQuery(
+            "SELECT payload FROM session_message_tail WHERE session_id=? " +
+                "ORDER BY ordinal DESC LIMIT ?",
+            arrayOf(id, limit.toString()),
+        ).use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) {
+                    add(json.decodeFromString(LocalHarnessMessage.serializer(), cursor.getString(0)))
+                }
+            }.asReversed()
+        }
+    }
+
     override fun ids(): List<String> = readableDatabase.rawQuery(
         "SELECT id FROM session_snapshots ORDER BY updated_at DESC, id", null,
     ).use { cursor ->
@@ -195,6 +227,7 @@ internal class SqliteSessionSnapshotStore(
     private companion object {
         const val DATABASE_NAME = "local_session_snapshots_v1.db"
         const val SCHEMA_VERSION = 1
+        const val MAX_PREVIEW_MESSAGES = 12
         val ID_PATTERN = Regex("[A-Za-z0-9._-]{1,128}")
     }
 }

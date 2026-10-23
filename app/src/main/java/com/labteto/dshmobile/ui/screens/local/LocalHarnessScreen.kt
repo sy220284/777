@@ -218,6 +218,16 @@ fun LocalHarnessScreen(
     // Foreground navigation is visual immediately; the heavy runtime restore may follow.
     // Never render the previously active transcript under the newly chosen session title.
     var pendingDrawerSessionId by remember { mutableStateOf<String?>(null) }
+    var pendingDrawerPreview by remember { mutableStateOf<List<LocalHarnessMessage>>(emptyList()) }
+    LaunchedEffect(pendingDrawerSessionId) {
+        val target = pendingDrawerSessionId
+        pendingDrawerPreview = emptyList()
+        if (target != null) {
+            val preview = runCatching { viewModel.previewSession(target) }.getOrDefault(emptyList())
+            // Generation is checked by LaunchedEffect cancellation and exact identity.
+            if (pendingDrawerSessionId == target) pendingDrawerPreview = preview
+        }
+    }
     var drawerFeatureOriginStack by rememberSaveable { mutableStateOf<List<String>?>(null) }
     var conversationOpenedFromDrawer by rememberSaveable { mutableStateOf(false) }
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
@@ -972,7 +982,24 @@ fun LocalHarnessScreen(
                         style = DsType.headline17,
                     )
                     Spacer(Modifier.height(12.dp))
-                    Text("正在打开会话…", style = DsType.std14)
+                    if (pendingDrawerPreview.isEmpty()) {
+                        Text("正在打开会话…", style = DsType.std14)
+                    } else {
+                        pendingDrawerPreview.takeLast(6).forEach { message ->
+                            if (message.role == "user" || message.role == "assistant") {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = (if (message.role == "user") "我：" else "助手：") +
+                                        message.content.take(240),
+                                    style = DsType.std14,
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Text("正在恢复会话运行状态…", style = DsType.std14)
+                    }
                 }
             }
         } else {

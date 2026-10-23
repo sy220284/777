@@ -25,6 +25,8 @@ internal interface LocalSessionSnapshotStore {
     /** Native summaries share the same transaction as the session snapshot. */
     val nativeSummaries: Boolean get() = false
     fun readSummaries(): List<LocalSessionSummary> = emptyList()
+    /** Small, read-only foreground preview; never used as the model's canonical context. */
+    fun recentMessages(id: String, limit: Int): List<LocalHarnessMessage> = emptyList()
     fun evict(id: String) {}
 }
 

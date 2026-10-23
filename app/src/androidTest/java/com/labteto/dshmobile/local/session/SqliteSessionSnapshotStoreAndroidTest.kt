@@ -36,6 +36,8 @@ class SqliteSessionSnapshotStoreAndroidTest {
                 assertEquals(2L, first.lastModified("s1"))
                 assertEquals(listOf("s1"), first.ids())
                 assertEquals("第二次", first.readSummaries().single().title)
+                // Snapshot's visible window is the source of the materialized preview.
+                assertTrue(first.recentMessages("s1", 12).isEmpty())
                 assertEquals(10L, first.readSummaries().single().updatedAt)
             }
             SqliteSessionSnapshotStore(context, Json, name).use { second ->
@@ -47,6 +49,7 @@ class SqliteSessionSnapshotStoreAndroidTest {
                 assertNull(second.read("s1"))
                 assertFalse(second.hasRecoverableSnapshot("s1"))
                 assertTrue(second.readSummaries().isEmpty())
+                assertTrue(second.recentMessages("s1", 12).isEmpty())
             }
             SqliteSessionSnapshotStore(context, Json, name).use { third ->
                 assertTrue(third.ids().isEmpty())

@@ -24,6 +24,9 @@ import kotlinx.coroutines.withContext
 class LocalSessionUiFacade @Inject constructor(
     private val session: LocalSessionReadRuntime,
 ) : UiMessageHistoryPort {
+    internal suspend fun previewMessages(sessionId: String, limit: Int = 12): List<LocalHarnessMessage> =
+        withContext(Dispatchers.IO) { session.previewTail(sessionId, limit) }
+
     private data class Cursor(val sessionId: String, val instance: String, val reset: Long,
         val ownerCursor: LocalTranscriptPageCursor) : UiTranscriptCursor
 

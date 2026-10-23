@@ -8,7 +8,7 @@ import javax.inject.Singleton
 /** Read-only Session capability for bounded, authorized transcript access. */
 @Singleton
 class LocalSessionReadRuntime @Inject internal constructor(
-    sessionStorage: LocalSessionStorageRuntime,
+    private val sessionStorage: LocalSessionStorageRuntime,
     runtimeStateStore: LocalRuntimeStateStore,
     activeSessionScopes: LocalActiveSessionScopeProvider,
     eventLogs: LocalSessionEventLogRegistry,
@@ -40,6 +40,12 @@ class LocalSessionReadRuntime @Inject internal constructor(
         val page = LocalSessionTranscriptPager(log).page(cursor, limit)
         check(!log.isClosed && log.resetGeneration == reset) { "历史已更新，请重新加载" }
         return ReadPage(page, instance, reset)
+    }
+
+    internal fun previewTail(sessionId: String, limit: Int): List<LocalHarnessMessage> {
+        // The same authorized Session capability is checked before exposing derived SQLite rows.
+        access.authorizedLog(sessionId)
+        return sessionStorage.previewMessages(sessionId, limit)
     }
 
     internal fun transcriptTail(sessionId: String, limit: Int): List<LocalHarnessMessage> =

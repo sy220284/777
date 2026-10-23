@@ -253,6 +253,19 @@ internal class LocalSessionRepository(
 
     fun read(id: String): LocalHarnessSession? = readWithLegacyApproval(id)?.session
 
+    fun preview(id: String, limit: Int = 12): List<LocalHarnessMessage> {
+        require(limit in 1..12)
+        // Lock-order matches read/delete; a removed session must never leak a stale preview.
+        return synchronized(sessionLock(id)) {
+            if (synchronized(lock) { id in deletedIds }) emptyList()
+            else {
+                val latest = synchronized(lock) { latestSnapshots[id] }
+                if (latest != null) latest.transcriptWindow.ifEmpty { latest.messages }.takeLast(limit)
+                else snapshotStore.recentMessages(id, limit)
+            }
+        }
+    }
+
     fun readWithLegacyApproval(id: String): LocalSessionRead? = synchronized(sessionLock(id)) {
         val (deleted, latest) = synchronized(lock) {
             (id in deletedIds) to latestSnapshots[id]
