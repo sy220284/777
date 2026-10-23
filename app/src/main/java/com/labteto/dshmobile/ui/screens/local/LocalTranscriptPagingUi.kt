@@ -34,6 +34,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /** Retarget an unfinished initial scroll when a resumed subscription replaces its cached tail. */
 @Composable
