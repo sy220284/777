@@ -130,9 +130,13 @@ internal class SqliteSessionSnapshotStore(
                 put("revision", lastRevision + 1L)
                 put("payload", payload.toString())
             }
-            check(db.insertWithOnConflict(
-                "session_snapshots", null, values, SQLiteDatabase.CONFLICT_REPLACE,
-            ) >= 0L) { "SQLite 会话保存失败：$id" }
+            // REPLACE deletes the old parent row, cascading through its child tables.
+            // An in-place UPDATE preserves the FK graph and avoids churn on every
+            // streaming/snapshot write; INSERT is only used for a genuinely new id.
+            val updated = db.update("session_snapshots", values, "id=?", arrayOf(id))
+            if (updated == 0) {
+                db.insertOrThrow("session_snapshots", null, values)
+            }
             val summaryValues = ContentValues().apply {
                 put("id", summary.id)
                 put("title", summary.title)

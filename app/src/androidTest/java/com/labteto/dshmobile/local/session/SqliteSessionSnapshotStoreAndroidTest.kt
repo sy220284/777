@@ -61,6 +61,37 @@ class SqliteSessionSnapshotStoreAndroidTest {
         }
     }
 
+    @Test fun repeatedSnapshotUpdatesPreserveChildRowsAndMonotonicRevisions() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "sqlite-snapshot-update-${UUID.randomUUID()}.db"
+        try {
+            SqliteSessionSnapshotStore(context, Json, name).use { db ->
+                repeat(40) { index ->
+                    val snapshot = LocalHarnessSession(
+                        id = "stream",
+                        title = "回合 $index",
+                        transcriptWindow = listOf(LocalHarnessMessage(
+                            id = "chat",
+                            role = "assistant",
+                            content = "令牌 $index",
+                            createdAt = index.toLong(),
+                        )),
+                    )
+                    db.write(
+                        "stream",
+                        Json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject,
+                        updatedAt = index.toLong(),
+                    )
+                }
+                assertEquals(40L, db.lastModified("stream"))
+                assertEquals("回合 39", db.readSummaries().single().title)
+                assertEquals("令牌 39", db.recentMessages("stream", 12).single().content)
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
     @Test fun durableWriteRevisionAndDeletionSurviveReopen() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "sqlite-session-test-" + UUID.randomUUID() + ".db"
