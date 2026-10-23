@@ -51,6 +51,21 @@ class LocalSessionEventLogRegistry internal constructor(
         }
 
     /**
+     * Read a historical Session stream through the same native core path lease without
+     * inserting a transient reader into the active adapter LRU. A large Work archive
+     * scan must never evict a foreground session's live Android EventLog adapter.
+     * The reader is not an additional writable fact source and cannot publish events.
+     */
+    internal fun <T> readHistorical(sessionId: String, block: (com.labteto.dshmobile.harness.session.SessionEventLog) -> T): T {
+        require(sessionId.isNotBlank() && '/' !in sessionId && '\\' !in sessionId && ".." !in sessionId) {
+            "Invalid historical session identity"
+        }
+        val reader = com.labteto.dshmobile.harness.session.SessionEventLog(
+            File(sessionsRoot, "${sessionId}.events.jsonl"), json)
+        return try { block(reader) } finally { reader.close() }
+    }
+
+    /**
      * Reset a deleted path before evicting it so the core shared sequence cursor cannot survive a
      * delete/recreate cycle for the same session id.
      */
