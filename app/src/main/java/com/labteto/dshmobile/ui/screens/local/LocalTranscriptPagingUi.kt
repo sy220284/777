@@ -75,6 +75,7 @@ internal fun LocalTranscriptAutoPager(
         // trigger a cascade of reads until the entire history is materialized.
         // Only an actual upward movement toward older content may prefetch.
         var priorPosition: Pair<Int, Int>? = null
+        var requestedDuringCurrentGesture = false
         snapshotFlow {
             Triple(
                 listState.firstVisibleItemIndex,
@@ -84,11 +85,17 @@ internal fun LocalTranscriptAutoPager(
         }.collect { (index, offset, scrolling) ->
             val previous = priorPosition
             priorPosition = index to offset
+            if (!scrolling) requestedDuringCurrentGesture = false
             val movingTowardOlder = previous != null &&
                 (index < previous.first || (index == previous.first && offset < previous.second))
-            if (scrolling && movingTowardOlder &&
+            if (scrolling && !requestedDuringCurrentGesture && movingTowardOlder &&
                 index <= LOCAL_TRANSCRIPT_AUTOLOAD_THRESHOLD_ITEMS
-            ) onLoadOlder(sessionId)
+            ) {
+                // A single long drag near the top can emit dozens of pixel offsets.
+                // One bounded page per gesture avoids a burst of serialized reads.
+                requestedDuringCurrentGesture = true
+                onLoadOlder(sessionId)
+            }
         }
     }
 }
