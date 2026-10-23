@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.work.improvement
 
 import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.work.LocalGoal
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import java.nio.file.Files
 import kotlinx.serialization.json.Json
@@ -56,8 +57,8 @@ class LocalWorkImprovementArchiveTest {
         assertTrue(summary.contains("Work 工具结果：2；其中错误结果：1"))
         assertTrue(problems.contains("发现 1 条冲突"))
         assertFalse(problems.contains("Sensitive prompt text"))
-        assertTrue(verification.contains("暂无合格的策略 A/B 比较"))
-        assertTrue(workspace.readRaw("自我改进/03-提示词优化.md").contains("当前没有已验证"))
+        assertTrue(verification.contains("暂无合格对照"))
+        assertTrue(workspace.readRaw("自我改进/03-提示词优化.md").contains("暂无候选"))
     }
 
     @Test
@@ -72,6 +73,51 @@ class LocalWorkImprovementArchiveTest {
         assertTrue(workspace.readRaw("自我改进/00-自我改进总览.md").contains("Work 已结算回合：2"))
         archive.refresh()
         assertTrue(workspace.readRaw("自我改进/00-自我改进总览.md").contains("Work 已结算回合：2"))
+    }
+
+    @Test
+    fun matchedEvidenceCandidateIsTrialedOnceThenAdoptedWithinExactGoalScope() = withArchive { workspace, logs, archive ->
+        val source = logs.get("baseline-session")
+        source.append("work/improvement-candidate", buildJsonObject {
+            put("id", "improvement-1")
+            put("source_run_id", "baseline-run")
+            put("goal_signature", workGoalComparisonKey(LocalGoal(
+                description = "审计代码", id = "source",
+                artifactPaths = listOf("report.md"), verificationCommands = listOf("test")
+            )))
+            put("goal_id", "source")
+            put("goal_revision", 2)
+            put("project_id", "project-alpha")
+            put("profile_id", "profile-a")
+            put("model", "test-model")
+            put("category", "prompt")
+            put("cue", "代码审计")
+            put("guidance", "先确认依赖关系与实际测试结果，再执行代码修改。")
+            put("reason", "避免返工")
+            put("baseline_tool_calls", 5)
+            put("baseline_tool_errors", 0)
+            put("baseline_test_verified", true)
+        })
+        archive.refresh()
+        val goal = LocalGoal("审计代码", "active", id = "different-goal",
+            artifactPaths = listOf("report.md"), verificationCommands = listOf("test"))
+        val advice = archive.adviceFor(goal, "project-alpha", "test-model", "profile-a")
+        assertEquals("improvement-1", advice?.id)
+        assertFalse(advice!!.active)
+        assertEquals(null, archive.adviceFor(goal, "wrong-project", "test-model", "profile-a"))
+        assertEquals(null, archive.adviceFor(goal.copy(verificationCommands = listOf("different-test")),
+            "project-alpha", "test-model", "profile-a"))
+        val trial = logs.get("trial-session")
+        trial.append("work/improvement-trial", buildJsonObject { put("candidate_id", "improvement-1") })
+        archive.refresh()
+        assertEquals(null, archive.adviceFor(goal, "project-alpha", "test-model", "profile-a"))
+        trial.append("work/improvement-adopted", buildJsonObject { put("candidate_id", "improvement-1") })
+        archive.refresh()
+        assertTrue(archive.adviceFor(goal, "project-alpha", "test-model", "profile-a")!!.active)
+        assertTrue(workspace.readRaw("自我改进/03-提示词优化.md").contains("已采纳的动态工作指导"))
+        trial.append("work/improvement-retired", buildJsonObject { put("candidate_id", "improvement-1") })
+        archive.refresh()
+        assertEquals(null, archive.adviceFor(goal, "project-alpha", "test-model", "profile-a"))
     }
 
     private fun withArchive(
