@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.aggregateTokenUsageRecords
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
 import java.util.concurrent.CountDownLatch
@@ -175,6 +177,32 @@ class AnthropicMessagesClientTest {
             assertEquals(3L, reply.usage.cacheWriteTokens)
             assertEquals(7L, reply.usage.completionTokens)
             assertEquals(4L, reply.usage.reasoningTokens)
+
+            // Provider cumulative counters must survive the canonical analytics projection once.
+            val recorded = TokenUsageRecord(
+                requestId = reply.requestId,
+                timestamp = System.currentTimeMillis(),
+                model = "MiniMax-M3",
+                inputTokens = reply.usage.promptTokens,
+                cacheHitTokens = reply.usage.cacheHitTokens,
+                cacheMissTokens = reply.usage.cacheMissTokens,
+                cacheWriteTokens = reply.usage.cacheWriteTokens,
+                outputTokens = reply.usage.completionTokens,
+                reasoningTokens = reply.usage.reasoningTokens,
+                reported = reply.usage.reported,
+            )
+            val analytics = aggregateTokenUsageRecords(
+                sequenceOf(recorded, recorded.copy(inputTokens = 999L)),
+            )
+            assertEquals(1L, analytics.tracked.requestCount)
+            assertEquals(17L, analytics.tracked.totalTokens)
+            assertEquals(10L, analytics.tracked.inputTokens)
+            assertEquals(2L, analytics.tracked.cacheHitTokens)
+            assertEquals(8L, analytics.tracked.cacheMissTokens)
+            assertEquals(3L, analytics.tracked.cacheWriteTokens)
+            assertEquals(7L, analytics.tracked.outputTokens)
+            assertEquals(4L, analytics.tracked.reasoningTokens)
+            assertEquals(17L, analytics.byModel.getValue("MiniMax-M3").tracked.totalTokens)
             assertTrue(deltas.any { it.content == "完成" })
             assertTrue(deltas.any { it.reasoning == "分析" })
             assertNotNull(reply.message[LOCAL_MODEL_REPLAY_KEY])
