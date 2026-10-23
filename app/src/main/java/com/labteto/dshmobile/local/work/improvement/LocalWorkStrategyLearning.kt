@@ -6,6 +6,7 @@ import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalAuxiliaryModelRequestRuntime
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.recordForeground
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.work.LocalGoal
@@ -132,6 +133,7 @@ internal class LocalWorkStrategyLearning(
                 put("baseline_test_verified", delivery.testCallId != null)
                 put("project_id", snapshot.projectId ?: "")
                 put("profile_id", snapshot.modelState.modelSelection.activeProfileId ?: "")
+                put("route_fingerprint", profile.routeFingerprint())
                 put("model", snapshot.modelState.model)
                 put("category", parsed.category)
                 put("cue", parsed.cue)
