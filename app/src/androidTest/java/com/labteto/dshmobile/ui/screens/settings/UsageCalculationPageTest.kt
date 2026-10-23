@@ -22,6 +22,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.TokenUsageAggregate
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
+import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
@@ -74,10 +75,44 @@ class UsageCalculationPageTest {
         compose.onNodeWithTag("menu-item:MiniMax-M3").performClick()
         compose.onNodeWithText("450").assertExists()
         compose.onNodeWithText("MiniMax-M3 ▾").performClick()
+        compose.onNodeWithTag("menu-item:deepseek-chat").performClick()
+        compose.onNodeWithText("50").assertExists()
+        compose.onNodeWithText("deepseek-chat ▾").performClick()
+        compose.onNodeWithTag("menu-item:MiniMax-M3").performClick()
+        compose.onNodeWithText("450").assertExists()
+        compose.onNodeWithText("MiniMax-M3 ▾").performClick()
         compose.onNodeWithText("never-used").performClick()
         compose.onNodeWithText("never-used ▾").assertExists()
         compose.onNodeWithText("450").assertDoesNotExist()
         compose.onAllNodesWithText("0").onFirst().assertExists()
+    }
+
+    @Test
+    fun requestDetailShowsCacheWriteAndReasoningWithoutInflatingTotals() {
+        val record = TokenUsageRecord(
+            requestId = "cache-write-detail",
+            timestamp = System.currentTimeMillis(),
+            model = "MiniMax-M3",
+            inputTokens = 10L,
+            cacheHitTokens = 2L,
+            cacheMissTokens = 8L,
+            cacheWriteTokens = 3L,
+            outputTokens = 7L,
+            reasoningTokens = 4L,
+            reported = true,
+        )
+        compose.setContent {
+            DshTheme {
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    UsageRequestDetailPage(record)
+                }
+            }
+        }
+
+        compose.onNodeWithText(context.getString(R.string.usage_calculation_cache_write)).assertExists()
+        compose.onNodeWithText("3").assertExists()
+        compose.onNodeWithText("17").assertExists()
+        compose.onNodeWithText(context.getString(R.string.usage_calculation_reasoning_note, "4")).assertExists()
     }
 
     @Test
