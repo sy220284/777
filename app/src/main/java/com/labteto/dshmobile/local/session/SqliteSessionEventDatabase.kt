@@ -131,6 +131,10 @@ internal class SqliteSessionEventDatabase(
         }
     }
 
+    fun sessionCount(): Int = readableDatabase.rawQuery(
+        "SELECT COUNT(*) FROM session_event_cursors", null,
+    ).use { cursor -> if (cursor.moveToFirst()) cursor.getInt(0) else 0 }
+
     fun latestSequence(sessionId: String): Long =
         nextSequence(sessionId)?.minus(1L) ?: -1L
 

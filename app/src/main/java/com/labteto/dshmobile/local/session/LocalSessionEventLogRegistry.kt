@@ -32,6 +32,8 @@ class LocalSessionEventLogRegistry internal constructor(
         require(maxEntries in 8..512) { "EventLog 注册表容量必须在 8..512 之间" }
     }
 
+    internal val sqliteDatabase: SqliteSessionEventDatabase? get() = sqlite
+
     private val logs = object : LinkedHashMap<String, LocalSessionEventLog>(16, 0.75f, true) {
         override fun removeEldestEntry(
             eldest: MutableMap.MutableEntry<String, LocalSessionEventLog>?,

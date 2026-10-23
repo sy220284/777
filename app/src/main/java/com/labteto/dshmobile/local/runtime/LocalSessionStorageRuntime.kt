@@ -12,7 +12,7 @@ import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.session.localSessionSnapshotBoundary
 import com.labteto.dshmobile.local.session.LocalSessionFilesRuntime
-import com.labteto.dshmobile.local.session.LocalSessionStorageManager
+import com.labteto.dshmobile.local.session.SqliteSessionStorageManager
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -57,7 +57,10 @@ class LocalSessionStorageRuntime @Inject internal constructor(
 
     private val orderedCodecs = domainCodecs.sortedBy(LocalSessionDomainCodec::id)
     private val repository: LocalSessionRepository
-    private val storageManager = LocalSessionStorageManager(sessionsRoot, json)
+    private val sqliteSnapshots = SqliteSessionSnapshotStore(context, json, domainCodecs = orderedCodecs)
+    private val storageManager = SqliteSessionStorageManager(
+        context, sqliteSnapshots, requireNotNull(eventLogs.sqliteDatabase),
+    )
     internal val coordinator: LocalSessionCoordinator
     internal val projectionRegistry = SessionProjectionRegistry()
     internal val agentRunCoordinator = LocalAgentRunCoordinator(eventLogFor = eventLogs::get)
@@ -77,7 +80,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
                 runtimeStateStore.projection.publishError(error.message ?: "会话写入失败")
             },
             domainCodecs = orderedCodecs,
-            snapshotStore = SqliteSessionSnapshotStore(context, json, domainCodecs = orderedCodecs),
+            snapshotStore = sqliteSnapshots,
         )
         coordinator = LocalSessionCoordinator(
             repository = repository,
