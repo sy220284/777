@@ -19,11 +19,13 @@ class LocalSessionEventLogRegistry internal constructor(
     private val sessionsRoot: File,
     private val json: Json,
     private val maxEntries: Int = 64,
+    private val sqlite: SqliteSessionEventDatabase? = null,
 ) {
     @Inject
     internal constructor(@ApplicationContext context: Context, json: Json) : this(
         sessionsRoot = File(context.filesDir, "local-harness/sessions").apply { mkdirs() },
         json = json,
+        sqlite = SqliteSessionEventDatabase(context, json),
     )
 
     init {
@@ -47,6 +49,7 @@ class LocalSessionEventLogRegistry internal constructor(
                 File(sessionsRoot, "$sessionId.events.jsonl"),
                 json,
                 sessionId = sessionId,
+                sqlite = sqlite,
             )
         }
 
@@ -57,9 +60,14 @@ class LocalSessionEventLogRegistry internal constructor(
     @Synchronized
     internal fun clearAndEvict(sessionIds: Set<String>) {
         sessionIds.forEach { id ->
-            logs.remove(id)?.let { log ->
-                log.clear()
-                log.close()
+            val cached = logs.remove(id)
+            if (cached != null) {
+                cached.clear()
+                cached.close()
+            } else {
+                // An evicted session still has durable SQL rows; do not let deletion
+                // resurrect it when a later session reuses the same identity.
+                sqlite?.clearSession(id)
             }
         }
     }
