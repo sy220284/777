@@ -73,6 +73,32 @@ class SqliteSessionEventDatabaseAndroidTest {
         }
     }
 
+    @Test fun hundredThousandEventsStillReturnOnlyTheRequestedRecentPage() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "sqlite-long-session-${UUID.randomUUID()}.db"
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { store ->
+                // Fifty hundred? Exactly 100,000 durable events, always in small
+                // WAL batches; nothing needs to be decoded before the latest page.
+                repeat(400) { batch ->
+                    store.appendBatch("long", (0 until 250).map { i ->
+                        "assistant/message" to buildJsonObject { put("ordinal", batch * 250 + i) }
+                    })
+                }
+                assertEquals(99_999L, store.latestSequence("long"))
+                val newest = store.pageBeforeNewestFirst("long", limit = 12)
+                assertEquals((99_999L downTo 99_988L).toList(), newest.map { it.sequence })
+                val earlier = store.pageBeforeNewestFirst(
+                    "long", beforeSequenceExclusive = 99_988L, limit = 24,
+                )
+                assertEquals((99_987L downTo 99_964L).toList(), earlier.map { it.sequence })
+                assertEquals(99_999L, store.latest("long", "assistant/message")?.sequence)
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
     @Test fun eventSequencesAndIndexedPagesSurviveReopen() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "sqlite-events-test-${UUID.randomUUID()}.db"
