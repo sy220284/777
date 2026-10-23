@@ -44,6 +44,20 @@ class LocalExtensionWorkshopTest {
         }
     }
 
+    @Test fun localMcpManifestPersistsAndRejectsModifiedSource() = withWorkspace { workshop, workspace ->
+        val created = workshop.createMcp("research-helper", "node", "process.stdout.write(\"ready\")")
+        assertTrue(created.contains("仅生成文件"))
+        val (argv, cwd) = workshop.launchCommand("research-helper")
+        assertEquals("node", argv.first())
+        assertTrue(argv.last().endsWith(".dsh/extensions/mcp-research-helper/server.js"))
+        assertEquals(workspace.path, cwd)
+        assertThrows(IllegalArgumentException::class.java) {
+            workshop.createMcp("research-helper", "node", "duplicate")
+        }
+        workspace.write(".dsh/extensions/mcp-research-helper/server.js", "tampered")
+        assertThrows(IllegalArgumentException::class.java) { workshop.launchCommand("research-helper") }
+    }
+
     @Test fun recordsHaveEvidenceButDoNotClaimLiveRegistration() = withWorkspace { workshop, workspace ->
         workspace.write("proof.txt", "MCP 模拟结果，不是官方生产验证")
         assertThrows(IllegalArgumentException::class.java) {

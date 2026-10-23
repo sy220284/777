@@ -185,6 +185,14 @@ object LocalToolCatalog {
             "id" to string("技能 ID"),
             "revision" to string("skill_update 返回的十六位版本哈希"),
         ), listOf("id", "revision")))
+        add(tool("mcp_create_local", "保存智能体编写的 Node/Python MCP 服务源码和可恢复的启动清单；不会直接运行", properties(
+            "id" to string("服务英文标识"),
+            "interpreter" to string("node 或 python3"),
+            "source" to string("完整服务端源码；必须自行满足 MCP 协议"),
+        ), listOf("id", "interpreter", "source")))
+        add(tool("mcp_start_local", "按经过哈希核验的本机清单启动 MCP；通过既有插件桥接真实连接和注册工具；会运行本地代码，需审批", properties(
+            "id" to string("已创建的本机 MCP 服务标识"),
+        ), listOf("id")))
         add(tool("extension_record", "把自建技能、工具、连接器、MCP、插件的过程及证据登记到长期工作区；记录不等于验收", properties(
             "kind" to string("skill/tool/connector/mcp/plugin"),
             "id" to string("扩展 ID"),

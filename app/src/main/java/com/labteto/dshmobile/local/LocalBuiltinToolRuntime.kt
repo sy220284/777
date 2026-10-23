@@ -335,6 +335,24 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 require(allowMutation) { "当前子任务没有回退技能的权限" }
                 extensionWorkshop.rollbackSkill(args.string("id"), args.string("revision"))
             }
+            "mcp_create_local" -> {
+                require(allowMutation) { "当前子任务不能创建 MCP 代码" }
+                extensionWorkshop.createMcp(
+                    args.string("id"), args.string("interpreter"), args.string("source"),
+                )
+            }
+            "mcp_start_local" -> {
+                require(allowMutation) { "当前子任务不能启动 MCP" }
+                val id = args.string("id")
+                val (command, directory) = extensionWorkshop.launchCommand(id)
+                val connection = root.plugins.connectMcpStdio(id, command, directory)
+                val liveNames = root.registry.names().filter { it.startsWith("mcp_${id}_") }
+                require(liveNames.isNotEmpty()) { "MCP 连接返回但没有注册任何可调用工具：$id" }
+                extensionWorkshop.record("mcp", id, "registered",
+                    "本地服务启动完成，登记 ${liveNames.size} 个工具；业务调用效果待测",
+                    ".dsh/extensions/mcp-$id/manifest.json")
+                "$connection；当前已注册工具：${liveNames.joinToString(", ")}；真实业务调用尚未验证。"
+            }
             "extension_record" -> {
                 require(allowMutation) { "当前子任务没有登记扩展的权限" }
                 extensionWorkshop.record(args.string("kind"), args.string("id"), args.string("phase"),

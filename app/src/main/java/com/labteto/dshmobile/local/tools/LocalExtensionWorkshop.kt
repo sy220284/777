@@ -3,6 +3,11 @@ package com.labteto.dshmobile.local.tools
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import java.io.File
 import java.security.MessageDigest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * Persistent, workspace-local authoring and provenance for agent-created capabilities.
@@ -17,10 +22,12 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         require(namePattern.matches(id)) { "扩展标识必须为小写英文字母、数字和连字符" }
         return id
     }
-    private fun sha(text: String): String =
+    private fun fullSha(text: String): String =
         MessageDigest.getInstance("SHA-256")
             .digest(text.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }.take(16)
+            .joinToString("") { "%02x".format(it) }
+
+    private fun sha(text: String): String = fullSha(text).take(16)
 
     private fun revisionPath(id: String, revision: String) =
         ".dsh/extensions/skill-${safeId(id)}/revisions/${revision}.md"
@@ -36,6 +43,53 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
             val target = File(workspace.path, ".dsh/extensions/$filename")
             if (!target.exists()) workspace.write(".dsh/extensions/$filename", initial)
         }
+    }
+
+    /** Create an inspectable, restart-reusable MCP source package; execution is a separate approval. */
+    fun createMcp(id: String, interpreter: String, source: String): String {
+        safeId(id)
+        require(interpreter in setOf("node", "python3")) { "本机 MCP 目前支持 node 或 python3 运行时" }
+        require(source.isNotBlank() && source.toByteArray(Charsets.UTF_8).size <= 128 * 1024) {
+            "服务源码不能为空或超过 128 KB"
+        }
+        val root = ".dsh/extensions/mcp-$id"
+        val filename = if (interpreter == "node") "server.js" else "server.py"
+        val manifestPath = "$root/manifest.json"
+        require(!File(workspace.path, manifestPath).exists()) { "同名 MCP 扩展已存在，请更新现有源码并重新校验" }
+        val sourcePath = "$root/$filename"
+        workspace.write(sourcePath, source)
+        val manifest = buildJsonObject {
+            put("schema_version", 1)
+            put("server_id", id)
+            put("interpreter", interpreter)
+            put("source_path", sourcePath)
+            put("source_sha256", fullSha(source))
+        }
+        workspace.write(manifestPath, manifest.toString() + "\n")
+        ensureExperienceDocuments()
+        require(launchCommand(id).first.size == 2) { "本地 MCP 启动配置无法重新加载" }
+        return "本机 MCP 源码及启动清单已写入：$manifestPath。此时仅生成文件；调用 mcp_start_local，经权限审批并真实连接后才算注册。"
+    }
+
+    /** Revalidate every persisted field and source digest before handing off to the real MCP bridge. */
+    fun launchCommand(id: String): Pair<List<String>, String> {
+        safeId(id)
+        val manifest = Json.parseToJsonElement(
+            workspace.readRaw(".dsh/extensions/mcp-$id/manifest.json")
+        ).jsonObject
+        require(manifest["schema_version"]?.jsonPrimitive?.content == "1") { "MCP 清单版本不兼容" }
+        require(manifest["server_id"]?.jsonPrimitive?.content == id) { "MCP 标识不一致" }
+        val interpreter = requireNotNull(manifest["interpreter"]?.jsonPrimitive?.content)
+        require(interpreter in setOf("node", "python3")) { "MCP 运行时不支持" }
+        val sourcePath = requireNotNull(manifest["source_path"]?.jsonPrimitive?.content)
+        val expected = ".dsh/extensions/mcp-$id/" +
+            if (interpreter == "node") "server.js" else "server.py"
+        require(sourcePath == expected) { "MCP 入口路径不符合安装清单" }
+        val source = workspace.readRaw(sourcePath)
+        require(fullSha(source) == manifest["source_sha256"]?.jsonPrimitive?.content) {
+            "MCP 源码已改变，必须审核并重新生成匹配的清单后才能启动"
+        }
+        return listOf(interpreter, File(workspace.path, sourcePath).absolutePath) to workspace.path
     }
 
     fun createSkill(id: String, displayName: String, description: String, instructions: String): String {
