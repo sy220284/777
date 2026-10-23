@@ -155,7 +155,7 @@ internal class LocalWorkImprovementArchive(
         val summary = """
             |# 777 自我改进总览
             |
-            |> 自动生成的 Work 执行事实摘要。数据来源：本机 Session EventLog；它不代表模型已经学会、优化或验证了新策略。
+            |> 自动生成的 Work 改进档案。数据来源：本机 Session EventLog；候选仅代表模型建议，采纳和验证须以独立工具/用量事实为依据。
             |
             |## 已观察到的事实
             |
@@ -197,6 +197,9 @@ internal class LocalWorkImprovementArchive(
                 "- 会话 `" + it.session + "`，事件 #" + it.sequence + "；" +
                     (if (it.hasMachineEvidence) "含机器执行凭据" else "无机器执行凭据；不能推断客观验证通过")
             }
+        val experienceWithCandidates = experience +
+            "\n## 经验与方法候选（按实际 Work 证据生成，尚需验证）\n\n" +
+            proposalLines(proposals)
         val changed = """
             |# 改进与采纳
             |
@@ -252,7 +255,7 @@ internal class LocalWorkImprovementArchive(
         }
         val documents = linkedMapOf(
             "00-自我改进总览.md" to summary,
-            "01-经验与方法.md" to experience,
+            "01-经验与方法.md" to experienceWithCandidates,
             "02-改进与采纳.md" to changed,
             "03-提示词优化.md" to prompts,
             "04-问题与迭代.md" to problems,
