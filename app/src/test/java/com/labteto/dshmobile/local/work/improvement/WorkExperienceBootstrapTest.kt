@@ -100,7 +100,7 @@ class WorkExperienceBootstrapTest {
             assertTrue(signals.supports("tool_contract_error"))
             val prompt = WorkExperienceBootstrap.reviewPrompt("完成任务", signals, true, true)
             assertTrue(prompt.contains("tool_contract_error: 2"))
-            assertTrue(prompt.contains("工具调用契约"))
+            assertTrue(prompt.contains("参数结构违反当前注册工具的 Schema"))
             assertFalse(prompt.contains("SENSITIVE_ARGUMENT_CONTENT"))
         } finally {
             root.deleteRecursively()
