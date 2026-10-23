@@ -6,6 +6,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
 import android.net.Uri
 import android.provider.OpenableColumns
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -57,6 +60,7 @@ import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot as McpServerSnapshot
 import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
+import com.labteto.dshmobile.local.network.requiresAndroid17LocalNetworkPermission
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
@@ -583,6 +587,37 @@ fun ToolsScreen(
     val skillFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.importSkill(uri)
     }
+    // API 37 permission path stays dormant while targetSdk remains 36.
+    val localNetworkPermission = "android.permission.ACCESS_LOCAL_NETWORK"
+    var pendingLocalNetworkAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var localNetworkPermissionFeedback by remember { mutableStateOf<String?>(null) }
+    val localNetworkLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val action = pendingLocalNetworkAction
+        pendingLocalNetworkAction = null
+        if (granted) {
+            localNetworkPermissionFeedback = "局域网访问已授权。"
+            action?.invoke()
+        } else {
+            localNetworkPermissionFeedback = "未获得局域网访问权限；可从系统设置授权后重试。"
+        }
+    }
+    val eligibleForLocalNetworkPermission = Build.VERSION.SDK_INT >= 37 &&
+        context.applicationInfo.targetSdkVersion >= 37
+    val localNetworkPermissionGranted = ContextCompat.checkSelfPermission(
+        context, localNetworkPermission
+    ) == PackageManager.PERMISSION_GRANTED
+    val connectWithLocalNetworkPermission: (String, () -> Unit) -> Unit = { url, action ->
+        if (requiresAndroid17LocalNetworkPermission(
+                Build.VERSION.SDK_INT, context.applicationInfo.targetSdkVersion, url
+            ) && ContextCompat.checkSelfPermission(
+                context, localNetworkPermission
+            ) != PackageManager.PERMISSION_GRANTED) {
+            pendingLocalNetworkAction = action
+            localNetworkLauncher.launch(localNetworkPermission)
+        } else {
+            action()
+        }
+    }
     val networkSearchEnabled by viewModel.networkSearchEnabled.collectAsStateWithLifecycle()
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val approvalMode by settingsViewModel.approvalMode.collectAsStateWithLifecycle()
@@ -932,7 +967,12 @@ fun ToolsScreen(
         SyResponsiveSheet(
             title = stringResource(R.string.tools_external_services),
             subtitle = stringResource(R.string.tools_external_services_hint),
-            onDismiss = { viewModel.cancelMcpLogin(); showExternalConfig = false; mcpBearer = "" },
+            onDismiss = {
+                pendingLocalNetworkAction = null
+                viewModel.cancelMcpLogin()
+                showExternalConfig = false
+                mcpBearer = ""
+            },
         ) {
             if (state.servers.isEmpty()) {
                 Text(
@@ -1011,6 +1051,23 @@ fun ToolsScreen(
                 singleLine = true,
                 shape = DsShapes.row,
             )
+            if (eligibleForLocalNetworkPermission && !localNetworkPermissionGranted) {
+                Text(
+                    "Android 17：如私有域名实际连接局域网，可先授权「附近设备」。",
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.textSecondary,
+                )
+                SyButton(
+                    text = "允许连接局域网服务",
+                    onClick = { localNetworkLauncher.launch(localNetworkPermission) },
+                    enabled = !state.loading,
+                    variant = SyButtonVariant.Ghost,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            localNetworkPermissionFeedback?.let { message ->
+                Text(message, style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+            }
             SyTextField(
                 value = mcpClientId,
                 onValueChange = { mcpClientId = it },
@@ -1021,7 +1078,12 @@ fun ToolsScreen(
             )
             SyButton(
                 text = if (state.mcpLoginServerId != null) "等待浏览器授权…" else "浏览器登录并连接",
-                onClick = { viewModel.loginMcp(serverId.trim(), endpoint.trim(), mcpClientId.trim()) },
+                onClick = {
+                    val id = serverId.trim()
+                    val url = endpoint.trim()
+                    val client = mcpClientId.trim()
+                    connectWithLocalNetworkPermission(url) { viewModel.loginMcp(id, url, client) }
+                },
                 enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
                 variant = SyButtonVariant.Outline, modifier = Modifier.fillMaxWidth(),
             )
@@ -1030,10 +1092,18 @@ fun ToolsScreen(
                     variant = SyButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
             }
             Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
-                SyButton(text = "刷新登录", onClick = { viewModel.refreshMcpLogin(serverId.trim(), endpoint.trim()) },
+                SyButton(text = "刷新登录", onClick = {
+                    val id = serverId.trim()
+                    val url = endpoint.trim()
+                    connectWithLocalNetworkPermission(url) { viewModel.refreshMcpLogin(id, url) }
+                },
                     enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
                     variant = SyButtonVariant.Ghost, modifier = Modifier.weight(1f))
-                SyButton(text = "撤销授权", onClick = { viewModel.revokeMcpLogin(serverId.trim(), endpoint.trim()) },
+                SyButton(text = "撤销授权", onClick = {
+                    val id = serverId.trim()
+                    val url = endpoint.trim()
+                    connectWithLocalNetworkPermission(url) { viewModel.revokeMcpLogin(id, url) }
+                },
                     enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
                     variant = SyButtonVariant.Ghost, modifier = Modifier.weight(1f))
             }
@@ -1053,7 +1123,10 @@ fun ToolsScreen(
                     if (state.loading) R.string.tools_processing else R.string.tools_connect,
                 ),
                 onClick = {
-                    viewModel.connectHttp(serverId.trim(), endpoint.trim(), mcpBearer)
+                    val id = serverId.trim()
+                    val url = endpoint.trim()
+                    val bearer = mcpBearer
+                    connectWithLocalNetworkPermission(url) { viewModel.connectHttp(id, url, bearer) }
                 },
                 enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
                 variant = SyButtonVariant.Outline,
