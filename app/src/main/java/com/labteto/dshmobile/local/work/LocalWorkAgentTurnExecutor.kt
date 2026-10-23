@@ -100,7 +100,7 @@ internal class LocalWorkAgentTurnExecutor(
     private val workToolResultRuntime: LocalWorkToolResultRuntime,
     private val workTurnToolRuntime: LocalWorkTurnToolRuntime,
     private val replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
-    private val onTurnSettled: (String) -> Unit = {},
+    private val onTurnSettled: (LocalWorkRunBinding, String) -> Unit = {},
     private val onRootExecutionSliceStarted: suspend (LocalWorkRunBinding) -> Unit = {},
 ) {
     init { LocalWorkSummarySettings.attach(context) }
@@ -1043,7 +1043,7 @@ internal class LocalWorkAgentTurnExecutor(
                 workRunRegistry.releaseCompletedTurn(binding, ownerJob)
                 // Derived human-readable archive refresh is independent of task success and
                 // cannot mutate the completed run, replay tools, or change goal admission.
-                onTurnSettled(binding.sessionId)
+                onTurnSettled(binding, runContext.runId)
             }
         }
     }
