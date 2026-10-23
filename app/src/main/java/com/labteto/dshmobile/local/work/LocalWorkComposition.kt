@@ -81,8 +81,11 @@ internal class LocalWorkComposition @Inject constructor(
     init {
         scope.launch {
             runCatching { improvementArchive.refresh() }
-                .onFailure { com.labteto.dshmobile.observability.AppLog.failure(
-                    "WorkImprovement", "initialize_archive", it) }
+                .onFailure {
+                    com.labteto.dshmobile.observability.AppLog.failure(
+                        "WorkImprovement", "initialize_archive", it)
+                    runtimeStateStore.projection.publishError("自我改进档案同步失败：" + it.message.orEmpty().take(160))
+                }
         }
     }
 
@@ -314,8 +317,11 @@ internal class LocalWorkComposition @Inject constructor(
         onTurnSettled = {
             scope.launch {
                 runCatching { improvementArchive.refresh() }
-                    .onFailure { com.labteto.dshmobile.observability.AppLog.failure(
-                        "WorkImprovement", "refresh_archive", it) }
+                    .onFailure {
+                        com.labteto.dshmobile.observability.AppLog.failure(
+                            "WorkImprovement", "refresh_archive", it)
+                        runtimeStateStore.projection.publishError("自我改进档案同步失败：" + it.message.orEmpty().take(160))
+                    }
             }
         },
         onRootExecutionSliceStarted = { binding ->
