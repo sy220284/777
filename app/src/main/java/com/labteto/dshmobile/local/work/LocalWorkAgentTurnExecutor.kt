@@ -104,7 +104,7 @@ internal class LocalWorkAgentTurnExecutor(
     private val workTurnToolRuntime: LocalWorkTurnToolRuntime,
     private val improvementArchive: LocalWorkImprovementArchive,
     private val replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
-    private val onTurnSettled: (LocalWorkRunBinding, String, WorkImprovementAdvice?) -> Unit = {},
+    private val onTurnSettled: (LocalWorkRunBinding, String, WorkImprovementAdvice?) -> Unit = { _, _, _ -> },
     private val onRootExecutionSliceStarted: suspend (LocalWorkRunBinding) -> Unit = {},
 ) {
     init { LocalWorkSummarySettings.attach(context) }
@@ -144,6 +144,9 @@ internal class LocalWorkAgentTurnExecutor(
         var foregroundLease: LocalExecutionService.Companion.TurnLease? = null
         var serviceReleased = false
         var cpuProjection: Job? = null
+        // Publish the settled identity outside the Session owner's lexical scope.
+        var settledRunId: String? = null
+        var settledImprovement: WorkImprovementAdvice? = null
         try {
             LocalSessionRuntimeRegistry.withOwner(
                 binding.sessionId,
@@ -271,6 +274,7 @@ internal class LocalWorkAgentTurnExecutor(
                 contextChars = runSnapshot.kernel.contextChars,
                 parentRunId = continuationParentRunId,
             )
+            settledRunId = runContext.runId
             var lastModelError: LocalModelException? = null
             val taskRunId = com.labteto.dshmobile.local.usage.resolveTokenUsageTaskRunId(runEventLog, runContext.runId)
             val progressTracker = LocalAgentProgressTracker()
@@ -399,6 +403,7 @@ internal class LocalWorkAgentTurnExecutor(
                             snapshot.modelState.modelSelection.activeProfile?.routeFingerprint().orEmpty(),
                         )?.let { advice ->
                             selectedImprovement = advice
+                            settledImprovement = advice
                             improvementGoalId = liveGoal.id
                             runEventLog.append(
                                 if (advice.active) "work/improvement-applied" else "work/improvement-trial",
@@ -1097,7 +1102,9 @@ internal class LocalWorkAgentTurnExecutor(
                 workRunRegistry.releaseCompletedTurn(binding, ownerJob)
                 // Derived human-readable archive refresh is independent of task success and
                 // cannot mutate the completed run, replay tools, or change goal admission.
-                onTurnSettled(binding, runContext.runId, selectedImprovement)
+                settledRunId?.let { runId ->
+                    onTurnSettled(binding, runId, settledImprovement)
+                }
             }
         }
     }
