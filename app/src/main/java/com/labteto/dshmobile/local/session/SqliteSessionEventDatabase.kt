@@ -345,9 +345,9 @@ class SqliteSessionEventDatabase(
         require(types.isNotEmpty()) { "事件类型集合不能为空" }
         var before = beforeSequenceExclusive
         while (true) {
-            val page = pageBeforeNewestFirst(sessionId, before, MAX_PAGE)
+            val page = typedPageBefore(sessionId, types, before, MAX_PAGE)
             if (page.isEmpty()) return null
-            page.firstOrNull { it.type in types && predicate(it.data) }?.let { return it }
+            page.firstOrNull { predicate(it.data) }?.let { return it }
             before = page.last().sequence
         }
     }
@@ -359,21 +359,34 @@ class SqliteSessionEventDatabase(
         keyOf: (SessionEvent) -> K?,
     ): Map<K, SessionEvent> {
         if (requiredKeys.isEmpty()) return emptyMap()
+        require(types.isNotEmpty()) { "事件类型集合不能为空" }
         val remaining = requiredKeys.toMutableSet()
         val found = linkedMapOf<K, SessionEvent>()
         var before = Long.MAX_VALUE
         while (remaining.isNotEmpty()) {
-            val page = pageBeforeNewestFirst(sessionId, before, MAX_PAGE)
+            val page = typedPageBefore(sessionId, types, before, MAX_PAGE)
             if (page.isEmpty()) break
             page.forEach { event ->
-                if (event.type in types) {
-                    val key = keyOf(event)
-                    if (key != null && remaining.remove(key)) found[key] = event
-                }
+                val key = keyOf(event)
+                if (key != null && remaining.remove(key)) found[key] = event
             }
             before = page.last().sequence
         }
         return found
+    }
+
+    private fun typedPageBefore(
+        sessionId: String, types: Set<String>, before: Long, limit: Int,
+    ): List<SessionEvent> {
+        validateSessionId(sessionId)
+        require(types.isNotEmpty()) { "事件类型集合不能为空" }
+        val placeholders = List(types.size) { "?" }.joinToString(",")
+        return queryPage(
+            "SELECT sequence,event_type,created_at,schema_version,payload " +
+                "FROM session_events WHERE session_id=? AND event_type IN ($placeholders) " +
+                "AND sequence<? ORDER BY sequence DESC LIMIT ?",
+            arrayOf(sessionId, *types.toTypedArray(), before.toString(), limit.toString()),
+        )
     }
 
     fun search(sessionId: String, query: String, limit: Int, afterSequence: Long): String {
