@@ -90,7 +90,7 @@ internal object WorkExperienceBootstrap {
         var rejections = 0
         var conflicts = 0
         var contractErrors = 0
-        log.forEachAfter(goal.startedAtSequence) { event ->
+        forEachCompletedGoalEvent(log, goal) { event ->
             when (event.type) {
                 "tool/result" -> if (
                     (event.data["is_error"] as? JsonPrimitive)?.contentOrNull == "true"
