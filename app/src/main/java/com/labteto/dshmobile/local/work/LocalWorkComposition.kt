@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.LocalToolApprovalRuntime
 import com.labteto.dshmobile.local.LocalToolCompositionRoot
 import com.labteto.dshmobile.local.context.ContextComposer
+import com.labteto.dshmobile.local.work.improvement.LocalWorkStrategyLearning
 import com.labteto.dshmobile.local.work.improvement.LocalWorkImprovementArchive
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
@@ -54,6 +55,7 @@ internal class LocalWorkComposition @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val modelGateway: LocalModelGateway,
+    private val auxiliaryModel: com.labteto.dshmobile.local.model.LocalAuxiliaryModelRequestRuntime,
     mediaRuntime: Provider<LocalMediaCreationRuntime>,
     modelRequests: LocalModelRequestCoordinator,
     usageTracker: DeepSeekUsageTracker,
@@ -72,6 +74,9 @@ internal class LocalWorkComposition @Inject constructor(
     json: Json,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val improvementLearning by lazy {
+        LocalWorkStrategyLearning(sessionStorage, modelGateway, auxiliaryModel, usageTracker)
+    }
     private val improvementArchive = LocalWorkImprovementArchive(
         workspace = sessionStorage.files.workspace,
         eventLogs = sessionStorage.eventLogs,
@@ -314,8 +319,16 @@ internal class LocalWorkComposition @Inject constructor(
         workToolResultRuntime = toolResultRuntime,
         workTurnToolRuntime = turnToolRuntime,
         replyDocuments = replyDocuments,
-        onTurnSettled = {
+        onTurnSettled = { binding, sourceRunId ->
             scope.launch {
+                try {
+                    improvementLearning.reflect(binding, sourceRunId)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (error: Throwable) {
+                    com.labteto.dshmobile.observability.AppLog.failure(
+                        "WorkImprovement", "reflect_candidate", error)
+                }
                 runCatching { improvementArchive.refresh() }
                     .onFailure {
                         com.labteto.dshmobile.observability.AppLog.failure(
