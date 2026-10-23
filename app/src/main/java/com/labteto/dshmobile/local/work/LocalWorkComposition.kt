@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.LocalToolApprovalRuntime
 import com.labteto.dshmobile.local.LocalToolCompositionRoot
 import com.labteto.dshmobile.local.context.ContextComposer
+import com.labteto.dshmobile.local.work.improvement.LocalWorkImprovementArchive
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.memory.MemoryManager
@@ -70,6 +71,20 @@ internal class LocalWorkComposition @Inject constructor(
     private val pinnedInvocations: com.labteto.dshmobile.local.tools.LocalPinnedInvocationStore,
     json: Json,
 ) {
+    private val improvementArchive = LocalWorkImprovementArchive(
+        workspace = sessionStorage.files.workspace,
+        eventLogs = sessionStorage.eventLogs,
+        sessionsRoot = File(context.filesDir, "local-harness/sessions"),
+    )
+
+    init {
+        scope.launch {
+            runCatching { improvementArchive.refresh() }
+                .onFailure { com.labteto.dshmobile.observability.AppLog.failure(
+                    "WorkImprovement", "initialize_archive", it) }
+        }
+    }
+
     private val workMediaTools = LocalWorkMediaToolRuntime(modelGateway, mediaRuntime)
     private val backgroundTools = LocalWorkBackgroundToolExecutor(runtimeStateStore, sessionStorage,
         approvalPreferences, tools, toolApproval)
@@ -296,6 +311,13 @@ internal class LocalWorkComposition @Inject constructor(
         workToolResultRuntime = toolResultRuntime,
         workTurnToolRuntime = turnToolRuntime,
         replyDocuments = replyDocuments,
+        onTurnSettled = {
+            scope.launch {
+                runCatching { improvementArchive.refresh() }
+                    .onFailure { com.labteto.dshmobile.observability.AppLog.failure(
+                        "WorkImprovement", "refresh_archive", it) }
+            }
+        },
         onRootExecutionSliceStarted = { binding ->
             persistentJobs.schedule(binding.sessionId, rootSliceAdmitted = true)
             subagents.resumePendingWorkflows(binding)
