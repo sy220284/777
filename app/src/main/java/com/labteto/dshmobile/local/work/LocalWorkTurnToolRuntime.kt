@@ -71,6 +71,11 @@ internal class LocalWorkTurnToolRuntime(
         if (!activeTask.isNullOrBlank()) {
             execution.enableTaskRelevantOptionalTools(activeTask, binding.enabledOptionalTools)
         }
+        // Newly connected MCP tools cannot enter the step that connected them. Make them
+        // candidates for the NEXT model request, without changing approval or tool access.
+        execution.prioritizeRunCreatedMcpTools(
+            binding.mcpDiscovery.observe(registry), binding.enabledOptionalTools,
+        )
         execution.prioritizePinnedForModelStep(binding.enabledOptionalTools)
         val enabled = synchronized(binding.enabledOptionalTools) {
             if (teamMode) {

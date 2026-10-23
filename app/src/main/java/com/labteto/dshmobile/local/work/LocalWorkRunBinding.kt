@@ -49,6 +49,8 @@ internal class LocalWorkRunBinding(
     val executingToolCallIds = MutableStateFlow<Set<String>>(emptySet())
     val workState: LocalWorkStatePort = localWorkRunStatePort(state)
     val enabledOptionalTools = linkedSetOf<String>()
+    /** Per-run MCP registrations discovered after a model step, not a global permission grant. */
+    internal val mcpDiscovery = LocalWorkRunMcpDiscovery()
     internal val workflowAdmission = kotlinx.coroutines.sync.Mutex()
     /** Not an extra queue: monotonic signal for committed, explicitly steered Work inputs. */
     val steeringRevision = MutableStateFlow(0L)

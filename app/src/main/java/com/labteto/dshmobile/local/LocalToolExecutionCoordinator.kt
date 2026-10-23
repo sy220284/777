@@ -162,6 +162,25 @@ internal class LocalToolExecutionCoordinator(
         enableOptionalTools(githubTools, target)
     }
 
+    /** Give MCP tools registered during this run a chance to enter the next schema budget.
+     * Discovery is never authorization; the live registry and per-call approval remain authoritative. */
+    fun prioritizeRunCreatedMcpTools(
+        names: List<String>, target: MutableSet<String> = enabledOptionalTools,
+    ) {
+        val preferred = names.mapNotNull(registry::get)
+            .filter { LocalToolRouter.isOptional(it) &&
+                it.metadata.family.equals("MCP", ignoreCase = true) &&
+                isNetworkSearchPermitted(it.name) }
+            .map(HarnessTool::name)
+        enableOptionalTools(preferred, target)
+        synchronized(target) {
+            val existing = target.toList()
+            target.clear()
+            target.addAll(preferred.filter { it in existing })
+            target.addAll(existing)
+        }
+    }
+
     /** Reassert explicit pins after each model-step heuristic rerank, including step-2+ schemas. */
     fun prioritizePinnedForModelStep(target: MutableSet<String> = enabledOptionalTools) {
         // Only re-order tools already credential-admitted during prepare().

@@ -216,6 +216,37 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun dynamicallyRegisteredMcpToolsArePromotedWithoutGuessingOrCrossServerLeakage() {
+        val registry = ToolRegistry().apply {
+            repeat(180) { index ->
+                register(tool("older_$index", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL, keywords = setOf("old")) { ToolResult("old") })
+            }
+        }
+        val discovery = com.labteto.dshmobile.local.work.LocalWorkRunMcpDiscovery()
+        assertTrue(discovery.observe(registry).isEmpty())
+        registry.register(tool("mcp_x_twitter_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
+            exposure = ToolExposure.OPTIONAL, family = "MCP") { ToolResult("post") })
+        registry.register(tool("mcp_other_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
+            exposure = ToolExposure.OPTIONAL, family = "MCP") { ToolResult("other") })
+        registry.register(tool("mcp_fake_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
+            exposure = ToolExposure.OPTIONAL, family = "Other") { ToolResult("fake") })
+        val created = discovery.observe(registry)
+        assertEquals(listOf("mcp_x_twitter_x_post", "mcp_other_x_post"), created)
+        val coordinator = coordinator(registry)
+        coordinator.enableOptionalTools((0 until 180).map { "older_$it" })
+        coordinator.prioritizeRunCreatedMcpTools(created)
+        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
+        assertTrue("mcp_x_twitter_x_post" in visible)
+        assertTrue("mcp_other_x_post" in visible)
+        assertFalse("mcp_fake_x_post" in visible)
+        assertEquals("mcp_x_twitter_x_post", coordinator.enabledOptionalSnapshot().first())
+        assertEquals(created, discovery.observe(registry))
+        registry.unregister("mcp_x_twitter_x_post")
+        assertEquals(listOf("mcp_other_x_post"), discovery.observe(registry))
+    }
+
+    @Test
     fun pinnedImagegenMakesRealMediaToolsVisibleAcrossStepsWithoutAutoSubmitting() = runBlocking {
         val registry = ToolRegistry().apply {
             for (name in listOf("media_image_options", "media_image_create", "media_image_status")) {

@@ -442,7 +442,8 @@ internal class LocalWorkAgentTurnExecutor(
                     val durableRequestMessages = withWorkTurnContext(
                         withLocalWorkExecutionMode(runHistory.snapshot()),
                         workPromptContext.stable,
-                        workPromptContext.dynamic + "\n" + com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
+                        workPromptContext.dynamic + "\n" + LOCAL_WORK_CAPABILITY_RECOVERY_GUIDANCE + "\n" +
+                            com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
                         workPromptContext.skill,
                     )
                     val selectedMode = resolveLocalImageInputMode(
@@ -601,12 +602,14 @@ internal class LocalWorkAgentTurnExecutor(
                 },
                 toolBatch = AgentToolBatchExecutor { calls ->
                     agentRunCoordinator.ensureCurrentOwner(runContext)
-                    workTurnToolRuntime.executeBatch(
-                        binding = binding,
-                        calls = calls.map { it.toLocalToolCall() },
-                        allowMutation = true,
-                        superseded = { binding.steeringRevision.value != latestAcceptedSamplingRevision },
-                    ).map { (_, result) -> result }
+                    modelToolStepSurface.executeVisibleBatch(calls) { visibleCalls ->
+                        workTurnToolRuntime.executeBatch(
+                            binding = binding,
+                            calls = visibleCalls.map { it.toLocalToolCall() },
+                            allowMutation = true,
+                            superseded = { binding.steeringRevision.value != latestAcceptedSamplingRevision },
+                        ).map { (_, result) -> result }
+                    }
                 },
                 isParallelTool = { call ->
                     modelToolStepSurface.allows(call.name) &&
