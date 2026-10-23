@@ -108,7 +108,7 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         if (!File(workspace.path, backup).exists()) workspace.write(backup, previous)
         saveMcpSource(id, source)
         record("mcp", id, "improved", "源码更新，旧版本 $oldVersion；已运行服务仍需重连并复测", backup)
-        return "MCP $id 源码已更新并复核完整性；原版 $oldVersion 已备份。先断开旧连接，再运行 mcp_start_local；业务效果尚未验证。"
+        return "MCP $id 源码已更新并复核完整性；旧版本 $oldVersion 已备份。先断开旧连接，再运行 mcp_start_local；业务效果尚未验证。"
     }
 
     fun rollbackMcp(id: String, revision: String): String {
