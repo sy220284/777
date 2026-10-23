@@ -121,6 +121,7 @@ internal class LocalWorkStrategyLearning(
             log.append("work/improvement-candidate", buildJsonObject {
                 put("id", UUID.randomUUID().toString())
                 put("source_run_id", sourceRunId)
+                put("source_task_run_id", com.labteto.dshmobile.local.usage.resolveTokenUsageTaskRunId(log, sourceRunId))
                 put("source_session", expectedSession)
                 put("source_sequence", sourceSequence)
                 put("goal_id", goal.id)
