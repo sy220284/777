@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name" translatable="false">神言神语</string>
     <string name="local_improvement_archive">自我改进档案</string>
+    <string name="usage_action_work_improvement">工作策略优化</string>
     <string name="skills_display_name_label">技能中文名称</string>
     <string name="skills_display_name_hint">用于技能列表与调用展示，不影响英文调用标识</string>
     <string name="sidebar_avatar_open">设置侧边栏头像</string>
