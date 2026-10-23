@@ -1,0 +1,31 @@
+package com.labteto.dshmobile.local.work.improvement
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class LocalWorkStrategyLearningTest {
+    @Test fun strictValidJsonBecomesCandidateNotAnActivePolicy() {
+        val result = parseProposal("""{"cue":"Kotlin 编译失败","guidance":"先检查构建日志中的实际错误，再修改最小文件并重新编译。","reason":"减少盲目返工","category":"prompt"}""")
+        assertEquals("prompt", result?.category)
+        assertTrue(result!!.guidance.contains("重新编译"))
+    }
+
+    @Test fun insufficientEvidenceReturnsNoCandidate() {
+        assertNull(parseProposal("""{"cue":"","guidance":"","reason":"insufficient evidence","category":"workflow"}"""))
+    }
+
+    @Test fun invalidOrOversizedResponseIsIgnored() {
+        assertNull(parseProposal("not json"))
+        assertNull(parseProposal("""{"cue":"x","guidance":"short","reason":"x","category":"security"}"""))
+        assertNull(parseProposal("x".repeat(5000)))
+    }
+
+    @Test fun codeFenceCanBeParsedButNeverChangesOfficialPrompt() {
+        val text = "```json\n" +
+            """{"cue":"重复工具调用","guidance":"每次调用前检验刚刚收到的实际工具结果，避免重复同一个请求。","reason":"减少重复请求","category":"workflow"}""" +
+            "\n```"
+        assertEquals("workflow", parseProposal(text)?.category)
+    }
+}
