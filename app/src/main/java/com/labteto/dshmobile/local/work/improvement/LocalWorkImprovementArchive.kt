@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.work.improvement
 
 import com.labteto.dshmobile.local.files.LocalWorkspace
-import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.harness.session.SessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import java.io.File
 import java.nio.file.Files
@@ -24,8 +24,8 @@ internal class LocalWorkImprovementArchive(
     private data class GoalReceipt(val session: String, val sequence: Long, val hasMachineEvidence: Boolean)
     private data class Facts(
         val lastSequence: Long,
-        val generation: Long,
-        val logIdentity: String,
+        val fileSize: Long,
+        val modifiedAt: Long,
         val workTurns: Int,
         val toolReceipts: Int,
         val failedTools: Int,
@@ -69,13 +69,16 @@ internal class LocalWorkImprovementArchive(
         cached.keys.retainAll(ids)
         files.forEach { file ->
             val id = file.name.removeSuffix(".events.jsonl")
-            val log = eventLogs.get(id)
-            val end = log.latestSequence()
-            val generation = log.resetGeneration
-            val existing = cached[id]
-            if (existing != null && existing.lastSequence == end && existing.generation == generation &&
-                existing.logIdentity == log.historyInstanceIdentity) return@forEach
-            cached[id] = readFacts(id, log, end, generation)
+            eventLogs.readHistorical(id) { log ->
+                val end = log.latestSequence()
+                val size = file.length()
+                val modified = file.lastModified()
+                val existing = cached[id]
+                if (existing == null || existing.lastSequence != end ||
+                    existing.fileSize != size || existing.modifiedAt != modified) {
+                    cached[id] = readFacts(id, log, end, size, modified)
+                }
+            }
         }
         val facts = cached.values.toList()
         val turns = facts.sumOf(Facts::workTurns)
@@ -193,7 +196,7 @@ internal class LocalWorkImprovementArchive(
         ensureInitialized()
     }
 
-    private fun readFacts(session: String, log: LocalSessionEventLog, end: Long, generation: Long): Facts {
+    private fun readFacts(session: String, log: SessionEventLog, end: Long, fileSize: Long, modifiedAt: Long): Facts {
         var isWork = false
         var turns = 0
         var toolReceipts = 0
@@ -243,7 +246,7 @@ internal class LocalWorkImprovementArchive(
                 }
             }
         }
-        return Facts(end, generation, log.historyInstanceIdentity, turns, toolReceipts, failedTools, goals.size,
+        return Facts(end, fileSize, modifiedAt, turns, toolReceipts, failedTools, goals.size,
             machineEvidenceGoals, problemsCount, problems.toList(), receipts.toList())
     }
 
