@@ -226,11 +226,11 @@ class LocalToolExecutionCoordinatorTest {
         val discovery = com.labteto.dshmobile.local.work.LocalWorkRunMcpDiscovery()
         assertTrue(discovery.observe(registry).isEmpty())
         registry.register(tool("mcp_x_twitter_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
-            exposure = ToolExposure.OPTIONAL, family = "MCP") { ToolResult("post") })
+            exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("x-twitter")) { ToolResult("post") })
         registry.register(tool("mcp_other_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
-            exposure = ToolExposure.OPTIONAL, family = "MCP") { ToolResult("other") })
+            exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("other")) { ToolResult("other") })
         registry.register(tool("mcp_fake_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
-            exposure = ToolExposure.OPTIONAL, family = "Other") { ToolResult("fake") })
+            exposure = ToolExposure.OPTIONAL, family = "Other", keywords = setOf("fake")) { ToolResult("fake") })
         val created = discovery.observe(registry)
         assertEquals(listOf("mcp_x_twitter_x_post", "mcp_other_x_post"), created)
         val coordinator = coordinator(registry)
