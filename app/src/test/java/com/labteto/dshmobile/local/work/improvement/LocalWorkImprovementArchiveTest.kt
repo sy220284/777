@@ -100,6 +100,7 @@ class LocalWorkImprovementArchiveTest {
         })
         archive.refresh()
         val goal = LocalGoal("审计代码", "active", id = "different-goal",
+            startedAtSequence = 0L,
             artifactPaths = listOf("report.md"), verificationCommands = listOf("test"))
         val advice = archive.adviceFor(goal, "project-alpha", "test-model", "profile-a")
         assertEquals("improvement-1", advice?.id)
@@ -118,6 +119,8 @@ class LocalWorkImprovementArchiveTest {
         trial.append("work/improvement-retired", buildJsonObject { put("candidate_id", "improvement-1") })
         archive.refresh()
         assertEquals(null, archive.adviceFor(goal, "project-alpha", "test-model", "profile-a"))
+        assertEquals(null, archive.adviceFor(goal.copy(startedAtSequence = -1L),
+            "project-alpha", "test-model", "profile-a"))
     }
 
     private fun withArchive(
