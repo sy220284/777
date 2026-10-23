@@ -36,6 +36,7 @@ internal class LocalWorkImprovementArchive(
     private data class Proposal(
         val session: String, val sequence: Long, val createdAt: Long, val id: String,
         val category: String, val cue: String, val guidance: String, val reason: String,
+        val artifactReceipt: String, val testReceipt: String,
         val advice: WorkImprovementAdvice,
     )
     private data class Evaluation(
@@ -386,7 +387,10 @@ internal class LocalWorkImprovementArchive(
                         )
                         addBounded(proposals, Proposal(session, e.sequence, e.createdAt, candidateId,
                             category, advice.cue, advice.guidance,
-                            data.text("reason").orEmpty().take(300), advice))
+                            data.text("reason").orEmpty().take(300),
+                            data.text("source_artifact_receipt").orEmpty().take(100),
+                            data.text("source_verification_receipt").orEmpty().take(100),
+                            advice))
                     }
                 }
                 "work/improvement-trial" -> data.text("candidate_id")?.let { candidateId ->
@@ -427,6 +431,8 @@ internal class LocalWorkImprovementArchive(
             "- [候选，未验证] " + it.cue.replace("\n", " ").take(100) +
                 "；建议：" + it.guidance.replace("\n", " ").take(400) +
                 "；理由：" + it.reason.replace("\n", " ").take(200) +
+                "；成果回执：" + it.artifactReceipt.ifEmpty { "无" } +
+                "；测试回执：" + it.testReceipt.ifEmpty { "无" } +
                 "；来源会话 " + it.session.take(80) + " 事件 #" + it.sequence
         }
 
