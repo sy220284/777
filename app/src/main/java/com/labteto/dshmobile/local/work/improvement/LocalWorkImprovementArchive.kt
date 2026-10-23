@@ -71,7 +71,7 @@ internal class LocalWorkImprovementArchive(
      */
     @Synchronized
     fun adviceFor(goal: LocalGoal, projectId: String, model: String, profileId: String): WorkImprovementAdvice? {
-        if (goal.status != "active" || goal.id.isBlank()) return null
+        if (goal.status != "active" || goal.id.isBlank() || goal.startedAtSequence < 0L) return null
         val signature = workGoalComparisonKey(goal)
         val used = cached.values.flatMap { it.trialIds + it.retiredIds }.toSet()
         val usedForThisGoal = cached.values.flatMap { it.trialGoalIds.entries }
@@ -80,7 +80,8 @@ internal class LocalWorkImprovementArchive(
         val matches = cached.values.flatMap(Facts::proposals)
             .asSequence().map(Proposal::advice)
             .filter { it.goalSignature == signature && it.projectId == projectId &&
-                it.model == model && it.profileId == profileId && it.baselineTestVerified }
+                it.model == model && it.profileId == profileId && it.baselineTestVerified &&
+                    it.baselineToolCalls != Int.MAX_VALUE && it.baselineToolErrors != Int.MAX_VALUE }
             .filter { it.id !in cached.values.flatMap { facts -> facts.retiredIds } }
             .distinctBy(WorkImprovementAdvice::id).toList()
         val adopted = matches.firstOrNull { it.id in active }
@@ -366,7 +367,7 @@ internal class LocalWorkImprovementArchive(
                 "work/improvement-trial" -> data.text("candidate_id")?.let { candidateId ->
                     trialIds.add(candidateId)
                     val goalId = data.text("goal_id").orEmpty()
-                    if (goalId.isNotBlank()) trialGoalIds.getOrPut(candidateId, ::linkedSetOf).add(goalId)
+                    if (goalId.isNotBlank()) trialGoalIds.getOrPut(candidateId) { linkedSetOf() }.add(goalId)
                 }
                 "work/improvement-adopted" -> data.text("candidate_id")?.let(adoptedIds::add)
                 "work/improvement-evaluation" -> {
