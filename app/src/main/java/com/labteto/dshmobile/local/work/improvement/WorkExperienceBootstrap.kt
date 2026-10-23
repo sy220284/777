@@ -33,6 +33,12 @@ internal object WorkExperienceBootstrap {
             safeDirection = "根据真实回执检查错误和未知结果，再决定是否允许重试",
         ),
         Pattern(
+            evidenceTag = "tool_contract_error",
+            name = "不同模型的工具调用契约错误",
+            reviewQuestion = "模型调用了不存在的工具，或者参数结构违反当前注册工具的 Schema；是否只需校正工具名与字段类型？",
+            safeDirection = "仅依据当前注册且已提供给模型的工具定义纠正调用；不要猜测新工具、添加未授权能力或自动重放写入",
+        ),
+        Pattern(
             evidenceTag = "goal_rejection",
             name = "目标验收前置检查",
             reviewQuestion = "Goal 完成变更曾被拒绝，是否漏核对明确的成果或测试验收要求？",
@@ -65,9 +71,11 @@ internal object WorkExperienceBootstrap {
         val toolFailures: Int,
         val goalRejections: Int,
         val qualityConflicts: Int,
+        val toolContractErrors: Int = 0,
     ) {
         fun supports(tag: String): Boolean = when (tag) {
             "tool_failure" -> toolFailures > 0
+            "tool_contract_error" -> toolContractErrors > 0
             "goal_rejection" -> goalRejections > 0
             "quality_conflict" -> qualityConflicts > 0
             else -> false
@@ -81,18 +89,25 @@ internal object WorkExperienceBootstrap {
         var toolFailures = 0
         var rejections = 0
         var conflicts = 0
+        var contractErrors = 0
         log.forEachAfter(goal.startedAtSequence) { event ->
             when (event.type) {
                 "tool/result" -> if (
                     (event.data["is_error"] as? JsonPrimitive)?.contentOrNull == "true"
-                ) toolFailures++
+                ) {
+                    toolFailures++
+                    val code = (event.data["error_code"] as? JsonPrimitive)?.contentOrNull
+                    if (code in setOf("UNKNOWN_TOOL", "INVALID_TOOL_ARGUMENTS", "TOOL_INVALID_ARGUMENT")) {
+                        contractErrors++
+                    }
+                }
                 "goal/transition-rejected" -> rejections++
                 "work/output-quality" -> {
                     conflicts += (event.data["findings"] as? JsonArray)?.size ?: 0
                 }
             }
         }
-        return Signals(toolFailures, rejections, conflicts)
+        return Signals(toolFailures, rejections, conflicts, contractErrors)
     }
 
     /**
@@ -115,6 +130,7 @@ internal object WorkExperienceBootstrap {
 
             OBSERVED EVENT COUNTS (from durable Session EventLog):
             - tool_failure: ${signals.toolFailures}
+            - tool_contract_error: ${signals.toolContractErrors}
             - goal_rejection: ${signals.goalRejections}
             - quality_conflict: ${signals.qualityConflicts}
             - artifact execution receipt exists: ${hasArtifactReceipt}
@@ -141,7 +157,7 @@ internal object WorkExperienceBootstrap {
             Otherwise return ONE JSON object only:
             {"cue":"generalizable situation trigger", "guidance":"concrete optional corrective action",
              "reason":"what the observed signal supports, without claiming a gain",
-             "category":"workflow|prompt|skill", "evidence_tag":"tool_failure|goal_rejection|quality_conflict"}
+             "category":"workflow|prompt|skill", "evidence_tag":"tool_failure|tool_contract_error|goal_rejection|quality_conflict"}
         """.trimIndent()
     }
 }
