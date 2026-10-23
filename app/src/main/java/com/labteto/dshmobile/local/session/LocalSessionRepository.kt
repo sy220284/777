@@ -1,10 +1,8 @@
 package com.labteto.dshmobile.local.session
 
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
-import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,10 +32,9 @@ internal class LocalSessionRepository(
     private val onWritten: () -> Unit,
     private val onError: (Throwable) -> Unit,
     private val domainCodecs: List<LocalSessionDomainCodec> = emptyList(),
+    private val snapshotStore: LocalSessionSnapshotStore = FileSessionSnapshotStore(root, json),
 ) {
     private val sessionsRoot = root
-    private val catalogStore = VersionedSessionStore(root, json)
-    private val sessionStores = ConcurrentHashMap<String, VersionedSessionStore>()
     private val sessionLocks = Array(SESSION_LOCK_STRIPES) { Any() }
     private val summaryIndex = LocalSessionSummaryIndex(root, json)
     private val lock = Any()
@@ -246,7 +243,7 @@ internal class LocalSessionRepository(
             ids.forEach { id ->
                 if (id !in pending && id !in latestSnapshots) {
                     deletedIds.remove(id)
-                    sessionStores.remove(id)
+                    snapshotStore.evict(id)
                 }
             }
         }
@@ -297,7 +294,7 @@ internal class LocalSessionRepository(
     }
 
     private fun loadSummaries(): List<LocalSessionSummary> {
-        val ids = catalogStore.ids()
+        val ids = snapshotStore.ids()
         val validIds = ids.toSet()
         summaryIndex.prune(validIds)
         return ids.mapNotNull { id ->
@@ -386,8 +383,7 @@ internal class LocalSessionRepository(
         return sessionLocks[index]
     }
 
-    private fun storeFor(id: String): VersionedSessionStore =
-        sessionStores.computeIfAbsent(id) { VersionedSessionStore(sessionsRoot, json) }
+    private fun storeFor(id: String): LocalSessionSnapshotStore = snapshotStore
 
     private fun projectSummary(snapshot: LocalHarnessSession): LocalSessionSummary =
         com.labteto.dshmobile.local.session.projectLocalSessionSummary(snapshot, domainCodecs)

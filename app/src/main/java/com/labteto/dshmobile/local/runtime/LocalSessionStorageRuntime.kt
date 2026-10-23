@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.runtime
 import android.content.Context
 import com.labteto.dshmobile.harness.session.SessionProjectionRegistry
 import com.labteto.dshmobile.local.session.LocalSessionCoordinator
+import com.labteto.dshmobile.local.session.SqliteSessionSnapshotStore
 import com.labteto.dshmobile.local.session.LocalSessionRepository
 import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
@@ -76,6 +77,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
                 runtimeStateStore.projection.publishError(error.message ?: "会话写入失败")
             },
             domainCodecs = orderedCodecs,
+            snapshotStore = SqliteSessionSnapshotStore(context, json),
         )
         coordinator = LocalSessionCoordinator(
             repository = repository,
