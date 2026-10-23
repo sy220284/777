@@ -23,6 +23,28 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.TokenUsageAggregate
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.TokenUsageAnalyticsStore
+import com.labteto.dshmobile.local.model.AnthropicMessagesClient
+import com.labteto.dshmobile.local.model.DeepSeekPricingRepository
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.model.LocalCanonicalContent
+import com.labteto.dshmobile.local.model.LocalCanonicalMessage
+import com.labteto.dshmobile.local.model.LocalCanonicalRole
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelProtocol
+import com.labteto.dshmobile.local.model.LocalModelRouteIdentity
+import com.labteto.dshmobile.local.model.LocalModelRuntimeCapabilities
+import com.labteto.dshmobile.local.model.LocalResolvedModelRoute
+import java.util.UUID
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
@@ -109,6 +131,100 @@ class UsageCalculationPageTest {
             }
         }
 
+        compose.onNodeWithText(context.getString(R.string.usage_calculation_cache_write)).assertExists()
+        compose.onNodeWithText("3").assertExists()
+        compose.onNodeWithText("17").assertExists()
+        compose.onNodeWithText(context.getString(R.string.usage_calculation_reasoning_note, "4")).assertExists()
+    }
+
+    @Test
+    fun providerStreamPersistsSixCountersAndRendersFromRealLedger() = runBlocking {
+        val requestId = "usage-e2e-${UUID.randomUUID()}"
+        val events = listOf(
+            """{"type":"message_start","message":{"id":"$requestId","usage":{"input_tokens":5,"cache_read_input_tokens":2,"cache_creation_input_tokens":3,"output_tokens":0,"output_tokens_details":{"thinking_tokens":1}}}}""",
+            """{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}""",
+            """{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"完成"}}""",
+            """{"type":"content_block_stop","index":0}""",
+            """{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":7,"output_tokens_details":{"thinking_tokens":4}}}""",
+            """{"type":"message_stop"}""",
+        )
+        val payload = events.joinToString(separator = "\n\n", postfix = "\n\n") { "data: $it" }
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder()
+                .request(chain.request())
+                .protocol(Protocol.HTTP_1_1)
+                .code(200)
+                .message("OK")
+                .header("Content-Type", "text/event-stream")
+                .body(payload.toResponseBody("text/event-stream".toMediaType()))
+                .build()
+        }.build()
+        val json = Json { ignoreUnknownKeys = true }
+        val route = LocalResolvedModelRoute(
+            profileId = "usage-test-minimax",
+            provider = "MiniMax",
+            model = "MiniMax-M3",
+            baseUrl = "https://api.minimaxi.com/anthropic/v1",
+            authKind = LocalModelAuthKind.API_KEY,
+            protocol = LocalModelProtocol.ANTHROPIC_MESSAGES,
+            bearerToken = "local-test-only",
+            capabilities = LocalModelRuntimeCapabilities(),
+        )
+        val reply = AnthropicMessagesClient(http, json).complete(
+            route = route,
+            messages = listOf(
+                LocalCanonicalMessage(
+                    LocalCanonicalRole.USER,
+                    listOf(LocalCanonicalContent.Text("核算 Token")),
+                ),
+            ),
+            tools = emptyList(),
+            temperature = null,
+            streaming = true,
+        )
+        assertEquals(requestId, reply.requestId)
+        val store = TokenUsageAnalyticsStore(context, json)
+        val tracker = DeepSeekUsageTracker(
+            context,
+            DeepSeekPricingRepository(context, http),
+            store,
+        )
+        tracker.reconcileLegacyUsage()
+        val before = store.snapshot().tracked
+        tracker.record(
+            model = "deepseek-chat", // UI changed while the MiniMax request was in flight.
+            usage = reply.usage,
+            requestId = reply.requestId,
+            route = LocalModelRouteIdentity(
+                profileId = route.profileId,
+                provider = route.provider,
+                model = route.model,
+                baseUrl = route.baseUrl,
+            ),
+        )
+        val record = store.recordById(requestId)
+        assertNotNull(record)
+        val saved = requireNotNull(record)
+        assertEquals("MiniMax-M3", saved.model)
+        assertEquals(10L, saved.inputTokens)
+        assertEquals(2L, saved.cacheHitTokens)
+        assertEquals(8L, saved.cacheMissTokens)
+        assertEquals(3L, saved.cacheWriteTokens)
+        assertEquals(7L, saved.outputTokens)
+        assertEquals(4L, saved.reasoningTokens)
+        assertEquals(17L, saved.totalTokens)
+        val after = store.snapshot()
+        assertEquals(before.totalTokens + 17L, after.tracked.totalTokens)
+        assertEquals(before.cacheWriteTokens + 3L, after.tracked.cacheWriteTokens)
+        assertEquals(before.reasoningTokens + 4L, after.tracked.reasoningTokens)
+        assertTrue(after.byModel.getValue("MiniMax-M3").tracked.totalTokens >= 17L)
+        compose.setContent {
+            DshTheme {
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    UsageRequestDetailPage(saved)
+                }
+            }
+        }
         compose.onNodeWithText(context.getString(R.string.usage_calculation_cache_write)).assertExists()
         compose.onNodeWithText("3").assertExists()
         compose.onNodeWithText("17").assertExists()
