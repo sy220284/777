@@ -128,6 +128,51 @@ class WorkExperienceBootstrapTest {
     }
 
     @Test
+    fun completedGoalMetricsExcludeLaterGoalsAndTheirToolFailures() {
+        val root = Files.createTempDirectory("777-goal-isolation").toFile()
+        try {
+            val log = LocalSessionEventLogRegistry(root, Json).get("sequential-goals")
+            log.append("goal/state", buildJsonObject {
+                put("id", "first")
+                put("revision", 1)
+                put("status", "active")
+            })
+            val firstStart = log.latestSequence()
+            log.append("tool/result", buildJsonObject { put("is_error", false) })
+            log.append("goal/state", buildJsonObject {
+                put("id", "first")
+                put("revision", 2)
+                put("status", "completed")
+                put("startedAtSequence", firstStart)
+            })
+            log.append("goal/state", buildJsonObject {
+                put("id", "second")
+                put("revision", 1)
+                put("status", "active")
+            })
+            log.append("tool/result", buildJsonObject {
+                put("is_error", true)
+                put("error_code", "UNKNOWN_TOOL")
+            })
+            log.append("goal/transition-rejected", buildJsonObject {
+                put("reason", "second-goal-only")
+            })
+            val first = LocalGoal(
+                "第一个目标", status = "completed", id = "first",
+                revision = 2, startedAtSequence = firstStart,
+            )
+            assertEquals(1 to 0, workGoalToolMetrics(log, first))
+            val signals = WorkExperienceBootstrap.collect(log, first)
+            assertEquals(0, signals.toolFailures)
+            assertEquals(0, signals.toolContractErrors)
+            assertEquals(0, signals.goalRejections)
+            assertFalse(signals.canReflect)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun starterTemplatesClearlyDenyTheyAreVerifiedLessons() {
         val text = WorkExperienceBootstrap.catalogMarkdown()
         assertTrue(text.contains("未验证经验"))
