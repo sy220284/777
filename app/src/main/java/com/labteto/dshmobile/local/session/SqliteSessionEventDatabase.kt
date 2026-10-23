@@ -17,7 +17,7 @@ import kotlinx.serialization.json.jsonObject
  * independent of the existing JSONL adapter until its repair, export and projection
  * consumers can all be cut over together; an incomplete dual-write is not safe.
  */
-internal class SqliteSessionEventDatabase(
+class SqliteSessionEventDatabase(
     context: Context,
     private val json: Json,
     name: String = "local_session_events_v1.db",
@@ -231,7 +231,7 @@ internal class SqliteSessionEventDatabase(
      * Deleting/resetting a session invalidates its old checkpoint automatically via
      * the FK and the random instance token, including delete-then-recreate races.
      */
-    fun readProjectionCheckpoint(
+    internal fun readProjectionCheckpoint(
         sessionId: String, name: String, version: Int,
     ): LocalSessionProjectionCheckpoint? {
         validateSessionId(sessionId)
@@ -253,7 +253,7 @@ internal class SqliteSessionEventDatabase(
         }
     }
 
-    fun writeProjectionCheckpoint(
+    internal fun writeProjectionCheckpoint(
         sessionId: String, name: String, checkpoint: LocalSessionProjectionCheckpoint,
     ): Boolean {
         validateSessionId(sessionId)
