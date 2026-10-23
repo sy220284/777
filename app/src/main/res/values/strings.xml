@@ -827,6 +827,7 @@
     <string name="usage_calculation_reasoning_note">其中推理 Token %1$s，已包含在输出中</string>
     <string name="usage_calculation_hit">缓存命中</string>
     <string name="usage_calculation_miss">缓存未命中</string>
+    <string name="usage_calculation_cache_write">缓存写入（包含在未命中中）</string>
     <string name="usage_calculation_cache_note">命中率 = 缓存命中 ÷（命中 + 未命中）</string>
     <string name="usage_calculation_partial">部分用量未计入金额</string>
     <string name="usage_calculation_disclaimer">金额按每次请求当时的模型价格估算，仅供参考；不等同于平台账单。</string>
