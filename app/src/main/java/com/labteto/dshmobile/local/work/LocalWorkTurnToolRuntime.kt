@@ -69,13 +69,7 @@ internal class LocalWorkTurnToolRuntime(
         // capabilities become available automatically without restarting or editing tool maps.
         val activeTask = LocalToolCapabilityIntent.latestUserInput(history)
         if (!activeTask.isNullOrBlank()) {
-            // A model's explicit capability_search selection must survive this step's
-            // heuristic refresh. The turn-start prepare() still reorders for a NEW user task.
-            // Here we only append newly registered relevant tools, preserving priority of
-            // the tools the model just discovered under the optional schema-token budget.
-            execution.enableTaskRelevantOptionalTools(
-                activeTask, binding.enabledOptionalTools, prioritize = false,
-            )
+            execution.enableTaskRelevantOptionalTools(activeTask, binding.enabledOptionalTools)
         }
         execution.prioritizePinnedForModelStep(binding.enabledOptionalTools)
         val enabled = synchronized(binding.enabledOptionalTools) {
@@ -168,9 +162,6 @@ internal class LocalWorkTurnToolRuntime(
         calls: List<LocalToolCall>,
         allowMutation: Boolean = true,
         superseded: () -> Boolean = { false },
-        // The caller's frozen model-step surface is a separate admission requirement from
-        // Registry registration. Apply it to EVERY batch member, even parallel groups.
-        blockedCall: (String) -> AgentToolResult? = { null },
     ): List<Pair<LocalToolCall, AgentToolResult>> {
         val output = mutableListOf<Pair<LocalToolCall, AgentToolResult>>()
         val groups = planLocalToolBatch(calls.size) { index -> isParallel(calls[index].name) }
@@ -178,17 +169,15 @@ internal class LocalWorkTurnToolRuntime(
             val part = calls.subList(group.startInclusive, group.endExclusive)
             if (!group.parallel) {
                 val call = part.single()
-                output += call to executeAdmittedWorkBatchCall(call, superseded, blockedCall) {
-                    execute(binding, call, allowMutation, stillCurrent = { !superseded() })
-                }
+                output += call to if (superseded()) workSteeredToolResult(call)
+                    else execute(binding, call, allowMutation, stillCurrent = { !superseded() })
                 continue
             }
             // Do not execute any later group before this entire group settles. Resource leases
             // remain in the shared tool coordinator, so approval and write semantics are intact.
             output += isolatedParallelMap(part) { call ->
-                call to executeAdmittedWorkBatchCall(call, superseded, blockedCall) {
-                    execute(binding, call, allowMutation, stillCurrent = { !superseded() })
-                }
+                call to if (superseded()) workSteeredToolResult(call)
+                    else execute(binding, call, allowMutation, stillCurrent = { !superseded() })
             }.mapIndexed { index, result ->
                 result.getOrElse { error ->
                     val call = part[index]
@@ -272,21 +261,6 @@ internal fun parallelToolFailure(
  * Write and agent-control calls retain their existing exclusive, ordered execution path.
  */
 internal fun isSafeParallelReadTool(tool: HarnessTool?): Boolean = isParallelSafeReadTool(tool)
-
-/**
- * The SAME frozen model-step tool-surface check applies to serial and parallel batches.
- * This pure gate prevents a model's unexposed guessed tool from reaching Registry execution
- * even if that tool is globally installed or has automatic approval.
- */
-internal suspend fun executeAdmittedWorkBatchCall(
-    call: LocalToolCall,
-    superseded: () -> Boolean,
-    blockedCall: (String) -> AgentToolResult?,
-    execute: suspend () -> AgentToolResult,
-): AgentToolResult {
-    if (superseded()) return workSteeredToolResult(call)
-    return blockedCall(call.name) ?: execute()
-}
 
 /** A committed correction invalidates unstarted calls from the preceding model sample. */
 internal fun workSteeredToolResult(call: LocalToolCall): AgentToolResult = AgentToolResult(
