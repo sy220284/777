@@ -204,18 +204,22 @@ internal class SqliteSessionStorageManager(
 
     private fun isEmptyDatabase(file: File): Boolean {
         if (!file.exists()) return true
+        // Only a recognized, genuinely empty session database may be replaced.
+        // An arbitrary SQLite file with other tables must never count as empty.
+        val requiredTable = when (file.name) {
+            snapshotDatabaseName -> "session_snapshots"
+            eventDatabaseName -> "session_events"
+            else -> return false
+        }
         return runCatching {
             SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
-                val tables = listOf("session_snapshots", "session_events")
-                tables.all { table ->
-                    db.rawQuery(
-                        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
-                        arrayOf(table),
-                    ).use { exists ->
-                        if (!exists.moveToFirst()) true else {
-                            db.rawQuery("SELECT 1 FROM $table LIMIT 1", null).use { rows ->
-                                !rows.moveToFirst()
-                            }
+                db.rawQuery(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                    arrayOf(requiredTable),
+                ).use { exists ->
+                    if (!exists.moveToFirst()) false else {
+                        db.rawQuery("SELECT 1 FROM $requiredTable LIMIT 1", null).use { rows ->
+                            !rows.moveToFirst()
                         }
                     }
                 }

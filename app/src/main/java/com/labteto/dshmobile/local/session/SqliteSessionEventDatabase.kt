@@ -396,18 +396,28 @@ class SqliteSessionEventDatabase(
         var used = 0
         var lastSequence = afterSequence
         var more = false
-        forEachAfter(sessionId, afterSequence) { event ->
-            if (matches.size >= limit.coerceIn(1, 200) || used >= budget) {
-                more = true
-            } else {
+        validateSessionId(sessionId)
+        readableDatabase.rawQuery(
+            "SELECT sequence,event_type,created_at,schema_version,payload " +
+                "FROM session_events WHERE session_id=? AND sequence>? ORDER BY sequence ASC",
+            arrayOf(sessionId, afterSequence.toString()),
+        ).use { rows ->
+            while (rows.moveToNext()) {
+                val event = readEvent(rows)
                 val encoded = json.encodeToString(SessionEvent.serializer(), event)
-                if (encoded.contains(query, ignoreCase = true)) {
-                    val line = "${event.sequence}: " + encoded.take(2048)
-                    if (used + line.length < budget) {
-                        matches += line
-                        used += line.length + 1
-                        lastSequence = event.sequence
-                    } else more = true
+                if (!encoded.contains(query, ignoreCase = true)) continue
+                if (matches.size >= limit.coerceIn(1, 200) || used >= budget) {
+                    more = true
+                    break
+                }
+                val line = "${event.sequence}: " + encoded.take(2048)
+                if (used + line.length < budget) {
+                    matches += line
+                    used += line.length + 1
+                    lastSequence = event.sequence
+                } else {
+                    more = true
+                    break
                 }
             }
         }
@@ -428,9 +438,14 @@ class SqliteSessionEventDatabase(
         val start = (sequence - before.coerceIn(0, 100)).coerceAtLeast(0L)
         val end = (sequence + after.coerceIn(0, 100)).coerceAtLeast(sequence)
         val out = mutableListOf<String>()
-        forEachAfter(sessionId, start - 1L) { event ->
-            if (event.sequence in start..end) {
-                out += json.encodeToString(SessionEvent.serializer(), event)
+        readableDatabase.rawQuery(
+            "SELECT sequence,event_type,created_at,schema_version,payload " +
+                "FROM session_events WHERE session_id=? AND sequence>=? AND sequence<=? " +
+                "ORDER BY sequence ASC",
+            arrayOf(sessionId, start.toString(), end.toString()),
+        ).use { rows ->
+            while (rows.moveToNext()) {
+                out += json.encodeToString(SessionEvent.serializer(), readEvent(rows))
             }
         }
         if (out.isEmpty()) return "事件不存在：$sequence"
