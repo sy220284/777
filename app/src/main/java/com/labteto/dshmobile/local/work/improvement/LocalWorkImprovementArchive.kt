@@ -20,6 +20,7 @@ internal data class WorkImprovementAdvice(
     val id: String, val sourceSession: String, val sourceRunId: String,
     val sourceTaskRunId: String,
     val goalSignature: String, val projectId: String, val model: String, val profileId: String,
+    val routeFingerprint: String,
     val category: String, val cue: String, val guidance: String,
     val baselineToolCalls: Int, val baselineToolErrors: Int,
     val baselineTestVerified: Boolean, val active: Boolean,
@@ -70,7 +71,8 @@ internal class LocalWorkImprovementArchive(
      * This never launches an extra side-effectful rollout or changes tool permissions.
      */
     @Synchronized
-    fun adviceFor(goal: LocalGoal, projectId: String, model: String, profileId: String): WorkImprovementAdvice? {
+    fun adviceFor(goal: LocalGoal, projectId: String, model: String, profileId: String,
+        routeFingerprint: String = ""): WorkImprovementAdvice? {
         if (goal.status != "active" || goal.id.isBlank() || goal.startedAtSequence < 0L) return null
         val signature = workGoalComparisonKey(goal)
         val used = cached.values.flatMap { it.trialIds + it.retiredIds }.toSet()
@@ -80,7 +82,8 @@ internal class LocalWorkImprovementArchive(
         val matches = cached.values.flatMap(Facts::proposals)
             .asSequence().map(Proposal::advice)
             .filter { it.goalSignature == signature && it.projectId == projectId &&
-                it.model == model && it.profileId == profileId && it.baselineTestVerified &&
+                it.model == model && it.profileId == profileId && it.routeFingerprint == routeFingerprint &&
+                    it.baselineTestVerified &&
                     it.baselineToolCalls != Int.MAX_VALUE && it.baselineToolErrors != Int.MAX_VALUE }
             .filter { it.id !in cached.values.flatMap { facts -> facts.retiredIds } }
             .distinctBy(WorkImprovementAdvice::id).toList()
@@ -354,6 +357,7 @@ internal class LocalWorkImprovementArchive(
                             projectId = data.text("project_id").orEmpty(),
                             model = data.text("model").orEmpty(),
                             profileId = data.text("profile_id").orEmpty(),
+                            routeFingerprint = data.text("route_fingerprint").orEmpty(),
                             category = category,
                             cue = data.text("cue").orEmpty().take(120),
                             guidance = data.text("guidance").orEmpty().take(500),
