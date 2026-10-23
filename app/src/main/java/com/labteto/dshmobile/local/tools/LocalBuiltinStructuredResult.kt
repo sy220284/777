@@ -41,7 +41,7 @@ internal fun localBuiltinStructuredResult(toolName: String, output: String): Too
             output in setOf("子代理无写入权限", "该子任务处于只读模式") ->
             "MUTATION_SCOPE_BLOCKED"
         canonical == "list_subagent_models" &&
-            output.startsWith("官方模型目录查询未成功（") ->
+            output.contains("\n【指定配置的官方模型目录】\n官方模型目录查询未成功（") ->
             "MODEL_CATALOG_UNAVAILABLE"
         else -> null
     }
