@@ -64,6 +64,48 @@ class TokenUsageDatabaseAndroidTest {
         assertEquals(120L, aggregate.totalTokens)
     }
 
+    @Test fun minimaxDeepseekMinimaxUsageSurvivesReopenWithoutReplayOrCrossModelMixing() {
+        database.migrate(legacy)
+        val first = record("m3-first").copy(
+            model = "MiniMax-M3", inputTokens = 10L, cacheHitTokens = 2L,
+            cacheMissTokens = 8L, cacheWriteTokens = 3L,
+            outputTokens = 7L, reasoningTokens = 4L,
+        )
+        val other = record("ds-middle").copy(
+            model = "deepseek-chat", inputTokens = 40L, cacheHitTokens = 10L,
+            cacheMissTokens = 30L, outputTokens = 10L,
+        )
+        val last = record("m3-last").copy(
+            model = "MiniMax-M3", inputTokens = 20L, cacheHitTokens = 7L,
+            cacheMissTokens = 13L, cacheWriteTokens = 5L,
+            outputTokens = 3L, reasoningTokens = 2L,
+        )
+        assertTrue(database.append(first).inserted)
+        assertTrue(database.append(other).inserted)
+        assertTrue(database.append(last).inserted)
+        assertFalse(database.append(first.copy(inputTokens = 99_999L)).inserted)
+
+        val before = database.lifetimeTotals()
+        assertEquals(90L, before.tracked.totalTokens)
+        assertEquals(3L, before.tracked.requestCount)
+        assertEquals(8L, before.tracked.cacheWriteTokens)
+        assertEquals(6L, before.tracked.reasoningTokens)
+        assertEquals(40L, before.models.getValue("MiniMax-M3").tracked.totalTokens)
+        assertEquals(50L, before.models.getValue("deepseek-chat").tracked.totalTokens)
+
+        database.close()
+        database = TokenUsageDatabase(context, json, name)
+        database.backfillModelTotalsIfNeeded()
+        val after = database.lifetimeTotals()
+        assertEquals(before.tracked, after.tracked)
+        assertEquals(before.models, after.models)
+        assertEquals(3L, database.recordById("m3-first")?.cacheWriteTokens)
+        assertEquals(4L, database.recordById("m3-first")?.reasoningTokens)
+        assertEquals("deepseek-chat", database.recordById("ds-middle")?.model)
+        assertFalse(database.append(last).inserted)
+        assertEquals(3L, database.lifetimeTotals().tracked.requestCount)
+    }
+
     @Test fun failedTotalsWriteRollsBackRequestAndAllowsSameIdRetry() {
         database.migrate(legacy)
         database.writableDatabase.execSQL("CREATE TRIGGER fail_totals BEFORE INSERT ON metadata WHEN NEW.id = 'totals' BEGIN SELECT RAISE(ABORT, 'injected failure'); END")

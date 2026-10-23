@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.aggregateTokenUsageRecords
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
 import java.util.concurrent.CountDownLatch
@@ -116,7 +118,7 @@ class AnthropicMessagesClientTest {
             exchange.sendResponseHeaders(200, 0)
             exchange.responseBody.use { output ->
                 val events = listOf(
-                    """{"type":"message_start","message":{"id":"msg-1","usage":{"input_tokens":5,"cache_read_input_tokens":2,"cache_creation_input_tokens":3,"output_tokens":0}}}""",
+                    """{"type":"message_start","message":{"id":"msg-1","usage":{"input_tokens":5,"cache_read_input_tokens":2,"cache_creation_input_tokens":3,"output_tokens":0,"output_tokens_details":{"thinking_tokens":1}}}}""",
                     """{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}""",
                     """{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"完成"}}""",
                     """{"type":"content_block_stop","index":0}""",
@@ -127,7 +129,7 @@ class AnthropicMessagesClientTest {
                     """{"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"tool-1","name":"read","input":{}}}""",
                     """{"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"{\"path\":\"a.txt\"}"}}""",
                     """{"type":"content_block_stop","index":2}""",
-                    """{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":7}}""",
+                    """{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":7,"output_tokens_details":{"thinking_tokens":4}}}""",
                     """{"type":"message_stop"}""",
                 )
                 events.forEach { event ->
@@ -172,7 +174,35 @@ class AnthropicMessagesClientTest {
             assertEquals(10L, reply.usage.promptTokens)
             assertEquals(2L, reply.usage.cacheHitTokens)
             assertEquals(8L, reply.usage.cacheMissTokens)
+            assertEquals(3L, reply.usage.cacheWriteTokens)
             assertEquals(7L, reply.usage.completionTokens)
+            assertEquals(4L, reply.usage.reasoningTokens)
+
+            // Provider cumulative counters must survive the canonical analytics projection once.
+            val recorded = TokenUsageRecord(
+                requestId = reply.requestId,
+                timestamp = System.currentTimeMillis(),
+                model = "MiniMax-M3",
+                inputTokens = reply.usage.promptTokens,
+                cacheHitTokens = reply.usage.cacheHitTokens,
+                cacheMissTokens = reply.usage.cacheMissTokens,
+                cacheWriteTokens = reply.usage.cacheWriteTokens,
+                outputTokens = reply.usage.completionTokens,
+                reasoningTokens = reply.usage.reasoningTokens,
+                reported = reply.usage.reported,
+            )
+            val analytics = aggregateTokenUsageRecords(
+                sequenceOf(recorded, recorded.copy(inputTokens = 999L)),
+            )
+            assertEquals(1L, analytics.tracked.requestCount)
+            assertEquals(17L, analytics.tracked.totalTokens)
+            assertEquals(10L, analytics.tracked.inputTokens)
+            assertEquals(2L, analytics.tracked.cacheHitTokens)
+            assertEquals(8L, analytics.tracked.cacheMissTokens)
+            assertEquals(3L, analytics.tracked.cacheWriteTokens)
+            assertEquals(7L, analytics.tracked.outputTokens)
+            assertEquals(4L, analytics.tracked.reasoningTokens)
+            assertEquals(17L, analytics.byModel.getValue("MiniMax-M3").tracked.totalTokens)
             assertTrue(deltas.any { it.content == "完成" })
             assertTrue(deltas.any { it.reasoning == "分析" })
             assertNotNull(reply.message[LOCAL_MODEL_REPLAY_KEY])

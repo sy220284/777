@@ -320,6 +320,9 @@ class DeepSeekPricingRepository @Inject constructor(
     }
 }
 
+internal fun recordedUsageModel(model: String, route: LocalModelRouteIdentity?): String =
+    route?.model?.takeIf(String::isNotBlank) ?: model
+
 internal fun LocalModelRouteIdentity?.allowsOfficialDeepSeekPricing(): Boolean {
     if (this == null) return false
     if (!provider.equals("DeepSeek", ignoreCase = true)) return false
@@ -364,11 +367,13 @@ class DeepSeekUsageTracker @Inject constructor(
         route: LocalModelRouteIdentity? = null,
     ) {
         val normalized = usage.normalizedForAccounting()
+        // The completed reply's frozen physical route wins over a mutable UI model selection.
+        val recordedModel = recordedUsageModel(model, route)
         val miss = normalized.cacheMissTokens
         val pricingEligible = route.allowsOfficialDeepSeekPricing()
         val cost = if (usage.reported && pricingEligible) {
             DeepSeekCostCalculator.estimateCny(
-                model = model,
+                model = recordedModel,
                 usage = normalized,
                 pricing = pricingRepository.state.value,
                 epochMillis = epochMillis,
@@ -382,7 +387,7 @@ class DeepSeekUsageTracker @Inject constructor(
                 TokenUsageRecord(
                     requestId = requestId,
                     timestamp = epochMillis,
-                    model = model,
+                    model = recordedModel,
                     route = route,
                     context = context,
                     inputTokens = if (usage.reported) normalized.promptTokens else 0L,

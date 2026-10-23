@@ -494,6 +494,7 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
             inputTokens = record.inputTokens,
             cacheHitTokens = record.cacheHitTokens,
             cacheMissTokens = record.cacheMissTokens,
+            cacheWriteTokens = record.cacheWriteTokens,
             outputTokens = record.outputTokens,
             reasoningTokens = record.reasoningTokens,
             requestCount = if (record.reported) 1 else 0,
@@ -521,6 +522,11 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
             UsageValueLine(
                 stringResource(R.string.usage_calculation_miss),
                 formatNumber(record.cacheMissTokens),
+                padded = false,
+            )
+            UsageValueLine(
+                stringResource(R.string.usage_calculation_cache_write),
+                formatNumber(record.cacheWriteTokens),
                 padded = false,
             )
             UsageValueLine(

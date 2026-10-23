@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.model.allowsOfficialDeepSeekPricing
 import com.labteto.dshmobile.local.model.parseDeepSeekAnthropicUsage
 import com.labteto.dshmobile.local.model.parseDeepSeekOpenAiUsage
 import com.labteto.dshmobile.local.model.parseDeepSeekPricingPage
+import com.labteto.dshmobile.local.model.recordedUsageModel
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlinx.serialization.json.jsonObject
@@ -23,6 +24,28 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class DeepSeekBillingTest {
+    @Test
+    fun frozenReplyRouteKeepsTokenOwnershipWhenUiModelChanges() {
+        val miniMaxRoute = LocalModelRouteIdentity(
+            profileId = "minimax-profile",
+            provider = "MiniMax",
+            model = "MiniMax-M3",
+            baseUrl = "https://api.minimaxi.com/anthropic/v1",
+        )
+        val deepSeekRoute = LocalModelRouteIdentity(
+            profileId = "deepseek-profile",
+            provider = "DeepSeek",
+            model = "deepseek-chat",
+            baseUrl = "https://api.deepseek.com",
+        )
+        // UI selection may already point to the next request when the prior response finishes.
+        assertEquals("MiniMax-M3", recordedUsageModel("deepseek-chat", miniMaxRoute))
+        assertEquals("deepseek-chat", recordedUsageModel("MiniMax-M3", deepSeekRoute))
+        assertEquals("MiniMax-M3", recordedUsageModel("deepseek-chat", miniMaxRoute))
+        // Old replies without a route retain their historical attribution.
+        assertEquals("deepseek-chat", recordedUsageModel("deepseek-chat", null))
+    }
+
     @Test
     fun parsesOfficialPricingTableShape() {
         val html = """
