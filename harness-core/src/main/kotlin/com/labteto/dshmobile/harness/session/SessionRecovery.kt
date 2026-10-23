@@ -86,7 +86,7 @@ object SessionRecovery {
 
     fun repairInterruptedTail(log: SessionEventLog): SessionRepairResult = repairInterruptedTail(
         withWriterLease = { task -> log.withWriterLease { task() } },
-        latest = log::latest,
+        latest = { type -> log.latest(type) },
         forEachAfter = log::forEachAfter,
         append = log::append,
     )

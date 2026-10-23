@@ -45,7 +45,11 @@ internal class SqliteSessionStorageManager(
     suspend fun compactAll(): LocalSessionStorageStatus {
         // Maintenance is explicit and never on the navigation / main-thread path.
         listOf(snapshots.writableDatabase, events.writableDatabase).forEach { db ->
-            db.execSQL("PRAGMA wal_checkpoint(TRUNCATE)")
+            db.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", null).use { result ->
+                if (result.moveToFirst()) {
+                    check(result.getInt(0) == 0) { "SQLite WAL 仍被活动读者占用" }
+                }
+            }
             db.execSQL("VACUUM")
         }
         return status()
@@ -146,6 +150,12 @@ internal class SqliteSessionStorageManager(
             // Never replace a live/user-owned database. Already installed bytes
             // are safe only when identical to the staged, verified source.
             if (dst.exists() && !sameBytes(src, dst)) {
+                // WAL sidecars may contain the only committed copy of an event.
+                // Do not overwrite a database whose sidecars are still present.
+                check(!File(dst.path + "-wal").exists() &&
+                    !File(dst.path + "-shm").exists()) {
+                    "SQLite WAL 尚未安全关闭，恢复拒绝覆盖"
+                }
                 require(isEmptyDatabase(dst)) { "已有 SQLite 会话数据，恢复拒绝覆盖" }
             }
         }
@@ -212,7 +222,18 @@ internal class SqliteSessionStorageManager(
 
     private fun sameBytes(a: File, b: File): Boolean {
         if (a.length() != b.length()) return false
-        fun digest(f: File) = MessageDigest.getInstance("SHA-256").digest(f.readBytes())
+        fun digest(f: File): ByteArray {
+            val hash = MessageDigest.getInstance("SHA-256")
+            f.inputStream().buffered().use { input ->
+                val buffer = ByteArray(32 * 1024)
+                while (true) {
+                    val n = input.read(buffer)
+                    if (n < 0) break
+                    hash.update(buffer, 0, n)
+                }
+            }
+            return hash.digest()
+        }
         return digest(a).contentEquals(digest(b))
     }
 

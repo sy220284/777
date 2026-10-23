@@ -181,6 +181,21 @@ internal class SqliteSessionEventDatabase(
         )
     }
 
+    /** Most recent bounded window returned in chronological order by SQLite itself. */
+    fun pageBeforeChronological(
+        sessionId: String, beforeSequenceExclusive: Long = Long.MAX_VALUE, limit: Int = 80,
+    ): List<SessionEvent> {
+        validateSessionId(sessionId)
+        require(limit in 1..MAX_PAGE) { "事件分页大小不合法" }
+        return queryPage(
+            "SELECT sequence,event_type,created_at,schema_version,payload FROM (" +
+                "SELECT sequence,event_type,created_at,schema_version,payload " +
+                "FROM session_events WHERE session_id=? AND sequence<? " +
+                "ORDER BY sequence DESC LIMIT ?) ORDER BY sequence ASC",
+            arrayOf(sessionId, beforeSequenceExclusive.toString(), limit.toString()),
+        )
+    }
+
     fun pageAfter(
         sessionId: String, sequenceExclusive: Long, limit: Int = 80,
     ): List<SessionEvent> {

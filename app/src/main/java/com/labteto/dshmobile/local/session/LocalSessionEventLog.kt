@@ -160,7 +160,7 @@ class LocalSessionEventLog(
         sequenceExclusive: Long = Long.MAX_VALUE,
         limit: Int = 80,
     ): List<Event> = (if (sqlite != null)
-        sqlite.pageBeforeNewestFirst(sqliteId, sequenceExclusive, limit).asReversed()
+        sqlite.pageBeforeChronological(sqliteId, sequenceExclusive, limit)
         else fileLog().pageBeforeChronological(sequenceExclusive, limit)).map { it.toLocalEvent() }
 
     /** 按 sequence 递减返回旧事件页，适合从最新事件向历史倒查。 */
