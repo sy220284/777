@@ -69,7 +69,13 @@ internal class LocalWorkTurnToolRuntime(
         // capabilities become available automatically without restarting or editing tool maps.
         val activeTask = LocalToolCapabilityIntent.latestUserInput(history)
         if (!activeTask.isNullOrBlank()) {
-            execution.enableTaskRelevantOptionalTools(activeTask, binding.enabledOptionalTools)
+            // A model's explicit capability_search selection must survive this step's
+            // heuristic refresh. The turn-start prepare() still reorders for a NEW user task.
+            // Here we only append newly registered relevant tools, preserving priority of
+            // the tools the model just discovered under the optional schema-token budget.
+            execution.enableTaskRelevantOptionalTools(
+                activeTask, binding.enabledOptionalTools, prioritize = false,
+            )
         }
         execution.prioritizePinnedForModelStep(binding.enabledOptionalTools)
         val enabled = synchronized(binding.enabledOptionalTools) {
