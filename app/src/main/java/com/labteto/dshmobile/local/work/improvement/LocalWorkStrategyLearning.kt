@@ -91,7 +91,12 @@ internal class LocalWorkStrategyLearning(
         )
         val parsed = parseProposal(reply.content.orEmpty()) ?: return
 
-        // Never commit conclusions against a changed goal or replaced Session log.
+        // Acquire the existing Session maintenance lease only at commit time; do not hold
+        // it across the provider request or block the user's foreground Work.
+        val lease = com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry.tryAcquire(
+            expectedSession, com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind.MAINTENANCE,
+        ) ?: return
+        try {
         if (bound.sessionId != expectedSession || bound.workState.snapshot().goal?.id != goal.id ||
             bound.workState.snapshot().goal?.revision != expectedRevision ||
             bound.workState.snapshot().goal?.status != "completed") return
@@ -116,6 +121,7 @@ internal class LocalWorkStrategyLearning(
                 put("verification", "not_compared")
             })
         }
+        } finally { lease.close() }
     }
 }
 
