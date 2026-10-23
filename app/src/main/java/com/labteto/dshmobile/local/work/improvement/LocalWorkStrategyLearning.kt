@@ -62,6 +62,7 @@ internal class LocalWorkStrategyLearning(
         }
         if (!reserved) return
         val expectedRevision = goal.revision
+        val baselineMetrics = workGoalToolMetrics(log, goal)
         val expectedSession = bound.sessionId
         val sourceSequence = log.latestSequence()
         val profile = gateway.profileForRoute(
@@ -124,7 +125,13 @@ internal class LocalWorkStrategyLearning(
                 put("source_sequence", sourceSequence)
                 put("goal_id", goal.id)
                 put("goal_revision", expectedRevision)
+                put("goal_signature", workGoalComparisonKey(goal))
+                put("goal_description", goal.description.take(300))
+                put("baseline_tool_calls", baselineMetrics.first)
+                put("baseline_tool_errors", baselineMetrics.second)
+                put("baseline_test_verified", delivery.testCallId != null)
                 put("project_id", snapshot.projectId ?: "")
+                put("profile_id", snapshot.modelState.modelSelection.activeProfileId ?: "")
                 put("model", snapshot.modelState.model)
                 put("category", parsed.category)
                 put("cue", parsed.cue)
@@ -157,6 +164,29 @@ internal fun parseProposal(raw: String): WorkImprovementProposal? {
     if (cue.length < 3 || guidance.length < 10 || category !in setOf("workflow", "prompt", "skill")) return null
     if ('<' in cue || '<' in guidance || '\u0000' in guidance) return null
     return WorkImprovementProposal(cue, guidance, reason, category)
+}
+
+internal fun workGoalComparisonKey(goal: LocalGoal): String {
+    val canonical = listOf(goal.description.trim().lowercase(),
+        goal.artifactPaths.sorted().joinToString("\u0000"),
+        goal.verificationCommands.sorted().joinToString("\u0000")).joinToString("\u0001")
+    return java.security.MessageDigest.getInstance("SHA-256")
+        .digest(canonical.toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }
+}
+
+internal fun workGoalToolMetrics(
+    log: com.labteto.dshmobile.local.session.LocalSessionEventLog, goal: LocalGoal,
+): Pair<Int, Int> {
+    var calls = 0
+    var failures = 0
+    log.forEachAfter(goal.startedAtSequence) { event ->
+        if (event.type == "tool/result") {
+            calls++
+            if ((event.data["is_error"] as? JsonPrimitive)?.contentOrNull == "true") failures++
+        }
+    }
+    return calls to failures
 }
 
 private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
