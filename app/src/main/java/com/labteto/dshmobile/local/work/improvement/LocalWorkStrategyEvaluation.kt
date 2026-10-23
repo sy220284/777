@@ -28,10 +28,11 @@ internal class LocalWorkStrategyEvaluation(
     private val usage: TokenUsageAnalyticsStore,
 ) {
     fun evaluate(bound: LocalWorkRunBinding, runId: String, advice: WorkImprovementAdvice) {
-        if (advice.active) return
         val log = bound.eventLog
         val goal = bound.workState.snapshot().goal ?: return
-        log.latestMatching(setOf("work/improvement-trial")) {
+        log.latestMatching(setOf(
+            if (advice.active) "work/improvement-applied" else "work/improvement-trial",
+        )) {
             it.value("run_id") == runId && it.value("candidate_id") == advice.id &&
                 it.value("goal_id") == goal.id &&
                 it.value("steering_revision") == bound.steeringRevision.value.toString()
@@ -89,7 +90,7 @@ internal class LocalWorkStrategyEvaluation(
                     put("comparison", "natural_same_acceptance_observational")
                     put("source_receipt", evidence.testCallId)
                 })
-                if (result.canAdopt) {
+                if (!advice.active && result.canAdopt) {
                     // Narrow acceptance only: exact Goal contract, project and model/profile.
                     // Never mutate stable System Prompt, skill files, approvals or tool policy.
                     log.append("work/improvement-adopted", buildJsonObject {
@@ -102,16 +103,38 @@ internal class LocalWorkStrategyEvaluation(
                         put("project_id", advice.projectId)
                         put("evaluation", "verified_narrow_scope")
                     })
-                } else if (result.disposition.name == "QUALITY_REGRESSION") {
+                } else if (shouldRetireWorkAdvice(
+                        active = advice.active,
+                        comparison = result.disposition,
+                        candidateToolCalls = tools.toLong(),
+                        baselineToolCalls = advice.baselineToolCalls.toLong(),
+                        candidateTokens = observedTokens,
+                        baselineTokens = baselineTokens,
+                    )) {
                     log.append("work/improvement-retired", buildJsonObject {
                         put("candidate_id", advice.id)
-                        put("reason", "quality_regression")
+                        put("run_id", runId)
+                        put("reason", if (result.disposition ==
+                            com.labteto.dshmobile.harness.optimization.StrategyComparisonDisposition.QUALITY_REGRESSION)
+                            "quality_regression" else "verified_efficiency_regression")
                     })
                 }
             }
         } finally { lease.close() }
     }
 }
+
+/** A published advice is kept only while its real outcomes stay safe and useful. */
+internal fun shouldRetireWorkAdvice(
+    active: Boolean,
+    comparison: com.labteto.dshmobile.harness.optimization.StrategyComparisonDisposition,
+    candidateToolCalls: Long,
+    baselineToolCalls: Long,
+    candidateTokens: Long,
+    baselineTokens: Long,
+): Boolean = comparison ==
+    com.labteto.dshmobile.harness.optimization.StrategyComparisonDisposition.QUALITY_REGRESSION ||
+    (active && candidateToolCalls > baselineToolCalls && candidateTokens > baselineTokens)
 
 private fun JsonObject.value(key: String): String? =
     (this[key] as? JsonPrimitive)?.contentOrNull
