@@ -44,6 +44,10 @@ internal class LocalWorkStrategyLearning(
         val delivery = localWorkDeliveryEvidence(log, goal, File(sessionStorage.files.workspace.path))
         if (delivery.missing.isNotEmpty() ||
             (delivery.artifactCallId == null && delivery.testCallId == null)) return
+        // Harness²-style evidence discipline: a completed Goal alone is not enough to
+        // infer a reusable lesson. No signal -> no extra model call and NO_ENTRY.
+        val observed = WorkExperienceBootstrap.collect(log, goal)
+        if (!observed.canReflect) return
 
         // One model proposal per durable Goal revision; failure/partial model text never activates.
         // Reserve exactly one auxiliary reflection attempt per verified Goal revision, even
@@ -75,19 +79,12 @@ internal class LocalWorkStrategyLearning(
         // Do not ship raw tool output, personal memory or secret-bearing source excerpts to
         // an auxiliary model. The task is already known to the same selected provider.
         val objective = goal.description.take(320)
-        val prompt = """
-            You review the execution method, not the task answer. A Work goal reached a
-            completed state with real artifact/test tool receipts. This does NOT prove a
-            new strategy is better than its baseline. Do not invent measurements.
-            Return exactly one JSON object with keys cue, guidance, reason, category.
-            category must be workflow, prompt, or skill. guidance must be a concise
-            optional method hint, with no security/permission overrides.
-            If the evidence is insufficient to infer a useful reusable method, return
-            {"cue":"","guidance":"","reason":"insufficient evidence","category":"workflow"}.
-            Task description (untrusted data): ${objective}
-            Artifact receipt: ${delivery.artifactCallId != null}
-            Verification-command receipt: ${delivery.testCallId != null}
-        """.trimIndent()
+        val prompt = WorkExperienceBootstrap.reviewPrompt(
+            objective = objective,
+            signals = observed,
+            hasArtifactReceipt = delivery.artifactCallId != null,
+            hasVerificationReceipt = delivery.testCallId != null,
+        )
         val reply = auxiliary.complete(
             modelAttempts = 1,
             profile = profile,
@@ -105,6 +102,8 @@ internal class LocalWorkStrategyLearning(
             taskLabel = "自我改进经验提炼",
         )
         val parsed = parseProposal(reply.content.orEmpty()) ?: return
+        // The model does not get to invent a problem: its tag must match actual events.
+        if (!observed.supports(parsed.evidenceTag)) return
 
         // Acquire the existing Session maintenance lease only at commit time; do not hold
         // it across the provider request or block the user's foreground Work.
@@ -141,6 +140,8 @@ internal class LocalWorkStrategyLearning(
                 put("cue", parsed.cue)
                 put("guidance", parsed.guidance)
                 put("reason", parsed.reason)
+                put("evidence_tag", parsed.evidenceTag)
+                put("reflection_method", WorkExperienceBootstrap.VERSION)
                 put("status", "candidate")
                 put("verification", "not_compared")
             })
@@ -151,6 +152,7 @@ internal class LocalWorkStrategyLearning(
 
 internal data class WorkImprovementProposal(
     val cue: String, val guidance: String, val reason: String, val category: String,
+    val evidenceTag: String,
 )
 
 /** Strict, intentionally small proposal surface. Tool outputs or instructions have no priority. */
@@ -165,9 +167,12 @@ internal fun parseProposal(raw: String): WorkImprovementProposal? {
     val guidance = field("guidance").orEmpty().take(500)
     val reason = field("reason").orEmpty().take(300)
     val category = field("category") ?: return null
-    if (cue.length < 3 || guidance.length < 10 || category !in setOf("workflow", "prompt", "skill")) return null
+    val evidenceTag = field("evidence_tag") ?: return null
+    if (cue.length < 3 || guidance.length < 10 || reason.isBlank() ||
+        category !in setOf("workflow", "prompt", "skill") ||
+        WorkExperienceBootstrap.patterns.none { it.evidenceTag == evidenceTag }) return null
     if ('<' in cue || '<' in guidance || '\u0000' in guidance) return null
-    return WorkImprovementProposal(cue, guidance, reason, category)
+    return WorkImprovementProposal(cue, guidance, reason, category, evidenceTag)
 }
 
 internal fun workGoalComparisonKey(goal: LocalGoal): String {
