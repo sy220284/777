@@ -229,6 +229,7 @@ class UsageCalculationPageTest {
         compose.onNodeWithText("3").assertExists()
         compose.onNodeWithText("17").assertExists()
         compose.onNodeWithText(context.getString(R.string.usage_calculation_reasoning_note, "4")).assertExists()
+        Unit
     }
 
     @Test
