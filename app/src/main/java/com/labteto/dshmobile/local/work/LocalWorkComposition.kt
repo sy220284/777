@@ -85,7 +85,6 @@ internal class LocalWorkComposition @Inject constructor(
     private val improvementArchive = LocalWorkImprovementArchive(
         workspace = sessionStorage.files.workspace,
         eventLogs = sessionStorage.eventLogs,
-        sessionsRoot = File(context.filesDir, "local-harness/sessions"),
     )
 
     init {
