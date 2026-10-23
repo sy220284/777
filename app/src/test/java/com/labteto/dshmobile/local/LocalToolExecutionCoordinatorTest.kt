@@ -382,6 +382,17 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun unknownCapabilityOffersAnExecutableBootstrapPathWithoutPretendingRegistration() {
+        val coordinator = coordinator(ToolRegistry())
+        val result = coordinator.searchCapabilities("尚未实现的 X 平台连接器")
+        assertTrue(result.contains("没有精确匹配"))
+        assertTrue(result.contains("GitHub"))
+        assertTrue(result.contains("MCP stdio"))
+        assertTrue(result.contains("下一模型步骤"))
+        assertFalse(coordinator.enabledOptionalSnapshot().any { it.startsWith("mcp_") })
+    }
+
+    @Test
     fun newlyRegisteredTaskToolsTakePriorityOverOlderOptionalSchemas() {
         val registry = ToolRegistry().apply {
             repeat(300) { index ->
