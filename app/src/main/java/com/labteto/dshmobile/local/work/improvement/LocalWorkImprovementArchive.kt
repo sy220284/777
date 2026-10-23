@@ -22,6 +22,10 @@ internal class LocalWorkImprovementArchive(
 ) {
     private data class Problem(val session: String, val sequence: Long, val createdAt: Long, val summary: String)
     private data class GoalReceipt(val session: String, val sequence: Long, val createdAt: Long, val hasMachineEvidence: Boolean)
+    private data class Proposal(
+        val session: String, val sequence: Long, val createdAt: Long, val id: String,
+        val category: String, val cue: String, val guidance: String, val reason: String,
+    )
     private data class Facts(
         val lastSequence: Long,
         val fileSize: Long,
@@ -34,6 +38,7 @@ internal class LocalWorkImprovementArchive(
         val problemsCount: Int,
         val problems: List<Problem>,
         val receipts: List<GoalReceipt>,
+        val proposals: List<Proposal>,
     )
 
     private val cached = linkedMapOf<String, Facts>()
@@ -91,6 +96,10 @@ internal class LocalWorkImprovementArchive(
             .sortedWith(compareByDescending<Problem> { it.createdAt }.thenByDescending { it.sequence }).take(50)
         val recentGoals = facts.flatMap(Facts::receipts)
             .sortedWith(compareByDescending<GoalReceipt> { it.createdAt }.thenByDescending { it.sequence }).take(40)
+        val proposalCount = facts.sumOf { it.proposals.size }
+        val proposals = facts.flatMap(Facts::proposals)
+            .sortedWith(compareByDescending<Proposal> { it.createdAt }.thenByDescending { it.sequence })
+            .take(40)
         val summary = """
             |# 777 自我改进总览
             |
@@ -103,6 +112,7 @@ internal class LocalWorkImprovementArchive(
             |- 其中有成果或测试执行凭据的 Goal：$receipts
             |- Work 工具结果：$tools；其中错误结果：$failedTools
             |- 可追踪的问题事件：$issues
+            |- 待独立验证的工作改进候选：$proposalCount
             |- 已验证并正式采纳的策略：暂无记录
             |- 已正式采纳的提示词优化：暂无记录
             |
@@ -122,7 +132,7 @@ internal class LocalWorkImprovementArchive(
             |
             |## 实证范围
             |
-            |当前档案只收集真实 Work 运行事实，尚未启用经对照验证的自动经验提炼与跨任务策略激活。
+            |基于真实完成证据生成的经验候选仅为待验证建议；未证明它们优于基线或已被激活。
             |
             |- 可观察的完成 Goal：$goals
             |- 其中具有实际工具成果或验收命令凭据：$receipts
@@ -137,20 +147,19 @@ internal class LocalWorkImprovementArchive(
         val changed = """
             |# 改进与采纳
             |
-            |当前没有已验证且已正式采纳的工作策略改动。
+            |正式采纳的工作策略：暂无记录。
             |
-            |未来记录需要同时包含：候选及基线版本、原始证据来源、独立评价、作用域、采纳/回退结果。
-            |仅完成任务不能证明某个工作方法优于旧方法。
-        """.trimMargin() + "\n"
+            |## 经验与策略候选（尚未生效）
+            |
+        """.trimMargin() + "\n" + proposalLines(proposals.filter { it.category != "prompt" })
         val prompts = """
             |# 提示词优化
             |
-            |当前没有已验证且已正式采纳的提示词优化记录。
+            |正式采纳的提示词优化：暂无记录。
             |
-            |未来记录需要同时包含：目标提示词层、原版本指纹、候选版本、适用模型与任务、
-            |客观质量证据、Token 与缓存影响、采纳或回退状态。
-            |用户规则、审批及安全边界不得由自动优化器自行改写。
-        """.trimMargin() + "\n"
+            |## 提示词候选（未激活）
+            |
+        """.trimMargin() + "\n" + proposalLines(proposals.filter { it.category == "prompt" })
         val problems = buildString {
             append("# 问题与迭代\n\n")
             append("以下问题从真实 Work 运行事件派生；不收录原始模型输出、提示词、工具参数或凭据。\n\n")
@@ -206,6 +215,7 @@ internal class LocalWorkImprovementArchive(
         val goals = linkedSetOf<String>()
         var machineEvidenceGoals = 0
         val receipts = ArrayDeque<GoalReceipt>()
+        val proposals = ArrayDeque<Proposal>()
         log.forEachAfter(-1L) { e ->
             val data = e.data
             when (e.type) {
@@ -246,6 +256,15 @@ internal class LocalWorkImprovementArchive(
                     addBounded(problems, Problem(session, e.sequence, e.createdAt,
                         "Work Goal 完成状态变更被验收规则拒绝"))
                 }
+                "work/improvement-candidate" -> {
+                    val candidateId = data.text("id").orEmpty()
+                    val category = data.text("category").orEmpty()
+                    if (candidateId.isNotBlank() && category in setOf("workflow", "prompt", "skill")) {
+                        addBounded(proposals, Proposal(session, e.sequence, e.createdAt, candidateId,
+                            category, data.text("cue").orEmpty().take(120),
+                            data.text("guidance").orEmpty().take(500), data.text("reason").orEmpty().take(300)))
+                    }
+                }
                 "work/output-quality" -> {
                     val count = (data["findings"] as? JsonArray)?.size ?: 0
                     if (count > 0) {
@@ -257,8 +276,16 @@ internal class LocalWorkImprovementArchive(
             }
         }
         return Facts(end, fileSize, modifiedAt, turns, toolReceipts, failedTools, goals.size,
-            machineEvidenceGoals, problemsCount, problems.toList(), receipts.toList())
+            machineEvidenceGoals, problemsCount, problems.toList(), receipts.toList(), proposals.toList())
     }
+
+    private fun proposalLines(items: List<Proposal>): String =
+        if (items.isEmpty()) "暂无候选。\n" else items.joinToString("\n", postfix = "\n") {
+            "- [候选，未验证] " + it.cue.replace("\n", " ").take(100) +
+                "；建议：" + it.guidance.replace("\n", " ").take(400) +
+                "；理由：" + it.reason.replace("\n", " ").take(200) +
+                "；来源会话 " + it.session.take(80) + " 事件 #" + it.sequence
+        }
 
     private fun JsonObject.text(key: String): String? =
         (this[key] as? JsonPrimitive)?.contentOrNull
