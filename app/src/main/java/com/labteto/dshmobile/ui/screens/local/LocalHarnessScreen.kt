@@ -215,6 +215,9 @@ fun LocalHarnessScreen(
     var settledUsageMode by rememberSaveable { mutableStateOf("") }
     // Only explicit mode-tab selections keep the drawer and underlying feature in place.
     var drawerModeSwitchTarget by remember { mutableStateOf<LocalUsageMode?>(null) }
+    // Foreground navigation is visual immediately; the heavy runtime restore may follow.
+    // Never render the previously active transcript under the newly chosen session title.
+    var pendingDrawerSessionId by remember { mutableStateOf<String?>(null) }
     var drawerFeatureOriginStack by rememberSaveable { mutableStateOf<List<String>?>(null) }
     var conversationOpenedFromDrawer by rememberSaveable { mutableStateOf(false) }
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
@@ -353,6 +356,8 @@ fun LocalHarnessScreen(
         sourceMessageId: String = "",
     ): Boolean {
         // Selecting a concrete conversation always navigates to that conversation.
+        // Drawer entries must still belong to the current session list.
+        if (fromDrawer && shell.sessions.none { it.id == sessionId }) return false
         drawerModeSwitchTarget = null
         val accepted = viewModel.switchSession(sessionId)
         if (accepted) {
@@ -360,12 +365,25 @@ fun LocalHarnessScreen(
             diarySourceSessionId = if (sourceMessageId.isNotBlank()) sessionId else ""
             diarySourceMessageId = sourceMessageId
         }
-        if (accepted && sessionId == shell.sessionId) {
+        if (accepted && fromDrawer) {
+            // Do not delay the drawer animation on Session IO, model-history replay,
+            // control projections, or the next queued navigation request.
+            pendingDrawerSessionId = sessionId.takeIf { it != shell.sessionId || shell.loading }
+            resetFeatureNavigation()
+            scope.launch { closeDrawerPromptly() }
+        } else if (accepted && sessionId == shell.sessionId) {
             // Tapping the current conversation must return to its conversation surface.
             resetFeatureNavigation()
             scope.launch { closeDrawerPromptly() }
         }
         return accepted
+    }
+
+    LaunchedEffect(shell.sessionId, shell.loading, pendingDrawerSessionId, shell.sessions) {
+        val pending = pendingDrawerSessionId ?: return@LaunchedEffect
+        if ((shell.sessionId == pending && !shell.loading) ||
+            (shell.sessions.none { it.id == pending } && !shell.loading)
+        ) pendingDrawerSessionId = null
     }
 
     // Only a settled session/mode transition commits navigation. This covers every entry point,
@@ -897,7 +915,6 @@ fun LocalHarnessScreen(
                     showNewSessionMode = true
                 },
                 onSwitchSession = { sessionId ->
-                    // Different sessions close the drawer only once the shell activates them.
                     switchToSessionAndShowConversation(sessionId, fromDrawer = true)
                 },
                 onDeleteSessions = ::deleteSessionsAndNavigate,
@@ -936,13 +953,37 @@ fun LocalHarnessScreen(
             )
     }
     val sySceneContent: @Composable () -> Unit = {
-        LocalFeatureAnimatedHost(
-            stack = featureStack,
-            predictiveBackProgress = predictiveBackProgress.value,
-            modifier = Modifier.fillMaxSize(),
-        ) { renderedPage ->
-            featureStateHolder.SaveableStateProvider(renderedPage.name) {
-                LocalFeaturePageContent(renderedPage, featureContributions)
+        val waitingForSession = pendingDrawerSessionId?.takeIf {
+            featurePage == LocalFeaturePage.HOME &&
+                (shell.sessionId != it || shell.loading)
+        }
+        if (waitingForSession != null) {
+            // The old session must never remain interactive or visually masquerade
+            // as the pending target. Only a cheap, session-identified shell is shown.
+            Surface(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        shell.sessions.firstOrNull { it.id == waitingForSession }?.title
+                            ?.ifBlank { "会话" } ?: "会话",
+                        style = DsType.headline17,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text("正在打开会话…", style = DsType.std14)
+                }
+            }
+        } else {
+            LocalFeatureAnimatedHost(
+                stack = featureStack,
+                predictiveBackProgress = predictiveBackProgress.value,
+                modifier = Modifier.fillMaxSize(),
+            ) { renderedPage ->
+                featureStateHolder.SaveableStateProvider(renderedPage.name) {
+                    LocalFeaturePageContent(renderedPage, featureContributions)
+                }
             }
         }
     }
