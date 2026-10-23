@@ -531,6 +531,39 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun wrongToolArgumentsGetRealSchemaGuidanceBeforeAnyExecutorRuns() = runBlocking {
+        var executions = 0
+        val tool = tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+            executions++
+            ToolResult("should never execute")
+        }.copy(schema = functionToolSchema(
+            name = "read",
+            description = "Read the requested workspace file.",
+            properties = com.labteto.dshmobile.harness.tools.simpleToolProperties(
+                mapOf("path" to "string", "lines" to "array"),
+            ),
+            required = setOf("path"),
+        ))
+        val registry = ToolRegistry().apply { register(tool) }
+        val failed = coordinator(registry).executeScoped(
+            original = LocalToolCall(
+                "wrong-shape", "read",
+                buildJsonObject { put("lines", "this is not an array") },
+                """{"lines":"this is not an array"}""",
+            ),
+            sessionId = "work", allowMutation = false, planModeEnabled = false,
+            approval = { _, _, _ -> error("invalid arguments must never reach approval") },
+        )
+        assertTrue(failed.isError)
+        assertEquals("INVALID_TOOL_ARGUMENTS", failed.errorCode)
+        assertEquals(0, executions)
+        assertEquals(AgentToolSideEffect.NONE, failed.sideEffect)
+        assertTrue(failed.recoveryHint.orEmpty().contains("path"))
+        assertTrue(failed.recoveryHint.orEmpty().contains("lines:array"))
+        assertTrue(failed.recoveryHint.orEmpty().contains("本轮实际提供"))
+    }
+
+    @Test
     fun planModeBlocksMutationBeforeExecutorRuns() = runBlocking {
         var executed = false
         val registry = ToolRegistry().apply {
