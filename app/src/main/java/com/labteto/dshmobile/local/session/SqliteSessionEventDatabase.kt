@@ -131,6 +131,23 @@ class SqliteSessionEventDatabase(
         }
     }
 
+    /** Source generations allow derived Work reports to detect deletion/recreation and append. */
+    internal fun historicalSources(): List<LocalHistoricalSessionSource> =
+        readableDatabase.rawQuery(
+            "SELECT session_id,instance,next_sequence FROM session_event_cursors ORDER BY session_id",
+            null,
+        ).use { rows ->
+            buildList {
+                while (rows.moveToNext()) {
+                    val next = rows.getLong(2)
+                    add(LocalHistoricalSessionSource(
+                        id = rows.getString(0), identity = rows.getString(1),
+                        size = next, modifiedAt = next,
+                    ))
+                }
+            }
+        }
+
     fun sessionCount(): Int = readableDatabase.rawQuery(
         "SELECT COUNT(*) FROM session_event_cursors", null,
     ).use { cursor -> if (cursor.moveToFirst()) cursor.getInt(0) else 0 }
