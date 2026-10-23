@@ -168,6 +168,9 @@ internal class LocalWorkTurnToolRuntime(
         calls: List<LocalToolCall>,
         allowMutation: Boolean = true,
         superseded: () -> Boolean = { false },
+        // The caller's frozen model-step surface is a separate admission requirement from
+        // Registry registration. Apply it to EVERY batch member, even parallel groups.
+        blockedCall: (String) -> AgentToolResult? = { null },
     ): List<Pair<LocalToolCall, AgentToolResult>> {
         val output = mutableListOf<Pair<LocalToolCall, AgentToolResult>>()
         val groups = planLocalToolBatch(calls.size) { index -> isParallel(calls[index].name) }
@@ -176,14 +179,16 @@ internal class LocalWorkTurnToolRuntime(
             if (!group.parallel) {
                 val call = part.single()
                 output += call to if (superseded()) workSteeredToolResult(call)
-                    else execute(binding, call, allowMutation, stillCurrent = { !superseded() })
+                    else blockedCall(call.name)
+                        ?: execute(binding, call, allowMutation, stillCurrent = { !superseded() })
                 continue
             }
             // Do not execute any later group before this entire group settles. Resource leases
             // remain in the shared tool coordinator, so approval and write semantics are intact.
             output += isolatedParallelMap(part) { call ->
                 call to if (superseded()) workSteeredToolResult(call)
-                    else execute(binding, call, allowMutation, stillCurrent = { !superseded() })
+                    else blockedCall(call.name)
+                        ?: execute(binding, call, allowMutation, stillCurrent = { !superseded() })
             }.mapIndexed { index, result ->
                 result.getOrElse { error ->
                     val call = part[index]
