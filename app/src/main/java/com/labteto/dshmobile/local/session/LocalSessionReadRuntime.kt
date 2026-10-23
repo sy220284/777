@@ -43,8 +43,9 @@ class LocalSessionReadRuntime @Inject internal constructor(
     }
 
     internal fun previewTail(sessionId: String, limit: Int): List<LocalHarnessMessage> {
-        // The same authorized Session capability is checked before exposing derived SQLite rows.
-        access.authorizedLog(sessionId)
+        // Selecting a session in the drawer may cross project boundaries; normal
+        // historical-message reads retain their stricter project/lineage authorization.
+        access.authorizeNavigationPreview(sessionId)
         return sessionStorage.previewMessages(sessionId, limit)
     }
 

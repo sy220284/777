@@ -67,7 +67,17 @@ internal class SqliteSessionSnapshotStore(
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        error("不支持的 SQLite 会话快照数据库版本：$oldVersion -> $newVersion")
+        require(oldVersion == 1 && newVersion == 2) {
+            "不支持的 SQLite 会话快照数据库版本：$oldVersion -> $newVersion"
+        }
+        // Earlier unmerged draft builds may already have the snapshot and summary
+        // tables; only the derived foreground preview is added here.
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS session_message_tail (" +
+                "session_id TEXT NOT NULL REFERENCES session_snapshots(id) ON DELETE CASCADE, " +
+                "ordinal INTEGER NOT NULL, payload TEXT NOT NULL, " +
+                "PRIMARY KEY(session_id, ordinal))"
+        )
     }
 
     override fun read(id: String): SessionLoadResult? {
@@ -226,7 +236,7 @@ internal class SqliteSessionSnapshotStore(
 
     private companion object {
         const val DATABASE_NAME = "local_session_snapshots_v1.db"
-        const val SCHEMA_VERSION = 1
+        const val SCHEMA_VERSION = 2
         const val MAX_PREVIEW_MESSAGES = 12
         val ID_PATTERN = Regex("[A-Za-z0-9._-]{1,128}")
     }
