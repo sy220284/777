@@ -178,7 +178,7 @@ class LocalWorkImprovementArchiveTest {
             val sessionRoot = root.resolve("sessions").apply { mkdirs() }
             val workspace = LocalWorkspace(root.resolve("workspace").apply { mkdirs() })
             val logs = LocalSessionEventLogRegistry(sessionRoot, Json)
-            test(workspace, logs, LocalWorkImprovementArchive(workspace, logs, sessionRoot))
+            test(workspace, logs, LocalWorkImprovementArchive(workspace, logs))
         } finally {
             root.deleteRecursively()
         }
