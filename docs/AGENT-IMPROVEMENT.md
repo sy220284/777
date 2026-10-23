@@ -44,6 +44,29 @@
 文件写入沿用 `LocalWorkspace` 原子写入与路径边界。
 用户笔记不参与自动同步、不作为策略采纳证据。
 
+## Harness² 经验提炼起步准则（本 PR 已实现）
+
+参考 Google Research [Harness²](https://github.com/google-research/harness2/tree/1cfe254e8d25b15f37048c3730134686abe60335)
+的经验反思方法（[prompts.py](https://github.com/google-research/harness2/blob/1cfe254e8d25b15f37048c3730134686abe60335/harness2/core/prompts.py)、
+[library.py](https://github.com/google-research/harness2/blob/1cfe254e8d25b15f37048c3730134686abe60335/harness2/core/library.py)）。
+上游采用 `cue / lesson / evidence / confidence` 和领域索引，强调从实际执行差异归因，
+证据不足时允许 `NO_ENTRY`，并明确认为单次未隔离变化不足以证明因果关系。
+
+777 没有从上游导入已验证的通用经验（该仓库没有可直接移植的生产经验数据集）。
+本 PR 新增 `WorkExperienceBootstrap.kt`，将理念独立实现为本机只读提炼准则：
+
+- 工具错误事件 → 检查错误状态与不可安全重试的副作用；
+- Goal 完成变更被拒绝 → 检查用户要求的交付和验收条件；
+- 交付质量事件有冲突 → 核实完成声明与文件、工具、测试回执。
+- 仅传入事件类别与聚合计数；**不复制**敏感工具输出、模型完整对话或验收答案给反思请求。
+- 没有相应的真实异常事件则不调用辅助模型；模型输出必须带已观察事件的 `evidence_tag`，
+  否则丢弃候选；每 Goal revision 至多执行一次反思。
+- 静态规则只辅助候选生成，在工作区《经验与方法》中标记为「方法模板，未验证经验」；
+  **不预先激活或发布为正式策略、技能和 System Prompt**。
+- 提炼结果仍为待验证候选，保持原 P1/P2 的基线对照、作用域校验和回退准入。
+
+这种引导让 777 有明确的起步方法，同时不会因为某次成功任务产生不可靠的“伪经验”。
+
 ## P1：经验学习及运行时策略/提示词激活（后续）
 
 - 从已结算 Work 运行中提取可溯源的经验候选；区分任务完成、机器验收和可归因的策略改善。
