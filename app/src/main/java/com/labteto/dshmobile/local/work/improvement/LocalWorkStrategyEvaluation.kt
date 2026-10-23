@@ -30,11 +30,15 @@ internal class LocalWorkStrategyEvaluation(
         if (advice.active) return
         val log = bound.eventLog
         val goal = bound.workState.snapshot().goal ?: return
-        val applicable = log.latestMatching(setOf("work/improvement-trial")) {
+        log.latestMatching(setOf("work/improvement-trial")) {
             it.value("run_id") == runId && it.value("candidate_id") == advice.id &&
                 it.value("goal_id") == goal.id
         } ?: return
         val evidence = localWorkDeliveryEvidence(log, goal, File(sessionStorage.files.workspace.path))
+        val current = bound.aggregateSnapshot()
+        if (current.modelState.model != advice.model ||
+            (current.modelState.modelSelection.activeProfileId ?: "") != advice.profileId ||
+            (current.projectId ?: "") != advice.projectId) return
         if (goal.status != "completed" || workGoalComparisonKey(goal) != advice.goalSignature ||
             !advice.baselineTestVerified || evidence.missing.isNotEmpty() || evidence.testCallId == null) return
 
@@ -46,8 +50,9 @@ internal class LocalWorkStrategyEvaluation(
             if (rows.isEmpty()) return null
             return rows.sumOf { it.aggregate.totalTokens }
         }
-        val baselineTokens = tokens(advice.sourceRunId) ?: return
-        val observedTokens = tokens(runId) ?: return
+        val baselineTokens = tokens(advice.sourceTaskRunId.ifBlank { advice.sourceRunId }) ?: return
+        val trialTaskRunId = com.labteto.dshmobile.local.usage.resolveTokenUsageTaskRunId(log, runId)
+        val observedTokens = tokens(trialTaskRunId) ?: return
         val (tools, failures) = workGoalToolMetrics(log, goal)
         val testKey = advice.goalSignature
         val result = StrategyComparison.compare(
