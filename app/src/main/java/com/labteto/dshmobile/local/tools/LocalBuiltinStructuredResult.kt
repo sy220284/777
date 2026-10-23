@@ -43,7 +43,6 @@ internal fun localBuiltinStructuredResult(toolName: String, output: String): Too
         canonical == "list_subagent_models" &&
             output.startsWith("官方模型目录查询未成功（") ->
             "MODEL_CATALOG_UNAVAILABLE"
-        output == "未知工具：$toolName" -> "UNKNOWN_TOOL"
         else -> null
     }
     return if (code == null) ToolResult(output)
@@ -56,7 +55,6 @@ internal fun localBuiltinStructuredResult(toolName: String, output: String): Too
             "MEDIA_PROVIDER_UNAVAILABLE" -> "请先在模型设置配置可用媒体账户，再查询 media_image_options。"
             "MODEL_CATALOG_UNAVAILABLE" -> "检查已保存模型档案的凭据及供应商目录接口。"
             "WORK_SESSION_REQUIRED" -> "需要有效 Work 会话；不要在普通聊天或已结束任务中假装执行成功。"
-            "UNKNOWN_TOOL" -> "使用 capability_search 发现本轮已注册的真实工具名。"
             else -> "请核对当前执行作用域和真实工具结果；不要盲目重试可能产生副作用的操作。"
         },
     )
