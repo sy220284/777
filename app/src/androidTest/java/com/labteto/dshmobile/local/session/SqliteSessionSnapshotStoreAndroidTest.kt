@@ -35,14 +35,18 @@ class SqliteSessionSnapshotStoreAndroidTest {
                 }, 10L)
                 assertEquals(2L, first.lastModified("s1"))
                 assertEquals(listOf("s1"), first.ids())
+                assertEquals("第二次", first.readSummaries().single().title)
+                assertEquals(10L, first.readSummaries().single().updatedAt)
             }
             SqliteSessionSnapshotStore(context, Json, name).use { second ->
                 assertEquals("第二次", second.read("s1")?.document?.payload?.get("title")?.jsonPrimitive?.content)
                 assertEquals(2L, second.lastModified("s1"))
                 assertTrue(second.hasRecoverableSnapshot("s1"))
+                assertEquals(1, second.readSummaries().size)
                 assertTrue(second.delete("s1"))
                 assertNull(second.read("s1"))
                 assertFalse(second.hasRecoverableSnapshot("s1"))
+                assertTrue(second.readSummaries().isEmpty())
             }
             SqliteSessionSnapshotStore(context, Json, name).use { third ->
                 assertTrue(third.ids().isEmpty())

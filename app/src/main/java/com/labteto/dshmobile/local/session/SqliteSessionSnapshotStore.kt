@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.SessionDocument
 import com.labteto.dshmobile.harness.session.SessionLoadResult
@@ -27,9 +28,15 @@ internal class SqliteSessionSnapshotStore(
     context: Context,
     private val json: Json,
     name: String = DATABASE_NAME,
+    private val domainCodecs: List<LocalSessionDomainCodec> = emptyList(),
 ) : SQLiteOpenHelper(context, name, null, SCHEMA_VERSION), LocalSessionSnapshotStore {
     init {
         setWriteAheadLoggingEnabled(true)
+    }
+
+    override fun onConfigure(db: SQLiteDatabase) {
+        super.onConfigure(db)
+        db.setForeignKeyConstraintsEnabled(true)
     }
 
     override fun onCreate(db: SQLiteDatabase) {
@@ -42,6 +49,15 @@ internal class SqliteSessionSnapshotStore(
                 "payload TEXT NOT NULL)"
         )
         db.execSQL("CREATE INDEX session_snapshots_recent ON session_snapshots(updated_at DESC, id)")
+        db.execSQL(
+            "CREATE TABLE session_summaries (" +
+                "id TEXT PRIMARY KEY NOT NULL REFERENCES session_snapshots(id) ON DELETE CASCADE, " +
+                "title TEXT NOT NULL, updated_at INTEGER NOT NULL, usage_mode TEXT NOT NULL, " +
+                "chat_mode TEXT, group_member_count INTEGER NOT NULL, persona_id TEXT, " +
+                "gallery_id TEXT, blank INTEGER NOT NULL, summary_preview TEXT, " +
+                "project_id TEXT, lineage_id TEXT)"
+        )
+        db.execSQL("CREATE INDEX session_summaries_recent ON session_summaries(updated_at DESC, id)")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -78,6 +94,8 @@ internal class SqliteSessionSnapshotStore(
         check(payload["id"]?.jsonPrimitive?.contentOrNull == id) {
             "SQLite 会话快照身份不一致：$id"
         }
+        val snapshot = json.decodeFromJsonElement(LocalHarnessSession.serializer(), payload)
+        val summary = projectLocalSessionSummary(snapshot, domainCodecs)
         val db = writableDatabase
         db.beginTransactionNonExclusive()
         try {
@@ -97,6 +115,23 @@ internal class SqliteSessionSnapshotStore(
             check(db.insertWithOnConflict(
                 "session_snapshots", null, values, SQLiteDatabase.CONFLICT_REPLACE,
             ) >= 0L) { "SQLite 会话保存失败：$id" }
+            val summaryValues = ContentValues().apply {
+                put("id", summary.id)
+                put("title", summary.title)
+                put("updated_at", summary.updatedAt)
+                put("usage_mode", summary.usageMode.name)
+                put("chat_mode", summary.chatMode)
+                put("group_member_count", summary.groupMemberCount)
+                put("persona_id", summary.personaId)
+                put("gallery_id", summary.galleryId)
+                put("blank", if (summary.blank) 1 else 0)
+                put("summary_preview", summary.summaryPreview)
+                put("project_id", summary.projectId)
+                put("lineage_id", summary.lineageId)
+            }
+            check(db.insertWithOnConflict(
+                "session_summaries", null, summaryValues, SQLiteDatabase.CONFLICT_REPLACE,
+            ) >= 0L) { "SQLite 会话摘要保存失败：$id" }
             db.setTransactionSuccessful()
             return SessionDocument(version, id, updatedAt, payload)
         } finally {
@@ -107,6 +142,33 @@ internal class SqliteSessionSnapshotStore(
     override fun delete(id: String): Boolean {
         validateId(id)
         return writableDatabase.delete("session_snapshots", "id=?", arrayOf(id)) > 0
+    }
+
+    override val nativeSummaries: Boolean get() = true
+
+    override fun readSummaries(): List<LocalSessionSummary> = readableDatabase.rawQuery(
+        "SELECT id,title,updated_at,usage_mode,chat_mode,group_member_count," +
+            "persona_id,gallery_id,blank,summary_preview,project_id,lineage_id " +
+            "FROM session_summaries ORDER BY updated_at DESC,id", null,
+    ).use { cursor ->
+        buildList {
+            while (cursor.moveToNext()) {
+                add(LocalSessionSummary(
+                    id = cursor.getString(0),
+                    title = cursor.getString(1),
+                    updatedAt = cursor.getLong(2),
+                    usageMode = LocalUsageMode.valueOf(cursor.getString(3)),
+                    chatMode = cursor.getString(4),
+                    groupMemberCount = cursor.getInt(5),
+                    personaId = cursor.getString(6),
+                    galleryId = cursor.getString(7),
+                    blank = cursor.getInt(8) != 0,
+                    summaryPreview = cursor.getString(9),
+                    projectId = cursor.getString(10),
+                    lineageId = cursor.getString(11),
+                ))
+            }
+        }
     }
 
     override fun ids(): List<String> = readableDatabase.rawQuery(

@@ -77,7 +77,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
                 runtimeStateStore.projection.publishError(error.message ?: "会话写入失败")
             },
             domainCodecs = orderedCodecs,
-            snapshotStore = SqliteSessionSnapshotStore(context, json),
+            snapshotStore = SqliteSessionSnapshotStore(context, json, domainCodecs = orderedCodecs),
         )
         coordinator = LocalSessionCoordinator(
             repository = repository,

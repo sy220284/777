@@ -22,6 +22,9 @@ internal interface LocalSessionSnapshotStore {
     /** Monotonic storage revision used to validate the derived summary cache. */
     fun lastModified(id: String): Long?
     fun hasRecoverableSnapshot(id: String): Boolean
+    /** Native summaries share the same transaction as the session snapshot. */
+    val nativeSummaries: Boolean get() = false
+    fun readSummaries(): List<LocalSessionSummary> = emptyList()
     fun evict(id: String) {}
 }
 

@@ -294,6 +294,7 @@ internal class LocalSessionRepository(
     }
 
     private fun loadSummaries(): List<LocalSessionSummary> {
+        if (snapshotStore.nativeSummaries) return snapshotStore.readSummaries()
         val ids = snapshotStore.ids()
         val validIds = ids.toSet()
         summaryIndex.prune(validIds)
@@ -360,6 +361,7 @@ internal class LocalSessionRepository(
     }
 
     private fun persistSummaryIndex(snapshot: LocalHarnessSession, sourceModifiedAt: Long) {
+        if (snapshotStore.nativeSummaries) return
         runCatching { summaryIndex.write(projectSummary(snapshot), sourceModifiedAt) }
             .onFailure { error ->
                 // The sidecar is derivative. A failed index write must not roll back a durable Session.
