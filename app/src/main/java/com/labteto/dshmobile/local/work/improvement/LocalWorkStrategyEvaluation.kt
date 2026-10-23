@@ -55,7 +55,7 @@ internal class LocalWorkStrategyEvaluation(
         }
         val baselineTokens = tokens(advice.sourceTaskRunId.ifBlank { advice.sourceRunId }) ?: return
         val trialTaskRunId = com.labteto.dshmobile.local.usage.resolveTokenUsageTaskRunId(log, runId)
-        val observedTokens = tokens(trialTaskRunId) ?: return
+        val observedTokens = tokens(trialTaskRunId ?: return) ?: return
         val (tools, failures) = workGoalToolMetrics(log, goal)
         val testKey = advice.goalSignature
         val result = StrategyComparison.compare(
