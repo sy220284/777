@@ -38,7 +38,7 @@ internal class LocalWorkStrategyLearning(
         val snapshot = bound.aggregateSnapshot()
         if (snapshot.usageMode != LocalUsageMode.WORK || !snapshot.modelState.configured) return
         val goal = snapshot.work.goal ?: return
-        if (goal.status != "completed" || goal.id.isBlank()) return
+        if (goal.status != "completed" || goal.id.isBlank() || goal.startedAtSequence < 0L) return
         val log = bound.eventLog
         val delivery = localWorkDeliveryEvidence(log, goal, File(sessionStorage.files.workspace.path))
         if (delivery.missing.isNotEmpty() ||
@@ -127,7 +127,6 @@ internal class LocalWorkStrategyLearning(
                 put("goal_id", goal.id)
                 put("goal_revision", expectedRevision)
                 put("goal_signature", workGoalComparisonKey(goal))
-                put("goal_description", goal.description.take(300))
                 put("baseline_tool_calls", baselineMetrics.first)
                 put("baseline_tool_errors", baselineMetrics.second)
                 put("baseline_test_verified", delivery.testCallId != null)
