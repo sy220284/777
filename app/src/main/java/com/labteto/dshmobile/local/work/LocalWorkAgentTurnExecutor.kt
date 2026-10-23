@@ -666,6 +666,10 @@ internal class LocalWorkAgentTurnExecutor(
                         calls = calls.map { it.toLocalToolCall() },
                         allowMutation = true,
                         superseded = { binding.steeringRevision.value != latestAcceptedSamplingRevision },
+                        blockedCall = { toolName ->
+                            if (modelToolStepSurface.allows(toolName)) null
+                            else modelToolStepSurface.hiddenCallResult(toolName)
+                        },
                     ).map { (_, result) -> result }
                 },
                 isParallelTool = { call ->
