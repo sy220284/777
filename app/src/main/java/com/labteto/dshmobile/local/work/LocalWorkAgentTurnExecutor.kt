@@ -41,6 +41,7 @@ import com.labteto.dshmobile.local.model.prepareLocalMultimodalMessages
 import com.labteto.dshmobile.local.recordForeground
 import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
 import com.labteto.dshmobile.local.model.toRunModelSurface
+import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.model.withModelToolCallEventData
 import com.labteto.dshmobile.observability.AppLog
@@ -395,6 +396,7 @@ internal class LocalWorkAgentTurnExecutor(
                             snapshot.projectId ?: "",
                             snapshot.modelState.model,
                             snapshot.modelState.modelSelection.activeProfileId ?: "",
+                            snapshot.modelState.modelSelection.activeProfile?.routeFingerprint().orEmpty(),
                         )?.let { advice ->
                             selectedImprovement = advice
                             improvementGoalId = liveGoal.id
@@ -405,6 +407,7 @@ internal class LocalWorkAgentTurnExecutor(
                                     put("run_id", runContext.runId)
                                     put("goal_id", liveGoal.id)
                                     put("goal_revision", liveGoal.revision)
+                                    put("steering_revision", binding.steeringRevision.value)
                                     put("goal_signature", advice.goalSignature)
                                     put("origin_session", advice.sourceSession)
                                     put("status", if (advice.active) "active" else "experimental")
@@ -415,7 +418,8 @@ internal class LocalWorkAgentTurnExecutor(
                     selectedImprovement?.let { advice ->
                         if (liveGoal?.id == improvementGoalId &&
                             snapshot.modelState.model == advice.model &&
-                            (snapshot.modelState.modelSelection.activeProfileId ?: "") == advice.profileId) {
+                            (snapshot.modelState.modelSelection.activeProfileId ?: "") == advice.profileId &&
+                            snapshot.modelState.modelSelection.activeProfile?.routeFingerprint().orEmpty() == advice.routeFingerprint) {
                             val marker = "[可选工作方法建议：" + advice.id + "]"
                             if (marker !in workPromptContext.dynamic) {
                                 workPromptContext = workPromptContext.copy(
