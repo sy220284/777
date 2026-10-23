@@ -500,8 +500,26 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     } else {
         emptyList()
     }
-    val transcriptMessages = remember(pagedOlderMessages, state.messages) {
-        mergeLocalTranscriptHistory(pagedOlderMessages, state.messages)
+    // Preserve the initial visible-tail anchor while new streaming rows arrive.
+    // The model/runtime can retain a larger hot window without composing it all.
+    var visibleTailAnchorId by remember(state.sessionId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(state.sessionId, state.messages) {
+        if (state.messages.isNotEmpty() &&
+            (visibleTailAnchorId == null || state.messages.none { it.id == visibleTailAnchorId })
+        ) {
+            visibleTailAnchorId = state.messages
+                .takeLast(LOCAL_TRANSCRIPT_INITIAL_VISIBLE_DIALOGUE_MESSAGES)
+                .first().id
+        }
+    }
+    val visibleLiveMessages = remember(state.messages, visibleTailAnchorId) {
+        localTranscriptVisibleLiveWindow(
+            state.messages, visibleTailAnchorId,
+            LOCAL_TRANSCRIPT_INITIAL_VISIBLE_DIALOGUE_MESSAGES,
+        )
+    }
+    val transcriptMessages = remember(pagedOlderMessages, visibleLiveMessages) {
+        mergeLocalTranscriptHistory(pagedOlderMessages, visibleLiveMessages)
     }
     // Cold historical cards are read-only. They are not part of the live Owner snapshot.
     var olderDocumentSnapshots by remember(state.sessionId) {
