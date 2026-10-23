@@ -23,10 +23,13 @@ internal class SqliteSessionStorageManager(
     private val context: Context,
     private val snapshots: SqliteSessionSnapshotStore,
     private val events: SqliteSessionEventDatabase,
+    private val snapshotDatabaseName: String = "local_session_snapshots_v1.db",
+    private val eventDatabaseName: String = "local_session_events_v1.db",
+    private val restoreKey: String = "default",
 ) {
-    private val pendingRoot get() = File(context.filesDir, "local-harness/.sqlite-restore-pending")
-    private val snapshotFile get() = context.getDatabasePath("local_session_snapshots_v1.db")
-    private val eventFile get() = context.getDatabasePath("local_session_events_v1.db")
+    private val pendingRoot get() = File(context.filesDir, "local-harness/.sqlite-restore-pending-$restoreKey")
+    private val snapshotFile get() = context.getDatabasePath(snapshotDatabaseName)
+    private val eventFile get() = context.getDatabasePath(eventDatabaseName)
 
     fun status(): LocalSessionStorageStatus {
         val files = listOf(snapshotFile, eventFile).flatMap { source ->
