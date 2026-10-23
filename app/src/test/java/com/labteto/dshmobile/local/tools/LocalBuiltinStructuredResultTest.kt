@@ -51,6 +51,16 @@ class LocalBuiltinStructuredResultTest {
         }
     }
 
+    @Test fun providerModelDiscoveryFailureIsMarkedEvenWhenLocalCatalogWasListed() {
+        val result = localBuiltinStructuredResult("list_subagent_models",
+            "已保存两个本地档案\\n\\n【指定配置的官方模型目录】\\n官方模型目录查询未成功（服务商拒绝、响应异常或网络故障）。可在应用中核对该档案权限与官方接口。")
+        assertTrue(result.isError)
+        assertEquals("MODEL_CATALOG_UNAVAILABLE", result.errorCode)
+        val ordinary = localBuiltinStructuredResult("read",
+            "已保存两个本地档案\\n\\n【指定配置的官方模型目录】\\n官方模型目录查询未成功（示例文字）")
+        assertFalse(ordinary.isError)
+    }
+
     @Test fun patchFailureRemainsStructuredAndReadOnlyFailuresArePrecise() {
         val patch = localBuiltinStructuredResult("apply_patch", "[apply_patch][CHECK_FAILED] patch failed")
         assertTrue(patch.isError)
