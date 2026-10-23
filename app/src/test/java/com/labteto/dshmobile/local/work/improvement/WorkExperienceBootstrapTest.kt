@@ -42,7 +42,11 @@ class WorkExperienceBootstrapTest {
         val root = Files.createTempDirectory("777-experience-bootstrap").toFile()
         try {
             val log = LocalSessionEventLogRegistry(root, Json).get("sample")
-            log.append("goal/state", buildJsonObject { put("status", "active") })
+            log.append("goal/state", buildJsonObject {
+                put("id", "goal-scoped")
+                put("revision", 1)
+                put("status", "active")
+            })
             val start = log.latestSequence()
             log.append("tool/result", buildJsonObject {
                 put("is_error", true)
@@ -55,8 +59,14 @@ class WorkExperienceBootstrapTest {
                     add(kotlinx.serialization.json.JsonPrimitive("PRIVATE_FINDING"))
                 })
             })
+            log.append("goal/state", buildJsonObject {
+                put("id", "goal-scoped")
+                put("revision", 2)
+                put("status", "completed")
+                put("startedAtSequence", start)
+            })
             val signals = WorkExperienceBootstrap.collect(
-                log, LocalGoal("审查", startedAtSequence = start),
+                log, LocalGoal("审查", status = "completed", id = "goal-scoped", revision = 2, startedAtSequence = start),
             )
             assertEquals(1, signals.toolFailures)
             assertEquals(1, signals.goalRejections)
@@ -77,7 +87,11 @@ class WorkExperienceBootstrapTest {
         val root = Files.createTempDirectory("777-tool-contract-evidence").toFile()
         try {
             val log = LocalSessionEventLogRegistry(root, Json).get("model-route")
-            log.append("goal/state", buildJsonObject { put("status", "active") })
+            log.append("goal/state", buildJsonObject {
+                put("id", "goal-scoped")
+                put("revision", 1)
+                put("status", "active")
+            })
             val start = log.latestSequence()
             log.append("tool/result", buildJsonObject {
                 put("is_error", true)
@@ -92,8 +106,14 @@ class WorkExperienceBootstrapTest {
                 put("is_error", true)
                 put("error_code", "TOOL_TIMEOUT")
             })
+            log.append("goal/state", buildJsonObject {
+                put("id", "goal-scoped")
+                put("revision", 2)
+                put("status", "completed")
+                put("startedAtSequence", start)
+            })
             val signals = WorkExperienceBootstrap.collect(
-                log, LocalGoal("执行工具", startedAtSequence = start),
+                log, LocalGoal("执行工具", status = "completed", id = "goal-scoped", revision = 2, startedAtSequence = start),
             )
             assertEquals(3, signals.toolFailures)
             assertEquals(2, signals.toolContractErrors)
