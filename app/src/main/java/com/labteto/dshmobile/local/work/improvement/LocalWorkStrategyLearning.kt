@@ -131,6 +131,8 @@ internal class LocalWorkStrategyLearning(
                 put("baseline_tool_calls", baselineMetrics.first)
                 put("baseline_tool_errors", baselineMetrics.second)
                 put("baseline_test_verified", delivery.testCallId != null)
+                delivery.artifactCallId?.let { put("source_artifact_receipt", it) }
+                delivery.testCallId?.let { put("source_verification_receipt", it) }
                 put("project_id", snapshot.projectId ?: "")
                 put("profile_id", snapshot.modelState.modelSelection.activeProfileId ?: "")
                 put("route_fingerprint", profile.routeFingerprint())
