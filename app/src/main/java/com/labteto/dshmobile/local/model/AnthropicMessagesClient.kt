@@ -317,6 +317,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         var cacheReadTokens = 0L
         var cacheCreationTokens = 0L
         var outputTokens = 0L
+        var reasoningTokens = 0L
         var stopReason: String? = null
         var sawMessageStop = false
         var sawMessageStart = false
@@ -363,6 +364,8 @@ internal class AnthropicMessagesClient @Inject constructor(
                             cacheReadTokens = usage["cache_read_input_tokens"]?.jsonPrimitive?.longOrNull ?: cacheReadTokens
                             cacheCreationTokens = usage["cache_creation_input_tokens"]?.jsonPrimitive?.longOrNull ?: cacheCreationTokens
                             outputTokens = usage["output_tokens"]?.jsonPrimitive?.longOrNull ?: outputTokens
+                            reasoningTokens = (usage["output_tokens_details"] as? JsonObject)
+                                ?.get("thinking_tokens")?.jsonPrimitive?.longOrNull ?: reasoningTokens
                         }
                     }
                     "content_block_start" -> {
@@ -417,6 +420,8 @@ internal class AnthropicMessagesClient @Inject constructor(
                         (event["usage"] as? JsonObject)?.let { usage ->
                             usageReported = true
                             outputTokens = usage["output_tokens"]?.jsonPrimitive?.longOrNull ?: outputTokens
+                            reasoningTokens = (usage["output_tokens_details"] as? JsonObject)
+                                ?.get("thinking_tokens")?.jsonPrimitive?.longOrNull ?: reasoningTokens
                             inputTokens = usage["input_tokens"]?.jsonPrimitive?.longOrNull ?: inputTokens
                             cacheReadTokens = usage["cache_read_input_tokens"]?.jsonPrimitive?.longOrNull ?: cacheReadTokens
                             cacheCreationTokens = usage["cache_creation_input_tokens"]?.jsonPrimitive?.longOrNull ?: cacheCreationTokens
@@ -519,7 +524,9 @@ internal class AnthropicMessagesClient @Inject constructor(
                 promptTokens = promptTokens,
                 cacheHitTokens = cacheReadTokens.coerceAtLeast(0L),
                 cacheMissTokens = safeAdd(inputTokens, cacheCreationTokens),
+                cacheWriteTokens = cacheCreationTokens.coerceAtLeast(0L),
                 completionTokens = outputTokens.coerceAtLeast(0L),
+                reasoningTokens = reasoningTokens.coerceAtLeast(0L),
                 reported = usageReported,
             ),
             requestId = requestId ?: messageId.orEmpty(),

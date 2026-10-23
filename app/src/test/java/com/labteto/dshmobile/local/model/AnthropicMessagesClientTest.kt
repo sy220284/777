@@ -116,7 +116,7 @@ class AnthropicMessagesClientTest {
             exchange.sendResponseHeaders(200, 0)
             exchange.responseBody.use { output ->
                 val events = listOf(
-                    """{"type":"message_start","message":{"id":"msg-1","usage":{"input_tokens":5,"cache_read_input_tokens":2,"cache_creation_input_tokens":3,"output_tokens":0}}}""",
+                    """{"type":"message_start","message":{"id":"msg-1","usage":{"input_tokens":5,"cache_read_input_tokens":2,"cache_creation_input_tokens":3,"output_tokens":0,"output_tokens_details":{"thinking_tokens":1}}}}""",
                     """{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}""",
                     """{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"完成"}}""",
                     """{"type":"content_block_stop","index":0}""",
@@ -127,7 +127,7 @@ class AnthropicMessagesClientTest {
                     """{"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"tool-1","name":"read","input":{}}}""",
                     """{"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"{\"path\":\"a.txt\"}"}}""",
                     """{"type":"content_block_stop","index":2}""",
-                    """{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":7}}""",
+                    """{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":7,"output_tokens_details":{"thinking_tokens":4}}}""",
                     """{"type":"message_stop"}""",
                 )
                 events.forEach { event ->
@@ -172,7 +172,9 @@ class AnthropicMessagesClientTest {
             assertEquals(10L, reply.usage.promptTokens)
             assertEquals(2L, reply.usage.cacheHitTokens)
             assertEquals(8L, reply.usage.cacheMissTokens)
+            assertEquals(3L, reply.usage.cacheWriteTokens)
             assertEquals(7L, reply.usage.completionTokens)
+            assertEquals(4L, reply.usage.reasoningTokens)
             assertTrue(deltas.any { it.content == "完成" })
             assertTrue(deltas.any { it.reasoning == "分析" })
             assertNotNull(reply.message[LOCAL_MODEL_REPLAY_KEY])
