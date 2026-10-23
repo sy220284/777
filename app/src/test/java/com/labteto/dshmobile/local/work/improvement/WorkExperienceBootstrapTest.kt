@@ -73,6 +73,41 @@ class WorkExperienceBootstrapTest {
     }
 
     @Test
+    fun toolSchemaAndUnknownToolErrorsAreSeparatelyClassifiedFromTransportFailures() {
+        val root = Files.createTempDirectory("777-tool-contract-evidence").toFile()
+        try {
+            val log = LocalSessionEventLogRegistry(root, Json).get("model-route")
+            log.append("goal/state", buildJsonObject { put("status", "active") })
+            val start = log.latestSequence()
+            log.append("tool/result", buildJsonObject {
+                put("is_error", true)
+                put("error_code", "INVALID_TOOL_ARGUMENTS")
+                put("content", "SENSITIVE_ARGUMENT_CONTENT")
+            })
+            log.append("tool/result", buildJsonObject {
+                put("is_error", true)
+                put("error_code", "UNKNOWN_TOOL")
+            })
+            log.append("tool/result", buildJsonObject {
+                put("is_error", true)
+                put("error_code", "TOOL_TIMEOUT")
+            })
+            val signals = WorkExperienceBootstrap.collect(
+                log, LocalGoal("执行工具", startedAtSequence = start),
+            )
+            assertEquals(3, signals.toolFailures)
+            assertEquals(2, signals.toolContractErrors)
+            assertTrue(signals.supports("tool_contract_error"))
+            val prompt = WorkExperienceBootstrap.reviewPrompt("完成任务", signals, true, true)
+            assertTrue(prompt.contains("tool_contract_error: 2"))
+            assertTrue(prompt.contains("工具调用契约"))
+            assertFalse(prompt.contains("SENSITIVE_ARGUMENT_CONTENT"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun starterTemplatesClearlyDenyTheyAreVerifiedLessons() {
         val text = WorkExperienceBootstrap.catalogMarkdown()
         assertTrue(text.contains("未验证经验"))
