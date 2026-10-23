@@ -25,6 +25,7 @@ internal class LocalWorkImprovementArchive(
     private data class Facts(
         val lastSequence: Long,
         val generation: Long,
+        val logIdentity: String,
         val workTurns: Int,
         val toolReceipts: Int,
         val failedTools: Int,
@@ -40,11 +41,14 @@ internal class LocalWorkImprovementArchive(
     /** Create only missing files. The user's notes are never overwritten. */
     @Synchronized
     fun ensureInitialized() {
+        requireSafeArchiveDirectory()
         generatedFiles().forEach { (name, initial) ->
+            requireSafeArchiveFile(name)
             if (!File(workspace.path, directory + name).exists()) {
                 workspace.write(directory + name, initial)
             }
         }
+        requireSafeArchiveFile(notesFile)
         val notes = File(workspace.path, directory + notesFile)
         if (!notes.exists()) workspace.write(directory + notesFile,
             "# 我的备注\n\n此文件由用户维护；777 不自动覆盖。\n\n")
@@ -57,6 +61,7 @@ internal class LocalWorkImprovementArchive(
      */
     @Synchronized
     fun refresh() {
+        requireSafeArchiveDirectory()
         val files = sessionsRoot.listFiles().orEmpty()
             .filter { it.isFile && !Files.isSymbolicLink(it.toPath()) && it.name.endsWith(".events.jsonl") }
             .sortedBy(File::getName)
@@ -68,7 +73,8 @@ internal class LocalWorkImprovementArchive(
             val end = log.latestSequence()
             val generation = log.resetGeneration
             val existing = cached[id]
-            if (existing != null && existing.lastSequence == end && existing.generation == generation) return@forEach
+            if (existing != null && existing.lastSequence == end && existing.generation == generation &&
+                existing.logIdentity == log.historyInstanceIdentity) return@forEach
             cached[id] = readFacts(id, log, end, generation)
         }
         val facts = cached.values.toList()
@@ -179,6 +185,7 @@ internal class LocalWorkImprovementArchive(
             "05-验证与成效.md" to verified,
         )
         documents.forEach { (name, body) ->
+            requireSafeArchiveFile(name)
             val path = directory + name
             val existing = File(workspace.path, path)
             if (!existing.isFile || workspace.readRaw(path) != body) workspace.write(path, body)
@@ -236,7 +243,7 @@ internal class LocalWorkImprovementArchive(
                 }
             }
         }
-        return Facts(end, generation, turns, toolReceipts, failedTools, goals.size,
+        return Facts(end, generation, log.historyInstanceIdentity, turns, toolReceipts, failedTools, goals.size,
             machineEvidenceGoals, problemsCount, problems.toList(), receipts.toList())
     }
 
@@ -246,6 +253,26 @@ internal class LocalWorkImprovementArchive(
     private fun <T> addBounded(queue: ArrayDeque<T>, value: T) {
         queue.addLast(value)
         if (queue.size > 50) queue.removeFirst()
+    }
+
+    /** Workspace supports user-granted external roots; managed reports must stay app-private. */
+    private fun requireSafeArchiveDirectory() {
+        val root = File(workspace.path).canonicalFile.toPath()
+        val folder = File(workspace.path, directory.removeSuffix("/")).toPath()
+        require(!Files.isSymbolicLink(folder) && folder.toFile().canonicalFile.toPath() == folder.toAbsolutePath().normalize() &&
+            folder.toFile().canonicalFile.toPath().startsWith(root)) {
+            "自我改进档案目录必须位于本机工作区内，且不能是符号链接"
+        }
+    }
+
+    private fun requireSafeArchiveFile(name: String) {
+        val root = File(workspace.path).canonicalFile.toPath()
+        val requested = File(workspace.path, directory + name).toPath()
+        require(!Files.isSymbolicLink(requested) &&
+            requested.toFile().canonicalFile.toPath() == requested.toAbsolutePath().normalize() &&
+            requested.toFile().canonicalFile.toPath().startsWith(root)) {
+            "自我改进档案不能通过符号链接写入其他目录"
+        }
     }
 
     private fun generatedFiles(): Map<String, String> = mapOf(
