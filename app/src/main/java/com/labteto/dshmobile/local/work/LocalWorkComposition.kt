@@ -71,6 +71,7 @@ internal class LocalWorkComposition @Inject constructor(
     private val pinnedInvocations: com.labteto.dshmobile.local.tools.LocalPinnedInvocationStore,
     json: Json,
 ) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val improvementArchive = LocalWorkImprovementArchive(
         workspace = sessionStorage.files.workspace,
         eventLogs = sessionStorage.eventLogs,
@@ -88,7 +89,6 @@ internal class LocalWorkComposition @Inject constructor(
     private val workMediaTools = LocalWorkMediaToolRuntime(modelGateway, mediaRuntime)
     private val backgroundTools = LocalWorkBackgroundToolExecutor(runtimeStateStore, sessionStorage,
         approvalPreferences, tools, toolApproval)
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val toolResultRuntime = LocalWorkToolResultRuntime(
         runtimeStateStore = runtimeStateStore,
         toolOutputStore = tools.toolOutputStore,
