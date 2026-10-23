@@ -416,13 +416,13 @@ internal class LocalWorkAgentTurnExecutor(
                         if (liveGoal?.id == improvementGoalId &&
                             snapshot.modelState.model == advice.model &&
                             (snapshot.modelState.modelSelection.activeProfileId ?: "") == advice.profileId) {
-                            val marker = "[可选工作方法建议：\\u0024{advice.id}]"
+                            val marker = "[可选工作方法建议：" + advice.id + "]"
                             if (marker !in workPromptContext.dynamic) {
                                 workPromptContext = workPromptContext.copy(
-                                    dynamic = workPromptContext.dynamic + "\\n\\n" + marker +
-                                        "\\n来自历史工作证据的" +
+                                    dynamic = workPromptContext.dynamic + "\n\n" + marker +
+                                        "\n来自历史工作证据的" +
                                         (if (advice.active) "已采纳方法" else "待验证实验候选") +
-                                        "；仅作为辅助建议，用户要求与已有权限/验收规则优先。\\n" +
+                                        "；仅作为辅助建议，用户要求与已有权限/验收规则优先。\n" +
                                         advice.guidance,
                                 )
                             }
