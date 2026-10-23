@@ -140,7 +140,8 @@ internal class SqliteSessionSnapshotStore(
             val summaryValues = ContentValues().apply {
                 put("id", summary.id)
                 put("title", summary.title)
-                put("updated_at", summary.updatedAt)
+                // The persisted snapshot timestamp is authoritative for recency sorting.
+                put("updated_at", updatedAt)
                 put("usage_mode", summary.usageMode.name)
                 put("chat_mode", summary.chatMode)
                 put("group_member_count", summary.groupMemberCount)
