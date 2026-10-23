@@ -109,9 +109,17 @@ class LocalWorkImprovementArchiveTest {
         assertEquals(null, archive.adviceFor(goal.copy(verificationCommands = listOf("different-test")),
             "project-alpha", "test-model", "profile-a"))
         val trial = logs.get("trial-session")
-        trial.append("work/improvement-trial", buildJsonObject { put("candidate_id", "improvement-1") })
+        trial.append("work/improvement-trial", buildJsonObject {
+            put("candidate_id", "improvement-1")
+            put("goal_id", goal.id)
+        })
         archive.refresh()
-        assertEquals(null, archive.adviceFor(goal, "project-alpha", "test-model", "profile-a"))
+        // Continuations of the very same Goal reuse their frozen experimental method.
+        assertEquals("improvement-1", archive.adviceFor(goal,
+            "project-alpha", "test-model", "profile-a")?.id)
+        // Another user-requested Goal cannot silently repeat the same experiment.
+        assertEquals(null, archive.adviceFor(goal.copy(id = "other-goal"),
+            "project-alpha", "test-model", "profile-a"))
         trial.append("work/improvement-adopted", buildJsonObject { put("candidate_id", "improvement-1") })
         archive.refresh()
         assertTrue(archive.adviceFor(goal, "project-alpha", "test-model", "profile-a")!!.active)
@@ -121,6 +129,45 @@ class LocalWorkImprovementArchiveTest {
         assertEquals(null, archive.adviceFor(goal, "project-alpha", "test-model", "profile-a"))
         assertEquals(null, archive.adviceFor(goal.copy(startedAtSequence = -1L),
             "project-alpha", "test-model", "profile-a"))
+    }
+
+    @Test
+    fun promotedSkillRemainsAnUninstalledDraftInUserWorkspace() = withArchive { workspace, logs, archive ->
+        val log = logs.get("sample")
+        log.append("work/improvement-candidate", buildJsonObject {
+            put("id", "sample-proposal")
+            put("source_run_id", "run-one")
+            put("goal_id", "goal-one")
+            put("goal_revision", 1)
+            put("goal_signature", "fingerprint")
+            put("project_id", "project")
+            put("model", "model")
+            put("profile_id", "profile")
+            put("category", "skill")
+            put("cue", "代码审计")
+            put("guidance", "先构建真实依赖关系，再按依赖关系修改并运行独立测试。")
+            put("reason", "减少回归")
+            put("baseline_tool_calls", 5)
+            put("baseline_tool_errors", 0)
+            put("baseline_test_verified", true)
+        })
+        log.append("work/improvement-adopted", buildJsonObject { put("candidate_id", "sample-proposal") })
+        archive.refresh()
+        val draft = workspace.readRaw("自我改进/技能草案/sample-proposal.md")
+        assertTrue(draft.contains("未安装"))
+        assertTrue(draft.contains("先构建真实依赖关系"))
+        assertTrue(workspace.skills().isEmpty())
+    }
+
+    @Test
+    fun goalAcceptanceFingerprintRequiresTheExactSameTestContract() {
+        val source = LocalGoal("修复项目", artifactPaths = listOf("a.kt", "b.kt"),
+            verificationCommands = listOf("test", "lint"))
+        val reordered = source.copy(artifactPaths = listOf("b.kt", "a.kt"),
+            verificationCommands = listOf("lint", "test"))
+        assertEquals(workGoalComparisonKey(source), workGoalComparisonKey(reordered))
+        assertFalse(workGoalComparisonKey(source) ==
+            workGoalComparisonKey(source.copy(verificationCommands = listOf("test"))))
     }
 
     private fun withArchive(
