@@ -42,6 +42,7 @@ internal class LocalWorkTurnToolRuntime(
 ) {
     internal fun clear(binding: LocalWorkRunBinding) {
         execution.clearTurnCapabilities(binding.enabledOptionalTools)
+        binding.toolPriority.reset()
     }
 
     internal suspend fun prepare(
@@ -69,7 +70,12 @@ internal class LocalWorkTurnToolRuntime(
         // capabilities become available automatically without restarting or editing tool maps.
         val activeTask = LocalToolCapabilityIntent.latestUserInput(history)
         if (!activeTask.isNullOrBlank()) {
-            execution.enableTaskRelevantOptionalTools(activeTask, binding.enabledOptionalTools)
+            // The first/new user task may re-rank. Repeating the same task must not undo
+            // an explicit capability_search selection from the previous model step.
+            execution.enableTaskRelevantOptionalTools(
+                activeTask, binding.enabledOptionalTools,
+                prioritize = binding.toolPriority.isNewTask(activeTask),
+            )
         }
         // Newly connected MCP tools cannot enter the step that connected them. Make them
         // candidates for the NEXT model request, without changing approval or tool access.
