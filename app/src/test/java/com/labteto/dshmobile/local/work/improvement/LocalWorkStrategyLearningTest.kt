@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work.improvement
 
+import com.labteto.dshmobile.harness.optimization.StrategyComparisonDisposition
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -20,6 +21,23 @@ class LocalWorkStrategyLearningTest {
         assertNull(parseProposal("not json"))
         assertNull(parseProposal("""{"cue":"x","guidance":"short","reason":"x","category":"security"}"""))
         assertNull(parseProposal("x".repeat(5000)))
+    }
+
+    @Test fun activeAdviceRetiresWhenVerifiedQualityRegresses() {
+        assertTrue(shouldRetireWorkAdvice(
+            true, StrategyComparisonDisposition.QUALITY_REGRESSION, 4, 5, 800, 900))
+    }
+
+    @Test fun activeAdviceRetiresWhenBothToolsAndTokensAreWorse() {
+        assertTrue(shouldRetireWorkAdvice(
+            true, StrategyComparisonDisposition.NO_MEASURED_BENEFIT, 9, 5, 1800, 900))
+        assertTrue(!shouldRetireWorkAdvice(
+            true, StrategyComparisonDisposition.NO_MEASURED_BENEFIT, 5, 5, 900, 900))
+    }
+
+    @Test fun unadoptedCandidateWithNoImprovementDoesNotForceRetirement() {
+        assertTrue(!shouldRetireWorkAdvice(
+            false, StrategyComparisonDisposition.NO_MEASURED_BENEFIT, 9, 5, 1800, 900))
     }
 
     @Test fun codeFenceCanBeParsedButNeverChangesOfficialPrompt() {
