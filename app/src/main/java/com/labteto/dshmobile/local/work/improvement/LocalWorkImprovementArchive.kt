@@ -36,6 +36,11 @@ internal class LocalWorkImprovementArchive(
         val category: String, val cue: String, val guidance: String, val reason: String,
         val advice: WorkImprovementAdvice,
     )
+    private data class Evaluation(
+        val session: String, val sequence: Long, val candidateId: String,
+        val disposition: String, val baselineToolCalls: Int, val candidateToolCalls: Int,
+        val baselineTokens: Long, val candidateTokens: Long,
+    )
     private data class Facts(
         val lastSequence: Long,
         val fileSize: Long,
@@ -52,6 +57,7 @@ internal class LocalWorkImprovementArchive(
         val trialIds: Set<String>,
         val adoptedIds: Set<String>,
         val retiredIds: Set<String>,
+        val evaluations: List<Evaluation>,
     )
 
     private val cached = linkedMapOf<String, Facts>()
@@ -134,6 +140,11 @@ internal class LocalWorkImprovementArchive(
         val proposals = facts.flatMap(Facts::proposals)
             .sortedWith(compareByDescending<Proposal> { it.createdAt }.thenByDescending { it.sequence })
             .take(40)
+        val adoptedIds = facts.flatMap(Facts::adoptedIds).toSet()
+        val retiredIds = facts.flatMap(Facts::retiredIds).toSet()
+        val evaluations = facts.flatMap(Facts::evaluations).takeLast(40)
+        val adopted = proposals.filter { it.id in adoptedIds && it.id !in retiredIds }
+        val activePrompts = adopted.filter { it.category == "prompt" }
         val summary = """
             |# 777 自我改进总览
             |
@@ -147,8 +158,9 @@ internal class LocalWorkImprovementArchive(
             |- Work 工具结果：$tools；其中错误结果：$failedTools
             |- 可追踪的问题事件：$issues
             |- 待独立验证的工作改进候选：$proposalCount
-            |- 已验证并正式采纳的策略：暂无记录
-            |- 已正式采纳的提示词优化：暂无记录
+            |- 有限作用域内正式采纳的策略：${adopted.size}
+            |- 已采纳的提示词优化：${activePrompts.size}
+            |- 有真实工具/用量凭据的候选比较：${evaluations.size}
             |
             |## 继续阅读
             |
@@ -181,19 +193,20 @@ internal class LocalWorkImprovementArchive(
         val changed = """
             |# 改进与采纳
             |
-            |正式采纳的工作策略：暂无记录。
+            |## 已采纳的窄范围策略
             |
-            |## 经验与策略候选（尚未生效）
-            |
-        """.trimMargin() + "\n" + proposalLines(proposals.filter { it.category != "prompt" })
+        """.trimMargin() + "\n" + proposalLines(adopted.filter { it.category != "prompt" }) +
+            "\n## 待验证或未采纳的候选\n\n" +
+            proposalLines(proposals.filter { it.id !in adoptedIds })
         val prompts = """
             |# 提示词优化
             |
-            |正式采纳的提示词优化：暂无记录。
+            |## 已采纳的动态工作指导
             |
-            |## 提示词候选（未激活）
-            |
-        """.trimMargin() + "\n" + proposalLines(proposals.filter { it.category == "prompt" })
+        """.trimMargin() + "\n" + proposalLines(activePrompts) +
+            "\n## 待验证的提示词候选\n\n" +
+            proposalLines(proposals.filter { it.category == "prompt" && it.id !in adoptedIds }) +
+            "\n不会自动修改基础 System Prompt 或安全与审批规则。\n"
         val problems = buildString {
             append("# 问题与迭代\n\n")
             append("以下问题从真实 Work 运行事件派生；不收录原始模型输出、提示词、工具参数或凭据。\n\n")
@@ -218,10 +231,18 @@ internal class LocalWorkImprovementArchive(
             |
             |## 优化前后对照
             |
-            |暂无合格的策略 A/B 比较；不提供虚构的提升率、节省 Token 或模型效果评分。
+            |## 自然发生的同验收任务对照
             |
-            |以后须保留原始基线，并区分目标完成、机器验收和可归因的策略收益。
-        """.trimMargin() + "\n"
+            |以下对照来自两次用户实际要求的任务及机器验收回执；不声称它是随机对照实验。
+            |
+        """.trimMargin() + "\n" + if (evaluations.isEmpty()) {
+            "暂无合格对照；不提供虚构的提升率或节省 Token。\n"
+        } else evaluations.joinToString("\n", postfix = "\n") { row ->
+            "- 候选 " + row.candidateId.take(36) + "；" + row.disposition +
+                "；工具调用 " + row.baselineToolCalls + " → " + row.candidateToolCalls +
+                "；Token " + row.baselineTokens + " → " + row.candidateTokens +
+                "（来源会话 " + row.session.take(65) + "，事件 #" + row.sequence + "）"
+        }
         val documents = linkedMapOf(
             "00-自我改进总览.md" to summary,
             "01-经验与方法.md" to experience,
@@ -230,6 +251,22 @@ internal class LocalWorkImprovementArchive(
             "04-问题与迭代.md" to problems,
             "05-验证与成效.md" to verified,
         )
+        // A skill proposal is a user-readable DRAFT only; ToolsFeature remains the sole
+        // installer/editor. Creating this file never registers or enables a live skill.
+        adopted.filter { it.category == "skill" }.forEach { proposal ->
+            val proposalPath = directory + "技能草案/" + proposal.id.take(36) + ".md"
+            val fullPath = File(workspace.path, proposalPath)
+            require(fullPath.canonicalFile.toPath().startsWith(File(workspace.path).canonicalFile.toPath()) &&
+                !Files.isSymbolicLink(fullPath.toPath())) { "技能草案路径不安全" }
+            if (!fullPath.exists()) {
+                workspace.write(proposalPath,
+                    "# 技能修订草案（未安装）\n\n" +
+                    "候选 ID：" + proposal.id.take(36) + "\n\n" +
+                    "适用场景：" + proposal.cue.replace("\n", " ").take(120) + "\n\n" +
+                    "建议方法：\n\n" + proposal.guidance.take(500) + "\n\n" +
+                    "验证：已通过受限的相同验收条件比较；发布技能前仍须通过 ToolsFeature 格式/权限检查。\n")
+            }
+        }
         documents.forEach { (name, body) ->
             requireSafeArchiveFile(name)
             val path = directory + name
@@ -253,6 +290,7 @@ internal class LocalWorkImprovementArchive(
         val trialIds = linkedSetOf<String>()
         val adoptedIds = linkedSetOf<String>()
         val retiredIds = linkedSetOf<String>()
+        val evaluations = ArrayDeque<Evaluation>()
         log.forEachAfter(-1L) { e ->
             val data = e.data
             when (e.type) {
@@ -319,6 +357,16 @@ internal class LocalWorkImprovementArchive(
                 }
                 "work/improvement-trial" -> data.text("candidate_id")?.let(trialIds::add)
                 "work/improvement-adopted" -> data.text("candidate_id")?.let(adoptedIds::add)
+                "work/improvement-evaluation" -> {
+                    val candidateId = data.text("candidate_id").orEmpty()
+                    if (candidateId.isNotBlank()) addBounded(evaluations, Evaluation(
+                        session, e.sequence, candidateId, data.text("disposition").orEmpty().take(50),
+                        data.text("baseline_tool_calls")?.toIntOrNull() ?: 0,
+                        data.text("candidate_tool_calls")?.toIntOrNull() ?: 0,
+                        data.text("baseline_tokens")?.toLongOrNull() ?: 0L,
+                        data.text("candidate_tokens")?.toLongOrNull() ?: 0L,
+                    ))
+                }
                 "work/improvement-retired" -> data.text("candidate_id")?.let(retiredIds::add)
                 "work/output-quality" -> {
                     val count = (data["findings"] as? JsonArray)?.size ?: 0
@@ -332,7 +380,7 @@ internal class LocalWorkImprovementArchive(
         }
         return Facts(end, fileSize, modifiedAt, turns, toolReceipts, failedTools, goals.size,
             machineEvidenceGoals, problemsCount, problems.toList(), receipts.toList(), proposals.toList(),
-            trialIds, adoptedIds, retiredIds)
+            trialIds, adoptedIds, retiredIds, evaluations.toList())
     }
 
     private fun proposalLines(items: List<Proposal>): String =
