@@ -178,17 +178,17 @@ internal class LocalWorkTurnToolRuntime(
             val part = calls.subList(group.startInclusive, group.endExclusive)
             if (!group.parallel) {
                 val call = part.single()
-                output += call to if (superseded()) workSteeredToolResult(call)
-                    else blockedCall(call.name)
-                        ?: execute(binding, call, allowMutation, stillCurrent = { !superseded() })
+                output += call to executeAdmittedWorkBatchCall(call, superseded, blockedCall) {
+                    execute(binding, call, allowMutation, stillCurrent = { !superseded() })
+                }
                 continue
             }
             // Do not execute any later group before this entire group settles. Resource leases
             // remain in the shared tool coordinator, so approval and write semantics are intact.
             output += isolatedParallelMap(part) { call ->
-                call to if (superseded()) workSteeredToolResult(call)
-                    else blockedCall(call.name)
-                        ?: execute(binding, call, allowMutation, stillCurrent = { !superseded() })
+                call to executeAdmittedWorkBatchCall(call, superseded, blockedCall) {
+                    execute(binding, call, allowMutation, stillCurrent = { !superseded() })
+                }
             }.mapIndexed { index, result ->
                 result.getOrElse { error ->
                     val call = part[index]
@@ -272,6 +272,21 @@ internal fun parallelToolFailure(
  * Write and agent-control calls retain their existing exclusive, ordered execution path.
  */
 internal fun isSafeParallelReadTool(tool: HarnessTool?): Boolean = isParallelSafeReadTool(tool)
+
+/**
+ * The SAME frozen model-step tool-surface check applies to serial and parallel batches.
+ * This pure gate prevents a model's unexposed guessed tool from reaching Registry execution
+ * even if that tool is globally installed or has automatic approval.
+ */
+internal suspend fun executeAdmittedWorkBatchCall(
+    call: LocalToolCall,
+    superseded: () -> Boolean,
+    blockedCall: (String) -> AgentToolResult?,
+    execute: suspend () -> AgentToolResult,
+): AgentToolResult {
+    if (superseded()) return workSteeredToolResult(call)
+    return blockedCall(call.name) ?: execute()
+}
 
 /** A committed correction invalidates unstarted calls from the preceding model sample. */
 internal fun workSteeredToolResult(call: LocalToolCall): AgentToolResult = AgentToolResult(
