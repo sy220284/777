@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.work.improvement
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.harness.session.SessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
+import com.labteto.dshmobile.local.work.LocalGoal
 import java.io.File
 import java.nio.file.Files
 import kotlinx.serialization.json.JsonArray
@@ -15,6 +16,14 @@ import kotlinx.serialization.json.contentOrNull
  * Session EventLog; these Markdown files are NEVER consulted as strategy or completion truth.
  * This class does not run an Agent, infer lessons, or authorize any prompt/skill mutation.
  */
+internal data class WorkImprovementAdvice(
+    val id: String, val sourceSession: String, val sourceRunId: String,
+    val goalSignature: String, val projectId: String, val model: String, val profileId: String,
+    val category: String, val cue: String, val guidance: String,
+    val baselineToolCalls: Int, val baselineToolErrors: Int,
+    val baselineTestVerified: Boolean, val active: Boolean,
+)
+
 internal class LocalWorkImprovementArchive(
     private val workspace: LocalWorkspace,
     private val eventLogs: LocalSessionEventLogRegistry,
@@ -25,6 +34,7 @@ internal class LocalWorkImprovementArchive(
     private data class Proposal(
         val session: String, val sequence: Long, val createdAt: Long, val id: String,
         val category: String, val cue: String, val guidance: String, val reason: String,
+        val advice: WorkImprovementAdvice,
     )
     private data class Facts(
         val lastSequence: Long,
@@ -39,9 +49,33 @@ internal class LocalWorkImprovementArchive(
         val problems: List<Problem>,
         val receipts: List<GoalReceipt>,
         val proposals: List<Proposal>,
+        val trialIds: Set<String>,
+        val adoptedIds: Set<String>,
+        val retiredIds: Set<String>,
     )
 
     private val cached = linkedMapOf<String, Facts>()
+
+    /**
+     * Bounded, matched guidance selection. Experimental advice is tried only on a naturally
+     * user-requested Work Goal with exactly the same acceptance signature as its source.
+     * This never launches an extra side-effectful rollout or changes tool permissions.
+     */
+    @Synchronized
+    fun adviceFor(goal: LocalGoal, projectId: String, model: String, profileId: String): WorkImprovementAdvice? {
+        if (goal.status != "active" || goal.id.isBlank()) return null
+        val signature = workGoalComparisonKey(goal)
+        val used = cached.values.flatMap { it.trialIds + it.retiredIds }.toSet()
+        val active = cached.values.flatMap { it.adoptedIds }.toSet()
+        val matches = cached.values.flatMap(Facts::proposals)
+            .asSequence().map(Proposal::advice)
+            .filter { it.goalSignature == signature && it.projectId == projectId &&
+                it.model == model && it.profileId == profileId && it.baselineTestVerified }
+            .filter { it.id !in cached.values.flatMap { facts -> facts.retiredIds } }
+            .distinctBy(WorkImprovementAdvice::id).toList()
+        val adopted = matches.firstOrNull { it.id in active }
+        return adopted?.copy(active = true) ?: matches.firstOrNull { it.id !in used }?.copy(active = false)
+    }
 
     /** Create only missing files. The user's notes are never overwritten. */
     @Synchronized
@@ -216,6 +250,9 @@ internal class LocalWorkImprovementArchive(
         var machineEvidenceGoals = 0
         val receipts = ArrayDeque<GoalReceipt>()
         val proposals = ArrayDeque<Proposal>()
+        val trialIds = linkedSetOf<String>()
+        val adoptedIds = linkedSetOf<String>()
+        val retiredIds = linkedSetOf<String>()
         log.forEachAfter(-1L) { e ->
             val data = e.data
             when (e.type) {
@@ -260,11 +297,29 @@ internal class LocalWorkImprovementArchive(
                     val candidateId = data.text("id").orEmpty()
                     val category = data.text("category").orEmpty()
                     if (candidateId.isNotBlank() && category in setOf("workflow", "prompt", "skill")) {
+                        val advice = WorkImprovementAdvice(
+                            id = candidateId, sourceSession = session,
+                            sourceRunId = data.text("source_run_id").orEmpty(),
+                            goalSignature = data.text("goal_signature").orEmpty(),
+                            projectId = data.text("project_id").orEmpty(),
+                            model = data.text("model").orEmpty(),
+                            profileId = data.text("profile_id").orEmpty(),
+                            category = category,
+                            cue = data.text("cue").orEmpty().take(120),
+                            guidance = data.text("guidance").orEmpty().take(500),
+                            baselineToolCalls = data.text("baseline_tool_calls")?.toIntOrNull() ?: Int.MAX_VALUE,
+                            baselineToolErrors = data.text("baseline_tool_errors")?.toIntOrNull() ?: Int.MAX_VALUE,
+                            baselineTestVerified = data.text("baseline_test_verified") == "true",
+                            active = false,
+                        )
                         addBounded(proposals, Proposal(session, e.sequence, e.createdAt, candidateId,
-                            category, data.text("cue").orEmpty().take(120),
-                            data.text("guidance").orEmpty().take(500), data.text("reason").orEmpty().take(300)))
+                            category, advice.cue, advice.guidance,
+                            data.text("reason").orEmpty().take(300), advice))
                     }
                 }
+                "work/improvement-trial" -> data.text("candidate_id")?.let(trialIds::add)
+                "work/improvement-adopted" -> data.text("candidate_id")?.let(adoptedIds::add)
+                "work/improvement-retired" -> data.text("candidate_id")?.let(retiredIds::add)
                 "work/output-quality" -> {
                     val count = (data["findings"] as? JsonArray)?.size ?: 0
                     if (count > 0) {
@@ -276,7 +331,8 @@ internal class LocalWorkImprovementArchive(
             }
         }
         return Facts(end, fileSize, modifiedAt, turns, toolReceipts, failedTools, goals.size,
-            machineEvidenceGoals, problemsCount, problems.toList(), receipts.toList(), proposals.toList())
+            machineEvidenceGoals, problemsCount, problems.toList(), receipts.toList(), proposals.toList(),
+            trialIds, adoptedIds, retiredIds)
     }
 
     private fun proposalLines(items: List<Proposal>): String =
