@@ -661,16 +661,14 @@ internal class LocalWorkAgentTurnExecutor(
                 },
                 toolBatch = AgentToolBatchExecutor { calls ->
                     agentRunCoordinator.ensureCurrentOwner(runContext)
-                    workTurnToolRuntime.executeBatch(
-                        binding = binding,
-                        calls = calls.map { it.toLocalToolCall() },
-                        allowMutation = true,
-                        superseded = { binding.steeringRevision.value != latestAcceptedSamplingRevision },
-                        blockedCall = { toolName ->
-                            if (modelToolStepSurface.allows(toolName)) null
-                            else modelToolStepSurface.hiddenCallResult(toolName)
-                        },
-                    ).map { (_, result) -> result }
+                    modelToolStepSurface.executeVisibleBatch(calls) { visibleCalls ->
+                        workTurnToolRuntime.executeBatch(
+                            binding = binding,
+                            calls = visibleCalls.map { it.toLocalToolCall() },
+                            allowMutation = true,
+                            superseded = { binding.steeringRevision.value != latestAcceptedSamplingRevision },
+                        ).map { (_, result) -> result }
+                    }
                 },
                 isParallelTool = { call ->
                     modelToolStepSurface.allows(call.name) &&
