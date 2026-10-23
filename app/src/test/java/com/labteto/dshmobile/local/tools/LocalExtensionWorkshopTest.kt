@@ -21,6 +21,7 @@ class LocalExtensionWorkshopTest {
         val done = workshop.createSkill("story-review", "章节审查", "核对章节逻辑", "按角色动机检查章节。")
         assertTrue(done.contains("已安装并复读"))
         assertTrue(workspace.readModelSkill("story-review").contains("按角色动机"))
+        assertTrue(workspace.readRaw(".dsh/extensions/IMPROVEMENTS.md").contains("story-review"))
         assertTrue(workspace.modelSkillCatalog().contains("story-review"))
         for (doc in listOf("EXPERIENCE.md", "IMPROVEMENTS.md", "PROMPT-CHANGES.md", "ISSUES.md")) {
             assertTrue(workspace.readRaw(".dsh/extensions/$doc").isNotBlank())
@@ -71,6 +72,9 @@ class LocalExtensionWorkshopTest {
         val absent = workshop.inspect("mcp", "x-twitter", emptySet(), emptySet())
         assertTrue(absent.contains("没有对应工具"))
         assertTrue(absent.contains("待独立核验"))
+        assertTrue(workspace.readRaw(".dsh/extensions/EXPERIENCE.md").contains("x-twitter"))
+        workshop.record("skill", "story-review", "prompt-optimized", "优化提示词但尚未复测", "proof.txt")
+        assertTrue(workspace.readRaw(".dsh/extensions/PROMPT-CHANGES.md").contains("story-review"))
         val registered = workshop.inspect("mcp", "x-twitter",
             setOf("mcp_x-twitter_x_post"), emptySet())
         assertTrue(registered.contains("mcp_x-twitter_x_post"))

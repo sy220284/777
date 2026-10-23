@@ -17,7 +17,7 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
     private val skills = LocalSkillStore(workspace)
     private val namePattern = Regex("[a-z][a-z0-9-]{1,47}")
     private val kinds = setOf("skill", "tool", "connector", "mcp", "plugin")
-    private val phases = setOf("discovered", "created", "registered", "tested", "improved", "failed")
+    private val phases = setOf("discovered", "created", "registered", "tested", "improved", "prompt-optimized", "failed")
     private fun safeId(id: String): String {
         require(namePattern.matches(id)) { "扩展标识必须为小写英文字母、数字和连字符" }
         return id
@@ -68,6 +68,7 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         workspace.write(manifestPath, manifest.toString() + "\n")
         ensureExperienceDocuments()
         require(launchCommand(id).first.size == 2) { "本地 MCP 启动配置无法重新加载" }
+        record("mcp", id, "created", "保存可恢复本地 MCP 启动清单和源码；尚未注册", manifestPath)
         return "本机 MCP 源码及启动清单已写入：$manifestPath。此时仅生成文件；调用 mcp_start_local，经权限审批并真实连接后才算注册。"
     }
 
@@ -97,7 +98,8 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         skills.create(id, displayName, description, instructions)
         val installed = workspace.readModelSkill(id)
         require(installed.contains(instructions.trim())) { "技能安装后读取内容不一致" }
-        ensureExperienceDocuments()
+        record("skill", id, "created", "技能已写入本地目录并完成可读性校验；实际执行效果尚未验证",
+            ".dsh/skills/$id/SKILL.md")
         return "已安装并复读校验技能：$id；来源 .dsh/skills/$id/SKILL.md。执行效果尚未验证，可直接使用 skill(name=$id) 读取。"
     }
 
@@ -112,7 +114,8 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         skills.updateDocument(id, document)
         val now = skills.readDocument(id)
         require(now == document.trimEnd() + "\n") { "技能更新结果未与提交文档一致" }
-        ensureExperienceDocuments()
+        record("skill", id, "improved", "备份旧版本 $revision 并更新技能；新版本实际执行效果尚未验证",
+            path)
         return "技能 $id 更新并复读成功；原版本备份 $revision，可调用 skill_rollback 回退。新版本执行效果尚未验证。"
     }
 
@@ -128,6 +131,8 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         if (!File(workspace.path, currentPath).exists()) workspace.write(currentPath, current)
         skills.updateDocument(id, backup)
         require(skills.readDocument(id) == backup.trimEnd() + "\n") { "回退内容校验失败" }
+        record("skill", id, "improved", "回退至 $revision，回退前版本 $currentRevision 已保存；需要复测",
+            currentPath)
         return "技能 $id 已回退至 $revision；回退前版本 $currentRevision 已保存。"
     }
 
@@ -152,7 +157,19 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
             (evidencePath.ifBlank { "尚未提交" }) + "；可信度：待独立核验\n"
         require((old + entry).toByteArray(Charsets.UTF_8).size <= 200_000) { "扩展记录过大，请整理归档" }
         workspace.write(target, old + entry)
-        return "已写入 $target；本次为记录声明，不代表工具已经注册或业务调用成功。"
+        val indexFile = when (phase) {
+            "tested" -> "EXPERIENCE.md"
+            "created", "registered", "improved" -> "IMPROVEMENTS.md"
+            "prompt-optimized" -> "PROMPT-CHANGES.md"
+            "discovered", "failed" -> "ISSUES.md"
+            else -> error("未知阶段")
+        }
+        val indexPath = ".dsh/extensions/$indexFile"
+        val index = workspace.readRaw(indexPath)
+        val indexed = "- $kind / $id：$clean；来源 [$phase]($kind-$id/RECORD.md)\n"
+        require((index + indexed).toByteArray(Charsets.UTF_8).size <= 200_000) { "扩展索引过大，请先归档" }
+        workspace.write(indexPath, index + indexed)
+        return "已写入 $target 及 $indexPath；本次为记录声明，不代表工具已经注册或业务调用成功。"
     }
 
     fun inspect(kind: String, id: String, liveToolNames: Set<String>, installedPlugins: Set<String>): String {
