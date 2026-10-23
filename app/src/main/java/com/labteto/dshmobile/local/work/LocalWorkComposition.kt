@@ -11,6 +11,7 @@ import com.labteto.dshmobile.local.LocalToolApprovalRuntime
 import com.labteto.dshmobile.local.LocalToolCompositionRoot
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.work.improvement.LocalWorkStrategyLearning
+import com.labteto.dshmobile.local.work.improvement.LocalWorkStrategyEvaluation
 import com.labteto.dshmobile.local.work.improvement.LocalWorkImprovementArchive
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
@@ -56,6 +57,7 @@ internal class LocalWorkComposition @Inject constructor(
     private val sessionStorage: LocalSessionStorageRuntime,
     private val modelGateway: LocalModelGateway,
     private val auxiliaryModel: com.labteto.dshmobile.local.model.LocalAuxiliaryModelRequestRuntime,
+    private val usageAnalytics: com.labteto.dshmobile.local.TokenUsageAnalyticsStore,
     mediaRuntime: Provider<LocalMediaCreationRuntime>,
     modelRequests: LocalModelRequestCoordinator,
     usageTracker: DeepSeekUsageTracker,
@@ -76,6 +78,9 @@ internal class LocalWorkComposition @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val improvementLearning by lazy {
         LocalWorkStrategyLearning(sessionStorage, modelGateway, auxiliaryModel, usageTracker)
+    }
+    private val improvementEvaluation by lazy {
+        LocalWorkStrategyEvaluation(sessionStorage, usageAnalytics)
     }
     private val improvementArchive = LocalWorkImprovementArchive(
         workspace = sessionStorage.files.workspace,
@@ -318,11 +323,13 @@ internal class LocalWorkComposition @Inject constructor(
         workSessionProjection = workSessionProjection,
         workToolResultRuntime = toolResultRuntime,
         workTurnToolRuntime = turnToolRuntime,
+        improvementArchive = improvementArchive,
         replyDocuments = replyDocuments,
-        onTurnSettled = { binding, sourceRunId ->
+        onTurnSettled = { binding, sourceRunId, selectedAdvice ->
             scope.launch {
                 try {
-                    improvementLearning.reflect(binding, sourceRunId)
+                    if (selectedAdvice == null) improvementLearning.reflect(binding, sourceRunId)
+                    else improvementEvaluation.evaluate(binding, sourceRunId, selectedAdvice)
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
                 } catch (error: Throwable) {
