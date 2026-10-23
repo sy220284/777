@@ -606,8 +606,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         transcriptHistory.loading
     val transcriptHistoryError = transcriptHistory.error
         ?.takeIf { transcriptHistory.sessionId == state.sessionId }
-    val showTranscriptPagingRow = transcriptHistoryError != null ||
-        (hasOlderTranscript && loadingOlderTranscript)
+    val showTranscriptPagingRow = transcriptHistoryError != null || hasOlderTranscript
     // A diary source may be in cold historical pages. Advance one durable page at a time
     // until the message is present, then scroll to the exact LazyColumn row.
     val locatingDiarySource = transcriptJumpTarget?.sessionId == state.sessionId &&
@@ -1071,6 +1070,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         LocalTranscriptPagingStatus(
                             loading = loadingOlderTranscript,
                             error = transcriptHistoryError,
+                            hasMore = hasOlderTranscript,
                             onRetry = {
                                 scope.launch { onLoadOlderTranscript(state.sessionId) }
                             },

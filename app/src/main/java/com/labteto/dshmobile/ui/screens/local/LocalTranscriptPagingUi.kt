@@ -34,7 +34,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
-import kotlinx.coroutines.flow.distinctUntilChanged
 
 /** Retarget an unfinished initial scroll when a resumed subscription replaces its cached tail. */
 @Composable
@@ -71,13 +70,25 @@ internal fun LocalTranscriptAutoPager(
 ) {
     LaunchedEffect(sessionId, listState, enabled) {
         if (!enabled) return@LaunchedEffect
+        // A freshly displayed short page can already be at index 0. That must not
+        // trigger a cascade of reads until the entire history is materialized.
+        // Only an actual upward movement toward older content may prefetch.
+        var priorPosition: Pair<Int, Int>? = null
         snapshotFlow {
-            listState.firstVisibleItemIndex <= LOCAL_TRANSCRIPT_AUTOLOAD_THRESHOLD_ITEMS
+            Triple(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset,
+                listState.isScrollInProgress,
+            )
+        }.collect { (index, offset, scrolling) ->
+            val previous = priorPosition
+            priorPosition = index to offset
+            val movingTowardOlder = previous != null &&
+                (index < previous.first || (index == previous.first && offset < previous.second))
+            if (scrolling && movingTowardOlder &&
+                index <= LOCAL_TRANSCRIPT_AUTOLOAD_THRESHOLD_ITEMS
+            ) onLoadOlder(sessionId)
         }
-            .distinctUntilChanged()
-            .collect { nearStart ->
-                if (nearStart) onLoadOlder(sessionId)
-            }
     }
 }
 
@@ -256,6 +267,7 @@ internal fun LazyListState.isConversationTailVisible(): Boolean {
 internal fun LocalTranscriptPagingStatus(
     loading: Boolean,
     error: String?,
+    hasMore: Boolean,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -269,7 +281,15 @@ internal fun LocalTranscriptPagingStatus(
         )
         return
     }
-    if (!loading) return
+    if (!loading) {
+        if (hasMore) SyButton(
+            text = stringResource(R.string.local_transcript_load_older),
+            onClick = onRetry,
+            modifier = modifier.fillMaxWidth(),
+            variant = SyButtonVariant.Ghost,
+        )
+        return
+    }
 
     Row(
         modifier = modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd),
