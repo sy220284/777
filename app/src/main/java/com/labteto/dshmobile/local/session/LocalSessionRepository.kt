@@ -73,7 +73,7 @@ internal class LocalSessionRepository(
                                     json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject,
                                     updatedAt = snapshot.updatedAt,
                                 )
-                                store.lastModified(snapshot.id)
+                                if (snapshotStore.nativeSummaries) 1L else store.lastModified(snapshot.id)
                             }
                         }
                         if (sourceModifiedAt != null) {
@@ -142,7 +142,9 @@ internal class LocalSessionRepository(
                     json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject,
                     updatedAt = snapshot.updatedAt,
                 )
-                requireNotNull(store.lastModified(snapshot.id)) { "会话写入后无法读取文件代际：${snapshot.id}" }
+                if (snapshotStore.nativeSummaries) 1L else requireNotNull(store.lastModified(snapshot.id)) {
+                    "会话写入后无法读取文件代际：${snapshot.id}"
+                }
             }
             persistSummaryIndex(snapshot, sourceModifiedAt)
             synchronized(lock) {
@@ -256,7 +258,14 @@ internal class LocalSessionRepository(
             (id in deletedIds) to latestSnapshots[id]
         }
         if (deleted) return@synchronized null
-        val persistedPayload = storeFor(id).read(id)?.document?.payload
+        // A new SQLite snapshot has no legacy auto-approval bit. When a newer
+        // accepted snapshot is already in memory, re-reading disk here can block
+        // navigation on a queued write with no semantic benefit.
+        val persistedPayload = if (latest != null && snapshotStore.nativeSummaries) {
+            null
+        } else {
+            storeFor(id).read(id)?.document?.payload
+        }
         if (latest != null) {
             LocalSessionRead(
                 session = latest,
