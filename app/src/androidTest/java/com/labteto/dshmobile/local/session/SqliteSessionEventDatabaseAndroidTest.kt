@@ -95,6 +95,29 @@ class SqliteSessionEventDatabaseAndroidTest {
                 assertEquals((115L..119L).toList(),
                     db.pageAfter("chat", 114L, 20).map { it.sequence })
                 assertEquals(-1L, db.latestSequence("other"))
+                val generation = requireNotNull(db.instance("chat"))
+                assertTrue(db.writeProjectionCheckpoint(
+                    "chat", "ui-transcript", LocalSessionProjectionCheckpoint(
+                        version = 2,
+                        identity = generation,
+                        throughSequence = 100L,
+                        payload = "indexed through 100",
+                    ),
+                ))
+                assertEquals("indexed through 100",
+                    db.readProjectionCheckpoint("chat", "ui-transcript", 2)?.payload)
+                assertTrue(!db.writeProjectionCheckpoint(
+                    "chat", "ui-transcript", LocalSessionProjectionCheckpoint(
+                        2, generation, 99L, "stale",
+                    ),
+                ))
+                assertEquals("indexed through 100",
+                    db.readProjectionCheckpoint("chat", "ui-transcript", 2)?.payload)
+                assertTrue(!db.writeProjectionCheckpoint(
+                    "chat", "ui-transcript", LocalSessionProjectionCheckpoint(
+                        2, "wrong-generation", 110L, "invalid",
+                    ),
+                ))
             }
             SqliteSessionEventDatabase(context, Json, name).use { db ->
                 assertEquals(identity, db.instance("chat"))
@@ -104,9 +127,11 @@ class SqliteSessionEventDatabaseAndroidTest {
                 assertEquals(listOf(119L, 120L), sequences)
                 db.clearSession("chat")
                 assertNull(db.instance("chat"))
+                assertNull(db.readProjectionCheckpoint("chat", "ui-transcript", 2))
                 assertTrue(db.pageBeforeNewestFirst("chat").isEmpty())
                 assertEquals(0L, db.append("chat", "turn/start", buildJsonObject {}).sequence)
                 assertNotEquals(identity, db.instance("chat"))
+                assertNull(db.readProjectionCheckpoint("chat", "ui-transcript", 2))
             }
         } finally {
             context.deleteDatabase(name)

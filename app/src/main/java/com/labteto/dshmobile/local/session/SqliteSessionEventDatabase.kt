@@ -22,7 +22,7 @@ internal class SqliteSessionEventDatabase(
     private val json: Json,
     name: String = "local_session_events_v1.db",
     private val clock: () -> Long = System::currentTimeMillis,
-) : SQLiteOpenHelper(context, name, null, 1) {
+) : SQLiteOpenHelper(context, name, null, 2) {
     init { setWriteAheadLoggingEnabled(true) }
 
     override fun onConfigure(db: SQLiteDatabase) {
@@ -48,10 +48,24 @@ internal class SqliteSessionEventDatabase(
             "CREATE INDEX session_event_type_latest " +
                 "ON session_events(session_id, event_type, sequence DESC)"
         )
+        createCheckpointTable(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        error("不支持的会话事件数据库版本：$oldVersion -> $newVersion")
+        require(oldVersion == 1 && newVersion == 2) {
+            "不支持的会话事件数据库版本：$oldVersion -> $newVersion"
+        }
+        createCheckpointTable(db)
+    }
+
+    private fun createCheckpointTable(db: SQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS session_projection_checkpoints (" +
+                "session_id TEXT NOT NULL REFERENCES session_event_cursors(session_id) ON DELETE CASCADE, " +
+                "checkpoint_name TEXT NOT NULL, version INTEGER NOT NULL, " +
+                "instance TEXT NOT NULL, through_sequence INTEGER NOT NULL, " +
+                "payload TEXT NOT NULL, PRIMARY KEY(session_id, checkpoint_name))"
+        )
     }
 
     fun append(sessionId: String, type: String, data: JsonObject): SessionEvent =
@@ -193,9 +207,95 @@ internal class SqliteSessionEventDatabase(
         }
     }
 
+    /**
+     * A derived checkpoint must belong to this exact durable event generation.
+     * Deleting/resetting a session invalidates its old checkpoint automatically via
+     * the FK and the random instance token, including delete-then-recreate races.
+     */
+    fun readProjectionCheckpoint(
+        sessionId: String, name: String, version: Int,
+    ): LocalSessionProjectionCheckpoint? {
+        validateSessionId(sessionId)
+        validateCheckpointName(name)
+        return readableDatabase.rawQuery(
+            "SELECT c.version,c.instance,c.through_sequence,c.payload " +
+                "FROM session_projection_checkpoints c " +
+                "JOIN session_event_cursors e ON e.session_id=c.session_id " +
+                "WHERE c.session_id=? AND c.checkpoint_name=? AND c.version=? " +
+                "AND c.instance=e.instance AND c.through_sequence<e.next_sequence",
+            arrayOf(sessionId, name, version.toString()),
+        ).use { rows ->
+            if (rows.moveToFirst()) LocalSessionProjectionCheckpoint(
+                version = rows.getInt(0),
+                identity = rows.getString(1),
+                throughSequence = rows.getLong(2),
+                payload = rows.getString(3),
+            ) else null
+        }
+    }
+
+    fun writeProjectionCheckpoint(
+        sessionId: String, name: String, checkpoint: LocalSessionProjectionCheckpoint,
+    ): Boolean {
+        validateSessionId(sessionId)
+        validateCheckpointName(name)
+        require(checkpoint.payload.toByteArray(Charsets.UTF_8).size <= MAX_CHECKPOINT_BYTES) {
+            "投影检查点超过 8 MiB 上限"
+        }
+        val db = writableDatabase
+        db.beginTransactionNonExclusive()
+        try {
+            val identity = db.rawQuery(
+                "SELECT instance,next_sequence FROM session_event_cursors WHERE session_id=?",
+                arrayOf(sessionId),
+            ).use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) to cursor.getLong(1) else null
+            } ?: return false
+            if (checkpoint.identity != identity.first ||
+                checkpoint.throughSequence < -1L ||
+                checkpoint.throughSequence >= identity.second
+            ) return false
+            val previousSequence = db.rawQuery(
+                "SELECT version,instance,through_sequence FROM session_projection_checkpoints " +
+                    "WHERE session_id=? AND checkpoint_name=?",
+                arrayOf(sessionId, name),
+            ).use { cursor ->
+                if (cursor.moveToFirst()) Triple(
+                    cursor.getInt(0), cursor.getString(1), cursor.getLong(2),
+                ) else null
+            }
+            if (previousSequence != null &&
+                previousSequence.first == checkpoint.version &&
+                previousSequence.second == checkpoint.identity &&
+                previousSequence.third > checkpoint.throughSequence
+            ) return false
+            val values = ContentValues().apply {
+                put("session_id", sessionId)
+                put("checkpoint_name", name)
+                put("version", checkpoint.version)
+                put("instance", checkpoint.identity)
+                put("through_sequence", checkpoint.throughSequence)
+                put("payload", checkpoint.payload)
+            }
+            val updated = db.update(
+                "session_projection_checkpoints", values,
+                "session_id=? AND checkpoint_name=?", arrayOf(sessionId, name),
+            )
+            if (updated == 0) db.insertOrThrow("session_projection_checkpoints", null, values)
+            db.setTransactionSuccessful()
+            return true
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     fun clearSession(sessionId: String) {
         validateSessionId(sessionId)
         writableDatabase.delete("session_event_cursors", "session_id=?", arrayOf(sessionId))
+    }
+
+    private fun validateCheckpointName(name: String) {
+        require(CHECKPOINT_PATTERN.matches(name)) { "检查点名称不合法" }
     }
 
     private fun queryPage(query: String, args: Array<String>): List<SessionEvent> =
@@ -223,9 +323,11 @@ internal class SqliteSessionEventDatabase(
 
     private companion object {
         val ID_PATTERN = Regex("[A-Za-z0-9._-]{1,128}")
+        val CHECKPOINT_PATTERN = Regex("[a-z0-9.-]{1,64}")
         const val EVENT_SCHEMA_VERSION = 1
         const val MAX_TYPE_LENGTH = 256
         const val MAX_PAGE = 200
         const val MAX_BATCH = 256
+        const val MAX_CHECKPOINT_BYTES = 8 * 1024 * 1024
     }
 }
