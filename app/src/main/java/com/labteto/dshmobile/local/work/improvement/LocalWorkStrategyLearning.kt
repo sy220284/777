@@ -45,9 +45,22 @@ internal class LocalWorkStrategyLearning(
             (delivery.artifactCallId == null && delivery.testCallId == null)) return
 
         // One model proposal per durable Goal revision; failure/partial model text never activates.
-        if (log.latestMatching(setOf("work/improvement-candidate")) {
-                it.string("goal_id") == goal.id && it.string("goal_revision") == goal.revision.toString()
-            } != null) return
+        // Reserve exactly one auxiliary reflection attempt per verified Goal revision, even
+        // when the model returns malformed data or times out. This bounds repeated token spend.
+        val reserved = log.withWriterLease {
+            if (log.latestMatching(setOf("work/improvement-reflection-attempt")) {
+                    it.string("goal_id") == goal.id && it.string("goal_revision") == goal.revision.toString()
+                } != null) false else {
+                log.append("work/improvement-reflection-attempt", buildJsonObject {
+                    put("goal_id", goal.id)
+                    put("goal_revision", goal.revision)
+                    put("source_run_id", sourceRunId)
+                    put("status", "started")
+                })
+                true
+            }
+        }
+        if (!reserved) return
         val expectedRevision = goal.revision
         val expectedSession = bound.sessionId
         val sourceSequence = log.latestSequence()
