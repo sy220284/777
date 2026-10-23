@@ -148,6 +148,23 @@
   历史技能命令采用正式契约；Work/媒体错误有真实失败码；普通输出不会误判错误。
   CI 和 Android 16/17 设备回归须以**最终 HEAD** 为准，不能沿用其他提交的结果。
 
+## 后续代码级复查：批量可见性与混合模型目录结果
+
+- Agent 核心调度器已经利用 `isParallelTool` 把未暴露的调用排除在并行批次之外；
+  Work 的 `toolBatch` 回调此前本身没有再次校验冻结的本步骤模型工具表。
+  现已在 `LocalWorkTurnToolRuntime.executeBatch` 为**每一个调用**提供统一
+  `blockedCall` gate，串行/并行两种分组共同使用 `executeAdmittedWorkBatchCall`，
+  并由 `LocalWorkAgentTurnExecutor` 按最新 `LocalModelToolStepSurface` 判定。
+  因而即使以后改变 Agent 分组策略，也不能直接执行只注册、却未交给模型的工具。
+- 新增回归覆盖：无效工具不会执行、并行组中只有暴露工具会执行、允许的旧别名
+  继续共享真实注册名、用户修订后的旧调用不能进入执行。
+- `list_subagent_models` 可在一次结果中同时包含真实本地档案和失败的在线供应商目录。
+  之前只匹配输出开头导致在线目录失败没被正确标记，现使用该命令独有的
+  「指定配置的官方模型目录」结果分隔标记识别，保留原本地目录并报告
+  `MODEL_CATALOG_UNAVAILABLE`；一般 `read` 文件内容同样的文字不会被误判。
+- 本阶段属于源码与 JVM 回归补强。实际不同 provider 的行为及 Android 设备结果
+  仍按当前 HEAD 的完整 CI 与设备测试单独签收，不以更早的通过结果代替。
+
 ## 核心不变量
 
 1. 任何模型陈述“优化成功”都不能改变事实；有正式验收与准入结果才可标记为生效。
