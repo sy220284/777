@@ -93,6 +93,69 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         return listOf(interpreter, File(workspace.path, sourcePath).absolutePath) to workspace.path
     }
 
+    /** All source changes are versioned; an already-running server needs an explicit reconnect. */
+    fun reviseMcp(id: String, source: String): String {
+        val (command, _) = launchCommand(id)
+        require(source.isNotBlank() && source.toByteArray(Charsets.UTF_8).size <= 128 * 1024) {
+            "MCP 新源码不能为空或超过 128 KB"
+        }
+        val filename = command.last()
+        val previous = workspace.readRaw(".dsh/extensions/mcp-$id/" +
+            if (filename.endsWith(".js")) "server.js" else "server.py")
+        val oldVersion = sha(previous)
+        val suffix = if (filename.endsWith(".js")) "js" else "py"
+        val backup = ".dsh/extensions/mcp-$id/revisions/$oldVersion.$suffix"
+        if (!File(workspace.path, backup).exists()) workspace.write(backup, previous)
+        saveMcpSource(id, source)
+        record("mcp", id, "improved", "源码更新，旧版本 $oldVersion；已运行服务仍需重连并复测", backup)
+        return "MCP $id 源码已更新并复核完整性；原版 $oldVersion 已备份。先断开旧连接，再运行 mcp_start_local；业务效果尚未验证。"
+    }
+
+    fun rollbackMcp(id: String, revision: String): String {
+        safeId(id)
+        require(Regex("[a-f0-9]{16}").matches(revision)) { "MCP 版本号无效" }
+        val manifest = Json.parseToJsonElement(
+            workspace.readRaw(".dsh/extensions/mcp-$id/manifest.json")
+        ).jsonObject
+        val interpreter = requireNotNull(manifest["interpreter"]?.jsonPrimitive?.content)
+        require(interpreter in setOf("node", "python3")) { "MCP 清单运行时不支持" }
+        val suffix = if (interpreter == "node") "js" else "py"
+        val path = ".dsh/extensions/mcp-$id/revisions/$revision.$suffix"
+        val backup = workspace.readRaw(path)
+        require(sha(backup) == revision) { "MCP 版本备份内容校验失败" }
+        val currentPath = ".dsh/extensions/mcp-$id/server.$suffix"
+        val current = workspace.readRaw(currentPath)
+        val currentVersion = sha(current)
+        val currentBackup = ".dsh/extensions/mcp-$id/revisions/$currentVersion.$suffix"
+        if (!File(workspace.path, currentBackup).exists()) workspace.write(currentBackup, current)
+        saveMcpSource(id, backup)
+        record("mcp", id, "improved", "回退到 $revision，原版 $currentVersion 已保留；重新连接后复测",
+            currentBackup)
+        return "MCP $id 已回退至 $revision（现版 $currentVersion 已备份）；旧进程需手动断开重启。"
+    }
+
+    private fun saveMcpSource(id: String, source: String) {
+        safeId(id)
+        val manifestPath = ".dsh/extensions/mcp-$id/manifest.json"
+        val old = Json.parseToJsonElement(workspace.readRaw(manifestPath)).jsonObject
+        require(old["server_id"]?.jsonPrimitive?.content == id) { "MCP 清单标识不一致" }
+        val interpreter = requireNotNull(old["interpreter"]?.jsonPrimitive?.content)
+        require(interpreter in setOf("node", "python3")) { "MCP 运行时不支持" }
+        val sourcePath = ".dsh/extensions/mcp-$id/" +
+            if (interpreter == "node") "server.js" else "server.py"
+        require(old["source_path"]?.jsonPrimitive?.content == sourcePath) { "MCP 清单路径无效" }
+        workspace.write(sourcePath, source)
+        val manifest = buildJsonObject {
+            put("schema_version", 1)
+            put("server_id", id)
+            put("interpreter", interpreter)
+            put("source_path", sourcePath)
+            put("source_sha256", fullSha(source))
+        }
+        workspace.write(manifestPath, manifest.toString() + "\n")
+        require(launchCommand(id).first.size == 2) { "MCP 更新内容校验失败" }
+    }
+
     fun createSkill(id: String, displayName: String, description: String, instructions: String): String {
         safeId(id)
         skills.create(id, displayName, description, instructions)

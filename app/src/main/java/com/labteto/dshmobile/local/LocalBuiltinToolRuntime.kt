@@ -341,6 +341,14 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                     args.string("id"), args.string("interpreter"), args.string("source"),
                 )
             }
+            "mcp_update_local" -> {
+                require(allowMutation) { "当前子任务不能修改 MCP" }
+                extensionWorkshop.reviseMcp(args.string("id"), args.string("source"))
+            }
+            "mcp_rollback_local" -> {
+                require(allowMutation) { "当前子任务不能回退 MCP" }
+                extensionWorkshop.rollbackMcp(args.string("id"), args.string("revision"))
+            }
             "mcp_start_local" -> {
                 require(allowMutation) { "当前子任务不能启动 MCP" }
                 val id = args.string("id")

@@ -190,6 +190,14 @@ object LocalToolCatalog {
             "interpreter" to string("node 或 python3"),
             "source" to string("完整服务端源码；必须自行满足 MCP 协议"),
         ), listOf("id", "interpreter", "source")))
+        add(tool("mcp_update_local", "保存自建 MCP 新版源码和旧版备份，同步完整性清单；重连后才使用新代码", properties(
+            "id" to string("已有的本地 MCP ID"),
+            "source" to string("完整新版本源码"),
+        ), listOf("id", "source")))
+        add(tool("mcp_rollback_local", "从经哈希验证的备份回退 MCP 源码，保留当前版本；需断开后重连", properties(
+            "id" to string("本地 MCP ID"),
+            "revision" to string("旧版本十六位哈希"),
+        ), listOf("id", "revision")))
         add(tool("mcp_start_local", "按经过哈希核验的本机清单启动 MCP；通过既有插件桥接真实连接和注册工具；会运行本地代码，需审批", properties(
             "id" to string("已创建的本机 MCP 服务标识"),
         ), listOf("id")))

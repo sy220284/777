@@ -59,6 +59,19 @@ class LocalExtensionWorkshopTest {
         assertThrows(IllegalArgumentException::class.java) { workshop.launchCommand("research-helper") }
     }
 
+    @Test fun localMcpUpdateRollbackSurvivesRestartAndRejectsModifiedBackup() = withWorkspace { workshop, workspace ->
+        workshop.createMcp("api-helper", "node", "console.log('v1')")
+        val result = workshop.reviseMcp("api-helper", "console.log('v2')")
+        val hash = Regex("旧版本 ([0-9a-f]{16})").find(result)!!.groupValues[1]
+        assertTrue(workspace.readRaw(".dsh/extensions/mcp-api-helper/server.js").contains("v2"))
+        assertEquals("node", workshop.launchCommand("api-helper").first.first())
+        workshop.rollbackMcp("api-helper", hash)
+        assertTrue(workspace.readRaw(".dsh/extensions/mcp-api-helper/server.js").contains("v1"))
+        assertThrows(IllegalArgumentException::class.java) {
+            workshop.rollbackMcp("api-helper", "0011223344556677")
+        }
+    }
+
     @Test fun recordsHaveEvidenceButDoNotClaimLiveRegistration() = withWorkspace { workshop, workspace ->
         workspace.write("proof.txt", "MCP 模拟结果，不是官方生产验证")
         assertThrows(IllegalArgumentException::class.java) {

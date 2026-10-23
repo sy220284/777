@@ -44,7 +44,7 @@ internal object LocalToolPolicy {
         "media_image_options", "media_image_create", "media_image_status",
         "job_list", "job_output", "job_kill", "json_query", "environment_info",
         "todo_write", "create_goal", "get_goal", "update_goal",
-        "skill", "skill_create", "skill_update", "skill_rollback", "mcp_create_local", "mcp_start_local", "extension_record", "extension_inspect", "subagent_fork", "list_agents", "send_message",
+        "skill", "skill_create", "skill_update", "skill_rollback", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local", "extension_record", "extension_inspect", "subagent_fork", "list_agents", "send_message",
         "interrupt_agent", "workflow", "team_members", "team_member_status",
         "team_create_member", "team_start_member", "team_spawn", "team_send_message",
         "team_messages", "team_wait_for_message", "team_task_create", "team_task_get",
@@ -101,7 +101,7 @@ internal object LocalToolPolicy {
 
     fun access(name: String): ToolAccess = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file", "present",
-        "skill_create", "skill_update", "skill_rollback", "extension_record", "mcp_create_local" -> ToolAccess.WORKSPACE_WRITE
+        "skill_create", "skill_update", "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local" -> ToolAccess.WORKSPACE_WRITE
         "update_plan", "exit_plan_mode", "todo_write", "create_goal", "update_goal",
         "ask_user_question", "memory_remember", "memory_update", "memory_forget" -> ToolAccess.SESSION_WRITE
         "bash", "job_kill" -> ToolAccess.PROCESS
@@ -133,7 +133,7 @@ internal object LocalToolPolicy {
             "update_plan", "exit_plan_mode", "todo_write", "create_goal", "get_goal", "update_goal",
             "ask_user_question" -> "任务"
             "skill", "skill_create", "skill_update", "skill_rollback" -> "技能"
-            "extension_record", "extension_inspect", "mcp_create_local", "mcp_start_local" -> "扩展能力"
+            "extension_record", "extension_inspect", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local" -> "扩展能力"
             "subagent", "subagent_fork", "workflow", "list_subagent_models", "list_agents",
             "send_message", "interrupt_agent", "team_members", "team_member_status",
             "team_create_member", "team_start_member", "team_spawn", "team_send_message",
@@ -176,7 +176,7 @@ internal object LocalToolPolicy {
             "skill_create" -> setOf("技能创建", "自创技能", "创建技能", "skill")
             "skill_update", "skill_rollback" -> setOf("技能优化", "技能版本", "版本回退", "skill")
             "extension_record", "extension_inspect" -> setOf("插件", "工具", "扩展", "MCP", "能力创建", "复用经验", "自我改进")
-            "mcp_create_local", "mcp_start_local" -> setOf("mcp", "自创工具", "新建连接器", "本地扩展", "启动MCP", "创建MCP")
+            "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local" -> setOf("mcp", "自创工具", "新建连接器", "本地扩展", "启动MCP", "创建MCP")
             "subagent" -> setOf("子代理", "只读代理", "继承上下文", "并行代理", "subagent")
             "subagent_fork" -> setOf("可写子代理", "继承权限", "fork", "代理写入")
             "list_subagent_models" -> setOf("子代理模型", "worker模型", "模型列表", "模型配置", "密钥可用模型")
@@ -207,7 +207,7 @@ internal object LocalToolPolicy {
             workspaceAccess = when (canonical) {
                 "read", "file_inspect", "list_files", "glob", "grep", "skill", "json_query", "update_goal", "extension_inspect" -> ToolWorkspaceAccess.READ
                 "write", "edit", "apply_patch", "download_file", "present", "bash",
-                "skill_create", "skill_update", "skill_rollback", "extension_record", "mcp_create_local" -> ToolWorkspaceAccess.WRITE
+                "skill_create", "skill_update", "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local" -> ToolWorkspaceAccess.WRITE
                 else -> ToolWorkspaceAccess.NONE
             },
             discoveryKeywords = discoveryKeywords,
@@ -229,7 +229,7 @@ internal object LocalToolPolicy {
      */
     fun approval(name: String): ToolApprovalPolicy = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file", "skill_create", "skill_update",
-        "skill_rollback", "extension_record", "mcp_create_local", "mcp_start_local", "bash", "job_kill", "send_message", "interrupt_agent",
+        "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local", "bash", "job_kill", "send_message", "interrupt_agent",
         "team_send_message", "team_interrupt", "team_disable_member", "team_dismiss_member", "team_stop_all",
         "http_request", "media_image_create", "session_event_search", "session_trace", "session_event_trace", "session_event_read",
         "memory_update", "memory_forget" -> ToolApprovalPolicy.ALWAYS
@@ -247,7 +247,7 @@ internal object LocalToolPolicy {
      */
     fun autoApprovalScope(name: String): LocalAutoApprovalScope = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file", "skill_create", "skill_update",
-        "skill_rollback", "extension_record", "mcp_create_local" -> LocalAutoApprovalScope.WORKSPACE
+        "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local" -> LocalAutoApprovalScope.WORKSPACE
         // A shell can leave cwd and reach same-UID app-private state; keep it outside low-risk classification.
         "bash" -> LocalAutoApprovalScope.NONE
         else -> if (access(name) == ToolAccess.READ_ONLY) {
