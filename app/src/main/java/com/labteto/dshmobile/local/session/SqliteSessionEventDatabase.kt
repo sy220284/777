@@ -54,10 +54,23 @@ internal class SqliteSessionEventDatabase(
         error("不支持的会话事件数据库版本：$oldVersion -> $newVersion")
     }
 
-    fun append(sessionId: String, type: String, data: JsonObject): SessionEvent {
+    fun append(sessionId: String, type: String, data: JsonObject): SessionEvent =
+        appendBatch(sessionId, listOf(type to data)).single()
+
+    /**
+     * Atomic bounded append. One SQLite WAL transaction reserves the whole contiguous
+     * sequence range, then commits every event (or none). Independent readers can
+     * continue reading the previous WAL snapshot while this writer commits.
+     */
+    fun appendBatch(
+        sessionId: String,
+        entries: List<Pair<String, JsonObject>>,
+    ): List<SessionEvent> {
         validateSessionId(sessionId)
-        require(type.isNotBlank() && type.length <= MAX_TYPE_LENGTH) { "事件类型不合法" }
-        val createdAt = clock()
+        require(entries.size in 1..MAX_BATCH) { "事件批量写入数量越界" }
+        require(entries.all { (type, _) -> type.isNotBlank() && type.length <= MAX_TYPE_LENGTH }) {
+            "事件类型不合法"
+        }
         val database = writableDatabase
         database.beginTransactionNonExclusive()
         try {
@@ -68,29 +81,37 @@ internal class SqliteSessionEventDatabase(
                     put("instance", UUID.randomUUID().toString())
                 }, SQLiteDatabase.CONFLICT_IGNORE,
             )
-            val sequence = database.rawQuery(
+            val startSequence = database.rawQuery(
                 "SELECT next_sequence FROM session_event_cursors WHERE session_id=?",
                 arrayOf(sessionId),
             ).use { rows ->
                 check(rows.moveToFirst()) { "缺少会话事件游标：$sessionId" }
                 rows.getLong(0)
             }
-            check(sequence >= 0L && sequence < Long.MAX_VALUE) { "会话事件序号已耗尽" }
+            check(startSequence >= 0L && startSequence <= Long.MAX_VALUE - entries.size) {
+                "会话事件序号已耗尽"
+            }
+            val nextSequence = startSequence + entries.size
             check(database.update(
                 "session_event_cursors",
-                ContentValues().apply { put("next_sequence", sequence + 1L) },
+                ContentValues().apply { put("next_sequence", nextSequence) },
                 "session_id=?", arrayOf(sessionId),
             ) == 1) { "事件序号更新失败：$sessionId" }
-            database.insertOrThrow("session_events", null, ContentValues().apply {
-                put("session_id", sessionId)
-                put("sequence", sequence)
-                put("event_type", type)
-                put("created_at", createdAt)
-                put("schema_version", EVENT_SCHEMA_VERSION)
-                put("payload", data.toString())
-            })
+            val written = entries.mapIndexed { index, (type, payload) ->
+                val sequence = startSequence + index
+                val createdAt = clock()
+                database.insertOrThrow("session_events", null, ContentValues().apply {
+                    put("session_id", sessionId)
+                    put("sequence", sequence)
+                    put("event_type", type)
+                    put("created_at", createdAt)
+                    put("schema_version", EVENT_SCHEMA_VERSION)
+                    put("payload", payload.toString())
+                })
+                SessionEvent(sequence, type, createdAt, payload)
+            }
             database.setTransactionSuccessful()
-            return SessionEvent(sequence, type, createdAt, data)
+            return written
         } finally {
             database.endTransaction()
         }
@@ -205,5 +226,6 @@ internal class SqliteSessionEventDatabase(
         const val EVENT_SCHEMA_VERSION = 1
         const val MAX_TYPE_LENGTH = 256
         const val MAX_PAGE = 200
+        const val MAX_BATCH = 256
     }
 }

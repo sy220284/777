@@ -3,6 +3,9 @@ package com.labteto.dshmobile.local.session
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.util.UUID
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -15,6 +18,61 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class SqliteSessionEventDatabaseAndroidTest {
+    @Test fun atomicBatchAppendAndConcurrentWritersNeverLeaveSequenceGaps() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "sqlite-batch-test-${UUID.randomUUID()}.db"
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { db ->
+                val firstBatch = db.appendBatch("chat", (0 until 100).map { index ->
+                    "assistant/message" to buildJsonObject { put("index", index) }
+                })
+                assertEquals((0L..99L).toList(), firstBatch.map { it.sequence })
+                // Invalid batch is rejected without advancing the durable cursor.
+                var invalidRejected = false
+                try {
+                    db.appendBatch("chat", listOf(
+                        "turn/start" to buildJsonObject {},
+                        "" to buildJsonObject {},
+                    ))
+                } catch (_: IllegalArgumentException) {
+                    invalidRejected = true
+                }
+                assertTrue(invalidRejected)
+                assertEquals(99L, db.latestSequence("chat"))
+
+                val executor = Executors.newFixedThreadPool(4)
+                try {
+                    val tasks = (0 until 4).map { writer ->
+                        Callable {
+                            repeat(8) { batch ->
+                                db.appendBatch("chat", (0 until 25).map { index ->
+                                    "tool/result" to buildJsonObject {
+                                        put("writer", writer)
+                                        put("batch", batch)
+                                        put("index", index)
+                                    }
+                                })
+                            }
+                        }
+                    }
+                    val futures = executor.invokeAll(tasks)
+                    futures.forEach { it.get(90, TimeUnit.SECONDS) }
+                } finally {
+                    executor.shutdownNow()
+                }
+
+                assertEquals(899L, db.latestSequence("chat"))
+                val encountered = mutableListOf<Long>()
+                db.forEachAfter("chat", -1L) { encountered += it.sequence }
+                assertEquals((0L..899L).toList(), encountered)
+                assertEquals((899L downTo 880L).toList(),
+                    db.pageBeforeNewestFirst("chat", limit = 20).map { it.sequence })
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
     @Test fun eventSequencesAndIndexedPagesSurviveReopen() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "sqlite-events-test-${UUID.randomUUID()}.db"
