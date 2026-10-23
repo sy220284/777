@@ -171,6 +171,31 @@ object LocalToolCatalog {
             "query" to string("可选；按当前任务内容优先展示相关技能；分页时保持一致"),
             "offset" to integer("可选；继续上次技能目录的 offset，默认 0"),
         )))
+        add(tool("skill_create", "将技能直接写入工作区、安装到真实技能目录并读取校验；不会自动证明执行效果", properties(
+            "id" to string("英文技能标识"),
+            "display_name" to string("技能中文名称"),
+            "description" to string("用途，1—240 字"),
+            "instructions" to string("完整执行规则，1—12000 字"),
+        ), listOf("id", "display_name", "description", "instructions")))
+        add(tool("skill_update", "更新已有技能，自动保存旧版本以便回退；参数为完整 SKILL.md", properties(
+            "id" to string("已安装技能 ID"),
+            "document" to string("新版本的完整 SKILL.md"),
+        ), listOf("id", "document")))
+        add(tool("skill_rollback", "按备份版本哈希回退技能，回退前也备份当前版本", properties(
+            "id" to string("技能 ID"),
+            "revision" to string("skill_update 返回的十六位版本哈希"),
+        ), listOf("id", "revision")))
+        add(tool("extension_record", "把自建技能、工具、连接器、MCP、插件的过程及证据登记到长期工作区；记录不等于验收", properties(
+            "kind" to string("skill/tool/connector/mcp/plugin"),
+            "id" to string("扩展 ID"),
+            "phase" to string("discovered/created/registered/tested/improved/failed"),
+            "summary" to string("本次做了什么，最多 1200 字"),
+            "evidence_path" to string("工作区证据文件相对路径；tested 时必填"),
+        ), listOf("kind", "id", "phase", "summary", "evidence_path")))
+        add(tool("extension_inspect", "比较自建扩展工作区记录与当前真实技能、工具、插件注册状态；绝不把登记当实测", properties(
+            "kind" to string("skill/tool/connector/mcp/plugin"),
+            "id" to string("扩展 ID"),
+        ), listOf("kind", "id")))
         add(tool("subagent", "统一的只读子代理入口：可隔离执行或继承当前对话上下文，同一工具块中多个调用可并行；始终禁止写入。需带写入权限的子代理仍须使用独立授权的 subagent_fork", properties(
             "task" to string("交给子代理的完整任务"),
             "instructions" to string("可选；该子代理持续遵循的工作规则，不会扩大工具或权限"),

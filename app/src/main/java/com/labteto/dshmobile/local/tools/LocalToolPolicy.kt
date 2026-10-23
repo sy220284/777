@@ -44,7 +44,7 @@ internal object LocalToolPolicy {
         "media_image_options", "media_image_create", "media_image_status",
         "job_list", "job_output", "job_kill", "json_query", "environment_info",
         "todo_write", "create_goal", "get_goal", "update_goal",
-        "skill", "subagent_fork", "list_agents", "send_message",
+        "skill", "skill_create", "skill_update", "skill_rollback", "extension_record", "extension_inspect", "subagent_fork", "list_agents", "send_message",
         "interrupt_agent", "workflow", "team_members", "team_member_status",
         "team_create_member", "team_start_member", "team_spawn", "team_send_message",
         "team_messages", "team_wait_for_message", "team_task_create", "team_task_get",
@@ -100,7 +100,8 @@ internal object LocalToolPolicy {
     }
 
     fun access(name: String): ToolAccess = when (canonical(name)) {
-        "write", "edit", "apply_patch", "download_file", "present" -> ToolAccess.WORKSPACE_WRITE
+        "write", "edit", "apply_patch", "download_file", "present",
+        "skill_create", "skill_update", "skill_rollback", "extension_record" -> ToolAccess.WORKSPACE_WRITE
         "update_plan", "exit_plan_mode", "todo_write", "create_goal", "update_goal",
         "ask_user_question", "memory_remember", "memory_update", "memory_forget" -> ToolAccess.SESSION_WRITE
         "bash", "job_kill" -> ToolAccess.PROCESS
@@ -112,7 +113,7 @@ internal object LocalToolPolicy {
         "http_request", "media_image_create" -> ToolAccess.PRIVILEGED
         "read", "tool_output_read", "file_inspect", "list_files", "glob", "grep", "job_list", "job_output", "json_query",
         "media_image_options", "media_image_status",
-        "environment_info", "capability_search", "get_goal", "skill", "list_subagent_models", "list_agents",
+        "environment_info", "capability_search", "get_goal", "skill", "extension_inspect", "list_subagent_models", "list_agents",
         "session_event_search", "session_search", "memory_search", "memory_list",
         "session_trace", "session_event_trace", "session_event_read",
         "team_members", "team_member_status", "team_messages", "team_wait_for_message",
@@ -131,7 +132,8 @@ internal object LocalToolPolicy {
             "environment_info", "capability_search" -> "环境"
             "update_plan", "exit_plan_mode", "todo_write", "create_goal", "get_goal", "update_goal",
             "ask_user_question" -> "任务"
-            "skill" -> "技能"
+            "skill", "skill_create", "skill_update", "skill_rollback" -> "技能"
+            "extension_record", "extension_inspect" -> "扩展能力"
             "subagent", "subagent_fork", "workflow", "list_subagent_models", "list_agents",
             "send_message", "interrupt_agent", "team_members", "team_member_status",
             "team_create_member", "team_start_member", "team_spawn", "team_send_message",
@@ -171,6 +173,9 @@ internal object LocalToolPolicy {
             "todo_write" -> setOf("待办", "任务清单", "todo")
             "create_goal", "get_goal", "update_goal" -> setOf("目标", "goal")
             "skill" -> setOf("技能", "skill")
+            "skill_create" -> setOf("技能创建", "自创技能", "创建技能", "skill")
+            "skill_update", "skill_rollback" -> setOf("技能优化", "技能版本", "版本回退", "skill")
+            "extension_record", "extension_inspect" -> setOf("插件", "工具", "扩展", "MCP", "能力创建", "复用经验", "自我改进")
             "subagent" -> setOf("子代理", "只读代理", "继承上下文", "并行代理", "subagent")
             "subagent_fork" -> setOf("可写子代理", "继承权限", "fork", "代理写入")
             "list_subagent_models" -> setOf("子代理模型", "worker模型", "模型列表", "模型配置", "密钥可用模型")
@@ -199,8 +204,9 @@ internal object LocalToolPolicy {
         return ToolMetadata(
             family = family,
             workspaceAccess = when (canonical) {
-                "read", "file_inspect", "list_files", "glob", "grep", "skill", "json_query", "update_goal" -> ToolWorkspaceAccess.READ
-                "write", "edit", "apply_patch", "download_file", "present", "bash" -> ToolWorkspaceAccess.WRITE
+                "read", "file_inspect", "list_files", "glob", "grep", "skill", "json_query", "update_goal", "extension_inspect" -> ToolWorkspaceAccess.READ
+                "write", "edit", "apply_patch", "download_file", "present", "bash",
+                "skill_create", "skill_update", "skill_rollback", "extension_record" -> ToolWorkspaceAccess.WRITE
                 else -> ToolWorkspaceAccess.NONE
             },
             discoveryKeywords = discoveryKeywords,
@@ -221,7 +227,8 @@ internal object LocalToolPolicy {
      * [autoApprovalScope] below only classifies lower-risk operations; it is not a global allowlist.
      */
     fun approval(name: String): ToolApprovalPolicy = when (canonical(name)) {
-        "write", "edit", "apply_patch", "download_file", "bash", "job_kill", "send_message", "interrupt_agent",
+        "write", "edit", "apply_patch", "download_file", "skill_create", "skill_update",
+        "skill_rollback", "extension_record", "bash", "job_kill", "send_message", "interrupt_agent",
         "team_send_message", "team_interrupt", "team_disable_member", "team_dismiss_member", "team_stop_all",
         "http_request", "media_image_create", "session_event_search", "session_trace", "session_event_trace", "session_event_read",
         "memory_update", "memory_forget" -> ToolApprovalPolicy.ALWAYS
@@ -238,7 +245,8 @@ internal object LocalToolPolicy {
      *   as a workspace-bounded operation.
      */
     fun autoApprovalScope(name: String): LocalAutoApprovalScope = when (canonical(name)) {
-        "write", "edit", "apply_patch", "download_file" -> LocalAutoApprovalScope.WORKSPACE
+        "write", "edit", "apply_patch", "download_file", "skill_create", "skill_update",
+        "skill_rollback", "extension_record" -> LocalAutoApprovalScope.WORKSPACE
         // A shell can leave cwd and reach same-UID app-private state; keep it outside low-risk classification.
         "bash" -> LocalAutoApprovalScope.NONE
         else -> if (access(name) == ToolAccess.READ_ONLY) {
