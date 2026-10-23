@@ -37,6 +37,7 @@ internal class LocalWorkImprovementArchive(
         val session: String, val sequence: Long, val createdAt: Long, val id: String,
         val category: String, val cue: String, val guidance: String, val reason: String,
         val artifactReceipt: String, val testReceipt: String,
+        val evidenceTag: String,
         val advice: WorkImprovementAdvice,
     )
     private data class Evaluation(
@@ -215,7 +216,8 @@ internal class LocalWorkImprovementArchive(
                 "- 会话 `" + it.session + "`，事件 #" + it.sequence + "；" +
                     (if (it.hasMachineEvidence) "含机器执行凭据" else "无机器执行凭据；不能推断客观验证通过")
             }
-        val experienceWithCandidates = experience +
+        val experienceWithCandidates = experience + "\n" +
+            WorkExperienceBootstrap.catalogMarkdown() +
             "\n## 经验与方法候选（按实际 Work 证据生成，尚需验证）\n\n" +
             proposalLines(proposals)
         val changed = """
@@ -390,6 +392,7 @@ internal class LocalWorkImprovementArchive(
                             data.text("reason").orEmpty().take(300),
                             data.text("source_artifact_receipt").orEmpty().take(100),
                             data.text("source_verification_receipt").orEmpty().take(100),
+                            data.text("evidence_tag").orEmpty().take(40),
                             advice))
                     }
                 }
@@ -431,6 +434,7 @@ internal class LocalWorkImprovementArchive(
             "- [候选，未验证] " + it.cue.replace("\n", " ").take(100) +
                 "；建议：" + it.guidance.replace("\n", " ").take(400) +
                 "；理由：" + it.reason.replace("\n", " ").take(200) +
+                "；观察到的问题：" + it.evidenceTag.ifEmpty { "旧候选未标注" } +
                 "；成果回执：" + it.artifactReceipt.ifEmpty { "无" } +
                 "；测试回执：" + it.testReceipt.ifEmpty { "无" } +
                 "；来源会话 " + it.session.take(80) + " 事件 #" + it.sequence
