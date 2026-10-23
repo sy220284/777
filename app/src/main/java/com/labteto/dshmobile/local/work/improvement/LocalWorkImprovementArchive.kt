@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.work.improvement
 
 import com.labteto.dshmobile.local.files.LocalWorkspace
-import com.labteto.dshmobile.harness.session.SessionEventLog
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import com.labteto.dshmobile.local.work.LocalGoal
 import java.io.File
@@ -29,7 +29,6 @@ internal data class WorkImprovementAdvice(
 internal class LocalWorkImprovementArchive(
     private val workspace: LocalWorkspace,
     private val eventLogs: LocalSessionEventLogRegistry,
-    private val sessionsRoot: File,
 ) {
     private data class Problem(val session: String, val sequence: Long, val createdAt: Long, val summary: String)
     private data class GoalReceipt(val session: String, val sequence: Long, val createdAt: Long, val hasMachineEvidence: Boolean)
@@ -122,21 +121,15 @@ internal class LocalWorkImprovementArchive(
     @Synchronized
     fun refresh() {
         requireSafeArchiveDirectory()
-        val files = sessionsRoot.listFiles().orEmpty()
-            .filter { it.isFile && !Files.isSymbolicLink(it.toPath()) && it.name.endsWith(".events.jsonl") }
-            .sortedBy(File::getName)
-        val ids = files.map { it.name.removeSuffix(".events.jsonl") }.toSet()
-        cached.keys.retainAll(ids)
-        files.forEach { file ->
-            val id = file.name.removeSuffix(".events.jsonl")
+        val sources = eventLogs.historicalSources()
+        cached.keys.retainAll(sources.map { it.id }.toSet())
+        sources.forEach { source ->
+            val id = source.id
             eventLogs.readHistorical(id) { log ->
                 val end = log.latestSequence()
-                val size = file.length()
-                val modified = file.lastModified()
-                val identity = runCatching {
-                    Files.readAttributes(file.toPath(), java.nio.file.attribute.BasicFileAttributes::class.java,
-                        java.nio.file.LinkOption.NOFOLLOW_LINKS).fileKey()?.toString().orEmpty()
-                }.getOrDefault("")
+                val size = source.size
+                val modified = source.modifiedAt
+                val identity = source.identity
                 val existing = cached[id]
                 if (existing == null || existing.lastSequence != end ||
                     existing.fileSize != size || existing.modifiedAt != modified ||
@@ -306,7 +299,7 @@ internal class LocalWorkImprovementArchive(
         ensureInitialized()
     }
 
-    private fun readFacts(session: String, log: SessionEventLog, end: Long, fileSize: Long,
+    private fun readFacts(session: String, log: LocalSessionEventLog, end: Long, fileSize: Long,
         modifiedAt: Long, fileIdentity: String, previous: Facts?): Facts {
         var isWork = previous?.workMode ?: false
         var turns = previous?.workTurns ?: 0
