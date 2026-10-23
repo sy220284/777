@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 import com.labteto.dshmobile.local.work.localWorkDeliveryEvidence
+import com.labteto.dshmobile.local.model.routeFingerprint
 import java.io.File
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -32,12 +33,14 @@ internal class LocalWorkStrategyEvaluation(
         val goal = bound.workState.snapshot().goal ?: return
         log.latestMatching(setOf("work/improvement-trial")) {
             it.value("run_id") == runId && it.value("candidate_id") == advice.id &&
-                it.value("goal_id") == goal.id
+                it.value("goal_id") == goal.id &&
+                it.value("steering_revision") == bound.steeringRevision.value.toString()
         } ?: return
         val evidence = localWorkDeliveryEvidence(log, goal, File(sessionStorage.files.workspace.path))
         val current = bound.aggregateSnapshot()
         if (current.modelState.model != advice.model ||
             (current.modelState.modelSelection.activeProfileId ?: "") != advice.profileId ||
+            current.modelState.modelSelection.activeProfile?.routeFingerprint().orEmpty() != advice.routeFingerprint ||
             (current.projectId ?: "") != advice.projectId) return
         if (goal.status != "completed" || workGoalComparisonKey(goal) != advice.goalSignature ||
             !advice.baselineTestVerified || evidence.missing.isNotEmpty() || evidence.testCallId == null) return
