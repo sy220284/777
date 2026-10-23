@@ -20,8 +20,8 @@ internal class LocalWorkImprovementArchive(
     private val eventLogs: LocalSessionEventLogRegistry,
     private val sessionsRoot: File,
 ) {
-    private data class Problem(val session: String, val sequence: Long, val summary: String)
-    private data class GoalReceipt(val session: String, val sequence: Long, val hasMachineEvidence: Boolean)
+    private data class Problem(val session: String, val sequence: Long, val createdAt: Long, val summary: String)
+    private data class GoalReceipt(val session: String, val sequence: Long, val createdAt: Long, val hasMachineEvidence: Boolean)
     private data class Facts(
         val lastSequence: Long,
         val fileSize: Long,
@@ -88,9 +88,9 @@ internal class LocalWorkImprovementArchive(
         val receipts = facts.sumOf(Facts::machineEvidenceGoals)
         val issues = facts.sumOf(Facts::problemsCount)
         val recentProblems = facts.flatMap(Facts::problems)
-            .sortedWith(compareByDescending<Problem> { it.sequence }.thenBy { it.session }).take(50)
+            .sortedWith(compareByDescending<Problem> { it.createdAt }.thenByDescending { it.sequence }).take(50)
         val recentGoals = facts.flatMap(Facts::receipts)
-            .sortedWith(compareByDescending<GoalReceipt> { it.sequence }.thenBy { it.session }).take(40)
+            .sortedWith(compareByDescending<GoalReceipt> { it.createdAt }.thenByDescending { it.sequence }).take(40)
         val summary = """
             |# 777 自我改进总览
             |
@@ -219,13 +219,18 @@ internal class LocalWorkImprovementArchive(
                     if (reason !in setOf("completed", "budget_exhausted_continuation",
                             "stream_interrupted_continuation", "output_limit_continuation")) {
                         problemsCount++
-                        addBounded(problems, Problem(session, e.sequence,
+                        addBounded(problems, Problem(session, e.sequence, e.createdAt,
                             "Work 回合以 " + reason.take(56).ifBlank { "unknown" } + " 结束"))
                     }
                 }
                 "tool/result" -> if (isWork) {
                     toolReceipts++
-                    if (data.text("is_error") == "true") failedTools++
+                    if (data.text("is_error") == "true") {
+                        failedTools++
+                        problemsCount++
+                        addBounded(problems, Problem(session, e.sequence, e.createdAt,
+                            "Work 工具执行返回错误；请核查源会话工具结果"))
+                    }
                 }
                 "goal/state" -> if (data.text("status") == "completed") {
                     val key = data.text("id").orEmpty() + ":" + data.text("revision").orEmpty()
@@ -233,14 +238,19 @@ internal class LocalWorkImprovementArchive(
                         val proven = !data.text("artifact_tool_call_id").isNullOrBlank() ||
                             !data.text("verification_tool_call_id").isNullOrBlank()
                         if (proven) machineEvidenceGoals++
-                        addBounded(receipts, GoalReceipt(session, e.sequence, proven))
+                        addBounded(receipts, GoalReceipt(session, e.sequence, e.createdAt, proven))
                     }
+                }
+                "goal/transition-rejected" -> {
+                    problemsCount++
+                    addBounded(problems, Problem(session, e.sequence, e.createdAt,
+                        "Work Goal 完成状态变更被验收规则拒绝"))
                 }
                 "work/output-quality" -> {
                     val count = (data["findings"] as? JsonArray)?.size ?: 0
                     if (count > 0) {
                         problemsCount++
-                        addBounded(problems, Problem(session, e.sequence,
+                        addBounded(problems, Problem(session, e.sequence, e.createdAt,
                             "Work 完成声明/交付质量发现 " + count + " 条冲突"))
                     }
                 }
