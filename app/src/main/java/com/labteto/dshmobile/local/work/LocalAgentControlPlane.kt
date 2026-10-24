@@ -31,7 +31,8 @@ internal class LocalAgentControlPlane(
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
     private val teams: LocalAgentTeamRuntime,
 ) {
-    private val control: LocalAgentControlPort = LocalWorkAgentControlRuntime(jobs, subagents, persistentJobs)
+    private val control: LocalAgentControlPort =
+        LocalWorkAgentControlRuntime(jobs, subagents, persistentJobs, teams)
 
     internal suspend fun execute(
         call: LocalToolCall,
@@ -43,7 +44,7 @@ internal class LocalAgentControlPlane(
             ?: return "Work 代理工具缺少活动运行上下文，已拒绝旧的无绑定执行路径"
         val args = call.arguments
         val snapshot = run.aggregateSnapshot()
-        teams.execute(call, run)?.let { return it }
+        control.executeTeam(run, call)?.let { return it }
 
         return when (call.name) {
             "subagent", "spawn_subagent" -> {
