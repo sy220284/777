@@ -70,6 +70,10 @@ internal fun isJobRecoveryOwnedBySession(snapshot: JobSnapshot, targetSession: S
 internal fun mustPreserveUnknownRecoveryOutcome(snapshot: JobSnapshot): Boolean =
     snapshot.status == "interrupted"
 
+/** Session-level recovery admits every eligible Job; explicit Agent resume admits only its ID. */
+internal fun matchesRequestedAgentRecovery(jobId: String, requestedAgentId: String?): Boolean =
+    requestedAgentId == null || jobId == requestedAgentId
+
 internal class LocalPersistentJobRecoveryCoordinator(
     private val scope: CoroutineScope,
     private val workspaceRoot: java.io.File,
@@ -354,7 +358,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         onlyAgentId: String? = null,
     ) {
         jobs.resumableSnapshots().forEach { snapshot ->
-            if (onlyAgentId != null && snapshot.id != onlyAgentId) return@forEach
+            if (!matchesRequestedAgentRecovery(snapshot.id, onlyAgentId)) return@forEach
             // Verify identity before decoding, failing, or reclassifying a recovery record.
             if (!isJobRecoveryOwnedBySession(snapshot, targetSession, json)) return@forEach
             // Startup/UI rehydration cannot grant new model request slots.
@@ -388,7 +392,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
 
         val waitingForActivationStop = jobs.pendingContinuableAgentMessageSnapshots().any { snapshot ->
             snapshot.ownerId == targetSession &&
-                (onlyAgentId == null || snapshot.id == onlyAgentId) &&
+                matchesRequestedAgentRecovery(snapshot.id, onlyAgentId) &&
                 snapshot.status == "interrupted"
         }
         if (waitingForActivationStop) {
