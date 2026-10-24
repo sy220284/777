@@ -401,6 +401,12 @@ object LocalToolCatalog {
             "task_id" to string("task-N"),
         ), listOf("task_id")))
         add(tool("team_task_list", "列出 Team 当前未删除任务及 readiness / owner / write-scope 警告", properties()))
+        add(tool("team_task_review", "记录独立 verify/review 成员对指定已完成任务的结构化核验结果。核验代理必须与任务执行人不同，且其真实终态模型输出为 JSON：task_id、reviewed_result_id、verdict(approve/reject)、reason。事件记录核验人意见，不代替真实测试/工件内容的机器证明", properties(
+            "task_id" to string("已完成的 Team 任务编号"),
+            "expected_revision" to integer("已完成任务当前 revision"),
+            "reviewer" to string("具备 verify/review 角色的另一位 active 成员"),
+            "review_result_id" to string("该 reviewer 自己的持久模型输出结果 ID"),
+        ), listOf("task_id", "expected_revision", "reviewer", "review_result_id")))
         add(tool("team_task_evidence", "从持久事件核查已完成 Team 任务的结果 ID、实际子代理 Job、检查点序号和任务归属；这只验证证据关联，不代表内容正确、独立审查通过或 Goal 完成", properties(
             "task_id" to string("已经完成的 Team 任务编号 task-N"),
         ), listOf("task_id")))
