@@ -141,6 +141,9 @@ internal class LocalAgentControlPlane(
                 LocalAgentMessageDeliveryMode.fromWire(args.optionalString("delivery_mode")),
             )
             "interrupt_agent" -> control.interrupt(run.sessionId, args.string("agent_id"))
+            "agent_inspect" -> control.inspect(run.sessionId, args.string("agent_id"))
+            "agent_resume" -> control.resume(run.sessionId, args.string("agent_id"))
+            "agent_close" -> control.close(run.sessionId, args.string("agent_id"))
             "workflow" -> subagents.runWorkflow(
                 resumeGraphId = args.optionalString("resume_graph_id"),
                 allowMutation = args.boolean("allow_mutation", false).also { requested ->
@@ -210,6 +213,9 @@ internal class LocalAgentControlPlane(
             "agent_tree",
             "send_message",
             "interrupt_agent",
+            "agent_inspect",
+            "agent_resume",
+            "agent_close",
             "workflow",
         ) + LocalAgentTeamContract.TOOL_NAMES
     }
