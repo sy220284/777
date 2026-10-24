@@ -567,6 +567,12 @@ internal class LocalToolExecutionCoordinator(
         }
         val recoveryHint = when {
             mutationMayHaveSideEffect -> "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
+            // Registry-proven PRE-execution schema rejection can be corrected deterministically
+            // using this exact registered tool. No guessed aliases, user approval or replay.
+            !executionStarted && errorCode == "INVALID_TOOL_ARGUMENTS" ->
+                "工具尚未进入执行器；" +
+                    com.labteto.dshmobile.local.tools.toolArgumentContractSummary(registered.schema) +
+                    "；仅使用本轮实际提供的工具名和参数字段，修正后重新提交。"
             else -> result.recoveryHint ?: when {
                 approvalDenied -> "该工具没有获得批准；不要重复调用，改用已授权能力或等待用户调整权限。"
                 timedOut && readLike -> "只读工具超时，可缩小范围后重试一次。"
