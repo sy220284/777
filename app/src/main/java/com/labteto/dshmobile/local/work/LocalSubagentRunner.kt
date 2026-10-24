@@ -27,6 +27,7 @@ import com.labteto.dshmobile.local.agent.LocalSubagentCompactionPolicy
 import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.LocalAgentSubtreeBudget
+import com.labteto.dshmobile.local.agent.withLocalSubagentAgentSlot
 import com.labteto.dshmobile.local.agent.compileNestedReadonlyCapabilities
 import com.labteto.dshmobile.local.agent.parseLocalNestedDelegation
 import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
@@ -189,14 +190,16 @@ internal class LocalSubagentRunner(
         onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)? = null,
         executionFence: () -> Unit = {},
         subtreeBudget: LocalAgentSubtreeBudget = LocalAgentSubtreeBudget(),
+        agentSlotWaitMillis: Long? = null,
     ): LocalSubagentResult {
         val validated = validateLocalSubagentLaunchSpec(
             spec,
             structuredOutputSupported = true,
         )
-        return resourceScheduler.withResource(
-            HarnessResourceKind.AGENT,
+        return withLocalSubagentAgentSlot(
+            scheduler = resourceScheduler,
             owner = "subagent:" + validated.task.take(80),
+            waitMillis = agentSlotWaitMillis,
         ) {
             var virtualScreenId: String? = null
             try {
@@ -658,7 +661,11 @@ internal class LocalSubagentRunner(
                                     parentLink = parent,
                                     capabilities = compileNestedReadonlyCapabilities(capabilities),
                                 )
-                                val child = withTimeoutOrNull(30_000L) {
+                                // Slot contention is bounded independently of model execution.
+                                // A normal multi-step model run often takes longer than 30 seconds.
+                                val childExecutionMillis = (request.maxSteps.toLong() * 60_000L)
+                                    .coerceIn(120_000L, 900_000L)
+                                val child = withTimeoutOrNull(childExecutionMillis) {
                                     requireNotNull(newNestedRunner) {
                                         "NESTED_DELEGATION_RUNNER_UNAVAILABLE"
                                     }().runResult(
@@ -672,6 +679,7 @@ internal class LocalSubagentRunner(
                                             }
                                         },
                                         subtreeBudget = subtreeBudget,
+                                        agentSlotWaitMillis = 5_000L,
                                     )
                                 }
                                 if (child == null) AgentToolResult(
