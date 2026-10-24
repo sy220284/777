@@ -18,6 +18,7 @@ class LocalWorkAgentControlBuiltinRuntimeTest {
                 "send_message",
                 "interrupt_agent",
                 "agent_inspect",
+                "agent_watch",
                 "agent_resume",
                 "agent_close",
                 "workflow",
