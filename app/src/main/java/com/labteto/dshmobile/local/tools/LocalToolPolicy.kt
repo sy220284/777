@@ -50,7 +50,7 @@ internal object LocalToolPolicy {
         "interrupt_agent", "agent_inspect", "agent_watch", "agent_resume", "agent_close", "workflow", "team_members", "team_member_status",
         "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown", "team_respond_shutdown", "team_ack_message",
         "team_messages", "team_message_receipt", "team_wait_for_message", "team_task_create", "team_task_get",
-        "team_task_list", "team_task_evidence", "team_task_update", "team_interrupt", "team_disable_member",
+        "team_task_list", "team_task_evidence", "team_task_review", "team_task_update", "team_interrupt", "team_disable_member",
         "team_dismiss_member", "team_stop_all", "team_wait",
         "memory_search", "memory_list", "memory_remember",
         "memory_update", "memory_forget", "session_search", "session_trace",
@@ -109,7 +109,7 @@ internal object LocalToolPolicy {
         "bash", "job_kill" -> ToolAccess.PROCESS
         "subagent", "subagent_fork", "workflow", "send_message", "interrupt_agent", "agent_resume", "agent_close",
         "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown", "team_respond_shutdown", "team_ack_message",
-        "team_task_create", "team_task_update", "team_interrupt", "team_disable_member",
+        "team_task_create", "team_task_update", "team_task_review", "team_interrupt", "team_disable_member",
         "team_dismiss_member", "team_stop_all" -> ToolAccess.AGENT_CONTROL
         "web_search", "web_fetch", "network_diagnose" -> ToolAccess.NETWORK
         "http_request", "media_image_create", "mcp_start_local" -> ToolAccess.PRIVILEGED
@@ -140,7 +140,7 @@ internal object LocalToolPolicy {
             "send_message", "interrupt_agent", "agent_inspect", "agent_watch", "agent_resume", "agent_close", "team_members", "team_member_status",
             "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown", "team_respond_shutdown", "team_ack_message",
             "team_messages", "team_message_receipt", "team_wait_for_message", "team_task_create", "team_task_get",
-            "team_task_list", "team_task_evidence", "team_task_update", "team_interrupt", "team_disable_member",
+            "team_task_list", "team_task_evidence", "team_task_review", "team_task_update", "team_interrupt", "team_disable_member",
             "team_dismiss_member", "team_stop_all", "team_wait" -> "智能体"
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" -> "记忆"
             "session_event_search", "session_search", "session_trace", "session_event_trace",
@@ -187,7 +187,7 @@ internal object LocalToolPolicy {
             "workflow" -> setOf("工作流", "workflow", "流水线", "pipeline", "并行任务")
             "team_members", "team_member_status", "team_create_member", "team_start_member",
             "team_spawn", "team_send_message", "team_request_shutdown", "team_respond_shutdown", "team_ack_message", "team_messages", "team_message_receipt", "team_wait_for_message",
-            "team_task_create", "team_task_get", "team_task_list", "team_task_evidence", "team_task_update",
+            "team_task_create", "team_task_get", "team_task_list", "team_task_evidence", "team_task_review", "team_task_update",
             "team_interrupt", "team_disable_member", "team_dismiss_member", "team_stop_all",
             "team_wait" -> setOf(
                 "智能体团队", "智能体集群", "多代理协作", "agent team", "agent swarm",
@@ -232,7 +232,7 @@ internal object LocalToolPolicy {
      */
     fun approval(name: String): ToolApprovalPolicy = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file", "skill_create", "skill_update",
-        "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local", "bash", "job_kill", "send_message", "interrupt_agent", "agent_resume", "agent_close",
+        "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local", "bash", "job_kill", "send_message", "interrupt_agent", "agent_resume", "agent_close", "team_task_review",
         "team_send_message", "team_interrupt", "team_disable_member", "team_dismiss_member", "team_stop_all",
         "http_request", "media_image_create", "session_event_search", "session_trace", "session_event_trace", "session_event_read",
         "memory_update", "memory_forget" -> ToolApprovalPolicy.ALWAYS
