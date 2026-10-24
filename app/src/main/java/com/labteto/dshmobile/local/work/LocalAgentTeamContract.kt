@@ -8,16 +8,18 @@ internal object LocalAgentTeamContract {
         const val TEAM_MESSAGE_QUEUED = "team/message/queued"
         const val TEAM_MESSAGE_DELIVERED = "team/message/delivered"
         const val TEAM_MESSAGE_DISCARDED = "team/message/discarded"
+        const val TEAM_SHUTDOWN_RESPONSE = "team/shutdown/response"
         const val TEAM_EVENT_VERSION = 2
         // Official V2 whole-value protocol remains at version 4; local activity projection adds display state.
         const val OFFICIAL_TEAM_PROJECTION_STATE_VERSION = 4
-        const val LOCAL_TEAM_PROJECTION_STATE_VERSION = 6
+        const val LOCAL_TEAM_PROJECTION_STATE_VERSION = 7
         val TEAM_EVENTS = setOf(
             TEAM_MEMBER_EVENT,
             TEAM_TASK_EVENT,
             TEAM_MESSAGE_QUEUED,
             TEAM_MESSAGE_DELIVERED,
             TEAM_MESSAGE_DISCARDED,
+            TEAM_SHUTDOWN_RESPONSE,
         )
         val MEMBER_TOOL_NAMES = com.labteto.dshmobile.local.tools.LocalTeamMemberToolContract.NAMES
         val TOOL_NAMES = setOf(
