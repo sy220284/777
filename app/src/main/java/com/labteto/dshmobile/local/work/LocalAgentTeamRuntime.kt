@@ -1230,8 +1230,8 @@ internal class LocalAgentTeamRuntime(
     }
 
     private fun synchronizeTeamRuntime(sessionId: String) {
+        // Explicit Lead commands take priority over an automatic claim.
         recoverMemberMailbox(sessionId)
-        reconcileIdleTeamTasks(sessionId)
     }
 
     private fun reconcileMemberOutcomes(sessionId: String) {
