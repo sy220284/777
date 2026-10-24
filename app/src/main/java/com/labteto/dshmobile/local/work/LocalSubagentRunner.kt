@@ -31,6 +31,7 @@ import com.labteto.dshmobile.local.agent.withLocalSubagentAgentSlot
 import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.modelMessageForAgentInput
+import com.labteto.dshmobile.local.agent.submittedLocalTeamMessageIds
 import com.labteto.dshmobile.local.agent.orderLocalTeamInboxBatch
 import com.labteto.dshmobile.local.agent.toJson
 import com.labteto.dshmobile.local.agent.LocalSubagentModelStepExecutor
@@ -566,9 +567,9 @@ internal class LocalSubagentRunner(
                     )
                     // Only record a delivery as submitted when the exact normalized message survived
                     // compaction and reached the model request. Dropped history remains unconfirmed.
-                    val actuallySubmitted = claimedForThisRequest.asSequence()
-                        .filter { input -> preparedHistory.any { it == modelMessageForAgentInput(input) } }
-                        .map { it.id }.toSet()
+                    val actuallySubmitted = submittedLocalTeamMessageIds(
+                        claimedForThisRequest, preparedHistory,
+                    )
                     if (actuallySubmitted.isNotEmpty()) {
                         submittedMessageIdsByStep[activationStep] = actuallySubmitted
                     }

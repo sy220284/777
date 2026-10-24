@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.agent
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.contentOrNull
@@ -53,3 +55,21 @@ internal fun orderLocalTeamInboxBatch(
         }
     }
 }
+
+// Trust only a provenance-tagged Team message that survived final model-input preparation.
+// Exact JSON match is conservative: transformed, truncated or compacted messages remain unconfirmed.
+internal fun submittedLocalTeamMessageIds(
+    newlyClaimed: List<QueuedAgentInput>,
+    modelInput: Iterable<JsonElement>,
+): Set<String> = newlyClaimed.asSequence().filter { message ->
+    if (message.kind != com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.AGENT_MESSAGE) return@filter false
+    val metadataId = (message.agentSource?.get("message_id") as? kotlinx.serialization.json.JsonPrimitive)
+        ?.contentOrNull
+    if (metadataId != message.id) return@filter false
+    val expected = modelMessageForAgentInput(message)
+    val content = (expected["content"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull.orEmpty()
+    // The trusted Team Runtime creates this unique envelope, not the agent-authored message body.
+    content.startsWith("[代理协作数据；") &&
+        content.contains("消息ID=${message.id}；") &&
+        modelInput.any { it == expected }
+}.map(QueuedAgentInput::id).toSet()
