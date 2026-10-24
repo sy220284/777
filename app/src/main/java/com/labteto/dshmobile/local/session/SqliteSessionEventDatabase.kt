@@ -179,6 +179,84 @@ class SqliteSessionEventDatabase(
         } finally { mutation.unlock() }
     }
 
+    internal fun legacyImportCommitted(sessionId: String): Boolean {
+        validateSessionId(sessionId)
+        val db = readableDatabase
+        val table = db.rawQuery(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_legacy_imports'",
+            null,
+        ).use { it.moveToFirst() }
+        if (!table) return false
+        return db.rawQuery(
+            "SELECT 1 FROM session_legacy_imports WHERE session_id=?",
+            arrayOf(sessionId),
+        ).use { it.moveToFirst() }
+    }
+
+    internal fun importLegacyEvents(sessionId: String, legacy: LocalSessionEventLog) {
+        validateSessionId(sessionId)
+        val mutation = SqliteSessionConsistencyGate.acquireMutation()
+        try {
+            val db = writableDatabase
+            db.beginTransactionNonExclusive()
+            try {
+                db.execSQL("CREATE TABLE IF NOT EXISTS session_legacy_imports (" +
+                    "session_id TEXT PRIMARY KEY NOT NULL, imported_sequence INTEGER NOT NULL)")
+                val imported = db.rawQuery(
+                    "SELECT imported_sequence FROM session_legacy_imports WHERE session_id=?",
+                    arrayOf(sessionId),
+                ).use { rows -> if (rows.moveToFirst()) rows.getLong(0) else null }
+                val historicalLatest = legacy.latestSequence()
+                if (imported != null) {
+                    check(imported == historicalLatest && latestSequence(sessionId) >= imported) {
+                        "旧会话 $sessionId 已迁移后源文件发生变化；保留双份数据并停止启动"
+                    }
+                    db.setTransactionSuccessful()
+                    return
+                }
+                val occupied = db.rawQuery(
+                    "SELECT 1 FROM session_event_cursors WHERE session_id=?",
+                    arrayOf(sessionId),
+                ).use { it.moveToFirst() }
+                check(!occupied) {
+                    "会话 $sessionId 同时存在旧文件和未登记的 SQLite 事件；禁止自动覆盖或合并"
+                }
+                db.insertOrThrow("session_event_cursors", null, ContentValues().apply {
+                    put("session_id", sessionId)
+                    put("next_sequence", 0L)
+                    put("instance", UUID.randomUUID().toString())
+                })
+                var expected = 0L
+                legacy.forEachAfter(-1L) { event ->
+                    check(event.sequence == expected) {
+                        "旧事件序号不连续，停止迁移 $sessionId：预期 $expected，实际 ${event.sequence}"
+                    }
+                    db.insertOrThrow("session_events", null, ContentValues().apply {
+                        put("session_id", sessionId)
+                        put("sequence", event.sequence)
+                        put("event_type", event.type)
+                        put("created_at", event.createdAt)
+                        put("schema_version", EVENT_SCHEMA_VERSION)
+                        put("payload", event.data.toString())
+                        put("visible_hint", if (isVisibleTranscriptCandidate(event.type, event.data)) 1 else 0)
+                    })
+                    expected++
+                }
+                check(expected - 1L == historicalLatest) {
+                    "旧会话 $sessionId 事件不完整，迁移事务已撤销"
+                }
+                db.update("session_event_cursors", ContentValues().apply {
+                    put("next_sequence", expected)
+                }, "session_id=?", arrayOf(sessionId))
+                db.insertOrThrow("session_legacy_imports", null, ContentValues().apply {
+                    put("session_id", sessionId)
+                    put("imported_sequence", historicalLatest)
+                })
+                db.setTransactionSuccessful()
+            } finally { db.endTransaction() }
+        } finally { mutation.unlock() }
+    }
+
     /** Source generations allow derived Work reports to detect deletion/recreation and append. */
     internal fun historicalSources(): List<LocalHistoricalSessionSource> =
         readableDatabase.rawQuery(

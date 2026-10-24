@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local.runtime
 import android.content.Context
 import com.labteto.dshmobile.local.LocalToolCompositionRoot
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
-import com.labteto.dshmobile.local.session.LocalSessionArchiveMaintenance
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.observability.DiagnosticReport
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -24,7 +23,6 @@ internal class LocalDiagnosticsRuntime @Inject constructor(
     private val bundledRuntimeManager: LocalBundledRuntimeManager,
     private val tools: LocalToolCompositionRoot,
 ) : LocalDiagnosticsPort {
-    private val sessionsRoot = File(context.filesDir, "local-harness/sessions").apply { mkdirs() }
     private val environment by lazy {
         LocalEnvironmentInfoCoordinator(
             workspacePath = { tools.workspace.path },
@@ -39,7 +37,7 @@ internal class LocalDiagnosticsRuntime @Inject constructor(
             commandAvailable = tools.process::isCommandAvailable,
             runtimeStatuses = bundledRuntimeManager::statuses,
             diagnostics = AppLog::snapshot,
-            storageStatus = { LocalSessionArchiveMaintenance.storageStatus(sessionsRoot) },
+            storageStatus = sessionStorage::storageDiagnosticSummary,
             processExitStatus = { LocalProcessExitStatus.read(context) },
             foregroundSessionId = runtimeStateStore::currentSessionId,
             foregroundHistory = { runtimeStateStore.foregroundRunHandle.modelHistory },
