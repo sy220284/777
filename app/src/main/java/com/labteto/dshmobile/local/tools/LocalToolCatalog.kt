@@ -225,6 +225,7 @@ object LocalToolCatalog {
             },
             "model" to string("可选；使用 list_subagent_models 返回的 profileId，或无歧义的模型名；留空继承父代理模型"),
             "max_steps" to integer("最大模型/工具循环步数，默认 20，可配置 1 到 512"),
+            "max_depth" to integer("最大只读代理树深度 1～3，默认 1；大于 1 时仅限前台只读，禁止虚拟屏及后台"),
             "virtual_screen" to boolean("是否为子代理分配独立虚拟屏；用于并行操作 Android 界面，默认 false"),
             "output_schema" to jsonSchemaObject("可选；要求子代理最终只返回符合该 JSON Schema 的对象"),
             "allowed_tools" to stringArray("可选；限制子代理本次可见且可执行的工具名；包含当前不可用工具时启动直接失败"),

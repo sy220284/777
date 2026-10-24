@@ -19,9 +19,14 @@ internal fun buildLocalDelegationCapabilities(
     toolAllowlist: Set<String>? = null,
     outputSchema: JsonObject? = null,
     initialOptionalTools: Set<String> = emptySet(),
+    maxDepth: Int = 1,
 ): LocalSubagentCapabilities {
     require(kind != LocalAgentDelegationKind.FOREGROUND_READONLY || !allowMutation) {
         "READONLY_DELEGATION_CANNOT_MUTATE"
+    }
+    require(maxDepth in 1..3 &&
+        (maxDepth == 1 || kind == LocalAgentDelegationKind.FOREGROUND_READONLY)) {
+        "RECURSIVE_DELEGATION_REQUIRES_FOREGROUND_READONLY"
     }
     require(kind != LocalAgentDelegationKind.FORK || !virtualScreen) {
         "FORK_CANNOT_BORROW_VIRTUAL_SCREEN"
@@ -40,7 +45,7 @@ internal fun buildLocalDelegationCapabilities(
         virtualScreen = virtualScreen,
         historyMode = if (kind == LocalAgentDelegationKind.FORK)
             LocalSubagentHistoryMode.INHERIT_PARENT else historyMode,
-        maxDepth = 1,
+        maxDepth = maxDepth,
         toolAllowlist = toolAllowlist,
         outputSchema = outputSchema,
         teamManaged = kind == LocalAgentDelegationKind.TEAM_MEMBER,
@@ -61,6 +66,7 @@ internal fun buildLocalDelegatedLaunchSpec(
     toolAllowlist: Set<String>? = null,
     outputSchema: JsonObject? = null,
     parentLink: LocalAgentParentLink? = null,
+    maxDepth: Int = 1,
 ): LocalSubagentLaunchSpec {
     require(kind == LocalAgentDelegationKind.FOREGROUND_READONLY ||
         kind == LocalAgentDelegationKind.FORK) {
@@ -78,6 +84,7 @@ internal fun buildLocalDelegatedLaunchSpec(
             allowMutation = allowMutation,
             historyMode = historyMode,
             virtualScreen = virtualScreen,
+            maxDepth = maxDepth,
             toolAllowlist = toolAllowlist,
             outputSchema = outputSchema,
         ),

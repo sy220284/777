@@ -72,6 +72,7 @@ internal class LocalAgentControlPlane(
                     instructions = instructions,
                     modelOverride = model,
                     maxSteps = maxSteps,
+                    maxDepth = args.int("max_depth", 1),
                     parentToolCallId = call.id,
                     virtualScreen = virtualScreen,
                     historyMode = historyMode,

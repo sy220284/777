@@ -60,6 +60,7 @@ internal class LocalSubagentRunnerFactory(
     private val defaultSessionId: () -> String,
     private val compactionPolicy: LocalSubagentCompactionPolicy,
     private val teamSchemas: (() -> JsonArray)? = null,
+    private val nestedReadonlySchemas: (() -> JsonArray)? = null,
     private val executeTeamTool: (suspend (String, String, LocalToolCall) -> AgentToolResult)? = null,
     private val importToolImages: suspend (com.labteto.dshmobile.harness.tools.ToolRichContent?) -> List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = { emptyList() },
 ) {
@@ -133,6 +134,7 @@ internal class LocalSubagentRunnerFactory(
     ): LocalSubagentRunner = LocalSubagentRunner(
         modelGateway = modelGateway,
         teamSchemas = teamSchemas,
+        nestedReadonlySchemas = nestedReadonlySchemas,
         executeTeamTool = executeTeamTool?.let { executor -> { jobId, call -> executor(runSessionId(), jobId, call) } },
         importToolImages = importToolImages,
         state = runnerState,

@@ -26,6 +26,9 @@ import com.labteto.dshmobile.local.buildTokenUsageContext
 import com.labteto.dshmobile.local.agent.LocalSubagentCompactionPolicy
 import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
+import com.labteto.dshmobile.local.agent.LocalAgentSubtreeBudget
+import com.labteto.dshmobile.local.agent.bindLocalAgentRole
+import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.modelMessageForAgentInput
 import com.labteto.dshmobile.local.agent.toJson
@@ -77,11 +80,13 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
@@ -113,6 +118,7 @@ internal class LocalSubagentRunner(
     private val schemas: (Boolean, Boolean, MutableSet<String>) -> JsonArray,
     private val execute: suspend (LocalToolCall, Boolean, MutableSet<String>) -> AgentToolResult,
     private val teamSchemas: (() -> JsonArray)? = null,
+    private val nestedReadonlySchemas: (() -> JsonArray)? = null,
     private val executeTeamTool: (suspend (String, LocalToolCall) -> AgentToolResult)? = null,
     private val spillToolOutput: (String, String) -> Boolean = { _, _ -> false },
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
@@ -180,6 +186,7 @@ internal class LocalSubagentRunner(
         resumeAfterCompletion: Boolean = false,
         onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)? = null,
         executionFence: () -> Unit = {},
+        subtreeBudget: LocalAgentSubtreeBudget = LocalAgentSubtreeBudget(),
     ): LocalSubagentResult {
         val validated = validateLocalSubagentLaunchSpec(
             spec,
@@ -208,6 +215,7 @@ internal class LocalSubagentRunner(
                     resumeAfterCompletion = resumeAfterCompletion,
                     onCheckpointProgress = onCheckpointProgress,
                     executionFence = executionFence,
+                    subtreeBudget = subtreeBudget,
                 )
             } finally {
                 virtualScreenId?.let(releaseVirtualScreen)
@@ -226,6 +234,7 @@ internal class LocalSubagentRunner(
         resumeAfterCompletion: Boolean,
         onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)?,
         executionFence: () -> Unit,
+        subtreeBudget: LocalAgentSubtreeBudget,
     ): LocalSubagentResult {
         val task = spec.task
         val instructions = spec.instructions
@@ -305,10 +314,15 @@ internal class LocalSubagentRunner(
             addAll(capabilities.toolAllowlist.orEmpty())
             addAll(capabilities.initialOptionalTools)
         }
+        val canDelegateNested = !capabilities.allowMutation && !capabilities.continuable &&
+            capabilities.depth < capabilities.maxDepth && runCoordinator != null &&
+            snapshot.kernel.resources.maxAgents > capabilities.depth
         fun executionSchemas(mutation: Boolean, virtual: Boolean, enabled: MutableSet<String>): JsonArray {
             val normal = schemas(mutation, virtual, enabled)
-            return if (capabilities.teamManaged && backgroundJobId != null)
-                JsonArray(normal + (teamSchemas?.invoke().orEmpty())) else normal
+            val team = if (capabilities.teamManaged && backgroundJobId != null)
+                teamSchemas?.invoke().orEmpty() else emptyList()
+            val nested = if (canDelegateNested) nestedReadonlySchemas?.invoke().orEmpty() else emptyList()
+            return JsonArray(normal + team + nested)
         }
         val initialToolSchemas = executionSchemas(
             allowMutation,
@@ -336,6 +350,7 @@ internal class LocalSubagentRunner(
             put("continuable", capabilities.continuable)
             put("history_mode", capabilities.historyMode.name.lowercase())
             put("max_depth", capabilities.maxDepth)
+            put("depth", capabilities.depth)
             capabilities.toolAllowlist?.let { allowlist ->
                 put("tool_allowlist", JsonArray(allowlist.sorted().map(::JsonPrimitive)))
             }
@@ -621,7 +636,73 @@ internal class LocalSubagentRunner(
                             )
                         } else withContext(LocalModelRunContext(runProfile)) {
                         currentCoroutineContext().ensureActive()
-                        if (capabilities.teamManaged && call.name in LocalAgentTeamContract.TOOL_NAMES) {
+                        if (canDelegateNested && call.name == "subagent") {
+                            try {
+                                val invalidKeys = call.arguments.keys -
+                                    setOf("task", "instructions", "role", "max_steps")
+                                require(invalidKeys.isEmpty()) { "NESTED_DELEGATION_FIELDS_BLOCKED" }
+                                require(resourceScheduler.snapshot().availableAgentSlots > 0) {
+                                    "NESTED_DELEGATION_NO_AGENT_SLOT"
+                                }
+                                val childTask = call.arguments["task"]?.jsonPrimitive?.contentOrNull
+                                    ?.takeIf(String::isNotBlank)
+                                    ?: error("NESTED_DELEGATION_TASK_REQUIRED")
+                                val childSteps = call.arguments["max_steps"]?.jsonPrimitive?.intOrNull
+                                    ?: minOf(maxSteps, 12)
+                                require(childSteps in 1..minOf(maxSteps, 24)) {
+                                    "NESTED_DELEGATION_STEP_BUDGET_EXCEEDED"
+                                }
+                                val rawInstructions = call.arguments["instructions"]?.jsonPrimitive
+                                    ?.contentOrNull.orEmpty()
+                                val role = bindLocalAgentRole(
+                                    requested = call.arguments["role"]?.jsonPrimitive?.contentOrNull,
+                                    userInstructions = rawInstructions,
+                                    parentMutationAllowed = false,
+                                )
+                                val parent = requireNotNull(captureLocalAgentParentLink(call.id)) {
+                                    "NESTED_DELEGATION_REQUIRES_LIVE_PARENT_RUN"
+                                }
+                                subtreeBudget.claim()
+                                val childSpec = LocalSubagentLaunchSpec(
+                                    task = childTask,
+                                    instructions = role.instructions,
+                                    modelOverride = runProfile.id,
+                                    maxSteps = childSteps,
+                                    parentLink = parent,
+                                    capabilities = capabilities.copy(
+                                        allowMutation = false,
+                                        continuable = false,
+                                        virtualScreen = false,
+                                        historyMode = LocalSubagentHistoryMode.ISOLATED,
+                                        depth = capabilities.depth + 1,
+                                        teamManaged = false,
+                                        outputSchema = null,
+                                        initialOptionalTools = emptySet(),
+                                    ),
+                                )
+                                val child = withTimeoutOrNull(30_000L) {
+                                    runResult(
+                                        spec = childSpec,
+                                        executionFence = executionFence,
+                                        subtreeBudget = subtreeBudget,
+                                    )
+                                }
+                                if (child == null) AgentToolResult(
+                                    content = "NESTED_DELEGATION_TIMEOUT：下级子代理已超时取消",
+                                    isError = true,
+                                ) else AgentToolResult(
+                                    content = child.output,
+                                    isError = child.status != LocalSubagentStatus.COMPLETED,
+                                )
+                            } catch (error: CancellationException) {
+                                throw error
+                            } catch (error: Exception) {
+                                AgentToolResult(
+                                    content = "NESTED_DELEGATION_REJECTED：" + error.message.orEmpty(),
+                                    isError = true,
+                                )
+                            }
+                        } else if (capabilities.teamManaged && call.name in LocalAgentTeamContract.TOOL_NAMES) {
                             requireNotNull(executeTeamTool) { "TEAM_CALLER_UNAVAILABLE" }(
                                 requireNotNull(backgroundJobId), call.toLocalToolCall(),
                             )

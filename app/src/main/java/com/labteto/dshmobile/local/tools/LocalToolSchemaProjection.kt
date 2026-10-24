@@ -54,6 +54,23 @@ internal class LocalToolSchemaProjection(
         })
     }
 
+    /** Narrow recursive child schema: no write, route change, background, or device operations. */
+    fun nestedReadOnlySubagentSchemas(): JsonArray {
+        val tool = registry.get("subagent") ?: return JsonArray(emptyList())
+        val raw = LocalToolRouter.selectSchemas(listOf(tool), emptySet())
+            .schemas.firstOrNull() as? JsonObject ?: return JsonArray(emptyList())
+        val fn = raw["function"] as? JsonObject ?: return JsonArray(emptyList())
+        val params = fn["parameters"] as? JsonObject ?: return JsonArray(emptyList())
+        val properties = params["properties"] as? JsonObject ?: return JsonArray(emptyList())
+        val nestedProps = JsonObject(properties.filterKeys {
+            it in setOf("task", "instructions", "role", "max_steps")
+        })
+        return JsonArray(listOf(JsonObject(raw + ("function" to JsonObject(fn + mapOf(
+            "description" to JsonPrimitive("受控只读下级研究代理：隔离上下文、固定模型及有限递归深度"),
+            "parameters" to JsonObject(params + ("properties" to nestedProps)),
+        ))))))
+    }
+
     fun subagentSchemas(
         allowMutation: Boolean,
         allowVirtualScreen: Boolean,

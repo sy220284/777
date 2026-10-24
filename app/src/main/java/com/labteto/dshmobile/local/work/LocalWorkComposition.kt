@@ -118,6 +118,7 @@ internal class LocalWorkComposition @Inject constructor(
         LocalSubagentRunnerFactory(
             modelGateway = modelGateway,
             teamSchemas = { tools.schemas.teamMemberSchemas() },
+            nestedReadonlySchemas = { tools.schemas.nestedReadOnlySubagentSchemas() },
             executeTeamTool = { sessionId, jobId, call ->
                 AgentToolResult(agentTeams.executeMember(sessionId, jobId, call))
             },

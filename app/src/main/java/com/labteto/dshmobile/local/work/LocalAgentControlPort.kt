@@ -17,6 +17,7 @@ internal data class LocalAgentDispatchRequest(
     val modelOverride: String?,
     val maxSteps: Int,
     val parentToolCallId: String,
+    val maxDepth: Int = 1,
     val allowMutation: Boolean = false,
     val historyMode: LocalSubagentHistoryMode = LocalSubagentHistoryMode.ISOLATED,
     val virtualScreen: Boolean = false,
@@ -25,6 +26,11 @@ internal data class LocalAgentDispatchRequest(
 ) {
     init {
         require(task.isNotBlank() && parentToolCallId.isNotBlank()) { "AGENT_DELEGATION_REQUEST_INVALID" }
+        require(maxDepth in 1..3) { "AGENT_DELEGATION_DEPTH_INVALID" }
+        require(maxDepth == 1 || kind == LocalAgentDispatchKind.READONLY_FOREGROUND) {
+            "AGENT_RECURSION_ONLY_FOREGROUND_READONLY"
+        }
+        require(maxDepth == 1 || !virtualScreen) { "AGENT_RECURSION_VIRTUAL_SCREEN_BLOCKED" }
         require(kind == LocalAgentDispatchKind.FORK || !allowMutation) { "READONLY_DELEGATION_CANNOT_MUTATE" }
         require(kind != LocalAgentDispatchKind.FORK || historyMode == LocalSubagentHistoryMode.INHERIT_PARENT) {
             "FORK_REQUIRES_PARENT_HISTORY"
@@ -80,6 +86,7 @@ internal class LocalWorkAgentControlRuntime(
                         request.historyMode == LocalSubagentHistoryMode.INHERIT_PARENT
                     },
                     historyMode = request.historyMode,
+                    maxDepth = request.maxDepth,
                     virtualScreen = request.virtualScreen,
                     toolAllowlist = request.toolAllowlist,
                     outputSchema = request.outputSchema,
