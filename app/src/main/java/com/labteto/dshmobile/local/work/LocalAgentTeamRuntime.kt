@@ -134,6 +134,9 @@ internal data class LocalTeamTaskSnapshot(
     val autoDispatchMessageId: String? = null,
     /** USER instruction revision that authorized the current task owner; absent on legacy events. */
     val rootUserRevision: Long? = null,
+    /** Persisted proof pointer fixed at the Task complete transition, never a model assertion. */
+    val completionResultId: String? = null,
+    val completionEvidenceSequence: Long? = null,
 )
 
 @Serializable
@@ -1599,17 +1602,21 @@ internal class LocalAgentTeamRuntime(
                         ?: error("TEAM_TASK_RESULT_REQUIRED：complete 必须提供已核验的 result_id")
                     val owner = state.members.singleOrNull { it.id == current.ownerId }
                         ?: error("TEAM_TASK_OWNER_REQUIRED：任务负责人不存在")
-                    require(hasFreshTaskResult(sessionId, current, owner.jobId, verifiedResultId)) {
-                        "TEAM_TASK_RESULT_STALE：结果必须属于当前负责人且晚于当前任务 revision"
-                    }
-                    next.copy(status = LocalTeamTaskStatus.COMPLETED, autoDispatchMessageId = null)
+                    val evidence = findFreshTaskResult(sessionId, current, owner.jobId, verifiedResultId)
+                        ?: error("TEAM_TASK_RESULT_STALE：结果必须属于当前负责人且晚于当前任务 revision")
+                    next.copy(
+                        status = LocalTeamTaskStatus.COMPLETED, autoDispatchMessageId = null,
+                        completionResultId = verifiedResultId,
+                        completionEvidenceSequence = evidence.sequence,
+                    )
                 }
                 "reopen" -> {
                     require(current.status == LocalTeamTaskStatus.COMPLETED) {
                         "TEAM_TASK_STATUS_INVALID：只有 completed 任务可以 reopen"
                     }
                     next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null, autoDispatchMessageId = null,
-                        rootUserRevision = null)
+                        rootUserRevision = null,
+                        completionResultId = null, completionEvidenceSequence = null)
                 }
                 "reassign" -> {
                     require(
@@ -1736,22 +1743,30 @@ internal class LocalAgentTeamRuntime(
         task: LocalTeamTaskSnapshot,
         jobId: String,
         resultId: String? = null,
-    ): Boolean {
+    ): Boolean = findFreshTaskResult(sessionId, task, jobId, resultId) != null
+
+    /** Return the exact existing durable evidence, not just a Boolean success claim. */
+    private fun findFreshTaskResult(
+        sessionId: String,
+        task: LocalTeamTaskSnapshot,
+        jobId: String,
+        resultId: String? = null,
+    ): LocalSessionEventLog.Event? {
         val log = eventLogFor(sessionId)
         val taskSequence = log.latestMatching(setOf(TEAM_TASK_EVENT)) { data ->
             val raw = data["task"] as? JsonObject ?: return@latestMatching false
             raw["id"]?.jsonPrimitive?.contentOrNull == task.id &&
                 raw["revision"]?.jsonPrimitive?.intOrNull == task.revision
-        }?.sequence ?: return false
+        }?.sequence ?: return null
         var before = Long.MAX_VALUE
         while (true) {
             val event = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT), before) { data ->
                 data["background_job_id"]?.jsonPrimitive?.contentOrNull == jobId &&
                     (resultId == null || resultIdentity(data) == resultId) &&
                     !data["terminal_output"]?.jsonPrimitive?.contentOrNull.isNullOrBlank()
-            } ?: return false
-            if (event.sequence <= taskSequence) return false
-            if (isFirstResultCheckpoint(log, event)) return true
+            } ?: return null
+            if (event.sequence <= taskSequence) return null
+            if (isFirstResultCheckpoint(log, event)) return event
             before = event.sequence
         }
     }
