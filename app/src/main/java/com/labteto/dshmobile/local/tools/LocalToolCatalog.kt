@@ -257,6 +257,11 @@ object LocalToolCatalog {
         add(tool("agent_inspect", "检查当前 Work 会话后台 Agent 的身份、运行状态、消息数、持久恢复类型和摘要；状态输出并非最终成果验收", properties(
             "agent_id" to string("当前 Work 会话中的后台代理编号"),
         ), listOf("agent_id")))
+        add(tool("agent_watch", "有界观察指定 Agent 的 Job 状态变化；先用 agent_inspect 获取 observation_cursor，再传入游标等待；无变化不会冒充轮次完成或消息消费", properties(
+            "agent_id" to string("当前 Work 会话中的后台代理编号"),
+            "after_cursor" to string("之前 agent_inspect/agent_watch 返回的 observation_cursor"),
+            "wait_ms" to integer("最长等待毫秒，0–20000，默认0；可取消，超时返回 changed=false"),
+        ), listOf("agent_id", "after_cursor")))
         add(tool("agent_resume", "仅请求已中断或 dormant 的持久只读代理通过既有恢复检查点重新激活；需要待处理 Inbox 消息或安全暂停执行片；返回的是请求回执，不代表轮次已被准入", properties(
             "agent_id" to string("当前 Work 会话中的持久可恢复代理编号"),
         ), listOf("agent_id")))
