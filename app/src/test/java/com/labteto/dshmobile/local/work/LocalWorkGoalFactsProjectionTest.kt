@@ -24,8 +24,39 @@ class LocalWorkGoalFactsProjectionTest {
             val projection = LocalWorkOpenGraphProjection(maxCachedFacts = 4)
             val first = projection.jobResult(log, "job-0")!!
             assertTrue(projection.cachedFactCount() <= 4)
+            assertEquals(11L, projection.indexedThroughSequence())
             assertEquals(first, projection.jobResult(log, "job-0"))
+            assertEquals(0, projection.lastRefreshEvents)
             assertEquals(11L, projection.jobResult(log, "job-11")!!.sequence)
+            assertEquals(0, projection.lastRefreshEvents)
+            assertTrue(projection.cachedFactCount() <= 4)
+            log.append("taskgraph/job-result", buildJsonObject {
+                put("job_id", "job-12"); put("graph_execution_id", "graph-12")
+            })
+            assertEquals(12L, projection.jobResult(log, "job-12")!!.sequence)
+            assertEquals(1, projection.lastRefreshEvents)
+            assertEquals(12L, projection.indexedThroughSequence())
+        } finally { log.close() }
+    }
+
+    @Test fun thousandsOfClosedJobsRetainCursorAndNeverFullReplayOnRepeatedQueries() {
+        val log = LocalSessionEventLog(File(temporary.root, "long-cold-history.jsonl"), Json)
+        try {
+            repeat(5_000) { n ->
+                log.append("taskgraph/job-result", buildJsonObject {
+                    put("job_id", "job-$n")
+                    put("graph_execution_id", "execution-$n")
+                })
+            }
+            val projection = LocalWorkOpenGraphProjection(maxCachedFacts = 4)
+            assertEquals(0L, projection.jobResult(log, "job-0")!!.sequence)
+            assertEquals(5_000, projection.lastRefreshEvents)
+            assertEquals(4_999L, projection.indexedThroughSequence())
+            repeat(3) {
+                assertEquals(0L, projection.jobResult(log, "job-0")!!.sequence)
+                assertEquals(4_999L, projection.jobResult(log, "job-4999")!!.sequence)
+                assertEquals(0, projection.lastRefreshEvents)
+            }
             assertTrue(projection.cachedFactCount() <= 4)
         } finally { log.close() }
     }
