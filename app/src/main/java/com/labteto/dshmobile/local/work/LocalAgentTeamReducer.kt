@@ -6,6 +6,8 @@ import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.MAX_BLOCKERS
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.MAX_DESCRIPTION_CHARS
