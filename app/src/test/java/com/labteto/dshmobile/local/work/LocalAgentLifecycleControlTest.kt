@@ -55,6 +55,16 @@ class LocalAgentLifecycleControlTest {
         }.isFailure)
     }
 
+    @Test fun observationCursorTracksStateAndMailboxWithoutMakingCompletionClaims() {
+        val running = info(status = "running", pending = 0).copy(updatedAt = 100L)
+        val interrupted = running.copy(status = "interrupted")
+        val queued = interrupted.copy(pendingMessageCount = 1)
+        assertEquals(localAgentObservationCursor(running), localAgentObservationCursor(running))
+        assertTrue(localAgentObservationCursor(running) != localAgentObservationCursor(interrupted))
+        assertTrue(localAgentObservationCursor(interrupted) != localAgentObservationCursor(queued))
+        assertTrue(localAgentObservationCursor(queued).contains("job-agent-one"))
+    }
+
     @Test fun resumeRequiresCompatiblePersistedChildAndRealWorkOrWaitingSlice() {
         validateAgentResumeAdmission(info(), snapshot())
         validateAgentResumeAdmission(info(status = "waiting_slice", pending = 0), snapshot())
