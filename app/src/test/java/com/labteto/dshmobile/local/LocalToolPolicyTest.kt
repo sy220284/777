@@ -59,6 +59,19 @@ class LocalToolPolicyTest {
         assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope("team_respond_shutdown"))
     }
 
+    @Test fun agentLifecycleControlHasExplicitReadVsMutationAndApprovalBoundary() {
+        for (read in listOf("agent_inspect", "agent_watch")) {
+            assertEquals(ToolAccess.READ_ONLY, LocalToolPolicy.access(read))
+            assertEquals(LocalAutoApprovalScope.READ_ONLY, LocalToolPolicy.autoApprovalScope(read))
+            assertEquals(ToolApprovalPolicy.NEVER, LocalToolPolicy.approval(read))
+        }
+        for (control in listOf("interrupt_agent", "agent_resume", "agent_close")) {
+            assertEquals(ToolAccess.AGENT_CONTROL, LocalToolPolicy.access(control))
+            assertEquals(ToolApprovalPolicy.ALWAYS, LocalToolPolicy.approval(control))
+            assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope(control))
+        }
+    }
+
     @Test fun memberMessageAcknowledgementHasExplicitNarrowAgentControlPolicy() {
         assertEquals(ToolAccess.AGENT_CONTROL, LocalToolPolicy.access("team_ack_message"))
         assertEquals(ToolExposure.OPTIONAL, LocalToolPolicy.exposure("team_ack_message"))
