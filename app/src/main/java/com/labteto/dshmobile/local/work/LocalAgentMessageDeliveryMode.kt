@@ -25,7 +25,9 @@ internal fun shouldWakeAgentAfterAcceptedMessage(
     mode: LocalAgentMessageDeliveryMode,
     accepted: Boolean,
     requiresResume: Boolean,
-): Boolean = accepted && requiresResume && mode == LocalAgentMessageDeliveryMode.TRIGGER_TURN
+    duplicate: Boolean = false,
+): Boolean = accepted && !duplicate && requiresResume &&
+    mode == LocalAgentMessageDeliveryMode.TRIGGER_TURN
 
 /**
  * A durable acceptance receipt. It explicitly does not promise execution, consumption or
@@ -40,7 +42,9 @@ internal fun renderLocalAgentMessageSubmission(
     rejection: String? = null,
 ): String {
     require(messageId.isNotBlank()) { "AGENT_MESSAGE_ID_REQUIRED" }
-    val wakeRequested = shouldWakeAgentAfterAcceptedMessage(mode, accepted, requiresResume)
+    val wakeRequested = shouldWakeAgentAfterAcceptedMessage(
+        mode, accepted, requiresResume, duplicate,
+    )
     return buildString {
         append("message_id=").append(messageId)
         append("\naccepted=").append(accepted)

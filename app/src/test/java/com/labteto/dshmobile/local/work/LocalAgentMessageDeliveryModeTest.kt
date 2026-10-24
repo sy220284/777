@@ -76,6 +76,24 @@ class LocalAgentMessageDeliveryModeTest {
         assertTrue(receipt.contains("processing_status=unverified"))
     }
 
+    @Test fun duplicateDurableInboxAdmissionMustNotCreateAnotherWakeRequest() {
+        val mode = LocalAgentMessageDeliveryMode.TRIGGER_TURN
+        assertFalse(shouldWakeAgentAfterAcceptedMessage(
+            mode, accepted = true, requiresResume = true, duplicate = true,
+        ))
+        val receipt = renderLocalAgentMessageSubmission(
+            messageId = "msg-same",
+            mode = mode,
+            accepted = true,
+            duplicate = true,
+            requiresResume = true,
+        )
+        assertTrue(receipt.contains("accepted=true"))
+        assertTrue(receipt.contains("duplicate=true"))
+        assertTrue(receipt.contains("wake_requested=false"))
+        assertTrue(receipt.contains("processing_status=unverified"))
+    }
+
     @Test fun unknownDeliveryModeFailsClosedBeforeAnyJobSideEffect() {
         for (input in listOf("wake", "resume", "force", "root", "none")) {
             assertTrue(input, runCatching {

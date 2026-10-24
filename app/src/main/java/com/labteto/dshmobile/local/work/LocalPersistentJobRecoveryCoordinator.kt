@@ -275,7 +275,9 @@ internal class LocalPersistentJobRecoveryCoordinator(
         mode: LocalAgentMessageDeliveryMode = LocalAgentMessageDeliveryMode.TRIGGER_TURN,
     ): JobMessageAdmission {
         val result = jobs.sendInput(agentId, input, sessionId)
-        if (shouldWakeAgentAfterAcceptedMessage(mode, result.accepted, result.requiresResume)) {
+        if (shouldWakeAgentAfterAcceptedMessage(
+            mode, result.accepted, result.requiresResume, result.duplicate,
+        )) {
             schedule(sessionId)
         }
         return result
