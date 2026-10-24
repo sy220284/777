@@ -575,6 +575,9 @@ internal class LocalSubagentRunner(
                             step = modelStep,
                             durableHistory = history,
                         ).also {
+                            // An ancestor may lose its Run while a remote model request is in flight.
+                            // Discard the late reply before usage/history/ToolStarted can commit.
+                            executionFence()
                             if (nativeImagesSent) {
                                 onNativeImageAccepted(snapshot.modelState.baseUrl, routeModel)
                             }
@@ -651,6 +654,12 @@ internal class LocalSubagentRunner(
                                     resourceScheduler.snapshot().availableAgentSlots
                                 },
                                 captureParent = { toolId -> captureLocalAgentParentLink(toolId) },
+                                ensureParentOwner = {
+                                    executionFence()
+                                    runContext?.let { parentContext ->
+                                        runCoordinator?.ensureCurrentOwner(parentContext)
+                                    }
+                                },
                                 runChild = { childSpec, sharedBudget ->
                                     requireNotNull(newNestedRunner) {
                                         "NESTED_DELEGATION_RUNNER_UNAVAILABLE"

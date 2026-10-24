@@ -26,6 +26,7 @@ internal suspend fun dispatchLocalNestedSubagent(
     subtreeBudget: LocalAgentSubtreeBudget,
     availableAgentSlots: () -> Int,
     captureParent: suspend (toolCallId: String) -> LocalAgentParentLink?,
+    ensureParentOwner: () -> Unit = {},
     runChild: suspend (LocalSubagentLaunchSpec, LocalAgentSubtreeBudget) -> LocalSubagentResult,
     executionDeadlineOverrideMillis: Long? = null,
 ): AgentToolResult {
@@ -33,6 +34,7 @@ internal suspend fun dispatchLocalNestedSubagent(
         require(call.name == "subagent") { "NESTED_DELEGATION_TOOL_INVALID" }
         val parsed = parseLocalNestedDelegation(call.arguments, parentMaxSteps)
         val childCapabilities = compileNestedReadonlyCapabilities(parentCapabilities)
+        ensureParentOwner()
         require(availableAgentSlots() > 0) { "NESTED_DELEGATION_NO_AGENT_SLOT" }
         val parent = requireNotNull(captureParent(call.id)) {
             "NESTED_DELEGATION_REQUIRES_LIVE_PARENT_RUN"
@@ -53,6 +55,8 @@ internal suspend fun dispatchLocalNestedSubagent(
         val result = withTimeoutOrNull(deadline) {
             runChild(child, subtreeBudget)
         }
+        // Reject a late success after the caller's Run lease was superseded or cancelled.
+        ensureParentOwner()
         return if (result == null) AgentToolResult(
             content = "NESTED_DELEGATION_TIMEOUT：下级子代理已超时取消",
             isError = true,

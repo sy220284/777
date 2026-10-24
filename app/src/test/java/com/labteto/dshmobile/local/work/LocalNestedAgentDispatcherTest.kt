@@ -94,6 +94,63 @@ class LocalNestedAgentDispatcherTest {
         assertEquals(0, budget.used())
     }
 
+    @Test fun parentLeaseRevocationAfterChildResultRejectsLateSuccess() = runBlocking {
+        var stillOwner = true
+        var ran = false
+        val budget = LocalAgentSubtreeBudget(maxDescendants = 2)
+        try {
+            dispatchLocalNestedSubagent(
+                call = call(),
+                parentCapabilities = LocalSubagentCapabilities(maxDepth = 2),
+                parentProfileId = "fixed-model",
+                parentMaxSteps = 5,
+                subtreeBudget = budget,
+                availableAgentSlots = { 2 },
+                captureParent = { LocalAgentParentLink("s", "old-run", "slot") },
+                ensureParentOwner = {
+                    if (!stillOwner) throw kotlinx.coroutines.CancellationException("old owner revoked")
+                },
+                runChild = { _, _ ->
+                    ran = true
+                    stillOwner = false
+                    LocalSubagentResult(LocalSubagentStatus.COMPLETED, "stale success")
+                },
+            )
+            error("late success must not reach the caller")
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            assertTrue(cancelled.message.orEmpty().contains("revoked"))
+        }
+        assertTrue(ran)
+        assertEquals(1, budget.used())
+    }
+
+    @Test fun parentLeaseRevocationBeforeAdmissionCannotStartChild() = runBlocking {
+        val budget = LocalAgentSubtreeBudget()
+        var ran = false
+        try {
+            dispatchLocalNestedSubagent(
+                call = call(),
+                parentCapabilities = LocalSubagentCapabilities(maxDepth = 2),
+                parentProfileId = "fixed-model",
+                parentMaxSteps = 5,
+                subtreeBudget = budget,
+                availableAgentSlots = { 2 },
+                captureParent = { LocalAgentParentLink("s", "old-run", "slot") },
+                ensureParentOwner = {
+                    throw kotlinx.coroutines.CancellationException("revoked before admit")
+                },
+                runChild = { _, _ ->
+                    ran = true
+                    LocalSubagentResult(LocalSubagentStatus.COMPLETED, "should not run")
+                },
+            )
+            error("revoked owner must fail closed")
+        } catch (_: kotlinx.coroutines.CancellationException) {
+            assertFalse(ran)
+            assertEquals(0, budget.used())
+        }
+    }
+
     @Test fun scriptedChildTimeoutProducesExplicitFailureAndLeavesOwnershipToParent() = runBlocking {
         val budget = LocalAgentSubtreeBudget()
         val result = dispatchLocalNestedSubagent(
