@@ -8,6 +8,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 
+/** A bounded historical stream listing, independent of the current foreground adapter LRU. */
+internal data class LocalHistoricalSessionSource(
+    val id: String,
+    val identity: String,
+    val size: Long,
+    val modifiedAt: Long,
+)
+
 /**
  * Process-local owner for Session EventLog adapters.
  *
@@ -49,6 +57,31 @@ class LocalSessionEventLogRegistry internal constructor(
                 sessionId = sessionId,
             )
         }
+
+    /** Report the authority's durable historical sessions without touching the active adapter LRU. */
+    internal fun historicalSources(): List<LocalHistoricalSessionSource> =
+        sessionsRoot.listFiles().orEmpty().asSequence()
+            .filter { it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) &&
+                it.name.endsWith(".events.jsonl") }
+            .map { file ->
+                val identity = java.nio.file.Files.readAttributes(
+                    file.toPath(), java.nio.file.attribute.BasicFileAttributes::class.java,
+                    java.nio.file.LinkOption.NOFOLLOW_LINKS,
+                ).fileKey()?.toString() ?: file.canonicalPath
+                LocalHistoricalSessionSource(file.name.removeSuffix(".events.jsonl"),
+                    identity, file.length(), file.lastModified())
+            }.sortedBy { it.id }.toList()
+
+    /** Scoped native adapter; historical scans must not evict a live foreground event log. */
+    internal fun <T> readHistorical(sessionId: String, block: (LocalSessionEventLog) -> T): T {
+        require(sessionId.isNotBlank() && '/' !in sessionId && '\\' !in sessionId && ".." !in sessionId) {
+            "Invalid historical session identity"
+        }
+        val reader = LocalSessionEventLog(
+            File(sessionsRoot, "${sessionId}.events.jsonl"), json, sessionId = sessionId,
+        )
+        return try { block(reader) } finally { reader.close() }
+    }
 
     /**
      * Reset a deleted path before evicting it so the core shared sequence cursor cannot survive a
