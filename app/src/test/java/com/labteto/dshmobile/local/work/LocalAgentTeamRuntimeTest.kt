@@ -2525,6 +2525,21 @@ class LocalAgentTeamRuntimeTest {
         assertNull(state.failure)
         assertEquals(LocalTeamTaskStatus.COMPLETED, state.tasks.first { it.id == "task-1" }.status)
         assertEquals(3, state.tasks.first { it.id == "task-1" }.revision)
+        val proof = state.tasks.first { it.id == "task-1" }
+        assertEquals("verified", proof.completionResultId)
+        val checkpoint = f.log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
+            data["result_id"]?.jsonPrimitive?.contentOrNull == "verified"
+        }
+        assertEquals(checkpoint?.sequence, proof.completionEvidenceSequence)
+        val cold = LocalAgentTeamRuntime(
+            f.jobs, { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
+            { _, _, _ -> JobMessageAdmission(false, false, false, "unused") },
+            { f.log }, SessionProjectionRegistry(),
+        )
+        val recovered = cold.project(session).tasks.first { it.id == "task-1" }
+        assertEquals(proof.completionResultId, recovered.completionResultId)
+        assertEquals(proof.completionEvidenceSequence, recovered.completionEvidenceSequence)
+        assertNull(recovered.completionResultId?.takeIf { it != "verified" })
     }
 
     @Test
