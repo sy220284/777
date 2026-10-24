@@ -31,6 +31,7 @@ import com.labteto.dshmobile.local.agent.withLocalSubagentAgentSlot
 import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.modelMessageForAgentInput
+import com.labteto.dshmobile.local.agent.orderLocalTeamInboxBatch
 import com.labteto.dshmobile.local.agent.toJson
 import com.labteto.dshmobile.local.agent.LocalSubagentModelStepExecutor
 import com.labteto.dshmobile.local.agent.validateLocalSubagentLaunchSpec
@@ -511,8 +512,11 @@ internal class LocalSubagentRunner(
                     executionFence()
                     currentCoroutineContext().ensureActive()
                     backgroundJobId?.let { jobId ->
-                        val queuedMessages = jobs.peekMessages(jobId)
+                        val freshInputs = jobs.peekMessages(jobId)
                             .filterNot { message -> message.id in claimedMessageIds }
+                        val queuedMessages = if (capabilities.teamManaged) {
+                            orderLocalTeamInboxBatch(freshInputs, runSessionId())
+                        } else freshInputs
                         if (queuedMessages.isNotEmpty()) {
                             eventLog().append(
                                 LOCAL_SUBAGENT_INBOX_CLAIM_EVENT,
