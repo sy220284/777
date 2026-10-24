@@ -35,6 +35,7 @@ class LocalWorkAgentControlBuiltinRuntimeTest {
                 "team_task_create",
                 "team_task_get",
                 "team_task_evidence",
+                "team_task_review",
                 "team_task_list",
                 "team_task_update",
                 "team_interrupt",
