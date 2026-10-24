@@ -2284,6 +2284,56 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun newerUserInstructionRejectsPreviouslyAuthorizedTeamResult() = runBlocking {
+        val session = "team-root-authorization"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        startLiveChild(f, session)
+        f.log.append("user/message", buildJsonObject { put("content", "先执行旧任务") })
+        val originalRevision = workflowUserRevision(f.log)
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 1, emptyList()))
+        val reserved = LocalTeamTaskSnapshot(
+            id = "task-1", revision = 2, subject = "task-1", description = "",
+            status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = "member-1",
+            rootUserRevision = originalRevision,
+        )
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { reserved.toEvent(session) })
+        f.log.append("subagent/tool-result", buildJsonObject {
+            put("background_job_id", "job-team-1")
+            put("id", "old-work-result")
+            put("name", "read")
+            put("is_error", false)
+            put("content", "实际工具观测结果")
+        })
+        assertEquals(originalRevision, workflowUserRevision(f.log))
+        // Even a newer child result cannot override an intervening USER instruction.
+        f.log.append("user/message", buildJsonObject { put("content", "撤销旧任务，改做别的") })
+        assertTrue(workflowUserRevision(f.log) > originalRevision)
+        f.log.append(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint("job-team-1", "sa-team-1", 3,
+                emptyList(), emptySet(), terminalOutput = "过期的结果", resultId = "stale-after-user"))
+        val binding = teamBinding(f, session)
+        val result = runCatching {
+            f.runtime.execute(LocalToolCall("complete-stale", "team_task_update", buildJsonObject {
+                put("task_id", "task-1")
+                put("expected_revision", 2)
+                put("action", "complete")
+                put("result_id", "stale-after-user")
+            }, "{}"), binding)
+        }
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message.orEmpty()
+            .contains("TEAM_TASK_ROOT_INSTRUCTION_SUPERSEDED"))
+        val unchanged = f.runtime.project(session).tasks.single()
+        assertEquals(LocalTeamTaskStatus.IN_PROGRESS, unchanged.status)
+        assertEquals(2, unchanged.revision)
+        assertEquals(originalRevision, unchanged.rootUserRevision)
+        assertNull(f.runtime.project(session).failure)
+    }
+
+    @Test
     fun completionRequiresFreshOwnedResultAndUnlocksDependencyOnlyAfterVerification() = runBlocking {
         val session = "team-verified-complete"
         val fixture = fixture(session)
