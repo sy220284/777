@@ -2,10 +2,12 @@ package com.labteto.dshmobile.local.model
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import com.labteto.dshmobile.local.persistence.DurableFileCommit
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.LinkOption
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.serialization.json.Json
@@ -27,8 +29,20 @@ internal class LocalMediaStudioBackupInstaller(
     private val json: Json,
 ) {
     fun install(staging: File): Int {
-        val archive = LocalMediaStudioBackupSnapshot(context, json).validate(staging)
         val database = context.getDatabasePath("local_media_v1.db")
+        val cleanup = File(staging.parentFile, ".installed-${staging.name}")
+        // Renaming a fully installed stage is the commit boundary. After that,
+        // deletion is garbage collection and no longer needs the staged manifest.
+        if (cleanup.exists()) {
+            check(!staging.exists() && cleanup.isDirectory && !Files.isSymbolicLink(cleanup.toPath())) {
+                "媒体恢复暂存与已提交清理目录冲突"
+            }
+            val count = installedCount(database)
+            check(cleanup.deleteRecursively()) { "媒体已恢复，残留目录清理未完成，可再次清理" }
+            DurableFileCommit.syncDirectory(requireNotNull(cleanup.parentFile))
+            return count
+        }
+        val archive = LocalMediaStudioBackupSnapshot(context, json).validate(staging)
         val targetMedia = File(context.filesDir, "media-studio")
         check(!Files.isSymbolicLink(staging.toPath()) &&
             !Files.isSymbolicLink(context.filesDir.toPath()) &&
@@ -63,10 +77,7 @@ internal class LocalMediaStudioBackupInstaller(
             "无法建立媒体成果恢复目录"
         }
         val marker = File(staging, "INSTALLING")
-        if (!marker.exists()) FileOutputStream(marker).use { stream ->
-            stream.write("media-studio-v1".toByteArray(Charsets.UTF_8))
-            stream.fd.sync()
-        }
+        if (!marker.exists()) DurableFileCommit.replace(marker, "media-studio-v1".toByteArray(Charsets.UTF_8))
         check(marker.readText(Charsets.UTF_8) == "media-studio-v1") {
             "媒体恢复事务标记损坏，停止安装"
         }
@@ -95,6 +106,7 @@ internal class LocalMediaStudioBackupInstaller(
                 "媒体恢复目标文件校验失败：${destination.name}"
             }
         }
+        DurableFileCommit.syncDirectory(targetMedia)
         if (!Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)) {
             val temp = File(database.parentFile, database.name + ".restore-${UUID.randomUUID()}")
             try {
@@ -117,18 +129,23 @@ internal class LocalMediaStudioBackupInstaller(
         check(sameBytes(database, archive.database)) {
             "媒体数据库恢复后校验失败"
         }
-        // The staged archive remains intact if a process dies before cleanup.
-        // On next process start, a byte-identical target can finish cleanup.
-        val restoredCount = SQLiteDatabase.openDatabase(
-            database.path, null, SQLiteDatabase.OPEN_READONLY,
-        ).use { db ->
-            db.rawQuery("SELECT COUNT(*) FROM media WHERE deleted=0", null).use { rows ->
-                check(rows.moveToFirst()) { "媒体备份结果行数无法核实" }
-                rows.getInt(0)
-            }
-        }
-        check(staging.deleteRecursively()) { "媒体已恢复但待处理快照无法清除，请勿重复导入" }
+        DurableFileCommit.syncDirectory(requireNotNull(database.parentFile))
+        val restoredCount = installedCount(database)
+        Files.move(staging.toPath(), cleanup.toPath(), StandardCopyOption.ATOMIC_MOVE)
+        DurableFileCommit.syncDirectory(requireNotNull(cleanup.parentFile))
+        check(cleanup.deleteRecursively()) { "媒体已恢复，残留目录清理未完成，可再次清理" }
+        DurableFileCommit.syncDirectory(requireNotNull(cleanup.parentFile))
         return restoredCount
+    }
+
+    private fun installedCount(database: File): Int = SQLiteDatabase.openDatabase(
+        database.path, null, SQLiteDatabase.OPEN_READONLY,
+    ).use { db ->
+        LocalMediaDatabase.validateBackupStructure(db)
+        db.rawQuery("SELECT COUNT(*) FROM media WHERE deleted=0", null).use { rows ->
+            check(rows.moveToFirst()) { "媒体备份结果行数无法核实" }
+            rows.getInt(0)
+        }
     }
 
     private fun sameBytes(a: File, b: File): Boolean =

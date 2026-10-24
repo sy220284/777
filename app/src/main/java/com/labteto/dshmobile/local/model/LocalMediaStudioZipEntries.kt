@@ -72,6 +72,10 @@ internal class LocalMediaStudioZipEntries(
         init {
             check(!Files.isSymbolicLink(stage.toPath()) &&
                 (stage.isDirectory || stage.mkdirs())) { "媒体 ZIP 暂存目录不安全" }
+            // An empty/text-only archive has no media member to create this directory.
+            val media = File(stage, MEDIA_ENTRY)
+            check(!Files.isSymbolicLink(media.toPath()) &&
+                (media.isDirectory || media.mkdirs())) { "媒体 ZIP 原件暂存目录无法创建" }
         }
 
         fun accept(entry: ZipEntry, zip: ZipInputStream) {

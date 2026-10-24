@@ -135,6 +135,7 @@ internal class LocalMediaStudioBackupSnapshot(
         return SQLiteDatabase.openDatabase(
             snapshot.path, null, SQLiteDatabase.OPEN_READONLY,
         ).use { db ->
+            LocalMediaDatabase.validateBackupStructure(db)
             db.rawQuery("PRAGMA quick_check", null).use { rows ->
                 check(rows.moveToFirst() && rows.getString(0) == "ok") {
                     "媒体成果 SQLite 完整性检查失败"

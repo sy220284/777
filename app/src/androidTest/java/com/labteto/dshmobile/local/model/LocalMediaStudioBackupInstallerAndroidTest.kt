@@ -24,7 +24,9 @@ class LocalMediaStudioBackupInstallerAndroidTest {
 
     private fun sandbox(root: File): Context = object : ContextWrapper(base) {
         override fun getFilesDir(): File = root
-        override fun getDatabasePath(name: String): File = File(root, "databases/$name")
+        override fun getDatabasePath(name: String): File = File(root, "databases/$name").also {
+            check(it.parentFile!!.isDirectory || it.parentFile!!.mkdirs())
+        }
         override fun openOrCreateDatabase(
             name: String, mode: Int, factory: SQLiteDatabase.CursorFactory?,
         ): SQLiteDatabase = openOrCreateDatabase(name, mode, factory, null)
@@ -108,9 +110,12 @@ class LocalMediaStudioBackupInstallerAndroidTest {
             }
             val receiver = codec.Receiver(File(root, "import-traversal"))
             java.util.zip.ZipInputStream(traversal.toByteArray().inputStream()).use { zip ->
-                val entry = requireNotNull(zip.nextEntry)
+                // Android 16+ validates traversal at getNextEntry, before our receiver.
+                assertThrows(java.util.zip.ZipException::class.java) { zip.nextEntry }
+            }
+            java.util.zip.ZipInputStream(byteArrayOf().inputStream()).use { input ->
                 assertThrows(IllegalArgumentException::class.java) {
-                    receiver.accept(entry, zip)
+                    receiver.accept(java.util.zip.ZipEntry("media-studio/media/../../stolen.db"), input)
                 }
             }
             assertFalse(File(root, "stolen.db").exists())
@@ -132,6 +137,103 @@ class LocalMediaStudioBackupInstallerAndroidTest {
                     repeatedReceiver.accept(requireNotNull(zip.nextEntry), zip)
                 }
             }
+        } finally { root.deleteRecursively() }
+    }
+
+    private fun studioZip(staging: File, destination: Context): ByteArray {
+        val output = java.io.ByteArrayOutputStream()
+        java.util.zip.ZipOutputStream(output).use { zip ->
+            LocalMediaStudioZipEntries(destination, json).writeInto(zip,
+                LocalMediaStudioBackupSnapshot(destination, json).validate(staging))
+        }
+        return output.toByteArray()
+    }
+
+    private fun receiveStudio(bytes: ByteArray, target: File, destination: Context): LocalMediaStudioBackupSnapshot.Prepared {
+        val receiver = LocalMediaStudioZipEntries(destination, json).Receiver(target)
+        java.util.zip.ZipInputStream(bytes.inputStream()).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                receiver.accept(entry, zip)
+                zip.closeEntry()
+            }
+        }
+        return receiver.validateStaged()
+    }
+
+    @Test fun emptyAndTextOnlyStudioArchivesRoundTripWithoutMediaEntries() {
+        val root = File(base.cacheDir, "media-zip-empty-"+UUID.randomUUID()).apply { mkdirs() }
+        try {
+            for (withText in listOf(false, true)) {
+                val source = sandbox(File(root, "source-$withText").apply { mkdirs() })
+                val record = LocalMediaRecord("text", result = LocalMediaResult(
+                    "text", "test", "test", "TEXT", 1L, textOutput = "文字成果", sessionId = "chat",
+                ))
+                val staging = File(root, "stage-$withText")
+                LocalMediaDatabase(source, json).use { db ->
+                    db.migrate(if (withText) listOf(record) else emptyList())
+                    LocalMediaStudioBackupSnapshot(source, json).prepare(db, staging)
+                }
+                val destination = sandbox(File(root, "destination-$withText").apply { mkdirs() })
+                val extracted = File(root, "extracted-$withText")
+                assertTrue(receiveStudio(studioZip(staging, source), extracted, destination).mediaFiles.isEmpty())
+                assertEquals(if (withText) 1 else 0,
+                    LocalMediaStudioBackupInstaller(destination, json).install(extracted))
+                LocalMediaDatabase(destination, json).use { db ->
+                    assertEquals(if (withText) "文字成果" else null, db.get("text")?.result?.textOutput)
+                }
+            }
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun corruptedZipMediaCannotReachInstalledDatabase() {
+        val root = File(base.cacheDir, "media-zip-tamper-"+UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val (staging, destination) = fixture(root)
+            val tampered = java.io.ByteArrayOutputStream()
+            java.util.zip.ZipInputStream(studioZip(staging, destination).inputStream()).use { input ->
+                java.util.zip.ZipOutputStream(tampered).use { output ->
+                    while (true) {
+                        val entry = input.nextEntry ?: break
+                        output.putNextEntry(java.util.zip.ZipEntry(entry.name))
+                        if (entry.name == "media-studio/media/shared-paid.png") output.write(byteArrayOf(7, 7, 7, 7))
+                        else input.copyTo(output)
+                        output.closeEntry()
+                        input.closeEntry()
+                    }
+                }
+            }
+            assertThrows(IllegalArgumentException::class.java) {
+                receiveStudio(tampered.toByteArray(), File(root, "tampered"), destination)
+            }
+            assertFalse(destination.getDatabasePath("local_media_v1.db").exists())
+            assertEquals(byteArrayOf(1, 3, 5, 7).toList(), File(staging, "media/shared-paid.png").readBytes().toList())
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun duplicateMembersInsideOnePhysicalZipAreRejected() {
+        val root = File(base.cacheDir, "media-zip-duplicate-"+UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val destination = sandbox(File(root, "destination").apply { mkdirs() })
+            val output = java.io.ByteArrayOutputStream()
+            java.util.zip.ZipOutputStream(output).use { zip ->
+                for (name in listOf("media-studio/media-studio.sqlite", "media-studio/media-studio.sqlitx")) {
+                    zip.putNextEntry(java.util.zip.ZipEntry(name))
+                    zip.write(byteArrayOf(1))
+                    zip.closeEntry()
+                }
+            }
+            val bytes = output.toByteArray()
+            val find = "media-studio/media-studio.sqlitx".toByteArray()
+            val replacement = "media-studio/media-studio.sqlite".toByteArray()
+            for (offset in 0..bytes.size - find.size) {
+                if (find.indices.all { bytes[offset + it] == find[it] })
+                    replacement.copyInto(bytes, offset)
+            }
+            assertThrows(IllegalArgumentException::class.java) {
+                receiveStudio(bytes, File(root, "duplicate"), destination)
+            }
+            assertFalse(destination.getDatabasePath("local_media_v1.db").exists())
         } finally { root.deleteRecursively() }
     }
 
@@ -249,6 +351,29 @@ class LocalMediaStudioBackupInstallerAndroidTest {
                 assertEquals("a", stored.get("a")?.result?.id)
                 assertEquals("b", stored.get("b")?.result?.id)
             }
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun interruptedCommittedCleanupDoesNotRequireDeletedManifestOrReplayInstall() {
+        val root = File(base.cacheDir, "restore-cleanup-"+UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val (staging, destination) = fixture(root)
+            val db = destination.getDatabasePath("local_media_v1.db")
+            File(staging, "media-studio.sqlite").copyTo(db)
+            val target = File(destination.filesDir, "media-studio/shared-paid.png")
+            target.parentFile!!.mkdirs()
+            File(staging, "media/shared-paid.png").copyTo(target)
+            val cleanup = File(staging.parentFile, ".installed-${staging.name}")
+            java.nio.file.Files.move(staging.toPath(), cleanup.toPath())
+            assertTrue(File(cleanup, "media-studio.manifest").delete())
+            assertEquals(2, LocalMediaStudioBackupInstaller(destination, json).install(staging))
+            assertFalse(cleanup.exists())
+            assertFalse(staging.exists())
+            LocalMediaDatabase(destination, json).use { stored ->
+                assertEquals("a", stored.get("a")?.result?.id)
+                assertEquals("b", stored.get("b")?.result?.id)
+            }
+            assertEquals(byteArrayOf(1, 3, 5, 7).toList(), target.readBytes().toList())
         } finally { root.deleteRecursively() }
     }
 
