@@ -31,6 +31,7 @@ internal class SqliteSessionStorageManager(
     private val snapshotDatabaseName: String = "local_session_snapshots_v1.db",
     private val eventDatabaseName: String = "local_session_events_v1.db",
     private val restoreKey: String = "default",
+    private val legacyDomainCodecs: List<LocalSessionDomainCodec> = emptyList(),
 ) {
     private val pendingRoot get() = File(context.filesDir, "local-harness/.sqlite-restore-pending-$restoreKey")
     private val snapshotFile get() = context.getDatabasePath(snapshotDatabaseName)
@@ -125,6 +126,81 @@ internal class SqliteSessionStorageManager(
         // Android 16+ / SQLite 3.27+: a consistent WAL-aware live snapshot.
         db.execSQL("VACUUM INTO ?", arrayOf(destination.absolutePath))
         validateDatabase(destination)
+    }
+
+    /**
+     * Explicit legacy v1 ZIP conversion. All old files are first validated by
+     * the original legacy archive reader inside a private isolated directory,
+     * then upgraded into throwaway SQLite copies. Only the resulting verified
+     * SQLite+media ZIP is offered to the normal staging owner.
+     *
+     * Old ZIP files never contained full original workspace media. Media bytes
+     * available in this device's managed attachment directory accompany the
+     * converted backup; missing historic attachments are not invented.
+     */
+    @Synchronized
+    fun stageLegacyRestore(archive: InputStream): Int {
+        require(!pendingRoot.exists()) { "存在尚未生效的恢复，请先处理" }
+        check(snapshots.readSummaries().isEmpty() &&
+            restorableEmptyEditor(events.readableDatabase)) {
+            "旧版会话 ZIP 只能导入空的 SQLite 会话库，不能覆盖本机资料"
+        }
+        val key = UUID.randomUUID().toString().replace("-", "")
+        val conversionRoot = File(context.cacheDir, "session-legacy-convert-$key")
+        val legacyRoot = File(conversionRoot, "sessions")
+        val legacySnapshotName = "legacy-converted-snapshot-$key.db"
+        val legacyEventName = "legacy-converted-event-$key.db"
+        check(legacyRoot.mkdirs()) { "无法创建旧会话隔离转换目录" }
+        try {
+            // V1 published a 64 MiB maximum; keep the same admission contract.
+            val raw = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(32 * 1024)
+            archive.use { input ->
+                while (true) {
+                    val n = input.read(buffer)
+                    if (n < 0) break
+                    require(raw.size().toLong() + n <= 64L * 1024L * 1024L) {
+                        "旧版 ZIP 超过原格式 64 MiB 上限，禁止截断转换"
+                    }
+                    raw.write(buffer, 0, n)
+                }
+            }
+            val legacy = LocalSessionStorageManager(legacyRoot, Json)
+            val count = legacy.stageRestore(raw.toByteArray())
+            require(count > 0 && legacy.applyPendingRestore() > 0) {
+                "旧版 ZIP 没有可转换的完整会话"
+            }
+            SqliteSessionSnapshotStore(context, Json, legacySnapshotName,
+                domainCodecs = legacyDomainCodecs).use { targetSnapshots ->
+                SqliteSessionEventDatabase(context, Json, legacyEventName).use { targetEvents ->
+                    LocalLegacySqliteMigration(conversionRoot, legacyRoot, Json,
+                        targetSnapshots, targetEvents).migrate()
+                    check(targetSnapshots.readSummaries().size == count) {
+                        "旧版会话转换数量不一致，禁止提交"
+                    }
+                }
+            }
+            val eventCopy = context.getDatabasePath(legacyEventName)
+            val snapshotCopy = context.getDatabasePath(legacySnapshotName)
+            val converted = File(conversionRoot, "converted.sqlite.zip")
+            ZipOutputStream(converted.outputStream().buffered()).use { zip ->
+                for ((source, name) in listOf(
+                    snapshotCopy to SNAPSHOT_ENTRY,
+                    eventCopy to EVENT_ENTRY,
+                )) {
+                    check(source.isFile) { "转换后的 SQLite 数据库缺失：$name" }
+                    zip.putNextEntry(ZipEntry(name))
+                    source.inputStream().buffered().use { it.copyTo(zip) }
+                    zip.closeEntry()
+                }
+                mediaBackup.export(zip, eventCopy)
+            }
+            return converted.inputStream().buffered().use(::stageRestore)
+        } finally {
+            conversionRoot.deleteRecursively()
+            context.deleteDatabase(legacySnapshotName)
+            context.deleteDatabase(legacyEventName)
+        }
     }
 
     /** Compatibility entry for existing in-memory tests and callers. */
