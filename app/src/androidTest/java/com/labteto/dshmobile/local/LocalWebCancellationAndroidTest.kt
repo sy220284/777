@@ -77,7 +77,11 @@ class LocalWebCancellationAndroidTest {
 
     private fun provider(http: OkHttpClient): LocalWebProvider {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        return LocalWebProvider(context, http, Json)
+        return LocalWebProvider(
+            context, http, Json,
+            com.labteto.dshmobile.local.web.LocalSearchUsageStore(context, Json),
+            com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings(context),
+        )
     }
 
     private fun blockedClient(entered: CountDownLatch, closed: AtomicBoolean): OkHttpClient =
