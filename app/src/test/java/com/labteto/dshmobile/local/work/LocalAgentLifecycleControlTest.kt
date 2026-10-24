@@ -55,6 +55,14 @@ class LocalAgentLifecycleControlTest {
         }.isFailure)
     }
 
+    @Test fun explicitResumeNeverSelectsAnotherAgentInSameSession() {
+        assertTrue(matchesRequestedAgentRecovery("job-first", null))
+        assertTrue(matchesRequestedAgentRecovery("job-second", null))
+        assertTrue(matchesRequestedAgentRecovery("job-first", "job-first"))
+        assertFalse(matchesRequestedAgentRecovery("job-second", "job-first"))
+        assertFalse(matchesRequestedAgentRecovery("job-first", "job-second"))
+    }
+
     @Test fun observationCursorTracksStateAndMailboxWithoutMakingCompletionClaims() {
         val running = info(status = "running", pending = 0).copy(updatedAt = 100L)
         val interrupted = running.copy(status = "interrupted")
