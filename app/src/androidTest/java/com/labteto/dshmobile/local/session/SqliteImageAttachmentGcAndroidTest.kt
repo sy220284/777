@@ -29,8 +29,10 @@ class SqliteImageAttachmentGcAndroidTest {
         try {
             val images = File(root, ".dsh/attachments").apply { mkdirs() }
             val keep = png(File(images, "used.png"))
+            val keepBlock = png(File(images, "block.png"))
             val delete = png(File(images, "unused.png"))
             keep.setLastModified(1L)
+            keepBlock.setLastModified(1L)
             delete.setLastModified(1L)
 
             SqliteSessionEventDatabase(context, Json, databaseName).use { sql ->
@@ -47,6 +49,23 @@ class SqliteImageAttachmentGcAndroidTest {
                     })
                 })
 
+                // Durable transcripts use kind=image / attachment_id, not
+                // local_image_ref. Verify this independent SQLite-only session.
+                registry.get("block-session").append("user/message", buildJsonObject {
+                    put("transcript", buildJsonArray {
+                        add(buildJsonObject {
+                            put("blocks", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("kind", "image")
+                                    put("path", ".dsh/attachments/block.png")
+                                    put("attachment_id", "block")
+                                    put("media_type", "image/png")
+                                })
+                            })
+                        })
+                    })
+                })
+                assertFalse(File(root, "block-session.events.jsonl").exists())
                 assertFalse(File(root, "other-session.events.jsonl").exists())
                 val ids = registry.historicalSources().map { it.id }.toSet() + "current-session"
                 val references = collectAuthoritativeLocalImageAttachmentReferences(
@@ -69,6 +88,7 @@ class SqliteImageAttachmentGcAndroidTest {
                     maxImageBytes = 1_000_000L,
                 )
                 assertTrue(keep.exists())
+                assertTrue(keepBlock.exists())
                 assertFalse(delete.exists())
                 assertEquals(1, result.deletedFiles)
             }
