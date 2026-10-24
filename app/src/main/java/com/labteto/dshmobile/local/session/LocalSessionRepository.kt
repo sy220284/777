@@ -266,7 +266,10 @@ internal class LocalSessionRepository(
             if (synchronized(lock) { id in deletedIds }) emptyList()
             else {
                 val latest = synchronized(lock) { latestSnapshots[id] }
-                if (latest != null) latest.transcriptWindow.ifEmpty { latest.messages }.takeLast(limit)
+                if (latest != null) latest.transcriptWindow.ifEmpty { latest.messages }
+                    .asReversed().asSequence()
+                    .filter { it.role == "user" || it.role == "assistant" }
+                    .take(limit).toList().asReversed()
                 else snapshotStore.recentMessages(id, limit)
             }
         }

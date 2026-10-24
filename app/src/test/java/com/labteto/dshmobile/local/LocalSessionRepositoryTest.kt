@@ -110,6 +110,26 @@ class LocalSessionRepositoryTest {
         assertEquals(null, repository.read("gone"))
     }
 
+    @Test fun queuedPreviewReturnsTwelveActualDialogueRowsDespiteToolMessages() = runTest {
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        val window = (0 until 48).map { i ->
+            LocalHarnessMessage(
+                id = "m$i",
+                role = when (i % 4) {
+                    0 -> "tool"
+                    1 -> "user"
+                    2 -> "progress"
+                    else -> "assistant"
+                },
+                content = "line-$i",
+            )
+        }
+        repository.enqueue(LocalHarnessSession(id = "preview", transcriptWindow = window))
+        val expected = window.filter { it.role == "user" || it.role == "assistant" }
+            .takeLast(12).map { it.id }
+        assertEquals(expected, repository.preview("preview", 12).map { it.id })
+    }
+
     @Test fun readPrefersNewestQueuedSnapshotBeforeWriterRuns() = runTest {
         val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
         repository.enqueue(
