@@ -25,7 +25,11 @@ internal class LocalWebTools(
         count: Int = 10,
         needContent: Boolean = false,
         provider: String = "auto",
-    ): String = web.searchWithFallback(queries, usageContext, searchKeyProvider, count, needContent, provider)
+        oriQuestion: String? = null,
+        localization: String? = null,
+    ): String = web.searchWithFallback(
+        queries, usageContext, searchKeyProvider, count, needContent, provider, oriQuestion, localization,
+    )
 
     suspend fun fetch(
         input: String,
