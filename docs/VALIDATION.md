@@ -332,7 +332,8 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - Responses SSE 的顶层 `error`、`response.failed`、`response.incomplete`、refusal 与 completed 均需保留真实语义；标准 Responses 错误不得映射成 ChatGPT 套餐错误。
 - DeepSeek 官方网页搜索只允许读取 DeepSeek 官方 API Key，不得把 OpenAI、Gemini、Qwen、ChatGPT OAuth 等当前模型凭据误发给 DeepSeek 搜索接口。
 - Work 默认暴露 web_search、web_fetch，切换模型不得清除默认联网工具；网络工具不会扩大文件/进程权限。
-- web_search 默认走无密钥 Bing RSS 公共搜索，失败后只可使用明确配置的 DeepSeek 官方 API Key 备用；任何模型账户凭据不得转发给公共搜索服务。
+- web_search 使用 DeepSeek 2026-10-17 发布的原生 `POST /v1/tools/search`：已配置 DeepSeek 官方 API Key 时自动优先原生搜索并在失败时退回免费 Bing RSS；未配置时直接使用 Bing。工具可显式选择 `provider=bing|deepseek|auto`，DeepSeek 原生 Search/Fetch 按成功请求计费（官方文档：https://api-docs.deepseek.com/zh-cn/guides/search/）；不得把其他服务商、ChatGPT OAuth 或模型路由的凭据转发给搜索服务。
+- web_fetch 默认本机抓取，特定网络错误才尝试官方 `POST /v1/tools/fetch`；`provider=deepseek` 可直接抓取 Markdown，`raw` 格式保持仅本机抓取。后台抓取必须持久保存 provider 并在恢复时沿用；网络抓取 URL 仍须经过公网校验。
 - Chat 与群聊无需模型支持工具调用；只有在明确联网或实时信息意图时才发起应用层检索，群聊一轮最多一次，并且结果仅进入当轮临时上下文，不进入长期会话历史。
 - system message 不进入 Responses input，转换为 `instructions`。
 - 文本、图片、function tool、function_call_output 和 continuation item 转换。
