@@ -28,8 +28,6 @@ import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.LocalAgentSubtreeBudget
 import com.labteto.dshmobile.local.agent.withLocalSubagentAgentSlot
-import com.labteto.dshmobile.local.agent.compileNestedReadonlyCapabilities
-import com.labteto.dshmobile.local.agent.parseLocalNestedDelegation
 import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.modelMessageForAgentInput
@@ -82,7 +80,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -644,59 +641,33 @@ internal class LocalSubagentRunner(
                         } else withContext(LocalModelRunContext(runProfile)) {
                         currentCoroutineContext().ensureActive()
                         if (canDelegateNested && call.name == "subagent") {
-                            try {
-                                val request = parseLocalNestedDelegation(call.arguments, maxSteps)
-                                require(resourceScheduler.snapshot().availableAgentSlots > 0) {
-                                    "NESTED_DELEGATION_NO_AGENT_SLOT"
-                                }
-                                val parent = requireNotNull(captureLocalAgentParentLink(call.id)) {
-                                    "NESTED_DELEGATION_REQUIRES_LIVE_PARENT_RUN"
-                                }
-                                subtreeBudget.claim()
-                                val childSpec = LocalSubagentLaunchSpec(
-                                    task = request.task,
-                                    instructions = request.instructions,
-                                    modelOverride = runProfile.id,
-                                    maxSteps = request.maxSteps,
-                                    parentLink = parent,
-                                    capabilities = compileNestedReadonlyCapabilities(capabilities),
-                                )
-                                // Slot contention is bounded independently of model execution.
-                                // A normal multi-step model run often takes longer than 30 seconds.
-                                val childExecutionMillis = (request.maxSteps.toLong() * 60_000L)
-                                    .coerceIn(120_000L, 900_000L)
-                                val child = withTimeoutOrNull(childExecutionMillis) {
+                            dispatchLocalNestedSubagent(
+                                call = call,
+                                parentCapabilities = capabilities,
+                                parentProfileId = runProfile.id,
+                                parentMaxSteps = maxSteps,
+                                subtreeBudget = subtreeBudget,
+                                availableAgentSlots = {
+                                    resourceScheduler.snapshot().availableAgentSlots
+                                },
+                                captureParent = { toolId -> captureLocalAgentParentLink(toolId) },
+                                runChild = { childSpec, sharedBudget ->
                                     requireNotNull(newNestedRunner) {
                                         "NESTED_DELEGATION_RUNNER_UNAVAILABLE"
                                     }().runResult(
                                         spec = childSpec,
                                         executionFence = {
                                             executionFence()
-                                            // The descendant must stop if its parent Run lost ownership;
-                                            // a live coroutine alone is not evidence of current authority.
+                                            // Parent must still own its Run before a descendant acts.
                                             runContext?.let { parentContext ->
                                                 runCoordinator?.ensureCurrentOwner(parentContext)
                                             }
                                         },
-                                        subtreeBudget = subtreeBudget,
+                                        subtreeBudget = sharedBudget,
                                         agentSlotWaitMillis = 5_000L,
                                     )
-                                }
-                                if (child == null) AgentToolResult(
-                                    content = "NESTED_DELEGATION_TIMEOUT：下级子代理已超时取消",
-                                    isError = true,
-                                ) else AgentToolResult(
-                                    content = child.output,
-                                    isError = child.status != LocalSubagentStatus.COMPLETED,
-                                )
-                            } catch (error: CancellationException) {
-                                throw error
-                            } catch (error: Exception) {
-                                AgentToolResult(
-                                    content = "NESTED_DELEGATION_REJECTED：" + error.message.orEmpty(),
-                                    isError = true,
-                                )
-                            }
+                                },
+                            )
                         } else if (capabilities.teamManaged && call.name in LocalAgentTeamContract.TOOL_NAMES) {
                             requireNotNull(executeTeamTool) { "TEAM_CALLER_UNAVAILABLE" }(
                                 requireNotNull(backgroundJobId), call.toLocalToolCall(),
