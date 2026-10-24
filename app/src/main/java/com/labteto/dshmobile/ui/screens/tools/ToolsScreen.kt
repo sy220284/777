@@ -154,8 +154,10 @@ class ToolsViewModel @Inject constructor(
     private val _state = MutableStateFlow(ToolsUiState())
     val state: StateFlow<ToolsUiState> = _state.asStateFlow()
     val networkSearchEnabled: StateFlow<Boolean> = networkSearchSettings.enabled
+    val deepSeekSearchPreferred: StateFlow<Boolean> = networkSearchSettings.deepSeekPreferred
 
     fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
+    fun setDeepSeekSearchPreferred(enabled: Boolean) = networkSearchSettings.setDeepSeekPreferred(enabled)
     private val operationGate = ToolsOperationGate()
     private var mcpLoginJob: kotlinx.coroutines.Job? = null
     private val _githubBrowse = MutableStateFlow(GitHubBrowseState())
@@ -619,6 +621,7 @@ fun ToolsScreen(
         }
     }
     val networkSearchEnabled by viewModel.networkSearchEnabled.collectAsStateWithLifecycle()
+    val deepSeekSearchPreferred by viewModel.deepSeekSearchPreferred.collectAsStateWithLifecycle()
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val approvalMode by settingsViewModel.approvalMode.collectAsStateWithLifecycle()
     val autoApprovalEnabled = approvalMode == LocalApprovalMode.AUTO
@@ -817,6 +820,27 @@ fun ToolsScreen(
                                                     onCheckedChange = { pulse(); viewModel.setNetworkSearchEnabled(it) },
                                                 )
                                             },
+                                        )
+                                        ToolCapabilityRow(
+                                            icon = SyEntryIcons.Search,
+                                            title = stringResource(R.string.tools_deepseek_search),
+                                            status = stringResource(
+                                                if (deepSeekSearchPreferred) R.string.common_enabled else R.string.common_disabled,
+                                            ),
+                                            state = if (deepSeekSearchPreferred) StateDotState.Done else StateDotState.Idle,
+                                            onClick = { pulse(); viewModel.setDeepSeekSearchPreferred(!deepSeekSearchPreferred) },
+                                            trailing = {
+                                                SySwitchControl(
+                                                    checked = deepSeekSearchPreferred,
+                                                    onCheckedChange = { pulse(); viewModel.setDeepSeekSearchPreferred(it) },
+                                                )
+                                            },
+                                        )
+                                        Text(
+                                            stringResource(R.string.tools_deepseek_search_hint),
+                                            style = DsType.caption11.withReadingWeight(),
+                                            color = colors.textSecondary,
+                                            modifier = Modifier.padding(horizontal = SyMetric.gapSm),
                                         )
                                         ToolCapabilityRow(
                                             icon = SyEntryIcons.Permissions,
