@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.database.sqlite.SQLiteDatabase
 import com.labteto.dshmobile.local.session.SqliteSessionConsistencyGate
 import com.labteto.dshmobile.local.session.SqliteSessionEventDatabase
+import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.model.LOCAL_IMAGE_REF
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
@@ -177,7 +178,7 @@ internal class SqliteLocalAssetCatalog(
                 "user/message" -> "user_image"
                 "assistant/message" -> "assistant_image"
                 "tool/result" -> "tool_image"
-                "agent/inbox/spliced" -> "inbox_image"
+                LOCAL_AGENT_INBOX_EVENT_TYPE -> "inbox_image"
                 "chat/active-transcript" -> "chat_image"
                 else -> return
             }
