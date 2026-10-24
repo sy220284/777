@@ -11,6 +11,9 @@ internal fun nextIdleTeamTaskAssignment(
     val byId = team.tasks.associateBy(LocalTeamTaskSnapshot::id)
     val ready = team.tasks.asSequence()
         .filter { it.status == LocalTeamTaskStatus.PENDING && it.ownerId == null }
+        // Previously authorized work cannot silently restart after a new USER instruction.
+        .filter { it.rootUserRevision == null || currentRootRevision == null ||
+            it.rootUserRevision == currentRootRevision }
         .filter { task -> task.blockedBy.all { byId[it]?.status == LocalTeamTaskStatus.COMPLETED } }
         .sortedWith(compareBy<LocalTeamTaskSnapshot> {
             it.id.removePrefix("task-").toIntOrNull() ?: Int.MAX_VALUE
