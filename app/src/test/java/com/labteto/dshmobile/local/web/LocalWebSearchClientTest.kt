@@ -141,13 +141,10 @@ class LocalWebSearchClientTest {
     @Test
     fun fetchRespectsRequestedSizeWithoutClaimingCompleteContent() = runBlocking {
         val client = LocalWebSearchClient(http { request ->
-            val body = Json.encodeToString(
-                kotlinx.serialization.json.JsonObject.serializer(),
-                buildJsonObject {
-                    put("title", "")
-                    put("content", "a".repeat(20000))
-                },
-            )
+            val body = buildJsonObject {
+                put("title", "")
+                put("content", "a".repeat(20000))
+            }.toString()
             response(request, 200, body)
         }, Json)
         val result = client.fetch("key", "https://example.com/long", maxBytes = 16 * 1024)
