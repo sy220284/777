@@ -19,6 +19,7 @@ import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_DISC
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_QUEUED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_ACKNOWLEDGED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_TASK_EVENT
+import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_TASK_REVIEW_EVENT
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_SHUTDOWN_RESPONSE
 import com.labteto.dshmobile.local.work.LocalAgentTeamEventCodec.decodeMember
 import com.labteto.dshmobile.local.work.LocalAgentTeamEventCodec.decodeMessage
@@ -57,6 +58,53 @@ internal object LocalAgentTeamReducer {
                     advanced.copy(
                         tasks = state.tasks.filterNot { it.id == task.id } + task,
                     )
+                }
+                TEAM_TASK_REVIEW_EVENT -> {
+                    validateTeamEnvelope(event.data)
+                    val data = event.data["review"] as? kotlinx.serialization.json.JsonObject
+                        ?: error("TEAM_TASK_REVIEW_EVENT_INVALID")
+                    val taskId = data["taskId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_TASK_REVIEW_TASK_REQUIRED")
+                    val revision = data["taskRevision"]?.jsonPrimitive?.intOrNull
+                        ?: error("TEAM_TASK_REVIEW_REVISION_REQUIRED")
+                    val taskResultId = data["taskResultId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_TASK_REVIEW_RESULT_REQUIRED")
+                    val reviewerId = data["reviewerId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_TASK_REVIEW_MEMBER_REQUIRED")
+                    val reviewResultId = data["reviewResultId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_TASK_REVIEW_EVIDENCE_REQUIRED")
+                    val reviewSeq = data["reviewEvidenceSequence"]?.jsonPrimitive?.longOrNull
+                        ?: error("TEAM_TASK_REVIEW_SEQUENCE_REQUIRED")
+                    val verdict = data["verdict"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_TASK_REVIEW_VERDICT_REQUIRED")
+                    val reason = data["reason"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                    val task = state.tasks.singleOrNull { it.id == taskId }
+                        ?: error("TEAM_TASK_REVIEW_TASK_NOT_FOUND")
+                    require(task.revision == revision && task.status == LocalTeamTaskStatus.COMPLETED &&
+                        task.completionResultId == taskResultId && task.completionEvidenceSequence != null) {
+                        "TEAM_TASK_REVIEW_STALE"
+                    }
+                    val reviewer = state.members.singleOrNull { it.id == reviewerId }
+                        ?: error("TEAM_TASK_REVIEW_MEMBER_NOT_FOUND")
+                    require(reviewer.id != task.ownerId && reviewer.phase == LocalTeamMemberPhase.ACTIVE &&
+                        reviewer.role in setOf("verify", "review")) {
+                        "TEAM_TASK_REVIEW_INDEPENDENT_MEMBER_REQUIRED"
+                    }
+                    require(reviewSeq > task.completionEvidenceSequence!! &&
+                        reviewSeq < event.sequence && reviewResultId.isNotBlank()) {
+                        "TEAM_TASK_REVIEW_EVIDENCE_ORDER_INVALID"
+                    }
+                    require(verdict in setOf("approve", "reject") &&
+                        reason.isNotBlank() &&
+                        reason.toByteArray(Charsets.UTF_8).size <= LocalAgentTeamContract.MAX_ERROR_CHARS) {
+                        "TEAM_TASK_REVIEW_VERDICT_INVALID"
+                    }
+                    require(state.taskReviews.none { it.taskId == taskId && it.taskRevision == revision }) {
+                        "TEAM_TASK_REVIEW_DUPLICATE"
+                    }
+                    advanced.copy(taskReviews = state.taskReviews +
+                        LocalTeamTaskReviewSnapshot(taskId, revision, taskResultId, reviewerId,
+                            reviewResultId, reviewSeq, verdict, reason))
                 }
                 TEAM_MESSAGE_QUEUED -> {
                     val message = decodeMessage(event.data)
