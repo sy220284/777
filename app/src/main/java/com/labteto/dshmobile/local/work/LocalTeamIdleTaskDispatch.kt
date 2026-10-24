@@ -4,6 +4,7 @@ package com.labteto.dshmobile.local.work
 internal fun nextIdleTeamTaskAssignment(
     team: LocalTeamProjection,
     activity: LocalAgentTeamActivityProjection,
+    currentRootRevision: Long? = null,
 ): Pair<LocalTeamMemberSnapshot, LocalTeamTaskSnapshot>? {
     if (team.failure != null) return null
     val activityById = activity.members.associateBy(LocalTeamMemberActivityView::memberId)
