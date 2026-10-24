@@ -28,7 +28,7 @@ import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.LocalAgentSubtreeBudget
 import com.labteto.dshmobile.local.agent.compileNestedReadonlyCapabilities
-import com.labteto.dshmobile.local.agent.bindLocalAgentRole
+import com.labteto.dshmobile.local.agent.parseLocalNestedDelegation
 import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.modelMessageForAgentInput
@@ -120,6 +120,7 @@ internal class LocalSubagentRunner(
     private val execute: suspend (LocalToolCall, Boolean, MutableSet<String>) -> AgentToolResult,
     private val teamSchemas: (() -> JsonArray)? = null,
     private val nestedReadonlySchemas: (() -> JsonArray)? = null,
+    private val newNestedRunner: (() -> LocalSubagentRunner)? = null,
     private val executeTeamTool: (suspend (String, LocalToolCall) -> AgentToolResult)? = null,
     private val spillToolOutput: (String, String) -> Boolean = { _, _ -> false },
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
@@ -553,6 +554,8 @@ internal class LocalSubagentRunner(
                     )
                     val nativeImagesSent = hasMaterializedImageUrls(preparedHistory)
                     val reply = try {
+                        // A child tree shares one bounded model-step grant across every descendant.
+                        if (capabilities.depth > 1) subtreeBudget.claimModelStep()
                         modelStepExecutor.complete(
                             surface = runSurface,
                             history = preparedHistory,
@@ -639,41 +642,26 @@ internal class LocalSubagentRunner(
                         currentCoroutineContext().ensureActive()
                         if (canDelegateNested && call.name == "subagent") {
                             try {
-                                val invalidKeys = call.arguments.keys -
-                                    setOf("task", "instructions", "role", "max_steps")
-                                require(invalidKeys.isEmpty()) { "NESTED_DELEGATION_FIELDS_BLOCKED" }
+                                val request = parseLocalNestedDelegation(call.arguments, maxSteps)
                                 require(resourceScheduler.snapshot().availableAgentSlots > 0) {
                                     "NESTED_DELEGATION_NO_AGENT_SLOT"
                                 }
-                                val childTask = call.arguments["task"]?.jsonPrimitive?.contentOrNull
-                                    ?.takeIf(String::isNotBlank)
-                                    ?: error("NESTED_DELEGATION_TASK_REQUIRED")
-                                val childSteps = call.arguments["max_steps"]?.jsonPrimitive?.intOrNull
-                                    ?: minOf(maxSteps, 12)
-                                require(childSteps in 1..minOf(maxSteps, 24)) {
-                                    "NESTED_DELEGATION_STEP_BUDGET_EXCEEDED"
-                                }
-                                val rawInstructions = call.arguments["instructions"]?.jsonPrimitive
-                                    ?.contentOrNull.orEmpty()
-                                val role = bindLocalAgentRole(
-                                    requested = call.arguments["role"]?.jsonPrimitive?.contentOrNull,
-                                    userInstructions = rawInstructions,
-                                    parentMutationAllowed = false,
-                                )
                                 val parent = requireNotNull(captureLocalAgentParentLink(call.id)) {
                                     "NESTED_DELEGATION_REQUIRES_LIVE_PARENT_RUN"
                                 }
                                 subtreeBudget.claim()
                                 val childSpec = LocalSubagentLaunchSpec(
-                                    task = childTask,
-                                    instructions = role.instructions,
+                                    task = request.task,
+                                    instructions = request.instructions,
                                     modelOverride = runProfile.id,
-                                    maxSteps = childSteps,
+                                    maxSteps = request.maxSteps,
                                     parentLink = parent,
                                     capabilities = compileNestedReadonlyCapabilities(capabilities),
                                 )
                                 val child = withTimeoutOrNull(30_000L) {
-                                    runResult(
+                                    requireNotNull(newNestedRunner) {
+                                        "NESTED_DELEGATION_RUNNER_UNAVAILABLE"
+                                    }().runResult(
                                         spec = childSpec,
                                         executionFence = executionFence,
                                         subtreeBudget = subtreeBudget,

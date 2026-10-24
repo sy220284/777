@@ -135,6 +135,22 @@ internal class LocalSubagentRunnerFactory(
         modelGateway = modelGateway,
         teamSchemas = teamSchemas,
         nestedReadonlySchemas = nestedReadonlySchemas,
+        // Every descendant owns fresh history policy and model step state; never reenter
+        // the parent's mutable runner instance while it is executing a tool call.
+        newNestedRunner = {
+            create(
+                eventLogProvider = eventLogProvider,
+                contextSnapshotProvider = contextSnapshotProvider,
+                schemasProvider = schemasProvider,
+                executeTool = executeTool,
+                runnerState = runnerState,
+                toolOutputSessionId = toolOutputSessionId,
+                runSessionId = runSessionId,
+                runKind = runKind,
+                historySnapshotProvider = historySnapshotProvider,
+                modelAdmission = modelAdmission,
+            )
+        },
         executeTeamTool = executeTeamTool?.let { executor -> { jobId, call -> executor(runSessionId(), jobId, call) } },
         importToolImages = importToolImages,
         state = runnerState,
