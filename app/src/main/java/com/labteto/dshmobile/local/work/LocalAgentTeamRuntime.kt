@@ -131,6 +131,8 @@ internal data class LocalTeamTaskSnapshot(
     val writeScopes: List<String> = emptyList(),
     /** Outbox identity persisted with an automatic Task reservation. */
     val autoDispatchMessageId: String? = null,
+    /** USER instruction revision that authorized the current task owner; absent on legacy events. */
+    val rootUserRevision: Long? = null,
 )
 
 @Serializable
