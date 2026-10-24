@@ -188,7 +188,7 @@ class LocalAgentTeamRuntimeTest {
         ).orEmpty()
         assertTrue(result.contains("status=checkpointed_in_model_history"))
         assertTrue(result.contains("target_id=member-1"))
-        assertTrue(result.contains("does not establish provider consumption"))
+        assertTrue(result.contains("does not prove comprehension"))
         assertNull(fixture.runtime.project(sessionId).failure)
     }
 

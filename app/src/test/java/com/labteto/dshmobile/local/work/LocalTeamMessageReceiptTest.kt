@@ -53,6 +53,45 @@ class LocalTeamMessageReceiptTest {
         },
     )
 
+    private fun modelReply(seq: Long, job: String) = event(
+        seq, LOCAL_SUBAGENT_INBOX_MODEL_REPLY_EVENT, buildJsonObject {
+            put("background_job_id", job)
+            put("message_ids", JsonArray(listOf(JsonPrimitive(id))))
+            put("step", 1)
+        },
+    )
+
+    @Test fun replyAfterDurableHistoryIsAnObservedModelTurnNotVerifiedTaskCompletion() {
+        val receipt = projectLocalTeamMessageReceipt(
+            id,
+            listOf(queued(1), delivered(2), checkpoint(3, jobId), modelReply(4, jobId)),
+            true, sessionId,
+        )
+        assertEquals("model_reply_observed", receipt.status)
+        assertEquals(4L, receipt.modelReplySequence)
+        assertTrue(receipt.render().contains("does not prove comprehension"))
+        assertFalse(receipt.render().contains("completion_status=completed"))
+    }
+
+    @Test fun unaffiliatedReplyOrMissingHistoryCannotUpgradeDelivery() {
+        val wrongJob = projectLocalTeamMessageReceipt(
+            id,
+            listOf(queued(1), delivered(2), checkpoint(3, jobId),
+                modelReply(4, "job-team-other")), true, sessionId,
+        )
+        assertEquals("checkpointed_in_model_history", wrongJob.status)
+        assertEquals(null, wrongJob.modelReplySequence)
+        val noDurableHistory = projectLocalTeamMessageReceipt(
+            id, listOf(queued(1), delivered(2), modelReply(3, jobId)), true, sessionId,
+        )
+        assertEquals("accepted_by_inbox", noDurableHistory.status)
+        val incomplete = projectLocalTeamMessageReceipt(
+            id, listOf(queued(1), checkpoint(2, jobId), modelReply(3, jobId)),
+            false, sessionId,
+        )
+        assertEquals("unknown_history_window", incomplete.status)
+    }
+
     @Test fun statusMustDistinguishQueueInboxAcceptanceAndDurableHistory() {
         val q = projectLocalTeamMessageReceipt(id, listOf(queued(1)), true, sessionId)
         assertEquals("queued", q.status)
@@ -63,7 +102,7 @@ class LocalTeamMessageReceiptTest {
             checkpoint(3, jobId)), true, sessionId)
         assertEquals("checkpointed_in_model_history", c.status)
         assertEquals(3L, c.historyCheckpointSequence)
-        assertTrue(c.render().contains("does not establish provider consumption"))
+        assertTrue(c.render().contains("does not prove comprehension"))
     }
 
     @Test fun differentJobCannotForgeMessageConsumption() {

@@ -295,6 +295,8 @@ internal class LocalSubagentRunner(
             kind = runKind,
         )
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
+        // Step-local evidence only: never infer an unseen provider reply from recovered Inbox ACKs.
+        val submittedMessageIdsByStep = mutableMapOf<Int, Set<String>>()
         val recoveredBaseStep = recoveredStep.coerceAtLeast(0)
         var activationStep = 0
         var modelStep = recoveredBaseStep
@@ -511,6 +513,7 @@ internal class LocalSubagentRunner(
                 model = AgentModel {
                     executionFence()
                     currentCoroutineContext().ensureActive()
+                    val claimedForThisRequest = mutableListOf<com.labteto.dshmobile.harness.agent.QueuedAgentInput>()
                     backgroundJobId?.let { jobId ->
                         val freshInputs = jobs.peekMessages(jobId)
                             .filterNot { message -> message.id in claimedMessageIds }
@@ -529,6 +532,7 @@ internal class LocalSubagentRunner(
                             queuedMessages.forEach { message ->
                                 history.append(modelMessageForAgentInput(message))
                                 claimedMessageIds += message.id
+                                claimedForThisRequest += message
                             }
                             persistContinuationCheckpoint(step = modelStep)
                             jobs.acknowledgeMessages(
@@ -560,6 +564,14 @@ internal class LocalSubagentRunner(
                         snapshot.modelState.baseUrl,
                         routeModel,
                     )
+                    // Only record a delivery as submitted when the exact normalized message survived
+                    // compaction and reached the model request. Dropped history remains unconfirmed.
+                    val actuallySubmitted = claimedForThisRequest.asSequence()
+                        .filter { input -> preparedHistory.any { it == modelMessageForAgentInput(input) } }
+                        .map { it.id }.toSet()
+                    if (actuallySubmitted.isNotEmpty()) {
+                        submittedMessageIdsByStep[activationStep] = actuallySubmitted
+                    }
                     val nativeImagesSent = hasMaterializedImageUrls(preparedHistory)
                     val reply = try {
                         // A child tree shares one bounded model-step grant across every descendant.
@@ -803,6 +815,19 @@ internal class LocalSubagentRunner(
                                 persistContinuationCheckpoint(
                                     step = addSubagentSteps(recoveredBaseStep, event.step),
                                 )
+                            }
+                            // Persist the assistant/tool history before advancing receipt semantics.
+                            // Terminal output without a durable checkpoint (schema path) is not proof.
+                            val evidence = submittedMessageIdsByStep.remove(event.step).orEmpty()
+                            if (backgroundJobId != null && evidence.isNotEmpty() &&
+                                (pendingTerminalOutput == null || capabilities.outputSchema == null)
+                            ) {
+                                eventLog().append(LOCAL_SUBAGENT_INBOX_MODEL_REPLY_EVENT, buildJsonObject {
+                                    put("background_job_id", backgroundJobId)
+                                    put("agent_id", subagentId)
+                                    put("step", addSubagentSteps(recoveredBaseStep, event.step))
+                                    put("message_ids", kotlinx.serialization.json.JsonArray(evidence.sorted().map { JsonPrimitive(it) }))
+                                })
                             }
                         }
                         is AgentEvent.TurnCompleted -> {

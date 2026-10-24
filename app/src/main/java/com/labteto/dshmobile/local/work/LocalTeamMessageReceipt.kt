@@ -19,11 +19,13 @@ internal data class LocalTeamMessageReceipt(
     val discardedSequence: Long?,
     val historyCheckpointSequence: Long?,
     val historyWindowComplete: Boolean,
+    val modelReplySequence: Long? = null,
 ) {
     val status: String get() = when {
         !historyWindowComplete -> "unknown_history_window"
         queuedSequence == null -> "not_found"
         discardedSequence != null -> "discarded"
+        modelReplySequence != null -> "model_reply_observed"
         historyCheckpointSequence != null -> "checkpointed_in_model_history"
         deliveredSequence != null -> "accepted_by_inbox"
         queuedSequence != null -> "queued"
@@ -40,8 +42,10 @@ internal data class LocalTeamMessageReceipt(
         deliveredSequence?.let { append("delivered_sequence=").append(it).append("\n") }
         discardedSequence?.let { append("discarded_sequence=").append(it).append("\n") }
         historyCheckpointSequence?.let { append("history_checkpoint_sequence=").append(it).append("\n") }
-        append("checkpointed means durably inserted in child model history; ")
-        append("it does not establish provider consumption, task completion or user authorization")
+        modelReplySequence?.let { append("model_reply_sequence=").append(it).append("\n") }
+        append("model_reply_observed means the request included the exact message and a subsequent ")
+        append("model reply was durably observed; it does not prove comprehension, ")
+        append("task completion or user authorization")
     }
 }
 
@@ -57,6 +61,7 @@ internal fun projectLocalTeamMessageReceipt(
     var discarded: Long? = null
     var target: String? = null
     val checkpointJobs = mutableListOf<Pair<String, Long>>()
+    val replyJobs = mutableListOf<Pair<String, Long>>()
     for (event in events) {
         val data = event.data
         when (event.type) {
@@ -81,6 +86,14 @@ internal fun projectLocalTeamMessageReceipt(
                     (discarded == null || event.sequence > discarded)
                 ) discarded = event.sequence
             }
+            LOCAL_SUBAGENT_INBOX_MODEL_REPLY_EVENT -> {
+                val submitted = data["message_ids"] as? JsonArray ?: continue
+                if (submitted.any { it.jsonPrimitive.contentOrNull == id }) {
+                    data["background_job_id"]?.jsonPrimitive?.contentOrNull?.let {
+                        replyJobs += it to event.sequence
+                    }
+                }
+            }
             LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT -> {
                 val claimed = data["claimed_message_ids"] as? JsonArray ?: continue
                 if (claimed.any { it.jsonPrimitive.contentOrNull == id }) {
@@ -97,6 +110,10 @@ internal fun projectLocalTeamMessageReceipt(
     val checkpoint = checkpointJobs.asSequence()
         .filter { it.first == expectedJob && (queuedAt == null || it.second >= queuedAt) }
         .maxOfOrNull { it.second }
+    // A matching model reply is stronger than an Inbox checkpoint, but never proof of task success.
+    val reply = replyJobs.asSequence()
+        .filter { it.first == expectedJob && queuedAt != null && it.second >= queuedAt }
+        .maxOfOrNull { it.second }
     // Do not conclude delivery from a checkpoint alone if the queued event was outside the scan.
     return LocalTeamMessageReceipt(
         id = id,
@@ -106,6 +123,7 @@ internal fun projectLocalTeamMessageReceipt(
         discardedSequence = discarded,
         historyCheckpointSequence = if (queued != null) checkpoint else null,
         historyWindowComplete = historyWindowComplete,
+        modelReplySequence = if (checkpoint != null) reply else null,
     )
 }
 
