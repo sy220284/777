@@ -90,7 +90,7 @@ internal class SqliteSessionStorageManager(
                     }
                     zip.closeEntry()
                 }
-                written += mediaBackup.export(zip)
+                written += mediaBackup.export(zip, eventCopy)
             }
             return written
         } finally {
