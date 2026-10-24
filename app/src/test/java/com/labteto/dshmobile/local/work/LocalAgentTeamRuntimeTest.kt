@@ -1512,6 +1512,54 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun teamRoleIsAdmittedThroughRealToolAndPreservedAcrossFailedStart() = runBlocking {
+        val sessionId = "team-specialist-admission"
+        val f = fixture(sessionId)
+        val binding = LocalWorkRunBinding(
+            sessionId = sessionId,
+            initialState = LocalHarnessState(
+                sessionId = sessionId, usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = sessionId, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = sessionId, maxPendingInputs = 8),
+            eventLog = f.log,
+        )
+        f.runtime.execute(
+            memberTestToolCall("create-verifier", "team_create_member", buildJsonObject {
+                put("name", "verifier")
+                put("role", "verify")
+                put("description", "independently verify artifacts")
+            }), binding,
+        )
+        val created = f.runtime.project(sessionId).members.single()
+        assertEquals("verify", created.role)
+        assertEquals(LocalTeamMemberPhase.CREATED, created.phase)
+
+        val rejected = runCatching {
+            f.runtime.execute(memberTestToolCall("invalid-role", "team_create_member", buildJsonObject {
+                put("name", "malicious")
+                put("role", "superuser")
+            }), binding)
+        }
+        assertTrue(rejected.isFailure)
+        assertEquals(1, f.runtime.project(sessionId).members.size)
+
+        // The fixture intentionally rejects the actual Job start, but admission must already
+        // have derived a read-only tool scope and retained the role in durable Team events.
+        val response = f.runtime.execute(
+            memberTestToolCall("start-verifier", "team_start_member", buildJsonObject {
+                put("target", "verifier")
+                put("task", "audit"
+            }), binding,
+        )
+        assertTrue(response.orEmpty().contains("TEAM_MEMBER_START_REJECTED"))
+        val failed = f.runtime.project(sessionId).members.single()
+        assertEquals("verify", failed.role)
+        assertEquals(false, failed.mutableToolsEnabled)
+        assertEquals(LocalTeamMemberPhase.FAILED, failed.phase)
+    }
+
+    @Test
     fun dismissedMemberFreesCurrentRosterSlotForReplacement() = runBlocking {
         val sessionId = "team-roster-capacity"
         val fixture = fixture(sessionId)
