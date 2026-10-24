@@ -699,7 +699,9 @@ internal class LocalSubagentRunner(
                                     )
                                 },
                             )
-                        } else if (capabilities.teamManaged && call.name in LocalAgentTeamContract.TOOL_NAMES) {
+                        } else if (capabilities.teamManaged &&
+                            (call.name in LocalAgentTeamContract.TOOL_NAMES ||
+                                call.name in LocalAgentTeamContract.MEMBER_TOOL_NAMES)) {
                             requireNotNull(executeTeamTool) { "TEAM_CALLER_UNAVAILABLE" }(
                                 requireNotNull(backgroundJobId), call.toLocalToolCall(),
                             )
