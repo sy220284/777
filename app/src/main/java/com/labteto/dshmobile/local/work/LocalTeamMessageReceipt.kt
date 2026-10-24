@@ -119,8 +119,11 @@ internal fun readLocalTeamMessageReceipt(
     require(maxEvents in 1..25_600) { "TEAM_MESSAGE_RECEIPT_SCAN_LIMIT_INVALID" }
     require(id.matches(Regex("team-msg-[a-zA-Z0-9_-]{1,64}"))) { "TEAM_MESSAGE_RECEIPT_ID_INVALID" }
     val seen = ArrayList<LocalSessionEventLog.Event>()
-    var cursor = Long.MAX_VALUE
-    var expectedSequence = log.latestSequence()
+    // Pin a high-water mark: new messages appended during this read must never be
+    // mistaken for gaps or silently included in an inconsistent receipt snapshot.
+    val highWater = log.latestSequence()
+    var cursor = if (highWater >= 0L && highWater < Long.MAX_VALUE) highWater + 1L else Long.MAX_VALUE
+    var expectedSequence = highWater
     var complete = false
     var invalidGap = false
     while (seen.size < maxEvents) {
