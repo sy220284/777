@@ -248,6 +248,11 @@ internal class LocalSubagentRunner(
         val inheritHistory = capabilities.historyMode == LocalSubagentHistoryMode.INHERIT_PARENT
         val allowMutation = capabilities.allowMutation
         val backgroundJobId = spec.backgroundJobId
+        fun ensureTeamRootAuthorization() {
+            if (capabilities.teamManaged) {
+                backgroundJobId?.let { jobId -> requireTeamRootAuthorization?.invoke(jobId) }
+            }
+        }
         val parentCallId = spec.parentCallId
         val modelOverride = spec.modelOverride
         val maxSteps = spec.maxSteps
