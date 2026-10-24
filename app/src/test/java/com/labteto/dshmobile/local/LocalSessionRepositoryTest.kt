@@ -122,6 +122,7 @@ class LocalSessionRepositoryTest {
                     else -> "assistant"
                 },
                 content = "line-$i",
+                createdAt = i.toLong(),
             )
         }
         repository.enqueue(LocalHarnessSession(id = "preview", transcriptWindow = window))
