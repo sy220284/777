@@ -288,6 +288,7 @@ internal class LocalWorkAgentTurnExecutor(
             var improvementChecked = false
             var selectedImprovement: WorkImprovementAdvice? = null
             var improvementGoalId: String? = null
+            var improvementSteeringRevision: Long? = null
 
             fun settlePendingTools(reason: String) {
                 val settlements = pendingToolSettlements(
@@ -405,6 +406,7 @@ internal class LocalWorkAgentTurnExecutor(
                             selectedImprovement = advice
                             settledImprovement = advice
                             improvementGoalId = liveGoal.id
+                            improvementSteeringRevision = binding.steeringRevision.value
                             runEventLog.append(
                                 if (advice.active) "work/improvement-applied" else "work/improvement-trial",
                                 buildJsonObject {
@@ -424,6 +426,7 @@ internal class LocalWorkAgentTurnExecutor(
                     // durable base context. A new Goal or route cannot inherit the old advice.
                     val improvementGuidance = selectedImprovement?.takeIf { advice ->
                         liveGoal != null && liveGoal.id == improvementGoalId &&
+                            improvementSteeringRevision == binding.steeringRevision.value &&
                             snapshot.modelState.model == advice.model &&
                             (snapshot.modelState.modelSelection.activeProfileId ?: "") == advice.profileId &&
                             snapshot.modelState.modelSelection.activeProfile?.routeFingerprint().orEmpty() == advice.routeFingerprint &&
