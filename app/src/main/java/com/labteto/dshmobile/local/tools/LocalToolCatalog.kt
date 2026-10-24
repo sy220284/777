@@ -343,6 +343,11 @@ object LocalToolCatalog {
             "target" to string("teammate 名称"),
             "message" to string("消息内容"),
         ), listOf("target", "message")))
+        add(tool("team_ack_message", "成员明确确认普通协作消息：必须已经投递给本人、进入模型持久历史且有后续模型回复；handled 仅为本人处理声明，不证明任务完成。无法处理时用 cannot_handle 并附原因。请在收到消息后的下一轮模型步骤调用，不能在首次阅读该消息的同轮工具调用中直接确认", properties(
+            "message_id" to string("本人收到的 team-msg-* 普通消息 ID；不能代确认或确认关闭请求"),
+            "outcome" to string("handled 或 cannot_handle"),
+            "reason" to string("不能处理时必填原因；已处理时可填简短说明"),
+        ), listOf("message_id", "outcome")))
         add(tool("team_respond_shutdown", "团队成员批准或拒绝受信 Lead 的关闭请求；只有请求目标本人可回应，批准后撤销成员身份", properties(
             "request_id" to string("已投递的 team-msg-* 关闭请求ID"),
             "approve" to boolean("true 同意关闭；false 拒绝关闭"),
