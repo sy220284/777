@@ -76,20 +76,32 @@ object LocalToolCatalog {
         add(tool("media_image_status", "按任务 ID 查询当前会话已提交的真实图片生成回执与成果；不触发新的付费调用", properties(
             "job_id" to string("media_image_create 返回的任务 ID"),
         ), listOf("job_id")))
-        add(tool("web_search", "搜索最新公开网页信息；默认使用免密公共搜索，连接失败时可使用已配置的 DeepSeek 备用通道", properties(
+        add(tool("web_search", "联网搜索：配置了 DeepSeek 官方密钥时默认使用原生 Search API（按成功请求计费），否则使用免费的 Bing RSS；可用 provider 指定搜索服务", properties(
             "queries" to buildJsonObject {
                 put("type", "array")
-                put("description", "1 到 4 个搜索词")
+                put("description", "1 到 4 个搜索词，DeepSeek 单词条最多 128 个 Unicode 字符")
                 put("items", buildJsonObject { put("type", "string") })
             },
+            "provider" to buildJsonObject {
+                put("type", "string")
+                put("description", "auto 自动选择，bing 强制免费公共搜索，deepseek 强制原生 DeepSeek Search")
+                put("enum", buildJsonArray { add(JsonPrimitive("auto")); add(JsonPrimitive("bing")); add(JsonPrimitive("deepseek")) })
+            },
+            "count" to integerRange("DeepSeek 单个搜索词的结果数量，1～50，默认 10；Bing RSS 每词最多 8 条", min = 1, max = 50),
+            "need_content" to boolean("DeepSeek 搜索结果是否附加正文摘录，默认 false；详细正文推荐 web_fetch"),
         ), listOf("queries")))
-        add(tool("web_fetch", "通过 HTTPS 或 HTTP 获取网页内容；大响应会自动完整落盘并返回工作区路径", properties(
+        add(tool("web_fetch", "抓取指定网页正文；默认本机抓取，失败后可用已配置的 DeepSeek 官方 Fetch API（按成功请求计费）备用；provider=deepseek 可直接抓取 Markdown", properties(
             "url" to string("完整网址"),
-            "max_bytes" to integer("最多读取字节数，默认 4194304，最大 4194304"),
+            "max_bytes" to integer("最多读取字节数，默认 4194304，最大 4194304；适用于本机抓取"),
             "format" to buildJsonObject {
                 put("type", "string")
-                put("description", "text 提取可读文本，raw 保留原始响应；默认 text")
+                put("description", "text 提取可读文本，raw 保留原始响应；DeepSeek Fetch 仅支持 text")
                 put("enum", buildJsonArray { add(JsonPrimitive("text")); add(JsonPrimitive("raw")) })
+            },
+            "provider" to buildJsonObject {
+                put("type", "string")
+                put("description", "auto 本机优先、DeepSeek Fetch 备用；local 只用本机；deepseek 只用官方 Fetch")
+                put("enum", buildJsonArray { add(JsonPrimitive("auto")); add(JsonPrimitive("local")); add(JsonPrimitive("deepseek")) })
             },
             "run_in_background" to boolean("是否转为后台抓取任务；后台模式使用更长网络时限，默认 false"),
         ), listOf("url")))
