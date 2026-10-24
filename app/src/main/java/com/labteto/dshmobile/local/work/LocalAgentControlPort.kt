@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.buildLocalDelegatedLaunchSpec
 import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import com.labteto.dshmobile.local.jobs.LocalJobManager
+import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import kotlinx.serialization.json.JsonObject
 
 /** Typed control command. Model schemas are parsed only by the model-facing adapter. */
