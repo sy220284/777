@@ -2312,6 +2312,9 @@ class LocalAgentTeamRuntimeTest {
         // Even a newer child result cannot override an intervening USER instruction.
         f.log.append("user/message", buildJsonObject { put("content", "撤销旧任务，改做别的") })
         assertTrue(workflowUserRevision(f.log) > originalRevision)
+        assertTrue(runCatching {
+            f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+        }.exceptionOrNull() is LocalWorkflowSuperseded)
         f.log.append(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
             encodeLocalSubagentHistoryCheckpoint("job-team-1", "sa-team-1", 3,
                 emptyList(), emptySet(), terminalOutput = "过期的结果", resultId = "stale-after-user"))
