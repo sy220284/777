@@ -28,7 +28,7 @@ internal class LocalLegacySqliteMigration(
         for (id in oldIds.sorted()) {
             val old = legacySnapshots.read(id)?.document
             val existing = snapshots.read(id)?.document
-            if (old != null && existing != null) {
+            if (old != null && existing != null && !events.legacyImportCommitted(id)) {
                 check(existing.payload == old.payload) {
                     "旧会话 $id 与 SQLite 已有不同快照，禁止自动覆盖；原数据已保留"
                 }
