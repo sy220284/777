@@ -519,6 +519,7 @@ internal class LocalSubagentRunner(
             val loop = AgentTurnEngine(
                 model = AgentModel {
                     executionFence()
+                    ensureTeamRootAuthorization()
                     currentCoroutineContext().ensureActive()
                     val claimedForThisRequest = mutableListOf<com.labteto.dshmobile.harness.agent.QueuedAgentInput>()
                     backgroundJobId?.let { jobId ->
