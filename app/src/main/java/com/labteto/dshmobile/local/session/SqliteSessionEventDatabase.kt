@@ -5,6 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.labteto.dshmobile.harness.session.SessionEvent
+import com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalog
 import java.util.UUID
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -22,7 +23,7 @@ class SqliteSessionEventDatabase(
     private val json: Json,
     name: String = "local_session_events_v1.db",
     private val clock: () -> Long = System::currentTimeMillis,
-) : SQLiteOpenHelper(context, name, null, 2) {
+) : SQLiteOpenHelper(context, name, null, 3) {
     init { setWriteAheadLoggingEnabled(true) }
 
     override fun onConfigure(db: SQLiteDatabase) {
@@ -49,13 +50,15 @@ class SqliteSessionEventDatabase(
                 "ON session_events(session_id, event_type, sequence DESC)"
         )
         createCheckpointTable(db)
+        SqliteLocalAssetCatalog.createSchema(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        require(oldVersion == 1 && newVersion == 2) {
+        require(oldVersion in 1..2 && newVersion == 3) {
             "不支持的会话事件数据库版本：$oldVersion -> $newVersion"
         }
-        createCheckpointTable(db)
+        if (oldVersion < 2) createCheckpointTable(db)
+        SqliteLocalAssetCatalog.createSchema(db)
     }
 
     private fun createCheckpointTable(db: SQLiteDatabase) {
