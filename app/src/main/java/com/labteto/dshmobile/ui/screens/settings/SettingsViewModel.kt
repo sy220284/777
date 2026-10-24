@@ -357,6 +357,8 @@ class SettingsViewModel @Inject constructor(
         } ?: error("无法读取会话备份")
     }
 
+    suspend fun cancelStagedSessionRestore(): Boolean = localHarness.cancelStagedSessionRestore()
+
     suspend fun environmentInfo(): String = localHarness.environmentInfo()
 
     suspend fun diagnosticReport(): String = localHarness.diagnosticReport()
