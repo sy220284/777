@@ -5,17 +5,31 @@ import com.labteto.dshmobile.local.files.LocalSkillMetadata
 import java.util.Locale
 import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
 
+private const val MAX_EAGER_SKILL_GUIDANCE_CHARS = 18_000
+
 /** Selected skill instructions are loaded once per model step and never persisted in history. */
 internal fun resolveLocalWorkSkillGuidance(
     workspace: LocalWorkspace,
     input: String,
     selectedInvocations: List<LocalPinnedInvocation> = emptyList(),
 ): String {
+    // Explicit selection is the strongest instruction source. Reserve its budget
+    // before auto-pinned instructions so a long pinned set cannot hide the user's choice.
+    val explicitName = Regex("^@skill:([a-z][a-z0-9-]{1,47})(?:\\r?\\n|$)").find(input)?.groupValues?.get(1)
+    val explicitDocument = explicitName?.let { name ->
+        try {
+            workspace.readSkill(name)
+        } catch (error: Exception) {
+            throw IllegalArgumentException("所选技能 ${name} 已移除或无法读取，请返回技能页重新选择。", error)
+        }
+    }
+    var remainingChars = MAX_EAGER_SKILL_GUIDANCE_CHARS
+    val explicitExcerpt = explicitDocument?.take(remainingChars)?.also { remainingChars -= it.length }
     val pinnedConnectors = selectedInvocations.filter {
         it.kind == LocalPinnedInvocation.Kind.CONNECTOR
     }.joinToString("、") { it.id }
     val pinnedSkills = selectedInvocations.filter {
-        it.kind == LocalPinnedInvocation.Kind.SKILL
+        it.kind == LocalPinnedInvocation.Kind.SKILL && it.id != explicitName
     }.map { selection ->
         val document = try {
             workspace.readSkill(selection.id)
@@ -28,7 +42,6 @@ internal fun resolveLocalWorkSkillGuidance(
     // discovery/tool call is required. Keep model history free of repeated instructions.
     // Keep several pinned skills from overwhelming each model step. Each skill can still
     // be retrieved in full through skill(name), including user-only skills explicitly pinned.
-    var remainingChars = 18_000
     val pinnedSkillInstructions = pinnedSkills.joinToString("\n\n") { (name, document) ->
         val excerpt = document.take(remainingChars.coerceAtLeast(0))
         remainingChars -= excerpt.length
@@ -46,24 +59,18 @@ internal fun resolveLocalWorkSkillGuidance(
         $pinnedSkillInstructions
         [固定来源结束]
     """.trimIndent()
-    val marker = Regex("^@skill:([a-z][a-z0-9-]{1,47})(?:\\r?\\n|$)")
-    val match = marker.find(input)
-    if (match != null) {
-        val name = match.groupValues[1]
-        val document = try {
-            workspace.readSkill(name)
-        } catch (error: Exception) {
-            throw IllegalArgumentException("所选技能 ${name} 已移除或无法读取，请返回技能页重新选择。", error)
-        }
+    if (explicitName != null) {
+        val document = checkNotNull(explicitDocument)
+        val excerpt = checkNotNull(explicitExcerpt)
+        val full = excerpt.length == document.length
         return """
-            [本轮技能已加载：${name}]
+            [本轮技能已加载：${explicitName}]
             用户明确选择了此技能。以下技能文件仅提供执行方法和默认约定；与本轮用户明确要求冲突时以用户要求为准，不得仅因技能规则拒绝执行。
-            ${document}
-            [技能规则结束]
+            ${excerpt}
+            ${if (full) "[技能规则结束]" else "[内容较长，已限制本轮自动注入；请调用 skill(name=$explicitName) 读取完整文档。不能假定未加载部分已阅读。]"}
             $pinnedNote
         """.trimIndent()
     }
-
     val requested = relevantSkillIdsForTask(input)
     val installed = workspace.skills().mapNotNull { name ->
         val metadata = try {
@@ -76,7 +83,13 @@ internal fun resolveLocalWorkSkillGuidance(
         name to metadata
     }
     val eligibleCount = installed.count { it.second.modelInvocable }
-    val lines = discoverLocalWorkSkills(input, requested, installed).map { (name, metadata) ->
+    // Installed front matter is the editable activation authority. The built-in
+    // keyword table remains only a compatibility fallback for old skills that
+    // have no when-to-use trigger; it must not outrank a user-maintained rule.
+    val compatibilityRequested = requested.filterTo(linkedSetOf()) { name ->
+        installed.firstOrNull { it.first == name }?.second?.whenToUse.isNullOrBlank()
+    }
+    val lines = discoverLocalWorkSkills(input, compatibilityRequested, installed).map { (name, metadata) ->
         val details = metadata.whenToUse?.takeIf(String::isNotBlank)?.let { "；适用：$it" }.orEmpty()
         "$name：" + metadata.description + details
     }
