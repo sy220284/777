@@ -89,6 +89,8 @@ object LocalToolCatalog {
             },
             "count" to integerRange("DeepSeek 单个搜索词的结果数量，1～50，默认 10；Bing RSS 每词最多 8 条", min = 1, max = 50),
             "need_content" to boolean("DeepSeek 搜索结果是否附加正文摘录，默认 false；详细正文推荐 web_fetch"),
+            "ori_question" to string("可选，触发搜索的原始用户问题；1～128 个 Unicode 字符"),
+            "localization" to string("可选，用于本地化搜索结果的 IP 地址；不提供时由服务商自行处理"),
         ), listOf("queries")))
         add(tool("web_fetch", "抓取指定网页正文；默认本机抓取，失败后可用已配置的 DeepSeek 官方 Fetch API（按成功请求计费）备用；provider=deepseek 可直接抓取 Markdown", properties(
             "url" to string("完整网址"),
