@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalModelConfigurationCoordinator
 import com.labteto.dshmobile.local.LocalWebProvider
+import com.labteto.dshmobile.local.LocalWebException
 import java.net.URI
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -22,7 +23,15 @@ internal class LocalChatWebContextProvider @Inject constructor(
         val result = try {
             when (lookup) {
                 is ChatWebLookup.Page -> {
-                    val fetched = web.fetch(lookup.url, maxBytes = 16 * 1024)
+                    val fetched = try {
+                        web.fetch(lookup.url, maxBytes = 16 * 1024)
+                    } catch (failure: LocalWebException) {
+                        if (failure.code !in setOf("HTTP_4XX", "HTTP_5XX", "DNS_FAILED", "TIMEOUT", "NETWORK_ERROR")) {
+                            throw failure
+                        }
+                        val key = configuration.resolveDeepSeekSearchCredential() ?: throw failure
+                        web.fetchViaDeepSeek(key, lookup.url)
+                    }
                     "网页：" + fetched.url + "\n" + fetched.content.take(6_000)
                 }
                 is ChatWebLookup.Search -> if (lookup.cacheable) searchCached(lookup.query)
