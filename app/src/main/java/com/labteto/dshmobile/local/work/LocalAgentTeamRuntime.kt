@@ -2126,6 +2126,9 @@ internal class LocalAgentTeamRuntime(
         val state = project(sessionId)
         require(state.failure == null) { "TEAM_PROJECTION_INVALID：不能使用损坏的团队授权" }
         val member = state.members.singleOrNull { it.jobId == jobId } ?: return
+        // The Job may begin before its provisioning event is promoted to ACTIVE.
+        // No task owner can be bound in PROVISIONING, so leave initial admission intact.
+        if (member.phase == LocalTeamMemberPhase.PROVISIONING) return
         if (member.phase != LocalTeamMemberPhase.ACTIVE) throw LocalWorkflowSuperseded()
         val assigned = state.tasks.singleOrNull {
             it.ownerId == member.id && it.status == LocalTeamTaskStatus.IN_PROGRESS
