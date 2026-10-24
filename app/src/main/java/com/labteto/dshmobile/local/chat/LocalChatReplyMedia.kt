@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.chat
 
 import android.graphics.BitmapFactory
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import com.labteto.dshmobile.local.attachment.commitImportedAttachmentFile
 import com.labteto.dshmobile.local.attachment.LocalMessageMediaPolicy
 import com.labteto.dshmobile.local.model.LOCAL_IMAGE_REF
 import com.labteto.dshmobile.local.model.LocalCanonicalContent
@@ -189,12 +190,9 @@ private fun materializeGeneratedImage(
             else -> error("不支持的模型图片格式：$actualMediaType")
         }
         val target = File(dir, "$digest.$extension")
-        if (target.exists()) {
-            incoming.delete()
-        } else if (!incoming.renameTo(target)) {
-            incoming.copyTo(target, overwrite = false)
-            incoming.delete()
-        }
+        // The same content-addressed publication rule as picker/MCP images:
+        // verify pre-existing bytes and never replace an unverified target.
+        commitImportedAttachmentFile(incoming, target)
 
         return LocalImportedAttachment(
             name = "模型图片-$ordinal-${digest.take(8)}.$extension",
