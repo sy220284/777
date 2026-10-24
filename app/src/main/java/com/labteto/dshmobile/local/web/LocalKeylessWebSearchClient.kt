@@ -18,7 +18,10 @@ import org.xml.sax.InputSource
  * Keyless public-web search, independent of the selected LLM account.
  * Only the pinned Bing RSS endpoint is queried; no HTML SERP scraping or hosted app backend.
  */
-internal class LocalKeylessWebSearchClient(private val http: OkHttpClient) {
+internal class LocalKeylessWebSearchClient(
+    private val http: OkHttpClient,
+    private val onSearchCompleted: () -> Unit = {},
+) {
     suspend fun search(queries: List<String>): String = withContext(Dispatchers.IO) {
         val clean = queries.map(String::trim).filter(String::isNotBlank).distinct().take(4)
         require(clean.isNotEmpty()) { "至少需要一个搜索词" }
@@ -47,7 +50,9 @@ internal class LocalKeylessWebSearchClient(private val http: OkHttpClient) {
                 if (bounded.truncated) {
                     throw LocalWebException("RESPONSE_TOO_LARGE", "公共搜索响应超过大小上限")
                 }
-                parseKeylessSearchRss(query, bounded.bytes.toString(Charsets.UTF_8))
+                parseKeylessSearchRss(query, bounded.bytes.toString(Charsets.UTF_8)).also {
+                    onSearchCompleted()
+                }
             }
         } catch (error: LocalWebException) {
             throw error
