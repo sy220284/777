@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.agent.LocalAgentDelegationKind
+import com.labteto.dshmobile.local.agent.bindLocalAgentRole
 import com.labteto.dshmobile.local.agent.buildLocalDelegatedLaunchSpec
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.tools.boolean
@@ -49,7 +50,12 @@ internal class LocalAgentControlPlane(
         return when (call.name) {
             "subagent", "spawn_subagent" -> {
                 val task = args.string("task")
-                val instructions = args.optionalString("instructions").orEmpty()
+                val roleBinding = bindLocalAgentRole(
+                    requested = args.optionalString("role"),
+                    userInstructions = args.optionalString("instructions").orEmpty(),
+                    parentMutationAllowed = false,
+                )
+                val instructions = roleBinding.instructions
                 val model = LocalWorkerModelRouter.resolve(args.optionalString("model"), snapshot)
                 val maxSteps = LocalAgentRuntimeLimits.normalizeSubagentSteps(
                     args.int("max_steps", snapshot.subagentMaxSteps),
@@ -91,19 +97,26 @@ internal class LocalAgentControlPlane(
                     )
                 }
             }
-            "subagent_fork", "fork_subagent" -> runner.run(
-                buildLocalDelegatedLaunchSpec(
-                    kind = LocalAgentDelegationKind.FORK,
-                    task = args.string("task"),
-                    instructions = args.optionalString("instructions").orEmpty(),
-                    modelOverride = LocalWorkerModelRouter.resolve(null, snapshot),
-                    maxSteps = snapshot.subagentMaxSteps,
-                    parentCallId = call.id,
-                    allowMutation = allowMutation,
-                    toolAllowlist = args.toolAllowlist(),
-                    outputSchema = args.outputSchema(),
-                ),
-            )
+            "subagent_fork", "fork_subagent" -> {
+                val roleBinding = bindLocalAgentRole(
+                    requested = args.optionalString("role"),
+                    userInstructions = args.optionalString("instructions").orEmpty(),
+                    parentMutationAllowed = allowMutation,
+                )
+                runner.run(
+                    buildLocalDelegatedLaunchSpec(
+                        kind = LocalAgentDelegationKind.FORK,
+                        task = args.string("task"),
+                        instructions = roleBinding.instructions,
+                        modelOverride = LocalWorkerModelRouter.resolve(null, snapshot),
+                        maxSteps = snapshot.subagentMaxSteps,
+                        parentCallId = call.id,
+                        allowMutation = roleBinding.allowMutation,
+                        toolAllowlist = args.toolAllowlist(),
+                        outputSchema = args.outputSchema(),
+                    ),
+                )
+            }
             "list_subagent_models" -> {
                 val saved = modelGateway.configuredProfiles()
                 val readyIds = modelGateway.availableProfiles().mapTo(mutableSetOf()) { it.id }

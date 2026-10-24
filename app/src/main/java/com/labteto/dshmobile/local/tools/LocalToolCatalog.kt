@@ -215,6 +215,7 @@ object LocalToolCatalog {
         add(tool("subagent", "统一的只读子代理入口：可隔离执行或继承当前对话上下文，同一工具块中多个调用可并行；始终禁止写入。需带写入权限的子代理仍须使用独立授权的 subagent_fork", properties(
             "task" to string("交给子代理的完整任务"),
             "instructions" to string("可选；该子代理持续遵循的工作规则，不会扩大工具或权限"),
+            "role" to string("专业角色：general、explore、plan、verify、review；只读入口不能选择 execute 或 integrate"),
             "context_mode" to buildJsonObject {
                 put("type", "string")
                 put("description", "isolated 只传任务（默认）；inherit 前台只读继承父会话历史，不能与后台或虚拟屏共用")
@@ -232,6 +233,7 @@ object LocalToolCatalog {
         add(tool("subagent_fork", "需要继承父会话当前操作权限时使用的高级代理入口；可能具有写入权限。纯阅读分析请使用 subagent 的 context_mode=inherit", properties(
             "task" to string("需要结合当前上下文处理的任务"),
             "instructions" to string("可选；继承上下文之外，额外约束该子代理持续遵循的工作规则"),
+            "role" to string("专业角色：general、explore、plan、execute、verify、review、integrate；只读角色会收窄实际工具权限"),
             "output_schema" to jsonSchemaObject("可选；要求子代理最终只返回符合该 JSON Schema 的对象"),
             "allowed_tools" to stringArray("可选；限制 fork 子代理可见且可执行的工具名"),
         ), listOf("task")))
