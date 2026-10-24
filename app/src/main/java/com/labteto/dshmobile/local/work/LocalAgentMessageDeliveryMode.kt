@@ -47,8 +47,8 @@ internal fun renderLocalAgentMessageSubmission(
         append("\nduplicate=").append(duplicate)
         append("\ndelivery_mode=").append(mode.wireValue)
         append("\nwake_requested=").append(wakeRequested)
-        append("\nprocessing_status=unverified")
-        append("\ncompletion_status=unverified")
+        append("\nprocessing_status=").append(if (accepted) "unverified" else "not_admitted")
+        append("\ncompletion_status=").append(if (accepted) "unverified" else "not_admitted")
         if (!accepted) rejection?.let { append("\nreason=").append(it) }
     }
 }

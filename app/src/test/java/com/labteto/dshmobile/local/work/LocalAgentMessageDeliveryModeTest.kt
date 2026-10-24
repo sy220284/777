@@ -63,6 +63,7 @@ class LocalAgentMessageDeliveryModeTest {
         assertTrue(rejected.contains("accepted=false"))
         assertTrue(rejected.contains("wake_requested=false"))
         assertTrue(rejected.contains("reason=inbox full"))
+        assertTrue(rejected.contains("processing_status=not_admitted"))
     }
 
     @Test fun duplicateAcceptanceIsNotASecondProcessingAcknowledgement() {
