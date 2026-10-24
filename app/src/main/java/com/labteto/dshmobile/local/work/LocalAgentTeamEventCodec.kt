@@ -125,6 +125,7 @@ internal object LocalAgentTeamEventCodec {
             autoDispatchMessageId = task.optionalTeamString("autoDispatchMessageId")?.also {
                 require(it.matches(Regex("team-msg-[a-f0-9]{20}"))) { "TEAM_TASK_AUTO_DISPATCH_ID_INVALID" }
             },
+            rootUserRevision = task["rootUserRevision"]?.jsonPrimitive?.longOrNull,
         )
     }
 
