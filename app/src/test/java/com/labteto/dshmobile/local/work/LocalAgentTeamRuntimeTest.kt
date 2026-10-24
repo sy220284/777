@@ -169,7 +169,7 @@ class LocalAgentTeamRuntimeTest {
         }), binding)
         val request = requireNotNull(f.log.latestMatching(
             setOf(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED),
-        ) { event -> LocalAgentTeamEventCodec.decodeMessage(event.data).kind == LocalTeamMessageKind.SHUTDOWN_REQUEST })
+        ) { event -> LocalAgentTeamEventCodec.decodeMessage(event).kind == LocalTeamMessageKind.SHUTDOWN_REQUEST })
         val requestId = LocalAgentTeamEventCodec.decodeMessage(request.data).id
         val owners = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
         val identity = com.labteto.dshmobile.harness.agent.AgentRunIdentity(session, "child:sa-team-1", "shutdown-run")
