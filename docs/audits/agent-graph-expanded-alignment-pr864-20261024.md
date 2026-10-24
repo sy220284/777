@@ -114,3 +114,12 @@
 - 新增只读 `team_task_evidence`：从原 Session EventLog 以持久 `result_id`、checkpoint sequence、owner job、任务 in_progress 事实做关联复核，明确 `content_verified=false`、`independent_reviewed=false`、`goal_accepted=false`。附带真实、缺失及伪造证据的回归测试。无新消息/成果事实源。
 - 这些代码增强了**功能覆盖**，并不自动满足所有 Codex/Claude 生命周期与独立验证语义。剩余必做：统一 resolve/admission/ensure_loaded、全树父子安全收敛、多拓扑可写组合、真正独立 Verifier/IntegrationDecision/Goal、强工作区隔离、多后端和 84 场景验收。
 - 本次静态核查及提交记录不能替代最新 SHA 的 Kotlin/Android CI；**PR 保留 Draft、禁止未验证合并**。
+
+
+## 2026-10-25 本轮：独立审查声明的持久核验（E08/D16 增量）
+
+- 上轮 HEAD `49645c1b` 的 CI：scope、static、architecture、ARM64、Android 16/17 和 Android Page Size Matrix 成功；`unit-tests` 在 3052 个用例中有 2 个失败，源于 `agent_inspect/watch/resume/close` 新工具未登记 `ToolExposure.OPTIONAL`。本轮已修正该缺失，不以旧 SHA 的成功冒充新 HEAD 通过。
+- 新增 `team_task_review`：仅 Lead 控制且需要工具审批。需要另一名 active 的 `verify/review` 专职成员，严禁任务原执行者自审；审核成员必须拥有真实本会话持久 Agent Job、在原任务完成后留下自己的结果检查点。
+- Reviewer 的终态模型文本必须是严格 JSON，包含 `task_id`、`reviewed_result_id`、`verdict: approve/reject`、`reason`。运行端验证目标任务版本、原执行结果 ID、审核成员 Job 与审核结果序号，拒绝不匹配、缺失、结构错误、重复审查；之后把单次事件 `team/task/review` 写回原 Team EventLog，升级 Projection stateVersion 到 9。
+- Reducer 重放检查 reviewer 独立身份、角色、事件次序及 task/result 绑定；冷恢复查询 `team_task_evidence` **再次验证**审核检查点与结构化输出，给出 `review_evidence_binding_valid`。已新增执行、拒绝路径及冷恢复回归测试。
+- **性质限制：** `verdict=approve` 是独立模型 reviewer 的可追溯判断，不等于文件 SHA、真实测试 exitCode、客观内容正确性、Integrate 合并门禁或 Goal 已完成。审查记录现已持久化，但自动 Goal 结算联动、可重现物证和多后端的完整语义尚待后续功能实施；必须以本 HEAD CI 最终结果验收。
