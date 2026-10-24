@@ -193,6 +193,61 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun completedTeammateTurnStaysIdleAndKeepsDurableInboxForNextTurn() = runBlocking {
+        val sessionId = "team-idle-multiple-prompts"
+        lateinit var jobManager: LocalJobManager
+        val f = fixture(
+            sessionId,
+            sender = { jobId, input, session ->
+                jobManager.sendInput(jobId, input, session)
+            },
+        )
+        jobManager = f.jobs
+        appendActiveMember(f.log, sessionId)
+        val first = f.jobs.startPersistentResult(
+            label = "子代理：teammate initial turn",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = sessionId,
+            continuable = true,
+            requestedId = "job-team-1",
+        ) { _, _ -> "initial result" }
+        assertTrue(first.accepted)
+        assertEquals("job-team-1", first.id)
+        kotlinx.coroutines.withTimeout(3_000L) {
+            while (f.jobs.snapshotInfos().first { it.id == "job-team-1" }.status !in
+                setOf("completed", "dormant")) {
+                kotlinx.coroutines.yield()
+            }
+        }
+        assertEquals("idle", f.runtime.uiState(sessionId).members.single().activity)
+        assertEquals(LocalTeamMemberPhase.ACTIVE, f.runtime.project(sessionId).members.single().phase)
+
+        val binding = LocalWorkRunBinding(
+            sessionId = sessionId,
+            initialState = LocalHarnessState(
+                sessionId = sessionId, usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = sessionId, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = sessionId, maxPendingInputs = 8),
+            eventLog = f.log,
+        )
+        val result = f.runtime.execute(
+            memberTestToolCall("next-prompt", "team_send_message", buildJsonObject {
+                put("target", "worker")
+                put("message", "Second task after idle")
+            }),
+            binding,
+        ).orEmpty()
+        assertTrue(result.contains("已投递"))
+        assertEquals(1, f.jobs.peekMessages("job-team-1").size)
+        assertEquals(LocalTeamMemberPhase.ACTIVE, f.runtime.project(sessionId).members.single().phase)
+        // Durable Inbox acceptance is the boundary; the coordinator must still admit a
+        // subsequent turn. Do not pretend the second message was processed already.
+        assertEquals(1, f.runtime.uiState(sessionId).members.single().pendingMessageCount)
+    }
+
+    @Test
     fun trustedMembersSendPeerLeadAndReadOwnDurableMailbox() = runBlocking {
         val received = mutableListOf<QueuedAgentInput>()
         val leadInbox = mutableListOf<QueuedAgentInput>()
