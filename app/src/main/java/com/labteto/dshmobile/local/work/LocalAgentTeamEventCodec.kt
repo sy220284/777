@@ -53,6 +53,8 @@ internal object LocalAgentTeamEventCodec {
             put("writeScopes", JsonArray(writeScopes.map(::JsonPrimitive)))
             autoDispatchMessageId?.let { put("autoDispatchMessageId", it) }
             rootUserRevision?.let { put("rootUserRevision", it) }
+            completionResultId?.let { put("completionResultId", it) }
+            completionEvidenceSequence?.let { put("completionEvidenceSequence", it) }
         })
     }
 
@@ -129,6 +131,11 @@ internal object LocalAgentTeamEventCodec {
             rootUserRevision = if ("rootUserRevision" in task) {
                 task["rootUserRevision"]?.jsonPrimitive?.longOrNull
                     ?: error("TEAM_TASK_USER_REVISION_INVALID")
+            } else null,
+            completionResultId = task.optionalTeamString("completionResultId"),
+            completionEvidenceSequence = if ("completionEvidenceSequence" in task) {
+                task["completionEvidenceSequence"]?.jsonPrimitive?.longOrNull
+                    ?: error("TEAM_TASK_COMPLETION_EVIDENCE_INVALID")
             } else null,
         )
     }
