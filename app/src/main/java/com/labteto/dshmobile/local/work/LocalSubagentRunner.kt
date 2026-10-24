@@ -663,7 +663,14 @@ internal class LocalSubagentRunner(
                                         "NESTED_DELEGATION_RUNNER_UNAVAILABLE"
                                     }().runResult(
                                         spec = childSpec,
-                                        executionFence = executionFence,
+                                        executionFence = {
+                                            executionFence()
+                                            // The descendant must stop if its parent Run lost ownership;
+                                            // a live coroutine alone is not evidence of current authority.
+                                            runContext?.let { parentContext ->
+                                                runCoordinator?.ensureCurrentOwner(parentContext)
+                                            }
+                                        },
                                         subtreeBudget = subtreeBudget,
                                     )
                                 }
