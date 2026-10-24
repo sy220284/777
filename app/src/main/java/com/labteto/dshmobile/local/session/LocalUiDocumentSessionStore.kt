@@ -111,7 +111,7 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
 
     internal fun actionReceipt(request: UiDocumentActionRequest): UiCommandReceipt? =
         logs.get(request.source.sessionId).withWriterLease {
-            latestActionReceipt(this, actionKey(request))
+            latestActionReceipt(logs.get(request.source.sessionId), actionKey(request))
         }
 
     internal fun submitActionOnce(
