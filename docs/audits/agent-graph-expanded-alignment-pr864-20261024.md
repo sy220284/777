@@ -15,7 +15,7 @@
 |---|---|---|---|
 | A01 多级代理树 | 部分落地 | `LocalNestedAgentDispatcher.kt`、`LocalSubagentCapabilities.kt`、`LocalAgentTreeProjection.kt` | 仅前台只读最多 3 层；持久 Team/Fork/设备混合深度、generation 与全树路径控制不完整 |
 | A02 混合拓扑 | 部分落地 | `LocalAgentTeamRuntime.kt`、`LocalWorkSubagentRuntime.kt` | Team、TaskGraph、同步树仍未形成统一混合任务身份、所有权与 DAG 结算 |
-| A03 统一控制 API | 部分落地 | `LocalAgentControlPort.kt` | 当前 Port 为 delegate/list/tree/send/interrupt，缺完整 resume/close/watch/inspect 与跨 Team 统一准入 |
+| A03 统一控制 API | 部分落地（本轮增强） | `LocalAgentControlPort.kt`、`LocalAgentControlPlane.kt` | 已有 delegate/list/tree/send/inspect/watch/interrupt/resume/close，并统一 Lead Team 入口；仍缺 Codex resolve/ensure_loaded/turn-admission/usage 与跨混合子树的统一事务 |
 | A04 角色系统 | 部分落地 | `LocalAgentRolePolicy.kt` | 7 个静态 preset，有只读限权；缺需求清单中完整角色、角色注册及版本冻结 |
 | A05 自定义代理与技能绑定 | 有基础 | `LocalAgentRolePolicy.kt`，既有技能工具 | 没有审计到版本化 AgentSkillBinding、角色+技能+grant 独立注册和生命周期 |
 | A06 动态任务图 | 部分落地 | `LocalAgentTeamRuntime.kt` Task CRUD、`LocalWorkSubagentRuntime.kt` TaskGraph | 尚无 Goal 驱动的自动分解/重规划与多代理分支回收闭环 |
@@ -55,7 +55,7 @@
 | D11 BudgetLease | 部分：`LocalAgentSubtreeBudget.kt` | 生命周期/TTL/树级租约回收 |
 | D12 ExecutionBackend | 未落地 | 本地隔离进程/可信远程能力接口和真实实现 |
 | D13 WorkspaceGrant | 未落地 | 执行层路径/命令/worktree 强 ACL |
-| D14 EvidenceRef | 部分：Team `completionResultId` + `completionEvidenceSequence`，TaskGraph outputs | 工件 SHA、测试 exitCode、跨 Goal 事实引用一致性 |
+| D14 EvidenceRef | 部分（本轮增强）：Team `completionResultId` + `completionEvidenceSequence`，新增只读 `team_task_evidence` 冷恢复关联复核，TaskGraph outputs | 仍缺内容级工件 SHA、测试 exitCode、独立 reviewer 与 Goal 事实引用一致性 |
 | D15 IntegrationDecision | 未落地 | approved/rejected/conflicted/review Gate |
 | D16 VerificationRecord | 有基础但未落地完整契约：Goal 机器接受 vs 独立审查 | 证据+verifier 身份+反例+判决 |
 | D17 LifecycleSnapshot | 部分：Run/Job/Team 多个投影 | 统一 admitted→dormant→unverifiable→terminal 执行后端状态 |
@@ -67,7 +67,7 @@
 |---|---|---|
 | E00 | 部分 | 资料快照和源文件映射有；没有实测三方 fixture 基线与成本指标 |
 | E01 | 代码修复存在、待验证 | Team fork allowMutation 与冷热 Inbox modelMessage 修复已有代码；以最新 CI/Android 为准 |
-| E02 | 部分 | typed Port/树/消息已接入，API 与统一结果 envelope 不全 |
+| E02 | 部分（本轮增强） | Port 已接入 Lead Team 控制和 inspect/watch/pause/resume/close；完整 resolve/准入、跨树身份和统一结果 Envelope 仍缺 |
 | E03 | 部分 | 静态角色+有限 allowlist，Agent 技能绑定/完整 grant 缺 |
 | E04 | 部分 | Team 根用户版本可在模型/工具边界检查；非全子树 Context+Memory 版本撤销 |
 | E05 | 部分 | 已有 Goal、TaskGraph、Team，但动态统一派单到 Goal 的集成闭环缺 |
@@ -104,3 +104,13 @@
 ## 严格结论
 
 **截至本次审计，A01–A24 没有任何一项获得“完整运行语义、全量计划范围、所有验收场景均通过”的证明。代码上多项有实质部分实现，A15/A20/A23/A24 等目标尤其明显未闭环；D01–D18、E00–E14 亦未全对齐。不能据此宣称 777 现在已达到完整 Codex/Claude 的执行效果。**
+
+
+## 2026-10-24 功能重构续推：统一 AgentControl 生命周期 + Team 证据重验
+
+- 新增模型工具 `agent_inspect`（源 Job 快照）、`agent_watch`（有界观察游标）、`agent_resume`（选定 Agent 安全恢复）、`agent_close`（永久取消），`interrupt_agent` 改为只中断可续跑 Agent Activation、保留身份与 Inbox。控制面通过单一 `LocalAgentControlPort` 接入 Lead Team 指令；Team 成员继续受自己的来源身份与事件投影管理，不允许普通 Agent 关闭命令绕过 Team。
+- `LocalPersistentJobRecoveryCoordinator` 使用 `pendingTargetedAgents` 精确限制显式恢复 Job ID，普通会话恢复逻辑保留；模型工具层 `agent_resume` 仅允许当前会话已有持久只读代理、有效暂停态和消息/安全执行片。回执仅声明恢复已请求，不声称模型已启动或完成。
+- `LocalAgentLifecycleControlTest` 验证会话所有权、非代理拒绝、不同恢复状态、Job 实际中断与永久关闭的 Inbox 行为和定向恢复筛选；工具策略同时登记读观察与需审批的生命周期变更。
+- 新增只读 `team_task_evidence`：从原 Session EventLog 以持久 `result_id`、checkpoint sequence、owner job、任务 in_progress 事实做关联复核，明确 `content_verified=false`、`independent_reviewed=false`、`goal_accepted=false`。附带真实、缺失及伪造证据的回归测试。无新消息/成果事实源。
+- 这些代码增强了**功能覆盖**，并不自动满足所有 Codex/Claude 生命周期与独立验证语义。剩余必做：统一 resolve/admission/ensure_loaded、全树父子安全收敛、多拓扑可写组合、真正独立 Verifier/IntegrationDecision/Goal、强工作区隔离、多后端和 84 场景验收。
+- 本次静态核查及提交记录不能替代最新 SHA 的 Kotlin/Android CI；**PR 保留 Draft、禁止未验证合并**。
