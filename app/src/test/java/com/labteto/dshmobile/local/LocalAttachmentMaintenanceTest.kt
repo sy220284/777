@@ -168,6 +168,52 @@ class LocalAttachmentMaintenanceTest {
     }
 
     @Test
+    fun genuineTranscriptImageBlockIsPreservedFromSnapshotAndEvents() {
+        val root = kotlin.io.path.createTempDirectory("attachment-real-transcript-").toFile()
+        try {
+            val img = png(File(root, ".dsh/attachments/transcript.png"), 32)
+            img.setLastModified(1L)
+            val persisted = buildJsonObject {
+                put("transcript", buildJsonArray {
+                    add(buildJsonObject {
+                        put("blocks", buildJsonArray {
+                            add(buildJsonObject {
+                                put("kind", "image")
+                                put("path", ".dsh/attachments/transcript.png")
+                                put("attachment_id", "transcript")
+                                put("media_type", "image/png")
+                            })
+                        })
+                    })
+                })
+            }
+            val refs = collectAuthoritativeLocalImageAttachmentReferences(
+                sessionIds = setOf("current", "other-session"),
+                currentSessionId = "current",
+                readEventReferences = { id ->
+                    if (id == "other-session") {
+                        collectLocalImageAttachmentReferences(
+                            emptySequence(), extraMessages = listOf(persisted),
+                        )
+                    } else LocalImageAttachmentReferences(emptySet(), emptySet())
+                },
+                readSnapshot = { id ->
+                    if (id == "other-session") persisted else null
+                },
+            )
+            assertEquals(setOf("transcript"), refs.attachmentIds)
+            assertEquals(setOf(".dsh/attachments/transcript.png"), refs.paths)
+            val result = cleanupLocalImageAttachments(
+                root, refs, nowMillis = 20_000_000L, graceMillis = 1_000L, maxImageBytes = 1L,
+            )
+            assertEquals(0, result.deletedFiles)
+            assertTrue(img.exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun failedAuthoritativeScanDoesNotStartDestructiveCleanup() {
         val root = kotlin.io.path.createTempDirectory("attachment-scan-fails-").toFile()
         try {
