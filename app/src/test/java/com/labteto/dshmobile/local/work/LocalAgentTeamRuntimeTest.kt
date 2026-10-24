@@ -255,6 +255,56 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun coldRecoveryFinalizesApprovedShutdownAndRejectsForgedActor() {
+        val session = "shutdown-recovery"
+        val toLead = mutableListOf<QueuedAgentInput>()
+        val f = fixture(session,
+            sender = { _, _, _ -> JobMessageAdmission(true, false, false, "accepted") },
+            leadSender = { _, input -> toLead += input; true },
+        )
+        appendActiveMember(f.log, session)
+        startLiveChild(f, session)
+        val requestId = "team-msg-aabbccddeeff11223344"
+        val request = LocalTeamMessageSnapshot(
+            id = requestId, senderId = session, senderName = "lead",
+            targetId = "member-1", content = "请批准退出",
+            kind = LocalTeamMessageKind.SHUTDOWN_REQUEST,
+        )
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
+            with(LocalAgentTeamEventCodec) { request.toEvent(session) })
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED,
+            teamDelivered(session, requestId, "member-1"))
+        f.log.append(LocalAgentTeamContract.TEAM_SHUTDOWN_RESPONSE, buildJsonObject {
+            put("version", LocalAgentTeamContract.TEAM_EVENT_VERSION)
+            put("teamId", session); put("requestId", requestId)
+            put("memberId", "member-1"); put("approved", true); put("reason", "交接完毕")
+        })
+        f.runtime.recoverMailbox(session)
+        assertNull(f.runtime.project(session).failure)
+        assertEquals(LocalTeamMemberPhase.DISMISSED, f.runtime.project(session).members.single().phase)
+        assertEquals(1, toLead.size)
+        f.runtime.recoverMailbox(session)
+        assertEquals(1, toLead.size)
+        assertEquals(1, f.runtime.project(session).shutdownResponses.size)
+
+        val attackerSession = "shutdown-forged-actor"
+        val attacker = fixture(attackerSession)
+        appendActiveMember(attacker.log, attackerSession)
+        val attacked = request.copy(senderId = attackerSession)
+        attacker.log.append(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
+            with(LocalAgentTeamEventCodec) { attacked.toEvent(attackerSession) })
+        attacker.log.append(LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED,
+            teamDelivered(attackerSession, requestId, "member-1"))
+        attacker.log.append(LocalAgentTeamContract.TEAM_SHUTDOWN_RESPONSE, buildJsonObject {
+            put("version", LocalAgentTeamContract.TEAM_EVENT_VERSION)
+            put("teamId", attackerSession); put("requestId", requestId)
+            put("memberId", "member-forged"); put("approved", true)
+        })
+        assertTrue(attacker.runtime.project(attackerSession).failure
+            ?.contains("TEAM_SHUTDOWN_REQUEST_TARGET_MISMATCH") == true)
+    }
+
+    @Test
     fun leadInboxAdmissionDoesNotHoldTeamCommandLockAgainstUi() {
         val foreground = Any()
         val uiHoldingForeground = CountDownLatch(1)
