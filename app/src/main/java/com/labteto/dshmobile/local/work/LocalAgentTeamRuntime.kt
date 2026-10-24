@@ -1767,6 +1767,80 @@ internal class LocalAgentTeamRuntime(
     }
 
     /**
+     * A reviewer is a distinct live verify/review Agent with an actual checkpointed result.
+     * The verdict must be present in that Agent's own structured model output. An event-backed
+     * reviewer declaration still does not prove that tests passed or artifacts are correct.
+     */
+    private fun recordIndependentTaskReview(
+        sessionId: String,
+        taskId: String,
+        expectedRevision: Int,
+        reviewerName: String,
+        reviewResultId: String,
+    ): String = synchronized(commandLock) {
+        val state = project(sessionId)
+        require(state.failure == null) { "TEAM_PROJECTION_INVALID" }
+        val task = state.tasks.singleOrNull { it.id == taskId }
+            ?: error("TEAM_TASK_REVIEW_TASK_NOT_FOUND")
+        require(task.status == LocalTeamTaskStatus.COMPLETED &&
+            task.revision == expectedRevision && task.completionResultId != null &&
+            task.completionEvidenceSequence != null) { "TEAM_TASK_REVIEW_STALE" }
+        require(state.taskReviews.none { it.taskId == taskId && it.taskRevision == expectedRevision }) {
+            "TEAM_TASK_REVIEW_DUPLICATE"
+        }
+        val reviewer = state.members.singleOrNull { it.name == reviewerName || it.id == reviewerName }
+            ?: error("TEAM_TASK_REVIEW_MEMBER_NOT_FOUND")
+        require(reviewer.id != task.ownerId && reviewer.phase == LocalTeamMemberPhase.ACTIVE &&
+            reviewer.role in setOf("verify", "review")) {
+            "TEAM_TASK_REVIEW_INDEPENDENT_MEMBER_REQUIRED"
+        }
+        require(jobs.snapshotInfos().any {
+            it.id == reviewer.jobId && it.ownerSessionId == sessionId && it.isAgent
+        }) { "TEAM_TASK_REVIEW_AGENT_NOT_FOUND" }
+        val cleanResultId = reviewResultId.trim()
+        require(cleanResultId.isNotBlank()) { "TEAM_TASK_REVIEW_RESULT_REQUIRED" }
+        val evidence = findFreshTaskResult(sessionId, task, reviewer.jobId, cleanResultId)
+            ?: error("TEAM_TASK_REVIEW_RESULT_STALE")
+        require(evidence.sequence > task.completionEvidenceSequence!!) {
+            "TEAM_TASK_REVIEW_EVIDENCE_ORDER_INVALID"
+        }
+        val rawOutput = evidence.data["terminal_output"]?.jsonPrimitive?.contentOrNull
+            ?: error("TEAM_TASK_REVIEW_OUTPUT_MISSING")
+        val declaration = runCatching {
+            Json.parseToJsonElement(rawOutput) as? JsonObject
+        }.getOrNull() ?: error("TEAM_TASK_REVIEW_STRUCTURED_OUTPUT_REQUIRED")
+        require(declaration["task_id"]?.jsonPrimitive?.contentOrNull == task.id &&
+            declaration["reviewed_result_id"]?.jsonPrimitive?.contentOrNull == task.completionResultId) {
+            "TEAM_TASK_REVIEW_TARGET_MISMATCH"
+        }
+        val verdict = declaration["verdict"]?.jsonPrimitive?.contentOrNull
+        require(verdict in setOf("approve", "reject")) { "TEAM_TASK_REVIEW_VERDICT_INVALID" }
+        val reason = declaration["reason"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
+        require(reason.isNotBlank() && reason.toByteArray(Charsets.UTF_8).size <= MAX_ERROR_CHARS) {
+            "TEAM_TASK_REVIEW_REASON_REQUIRED"
+        }
+        val log = eventLogFor(sessionId)
+        log.append(TEAM_TASK_REVIEW_EVENT, buildJsonObject {
+            put("version", TEAM_EVENT_VERSION)
+            put("teamId", sessionId)
+            put("review", buildJsonObject {
+                put("taskId", task.id)
+                put("taskRevision", task.revision)
+                put("taskResultId", task.completionResultId)
+                put("reviewerId", reviewer.id)
+                put("reviewResultId", cleanResultId)
+                put("reviewEvidenceSequence", evidence.sequence)
+                put("verdict", verdict)
+                put("reason", reason)
+            })
+        })
+        "review_recorded=true\ntask_id=$taskId\nreviewer=${reviewer.name}" +
+            "\nreviewer_declared_verdict=$verdict\nreview_result_id=$cleanResultId" +
+            "\nreview_checkpoint_sequence=${evidence.sequence}" +
+            "\nindependent_identity=true\nartifact_verified=false\ngoal_accepted=false"
+    }
+
+    /**
      * Recheck the persisted proof pointer from the original Session EventLog.
      * This validates event provenance and freshness, not artifact content or Goal correctness.
      */
@@ -1812,6 +1886,10 @@ internal class LocalAgentTeamRuntime(
         val rootCurrent = task.rootUserRevision?.let {
             it == workflowUserRevision(log)
         }
+        val review = state.taskReviews.singleOrNull {
+            it.taskId == taskId && it.taskRevision == task.revision &&
+                it.taskResultId == resultId
+        }
         return buildString {
             append("task_id=").append(taskId)
             append("\nresult_id=").append(resultId)
@@ -1819,7 +1897,14 @@ internal class LocalAgentTeamRuntime(
             append("\ncheckpoint_binding_valid=").append(bindingValid)
             append("\nowner_job=").append(member?.jobId ?: "missing")
             append("\nroot_instruction_current=").append(rootCurrent ?: "legacy_unknown")
-            append("\ncontent_verified=false\nindependent_reviewed=false\ngoal_accepted=false")
+            append("\nindependent_reviewer_reported=").append(review != null)
+            review?.let {
+                append("\nreviewer_id=").append(it.reviewerId)
+                append("\nreviewer_declared_verdict=").append(it.verdict)
+                append("\nreview_result_id=").append(it.reviewResultId)
+                append("\nreview_evidence_sequence=").append(it.reviewEvidenceSequence)
+            }
+            append("\ncontent_verified=false\ngoal_accepted=false")
         }
     }
 
