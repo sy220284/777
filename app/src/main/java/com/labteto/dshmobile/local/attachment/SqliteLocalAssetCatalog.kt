@@ -33,7 +33,7 @@ internal class SqliteLocalAssetCatalog(
         val id = requireNotNull(imported.attachmentId) { "附件缺少内容哈希" }
         require(SHA256.matches(id)) { "附件哈希不合法" }
         require(imported.relativePath.matches(Regex(
-            "^\\.dsh/attachments/$id\\.[a-z0-9]{1,10}$"
+            "^\\.dsh/attachments/$id(?:\\.[a-z0-9]{1,10})?$"
         ))) { "附件相对路径与内容哈希不一致" }
         require(imported.bytes >= 0L && imported.mediaType.length in 1..100 &&
             imported.mediaType.none { it == '\n' || it == '\r' }) { "附件元数据非法" }
