@@ -700,8 +700,7 @@ internal class LocalSubagentRunner(
                                 },
                             )
                         } else if (capabilities.teamManaged &&
-                            (call.name in LocalAgentTeamContract.TOOL_NAMES ||
-                                call.name in LocalAgentTeamContract.MEMBER_TOOL_NAMES)) {
+                            LocalAgentTeamContract.isTeamChildControlCall(call.name)) {
                             requireNotNull(executeTeamTool) { "TEAM_CALLER_UNAVAILABLE" }(
                                 requireNotNull(backgroundJobId), call.toLocalToolCall(),
                             )
