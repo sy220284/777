@@ -24,7 +24,9 @@ class LocalSessionNavigationInboxTest {
         val inbox = LocalSessionNavigationInbox()
         inbox.offer(LocalSessionNavigationRequest.Mode(LocalUsageMode.CHAT))
         inbox.offer(LocalSessionNavigationRequest.Mode(LocalUsageMode.WORK))
+        assertEquals(true, inbox.hasPending())
         assertEquals(LocalSessionNavigationRequest.Mode(LocalUsageMode.WORK), inbox.take())
+        assertEquals(false, inbox.hasPending())
     }
 
     @Test
@@ -36,6 +38,7 @@ class LocalSessionNavigationInboxTest {
         assertEquals(LocalSessionNavigationRequest.Mode(LocalUsageMode.WORK), inbox.take())
         inbox.offer(old)
         inbox.clear()
+        assertEquals(false, inbox.hasPending())
         assertNull(inbox.take())
     }
 }

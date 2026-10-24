@@ -35,7 +35,7 @@ internal class LocalTranscriptHistoryLoader(
         var loadedRawMessages = 0
 
         do {
-            val page = readPage(sessionId, pageCursor)
+            val page = readPage(sessionId, pageCursor, LOCAL_TRANSCRIPT_INITIAL_VISIBLE_DIALOGUE_MESSAGES)
             loadedPages++
             loadedRawMessages += page.messages.size
             if (currentSessionId() != sessionId) return null
@@ -81,7 +81,7 @@ internal class LocalTranscriptHistoryLoader(
 
         do {
             val requestedCursor = nextCursor ?: break
-            val page = readPage(sessionId, requestedCursor)
+            val page = readPage(sessionId, requestedCursor, LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES)
             loadedPages++
             loadedRawMessages += page.messages.size
             if (currentSessionId() != sessionId) return null
@@ -116,11 +116,12 @@ internal class LocalTranscriptHistoryLoader(
     private suspend fun readPage(
         sessionId: String,
         cursor: UiTranscriptCursor?,
+        limit: Int,
     ): UiMessagePage = withContext(Dispatchers.IO) {
         session.messagePage(
             sessionId = sessionId,
             cursor = cursor,
-            limit = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,
+            limit = limit,
         )
     }
 
@@ -139,11 +140,11 @@ internal class LocalTranscriptHistoryLoader(
 }
 
 // Foreground history budget survives UI replacement; no Compose or legacy renderer is needed.
-internal const val LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES = 200
-internal const val LOCAL_TRANSCRIPT_INITIAL_VISIBLE_DIALOGUE_MESSAGES = 200
-internal const val LOCAL_TRANSCRIPT_HISTORY_VISIBLE_DIALOGUE_BATCH_MESSAGES = 40
-internal const val LOCAL_TRANSCRIPT_HISTORY_MAX_PAGES_PER_LOAD = 20
-internal const val LOCAL_TRANSCRIPT_HISTORY_MAX_RAW_MESSAGES_PER_LOAD = 4_000
+internal const val LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES = 24
+internal const val LOCAL_TRANSCRIPT_INITIAL_VISIBLE_DIALOGUE_MESSAGES = 12
+internal const val LOCAL_TRANSCRIPT_HISTORY_VISIBLE_DIALOGUE_BATCH_MESSAGES = 24
+internal const val LOCAL_TRANSCRIPT_HISTORY_MAX_PAGES_PER_LOAD = 8
+internal const val LOCAL_TRANSCRIPT_HISTORY_MAX_RAW_MESSAGES_PER_LOAD = 256
 
 internal fun userVisibleDialogueMessageCount(messages: List<UiMessageSnapshot>): Int =
     messages.count { it.role == UiMessageRole.USER || it.role == UiMessageRole.ASSISTANT }

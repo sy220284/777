@@ -36,6 +36,14 @@ internal class LocalSessionAccessCoordinator(
         else hits.joinToString("\n\n") + suffix
     }
 
+    fun authorizeNavigationPreview(sessionId: String) {
+        // Drawer selection is an explicit navigation to ANY of this user's sessions,
+        // including a different project. Do not open the event log while checking it.
+        require(sessionId.isNotBlank() &&
+            (sessionId == currentSessionId() || summaries().any { it.id == sessionId })
+        ) { "目标会话不存在：$sessionId" }
+    }
+
     fun authorizedLog(
         requestedId: String?,
         defaultSessionId: String = currentSessionId(),

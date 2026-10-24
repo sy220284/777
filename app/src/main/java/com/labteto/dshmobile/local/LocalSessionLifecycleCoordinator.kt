@@ -363,8 +363,15 @@ internal class LocalSessionLifecycleCoordinator(
                             state.update { it.copy(error = "目标会话已不存在，请从历史记录重新选择") }
                             return@withLock
                         }
+                        // A superseding tap may arrive while waiting for the
+                        // transition mutex or catalog check. Do not start an
+                        // expensive restore the user will never see.
+                        if (navigationInbox.hasPending()) return@withLock
                         if (cancelVisibleChatRun) cancelActiveRunAndJoin()
                         persist()
+                        // Persisting the outgoing session may perform IO. Prefer the
+                        // last requested destination before changing runtime identity.
+                        if (navigationInbox.hasPending()) return@withLock
                         activateSession(sessionId, null)
                         loadSession(sessionId)
                         restartInterruptedSafeJobs()
@@ -373,7 +380,9 @@ internal class LocalSessionLifecycleCoordinator(
                         state.update { it.copy(loading = false) }
                     }
                 }
-                startNextQueuedTurnIfIdle()?.start()
+                // Do not admit work for a now-unwanted foreground session when
+                // a newer navigation is already queued.
+                if (!navigationInbox.hasPending()) startNextQueuedTurnIfIdle()?.start()
             } finally {
                 // Even a failed restore must not strand a newer navigation tap.
                 continueQueuedNavigation()

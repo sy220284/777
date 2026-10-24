@@ -13,11 +13,9 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeBootstrapPort
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.prepareLocalHarnessStartup
-import com.labteto.dshmobile.local.session.LocalSessionArchiveMaintenance
 import com.labteto.dshmobile.local.session.LocalSessionDeletionCleanup
 import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import com.labteto.dshmobile.local.session.migrateLegacySessionFiles
 import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
 import com.labteto.dshmobile.local.work.LocalWorkComposition
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -91,7 +89,6 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
                 com.labteto.dshmobile.observability.AppLog.warn("MemoryDiaryRecovery", "关联日记清理待恢复：${it.message}")
             }
         }
-        migrateLegacySessionFiles(root, sessionsRoot, initialSessionId)
         if (sessionStorage.coordinator.read(initialSessionId) == null &&
             pendingSessions.modeFor(initialSessionId) == null) {
             pendingSessions.remember(initialSessionId, runtimeStateStore.state.value.usageMode)
@@ -122,9 +119,6 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
         foregroundWake.startNextIfIdle()?.start()
         work.schedulePersistentRecovery()
         scope.launch { cleanupLocalImagesIfDue() }
-        scope.launch {
-            LocalSessionArchiveMaintenance(sessionsRoot, json, runtimeStateStore::currentSessionId).run()
-        }
     }
 
     private fun cleanupLocalImagesIfDue() {

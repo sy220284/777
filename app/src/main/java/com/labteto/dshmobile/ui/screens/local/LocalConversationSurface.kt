@@ -500,8 +500,26 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     } else {
         emptyList()
     }
-    val transcriptMessages = remember(pagedOlderMessages, state.messages) {
-        mergeLocalTranscriptHistory(pagedOlderMessages, state.messages)
+    // Preserve the initial visible-tail anchor while new streaming rows arrive.
+    // The model/runtime can retain a larger hot window without composing it all.
+    var visibleTailAnchorId by remember(state.sessionId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(state.sessionId, state.messages) {
+        if (state.messages.isNotEmpty() &&
+            (visibleTailAnchorId == null || state.messages.none { it.id == visibleTailAnchorId })
+        ) {
+            visibleTailAnchorId = state.messages
+                .takeLast(LOCAL_TRANSCRIPT_INITIAL_VISIBLE_DIALOGUE_MESSAGES)
+                .first().id
+        }
+    }
+    val visibleLiveMessages = remember(state.messages, visibleTailAnchorId) {
+        localTranscriptVisibleLiveWindow(
+            state.messages, visibleTailAnchorId,
+            LOCAL_TRANSCRIPT_INITIAL_VISIBLE_DIALOGUE_MESSAGES,
+        )
+    }
+    val transcriptMessages = remember(pagedOlderMessages, visibleLiveMessages) {
+        mergeLocalTranscriptHistory(pagedOlderMessages, visibleLiveMessages)
     }
     // Cold historical cards are read-only. They are not part of the live Owner snapshot.
     var olderDocumentSnapshots by remember(state.sessionId) {
@@ -606,8 +624,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         transcriptHistory.loading
     val transcriptHistoryError = transcriptHistory.error
         ?.takeIf { transcriptHistory.sessionId == state.sessionId }
-    val showTranscriptPagingRow = transcriptHistoryError != null ||
-        (hasOlderTranscript && loadingOlderTranscript)
+    val showTranscriptPagingRow = transcriptHistoryError != null || hasOlderTranscript
     // A diary source may be in cold historical pages. Advance one durable page at a time
     // until the message is present, then scroll to the exact LazyColumn row.
     val locatingDiarySource = transcriptJumpTarget?.sessionId == state.sessionId &&
@@ -1071,6 +1088,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         LocalTranscriptPagingStatus(
                             loading = loadingOlderTranscript,
                             error = transcriptHistoryError,
+                            hasMore = hasOlderTranscript,
                             onRetry = {
                                 scope.launch { onLoadOlderTranscript(state.sessionId) }
                             },

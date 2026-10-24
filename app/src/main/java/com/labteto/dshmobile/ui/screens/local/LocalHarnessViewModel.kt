@@ -151,10 +151,15 @@ class LocalHarnessViewModel @Inject constructor(
     private val transcriptHistoryController = LocalTranscriptHistoryController(
         session = sessionUi,
         currentSessionId = { state.value.sessionId },
-        liveMessages = { state.value.messages },
+        // The full runtime/model window is not the foreground history page.
+        liveMessages = {
+            state.value.messages.takeLast(LOCAL_TRANSCRIPT_INITIAL_VISIBLE_DIALOGUE_MESSAGES)
+        },
         scope = viewModelScope,
     )
     internal val transcriptHistory = transcriptHistoryController.history
+    internal suspend fun previewSession(sessionId: String): List<com.labteto.dshmobile.local.session.LocalHarnessMessage> =
+        sessionUi.previewMessages(sessionId)
     private val conversationUiState = LocalConversationUiStateStore(appContext)
     val pinnedSessionIds = conversationUiState.pinnedSessionIds
     val sessionTitleOverrides = conversationUiState.sessionTitleOverrides

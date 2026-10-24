@@ -71,13 +71,32 @@ internal fun LocalTranscriptAutoPager(
 ) {
     LaunchedEffect(sessionId, listState, enabled) {
         if (!enabled) return@LaunchedEffect
+        // A freshly displayed short page can already be at index 0. That must not
+        // trigger a cascade of reads until the entire history is materialized.
+        // Only an actual upward movement toward older content may prefetch.
+        var priorPosition: Pair<Int, Int>? = null
+        var requestedDuringCurrentGesture = false
         snapshotFlow {
-            listState.firstVisibleItemIndex <= LOCAL_TRANSCRIPT_AUTOLOAD_THRESHOLD_ITEMS
-        }
-            .distinctUntilChanged()
-            .collect { nearStart ->
-                if (nearStart) onLoadOlder(sessionId)
+            Triple(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset,
+                listState.isScrollInProgress,
+            )
+        }.collect { (index, offset, scrolling) ->
+            val previous = priorPosition
+            priorPosition = index to offset
+            if (!scrolling) requestedDuringCurrentGesture = false
+            val movingTowardOlder = previous != null &&
+                (index < previous.first || (index == previous.first && offset < previous.second))
+            if (scrolling && !requestedDuringCurrentGesture && movingTowardOlder &&
+                index <= LOCAL_TRANSCRIPT_AUTOLOAD_THRESHOLD_ITEMS
+            ) {
+                // A single long drag near the top can emit dozens of pixel offsets.
+                // One bounded page per gesture avoids a burst of serialized reads.
+                requestedDuringCurrentGesture = true
+                onLoadOlder(sessionId)
             }
+        }
     }
 }
 
@@ -256,6 +275,7 @@ internal fun LazyListState.isConversationTailVisible(): Boolean {
 internal fun LocalTranscriptPagingStatus(
     loading: Boolean,
     error: String?,
+    hasMore: Boolean,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -269,7 +289,15 @@ internal fun LocalTranscriptPagingStatus(
         )
         return
     }
-    if (!loading) return
+    if (!loading) {
+        if (hasMore) SyButton(
+            text = stringResource(R.string.local_transcript_load_older),
+            onClick = onRetry,
+            modifier = modifier.fillMaxWidth(),
+            variant = SyButtonVariant.Ghost,
+        )
+        return
+    }
 
     Row(
         modifier = modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd),

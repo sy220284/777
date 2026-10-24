@@ -217,6 +217,37 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun dynamicallyRegisteredMcpToolsArePromotedWithoutGuessingOrCrossServerLeakage() {
+        val registry = ToolRegistry().apply {
+            repeat(180) { index ->
+                register(tool("older_$index", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL, keywords = setOf("old")) { ToolResult("old") })
+            }
+        }
+        val discovery = com.labteto.dshmobile.local.work.LocalWorkRunMcpDiscovery()
+        assertTrue(discovery.observe(registry).isEmpty())
+        registry.register(tool("mcp_x_twitter_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
+            exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("x-twitter")) { ToolResult("post") })
+        registry.register(tool("mcp_other_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
+            exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("other")) { ToolResult("other") })
+        registry.register(tool("mcp_fake_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
+            exposure = ToolExposure.OPTIONAL, family = "Other", keywords = setOf("fake")) { ToolResult("fake") })
+        val created = discovery.observe(registry)
+        assertEquals(listOf("mcp_x_twitter_x_post", "mcp_other_x_post"), created)
+        val coordinator = coordinator(registry)
+        coordinator.enableOptionalTools((0 until 180).map { "older_$it" })
+        coordinator.prioritizeRunCreatedMcpTools(created)
+        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
+        assertTrue("mcp_x_twitter_x_post" in visible)
+        assertTrue("mcp_other_x_post" in visible)
+        assertFalse("mcp_fake_x_post" in visible)
+        assertEquals("mcp_x_twitter_x_post", coordinator.enabledOptionalSnapshot().first())
+        assertEquals(created, discovery.observe(registry))
+        registry.unregister("mcp_x_twitter_x_post")
+        assertEquals(listOf("mcp_other_x_post"), discovery.observe(registry))
+    }
+
+    @Test
     fun pinnedImagegenMakesRealMediaToolsVisibleAcrossStepsWithoutAutoSubmitting() = runBlocking {
         val registry = ToolRegistry().apply {
             for (name in listOf("media_image_options", "media_image_create", "media_image_status")) {
@@ -379,6 +410,17 @@ class LocalToolExecutionCoordinatorTest {
         assertFalse("web_search" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
         coordinator.searchCapabilities("联网")
         assertFalse("web_search" in coordinator.enabledOptionalSnapshot())
+    }
+
+    @Test
+    fun unknownCapabilityOffersAnExecutableBootstrapPathWithoutPretendingRegistration() {
+        val coordinator = coordinator(ToolRegistry())
+        val result = coordinator.searchCapabilities("尚未实现的 X 平台连接器")
+        assertTrue(result.contains("没有精确匹配"))
+        assertTrue(result.contains("GitHub"))
+        assertTrue(result.contains("MCP stdio"))
+        assertTrue(result.contains("下一模型步骤"))
+        assertFalse(coordinator.enabledOptionalSnapshot().any { it.startsWith("mcp_") })
     }
 
     @Test

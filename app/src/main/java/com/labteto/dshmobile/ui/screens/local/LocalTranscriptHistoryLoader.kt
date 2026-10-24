@@ -39,7 +39,7 @@ internal class LocalTranscriptHistoryLoader(
         var loadedRawMessages = 0
 
         do {
-            val page = readPage(sessionId, pageCursor)
+            val page = readPage(sessionId, pageCursor, LOCAL_TRANSCRIPT_INITIAL_VISIBLE_DIALOGUE_MESSAGES)
             loadedPages++
             loadedRawMessages += page.messages.size
             if (currentSessionId() != sessionId) return@withContext null
@@ -85,7 +85,7 @@ internal class LocalTranscriptHistoryLoader(
 
         do {
             val requestedCursor = nextCursor ?: break
-            val page = readPage(sessionId, requestedCursor)
+            val page = readPage(sessionId, requestedCursor, LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES)
             loadedPages++
             loadedRawMessages += page.messages.size
             if (currentSessionId() != sessionId) return@withContext null
@@ -120,11 +120,12 @@ internal class LocalTranscriptHistoryLoader(
     private suspend fun readPage(
         sessionId: String,
         cursor: LocalTranscriptPageCursor?,
+        limit: Int,
     ): LocalTranscriptPage = withContext(Dispatchers.IO) {
         session.transcriptPage(
             sessionId = sessionId,
             cursor = cursor,
-            limit = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,
+            limit = limit,
         )
     }
 
