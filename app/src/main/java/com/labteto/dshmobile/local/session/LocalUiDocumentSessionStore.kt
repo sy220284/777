@@ -100,11 +100,10 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
         return when (event.data["disposition"]?.jsonPrimitive?.content) {
             "accepted" -> UiCommandReceipt.Accepted
             "queued" -> UiCommandReceipt.Queued
-            "rejected" -> {
-                val name = event.data["reason"]?.jsonPrimitive?.content.orEmpty()
-                UiCommandReceipt.Rejected(UiCommandRejection.valueOf(name))
-            }
-            "not-admitted" -> UiCommandReceipt.NotAdmitted
+            // A rejected admission produced no new user input. Keep retry possible
+            // when loading, queue limits or configuration change; accepted/unknown
+            // outcomes remain durable and never replay automatically.
+            "rejected", "not-admitted" -> null
             else -> UiCommandReceipt.OutcomeUnknown
         }
     }
