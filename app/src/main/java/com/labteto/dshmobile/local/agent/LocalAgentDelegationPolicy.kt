@@ -60,6 +60,7 @@ internal fun buildLocalDelegatedLaunchSpec(
     virtualScreen: Boolean = false,
     toolAllowlist: Set<String>? = null,
     outputSchema: JsonObject? = null,
+    parentLink: LocalAgentParentLink? = null,
 ): LocalSubagentLaunchSpec {
     require(kind == LocalAgentDelegationKind.FOREGROUND_READONLY ||
         kind == LocalAgentDelegationKind.FORK) {
@@ -71,6 +72,7 @@ internal fun buildLocalDelegatedLaunchSpec(
         modelOverride = modelOverride,
         maxSteps = maxSteps,
         parentCallId = parentCallId,
+        parentLink = parentLink,
         capabilities = buildLocalDelegationCapabilities(
             kind = kind,
             allowMutation = allowMutation,

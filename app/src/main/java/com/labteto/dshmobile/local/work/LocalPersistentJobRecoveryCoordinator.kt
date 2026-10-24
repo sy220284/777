@@ -24,6 +24,9 @@ import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.agent.LocalAgentDelegationKind
 import com.labteto.dshmobile.local.agent.buildLocalDelegationCapabilities
 import com.labteto.dshmobile.local.agent.modelMessageForAgentInput
+import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
+import com.labteto.dshmobile.local.agent.decodeLocalAgentParentLink
+import com.labteto.dshmobile.local.agent.toJson
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.validateLocalSubagentLaunchSpec
@@ -100,6 +103,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         outputSchema: JsonObject? = null,
         toolAllowlist: Set<String>? = null,
         forkParentCallId: String? = null,
+        parentToolCallId: String? = null,
         sessionId: String = currentSessionId(),
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
@@ -113,6 +117,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         outputSchema = outputSchema,
         toolAllowlist = toolAllowlist,
         forkParentCallId = forkParentCallId,
+        parentToolCallId = parentToolCallId,
         sessionId = sessionId,
         boundState = boundState,
         historySnapshot = historySnapshot,
@@ -128,6 +133,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         outputSchema: JsonObject? = null,
         toolAllowlist: Set<String>? = null,
         forkParentCallId: String? = null,
+        parentToolCallId: String? = null,
         sessionId: String = currentSessionId(),
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
@@ -141,6 +147,8 @@ internal class LocalPersistentJobRecoveryCoordinator(
             model ?: boundState.modelState.modelSelection.activeProfileId,
         )
         val protocol = effectiveProtocol(runProfile)
+        val parentLink = captureLocalAgentParentLink(parentToolCallId ?: forkParentCallId)
+        require(parentLink == null || parentLink.sessionId == sessionId) { "AGENT_PARENT_SESSION_MISMATCH" }
         val runner = subagentRunner(sessionId, boundState, historySnapshot)
         val capabilities = buildLocalDelegationCapabilities(
             kind = if (teamManaged) LocalAgentDelegationKind.TEAM_MEMBER
@@ -198,6 +206,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             put("route_fingerprint", runProfile.routeFingerprint())
             put("max_steps", maxSteps)
             forkParentCallId?.let { put("parent_call_id", it) }
+            parentLink?.let { put("parent_link", it.toJson()) }
             put("capabilities", encodeLocalSubagentCapabilities(capabilities))
             workflowFence?.let { put("workflow_fence", it) }
         }.toString()
@@ -220,6 +229,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                         modelOverride = runProfile.id,
                         maxSteps = maxSteps,
                         parentCallId = forkParentCallId,
+                        parentLink = parentLink,
                         backgroundJobId = jobId,
                         capabilities = capabilities,
                     ),
@@ -523,6 +533,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                             modelOverride = profile.id,
                             maxSteps = maxSteps,
                             parentCallId = payload["parent_call_id"]?.jsonPrimitive?.contentOrNull,
+                            parentLink = decodeLocalAgentParentLink(payload["parent_link"] as? JsonObject),
                             backgroundJobId = jobId,
                             capabilities = capabilities,
                         ),

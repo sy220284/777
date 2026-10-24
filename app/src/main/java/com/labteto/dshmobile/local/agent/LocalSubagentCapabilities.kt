@@ -37,6 +37,7 @@ internal data class LocalSubagentLaunchSpec(
     val parentCallId: String? = null,
     val backgroundJobId: String? = null,
     val capabilities: LocalSubagentCapabilities = LocalSubagentCapabilities(),
+    val parentLink: LocalAgentParentLink? = null,
 )
 
 internal fun validateLocalSubagentLaunchSpec(

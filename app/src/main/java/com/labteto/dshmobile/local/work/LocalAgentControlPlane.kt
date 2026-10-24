@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.agent.LocalAgentDelegationKind
 import com.labteto.dshmobile.local.agent.bindLocalAgentRole
 import com.labteto.dshmobile.local.agent.buildLocalDelegatedLaunchSpec
+import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
@@ -76,6 +77,7 @@ internal class LocalAgentControlPlane(
                         virtualScreen = virtualScreen,
                         outputSchema = outputSchema,
                         toolAllowlist = toolAllowlist,
+                        parentToolCallId = call.id,
                         sessionId = run.sessionId,
                         boundState = snapshot,
                         historySnapshot = run.runHandle.modelHistory::snapshot,
@@ -93,6 +95,7 @@ internal class LocalAgentControlPlane(
                             historyMode = historyMode,
                             toolAllowlist = toolAllowlist,
                             outputSchema = outputSchema,
+                            parentLink = captureLocalAgentParentLink(call.id),
                         ),
                     )
                 }
@@ -114,6 +117,7 @@ internal class LocalAgentControlPlane(
                         allowMutation = roleBinding.allowMutation,
                         toolAllowlist = args.toolAllowlist(),
                         outputSchema = args.outputSchema(),
+                        parentLink = captureLocalAgentParentLink(call.id),
                     ),
                 )
             }

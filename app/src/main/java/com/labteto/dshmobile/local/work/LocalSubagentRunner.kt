@@ -28,6 +28,7 @@ import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.modelMessageForAgentInput
+import com.labteto.dshmobile.local.agent.toJson
 import com.labteto.dshmobile.local.agent.LocalSubagentModelStepExecutor
 import com.labteto.dshmobile.local.agent.validateLocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.validateLocalSubagentToolAllowlist
@@ -315,10 +316,14 @@ internal class LocalSubagentRunner(
             enabledOptionalTools,
         )
         validateLocalSubagentToolAllowlist(initialToolSchemas, capabilities)
+        require(spec.parentLink == null || spec.parentLink.sessionId == runSessionId()) {
+            "AGENT_PARENT_SESSION_MISMATCH"
+        }
 
         eventLog().append("subagent/start", buildJsonObject {
             put("agent_id", subagentId)
             put("background_job_id", backgroundJobId ?: "")
+            spec.parentLink?.let { put("parent_link", it.toJson()) }
             put("model", routeModel)
             put("profile_id", runProfile.id)
             put("auth_kind", runProfile.authKind.name)
@@ -345,7 +350,7 @@ internal class LocalSubagentRunner(
             })
             return LocalSubagentResult(LocalSubagentStatus.FAILED, output, "NO_MODEL_CREDENTIAL")
         }
-        val parentRunId = parentCallId?.let { callId ->
+        val parentRunId = spec.parentLink?.parentRunId ?: parentCallId?.let { callId ->
             eventLog().latestMatching(setOf(LOCAL_AGENT_RUN_CHECKPOINT_EVENT)) { data ->
                 data["call_id"]?.jsonPrimitive?.contentOrNull == callId
             }?.data?.get("run_id")?.jsonPrimitive?.contentOrNull
