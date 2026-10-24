@@ -71,6 +71,9 @@ internal class LocalMediaStudioBackupZip(
         }
         check(target.mkdirs()) { "无法创建媒体备份恢复隔离目录" }
         try {
+            // ZIP does not serialize empty directories. An empty Studio (or one
+            // with only remote links) is a valid archive with zero local files.
+            check(File(target, "media").mkdirs()) { "无法建立媒体成果暂存目录" }
             val entries = linkedSetOf<String>()
             var bytes = 0L
             ZipInputStream(input.buffered()).use { zip ->
