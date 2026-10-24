@@ -80,6 +80,32 @@ class LocalMediaStudioBackupZipAndroidTest {
         } finally { root.deleteRecursively() }
     }
 
+    @Test fun emptyStudioZipHasNoMediaEntriesButStillRestoresItsDatabase() {
+        val root = File(base.cacheDir, "studio-zip-empty-"+UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val source = sandbox(File(root, "source-empty").apply { mkdirs() })
+            val prepared = File(root, "prepared-empty")
+            LocalMediaDatabase(source, json).use { db ->
+                db.migrate(emptyList())
+                assertEquals(0, LocalMediaStudioBackupSnapshot(source, json)
+                    .prepare(db, prepared).mediaFiles.size)
+            }
+            val codec = LocalMediaStudioBackupZip(source, json)
+            val archive = ByteArrayOutputStream().also { codec.export(prepared, it) }
+            val extraction = File(root, "extract-empty")
+            val restored = codec.stage(ByteArrayInputStream(archive.toByteArray()), extraction)
+            assertTrue(File(extraction, "media").isDirectory)
+            assertTrue(restored.mediaFiles.isEmpty())
+            val destination = sandbox(File(root, "destination-empty").apply { mkdirs() })
+            assertEquals(0, LocalMediaStudioBackupInstaller(destination, json).install(extraction))
+            assertFalse(extraction.exists())
+            LocalMediaDatabase(destination, json).use { db ->
+                assertTrue(db.migrated())
+                assertTrue(db.page(null, 10).isEmpty())
+            }
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun traversalOrUnrelatedZipEntryFailsBeforeAnyUserInstallation() {
         val root = File(base.cacheDir, "studio-zip-traversal-"+UUID.randomUUID()).apply { mkdirs() }
         try {
