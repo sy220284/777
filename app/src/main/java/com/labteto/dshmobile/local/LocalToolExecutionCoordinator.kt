@@ -162,6 +162,25 @@ internal class LocalToolExecutionCoordinator(
         enableOptionalTools(githubTools, target)
     }
 
+    /** Give MCP tools registered during this run a chance to enter the next schema budget.
+     * Discovery is never authorization; the live registry and per-call approval remain authoritative. */
+    fun prioritizeRunCreatedMcpTools(
+        names: List<String>, target: MutableSet<String> = enabledOptionalTools,
+    ) {
+        val preferred = names.mapNotNull(registry::get)
+            .filter { LocalToolRouter.isOptional(it) &&
+                it.metadata.family.equals("MCP", ignoreCase = true) &&
+                isNetworkSearchPermitted(it.name) }
+            .map(HarnessTool::name)
+        enableOptionalTools(preferred, target)
+        synchronized(target) {
+            val existing = target.toList()
+            target.clear()
+            target.addAll(preferred.filter { it in existing })
+            target.addAll(existing)
+        }
+    }
+
     /** Reassert explicit pins after each model-step heuristic rerank, including step-2+ schemas. */
     fun prioritizePinnedForModelStep(target: MutableSet<String> = enabledOptionalTools) {
         // Only re-order tools already credential-admitted during prepare().
@@ -264,7 +283,11 @@ internal class LocalToolExecutionCoordinator(
         val matches = LocalToolRouter.search(tools, query)
         if (matches.isEmpty()) {
             // Don't bounce the user back to guess an internal capability name.
-            return "未精确匹配本次描述，以下是实际已注册的能力目录，可据此选择具体工具：\n" +
+            return "实时工具表没有精确匹配的扩展能力。请勿猜测调用不存在的工具，也不必因此放弃任务。\n" +
+                "在允许联网与写入的 Work 中，可先用 web_search / GitHub 查找可复用实现，" +
+                "或使用工作区文件和终端制作脚本、技能或 MCP stdio 服务，" +
+                "经 mcp_stdio_connect 注册后在下一模型步骤确认实际暴露与审批，再做真实测试。\n" +
+                "以下为当前真实已注册能力（目录不代表远端服务已验证）：\n" +
                 LocalToolRouter.capabilityDirectory(registered,
                     synchronized(target) { target.toSet() }, blocked)
         }
@@ -544,12 +567,6 @@ internal class LocalToolExecutionCoordinator(
         }
         val recoveryHint = when {
             mutationMayHaveSideEffect -> "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
-            // Registry-proven PRE-execution schema rejection can be corrected deterministically
-            // using this exact registered tool. No guessed aliases, user approval or replay.
-            !executionStarted && errorCode == "INVALID_TOOL_ARGUMENTS" ->
-                "工具尚未进入执行器；" +
-                    com.labteto.dshmobile.local.tools.toolArgumentContractSummary(registered.schema) +
-                    "；仅使用本轮实际提供的工具名和参数字段，修正后重新提交。"
             else -> result.recoveryHint ?: when {
                 approvalDenied -> "该工具没有获得批准；不要重复调用，改用已授权能力或等待用户调整权限。"
                 timedOut && readLike -> "只读工具超时，可缩小范围后重试一次。"
