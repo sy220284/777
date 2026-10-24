@@ -18,7 +18,7 @@ import kotlinx.serialization.json.contentOrNull
  * Work may depend on this list; model-facing Tools must never depend on Work internals.
  */
 internal object LocalTeamMemberToolContract {
-    val NAMES = setOf("team_send_message", "team_messages", "team_task_list", "team_task_get", "team_task_update")
+    val NAMES = setOf("team_send_message", "team_respond_shutdown", "team_messages", "team_task_list", "team_task_get", "team_task_update")
 }
 
 /** Pure model-visible projection of the registered tool catalog. */
