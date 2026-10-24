@@ -172,6 +172,17 @@ class LocalSessionEventLog(
         sqlite.pageBeforeChronological(sqliteId, sequenceExclusive, limit)
         else fileLog().pageBeforeChronological(sequenceExclusive, limit)).map { it.toLocalEvent() }
 
+    /**
+     * Transcript-only reverse feed. Native SQLite uses the visible-hint index;
+     * file-backed JVM contracts retain the original full event scan.
+     */
+    internal fun pageVisibleTranscriptBefore(
+        sequenceExclusive: Long = Long.MAX_VALUE,
+        limit: Int = 80,
+    ): List<Event> = (if (sqlite != null)
+        sqlite.pageVisibleBeforeNewestFirst(sqliteId, sequenceExclusive, limit)
+        else fileLog().pageBeforeNewestFirst(sequenceExclusive, limit)).map { it.toLocalEvent() }
+
     /** 按 sequence 递减返回旧事件页，适合从最新事件向历史倒查。 */
     fun pageBeforeNewestFirst(
         sequenceExclusive: Long = Long.MAX_VALUE,
