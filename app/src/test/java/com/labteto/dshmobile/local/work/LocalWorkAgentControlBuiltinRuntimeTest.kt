@@ -34,6 +34,7 @@ class LocalWorkAgentControlBuiltinRuntimeTest {
                 "team_wait_for_message",
                 "team_task_create",
                 "team_task_get",
+                "team_task_evidence",
                 "team_task_list",
                 "team_task_update",
                 "team_interrupt",
