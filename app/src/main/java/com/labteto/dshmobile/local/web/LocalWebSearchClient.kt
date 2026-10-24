@@ -25,6 +25,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 internal class LocalWebSearchClient(
     private val http: OkHttpClient,
     private val json: Json,
+    private val onBillableResult: (String) -> Unit = {},
 ) {
     suspend fun search(
         apiKey: String,
@@ -45,29 +46,37 @@ internal class LocalWebSearchClient(
                 put("count", count)
                 put("need_content", needContent)
             }
-            formatDeepSeekSearch(normalized, postJson(apiKey, SEARCH_ENDPOINT, payload), needContent)
+            val result = postJson(apiKey, SEARCH_ENDPOINT, payload)
+            val rows = result["results"] as? JsonArray
+                ?: throw LocalWebException("INVALID_RESPONSE", "DeepSeek Search 缺少 results 数组")
+            if (rows.isNotEmpty()) onBillableResult("search")
+            formatDeepSeekSearch(normalized, result, needContent)
         }.joinToString("\n\n")
     }
 
-    suspend fun fetch(apiKey: String, url: String): LocalWebFetchResult = withContext(Dispatchers.IO) {
-        val root = postJson(apiKey, FETCH_ENDPOINT, buildJsonObject { put("url", url) })
+    suspend fun fetch(apiKey: String, url: String, maxBytes: Int = LOCAL_WEB_MAX_RESPONSE_BYTES, timeoutSeconds: Long = 45L): LocalWebFetchResult = withContext(Dispatchers.IO) {
+        val root = postJson(apiKey, FETCH_ENDPOINT, buildJsonObject { put("url", url) }, timeoutSeconds)
         val body = root["content"]?.jsonPrimitive?.contentOrNull
             ?: throw LocalWebException("INVALID_RESPONSE", "DeepSeek Fetch 缺少网页正文")
         if (body.isBlank()) throw LocalWebException("EMPTY_BODY", "DeepSeek Fetch 未返回可读正文")
+        onBillableResult("fetch")
         val title = root["title"]?.jsonPrimitive?.contentOrNull.orEmpty()
         val markdown = if (title.isBlank()) body else "标题：" + title + "\n\n" + body
         val bytes = markdown.toByteArray(Charsets.UTF_8)
+        val limit = maxBytes.coerceIn(16 * 1024, LOCAL_WEB_MAX_RESPONSE_BYTES)
+        val truncated = bytes.size > limit
+        val visible = if (truncated) bytes.copyOf(limit).toString(Charsets.UTF_8) else markdown
         LocalWebFetchResult(
             url = url,
             mediaType = "text/markdown; charset=utf-8",
-            content = markdown,
-            bytesRead = bytes.size,
+            content = visible,
+            bytesRead = minOf(bytes.size, limit),
             totalBytes = bytes.size.toLong(),
-            truncated = false,
+            truncated = truncated,
         )
     }
 
-    private suspend fun postJson(apiKey: String, endpoint: String, payload: JsonObject): JsonObject {
+    private suspend fun postJson(apiKey: String, endpoint: String, payload: JsonObject, timeoutSeconds: Long = 45L): JsonObject {
         val request = Request.Builder()
             .url(endpoint)
             .header("Authorization", "Bearer " + apiKey)
@@ -75,7 +84,10 @@ internal class LocalWebSearchClient(
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
         return try {
-            withCancellableHttpResponse(http.newCall(request)) { response ->
+            withCancellableHttpResponse(http.newBuilder()
+                .callTimeout(timeoutSeconds.coerceIn(15L, 900L), java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(timeoutSeconds.coerceIn(15L, 900L), java.util.concurrent.TimeUnit.SECONDS)
+                .build().newCall(request)) { response ->
                 val bounded = response.body?.byteStream()?.use {
                     readBoundedWebBody(it, LOCAL_WEB_MAX_RESPONSE_BYTES)
                 } ?: throw LocalWebException("INVALID_RESPONSE", "DeepSeek 未返回 JSON 数据")
@@ -86,7 +98,11 @@ internal class LocalWebSearchClient(
                     val code = when (response.code) {
                         401 -> "AUTH_FAILED"
                         402 -> "INSUFFICIENT_BALANCE"
-                        408, 429 -> "RATE_LIMITED"
+                        408 -> "TIMEOUT"
+                        429 -> "RATE_LIMITED"
+                        403 -> "ACCESS_DENIED"
+                        404 -> "NOT_FOUND"
+                        413 -> "REQUEST_TOO_LARGE"
                         in 400..499 -> "HTTP_4XX"
                         else -> "HTTP_5XX"
                     }
