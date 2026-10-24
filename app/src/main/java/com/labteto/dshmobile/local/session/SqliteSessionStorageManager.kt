@@ -82,7 +82,24 @@ internal class SqliteSessionStorageManager(
             }
             validateSnapshotEventCursors(snapshotCopy, eventCopy)
             var written = 0L
-            ZipOutputStream(output.buffered()).use { zip ->
+            // An exported backup must fit the same limit as stageRestore(ByteArray).
+            // Fail the export explicitly rather than returning an unrestorable ZIP.
+            val bounded = object : java.io.FilterOutputStream(output) {
+                var count = 0L
+                override fun write(value: Int) {
+                    check(count < MAX_ZIP_BYTES) { "完整 SQLite 媒体备份超过当前恢复包上限" }
+                    out.write(value)
+                    count++
+                }
+                override fun write(bytes: ByteArray, offset: Int, length: Int) {
+                    check(length >= 0 && count + length <= MAX_ZIP_BYTES) {
+                        "完整 SQLite 媒体备份超过当前恢复包上限"
+                    }
+                    out.write(bytes, offset, length)
+                    count += length
+                }
+            }
+            ZipOutputStream(bounded.buffered()).use { zip ->
                 listOf(snapshotCopy, eventCopy).forEach { source ->
                     zip.putNextEntry(ZipEntry(source.name))
                     source.inputStream().buffered().use { input ->
@@ -109,7 +126,8 @@ internal class SqliteSessionStorageManager(
     fun stageRestore(archive: ByteArray): Int {
         require(archive.isNotEmpty() && archive.size <= MAX_ZIP_BYTES) { "SQLite 备份压缩包为空或超限" }
         require(!pendingRoot.exists()) { "已有待恢复数据，请重启应用处理" }
-        check(snapshots.readSummaries().isEmpty() && events.sessionCount() == 0) {
+        check(snapshots.readSummaries().isEmpty() && events.sessionCount() == 0 &&
+            !hasRegisteredAssets(events.readableDatabase)) {
             "为防止覆盖现有会话，SQLite 备份目前只允许恢复到空会话库"
         }
         val staging = File(context.filesDir, "local-harness/.sqlite-restore-${UUID.randomUUID()}")
@@ -286,6 +304,14 @@ internal class SqliteSessionStorageManager(
             }
         }
 
+    private fun hasRegisteredAssets(db: SQLiteDatabase): Boolean {
+        val exists = db.rawQuery(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='local_assets'", null,
+        ).use { it.moveToFirst() }
+        if (!exists) return false
+        return db.rawQuery("SELECT 1 FROM local_assets LIMIT 1", null).use { it.moveToFirst() }
+    }
+
     private fun isEmptyDatabase(file: File): Boolean {
         if (!file.exists()) return true
         // Only a recognized, genuinely empty session database may be replaced.
@@ -303,7 +329,8 @@ internal class SqliteSessionStorageManager(
                 ).use { exists ->
                     if (!exists.moveToFirst()) false else {
                         db.rawQuery("SELECT 1 FROM $requiredTable LIMIT 1", null).use { rows ->
-                            !rows.moveToFirst()
+                            !rows.moveToFirst() &&
+                                (requiredTable != "session_events" || !hasRegisteredAssets(db))
                         }
                     }
                 }
