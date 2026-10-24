@@ -22,9 +22,25 @@ internal data class LocalMediaRecord(
 }
 
 internal class LocalMediaDatabase(context: Context, private val json: Json, name: String = "local_media_v1.db") :
-    SQLiteOpenHelper(context, name, null, 1, android.database.DatabaseErrorHandler {
+    SQLiteOpenHelper(context, name, null, VERSION, android.database.DatabaseErrorHandler {
         throw android.database.sqlite.SQLiteDatabaseCorruptException("媒体数据库损坏，原文件保留，请恢复备份")
     }) {
+    companion object {
+        private const val VERSION = 1
+
+        /** Check the schema consumed by this owner before installing an external snapshot. */
+        internal fun validateBackupStructure(db: SQLiteDatabase) {
+            require(db.version == VERSION) { "媒体数据库备份版本不兼容：${db.version}" }
+            fun columns(table: String): Set<String> = db.rawQuery("PRAGMA table_info($table)", null).use { rows ->
+                buildSet { while (rows.moveToNext()) add(rows.getString(rows.getColumnIndexOrThrow("name"))) }
+            }
+            require(columns("media").containsAll(setOf("id", "session_id", "timestamp", "deleted", "pending", "payload")) &&
+                columns("metadata").containsAll(setOf("id", "value"))) {
+                "媒体数据库备份缺少当前读取和恢复所需字段"
+            }
+        }
+    }
+
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE media (id TEXT PRIMARY KEY, session_id TEXT, timestamp INTEGER NOT NULL, deleted INTEGER NOT NULL, pending INTEGER NOT NULL, payload TEXT NOT NULL)")
         db.execSQL("CREATE INDEX media_page ON media(deleted, timestamp DESC, id)")

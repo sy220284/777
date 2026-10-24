@@ -118,6 +118,13 @@ internal fun LocalSessionStorageCard(
                 modifier = Modifier.weight(1f),
             )
         }
+        // Session archive and Media Studio have separate persistence owners.
+        // This disclosure must be visible beside export/import, even when status is loading.
+        Text(
+            text = stringResource(R.string.settings_local_session_storage_backup_scope),
+            style = DsType.caption11.withReadingWeight(),
+            color = colors.warningInk,
+        )
         SyButton(
             text = "导入会话备份（重启后生效）",
             onClick = onRestore,
