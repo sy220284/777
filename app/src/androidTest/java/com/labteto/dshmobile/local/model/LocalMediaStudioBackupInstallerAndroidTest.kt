@@ -167,7 +167,7 @@ class LocalMediaStudioBackupInstallerAndroidTest {
             for (withText in listOf(false, true)) {
                 val source = sandbox(File(root, "source-$withText").apply { mkdirs() })
                 val record = LocalMediaRecord("text", result = LocalMediaResult(
-                    "text", "test", "test", "TEXT", 1L, textOutput = "文字成果", sessionId = "chat",
+                    "text", "test", "test", "TRANSCRIBE", 1L, textOutput = "文字成果", sessionId = "chat",
                 ))
                 val staging = File(root, "stage-$withText")
                 LocalMediaDatabase(source, json).use { db ->
