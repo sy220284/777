@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.session
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import android.database.sqlite.SQLiteDatabase
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -37,9 +38,9 @@ class SqliteSessionMediaArchiveAndroidTest {
                     zip.write(byteArrayOf(1))
                     zip.closeEntry()
                     zip.putNextEntry(ZipEntry("events.sqlite"))
-                    zip.write(byteArrayOf(2))
+                    zip.write(eventDb(root).readBytes())
                     zip.closeEntry()
-                    archive.export(zip)
+                    archive.export(zip, eventDb(root))
                 }
             }.toByteArray()
             val names = extract(zipped, staged)
@@ -68,12 +69,13 @@ class SqliteSessionMediaArchiveAndroidTest {
             File(dir, "legacy.png").writeBytes(byteArrayOf(1, 2, 3))
             val zipped = ByteArrayOutputStream().also { stream ->
                 ZipOutputStream(stream).use { zip ->
-                    listOf("snapshot.sqlite", "events.sqlite").forEach {
-                        zip.putNextEntry(ZipEntry(it))
-                        zip.write(byteArrayOf(0))
-                        zip.closeEntry()
-                    }
-                    SqliteSessionMediaArchive(context, root).export(zip)
+                    zip.putNextEntry(ZipEntry("snapshot.sqlite"))
+                    zip.write(byteArrayOf(0))
+                    zip.closeEntry()
+                    zip.putNextEntry(ZipEntry("events.sqlite"))
+                    zip.write(eventDb(root).readBytes())
+                    zip.closeEntry()
+                    SqliteSessionMediaArchive(context, root).export(zip, eventDb(root))
                 }
             }.toByteArray()
             val names = extract(zipped, staged)
@@ -104,12 +106,13 @@ class SqliteSessionMediaArchiveAndroidTest {
             val unsafe = File(directory, "empty-image.png").apply { writeBytes(byteArrayOf(1)) }
             val archived = ByteArrayOutputStream().also { stream ->
                 ZipOutputStream(stream).use { zip ->
-                    listOf("snapshot.sqlite", "events.sqlite").forEach {
-                        zip.putNextEntry(ZipEntry(it))
-                        zip.write(byteArrayOf(0))
-                        zip.closeEntry()
-                    }
-                    SqliteSessionMediaArchive(context, root).export(zip)
+                    zip.putNextEntry(ZipEntry("snapshot.sqlite"))
+                    zip.write(byteArrayOf(0))
+                    zip.closeEntry()
+                    zip.putNextEntry(ZipEntry("events.sqlite"))
+                    zip.write(eventDb(root).readBytes())
+                    zip.closeEntry()
+                    SqliteSessionMediaArchive(context, root).export(zip, eventDb(root))
                 }
             }.toByteArray()
             val names = extract(archived, stage)
@@ -121,13 +124,24 @@ class SqliteSessionMediaArchiveAndroidTest {
             File(directory, ".incoming-incomplete").writeBytes(byteArrayOf(3))
             assertTrue(runCatching {
                 ZipOutputStream(ByteArrayOutputStream()).use { zip ->
-                    SqliteSessionMediaArchive(context, root).export(zip)
+                    SqliteSessionMediaArchive(context, root).export(zip, eventDb(root))
                 }
             }.isFailure)
         } finally {
             root.deleteRecursively()
             stage.deleteRecursively()
         }
+    }
+
+    private fun eventDb(root: File): File {
+        val file = File(root, "events-test.sqlite")
+        if (!file.exists()) {
+            file.parentFile?.mkdirs()
+            SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+                db.execSQL("CREATE TABLE session_event_cursors(session_id TEXT PRIMARY KEY)")
+            }
+        }
+        return file
     }
 
     private fun extract(bytes: ByteArray, root: File): Set<String> {
