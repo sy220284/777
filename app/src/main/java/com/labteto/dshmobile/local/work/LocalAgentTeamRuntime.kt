@@ -1841,6 +1841,38 @@ internal class LocalAgentTeamRuntime(
     }
 
     /**
+     * Revalidate the reviewer event's actual source checkpoint on every read.
+     * A structurally valid EventLog entry alone is not independent review evidence.
+     */
+    private fun hasValidReviewerCheckpoint(
+        log: LocalSessionEventLog,
+        task: LocalTeamTaskSnapshot,
+        review: LocalTeamTaskReviewSnapshot,
+        state: LocalTeamProjection,
+    ): Boolean {
+        val reviewer = state.members.singleOrNull { it.id == review.reviewerId } ?: return false
+        if (reviewer.id == task.ownerId || reviewer.role !in setOf("verify", "review")) return false
+        if (review.taskId != task.id || review.taskRevision != task.revision ||
+            review.taskResultId != task.completionResultId ||
+            review.reviewEvidenceSequence <= (task.completionEvidenceSequence ?: return false)) return false
+        val seq = review.reviewEvidenceSequence
+        val event = log.pageBeforeNewestFirst(
+            sequenceExclusive = if (seq == Long.MAX_VALUE) Long.MAX_VALUE else seq + 1L, limit = 1,
+        ).singleOrNull() ?: return false
+        if (event.sequence != seq || event.type != LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT ||
+            event.data["background_job_id"]?.jsonPrimitive?.contentOrNull != reviewer.jobId ||
+            resultIdentity(event.data) != review.reviewResultId ||
+            !isFirstResultCheckpoint(log, event)) return false
+        val output = event.data["terminal_output"]?.jsonPrimitive?.contentOrNull ?: return false
+        val declared = runCatching { Json.parseToJsonElement(output) as? JsonObject }
+            .getOrNull() ?: return false
+        return declared["task_id"]?.jsonPrimitive?.contentOrNull == task.id &&
+            declared["reviewed_result_id"]?.jsonPrimitive?.contentOrNull == task.completionResultId &&
+            declared["verdict"]?.jsonPrimitive?.contentOrNull == review.verdict &&
+            declared["reason"]?.jsonPrimitive?.contentOrNull?.trim() == review.reason
+    }
+
+    /**
      * Recheck the persisted proof pointer from the original Session EventLog.
      * This validates event provenance and freshness, not artifact content or Goal correctness.
      */
@@ -1890,6 +1922,7 @@ internal class LocalAgentTeamRuntime(
             it.taskId == taskId && it.taskRevision == task.revision &&
                 it.taskResultId == resultId
         }
+        val reviewBindingValid = review?.let { hasValidReviewerCheckpoint(log, task, it, state) } ?: false
         return buildString {
             append("task_id=").append(taskId)
             append("\nresult_id=").append(resultId)
@@ -1898,6 +1931,7 @@ internal class LocalAgentTeamRuntime(
             append("\nowner_job=").append(member?.jobId ?: "missing")
             append("\nroot_instruction_current=").append(rootCurrent ?: "legacy_unknown")
             append("\nindependent_reviewer_reported=").append(review != null)
+            append("\nreview_evidence_binding_valid=").append(reviewBindingValid)
             review?.let {
                 append("\nreviewer_id=").append(it.reviewerId)
                 append("\nreviewer_declared_verdict=").append(it.verdict)
