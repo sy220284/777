@@ -488,7 +488,7 @@ class LocalAgentTeamRuntimeTest {
         manager = f.jobs
         appendActiveMember(f.log, session)
         val initial = f.jobs.startPersistentResult(
-            label = "member first turn",
+            label = "子代理：worker 初始执行",
             resumeKind = "subagent_readonly",
             resumePayload = "{}",
             ownerSessionId = session,
@@ -525,7 +525,7 @@ class LocalAgentTeamRuntimeTest {
         manager2 = f2.jobs
         appendActiveMember(f2.log, session2)
         val started = f2.jobs.startPersistentResult(
-            label = "member interrupted between reservation and outbox",
+            label = "子代理：worker 崩溃恢复执行",
             resumeKind = "subagent_readonly",
             resumePayload = "{}",
             ownerSessionId = session2,
