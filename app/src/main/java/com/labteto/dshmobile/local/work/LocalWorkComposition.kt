@@ -280,6 +280,7 @@ internal class LocalWorkComposition @Inject constructor(
                     virtualScreen = false,
                     forkParentCallId =
                         parentCallId.takeIf { context == LocalTeamMemberContext.FORK },
+                    parentToolCallId = parentCallId,
                     sessionId = binding.sessionId,
                     boundState = binding.aggregateSnapshot(),
                     historySnapshot = binding.runHandle.modelHistory::snapshot,

@@ -41,6 +41,7 @@ internal data class LocalAgentDispatchRequest(
 internal interface LocalAgentControlPort {
     suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String
     fun list(sessionId: String): String
+    fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String
     fun send(sessionId: String, agentId: String, message: String): String
     fun interrupt(sessionId: String, agentId: String): String
 }
@@ -103,6 +104,8 @@ internal class LocalWorkAgentControlRuntime(
     }
 
     override fun list(sessionId: String): String = jobs.listAgents(sessionId)
+    override fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String =
+        readLocalAgentTree(binding.eventLog, maxNodes).render()
     override fun send(sessionId: String, agentId: String, message: String): String =
         persistentJobs.sendMessage(agentId, message, sessionId)
     override fun interrupt(sessionId: String, agentId: String): String = jobs.kill(agentId, sessionId)

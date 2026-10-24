@@ -14,6 +14,7 @@ class LocalWorkAgentControlBuiltinRuntimeTest {
                 "fork_subagent",
                 "list_subagent_models",
                 "list_agents",
+                "agent_tree",
                 "send_message",
                 "interrupt_agent",
                 "workflow",

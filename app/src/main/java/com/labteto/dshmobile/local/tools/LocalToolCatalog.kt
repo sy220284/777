@@ -242,6 +242,9 @@ object LocalToolCatalog {
             "profile_id" to string("需要查询的已保存模型 profileId；联网查询时必填"),
         )))
         add(tool("list_agents", "列出当前会话启动的后台代理", properties()))
+        add(tool("agent_tree", "从本会话持久 Run 检查点查看主子代理关系和最新记录状态；结果可能是部分历史，不代表当前活跃进程清单", properties(
+            "max_nodes" to integer("最大返回代理运行节点数，1–256，默认100；历史窗口不足会标记partial"),
+        )))
         add(tool("send_message", "向后台代理追加消息；可继续的持久子代理即使已完成或因进程中断，也会先持久排队并安全恢复同一身份", properties(
             "agent_id" to string("后台代理编号"),
             "message" to string("需要追加的消息"),
