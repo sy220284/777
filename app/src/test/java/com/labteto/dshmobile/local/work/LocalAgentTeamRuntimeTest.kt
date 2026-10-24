@@ -97,6 +97,9 @@ class LocalAgentTeamRuntimeTest {
             JobMessageAdmission(true, false, false, "accepted")
         })
         appendActiveMember(f.log, session)
+        // Active Team member must have a real persistent Child Job at admission.
+        // A missing Job is correctly failed closed by synchronizeTeamRuntime.
+        startLiveChild(f, session)
         val binding = LocalWorkRunBinding(
             sessionId = session,
             initialState = LocalHarnessState(
