@@ -879,7 +879,7 @@ private fun teamMemberPriority(member: LocalAgentTeamMemberUiState): Int = when 
     member.awaitingReview -> 2
     member.activity == "running" || member.activity == "stopping" -> 0
     member.phase == "provisioning" -> 1
-    member.activity == "dormant" || member.activity == "waiting" || member.activity == "active" -> 2
+    member.activity == "idle" || member.activity == "dormant" || member.activity == "waiting" || member.activity == "active" -> 2
     member.activity == "completed" -> 3
     member.activity == "killed" || member.activity == "cancelled" || member.activity == "interrupted" -> 4
     member.phase == "failed" || member.activity == "failed" -> 5
@@ -910,8 +910,8 @@ private fun memberStatusLabel(member: LocalAgentTeamMemberUiState): String = str
         member.activity == "completed" -> R.string.local_team_state_task_done
         member.activity == "killed" -> R.string.local_team_state_dismissed
         member.activity == "cancelled" || member.activity == "interrupted" -> R.string.local_team_state_stopped
-        member.activity == "dormant" && member.resultMessageCount > 0 -> R.string.local_team_state_awaiting_review
-        member.activity == "dormant" -> R.string.local_team_state_offwork
+        member.activity in setOf("idle", "dormant") && member.resultMessageCount > 0 -> R.string.local_team_state_awaiting_review
+        member.activity == "idle" || member.activity == "dormant" -> R.string.local_team_state_offwork
         else -> R.string.local_team_state_waiting
     },
 )

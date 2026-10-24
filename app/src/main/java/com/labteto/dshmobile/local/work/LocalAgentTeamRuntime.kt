@@ -436,7 +436,10 @@ internal class LocalAgentTeamRuntime(
         val state = try { project(sessionId) } catch (_: LocalTeamProjectionRebuilding) {
             return LocalAgentTeamUiState(rebuilding = true)
         }
-        val jobsById = jobs.snapshotInfos().associateBy { it.id }
+        val jobsSnapshot = jobs.snapshotInfos()
+        val jobsById = jobsSnapshot.associateBy { it.id }
+        val activityById = projectLocalAgentTeamActivity(state, jobsSnapshot)
+            .members.associateBy(LocalTeamMemberActivityView::memberId)
         val visibleTasks = state.tasks
             .filter { it.status != LocalTeamTaskStatus.DELETED }
             .sortedBy(::taskNumber)
@@ -453,14 +456,7 @@ internal class LocalAgentTeamRuntime(
             .groupingBy(LocalTeamAgentMessageSnapshot::memberId)
             .eachCount()
         val members = state.members.map { member ->
-            val activity = when (member.phase) {
-                LocalTeamMemberPhase.CREATED -> "created"
-                LocalTeamMemberPhase.PROVISIONING -> "provisioning"
-                LocalTeamMemberPhase.ACTIVE -> jobsById[member.jobId]?.status ?: "waiting"
-                LocalTeamMemberPhase.DISABLED -> "disabled"
-                LocalTeamMemberPhase.DISMISSED -> "dismissed"
-                LocalTeamMemberPhase.FAILED -> "failed"
-            }
+            val activity = requireNotNull(activityById[member.id]).activity.name.lowercase()
             val currentTask = visibleTasks.firstOrNull {
                 it.ownerId == member.id && it.status == LocalTeamTaskStatus.IN_PROGRESS
             }
@@ -476,7 +472,7 @@ internal class LocalAgentTeamRuntime(
                 phase = member.phase.name.lowercase(),
                 activity = activity,
                 currentTask = currentTask?.subject,
-                hasCurrentTaskResult = currentTask != null && activity in setOf("dormant", "completed") &&
+                hasCurrentTaskResult = currentTask != null && activity == "idle" &&
                     hasFreshTaskResult(sessionId, currentTask, member.jobId),
                 executionSteps = execution.usedSteps,
                 executionStepLimit = execution.stepLimit,
@@ -1369,16 +1365,10 @@ internal class LocalAgentTeamRuntime(
         val state = project(sessionId)
         val member = state.members.singleOrNull { it.name == targetName.trim() }
             ?: error("TEAM_MEMBER_NOT_FOUND：找不到 teammate：" + targetName)
-        val jobStatus = jobs.snapshotInfos()
-            .firstOrNull { it.id == member.jobId }
-            ?.status
-            ?: when (member.phase) {
-                LocalTeamMemberPhase.CREATED -> "created"
-                LocalTeamMemberPhase.DISABLED -> "disabled"
-                LocalTeamMemberPhase.DISMISSED -> "dismissed"
-                LocalTeamMemberPhase.FAILED -> "failed"
-                else -> "missing"
-            }
+        val jobInfos = jobs.snapshotInfos()
+        val jobStatus = jobInfos.firstOrNull { it.id == member.jobId }?.status
+        val activity = projectLocalAgentTeamActivity(state, jobInfos)
+            .members.single { it.memberId == member.id }.activity.name.lowercase()
         val execution = memberExecutionEvidence(sessionId, member)
         val currentTask = state.tasks.firstOrNull {
             it.ownerId == member.id && it.status == LocalTeamTaskStatus.IN_PROGRESS
@@ -1389,7 +1379,9 @@ internal class LocalAgentTeamRuntime(
             append(" | phase=")
             append(member.phase.name.lowercase())
             append(" | activity=")
-            append(jobStatus)
+            append(activity)
+            append(" | job_status=")
+            append(jobStatus ?: "missing")
             execution.usedSteps?.let { steps ->
                 append(" | steps=").append(steps)
                 execution.stepLimit?.let { append("/").append(it) }
