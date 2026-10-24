@@ -145,6 +145,15 @@ class LocalSessionEventLog(
         }
     }
 
+    fun controlEventsAfter(
+        sequenceExclusive: Long, types: Set<String>,
+    ): List<Event> {
+        require(types.isNotEmpty())
+        return (if (sqlite != null) sqlite.selectTypesAfter(sqliteId, sequenceExclusive, types)
+        else fileLog().snapshotAfter(sequenceExclusive).filter { it.type in types })
+            .map { it.toLocalEvent() }
+    }
+
     fun snapshotAfter(sequenceExclusive: Long): List<Event> = if (sqlite != null) buildList {
         sqlite.forEachAfter(sqliteId, sequenceExclusive) { add(it.toLocalEvent()) }
     } else fileLog().snapshotAfter(sequenceExclusive).map { it.toLocalEvent() }

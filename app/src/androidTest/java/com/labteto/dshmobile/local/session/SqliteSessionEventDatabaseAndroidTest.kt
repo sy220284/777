@@ -121,6 +121,11 @@ class SqliteSessionEventDatabaseAndroidTest {
                 assertEquals((115L..119L).toList(),
                     db.pageAfter("chat", 114L, 20).map { it.sequence })
                 assertEquals(-1L, db.latestSequence("other"))
+                val selected = db.selectTypesAfter(
+                    "chat", 10L, setOf("tool/result"),
+                )
+                assertEquals((11L..119L step 2).toList(), selected.map { it.sequence })
+                assertTrue(selected.all { it.type == "tool/result" })
                 val generation = requireNotNull(db.instance("chat"))
                 assertTrue(db.writeProjectionCheckpoint(
                     "chat", "ui-transcript", LocalSessionProjectionCheckpoint(

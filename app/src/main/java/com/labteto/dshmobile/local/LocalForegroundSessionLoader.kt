@@ -25,6 +25,8 @@ import com.labteto.dshmobile.local.model.durableModelHistorySnapshot
 import com.labteto.dshmobile.local.model.migrateOfficialClaudeModel
 import com.labteto.dshmobile.local.model.workSystemPrompt
 import com.labteto.dshmobile.local.runtime.LOCAL_PROJECT_ID
+import com.labteto.dshmobile.local.chat.LOCAL_CHAT_CONTROL_EVENT_TYPES
+import com.labteto.dshmobile.local.work.LOCAL_WORK_CONTROL_EVENT_TYPES
 import com.labteto.dshmobile.local.chat.projectChatSessionControls
 import com.labteto.dshmobile.local.chat.recoverInterruptedChatReply
 import com.labteto.dshmobile.local.work.LocalForegroundRecoveryCoordinator
@@ -168,7 +170,11 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             }
             return
         }
-        val controlTail = log.snapshotAfter(projectionCursor)
+        // Do not decode thousands of tool/chat events which the two control
+        // reducers ignore. Indexed SQL fetch preserves the original global order.
+        val controlTail = log.controlEventsAfter(
+            projectionCursor, LOCAL_CHAT_CONTROL_EVENT_TYPES + LOCAL_WORK_CONTROL_EVENT_TYPES,
+        )
         val projectedChatControls = projectChatSessionControls(stored, controlTail)
         val projectedWorkControls = projectWorkSessionControls(stored, controlTail)
         val restoredTranscript = try {

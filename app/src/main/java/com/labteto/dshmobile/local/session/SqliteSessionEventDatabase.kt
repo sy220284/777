@@ -229,6 +229,23 @@ class SqliteSessionEventDatabase(
         )
     }
 
+    /** Only replay event kinds interpreted by Chat/Work control reducers.
+     * SQL uses (session_id,event_type,sequence) and preserves global event order.
+     */
+    fun selectTypesAfter(
+        sessionId: String, sequenceExclusive: Long, types: Set<String>,
+    ): List<SessionEvent> {
+        validateSessionId(sessionId)
+        require(types.isNotEmpty() && types.size <= 32) { "控制事件类型集合不合法" }
+        val columns = List(types.size) { "?" }.joinToString(",")
+        return queryPage(
+            "SELECT sequence,event_type,created_at,schema_version,payload " +
+                "FROM session_events WHERE session_id=? AND event_type IN ($columns) " +
+                "AND sequence>? ORDER BY sequence ASC",
+            arrayOf(sessionId, *types.toTypedArray(), sequenceExclusive.toString()),
+        )
+    }
+
     /**
      * Stream without loading the complete event archive into a Kotlin collection.
      * The SQLite cursor is read-only and remains valid alongside one WAL writer.
