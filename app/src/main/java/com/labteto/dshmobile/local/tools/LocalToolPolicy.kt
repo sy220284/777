@@ -47,7 +47,7 @@ internal object LocalToolPolicy {
         "job_list", "job_output", "job_kill", "json_query", "environment_info",
         "todo_write", "create_goal", "get_goal", "update_goal",
         "skill", "skill_create", "skill_update", "skill_rollback", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local", "extension_record", "extension_inspect", "subagent_fork", "list_agents", "agent_tree", "send_message",
-        "interrupt_agent", "workflow", "team_members", "team_member_status",
+        "interrupt_agent", "agent_inspect", "agent_watch", "agent_resume", "agent_close", "workflow", "team_members", "team_member_status",
         "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown", "team_respond_shutdown", "team_ack_message",
         "team_messages", "team_message_receipt", "team_wait_for_message", "team_task_create", "team_task_get",
         "team_task_list", "team_task_evidence", "team_task_update", "team_interrupt", "team_disable_member",
