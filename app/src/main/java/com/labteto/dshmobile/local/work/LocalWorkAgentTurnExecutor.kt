@@ -424,20 +424,17 @@ internal class LocalWorkAgentTurnExecutor(
                     }
                     // Assemble strategy guidance per *request*, never append it to the
                     // durable base context. A new Goal or route cannot inherit the old advice.
-                    val improvementGuidance = selectedImprovement?.takeIf { advice ->
-                        liveGoal != null && liveGoal.id == improvementGoalId &&
-                            improvementSteeringRevision == binding.steeringRevision.value &&
-                            snapshot.modelState.model == advice.model &&
-                            (snapshot.modelState.modelSelection.activeProfileId ?: "") == advice.profileId &&
-                            snapshot.modelState.modelSelection.activeProfile?.routeFingerprint().orEmpty() == advice.routeFingerprint &&
-                            (snapshot.projectId ?: "") == advice.projectId &&
-                            com.labteto.dshmobile.local.work.improvement.workGoalComparisonKey(liveGoal) == advice.goalSignature
-                    }?.let { advice ->
-                        "\n\n[可选工作方法建议：" + advice.id + "]\n来自历史工作证据的" +
-                            (if (advice.active) "已采纳方法" else "待验证实验候选") +
-                            "；仅作为辅助建议，用户要求与已有权限/验收规则优先。\n" +
-                            advice.guidance
-                    }.orEmpty()
+                    val improvementGuidance = workImprovementGuidanceForStep(
+                        advice = selectedImprovement,
+                        liveGoal = liveGoal,
+                        admittedGoalId = improvementGoalId,
+                        admittedSteeringRevision = improvementSteeringRevision,
+                        currentSteeringRevision = binding.steeringRevision.value,
+                        projectId = snapshot.projectId,
+                        model = snapshot.modelState.model,
+                        profileId = snapshot.modelState.modelSelection.activeProfileId,
+                        routeFingerprint = snapshot.modelState.modelSelection.activeProfile?.routeFingerprint(),
+                    )
                     val skillGuidance = resolveLocalWorkSkillGuidance(
                         sessionStorage.files.workspace, effectiveSkillInput,
                         selectedInvocations = pinnedInvocations.current(),
