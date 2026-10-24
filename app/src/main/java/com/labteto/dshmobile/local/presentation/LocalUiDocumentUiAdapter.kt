@@ -127,6 +127,10 @@ internal class LocalUiDocumentUiAdapter(
                 UiDocumentSnapshot(document, record.provenance, document.actions.associate { action ->
                     val reason = when {
                         !current -> UiCommandRejection.STALE_IDENTITY
+                        action is UiDocumentAction.SendUserInput && action.submit &&
+                            store.actionReceipt(UiDocumentActionRequest(document.documentId,
+                                document.revision, document.source, action.id, emptyMap())) != null ->
+                            UiCommandRejection.UNSUPPORTED
                         action is UiDocumentAction.AnswerApproval && conversations.documentFactsSnapshot().approval?.pendingId != action.pendingId -> UiCommandRejection.APPROVAL_EXPIRED
                         action is UiDocumentAction.OpenKnownScene && action.sceneId !in navigationScenes -> UiCommandRejection.UNSUPPORTED
                         else -> null
@@ -516,9 +520,14 @@ internal class LocalUiDocumentUiAdapter(
                     when {
                         text.isBlank() -> UiDocumentReceipt.Rejected(UiCommandRejection.EMPTY_INPUT)
                         action.submit && !request.confirmed -> UiDocumentReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
-                        action.submit -> UiDocumentReceipt.OwnerReceipt(if (workMode)
-                            conversations.work.submit(WorkConversationUiCommand.SendText(identity, text))
-                            else conversations.chat.submit(com.labteto.dshmobile.uicontract.ChatUiCommand.SendText(identity, text)))
+                        action.submit -> UiDocumentReceipt.OwnerReceipt(
+                            store.submitActionOnce(request) {
+                                if (workMode) conversations.work.submit(
+                                    WorkConversationUiCommand.SendText(identity, text))
+                                else conversations.chat.submit(
+                                    com.labteto.dshmobile.uicontract.ChatUiCommand.SendText(identity, text))
+                            },
+                        )
                         else -> { drafts.updateDraft(identity.sessionId, text); UiDocumentReceipt.DraftPrepared }
                     }
                 }
