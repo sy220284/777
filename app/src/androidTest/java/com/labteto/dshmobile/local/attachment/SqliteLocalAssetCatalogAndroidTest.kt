@@ -247,7 +247,7 @@ class SqliteLocalAssetCatalogAndroidTest {
                 )
                 old.execSQL(
                     "INSERT INTO local_assets VALUES (?,?,?,?,?,?,?)",
-                    arrayOf(digest, image.relativePath, image.mediaType, image.bytes, "file", "present", 1L),
+                    arrayOf<Any>(digest, image.relativePath, image.mediaType, image.bytes, "file", "present", 1L),
                 )
                 old.version = 3
             }
