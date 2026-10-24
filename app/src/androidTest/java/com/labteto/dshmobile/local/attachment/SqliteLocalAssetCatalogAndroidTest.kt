@@ -1,6 +1,11 @@
 package com.labteto.dshmobile.local.attachment
 
 import android.database.sqlite.SQLiteDatabase
+import android.graphics.Bitmap
+import com.labteto.dshmobile.local.files.LocalWorkspace
+import java.io.ByteArrayOutputStream
+import java.io.File
+import kotlinx.coroutines.runBlocking
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.local.session.SqliteSessionEventDatabase
@@ -118,6 +123,37 @@ class SqliteLocalAssetCatalogAndroidTest {
             }
         } finally {
             context.deleteDatabase(name)
+        }
+    }
+
+    @Test fun realImageImporterPublishesAndRegistersFileMetadata() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val unique = UUID.randomUUID().toString()
+        val name = "asset-import-$unique.db"
+        val root = File(context.cacheDir, "asset-import-$unique").apply { mkdirs() }
+        val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        val encoded = ByteArrayOutputStream().also { output ->
+            check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
+        }.toByteArray()
+        bitmap.recycle()
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { events ->
+                val catalog = SqliteLocalAssetCatalog(events)
+                val importer = LocalAttachmentImporter(
+                    context, LocalWorkspace(root), catalog::register,
+                )
+                val item = importer.importImageBytes(encoded, "image/png")
+                assertEquals("image/png", item.mediaType)
+                assertEquals(item.bytes, catalog.asset(requireNotNull(item.attachmentId))?.bytes)
+                assertTrue(File(root, item.relativePath).isFile)
+                // Duplicate imports should reuse bytes and metadata safely.
+                val duplicate = importer.importImageBytes(encoded, "image/png")
+                assertEquals(item.attachmentId, duplicate.attachmentId)
+                assertEquals(item.relativePath, duplicate.relativePath)
+            }
+        } finally {
+            context.deleteDatabase(name)
+            root.deleteRecursively()
         }
     }
 
