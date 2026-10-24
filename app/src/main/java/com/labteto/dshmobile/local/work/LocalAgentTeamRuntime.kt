@@ -2135,11 +2135,27 @@ internal class LocalAgentTeamRuntime(
         // No task owner can be bound in PROVISIONING, so leave initial admission intact.
         if (member.phase == LocalTeamMemberPhase.PROVISIONING) return
         if (member.phase != LocalTeamMemberPhase.ACTIVE) throw LocalWorkflowSuperseded()
+        val log = eventLogFor(sessionId)
         val assigned = state.tasks.singleOrNull {
             it.ownerId == member.id && it.status == LocalTeamTaskStatus.IN_PROGRESS
-        } ?: return
+        }
+        if (assigned == null) {
+            // A released/reassigned Job may still be running: lack of a current owner is
+            // not permission to continue. Consult the existing durable ownership events.
+            val previouslyOwned = log.latestMatching(setOf(TEAM_TASK_EVENT)) { data ->
+                data["teamId"]?.jsonPrimitive?.contentOrNull == sessionId &&
+                    (data["task"] as? JsonObject)?.let { task ->
+                        task["ownerId"]?.jsonPrimitive?.contentOrNull == member.id &&
+                            task["status"]?.jsonPrimitive?.contentOrNull == "in_progress"
+                    } == true
+            }?.data?.let(LocalAgentTeamEventCodec::decodeTask) ?: return
+            val latest = state.tasks.singleOrNull { it.id == previouslyOwned.id }
+            if (latest == null || (latest.status != LocalTeamTaskStatus.COMPLETED &&
+                    latest.ownerId != member.id)) throw LocalWorkflowSuperseded()
+            return
+        }
         val admitted = assigned.rootUserRevision ?: return // Legacy tasks retain their previous semantics.
-        if (admitted != workflowUserRevision(eventLogFor(sessionId))) throw LocalWorkflowSuperseded()
+        if (admitted != workflowUserRevision(log)) throw LocalWorkflowSuperseded()
     }
 
     internal fun activityProjection(sessionId: String): LocalAgentTeamActivityProjection =
