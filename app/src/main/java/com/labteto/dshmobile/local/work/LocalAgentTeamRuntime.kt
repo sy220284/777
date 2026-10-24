@@ -2121,6 +2121,19 @@ internal class LocalAgentTeamRuntime(
         }
     }
 
+    /** One canonical USER epoch for an owned task; stale children must not call tools. */
+    internal fun requireCurrentRootAuthorization(sessionId: String, jobId: String) {
+        val state = project(sessionId)
+        require(state.failure == null) { "TEAM_PROJECTION_INVALID：不能使用损坏的团队授权" }
+        val member = state.members.singleOrNull { it.jobId == jobId } ?: return
+        if (member.phase != LocalTeamMemberPhase.ACTIVE) throw LocalWorkflowSuperseded()
+        val assigned = state.tasks.singleOrNull {
+            it.ownerId == member.id && it.status == LocalTeamTaskStatus.IN_PROGRESS
+        } ?: return
+        val admitted = assigned.rootUserRevision ?: return // Legacy tasks retain their previous semantics.
+        if (admitted != workflowUserRevision(eventLogFor(sessionId))) throw LocalWorkflowSuperseded()
+    }
+
     internal fun activityProjection(sessionId: String): LocalAgentTeamActivityProjection =
         projectLocalAgentTeamActivity(
             team = project(sessionId),
