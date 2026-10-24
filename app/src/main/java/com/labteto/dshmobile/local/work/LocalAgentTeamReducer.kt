@@ -323,6 +323,21 @@ internal object LocalAgentTeamReducer {
             "TEAM_TASK_BLOCKER_DUPLICATE"
         }
         require(next.writeScopes.size <= MAX_WRITE_SCOPES) { "TEAM_TASK_WRITE_SCOPE_LIMIT" }
+        require((next.completionResultId == null) == (next.completionEvidenceSequence == null)) {
+            "TEAM_TASK_COMPLETION_EVIDENCE_PAIR_REQUIRED"
+        }
+        require(next.completionEvidenceSequence == null ||
+            (next.status == LocalTeamTaskStatus.COMPLETED && next.completionEvidenceSequence >= 0L &&
+                !next.completionResultId.isNullOrBlank())) {
+            "TEAM_TASK_COMPLETION_EVIDENCE_INVALID"
+        }
+        if (previous?.status == LocalTeamTaskStatus.COMPLETED &&
+            next.status == LocalTeamTaskStatus.COMPLETED) {
+            require(previous.completionResultId == next.completionResultId &&
+                previous.completionEvidenceSequence == next.completionEvidenceSequence) {
+                "TEAM_TASK_COMPLETION_EVIDENCE_IMMUTABLE"
+            }
+        }
         require(next.rootUserRevision == null || next.rootUserRevision >= -1L) {
             "TEAM_TASK_USER_REVISION_INVALID"
         }
