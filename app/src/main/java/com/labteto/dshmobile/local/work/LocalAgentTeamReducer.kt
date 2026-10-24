@@ -286,6 +286,13 @@ internal object LocalAgentTeamReducer {
             (next.status == LocalTeamTaskStatus.IN_PROGRESS && next.ownerId != null)) {
             "TEAM_TASK_AUTO_DISPATCH_STATE_INVALID"
         }
+        // Same owner cannot silently renew root authority by editing the task or its description.
+        if (previous?.status == LocalTeamTaskStatus.IN_PROGRESS &&
+            next.status == LocalTeamTaskStatus.IN_PROGRESS && next.ownerId == previous.ownerId) {
+            require(next.rootUserRevision == previous.rootUserRevision) {
+                "TEAM_TASK_ROOT_AUTHORITY_IMMUTABLE"
+            }
+        }
         if (next.autoDispatchMessageId != null && previous != null) {
             require(
                 next.autoDispatchMessageId == previous.autoDispatchMessageId ||
