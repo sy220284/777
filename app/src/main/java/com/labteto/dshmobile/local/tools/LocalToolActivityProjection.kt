@@ -235,7 +235,7 @@ internal fun localToolActivityKind(name: String): LocalToolActivityKind {
         "memory" in canonical -> LocalToolActivityKind.MEMORY
         "mcp" in canonical -> LocalToolActivityKind.MCP
         "subagent" in canonical || canonical.startsWith("team_") || canonical == "workflow" ||
-            canonical in setOf("send_message", "interrupt_agent", "agent_inspect", "agent_resume", "agent_close", "list_agents") ->
+            canonical in setOf("send_message", "interrupt_agent", "agent_inspect", "agent_watch", "agent_resume", "agent_close", "list_agents") ->
             LocalToolActivityKind.AGENT
         "task" in canonical || "todo" in canonical || "goal" in canonical || "automation" in canonical ->
             LocalToolActivityKind.TASK
