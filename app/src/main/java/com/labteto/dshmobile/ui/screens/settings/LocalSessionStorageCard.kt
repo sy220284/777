@@ -28,6 +28,7 @@ internal fun LocalSessionStorageCard(
     onCompact: () -> Unit,
     onExport: () -> Unit,
     onRestore: () -> Unit,
+    onCancelRestore: () -> Unit,
     onCleanup: () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
@@ -123,6 +124,15 @@ internal fun LocalSessionStorageCard(
             variant = SyButtonVariant.Outline,
             modifier = Modifier.fillMaxWidth(),
         )
+        if (status?.pendingRestore == true) {
+            SyButton(
+                text = "取消未开始的备份恢复",
+                onClick = onCancelRestore,
+                enabled = !busy,
+                variant = SyButtonVariant.Outline,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         SyButton(
             text = stringResource(R.string.settings_local_session_storage_cleanup),
             onClick = onCleanup,
