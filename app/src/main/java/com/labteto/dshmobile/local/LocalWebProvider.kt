@@ -300,7 +300,9 @@ class LocalWebProvider @Inject constructor(
         usageContext: TokenUsageContext? = null,
         count: Int = 10,
         needContent: Boolean = false,
-    ): String = searchClient.search(apiKey, queries, usageContext, count, needContent)
+        oriQuestion: String? = null,
+        localization: String? = null,
+    ): String = searchClient.search(apiKey, queries, usageContext, count, needContent, oriQuestion, localization)
 
     /**
      * A configured official DeepSeek credential enables native Search.
@@ -314,6 +316,8 @@ class LocalWebProvider @Inject constructor(
         count: Int = 10,
         needContent: Boolean = false,
         provider: String = "auto",
+        oriQuestion: String? = null,
+        localization: String? = null,
     ): String {
         require(provider in setOf("auto", "bing", "deepseek")) { "未知网页搜索服务：" + provider }
         if (!networkSettings.isEnabled()) throw LocalWebException("NETWORK_SEARCH_DISABLED", "网络搜索已关闭")
@@ -327,11 +331,11 @@ class LocalWebProvider @Inject constructor(
             if (key.isNullOrBlank()) throw LocalWebException(
                 "SEARCH_UNAVAILABLE", "DeepSeek 搜索需要单独配置官方 DeepSeek API Key",
             )
-            return searchClient.search(key, queries, usageContext, count, needContent)
+            return searchClient.search(key, queries, usageContext, count, needContent, oriQuestion, localization)
         }
         if (key.isNullOrBlank()) return keylessSearchClient.search(queries)
         return try {
-            searchClient.search(key, queries, usageContext, count, needContent)
+            searchClient.search(key, queries, usageContext, count, needContent, oriQuestion, localization)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (deepSeekFailure: Exception) {
