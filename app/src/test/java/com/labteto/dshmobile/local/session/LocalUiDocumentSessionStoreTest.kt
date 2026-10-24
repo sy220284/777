@@ -47,6 +47,33 @@ class LocalUiDocumentSessionStoreTest {
         } finally { registry.get("session").close(); directory.deleteRecursively() }
     }
 
+    @Test fun rejectedFormAdmissionCanBeRetriedWithoutLosingAcceptedDeduplication() {
+        val dir = Files.createTempDirectory("ui-doc-retry").toFile()
+        val registry = LocalSessionEventLogRegistry(dir, Json)
+        try {
+            val card = document("message")
+            val request = UiDocumentActionRequest(card.documentId, card.revision,
+                card.source, "send", emptyMap(), true)
+            val owner = LocalUiDocumentSessionStore(registry)
+            var attempts = 0
+            assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.QUEUE_FULL),
+                owner.submitActionOnce(request) {
+                    attempts++
+                    UiCommandReceipt.Rejected(UiCommandRejection.QUEUE_FULL)
+                })
+            assertEquals(null, owner.actionReceipt(request))
+            assertEquals(UiCommandReceipt.Accepted, owner.submitActionOnce(request) {
+                attempts++
+                UiCommandReceipt.Accepted
+            })
+            assertEquals(UiCommandReceipt.Accepted, owner.submitActionOnce(request) {
+                attempts++
+                UiCommandReceipt.Accepted
+            })
+            assertEquals(2, attempts)
+        } finally { registry.get("session").close(); dir.deleteRecursively() }
+    }
+
     @Test fun interruptedDocumentActionIsNeverSilentlyDispatchedAgain() {
         val directory = Files.createTempDirectory("ui-doc-unknown").toFile()
         val registry = LocalSessionEventLogRegistry(directory, Json)
