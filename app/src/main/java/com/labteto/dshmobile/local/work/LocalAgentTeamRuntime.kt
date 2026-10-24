@@ -1058,6 +1058,10 @@ internal class LocalAgentTeamRuntime(
             ).toString().replace("-", "").take(20)
             if (id in state.deliveredMessageIds || id in state.discardedMessageIds ||
                 state.pendingMessages.any { it.id == id }) return@forEach
+            // A full Lead mailbox is transient backpressure, not a corrupt Team event.
+            if (state.pendingMessages.count { it.targetId == sessionId } >= MAX_PENDING_MESSAGES_PER_MEMBER) {
+                return@synchronized
+            }
             val member = state.members.singleOrNull { it.id == response.memberId } ?: return@forEach
             val summary = if (response.approved) "approved" else "rejected"
             val message = LocalTeamMessageSnapshot(
