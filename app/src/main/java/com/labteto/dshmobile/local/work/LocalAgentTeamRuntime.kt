@@ -286,6 +286,8 @@ internal class LocalAgentTeamRuntime(
             }
         }
         // Work can become eligible after this member settles a dependency.
+        // Never dispatch other work from a cancelled member execution.
+        currentCoroutineContext().ensureActive()
         reconcileIdleTeamTasks(sessionId)
         deliverLeadMailbox(sessionId)
         return result
