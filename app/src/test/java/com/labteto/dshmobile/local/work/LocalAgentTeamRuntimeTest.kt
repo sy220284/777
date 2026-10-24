@@ -304,6 +304,38 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun teamWaitReportsDurableChangeThroughRealLeadTool() = runBlocking {
+        val session = "team-wait-transition-contract"
+        val fixture = fixture(session)
+        // A ready projection establishes the baseline before the waiter suspends.
+        assertEquals(0, fixture.runtime.project(session).members.size)
+        val binding = LocalWorkRunBinding(
+            sessionId = session,
+            initialState = LocalHarnessState(
+                sessionId = session, usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = session, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = session, maxPendingInputs = 8),
+            eventLog = fixture.log,
+        )
+        val waiting = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            fixture.runtime.execute(memberTestToolCall(
+                "wait-for-team", "team_wait", buildJsonObject { put("timeout_ms", 2_000) },
+            ), binding).orEmpty()
+        }
+        fixture.log.append(
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", revision = 1, blockedBy = emptyList()),
+        )
+        val result = kotlinx.coroutines.withTimeout(3_000L) { waiting.await() }
+        assertTrue(result.contains("Team 状态已变化"))
+        assertTrue(result.contains("event_seq="))
+        assertTrue(result.contains("from_seq="))
+        assertTrue(result.contains("member_changes=none"))
+        assertTrue(result.contains("task_completion=unverified"))
+    }
+
+    @Test
     fun trustedMembersSendPeerLeadAndReadOwnDurableMailbox() = runBlocking {
         val received = mutableListOf<QueuedAgentInput>()
         val leadInbox = mutableListOf<QueuedAgentInput>()
