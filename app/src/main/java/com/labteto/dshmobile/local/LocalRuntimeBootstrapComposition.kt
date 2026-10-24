@@ -5,7 +5,7 @@ import android.content.Context
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.attachment.cleanupLocalImageAttachments
 import com.labteto.dshmobile.local.attachment.collectLocalImageAttachmentReferences
-import com.labteto.dshmobile.local.attachment.mergeLocalImageAttachmentReferences
+import com.labteto.dshmobile.local.attachment.collectAuthoritativeLocalImageAttachmentReferences
 import com.labteto.dshmobile.local.runtime.ATTACHMENT_GC_INTERVAL_MILLIS
 import com.labteto.dshmobile.local.runtime.KEY_ATTACHMENT_GC_AT
 import com.labteto.dshmobile.local.runtime.LocalBundledRuntimeManager
@@ -15,7 +15,7 @@ import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.prepareLocalHarnessStartup
 import com.labteto.dshmobile.local.session.LocalSessionDeletionCleanup
 import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
-import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
 import com.labteto.dshmobile.local.work.LocalWorkComposition
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -26,7 +26,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -122,7 +122,7 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
         }
         foregroundWake.startNextIfIdle()?.start()
         work.schedulePersistentRecovery()
-        scope.launch { cleanupLocalImagesIfDue() }
+        scope.launch(kotlinx.coroutines.Dispatchers.IO) { cleanupLocalImagesIfDue() }
     }
 
     private fun cleanupLocalImagesIfDue() {
@@ -130,60 +130,56 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
         val last = preferences.getLong(KEY_ATTACHMENT_GC_AT, 0L)
         if (now - last < ATTACHMENT_GC_INTERVAL_MILLIS) return
         val currentSessionId = runtimeStateStore.currentSessionId
-        val eventLog = sessionStorage.eventLogs.get(currentSessionId)
         runCatching {
-            cleanupUnreferencedLocalImagesNow(
-                sessionsRoot = sessionsRoot,
+            // A partially migrated/missing authority is a hard stop for destructive GC.
+            // The legacy JSONL directory cannot enumerate SQLite-owned sessions.
+            check(sessionStorage.eventLogs.sqliteDatabase != null) {
+                "SQLite 会话事件权威来源不可用，附件回收已停止"
+            }
+            val ids = buildSet {
+                addAll(sessionStorage.eventLogs.historicalSources().map { it.id })
+                addAll(sessionStorage.coordinator.summaries().map { it.id })
+                addAll(pendingSessions.entries().keys)
+                add(currentSessionId)
+            }
+            val refs = collectAuthoritativeLocalImageAttachmentReferences(
+                sessionIds = ids,
                 currentSessionId = currentSessionId,
-                eventLogFor = sessionStorage.eventLogs::get,
-                modelHistory = runtimeStateStore.foregroundRunHandle.modelHistory.snapshot(),
-                workspacePath = workspace.path,
-                eventLog = eventLog,
+                readEventReferences = { id ->
+                    // Scoped reader does not evict any foreground EventLog adapter.
+                    sessionStorage.eventLogs.readHistorical(id) { log ->
+                        log.withEvents { events ->
+                            collectLocalImageAttachmentReferences(events)
+                        }
+                    }
+                },
+                readSnapshot = { id ->
+                    sessionStorage.coordinator.read(id)?.let { snapshot ->
+                        json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject
+                    }
+                },
+                foregroundMessages = runtimeStateStore.foregroundRunHandle.modelHistory.snapshot(),
             )
+            val result = cleanupLocalImageAttachments(
+                workspaceRoot = File(workspace.path),
+                references = refs,
+            )
+            if (result.deletedFiles > 0) {
+                sessionStorage.eventLogs.get(currentSessionId).append("attachment/gc", buildJsonObject {
+                    put("status", "completed")
+                    put("deleted_files", result.deletedFiles)
+                    put("deleted_bytes", result.deletedBytes)
+                    put("retained_image_bytes", result.retainedImageBytes)
+                })
+            }
         }.onSuccess {
             preferences.edit().putLong(KEY_ATTACHMENT_GC_AT, now).apply()
+        }.onFailure { failure ->
+            // Do not stamp the GC time: retry after recovery instead of silently
+            // deleting files whose SQLite owner could not be enumerated/read.
+            com.labteto.dshmobile.observability.AppLog.warn(
+                "AttachmentGC", "SQLite 引用扫描不完整；本轮没有完成附件清理", failure,
+            )
         }
-    }
-}
-
-private fun cleanupUnreferencedLocalImagesNow(
-    sessionsRoot: File,
-    currentSessionId: String,
-    eventLogFor: (String) -> LocalSessionEventLog,
-    modelHistory: List<JsonObject>,
-    workspacePath: String,
-    eventLog: LocalSessionEventLog,
-) {
-    val sessionIds = sessionsRoot.listFiles().orEmpty()
-        .asSequence()
-        .filter(File::isFile)
-        .map(File::getName)
-        .filter { name -> ".events.jsonl" in name }
-        .map { name -> name.substringBefore(".events.jsonl") }
-        .filter { id -> id.matches(Regex("[A-Za-z0-9._-]{1,128}")) }
-        .plus(currentSessionId)
-        .distinct()
-        .toList()
-    val references = mergeLocalImageAttachmentReferences(
-        sessionIds.map { id ->
-            eventLogFor(id).withEvents { events ->
-                collectLocalImageAttachmentReferences(
-                    events = events,
-                    extraMessages = if (id == currentSessionId) modelHistory else emptyList(),
-                )
-            }
-        },
-    )
-    val result = cleanupLocalImageAttachments(
-        workspaceRoot = File(workspacePath),
-        references = references,
-    )
-    if (result.deletedFiles > 0) {
-        eventLog.append("attachment/gc", buildJsonObject {
-            put("status", "completed")
-            put("deleted_files", result.deletedFiles)
-            put("deleted_bytes", result.deletedBytes)
-            put("retained_image_bytes", result.retainedImageBytes)
-        })
     }
 }
