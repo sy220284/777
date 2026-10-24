@@ -2502,6 +2502,51 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun taskEvidenceNeverTreatsMissingOrForgedCheckpointAsVerified() = runBlocking {
+        val session = "team-machine-proof-audit"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        val pending = LocalTeamTaskSnapshot(
+            id = "task-1", revision = 1, subject = "核对成果", description = "",
+            status = LocalTeamTaskStatus.PENDING,
+        )
+        val running = pending.copy(
+            revision = 2, status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = "member-1",
+        )
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { pending.toEvent(session) })
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { running.toEvent(session) })
+        val legacy = running.copy(revision = 3, status = LocalTeamTaskStatus.COMPLETED)
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { legacy.toEvent(session) })
+        val binding = teamBinding(f, session)
+        val unknown = f.runtime.execute(LocalToolCall("legacy-proof", "team_task_evidence",
+            buildJsonObject { put("task_id", "task-1") }, "{}"), binding).orEmpty()
+        assertTrue(unknown.contains("evidence_state=legacy_unknown"))
+
+        val session2 = "team-machine-proof-forged"
+        val bad = fixture(session2)
+        appendActiveMember(bad.log, session2)
+        bad.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { pending.toEvent(session2) })
+        bad.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { running.toEvent(session2) })
+        val faked = running.copy(
+            revision = 3, status = LocalTeamTaskStatus.COMPLETED,
+            completionResultId = "unverified-model-claim",
+            completionEvidenceSequence = 902L,
+        )
+        bad.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { faked.toEvent(session2) })
+        val rejected = bad.runtime.execute(LocalToolCall("forged-proof", "team_task_evidence",
+            buildJsonObject { put("task_id", "task-1") }, "{}"), teamBinding(bad, session2)).orEmpty()
+        assertTrue(rejected.contains("checkpoint_binding_valid=false"))
+        assertTrue(rejected.contains("content_verified=false"))
+        assertNull(bad.runtime.project(session2).failure)
+    }
+
+    @Test
     fun completionRequiresFreshOwnedResultAndUnlocksDependencyOnlyAfterVerification() = runBlocking {
         val session = "team-verified-complete"
         val fixture = fixture(session)
@@ -2542,6 +2587,15 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(proof.completionResultId, recovered.completionResultId)
         assertEquals(proof.completionEvidenceSequence, recovered.completionEvidenceSequence)
         assertNull(recovered.completionResultId?.takeIf { it != "verified" })
+        val inspected = fixture.runtime.execute(
+            LocalToolCall("proof", "team_task_evidence", buildJsonObject {
+                put("task_id", "task-1")
+            }, "{}"), binding,
+        ).orEmpty()
+        assertTrue(inspected.contains("checkpoint_binding_valid=true"))
+        assertTrue(inspected.contains("result_id=verified"))
+        assertTrue(inspected.contains("content_verified=false"))
+        assertTrue(inspected.contains("goal_accepted=false"))
     }
 
     @Test
