@@ -43,7 +43,7 @@ class McpExternalLoopbackProtocolAndroidTest {
                         socket.soTimeout = 15_000
                         val input = BufferedReader(InputStreamReader(
                             socket.getInputStream(), Charsets.UTF_8))
-                        val first = input.readLine()
+                        val first = requireNotNull(input.readLine()) { "No HTTP request" }
                         check(first.startsWith("POST /mcp HTTP/1.")) { "Bad HTTP path: $first" }
                         var length = -1
                         while (true) {
