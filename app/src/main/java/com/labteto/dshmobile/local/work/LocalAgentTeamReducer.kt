@@ -239,6 +239,20 @@ internal object LocalAgentTeamReducer {
             "TEAM_TASK_BLOCKER_DUPLICATE"
         }
         require(next.writeScopes.size <= MAX_WRITE_SCOPES) { "TEAM_TASK_WRITE_SCOPE_LIMIT" }
+        require(next.autoDispatchMessageId == null ||
+            (next.status == LocalTeamTaskStatus.IN_PROGRESS && next.ownerId != null)) {
+            "TEAM_TASK_AUTO_DISPATCH_STATE_INVALID"
+        }
+        if (next.autoDispatchMessageId != null && previous != null) {
+            require(
+                next.autoDispatchMessageId == previous.autoDispatchMessageId ||
+                    (previous.status == LocalTeamTaskStatus.PENDING &&
+                        previous.autoDispatchMessageId == null)
+            ) { "TEAM_TASK_AUTO_DISPATCH_REPLACED" }
+            if (next.autoDispatchMessageId == previous.autoDispatchMessageId) {
+                require(next.ownerId == previous.ownerId) { "TEAM_TASK_AUTO_OWNER_CHANGED" }
+            }
+        }
         if (previous == null) {
             require(next.status == LocalTeamTaskStatus.PENDING && next.ownerId == null) {
                 "TEAM_TASK_MUST_START_PENDING：" + next.id
