@@ -217,7 +217,7 @@ internal class SqliteSessionMediaArchive(
         const val STAGED_MEDIA_DIR = "media"
         const val MAX_MEDIA_BYTES = 512L * 1024L * 1024L
         const val MAX_MEDIA_FILES = 20_000
-        const val MAX_MANIFEST_BYTES = 3L * 1024L * 1024L
+        const val MAX_MANIFEST_BYTES = 8L * 1024L * 1024L
         private val NAME = Regex("[A-Za-z0-9_-][A-Za-z0-9._-]{0,180}")
         private val SHA256 = Regex("[a-f0-9]{64}")
 
