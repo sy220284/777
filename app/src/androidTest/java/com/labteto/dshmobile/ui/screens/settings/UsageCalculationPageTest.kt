@@ -20,6 +20,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.web.LocalSearchUsageSnapshot
+import com.labteto.dshmobile.local.web.LocalSearchUsageDay
 import com.labteto.dshmobile.local.TokenUsageAggregate
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageRecord
@@ -53,6 +55,35 @@ import org.junit.Test
 
 class UsageCalculationPageTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test
+    fun searchTabShowsOnlyRecordedRequestsAndCostsWithoutInventingTokens() {
+        val day = java.time.LocalDate.now().toEpochDay()
+        val search = LocalSearchUsageSnapshot(
+            bingSearch = 2,
+            deepSeekSearch = 3,
+            deepSeekFetch = 1,
+            days = listOf(LocalSearchUsageDay(day, bingSearch = 2, deepSeekSearch = 3, deepSeekFetch = 1)),
+        )
+        compose.setContent {
+            DshTheme {
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    UsageCalculationPage(
+                        usage = DeepSeekUsageSnapshot(),
+                        onOpenPricing = {},
+                        searchUsage = search,
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.usage_mode_search)).performClick()
+        compose.onNodeWithTag("usage-search-total").assertExists()
+        compose.onNodeWithTag("usage-search-today").assertExists()
+        compose.onNodeWithTag("usage-search-fee").assertExists()
+        compose.onNodeWithText("¥0.0200").assertExists()
+        compose.onNodeWithText(context.getString(R.string.usage_search_independent)).assertExists()
+        compose.onNodeWithTag("usage-search-chart").assertExists()
+    }
 
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
