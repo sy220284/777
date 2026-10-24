@@ -119,7 +119,7 @@ internal fun UsageSearchSection(usage: LocalSearchUsageSnapshot, rangeDays: Int)
                 ) {
                     Box(
                         Modifier.fillMaxWidth()
-                            .height(if (count == 0L) 3.dp else (92f * count / maximum).dp.coerceAtLeast(5.dp))
+                            .height(if (count == 0L) 3.dp else (92f * count.toFloat() / maximum.toFloat()).dp.coerceAtLeast(5.dp))
                             .background(colors.selected, RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp)),
                     )
                 }
