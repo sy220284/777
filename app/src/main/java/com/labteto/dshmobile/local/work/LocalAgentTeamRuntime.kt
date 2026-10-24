@@ -31,6 +31,7 @@ import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MEMBER_ID_PR
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_DISCARDED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_QUEUED
+import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_ACKNOWLEDGED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_TASK_EVENT
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_SHUTDOWN_RESPONSE
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TOOL_NAMES
@@ -273,6 +274,13 @@ internal class LocalAgentTeamRuntime(
                 when (call.name) {
                     "team_send_message" -> sendMessage(sessionId, args.requiredTeamString("target"),
                         args.requiredTeamString("message"), member)
+                    "team_ack_message" -> acknowledgeMessage(
+                        sessionId = sessionId,
+                        member = member,
+                        messageId = args.requiredTeamString("message_id"),
+                        outcome = args.requiredTeamString("outcome"),
+                        reason = args.optionalTeamString("reason").orEmpty(),
+                    )
                     "team_respond_shutdown" -> respondShutdown(
                         sessionId = sessionId,
                         member = member,
@@ -1036,6 +1044,57 @@ internal class LocalAgentTeamRuntime(
                 "Team 消息已持久排队：${snapshot.id} → ${member?.name ?: "lead"}"
             }
         }
+    }
+
+    /**
+     * Explicit work-message acknowledgement only after an observed provider reply to
+     * the exact Inbox payload. This is a member declaration, not task verification.
+     */
+    private fun acknowledgeMessage(
+        sessionId: String,
+        member: LocalTeamMemberSnapshot,
+        messageId: String,
+        outcome: String,
+        reason: String,
+    ): String = synchronized(commandLock) {
+        val normalized = outcome.trim().lowercase()
+        require(normalized in setOf("handled", "cannot_handle")) {
+            "TEAM_MESSAGE_ACK_OUTCOME_INVALID"
+        }
+        val cleanReason = boundedTeamText(reason, "reason", MAX_ERROR_CHARS, allowEmpty = normalized == "handled")
+        val state = project(sessionId)
+        require(state.failure == null) { "TEAM_PROJECTION_INVALID" }
+        val prior = state.messageAcknowledgements.singleOrNull { it.messageId == messageId }
+        if (prior != null) {
+            require(prior.memberId == member.id && prior.outcome == normalized &&
+                prior.reason == cleanReason) { "TEAM_MESSAGE_ACK_CONFLICT" }
+            return@synchronized "消息回执已记录：$messageId；outcome=$normalized（无重复事件）"
+        }
+        require(messageId in state.deliveredMessageIds &&
+            state.deliveredMessageTargets[messageId] == member.id) {
+            "TEAM_MESSAGE_ACK_WRONG_RECIPIENT"
+        }
+        val queued = eventLogFor(sessionId).latestMatching(setOf(TEAM_MESSAGE_QUEUED)) { data ->
+            data["teamId"]?.jsonPrimitive?.contentOrNull == sessionId &&
+                (data["message"] as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull == messageId
+        }?.data ?: error("TEAM_MESSAGE_ACK_QUEUE_MISSING")
+        require(LocalAgentTeamEventCodec.decodeMessage(queued).kind == LocalTeamMessageKind.MESSAGE) {
+            "TEAM_MESSAGE_ACK_SHUTDOWN_USE_STRUCTURED_RESPONSE"
+        }
+        val receipt = readLocalTeamMessageReceipt(eventLogFor(sessionId), sessionId, messageId)
+        require(receipt.historyWindowComplete && receipt.queuedSequence != null &&
+            receipt.deliveredSequence != null && receipt.modelReplySequence != null) {
+            "TEAM_MESSAGE_ACK_MODEL_REPLY_REQUIRED：请在消息进入模型历史并完成一轮回复后再确认"
+        }
+        eventLogFor(sessionId).append(TEAM_MESSAGE_ACKNOWLEDGED, buildJsonObject {
+            put("version", TEAM_EVENT_VERSION)
+            put("teamId", sessionId)
+            put("messageId", messageId)
+            put("memberId", member.id)
+            put("outcome", normalized)
+            put("reason", cleanReason)
+        })
+        "消息处理声明已记录：$messageId；outcome=$normalized；不代表任务成果已验收"
     }
 
     /** The execution context above authenticates the actor; only the addressed member can reply. */
