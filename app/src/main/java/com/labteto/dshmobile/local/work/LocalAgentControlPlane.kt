@@ -142,6 +142,10 @@ internal class LocalAgentControlPlane(
             )
             "interrupt_agent" -> control.interrupt(run.sessionId, args.string("agent_id"))
             "agent_inspect" -> control.inspect(run.sessionId, args.string("agent_id"))
+            "agent_watch" -> control.watch(
+                run.sessionId, args.string("agent_id"),
+                args.string("after_cursor"), args.int("wait_ms", 0),
+            )
             "agent_resume" -> control.resume(run.sessionId, args.string("agent_id"))
             "agent_close" -> control.close(run.sessionId, args.string("agent_id"))
             "workflow" -> subagents.runWorkflow(
@@ -214,6 +218,7 @@ internal class LocalAgentControlPlane(
             "send_message",
             "interrupt_agent",
             "agent_inspect",
+            "agent_watch",
             "agent_resume",
             "agent_close",
             "workflow",
