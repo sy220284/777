@@ -54,7 +54,17 @@ internal interface LocalAgentControlPort {
         message: String,
         mode: LocalAgentMessageDeliveryMode = LocalAgentMessageDeliveryMode.TRIGGER_TURN,
     ): String
+    /**
+     * Inspect only an owned, actually registered persistent Agent. A Job label alone never
+     * authorizes control over another session or an unrelated background process.
+     */
+    fun inspect(sessionId: String, agentId: String): String
+    /** Stop this Activation without deleting the resumable Agent identity/Inbox. */
     fun interrupt(sessionId: String, agentId: String): String
+    /** Terminal cancellation; unlike interrupt, this clears the durable Inbox. */
+    fun close(sessionId: String, agentId: String): String
+    /** Request admission through the existing trusted recovery coordinator, not direct replay. */
+    fun resume(sessionId: String, agentId: String): String
 }
 
 /** Runtime implementation; no model-visible JSON parsing and no parallel persistence store. */
@@ -124,5 +134,59 @@ internal class LocalWorkAgentControlRuntime(
         message: String,
         mode: LocalAgentMessageDeliveryMode,
     ): String = persistentJobs.sendMessage(agentId, message, sessionId, mode)
-    override fun interrupt(sessionId: String, agentId: String): String = jobs.kill(agentId, sessionId)
+    private fun requireOwnedAgent(sessionId: String, agentId: String): LocalJobInfo {
+        require(sessionId.isNotBlank() && agentId.isNotBlank()) { "AGENT_TARGET_REQUIRED" }
+        return jobs.snapshotInfos().singleOrNull {
+            it.id == agentId && it.ownerSessionId == sessionId && it.isAgent
+        } ?: error("AGENT_TARGET_NOT_FOUND：目标不属于当前 Work 会话或不是后台代理")
+    }
+
+    override fun inspect(sessionId: String, agentId: String): String {
+        val info = requireOwnedAgent(sessionId, agentId)
+        val snapshot = jobs.snapshots().singleOrNull {
+            it.id == agentId && it.ownerId == sessionId
+        } ?: error("AGENT_SNAPSHOT_NOT_FOUND")
+        return buildString {
+            append("agent_id=").append(info.id)
+            append("\nstatus=").append(info.status)
+            append("\nowner_session=").append(sessionId)
+            append("\ncontinuable=").append(info.continuable)
+            append("\npending_messages=").append(info.pendingMessageCount)
+            append("\nupdated_at=").append(info.updatedAt)
+            append("\nresume_kind=").append(snapshot.resumeKind ?: "none")
+            append("\nlatest_output=").append(snapshot.output.take(1_500))
+            append("\nexecution_result_verified=false")
+        }
+    }
+
+    override fun interrupt(sessionId: String, agentId: String): String {
+        val info = requireOwnedAgent(sessionId, agentId)
+        require(info.continuable) { "AGENT_NOT_CONTINUABLE：非持久代理不可安全暂停，可使用 agent_close 永久关闭" }
+        return jobs.interruptContinuableAgent(agentId, sessionId)
+    }
+
+    override fun close(sessionId: String, agentId: String): String {
+        requireOwnedAgent(sessionId, agentId)
+        return jobs.kill(agentId, sessionId)
+    }
+
+    override fun resume(sessionId: String, agentId: String): String {
+        val info = requireOwnedAgent(sessionId, agentId)
+        val snapshot = jobs.snapshots().singleOrNull {
+            it.id == agentId && it.ownerId == sessionId
+        } ?: error("AGENT_SNAPSHOT_NOT_FOUND")
+        require(info.continuable && snapshot.resumeKind == "subagent_readonly") {
+            "AGENT_RESUME_UNSUPPORTED：仅支持已有持久只读代理的安全恢复"
+        }
+        require(info.status in setOf("interrupted", "dormant", "waiting_slice")) {
+            "AGENT_RESUME_STATE_INVALID：当前状态不能重新激活"
+        }
+        require(info.pendingMessageCount > 0 || info.status == "waiting_slice") {
+            "AGENT_RESUME_INPUT_REQUIRED：需先有持久消息或等待中的安全执行片"
+        }
+        persistentJobs.schedule(sessionId, rootSliceAdmitted = true)
+        return "agent_id=$agentId\nresume_requested=true\nresume_admitted=unverified" +
+            "\nstatus_before=" + info.status +
+            "\n说明=恢复必须通过原 Job 检查点、模型路由与授权安全闸门"
+    }
 }
