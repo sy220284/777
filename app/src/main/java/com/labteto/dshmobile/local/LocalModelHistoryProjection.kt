@@ -16,6 +16,18 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+/**
+ * The model-history reducer consumes only these semantic event kinds.
+ * Keep synchronized with applyModelHistoryEvent and checkpoint invalidation.
+ * Native SQL can skip unrelated Work/tool lifecycle rows before JSON decoding.
+ */
+internal val LOCAL_MODEL_HISTORY_REPLAY_TYPES = setOf(
+    ModelHistoryCheckpointCodec.EVENT_TYPE,
+    "system/prompt", "chat/active-transcript", "work/active-transcript",
+    "user/message", "user/queue", LOCAL_AGENT_INBOX_EVENT_TYPE,
+    "assistant/message", "tool/result",
+)
+
 internal data class LocalModelHistoryRestore(
     val messages: List<JsonObject>,
     val replayedTail: Boolean,

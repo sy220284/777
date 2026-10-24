@@ -145,7 +145,7 @@ class LocalSessionEventLog(
         }
     }
 
-    fun controlEventsAfter(
+    fun eventsOfTypesAfter(
         sequenceExclusive: Long, types: Set<String>,
     ): List<Event> {
         require(types.isNotEmpty())
