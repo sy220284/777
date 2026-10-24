@@ -149,6 +149,50 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun leadReceiptToolReflectsRealTeamAndSubagentCheckpointEvents() = runBlocking {
+        val sessionId = "team-message-receipt-runtime"
+        val fixture = fixture(sessionId)
+        appendActiveMember(fixture.log, sessionId)
+        val messageId = "team-msg-receipt001"
+        fixture.log.append(
+            LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
+            teamMessage(sessionId, messageId, "member-1", "verify files"),
+        )
+        fixture.log.append(LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED, buildJsonObject {
+            put("version", LocalAgentTeamContract.TEAM_EVENT_VERSION)
+            put("teamId", sessionId)
+            put("messageId", messageId)
+            put("targetId", "member-1")
+        })
+        fixture.log.append(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT, encodeLocalSubagentHistoryCheckpoint(
+            backgroundJobId = "job-team-1",
+            agentId = localPersistentSubagentId("job-team-1"),
+            step = 1,
+            history = emptyList(),
+            claimedMessageIds = setOf(messageId),
+        ))
+        val binding = LocalWorkRunBinding(
+            sessionId = sessionId,
+            initialState = LocalHarnessState(
+                sessionId = sessionId, usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = sessionId, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = sessionId, maxPendingInputs = 8),
+            eventLog = fixture.log,
+        )
+        val result = fixture.runtime.execute(
+            memberTestToolCall("receipt", "team_message_receipt", buildJsonObject {
+                put("message_id", messageId)
+            }),
+            binding,
+        ).orEmpty()
+        assertTrue(result.contains("status=checkpointed_in_model_history"))
+        assertTrue(result.contains("target_id=member-1"))
+        assertTrue(result.contains("does not establish provider consumption"))
+        assertNull(fixture.runtime.project(sessionId).failure)
+    }
+
+    @Test
     fun trustedMembersSendPeerLeadAndReadOwnDurableMailbox() = runBlocking {
         val received = mutableListOf<QueuedAgentInput>()
         val leadInbox = mutableListOf<QueuedAgentInput>()
