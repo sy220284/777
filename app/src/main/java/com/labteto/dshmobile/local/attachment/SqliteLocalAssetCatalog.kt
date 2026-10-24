@@ -176,15 +176,23 @@ internal class SqliteLocalAssetCatalog(
             val kind = when (eventType) {
                 "user/message" -> "user_image"
                 "assistant/message" -> "assistant_image"
+                "tool/result" -> "tool_image"
+                "agent/inbox/spliced" -> "inbox_image"
+                "chat/active-transcript" -> "chat_image"
                 else -> return
             }
             val digests = linkedSetOf<String>()
             fun visit(element: JsonElement?) {
                 when (element) {
                     is JsonObject -> {
-                        if ((element["type"] as? JsonPrimitive)?.contentOrNull == LOCAL_IMAGE_REF) {
-                            val hash = (element["attachmentId"] as? JsonPrimitive)?.contentOrNull
-                            if (hash != null && SHA256.matches(hash)) digests += hash
+                        val type = (element["type"] as? JsonPrimitive)?.contentOrNull
+                        val blockKind = (element["kind"] as? JsonPrimitive)?.contentOrNull
+                        if (type == LOCAL_IMAGE_REF || blockKind == "image") {
+                            val hash = sequenceOf("attachmentId", "attachment_id")
+                                .mapNotNull { key ->
+                                    (element[key] as? JsonPrimitive)?.contentOrNull
+                                }.firstOrNull { SHA256.matches(it) }
+                            if (hash != null) digests += hash
                         }
                         element.values.forEach(::visit)
                     }
