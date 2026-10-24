@@ -1303,6 +1303,7 @@ internal class LocalAgentTeamRuntime(
             state = project(sessionId)
             val assignment = nextIdleTeamTaskAssignment(
                 state, projectLocalAgentTeamActivity(state, jobs.snapshotInfos()),
+                currentRootRevision = workflowUserRevision(eventLogFor(sessionId)),
             ) ?: break
             val (member, task) = assignment
             val revision = task.revision + 1
