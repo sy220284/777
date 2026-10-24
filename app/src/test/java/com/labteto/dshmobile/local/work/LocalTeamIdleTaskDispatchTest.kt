@@ -75,6 +75,18 @@ class LocalTeamIdleTaskDispatchTest {
     }
 
 
+    @Test fun sameOwnerCannotRenewRootInstructionByEditingTask() {
+        val start = task("task-1")
+        val accepted = start.copy(revision = 2, status = LocalTeamTaskStatus.IN_PROGRESS,
+            ownerId = "member-1", rootUserRevision = 4L)
+        LocalAgentTeamReducer.validateTaskTransition(listOf(start), start, accepted)
+        val replaced = accepted.copy(revision = 3, subject = "edited", rootUserRevision = 5L)
+        val err = runCatching {
+            LocalAgentTeamReducer.validateTaskTransition(listOf(accepted), accepted, replaced)
+        }.exceptionOrNull()
+        assertEquals("TEAM_TASK_ROOT_AUTHORITY_IMMUTABLE", err?.message)
+    }
+
     @Test fun replayRejectsReplacedAutoDispatchIdentityAndOwner() {
         val first = task("task-1")
         val reserved = first.copy(
@@ -105,14 +117,16 @@ class LocalTeamIdleTaskDispatchTest {
             status = LocalTeamTaskStatus.IN_PROGRESS,
             ownerId = "member-1",
             autoDispatchMessageId = "team-msg-1234567890abcdef1234",
+            rootUserRevision = 42L,
         )
         val encoded = with(LocalAgentTeamEventCodec) { reserved.toEvent("session") }
         val decoded = LocalAgentTeamEventCodec.decodeTask(encoded)
         assertEquals(reserved, decoded)
 
         val legacy = with(LocalAgentTeamEventCodec) {
-            reserved.copy(autoDispatchMessageId = null).toEvent("session")
+            reserved.copy(autoDispatchMessageId = null, rootUserRevision = null).toEvent("session")
         }
         assertNull(LocalAgentTeamEventCodec.decodeTask(legacy).autoDispatchMessageId)
+        assertNull(LocalAgentTeamEventCodec.decodeTask(legacy).rootUserRevision)
     }
 }
