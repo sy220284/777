@@ -284,12 +284,33 @@ fun SettingsScreen(
             localSessionStorageBusy = true
             try {
                 val sessions = viewModel.importLocalSessionStorage(uri)
+                localSessionStorageStatus = viewModel.localSessionStorageStatus()
                 toast.second("已验证并安排恢复 $sessions 个会话，重启应用后生效")
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 AppLog.failure("Settings", "stage_session_archive_restore", error)
                 toast.second(error.message ?: "会话备份导入失败")
+            } finally {
+                localSessionStorageBusy = false
+            }
+        }
+    }
+
+    val legacyStorageImporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            localSessionStorageBusy = true
+            try {
+                val sessions = viewModel.importLegacySessionStorage(uri)
+                localSessionStorageStatus = viewModel.localSessionStorageStatus()
+                toast.second("旧版 ZIP 已转换为 SQLite 恢复计划：$sessions 个会话。旧归档不含完整媒体原件，请自行保留素材备份；重启后生效")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                AppLog.failure("Settings", "stage_legacy_session_restore", error)
+                toast.second(error.message ?: "旧版 ZIP 转换失败")
             } finally {
                 localSessionStorageBusy = false
             }
@@ -983,6 +1004,24 @@ fun SettingsScreen(
                             },
                             onExport = { sessionStorageExporter.launch("777-local-sessions.zip") },
                             onRestore = { sessionStorageImporter.launch(arrayOf("application/zip", "application/octet-stream")) },
+                            onLegacyRestore = {
+                                legacyStorageImporter.launch(arrayOf("application/zip", "application/octet-stream"))
+                            },
+                            onCancelRestore = {
+                                scope.launch {
+                                    localSessionStorageBusy = true
+                                    try {
+                                        if (viewModel.cancelStagedSessionRestore()) {
+                                            toast.second("已取消未开始的备份恢复")
+                                            localSessionStorageStatus = viewModel.localSessionStorageStatus()
+                                        }
+                                    } catch (error: Exception) {
+                                        toast.second(error.message ?: "无法取消已开始的恢复")
+                                    } finally {
+                                        localSessionStorageBusy = false
+                                    }
+                                }
+                            },
                             onCleanup = onClose,
                         )
                     }

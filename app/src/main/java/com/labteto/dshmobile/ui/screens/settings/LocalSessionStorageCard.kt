@@ -28,6 +28,8 @@ internal fun LocalSessionStorageCard(
     onCompact: () -> Unit,
     onExport: () -> Unit,
     onRestore: () -> Unit,
+    onLegacyRestore: () -> Unit,
+    onCancelRestore: () -> Unit,
     onCleanup: () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
@@ -119,10 +121,26 @@ internal fun LocalSessionStorageCard(
         SyButton(
             text = "导入会话备份（重启后生效）",
             onClick = onRestore,
-            enabled = !busy,
+            enabled = !busy && status?.pendingRestore != true,
             variant = SyButtonVariant.Outline,
             modifier = Modifier.fillMaxWidth(),
         )
+        SyButton(
+            text = "转换旧版会话 ZIP（不包含原媒体文件）",
+            onClick = onLegacyRestore,
+            enabled = !busy && status?.pendingRestore != true,
+            variant = SyButtonVariant.Outline,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (status?.pendingRestore == true) {
+            SyButton(
+                text = "取消未开始的备份恢复",
+                onClick = onCancelRestore,
+                enabled = !busy,
+                variant = SyButtonVariant.Outline,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         SyButton(
             text = stringResource(R.string.settings_local_session_storage_cleanup),
             onClick = onCleanup,

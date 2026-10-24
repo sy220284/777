@@ -357,6 +357,14 @@ class SettingsViewModel @Inject constructor(
         } ?: error("无法读取会话备份")
     }
 
+    suspend fun importLegacySessionStorage(uri: Uri): Int = withContext(Dispatchers.IO) {
+        appContext.contentResolver.openInputStream(uri)?.use {
+            localHarness.stageLegacySessionRestore(it)
+        } ?: error("无法读取旧版 ZIP")
+    }
+
+    suspend fun cancelStagedSessionRestore(): Boolean = localHarness.cancelStagedSessionRestore()
+
     suspend fun environmentInfo(): String = localHarness.environmentInfo()
 
     suspend fun diagnosticReport(): String = localHarness.diagnosticReport()

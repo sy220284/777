@@ -118,9 +118,10 @@ internal class LocalWorkOpenGraphProjection(private val maxCachedFacts: Int = 4_
             check(!log.isClosed) { "会话已关闭，无法读取任务执行事实。" }
             synchronized(this) {
                 try { read() } finally {
-                    // Drop disposable acceleration only, never durable facts or unresolved effects.
-                    // The next query rebuilds from EventLog under the same owner lease.
-                    if (cachedFactCount() > maxCachedFacts) reset()
+                    // Metadata keys + event offsets are the cold index. Evict only decoded
+                    // tool-attempt ledgers; never erase the durable event cursor just because
+                    // thousands of completed Jobs exist.
+                    trimMaterializedCaches()
                 }
             }
         }
@@ -142,7 +143,10 @@ internal class LocalWorkOpenGraphProjection(private val maxCachedFacts: Int = 4_
         val ledger = ToolAttemptLedger()
         var throughSequence = -1L
     }
-    private val toolsByJob = linkedMapOf<String, JobTools>()
+    private val toolsByJob = LinkedHashMap<String, JobTools>(16, 0.75f, true)
+    /** Number of EventLog facts decoded by the latest refresh, for performance regression tests. */
+    internal var lastRefreshEvents: Int = 0
+        private set
 
     // Retain only sequence/identity indices, never complete output, arguments or history.
     // Closed graph/Job evidence remains addressable without truncating durable facts.
@@ -163,12 +167,21 @@ internal class LocalWorkOpenGraphProjection(private val maxCachedFacts: Int = 4_
         return subList(from, size)
     }
 
-    internal fun cachedFactCount(): Int = ledger.unresolved().size + accepted.values.sumOf { it.size } +
-        jobResultsBySequence.size + jobResultsById.size + admissions.values.sumOf { it.size } +
-        runsByAgent.values.sumOf { it.size } + startsByRun.values.sumOf { it.size } +
-        resultsByJob.values.sumOf { it.size } + historyCheckpoints.size +
-        callsByAgent.values.sumOf { it.size } + toolResults.size +
+    // The bounded hot cache contains decoded tool ledgers only. The remaining maps
+    // retain lightweight identity-to-sequence indices (no tool arguments or output).
+    internal fun cachedFactCount(): Int = ledger.unresolved().size +
         toolsByJob.values.sumOf { it.ledger.snapshot().size }
+
+    internal fun indexedThroughSequence(): Long = throughSequence
+
+    private fun trimMaterializedCaches() {
+        // Keep the most recently queried Job even if it alone exceeds the budget:
+        // dropping it on every read would recreate the very replay storm we avoid.
+        while (toolsByJob.size > 1 && cachedFactCount() > maxCachedFacts) {
+            val oldest = toolsByJob.keys.first()
+            toolsByJob.remove(oldest)
+        }
+    }
 
     private fun reset() {
         throughSequence = -1L
@@ -187,6 +200,7 @@ internal class LocalWorkOpenGraphProjection(private val maxCachedFacts: Int = 4_
     }
 
     private fun refresh(log: LocalSessionEventLog) {
+        lastRefreshEvents = 0
         val latest = log.latestSequence()
         if (generation != log.resetGeneration || latest < throughSequence) {
             generation = log.resetGeneration
@@ -196,6 +210,7 @@ internal class LocalWorkOpenGraphProjection(private val maxCachedFacts: Int = 4_
         val diagnosticBefore = log.diagnostics()
         try {
         log.forEachAfter(throughSequence) { event ->
+            lastRefreshEvents++
             ledger.observe(event.type, event.data)
             val data = event.data
             val execution = (data["graph_execution_id"] as? JsonPrimitive)?.contentOrNull
@@ -314,11 +329,13 @@ internal class LocalWorkOpenGraphProjection(private val maxCachedFacts: Int = 4_
         val sequences = runs.flatMap { startsByRun[it].orEmpty().after(state.throughSequence) } +
             resultsByJob[jobId].orEmpty().after(state.throughSequence) +
             callsByAgent[agent].orEmpty().after(state.throughSequence)
-        val remaining = sequences.toMutableSet()
-        // Read the new tail once, rather than reopening/redecoding the segment per fact.
+        // Cold Job reconstruction reads only the authoritative indexed sequences.
+        // A dropped decoded hot cache must not trigger another complete EventLog
+        // fold. Sorting preserves execution/admission ordering exactly.
+        val indexedSequences = sequences.distinct().sorted()
         try {
-            if (remaining.isNotEmpty()) log.forEachAfter(state.throughSequence) { event ->
-                if (!remaining.remove(event.sequence)) return@forEachAfter
+            for (sequence in indexedSequences) {
+                val event = eventAt(log, sequence)
                 val type = when (event.type) {
                     "subagent/tool-call" -> "tool/call"
                     "subagent/tool-result" -> "tool/result"
@@ -326,10 +343,8 @@ internal class LocalWorkOpenGraphProjection(private val maxCachedFacts: Int = 4_
                 }
                 state.ledger.observe(type, event.data)
             }
-            // An indexed admission cannot disappear during reread and become a safe result.
-            check(remaining.isEmpty()) { "任务工具执行记录读取不完整，无法确认执行结果。" }
         } catch (error: Exception) {
-            // A partial fold must be rebuilt before retry, including declarations.
+            // Missing/corrupt indexed facts must fail closed, not become success.
             toolsByJob.remove(jobId)
             throw error
         }

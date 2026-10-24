@@ -21,6 +21,45 @@ import org.junit.runner.RunWith
 /** Full archive round-trip on Android, including original media after process-style reopen. */
 @RunWith(AndroidJUnit4::class)
 class SqliteSessionMediaRestoreAndroidTest {
+    @Test fun restorePlanCanBeCancelledBeforeInstallButNotAfterInstallationStarts() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val unique = UUID.randomUUID().toString().replace("-", "")
+        val sourceSnap = "cancel-source-snap-$unique.db"
+        val sourceEvents = "cancel-source-event-$unique.db"
+        val targetSnap = "cancel-target-snap-$unique.db"
+        val targetEvents = "cancel-target-event-$unique.db"
+        val pending = File(context.filesDir, "local-harness/.sqlite-restore-pending-$unique")
+        try {
+            val output = ByteArrayOutputStream()
+            SqliteSessionSnapshotStore(context, Json, sourceSnap).use { ss ->
+                SqliteSessionEventDatabase(context, Json, sourceEvents).use { ev ->
+                    SqliteSessionStorageManager(context, ss, ev,
+                        sourceSnap, sourceEvents, unique).exportAll(output)
+                }
+            }
+            SqliteSessionSnapshotStore(context, Json, targetSnap).use { ss ->
+                SqliteSessionEventDatabase(context, Json, targetEvents).use { ev ->
+                    val manager = SqliteSessionStorageManager(context, ss, ev,
+                        targetSnap, targetEvents, unique)
+                    assertEquals(0, manager.stageRestore(ByteArrayInputStream(output.toByteArray())))
+                    assertTrue(manager.status().pendingRestore)
+                    assertTrue(manager.cancelPendingRestore())
+                    assertTrue(!manager.status().pendingRestore)
+                    assertTrue(!pending.exists())
+                    manager.stageRestore(ByteArrayInputStream(output.toByteArray()))
+                    File(pending, "INSTALLING").writeText("1")
+                    org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+                        manager.cancelPendingRestore()
+                    }
+                    assertTrue(pending.exists())
+                }
+            }
+        } finally {
+            pending.deleteRecursively()
+            listOf(sourceSnap, sourceEvents, targetSnap, targetEvents).forEach(context::deleteDatabase)
+        }
+    }
+
     @Test fun backupStagesAndRestoresBothDatabasesAndOriginalImage() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val unique = UUID.randomUUID().toString().replace("-", "")

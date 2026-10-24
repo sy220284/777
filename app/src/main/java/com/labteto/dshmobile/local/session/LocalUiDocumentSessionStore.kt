@@ -2,6 +2,10 @@ package com.labteto.dshmobile.local.session
 
 import com.labteto.dshmobile.local.presentation.document.LocalUiDocumentCodec
 import com.labteto.dshmobile.uicontract.UiDocument
+import com.labteto.dshmobile.uicontract.UiDocumentActionRequest
+import com.labteto.dshmobile.uicontract.UiCommandReceipt
+import com.labteto.dshmobile.uicontract.UiCommandRejection
+import java.security.MessageDigest
 import com.labteto.dshmobile.uicontract.matches
 import com.labteto.dshmobile.uicontract.UiDocumentBudget
 import com.labteto.dshmobile.uicontract.UiDocumentSource
@@ -30,6 +34,8 @@ import kotlinx.serialization.json.boolean
 internal const val UI_DOCUMENT_EVENT = "ui.document.published"
 internal const val UI_DOCUMENT_DELETED_EVENT = "ui.document.deleted"
 internal const val UI_DOCUMENT_BATCH_DELETED_EVENT = "ui.document.batch-deleted"
+internal const val UI_DOCUMENT_ACTION_CLAIMED = "ui.document.action-claimed"
+internal const val UI_DOCUMENT_ACTION_SETTLED = "ui.document.action-settled"
 internal data class LocalUiDocumentRecord(val document: UiDocument, val provenance: UiDocumentProvenance,
     val recoveryNotice: String? = null)
 
@@ -66,6 +72,82 @@ internal class LocalUiDocumentSessionStore @Inject constructor(
     @Volatile private var lastRead: ReadCache? = null
     private val mutableRevision = MutableStateFlow(0L)
     val revision = mutableRevision.asStateFlow()
+
+    /**
+     * Session-owned idempotent command admission shared by message cards and the
+     * document drawer. Claim is durable *before* invoking Chat/Work; a process death
+     * between these two records is UNKNOWN, never permission to send again.
+     * This guarantees at-most-once admission for one immutable action revision.
+     */
+    internal fun actionKey(request: UiDocumentActionRequest): String {
+        val source = request.source
+        val parts = listOf(source.sessionId, source.messageId, source.contextGeneration.toString(),
+            source.profileId ?: "<null>", source.projectId ?: "<null>", source.workMode.toString(),
+            request.documentId, request.revision.toString(), request.actionId)
+        val canonical = parts.joinToString("") { "${it.length}:$it" }
+        return MessageDigest.getInstance("SHA-256")
+            .digest(canonical.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+    }
+
+    private fun latestActionReceipt(
+        log: LocalSessionEventLog, key: String,
+    ): UiCommandReceipt? {
+        val event = log.latestMatching(setOf(UI_DOCUMENT_ACTION_CLAIMED, UI_DOCUMENT_ACTION_SETTLED)) {
+            it["action_key"]?.jsonPrimitive?.content == key
+        } ?: return null
+        if (event.type == UI_DOCUMENT_ACTION_CLAIMED) return UiCommandReceipt.OutcomeUnknown
+        return when (event.data["disposition"]?.jsonPrimitive?.content) {
+            "accepted" -> UiCommandReceipt.Accepted
+            "queued" -> UiCommandReceipt.Queued
+            // A rejected admission produced no new user input. Keep retry possible
+            // when loading, queue limits or configuration change; accepted/unknown
+            // outcomes remain durable and never replay automatically.
+            "rejected", "not-admitted" -> null
+            else -> UiCommandReceipt.OutcomeUnknown
+        }
+    }
+
+    internal fun actionReceipt(request: UiDocumentActionRequest): UiCommandReceipt? =
+        logs.get(request.source.sessionId).withWriterLease {
+            latestActionReceipt(logs.get(request.source.sessionId), actionKey(request))
+        }
+
+    internal fun submitActionOnce(
+        request: UiDocumentActionRequest,
+        dispatch: () -> UiCommandReceipt,
+    ): UiCommandReceipt {
+        val log = logs.get(request.source.sessionId)
+        return log.withWriterLease {
+            val key = actionKey(request)
+            latestActionReceipt(log, key)?.let { return@withWriterLease it }
+            log.append(UI_DOCUMENT_ACTION_CLAIMED, buildJsonObject {
+                put("action_key", key)
+                put("message_id", request.source.messageId)
+                put("document_id", request.documentId)
+                put("revision", request.revision)
+                put("action_id", request.actionId)
+            })
+            mutableRevision.update { it + 1L }
+            // The claiming event survives if dispatch throws or the process dies.
+            // An unresolved outcome is never replayed as a new user intention.
+            val result = dispatch()
+            val disposition = when (result) {
+                UiCommandReceipt.Accepted -> "accepted"
+                UiCommandReceipt.Queued -> "queued"
+                is UiCommandReceipt.Rejected -> "rejected"
+                UiCommandReceipt.NotAdmitted -> "not-admitted"
+                else -> "unknown"
+            }
+            log.append(UI_DOCUMENT_ACTION_SETTLED, buildJsonObject {
+                put("action_key", key)
+                put("disposition", disposition)
+                if (result is UiCommandReceipt.Rejected) put("reason", result.reason.name)
+            })
+            mutableRevision.update { it + 1L }
+            result
+        }
+    }
 
     /** The Session sidecar owns revision admission for every producer, including local templates. */
     @Synchronized

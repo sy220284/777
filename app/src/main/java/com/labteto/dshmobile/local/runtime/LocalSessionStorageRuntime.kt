@@ -61,6 +61,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     private val sqliteSnapshots = SqliteSessionSnapshotStore(context, json, domainCodecs = orderedCodecs)
     private val storageManager = SqliteSessionStorageManager(
         context, sqliteSnapshots, requireNotNull(eventLogs.sqliteDatabase),
+        legacyDomainCodecs = orderedCodecs,
     )
     internal val coordinator: LocalSessionCoordinator
     internal val projectionRegistry = SessionProjectionRegistry()
@@ -148,6 +149,12 @@ class LocalSessionStorageRuntime @Inject internal constructor(
 
     internal suspend fun compactStorage(): LocalSessionStorageStatus =
         withContext(Dispatchers.IO) { storageManager.compactAll() }
+
+    internal suspend fun stageLegacyRestoreStorage(archive: java.io.InputStream): Int =
+        withContext(Dispatchers.IO) { storageManager.stageLegacyRestore(archive) }
+
+    internal suspend fun cancelStagedRestore(): Boolean =
+        withContext(Dispatchers.IO) { storageManager.cancelPendingRestore() }
 
     internal suspend fun stageRestoreStorage(archive: java.io.InputStream): Int =
         withContext(Dispatchers.IO) { storageManager.stageRestore(archive) }

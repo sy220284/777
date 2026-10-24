@@ -88,6 +88,9 @@ class LocalSettingsRuntime @Inject internal constructor(
     override suspend fun exportSessionStorage(output: OutputStream) = sessionStorage.exportStorage(output)
     override suspend fun stageRestoreSessionStorage(archive: java.io.InputStream) =
         sessionStorage.stageRestoreStorage(archive)
+    override suspend fun cancelStagedSessionRestore() = sessionStorage.cancelStagedRestore()
+    override suspend fun stageLegacySessionRestore(archive: java.io.InputStream) =
+        sessionStorage.stageLegacyRestoreStorage(archive)
     override suspend fun environmentInfo() = diagnostics.environmentInfo()
     override suspend fun diagnosticReport() = diagnostics.diagnosticReport()
     override fun clearCredential() = modelRuntime.clearCredential()

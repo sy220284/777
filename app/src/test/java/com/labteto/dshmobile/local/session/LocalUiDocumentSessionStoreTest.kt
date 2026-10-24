@@ -15,6 +15,86 @@ class LocalUiDocumentSessionStoreTest {
         UiDocumentSource("session", message, 2, "profile", null), 0,
         UiLocalDocumentData.ListItems(listOf("preserved")), budget, emptySet()).getOrThrow()
 
+    @Test fun documentActionConsumedExactlyOnceAcrossTwoEntrypointsAndReopen() {
+        val directory = Files.createTempDirectory("ui-doc-once").toFile()
+        val registry = LocalSessionEventLogRegistry(directory, Json)
+        try {
+            val card = document("message")
+            val action = UiDocumentActionRequest(card.documentId, card.revision,
+                card.source, "send", mapOf("field" to "chosen"), true)
+            val first = LocalUiDocumentSessionStore(registry)
+            val second = LocalUiDocumentSessionStore(registry)
+            var accepted = 0
+            assertEquals(UiCommandReceipt.Accepted, first.submitActionOnce(action) {
+                accepted++
+                UiCommandReceipt.Accepted
+            })
+            assertEquals(UiCommandReceipt.Accepted, second.submitActionOnce(action.copy(
+                fields = mapOf("field" to "other"))) {
+                accepted++
+                UiCommandReceipt.Accepted
+            })
+            assertEquals(1, accepted)
+            // Neither navigation nor a new Session-store object creates another admission.
+            assertEquals(UiCommandReceipt.Accepted,
+                LocalUiDocumentSessionStore(registry).actionReceipt(action))
+            val next = action.copy(revision = action.revision + 1L)
+            assertEquals(UiCommandReceipt.Queued, second.submitActionOnce(next) {
+                accepted++
+                UiCommandReceipt.Queued
+            })
+            assertEquals(2, accepted)
+        } finally { registry.get("session").close(); directory.deleteRecursively() }
+    }
+
+    @Test fun rejectedFormAdmissionCanBeRetriedWithoutLosingAcceptedDeduplication() {
+        val dir = Files.createTempDirectory("ui-doc-retry").toFile()
+        val registry = LocalSessionEventLogRegistry(dir, Json)
+        try {
+            val card = document("message")
+            val request = UiDocumentActionRequest(card.documentId, card.revision,
+                card.source, "send", emptyMap(), true)
+            val owner = LocalUiDocumentSessionStore(registry)
+            var attempts = 0
+            assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.QUEUE_FULL),
+                owner.submitActionOnce(request) {
+                    attempts++
+                    UiCommandReceipt.Rejected(UiCommandRejection.QUEUE_FULL)
+                })
+            assertEquals(null, owner.actionReceipt(request))
+            assertEquals(UiCommandReceipt.Accepted, owner.submitActionOnce(request) {
+                attempts++
+                UiCommandReceipt.Accepted
+            })
+            assertEquals(UiCommandReceipt.Accepted, owner.submitActionOnce(request) {
+                attempts++
+                UiCommandReceipt.Accepted
+            })
+            assertEquals(2, attempts)
+        } finally { registry.get("session").close(); dir.deleteRecursively() }
+    }
+
+    @Test fun interruptedDocumentActionIsNeverSilentlyDispatchedAgain() {
+        val directory = Files.createTempDirectory("ui-doc-unknown").toFile()
+        val registry = LocalSessionEventLogRegistry(directory, Json)
+        try {
+            val card = document("message")
+            val action = UiDocumentActionRequest(card.documentId, card.revision,
+                card.source, "send", emptyMap(), true)
+            val store = LocalUiDocumentSessionStore(registry)
+            assertThrows(IllegalStateException::class.java) {
+                store.submitActionOnce(action) { throw IllegalStateException("power loss simulation") }
+            }
+            var repeats = 0
+            assertEquals(UiCommandReceipt.OutcomeUnknown,
+                LocalUiDocumentSessionStore(registry).submitActionOnce(action) {
+                    repeats++
+                    UiCommandReceipt.Accepted
+                })
+            assertEquals(0, repeats)
+        } finally { registry.get("session").close(); directory.deleteRecursively() }
+    }
+
     @Test fun failedOptionalCheckpointWriteDoesNotHideDurableHistory() {
         val directory = Files.createTempDirectory("ui-doc-checkpoint-write-failure").toFile()
         val registry = LocalSessionEventLogRegistry(directory, Json)
