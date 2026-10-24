@@ -44,9 +44,12 @@ internal class SqliteLocalAssetCatalog(
             try {
                 val previous = readAsset(db, id)
                 if (previous != null) {
-                    check(previous.path == imported.relativePath &&
-                        previous.mediaType == imported.mediaType &&
-                        previous.bytes == imported.bytes) { "同一资源哈希出现不一致的文件元数据" }
+                    // Hash identifies the content. A byte-identical attachment
+                    // may arrive as foo.txt or foo.csv; the visible MIME/path
+                    // belongs to its individual verified location.
+                    check(previous.bytes == imported.bytes) {
+                        "同一资源哈希出现不一致的字节数"
+                    }
                 } else {
                     db.insertOrThrow("local_assets", null, ContentValues().apply {
                         put("asset_id", id)
@@ -57,6 +60,26 @@ internal class SqliteLocalAssetCatalog(
                         put("state", "present")
                         put("created_at", System.currentTimeMillis())
                     })
+                }
+                // Never erase the first path. Every published path must be
+                // represented, including distinct extensions of identical bytes.
+                db.insertWithOnConflict(
+                    "local_asset_locations", null, ContentValues().apply {
+                        put("relative_path", imported.relativePath)
+                        put("asset_id", id)
+                        put("media_type", imported.mediaType)
+                        put("byte_size", imported.bytes)
+                    }, SQLiteDatabase.CONFLICT_IGNORE,
+                )
+                val registered = db.rawQuery(
+                    "SELECT asset_id,byte_size,media_type FROM local_asset_locations WHERE relative_path=?",
+                    arrayOf(imported.relativePath),
+                ).use { rows ->
+                    check(rows.moveToFirst()) { "附件路径登记失败" }
+                    Triple(rows.getString(0), rows.getLong(1), rows.getString(2))
+                }
+                check(registered == Triple(id, imported.bytes, imported.mediaType)) {
+                    "附件路径登记与原记录冲突"
                 }
                 db.setTransactionSuccessful()
             } finally {
@@ -100,6 +123,17 @@ internal class SqliteLocalAssetCatalog(
     fun asset(assetId: String): Asset? {
         require(SHA256.matches(assetId))
         return readAsset(events.readableDatabase, assetId)
+    }
+
+    /** Verified published locations for one content digest (not a GC authority). */
+    fun locations(assetId: String): List<String> {
+        require(SHA256.matches(assetId))
+        return events.readableDatabase.rawQuery(
+            "SELECT relative_path FROM local_asset_locations WHERE asset_id=? ORDER BY relative_path",
+            arrayOf(assetId),
+        ).use { rows ->
+            buildList { while (rows.moveToNext()) add(rows.getString(0)) }
+        }
     }
 
     fun referenceCount(assetId: String): Long {
@@ -191,6 +225,23 @@ internal class SqliteLocalAssetCatalog(
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS local_asset_references_by_asset " +
                     "ON local_asset_references(asset_id)"
+            )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS local_asset_locations (" +
+                    "relative_path TEXT PRIMARY KEY NOT NULL, " +
+                    "asset_id TEXT NOT NULL REFERENCES local_assets(asset_id) ON DELETE RESTRICT, " +
+                    "media_type TEXT NOT NULL, byte_size INTEGER NOT NULL CHECK(byte_size>=0))"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS local_asset_locations_by_asset " +
+                    "ON local_asset_locations(asset_id)"
+            )
+            // v3 pilot data already has one canonical path in local_assets.
+            // Backfill it idempotently when upgrading and on fresh creation.
+            db.execSQL(
+                "INSERT OR IGNORE INTO local_asset_locations " +
+                    "(relative_path,asset_id,media_type,byte_size) " +
+                    "SELECT relative_path,asset_id,media_type,byte_size FROM local_assets"
             )
         }
     }
