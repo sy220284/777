@@ -663,6 +663,7 @@ internal class LocalSubagentRunner(
                 },
                 tools = AgentToolExecutor { call ->
                     executionFence()
+                    ensureTeamRootAuthorization()
                     currentCoroutineContext().ensureActive()
                     LocalRecursiveReadOnlyToolScope.rejection(call, capabilities)
                         ?: toolCallPolicy.rejection(call)
