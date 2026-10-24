@@ -36,11 +36,11 @@ class LocalLegacySqliteMigrationAndroidTest {
             SqliteSessionSnapshotStore(ctx, Json, snapshotDb).use { snapshots ->
                 SqliteSessionEventDatabase(ctx, Json, eventDb).use { events ->
                     val importer = LocalLegacySqliteMigration(root, sessions, Json, snapshots, events)
-                    importer.migrate("older")
+                    importer.migrate()
                     assertEquals("既有历史", snapshots.read("older")?.document?.payload
                         ?.get("title")?.toString()?.trim('"'))
                     assertEquals(1L, events.latestSequence("older"))
-                    importer.migrate("older")
+                    importer.migrate()
                     assertEquals(1L, events.latestSequence("older"))
                     assertNotNull(snapshots.read("older"))
                     assertEquals(2, events.pageAfter("older", -1L).size)
