@@ -49,6 +49,19 @@ internal class SqliteSessionStorageManager(
         )
     }
 
+    /** Shared Session owner supplies environment diagnostics as well as settings. */
+    fun diagnosticSummary(): String {
+        val core = status()
+        val mediaRoot = File(context.filesDir, "local-harness/workspace/.dsh/attachments")
+        val mediaBytes = mediaRoot.listFiles().orEmpty()
+            .sumOf { if (it.isFile) it.length() else 0L }
+        val total = core.totalBytes + mediaBytes
+        val warning = if (total >= core.budgetBytes || core.lowFreeSpace) "（空间偏紧）" else ""
+        val mib = 1024L * 1024L
+        return "会话存储：${total / mib} MiB（SQLite及WAL ${core.totalBytes / mib} MiB，附件 ${mediaBytes / mib} MiB），" +
+            "设备可用 ${core.freeBytes / mib} MiB${warning}"
+    }
+
     suspend fun compactAll(): LocalSessionStorageStatus {
         val maintenance = SqliteSessionConsistencyGate.acquireExclusive()
         try {
