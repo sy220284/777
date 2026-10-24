@@ -83,7 +83,13 @@ internal fun resolveLocalWorkSkillGuidance(
         name to metadata
     }
     val eligibleCount = installed.count { it.second.modelInvocable }
-    val lines = discoverLocalWorkSkills(input, requested, installed).map { (name, metadata) ->
+    // Installed front matter is the editable activation authority. The built-in
+    // keyword table remains only a compatibility fallback for old skills that
+    // have no when-to-use trigger; it must not outrank a user-maintained rule.
+    val compatibilityRequested = requested.filterTo(linkedSetOf()) { name ->
+        installed.firstOrNull { it.first == name }?.second?.whenToUse.isNullOrBlank()
+    }
+    val lines = discoverLocalWorkSkills(input, compatibilityRequested, installed).map { (name, metadata) ->
         val details = metadata.whenToUse?.takeIf(String::isNotBlank)?.let { "；适用：$it" }.orEmpty()
         "$name：" + metadata.description + details
     }
