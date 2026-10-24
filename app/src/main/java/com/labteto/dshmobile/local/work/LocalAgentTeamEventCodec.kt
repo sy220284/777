@@ -61,6 +61,7 @@ internal object LocalAgentTeamEventCodec {
             put("senderId", senderId)
             put("senderName", senderName)
             put("targetId", targetId)
+            if (kind != LocalTeamMessageKind.MESSAGE) put("kind", kind.wireName)
             put("content", buildJsonArray {
                 add(buildJsonObject {
                     put("type", "text")
@@ -137,6 +138,14 @@ internal object LocalAgentTeamEventCodec {
             senderName = message.requiredTeamString("senderName"),
             targetId = message.requiredTeamString("targetId"),
             content = text,
+            kind = LocalTeamMessageKind.fromWire(message.optionalTeamString("kind"))
+                .also { kind ->
+                    if (kind == LocalTeamMessageKind.SHUTDOWN_REQUEST) {
+                        require(message.requiredTeamString("senderId") == data.requiredTeamString("teamId")) {
+                            "TEAM_SHUTDOWN_REQUEST_LEAD_ONLY"
+                        }
+                    }
+                },
         )
     }
 

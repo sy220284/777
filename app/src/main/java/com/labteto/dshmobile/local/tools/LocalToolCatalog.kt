@@ -343,6 +343,10 @@ object LocalToolCatalog {
             "target" to string("teammate 名称"),
             "message" to string("消息内容"),
         ), listOf("target", "message")))
+        add(tool("team_request_shutdown", "Lead 向指定成员发出经过来源验证的关闭请求；优先交给成员模型自行决定，不会直接禁用成员", properties(
+            "target" to string("active teammate 名称"),
+            "reason" to string("申请关闭的理由及应完成的交接"),
+        ), listOf("target", "reason")))
         add(tool("team_message_receipt", "查询持久 Team 消息的排队、投递与历史检查点，不能证明模型已处理或任务完成", properties(
             "message_id" to string("team-msg-* 持久消息ID"),
         ), listOf("message_id")))

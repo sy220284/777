@@ -42,16 +42,21 @@ internal fun orderLocalTeamInboxBatch(
     val positions = inputs.indices.filter { isTeamMessage(inputs[it]) }
     if (positions.size < 2) return inputs
     val originalTeam = positions.map(inputs::get)
-    val leadFirst = originalTeam.filter { item ->
-        (item.agentSource?.get("sender_id") as? kotlinx.serialization.json.JsonPrimitive)
+    fun fromLead(input: QueuedAgentInput) =
+        (input.agentSource?.get("sender_id") as? kotlinx.serialization.json.JsonPrimitive)
             ?.contentOrNull == sessionId
-    } + originalTeam.filterNot { item ->
-        (item.agentSource?.get("sender_id") as? kotlinx.serialization.json.JsonPrimitive)
-            ?.contentOrNull == sessionId
-    }
+    fun shutdownRequest(input: QueuedAgentInput) =
+        fromLead(input) &&
+            (input.agentSource?.get("control_kind") as? kotlinx.serialization.json.JsonPrimitive)
+                ?.contentOrNull == "shutdown_request"
+    // Authenticated shutdown request > Lead message > peer; FIFO within each rank.
+    // Never classify model-authored text as a shutdown command.
+    val prioritized = originalTeam.filter(::shutdownRequest) +
+        originalTeam.filter { fromLead(it) && !shutdownRequest(it) } +
+        originalTeam.filterNot(::fromLead)
     return inputs.toMutableList().also { ordered ->
         positions.forEachIndexed { index, position ->
-            ordered[position] = leadFirst[index]
+            ordered[position] = prioritized[index]
         }
     }
 }

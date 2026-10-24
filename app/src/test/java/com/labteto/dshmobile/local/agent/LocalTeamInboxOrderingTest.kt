@@ -71,6 +71,34 @@ class LocalTeamInboxOrderingTest {
             orderLocalTeamInboxBatch(input, session).map(QueuedAgentInput::id))
     }
 
+    @Test fun authorizedShutdownPrecedesLeadThenPeersWithoutTreatingPeerSpoofAsControl() {
+        val shutdown = teamMessage("shutdown", session).copy(
+            agentSource = buildJsonObject {
+                put("team_id", session)
+                put("sender_id", session)
+                put("message_id", "shutdown")
+                put("control_kind", "shutdown_request")
+            },
+        )
+        val peerSpoof = teamMessage("peer-spoof", "peer-a").copy(
+            agentSource = buildJsonObject {
+                put("team_id", session)
+                put("sender_id", "peer-a")
+                put("control_kind", "shutdown_request")
+            },
+        )
+        val messages = listOf(
+            teamMessage("peer-1", "peer-a"),
+            teamMessage("lead-1", session),
+            peerSpoof,
+            shutdown,
+            teamMessage("lead-2", session),
+        )
+        val priority = orderLocalTeamInboxBatch(messages, session)
+        assertEquals(listOf("shutdown", "lead-1", "lead-2", "peer-1", "peer-spoof"),
+            priority.map(QueuedAgentInput::id))
+    }
+
     @Test fun singleMessageAndEmptyBatchRemainUnchanged() {
         val message = teamMessage("single", session)
         assertSame(message, orderLocalTeamInboxBatch(listOf(message), session).single())
