@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.attachment.LocalAttachmentImporter
+import com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalog
 import com.labteto.dshmobile.local.attachment.inspectImportedAttachmentFile
 import com.labteto.dshmobile.uicontract.UiAttachmentInspectionReceipt
 import com.labteto.dshmobile.local.files.LocalWorkspace
@@ -53,6 +54,14 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     private val attachmentImporter = LocalAttachmentImporter(
         context = context,
         workspace = workspace,
+        onPublished = { published ->
+            // SQLite is the only metadata authority. The file already exists;
+            // catalog failure is surfaced to the caller without deleting bytes.
+            val db = requireNotNull(eventLogs.sqliteDatabase) {
+                "SQLite 资源目录不可用，附件已保留在本地，需重试登记"
+            }
+            SqliteLocalAssetCatalog(db).register(published)
+        },
     )
 
     internal val coordinator = LocalConversationFilesCoordinator(
