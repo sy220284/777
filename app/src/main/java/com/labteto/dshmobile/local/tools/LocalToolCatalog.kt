@@ -357,7 +357,7 @@ object LocalToolCatalog {
             "target" to string("active teammate 名称"),
             "reason" to string("申请关闭的理由及应完成的交接"),
         ), listOf("target", "reason")))
-        add(tool("team_message_receipt", "查询持久 Team 消息的排队、投递与历史检查点，不能证明模型已处理或任务完成", properties(
+        add(tool("team_message_receipt", "查询 Team 消息的持久排队、投递、模型回复以及成员显式处理声明；任何一项都不自动证明任务已核验完成", properties(
             "message_id" to string("team-msg-* 持久消息ID"),
         ), listOf("message_id")))
         add(tool("team_messages", "读取 Team 成员独立结果消息流；返回 durable EventLog sequence 作为结果游标", properties(
