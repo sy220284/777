@@ -85,6 +85,46 @@ class LocalWorkSkillActivationTest {
     }
 
     @Test
+    fun longExplicitSkillIsBoundedAndItsUnreadTailIsNotPretendedLoaded() {
+        val root = Files.createTempDirectory("explicit-skill-budget").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            val longBody = "START_REQUIRED\\n" + "A".repeat(45_000) + "\\nTAIL_NOT_READ"
+            workspace.write(".dsh/skills/long-skill/SKILL.md", longBody)
+            val guidance = resolveLocalWorkSkillGuidance(workspace, "@skill:long-skill\\n执行")
+            assertTrue(guidance.contains("START_REQUIRED"))
+            assertFalse(guidance.contains("TAIL_NOT_READ"))
+            assertTrue(guidance.contains("已限制本轮自动注入"))
+            assertTrue(guidance.contains("skill(name=long-skill)"))
+            assertTrue(guidance.length < 20_000)
+            // The persisted original must remain untouched and retrievable through the tool.
+            assertTrue(workspace.readSkill("long-skill").endsWith("TAIL_NOT_READ"))
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
+    fun explicitSkillGetsBudgetBeforeOtherPinsAndIsNotLoadedTwice() {
+        val root = Files.createTempDirectory("skill-explicit-priority").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            workspace.write(".dsh/skills/explicit/SKILL.md",
+                "EXPLICIT_START\\n" + "X".repeat(18_500) + "\\nEXPLICIT_TAIL")
+            workspace.write(".dsh/skills/second/SKILL.md", "SECOND_PIN_GUIDANCE")
+            val pins = listOf(
+                LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "explicit"),
+                LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "second"),
+            )
+            val result = resolveLocalWorkSkillGuidance(workspace, "@skill:explicit\\n执行", pins)
+            assertTrue(result.contains("EXPLICIT_START"))
+            assertFalse(result.contains("EXPLICIT_TAIL"))
+            assertFalse(result.contains("SECOND_PIN_GUIDANCE"))
+            assertTrue(result.contains("skill(name=second)"))
+            assertEquals(1, Regex("EXPLICIT_START").findAll(result).count())
+            assertFalse(result.contains("[已固定技能：explicit]"))
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
     fun userOnlyRequiresExplicitSelectionButRemovedSkillFails() {
         val root = Files.createTempDirectory("skill-disabled").toFile()
         try {
