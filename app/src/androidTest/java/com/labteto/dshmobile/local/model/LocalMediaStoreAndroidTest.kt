@@ -204,6 +204,31 @@ class LocalMediaStoreAndroidTest {
         assertFalse(shared.exists())
     }
 
+    @Test fun backupRejectsStructurallyIncompatibleDatabaseDespiteValidHash() {
+        legacy(emptyList())
+        val media = store()
+        for (invalidVersion in listOf(false, true)) {
+            val target = File(root, "incompatible-backup-$invalidVersion")
+            val backup = media.stageMediaStudioBackup(target)
+            SQLiteDatabase.openDatabase(backup.database.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+                if (invalidVersion) db.version = 2
+                else {
+                    db.execSQL("DROP INDEX media_pending")
+                    db.execSQL("ALTER TABLE media DROP COLUMN pending")
+                }
+            }
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(backup.database.readBytes()).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            File(target, "media-studio.manifest").writeText(
+                "media-studio-v1\ndatabase\t${backup.database.length()}\t$digest\n",
+            )
+            assertThrows(IllegalArgumentException::class.java) {
+                LocalMediaStudioBackupSnapshot(context, json).validate(target)
+            }
+            assertTrue(media.page().results.isEmpty())
+        }
+    }
+
     @Test fun snapshotPreservesCrossSessionSharedOriginalAfterLiveRowsAreDeleted() {
         val original = File(directory, "paid-shared.png").apply { writeBytes(byteArrayOf(2, 4, 6, 8)) }
         legacy(listOf(

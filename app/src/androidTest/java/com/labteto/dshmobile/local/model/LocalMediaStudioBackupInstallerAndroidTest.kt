@@ -24,7 +24,9 @@ class LocalMediaStudioBackupInstallerAndroidTest {
 
     private fun sandbox(root: File): Context = object : ContextWrapper(base) {
         override fun getFilesDir(): File = root
-        override fun getDatabasePath(name: String): File = File(root, "databases/$name")
+        override fun getDatabasePath(name: String): File = File(root, "databases/$name").also {
+            check(it.parentFile!!.isDirectory || it.parentFile!!.mkdirs())
+        }
         override fun openOrCreateDatabase(
             name: String, mode: Int, factory: SQLiteDatabase.CursorFactory?,
         ): SQLiteDatabase = openOrCreateDatabase(name, mode, factory, null)
@@ -173,6 +175,29 @@ class LocalMediaStudioBackupInstallerAndroidTest {
                 assertEquals("a", stored.get("a")?.result?.id)
                 assertEquals("b", stored.get("b")?.result?.id)
             }
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun interruptedCommittedCleanupDoesNotRequireDeletedManifestOrReplayInstall() {
+        val root = File(base.cacheDir, "restore-cleanup-"+UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val (staging, destination) = fixture(root)
+            val db = destination.getDatabasePath("local_media_v1.db")
+            File(staging, "media-studio.sqlite").copyTo(db)
+            val target = File(destination.filesDir, "media-studio/shared-paid.png")
+            target.parentFile!!.mkdirs()
+            File(staging, "media/shared-paid.png").copyTo(target)
+            val cleanup = File(staging.parentFile, ".installed-${staging.name}")
+            java.nio.file.Files.move(staging.toPath(), cleanup.toPath())
+            assertTrue(File(cleanup, "media-studio.manifest").delete())
+            assertEquals(2, LocalMediaStudioBackupInstaller(destination, json).install(staging))
+            assertFalse(cleanup.exists())
+            assertFalse(staging.exists())
+            LocalMediaDatabase(destination, json).use { stored ->
+                assertEquals("a", stored.get("a")?.result?.id)
+                assertEquals("b", stored.get("b")?.result?.id)
+            }
+            assertEquals(byteArrayOf(1, 3, 5, 7).toList(), target.readBytes().toList())
         } finally { root.deleteRecursively() }
     }
 

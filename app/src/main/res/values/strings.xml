@@ -672,6 +672,7 @@
     <string name="settings_local_session_storage_segments">历史记录 %1$d 份 · 已整理 %2$d 份</string>
     <string name="settings_local_session_storage_warning">会话存储已超过软预算，或设备剩余空间偏低。建议先导出，再删除不再需要的会话。</string>
     <string name="settings_local_session_storage_retention">原始会话事实会一直保留到你主动删除会话；压缩不会丢历史。</string>
+    <string name="settings_local_session_storage_backup_scope">重要：会话备份仅包含会话 SQLite 数据及其托管附件，不包含媒体工作室独立创作记录和图片、音频、视频原文件。卸载、清数据或换机前，请单独保存这些媒体成果；此备份不能恢复它们。</string>
     <string name="settings_local_session_storage_compact">整理旧聊天记录</string>
     <string name="settings_local_session_storage_export">导出全部本地会话</string>
     <string name="settings_local_session_storage_cleanup">返回聊天页清理会话</string>
