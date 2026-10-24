@@ -124,6 +124,24 @@ class LocalMediaStudioBackupInstallerAndroidTest {
         } finally { root.deleteRecursively() }
     }
 
+    @Test fun danglingSymlinkNeverCountsAsAnEmptyRestoreDestination() {
+        val root = File(base.cacheDir, "restore-symlink-"+UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val (staging, destination) = fixture(root)
+            val file = File(destination.filesDir, "media-studio/shared-paid.png")
+            file.parentFile?.mkdirs()
+            java.nio.file.Files.createSymbolicLink(
+                file.toPath(), File(root, "nonexistent-external-media").toPath(),
+            )
+            assertThrows(IllegalStateException::class.java) {
+                LocalMediaStudioBackupInstaller(destination, json).install(staging)
+            }
+            assertTrue(java.nio.file.Files.isSymbolicLink(file.toPath()))
+            assertFalse(destination.getDatabasePath("local_media_v1.db").exists())
+            assertTrue(staging.isDirectory)
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun strayWalSidecarAlwaysRefusesUnverifiedRestoration() {
         val root = File(base.cacheDir, "restore-wal-guard-"+UUID.randomUUID()).apply { mkdirs() }
         try {
