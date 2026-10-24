@@ -288,6 +288,7 @@ internal class LocalWorkAgentTurnExecutor(
             var improvementChecked = false
             var selectedImprovement: WorkImprovementAdvice? = null
             var improvementGoalId: String? = null
+            var improvementSteeringRevision: Long? = null
 
             fun settlePendingTools(reason: String) {
                 val settlements = pendingToolSettlements(
@@ -405,6 +406,7 @@ internal class LocalWorkAgentTurnExecutor(
                             selectedImprovement = advice
                             settledImprovement = advice
                             improvementGoalId = liveGoal.id
+                            improvementSteeringRevision = binding.steeringRevision.value
                             runEventLog.append(
                                 if (advice.active) "work/improvement-applied" else "work/improvement-trial",
                                 buildJsonObject {
@@ -420,23 +422,22 @@ internal class LocalWorkAgentTurnExecutor(
                             )
                         }
                     }
-                    selectedImprovement?.let { advice ->
-                        if (liveGoal?.id == improvementGoalId &&
+                    // Assemble strategy guidance per *request*, never append it to the
+                    // durable base context. A new Goal or route cannot inherit the old advice.
+                    val improvementGuidance = selectedImprovement?.takeIf { advice ->
+                        liveGoal != null && liveGoal.id == improvementGoalId &&
+                            improvementSteeringRevision == binding.steeringRevision.value &&
                             snapshot.modelState.model == advice.model &&
                             (snapshot.modelState.modelSelection.activeProfileId ?: "") == advice.profileId &&
-                            snapshot.modelState.modelSelection.activeProfile?.routeFingerprint().orEmpty() == advice.routeFingerprint) {
-                            val marker = "[可选工作方法建议：" + advice.id + "]"
-                            if (marker !in workPromptContext.dynamic) {
-                                workPromptContext = workPromptContext.copy(
-                                    dynamic = workPromptContext.dynamic + "\n\n" + marker +
-                                        "\n来自历史工作证据的" +
-                                        (if (advice.active) "已采纳方法" else "待验证实验候选") +
-                                        "；仅作为辅助建议，用户要求与已有权限/验收规则优先。\n" +
-                                        advice.guidance,
-                                )
-                            }
-                        }
-                    }
+                            snapshot.modelState.modelSelection.activeProfile?.routeFingerprint().orEmpty() == advice.routeFingerprint &&
+                            (snapshot.projectId ?: "") == advice.projectId &&
+                            com.labteto.dshmobile.local.work.improvement.workGoalComparisonKey(liveGoal) == advice.goalSignature
+                    }?.let { advice ->
+                        "\n\n[可选工作方法建议：" + advice.id + "]\n来自历史工作证据的" +
+                            (if (advice.active) "已采纳方法" else "待验证实验候选") +
+                            "；仅作为辅助建议，用户要求与已有权限/验收规则优先。\n" +
+                            advice.guidance
+                    }.orEmpty()
                     val skillGuidance = resolveLocalWorkSkillGuidance(
                         sessionStorage.files.workspace, effectiveSkillInput,
                         selectedInvocations = pinnedInvocations.current(),
@@ -450,7 +451,7 @@ internal class LocalWorkAgentTurnExecutor(
                     )
                     val productContextTokens =
                         estimateModelTokens(workPromptContext.stable) +
-                            estimateModelTokens(workPromptContext.dynamic) +
+                            estimateModelTokens(workPromptContext.dynamic + improvementGuidance) +
                             estimateModelTokens(workPromptContext.skill)
                     if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep)) {
                         LocalWorkSummarySettings.attach(context)
@@ -502,7 +503,7 @@ internal class LocalWorkAgentTurnExecutor(
                     val durableRequestMessages = withWorkTurnContext(
                         withLocalWorkExecutionMode(runHistory.snapshot()),
                         workPromptContext.stable,
-                        workPromptContext.dynamic + "\n" + com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
+                        workPromptContext.dynamic + improvementGuidance + "\n" + com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
                         workPromptContext.skill,
                     )
                     val selectedMode = resolveLocalImageInputMode(
