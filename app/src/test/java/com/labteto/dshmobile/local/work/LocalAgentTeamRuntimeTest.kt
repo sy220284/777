@@ -106,13 +106,20 @@ class LocalAgentTeamRuntimeTest {
             runHandle = LocalAgentRunHandle(initialSessionId = session, maxPendingInputs = 8),
             eventLog = f.log,
         )
-        val response = f.runtime.execute(
-            memberTestToolCall("shutdown-req", "team_request_shutdown", buildJsonObject {
-                put("target", "worker")
-                put("reason", "finish your work and hand off remaining evidence")
-            }),
-            binding,
-        ).orEmpty()
+        val response = try {
+            f.runtime.execute(
+                memberTestToolCall("shutdown-req", "team_request_shutdown", buildJsonObject {
+                    put("target", "worker")
+                    put("reason", "finish your work and hand off remaining evidence")
+                }),
+                binding,
+            ).orEmpty()
+        } catch (error: Exception) {
+            throw AssertionError(
+                "Real Lead shutdown request failed: " + error.message + "\n" + error.stackTraceToString(),
+                error,
+            )
+        }
         assertTrue(response.contains("Team 消息已投递"))
         val durable = requireNotNull(f.log.latestMatching(
             setOf(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED),
