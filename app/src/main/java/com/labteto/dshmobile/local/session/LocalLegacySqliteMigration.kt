@@ -16,10 +16,12 @@ internal class LocalLegacySqliteMigration(
     private val snapshots: SqliteSessionSnapshotStore,
     private val events: SqliteSessionEventDatabase,
 ) {
-    fun migrate(currentSessionId: String) {
+    fun migrate() {
         if (events.legacyAdoptionFinished()) return
         // Move the single-file predecessor into the same historical folder first.
-        migrateLegacySessionFiles(root, sessionsRoot, currentSessionId)
+        // Startup has not initialized the foreground Session yet. An explicit legacy
+        // file ID always wins; missing IDs receive a stable, isolated import owner.
+        migrateLegacySessionFiles(root, sessionsRoot, "legacy-import")
         val legacySnapshots = VersionedSessionStore(sessionsRoot, json)
         val oldIds = legacySnapshots.ids().toMutableSet()
         val eventPattern = Regex("^(.+)\\.events\\.jsonl(?:\\.part-[0-9]+(?:\\.gz)?)?$")
