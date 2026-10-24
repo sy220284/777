@@ -218,7 +218,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             continuable = true,
             requestedId = requestedJobId,
         ) { jobId, report ->
-            suspendWorkflowJobForNewUser(eventLogFor(sessionId), jobId, workflowFence != null, allowMutation) {
+            suspendWorkflowJobForNewUser(eventLogFor(sessionId), jobId, workflowFence != null, allowMutation, teamManaged)  {
               withContext(LocalModelRunContext(runProfile) + LocalWorkflowExecutionFence {
                 if (workflowFence != null) requireWorkflowFenceCurrent(sessionId, workflowFence)
               }) {
@@ -530,7 +530,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
 
         jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { jobId, report ->
-          suspendWorkflowJobForNewUser(eventLogFor(sessionId), jobId, workflowFence != null, capabilities.allowMutation) {
+          suspendWorkflowJobForNewUser(eventLogFor(sessionId), jobId, workflowFence != null, capabilities.allowMutation, capabilities.teamManaged) {
             val profile = modelGateway.profileForRoute(profileId, model, baseUrl)
             require(
                 profile.authKind.name == authKind &&
@@ -789,9 +789,11 @@ internal class LocalPersistentJobRecoveryCoordinator(
 /** Actual persisted Jobs block, retaining only a slice without uncheckpointed write effects. */
 internal suspend fun <T> suspendWorkflowJobForNewUser(
     log: LocalSessionEventLog, jobId: String, workflowNode: Boolean, allowMutation: Boolean,
+    teamManaged: Boolean = false,
     block: suspend () -> T,
 ): T = try { block() } catch (superseded: LocalWorkflowSuperseded) {
-    if (!workflowNode) throw superseded
+    if (!workflowNode && !teamManaged) throw superseded
+    // Team task changes pause the existing Job only at a safely replayable slice.
     // A USER fence can fire between a tool's settlement and its history checkpoint.
     // Without a matching terminal result, even a settled write must not be reissued.
     if (allowMutation && !workflowToolContinuationSafe(log, jobId)) throw superseded
