@@ -123,6 +123,8 @@ class LocalSessionStorageRuntime @Inject internal constructor(
         return true
     }
 
+    internal fun storageDiagnosticSummary(): String = storageManager.diagnosticSummary()
+
     internal suspend fun storageStatus(): LocalSessionStorageStatus =
         withContext(Dispatchers.IO) { storageManager.status() }
 
