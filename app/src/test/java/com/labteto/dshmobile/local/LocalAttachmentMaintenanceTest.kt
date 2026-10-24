@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.attachment.LocalImageAttachmentReferences
 import com.labteto.dshmobile.local.attachment.cleanupLocalImageAttachments
+import com.labteto.dshmobile.local.attachment.collectAuthoritativeLocalImageAttachmentReferences
 import com.labteto.dshmobile.local.attachment.collectLocalImageAttachmentReferences
 import com.labteto.dshmobile.local.model.LOCAL_IMAGE_REF
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
@@ -108,7 +109,7 @@ class LocalAttachmentMaintenanceTest {
                     attachmentIds = setOf("keep"),
                     paths = emptySet(),
                 ),
-                nowMillis = 100L,
+                nowMillis = 4L * 60L * 60L * 1000L,
                 graceMillis = Long.MAX_VALUE,
                 maxImageBytes = keep.length() + newer.length(),
             )
@@ -117,6 +118,140 @@ class LocalAttachmentMaintenanceTest {
             assertFalse(oldest.exists())
             assertTrue(newer.exists())
             assertEquals(1, result.deletedFiles)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun authoritativeReferencesProtectImagesFromOtherSessionsAndSnapshots() {
+        val root = kotlin.io.path.createTempDirectory("attachment-sql-refs-").toFile()
+        try {
+            val dir = File(root, ".dsh/attachments").apply { mkdirs() }
+            val fromEvents = png(File(dir, "event.png"), 32)
+            val fromSnapshot = png(File(dir, "snapshot.png"), 32)
+            val obsolete = png(File(dir, "obsolete.png"), 32)
+            listOf(fromEvents, fromSnapshot, obsolete).forEach { it.setLastModified(1L) }
+            val refs = collectAuthoritativeLocalImageAttachmentReferences(
+                sessionIds = setOf("current", "sql-only", "snapshot-only"),
+                currentSessionId = "current",
+                readEventReferences = { id ->
+                    if (id == "sql-only") LocalImageAttachmentReferences(
+                        setOf("event"), emptySet(),
+                    ) else LocalImageAttachmentReferences(emptySet(), emptySet())
+                },
+                readSnapshot = { id ->
+                    if (id != "snapshot-only") null else buildJsonObject {
+                        put("content", buildJsonArray {
+                            add(buildJsonObject {
+                                put("type", LOCAL_IMAGE_REF)
+                                put("path", ".dsh/attachments/snapshot.png")
+                            })
+                        })
+                    }
+                },
+            )
+            val result = cleanupLocalImageAttachments(
+                workspaceRoot = root,
+                references = refs,
+                nowMillis = 20_000_000L,
+                graceMillis = 1_000L,
+                maxImageBytes = 10_000L,
+            )
+            assertTrue(fromEvents.exists())
+            assertTrue(fromSnapshot.exists())
+            assertFalse(obsolete.exists())
+            assertEquals(1, result.deletedFiles)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun genuineTranscriptImageBlockIsPreservedFromSnapshotAndEvents() {
+        val root = kotlin.io.path.createTempDirectory("attachment-real-transcript-").toFile()
+        try {
+            val img = png(File(root, ".dsh/attachments/transcript.png"), 32)
+            img.setLastModified(1L)
+            val persisted = buildJsonObject {
+                put("transcript", buildJsonArray {
+                    add(buildJsonObject {
+                        put("blocks", buildJsonArray {
+                            add(buildJsonObject {
+                                put("kind", "image")
+                                put("path", ".dsh/attachments/transcript.png")
+                                put("attachment_id", "transcript")
+                                put("media_type", "image/png")
+                            })
+                        })
+                    })
+                })
+            }
+            val refs = collectAuthoritativeLocalImageAttachmentReferences(
+                sessionIds = setOf("current", "other-session"),
+                currentSessionId = "current",
+                readEventReferences = { id ->
+                    if (id == "other-session") {
+                        collectLocalImageAttachmentReferences(
+                            emptySequence(), extraMessages = listOf(persisted),
+                        )
+                    } else LocalImageAttachmentReferences(emptySet(), emptySet())
+                },
+                readSnapshot = { id ->
+                    if (id == "other-session") persisted else null
+                },
+            )
+            assertEquals(setOf("transcript"), refs.attachmentIds)
+            assertEquals(setOf(".dsh/attachments/transcript.png"), refs.paths)
+            val result = cleanupLocalImageAttachments(
+                root, refs, nowMillis = 20_000_000L, graceMillis = 1_000L, maxImageBytes = 1L,
+            )
+            assertEquals(0, result.deletedFiles)
+            assertTrue(img.exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun failedAuthoritativeScanDoesNotStartDestructiveCleanup() {
+        val root = kotlin.io.path.createTempDirectory("attachment-scan-fails-").toFile()
+        try {
+            val image = png(File(root, ".dsh/attachments/protected.png"), 32)
+            image.setLastModified(1L)
+            val attempt = runCatching {
+                val refs = collectAuthoritativeLocalImageAttachmentReferences(
+                    sessionIds = setOf("current", "unreadable"),
+                    currentSessionId = "current",
+                    readEventReferences = { id ->
+                        if (id == "unreadable") error("simulated SQLite failure")
+                        LocalImageAttachmentReferences(emptySet(), emptySet())
+                    },
+                    readSnapshot = { null },
+                )
+                cleanupLocalImageAttachments(root, refs, 20_000_000L, 1_000L, 1L)
+            }
+            assertTrue(attempt.isFailure)
+            assertTrue(image.exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun quotaPressureCannotDeleteJustCreatedUnreferencedImages() {
+        val root = kotlin.io.path.createTempDirectory("attachment-inflight-").toFile()
+        try {
+            val image = png(File(root, ".dsh/attachments/inflight.png"), 32)
+            val now = 20_000_000L
+            image.setLastModified(now - 1_000L)
+            val result = cleanupLocalImageAttachments(
+                root, LocalImageAttachmentReferences(emptySet(), emptySet()),
+                nowMillis = now, graceMillis = 7L * 24 * 60 * 60 * 1_000,
+                maxImageBytes = 1L,
+            )
+            assertTrue(image.exists())
+            assertEquals(0, result.deletedFiles)
         } finally {
             root.deleteRecursively()
         }
