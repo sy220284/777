@@ -22,7 +22,7 @@ class LocalWebSearchClientTest {
         val client = LocalWebSearchClient(http { request ->
             assertEquals("https://api.deepseek.com/v1/tools/search", request.url.toString())
             assertEquals("Bearer official-key", request.header("Authorization"))
-            assertEquals("application/json; charset=utf-8", request.header("Content-Type"))
+            assertEquals("application/json; charset=utf-8", request.body?.contentType().toString())
             val body = Buffer().also { request.body!!.writeTo(it) }.readUtf8()
             val fields = Json.parseToJsonElement(body).let { it as kotlinx.serialization.json.JsonObject }
             assertEquals("最新技术", fields["query"]?.let { it.toString().trim('"') })
