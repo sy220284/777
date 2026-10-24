@@ -154,7 +154,7 @@ class SqliteSessionMediaArchiveAndroidTest {
                 db.execSQL("CREATE TABLE local_asset_locations (" +
                     "relative_path TEXT PRIMARY KEY, asset_id TEXT, byte_size INTEGER)")
                 db.execSQL("INSERT INTO local_asset_locations VALUES(?,?,?)",
-                    arrayOf(".dsh/attachments/$filename", digest, body.size))
+                    arrayOf<Any>(".dsh/attachments/$filename", digest, body.size))
             }
             val archive = SqliteSessionMediaArchive(context, root)
             assertTrue(runCatching {
