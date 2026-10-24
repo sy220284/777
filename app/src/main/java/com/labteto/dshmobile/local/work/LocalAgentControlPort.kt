@@ -69,6 +69,33 @@ internal interface LocalAgentControlPort {
 }
 
 /** Runtime implementation; no model-visible JSON parsing and no parallel persistence store. */
+/** Canonical owner-sensitive admission for every standalone child-control operation. */
+internal fun requireOwnedAgentInfo(
+    available: List<LocalJobInfo>,
+    sessionId: String,
+    agentId: String,
+): LocalJobInfo {
+    require(sessionId.isNotBlank() && agentId.isNotBlank()) { "AGENT_TARGET_REQUIRED" }
+    return available.singleOrNull {
+        it.id == agentId && it.ownerSessionId == sessionId && it.isAgent
+    } ?: error("AGENT_TARGET_NOT_FOUND：目标不属于当前 Work 会话或不是后台代理")
+}
+
+internal fun validateAgentResumeAdmission(
+    info: LocalJobInfo,
+    snapshot: com.labteto.dshmobile.harness.jobs.JobSnapshot,
+) {
+    require(info.continuable && snapshot.resumeKind == "subagent_readonly") {
+        "AGENT_RESUME_UNSUPPORTED：仅支持已有持久只读代理的安全恢复"
+    }
+    require(info.status in setOf("interrupted", "dormant", "waiting_slice")) {
+        "AGENT_RESUME_STATE_INVALID：当前状态不能重新激活"
+    }
+    require(info.pendingMessageCount > 0 || info.status == "waiting_slice") {
+        "AGENT_RESUME_INPUT_REQUIRED：需先有持久消息或等待中的安全执行片"
+    }
+}
+
 internal class LocalWorkAgentControlRuntime(
     private val jobs: LocalJobManager,
     private val subagents: LocalWorkSubagentRuntime,
@@ -136,10 +163,7 @@ internal class LocalWorkAgentControlRuntime(
         mode: LocalAgentMessageDeliveryMode,
     ): String = persistentJobs.sendMessage(agentId, message, sessionId, mode)
     private fun requireOwnedAgent(sessionId: String, agentId: String): LocalJobInfo {
-        require(sessionId.isNotBlank() && agentId.isNotBlank()) { "AGENT_TARGET_REQUIRED" }
-        return jobs.snapshotInfos().singleOrNull {
-            it.id == agentId && it.ownerSessionId == sessionId && it.isAgent
-        } ?: error("AGENT_TARGET_NOT_FOUND：目标不属于当前 Work 会话或不是后台代理")
+        return requireOwnedAgentInfo(jobs.snapshotInfos(), sessionId, agentId)
     }
 
     private fun requireStandaloneAgent(info: LocalJobInfo) {
@@ -184,15 +208,7 @@ internal class LocalWorkAgentControlRuntime(
         val snapshot = jobs.snapshots().singleOrNull {
             it.id == agentId && it.ownerId == sessionId
         } ?: error("AGENT_SNAPSHOT_NOT_FOUND")
-        require(info.continuable && snapshot.resumeKind == "subagent_readonly") {
-            "AGENT_RESUME_UNSUPPORTED：仅支持已有持久只读代理的安全恢复"
-        }
-        require(info.status in setOf("interrupted", "dormant", "waiting_slice")) {
-            "AGENT_RESUME_STATE_INVALID：当前状态不能重新激活"
-        }
-        require(info.pendingMessageCount > 0 || info.status == "waiting_slice") {
-            "AGENT_RESUME_INPUT_REQUIRED：需先有持久消息或等待中的安全执行片"
-        }
+        validateAgentResumeAdmission(info, snapshot)
         persistentJobs.scheduleAgentResume(sessionId, agentId)
         return "agent_id=$agentId\nresume_requested=true\nresume_admitted=unverified" +
             "\nstatus_before=" + info.status +
