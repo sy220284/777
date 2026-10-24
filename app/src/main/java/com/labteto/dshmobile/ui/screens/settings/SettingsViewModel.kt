@@ -10,6 +10,8 @@ import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
+import com.labteto.dshmobile.local.web.LocalSearchUsageStore
+import com.labteto.dshmobile.local.web.LocalSearchUsageSnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageGroupKind
 import com.labteto.dshmobile.local.TokenUsageRecord
@@ -49,6 +51,7 @@ class SettingsViewModel @Inject constructor(
     private val hostsStore: HostsStore,
     private val localHarness: LocalSettingsRuntime,
     private val settingsData: LocalSettingsDataFacade,
+    private val searchUsageStore: LocalSearchUsageStore,
     @ApplicationContext context: Context,
 ) : ViewModel() {
 
@@ -70,6 +73,7 @@ class SettingsViewModel @Inject constructor(
     val chatStyleGuardBuiltInPhrases: List<String> get() = localHarness.chatStyleGuardBuiltInPhrases
     val approvalMode: StateFlow<LocalApprovalMode> = localHarness.approvalMode
     val deepSeekPricing: StateFlow<DeepSeekPricingState> = settingsData.deepSeekPricing
+    val searchUsage: StateFlow<LocalSearchUsageSnapshot> = searchUsageStore.usage
     val usageAnalytics: StateFlow<TokenUsageAnalyticsSnapshot> = settingsData.usageRevision
         .mapLatest {
             withContext(Dispatchers.IO) { settingsData.usageSnapshot() }
