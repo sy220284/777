@@ -78,6 +78,41 @@ class LocalTeamIdleTaskDispatchTest {
     }
 
 
+    @Test fun malformedCompletionProofCannotMasqueradeAsVerifiedTask() {
+        val original = task("task-1")
+        val completed = original.copy(
+            revision = 2, status = LocalTeamTaskStatus.COMPLETED,
+            completionResultId = "claimed-without-event",
+            completionEvidenceSequence = 42L,
+        )
+        val err = runCatching {
+            LocalAgentTeamReducer.validateTaskTransition(listOf(original), original, completed)
+        }.exceptionOrNull()
+        // Reducer checks structural shape; actual result ownership is checked by Runtime.
+        assertNull(err)
+        assertEquals("TEAM_TASK_COMPLETION_EVIDENCE_PAIR_REQUIRED",
+            runCatching {
+                LocalAgentTeamReducer.validateTaskTransition(listOf(original), original,
+                    completed.copy(completionEvidenceSequence = null))
+            }.exceptionOrNull()?.message)
+        assertEquals("TEAM_TASK_COMPLETION_EVIDENCE_INVALID",
+            runCatching {
+                LocalAgentTeamReducer.validateTaskTransition(listOf(original), original,
+                    completed.copy(completionEvidenceSequence = -2L))
+            }.exceptionOrNull()?.message)
+        val revised = completed.copy(revision = 3, completionResultId = "different")
+        assertEquals("TEAM_TASK_COMPLETION_EVIDENCE_IMMUTABLE",
+            runCatching {
+                LocalAgentTeamReducer.validateTaskTransition(listOf(completed), completed, revised)
+            }.exceptionOrNull()?.message)
+        val event = with(LocalAgentTeamEventCodec) { completed.toEvent("session") }
+        assertEquals(completed, LocalAgentTeamEventCodec.decodeTask(event))
+        val legacy = with(LocalAgentTeamEventCodec) {
+            completed.copy(completionResultId = null, completionEvidenceSequence = null).toEvent("session")
+        }
+        assertNull(LocalAgentTeamEventCodec.decodeTask(legacy).completionResultId)
+    }
+
     @Test fun malformedUserRevisionCannotMasqueradeAsLegacyTask() {
         val clean = with(LocalAgentTeamEventCodec) { task("task-1").toEvent("session") }
         val fields = clean.getValue("task").jsonObject
