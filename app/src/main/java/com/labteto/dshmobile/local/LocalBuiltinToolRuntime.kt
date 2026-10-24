@@ -243,6 +243,9 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                         TokenUsageAction.WEB_SEARCH,
                         queries.firstOrNull(),
                     ),
+                    count = args.int("count", 10).coerceIn(1, 50),
+                    needContent = args.boolean("need_content", false),
+                    provider = args.optionalString("provider") ?: "auto",
                 )
             }
             "web_fetch" -> {
@@ -250,6 +253,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 val maxBytes = args.int("max_bytes", DEFAULT_WEB_FETCH_BYTES)
                     .coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES)
                 val format = args.optionalString("format") ?: "text"
+                val provider = args.optionalString("provider") ?: "auto"
                 val background = args.boolean("run_in_background", false)
                 val readOnlyScope = !allowMutation || state.work.planMode
                 if (background && readOnlyScope) {
@@ -261,7 +265,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                     FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS
                 }
                 if (background) {
-                    startPersistentWebFetch(input, maxBytes, format, timeout, boundSessionId)
+                    startPersistentWebFetch(input, maxBytes, format, timeout, boundSessionId, provider)
                 } else {
                     root.webTools.fetch(
                         input,
@@ -269,6 +273,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                         format,
                         timeout,
                         allowArtifactWrite = !readOnlyScope,
+                        provider = provider,
                     )
                 }
             }
@@ -429,6 +434,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         format: String,
         timeoutSeconds: Long,
         sessionId: String,
+        provider: String,
     ): String = jobs.startPersistent(
         label = "网页抓取：${url.take(120)}",
         resumeKind = "web_fetch",
@@ -437,11 +443,12 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
             put("url", url)
             put("max_bytes", maxBytes)
             put("format", format)
+            put("provider", provider)
             put("timeout_seconds", timeoutSeconds)
         }.toString(),
         ownerSessionId = sessionId,
     ) { _, report ->
         report("正在抓取：$url")
-        tools.get().webTools.fetch(url, maxBytes, format, timeoutSeconds)
+        tools.get().webTools.fetch(url, maxBytes, format, timeoutSeconds, provider = provider)
     }
 }
