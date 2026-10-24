@@ -79,9 +79,11 @@ class LocalTeamIdleTaskDispatchTest {
 
 
     @Test fun malformedCompletionProofCannotMasqueradeAsVerifiedTask() {
-        val original = task("task-1")
+        val original = task("task-1").copy(
+            revision = 2, status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = "member-1",
+        )
         val completed = original.copy(
-            revision = 2, status = LocalTeamTaskStatus.COMPLETED,
+            revision = 3, status = LocalTeamTaskStatus.COMPLETED,
             completionResultId = "claimed-without-event",
             completionEvidenceSequence = 42L,
         )
@@ -100,7 +102,7 @@ class LocalTeamIdleTaskDispatchTest {
                 LocalAgentTeamReducer.validateTaskTransition(listOf(original), original,
                     completed.copy(completionEvidenceSequence = -2L))
             }.exceptionOrNull()?.message)
-        val revised = completed.copy(revision = 3, completionResultId = "different")
+        val revised = completed.copy(revision = 4, completionResultId = "different")
         assertEquals("TEAM_TASK_COMPLETION_EVIDENCE_IMMUTABLE",
             runCatching {
                 LocalAgentTeamReducer.validateTaskTransition(listOf(completed), completed, revised)
