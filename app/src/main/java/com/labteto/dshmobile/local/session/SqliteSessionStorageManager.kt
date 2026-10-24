@@ -50,6 +50,7 @@ internal class SqliteSessionStorageManager(
             sessionCount = snapshots.readSummaries().size,
             rawSegmentCount = 0,
             compressedSegmentCount = 0,
+            pendingRestore = File(pendingRoot, "READY").isFile,
         )
     }
 
@@ -208,6 +209,27 @@ internal class SqliteSessionStorageManager(
      * Called before Session adapters open SQLite connections, on the NEXT process
      * launch. A partial install is idempotently replayed from unchanged staged copies.
      */
+    /** Cancel only a staged, not-yet-started restore. Once installation begins
+     * its original ZIP and verified files must remain for safe idempotent replay.
+     */
+    @Synchronized
+    fun cancelPendingRestore(): Boolean {
+        val ready = File(pendingRoot, "READY")
+        if (!ready.isFile) return false
+        check(!File(pendingRoot, "INSTALLING").exists()) {
+            "恢复安装已经开始，必须继续完成；不能撤销部分安装的数据"
+        }
+        val originals = listOf(
+            File(pendingRoot, SNAPSHOT_ENTRY) to snapshotFile,
+            File(pendingRoot, EVENT_ENTRY) to eventFile,
+        )
+        check(originals.none { (staged, installed) ->
+            staged.isFile && installed.isFile && sameBytes(staged, installed)
+        }) { "已有恢复数据写入，请重启继续完成，不能直接取消" }
+        check(pendingRoot.deleteRecursively()) { "无法清除未启动的恢复计划" }
+        return true
+    }
+
     @Synchronized
     fun applyPendingRestore(): Int {
         val ready = File(pendingRoot, "READY")
@@ -238,6 +260,14 @@ internal class SqliteSessionStorageManager(
                 .listFiles().orEmpty().forEach { add(SqliteSessionMediaArchive.MEDIA_PREFIX + it.name) }
         }
         mediaBackup.validateStaged(pendingRoot, mediaNames)
+        // Durable fence: never allow UI cancellation after any installed media/DB bytes.
+        val installing = File(pendingRoot, "INSTALLING")
+        if (!installing.exists()) {
+            java.io.FileOutputStream(installing).use { stream ->
+                stream.write(byteArrayOf(1))
+                stream.fd.sync()
+            }
+        }
         // Install and hash-verify all attachments before committing a SQLite DB
         // that may reference them. Retrying after process death is idempotent.
         mediaBackup.installStaged(pendingRoot)
