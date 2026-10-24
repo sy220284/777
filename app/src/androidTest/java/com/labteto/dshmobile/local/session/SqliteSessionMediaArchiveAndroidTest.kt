@@ -140,6 +140,44 @@ class SqliteSessionMediaArchiveAndroidTest {
         }
     }
 
+    @Test fun sqliteIndexedMediaMustExistAndMatchBeforeBackupSucceeds() {
+        val root = File(context.cacheDir, "media-catalog-src-${UUID.randomUUID()}")
+        try {
+            val dbFile = eventDb(root)
+            val body = byteArrayOf(9, 8, 7)
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(body)
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            val filename = "$digest.png"
+            SQLiteDatabase.openDatabase(
+                dbFile.path, null, SQLiteDatabase.OPEN_READWRITE,
+            ).use { db ->
+                db.execSQL("CREATE TABLE local_asset_locations (" +
+                    "relative_path TEXT PRIMARY KEY, asset_id TEXT, byte_size INTEGER)")
+                db.execSQL("INSERT INTO local_asset_locations VALUES(?,?,?)",
+                    arrayOf(".dsh/attachments/$filename", digest, body.size))
+            }
+            val archive = SqliteSessionMediaArchive(context, root)
+            assertTrue(runCatching {
+                ZipOutputStream(ByteArrayOutputStream()).use { zip ->
+                    archive.export(zip, dbFile)
+                }
+            }.isFailure)
+            File(root, ".dsh/attachments").mkdirs()
+            File(root, ".dsh/attachments/$filename").writeBytes(body)
+            ZipOutputStream(ByteArrayOutputStream()).use { zip ->
+                archive.export(zip, dbFile)
+            }
+            File(root, ".dsh/attachments/$filename").writeBytes(byteArrayOf(1, 2, 3))
+            assertTrue(runCatching {
+                ZipOutputStream(ByteArrayOutputStream()).use { zip ->
+                    archive.export(zip, dbFile)
+                }
+            }.isFailure)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     private fun eventDb(root: File): File {
         val file = File(root, "events-test.sqlite")
         if (!file.exists()) {
