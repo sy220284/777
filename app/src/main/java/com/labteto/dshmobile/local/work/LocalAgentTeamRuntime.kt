@@ -169,6 +169,14 @@ internal data class LocalTeamShutdownResponseSnapshot(
     val reason: String = "",
 )
 
+@Serializable
+internal data class LocalTeamMessageAckSnapshot(
+    val messageId: String,
+    val memberId: String,
+    val outcome: String,
+    val reason: String = "",
+)
+
 internal data class LocalTeamAgentMessageSnapshot(
     val id: String,
     val sequence: Long,
@@ -185,6 +193,9 @@ internal data class LocalTeamProjection(
     val tasks: List<LocalTeamTaskSnapshot> = emptyList(),
     val pendingMessages: List<LocalTeamMessageSnapshot> = emptyList(),
     val deliveredMessageIds: List<String> = emptyList(),
+    /** Rebuilt from delivery events to authenticate later member acknowledgements. */
+    val deliveredMessageTargets: Map<String, String> = emptyMap(),
+    val messageAcknowledgements: List<LocalTeamMessageAckSnapshot> = emptyList(),
     val discardedMessageIds: List<String> = emptyList(),
     val shutdownRequests: List<LocalTeamShutdownRequestSnapshot> = emptyList(),
     val shutdownResponses: List<LocalTeamShutdownResponseSnapshot> = emptyList(),
