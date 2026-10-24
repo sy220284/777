@@ -241,6 +241,12 @@ class LocalAgentTeamRuntimeTest {
         ).orEmpty()
         assertTrue(result.contains("已投递"))
         assertEquals(1, f.jobs.peekMessages("job-team-1").size)
+        val rendered = f.runtime.execute(
+            memberTestToolCall("members-after-idle", "team_members", buildJsonObject {}),
+            binding,
+        ).orEmpty()
+        assertTrue(rendered.contains("activity=idle"))
+        assertTrue(rendered.contains("job_status="))
         assertEquals(LocalTeamMemberPhase.ACTIVE, f.runtime.project(sessionId).members.single().phase)
         // Durable Inbox acceptance is the boundary; the coordinator must still admit a
         // subsequent turn. Do not pretend the second message was processed already.

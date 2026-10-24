@@ -1757,17 +1757,15 @@ internal class LocalAgentTeamRuntime(
 
     private fun renderMembers(sessionId: String): String {
         val state = project(sessionId)
-        val statuses = jobs.snapshotInfos().associateBy { it.id }
+        val currentJobs = jobs.snapshotInfos()
+        val statuses = currentJobs.associateBy { it.id }
+        val activityById = projectLocalAgentTeamActivity(state, currentJobs)
+            .members.associateBy(LocalTeamMemberActivityView::memberId)
         val rows = buildList {
             add("lead | active | id=$sessionId")
             state.members.forEach { member ->
-                val activity = statuses[member.jobId]?.status ?: when (member.phase) {
-                    LocalTeamMemberPhase.CREATED -> "created"
-                    LocalTeamMemberPhase.DISABLED -> "disabled"
-                    LocalTeamMemberPhase.DISMISSED -> "dismissed"
-                    LocalTeamMemberPhase.FAILED -> "failed"
-                    else -> "missing"
-                }
+                val activity = requireNotNull(activityById[member.id]).activity.name.lowercase()
+                val jobStatus = statuses[member.jobId]?.status ?: "missing"
                 val execution = memberExecutionEvidence(sessionId, member)
                 val messages = agentMessages(
                     sessionId = sessionId,
@@ -1777,6 +1775,7 @@ internal class LocalAgentTeamRuntime(
                 add(
                     member.name + " | " + member.phase.name.lowercase() +
                         " | activity=" + activity +
+                        " | job_status=" + jobStatus +
                         (execution.usedSteps?.let { used ->
                             " | steps=" + used +
                                 (execution.stepLimit?.let { "/$it" } ?: "")
