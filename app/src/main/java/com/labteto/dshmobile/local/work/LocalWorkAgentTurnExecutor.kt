@@ -423,7 +423,7 @@ internal class LocalWorkAgentTurnExecutor(
                     // Assemble strategy guidance per *request*, never append it to the
                     // durable base context. A new Goal or route cannot inherit the old advice.
                     val improvementGuidance = selectedImprovement?.takeIf { advice ->
-                        liveGoal?.id == improvementGoalId &&
+                        liveGoal != null && liveGoal.id == improvementGoalId &&
                             snapshot.modelState.model == advice.model &&
                             (snapshot.modelState.modelSelection.activeProfileId ?: "") == advice.profileId &&
                             snapshot.modelState.modelSelection.activeProfile?.routeFingerprint().orEmpty() == advice.routeFingerprint &&
