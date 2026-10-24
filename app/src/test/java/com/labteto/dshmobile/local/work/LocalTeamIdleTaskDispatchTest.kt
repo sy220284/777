@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.work.LocalAgentTeamEventCodec.toEvent
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -74,6 +77,16 @@ class LocalTeamIdleTaskDispatchTest {
         ))
     }
 
+
+    @Test fun malformedUserRevisionCannotMasqueradeAsLegacyTask() {
+        val clean = with(LocalAgentTeamEventCodec) { task("task-1").toEvent("session") }
+        val fields = clean.getValue("task").jsonObject
+        val malformed = JsonObject(clean + ("task" to JsonObject(
+            fields + ("rootUserRevision" to JsonPrimitive("invalid")),
+        )))
+        assertEquals("TEAM_TASK_USER_REVISION_INVALID",
+            runCatching { LocalAgentTeamEventCodec.decodeTask(malformed) }.exceptionOrNull()?.message)
+    }
 
     @Test fun previousUserTaskCannotAutoRestartAfterNewRootInstruction() {
         val stale = task("task-1").copy(rootUserRevision = 7L)
