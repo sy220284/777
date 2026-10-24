@@ -39,6 +39,28 @@ class LocalNestedDelegationContractTest {
         }.isFailure)
     }
 
+    @Test fun rejectsWrongJsonTypesRatherThanSilentlyUsingDefaults() {
+        for (field in listOf("task", "role", "instructions")) {
+            val args = buildJsonObject {
+                put("task", "review")
+                put(field, true)
+            }
+            assertTrue(field, runCatching { parseLocalNestedDelegation(args, 10) }.isFailure)
+        }
+        assertTrue(runCatching {
+            parseLocalNestedDelegation(buildJsonObject {
+                put("task", "review")
+                put("max_steps", "4")
+            }, 10)
+        }.isFailure)
+        assertTrue(runCatching {
+            parseLocalNestedDelegation(buildJsonObject {
+                put("task", "review")
+                put("max_steps", true)
+            }, 10)
+        }.isFailure)
+    }
+
     @Test fun rejectsInvalidStepBudgetsAndOversizedTask() {
         for (steps in listOf(0, -1, 11, 25)) {
             assertTrue(runCatching {
