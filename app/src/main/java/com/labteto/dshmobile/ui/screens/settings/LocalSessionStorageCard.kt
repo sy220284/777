@@ -28,6 +28,7 @@ internal fun LocalSessionStorageCard(
     onCompact: () -> Unit,
     onExport: () -> Unit,
     onRestore: () -> Unit,
+    onLegacyRestore: () -> Unit,
     onCancelRestore: () -> Unit,
     onCleanup: () -> Unit,
 ) {
@@ -120,6 +121,13 @@ internal fun LocalSessionStorageCard(
         SyButton(
             text = "导入会话备份（重启后生效）",
             onClick = onRestore,
+            enabled = !busy,
+            variant = SyButtonVariant.Outline,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        SyButton(
+            text = "转换旧版会话 ZIP（不包含原媒体文件）",
+            onClick = onLegacyRestore,
             enabled = !busy,
             variant = SyButtonVariant.Outline,
             modifier = Modifier.fillMaxWidth(),
