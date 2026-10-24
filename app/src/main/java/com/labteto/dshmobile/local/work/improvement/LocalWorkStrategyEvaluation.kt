@@ -43,8 +43,42 @@ internal class LocalWorkStrategyEvaluation(
             (current.modelState.modelSelection.activeProfileId ?: "") != advice.profileId ||
             current.modelState.modelSelection.activeProfile?.routeFingerprint().orEmpty() != advice.routeFingerprint ||
             (current.projectId ?: "") != advice.projectId) return
-        if (goal.status != "completed" || workGoalComparisonKey(goal) != advice.goalSignature ||
-            !advice.baselineTestVerified || evidence.missing.isNotEmpty() || evidence.testCallId == null) return
+        // A blocked Goal with a recorded failed tool outcome is real negative evidence.
+        // It is not a proven causal attribution, so record it as an observation and
+        // suspend this advice rather than allowing indefinite reuse as 'adopted'.
+        if (workGoalComparisonKey(goal) != advice.goalSignature || !advice.baselineTestVerified) return
+        val (_, failedTools) = workGoalToolMetrics(log, goal)
+        if (goal.status == "blocked" && failedTools > 0) {
+            val lease = LocalSessionRuntimeRegistry.tryAcquire(
+                bound.sessionId, LocalSessionRuntimeKind.MAINTENANCE,
+            ) ?: return
+            try {
+                if (bound.workState.snapshot().goal != goal) return
+                log.withWriterLease {
+                    if (log.latestMatching(setOf("work/improvement-evaluation")) {
+                            it.value("run_id") == runId && it.value("candidate_id") == advice.id
+                        } != null) return@withWriterLease
+                    log.append("work/improvement-evaluation", buildJsonObject {
+                        put("candidate_id", advice.id)
+                        put("run_id", runId)
+                        put("goal_id", goal.id)
+                        put("goal_signature", advice.goalSignature)
+                        put("disposition", "quality_regression")
+                        put("comparison", "observed_blocked_goal_not_causal_attribution")
+                        put("candidate_tool_errors", failedTools)
+                        put("source_receipt", evidence.testCallId.orEmpty())
+                    })
+                    log.append("work/improvement-retired", buildJsonObject {
+                        put("candidate_id", advice.id)
+                        put("run_id", runId)
+                        put("reason", "observed_failed_acceptance")
+                    })
+                }
+            } finally { lease.close() }
+            return
+        }
+        if (goal.status != "completed" ||
+            evidence.missing.isNotEmpty() || evidence.testCallId == null) return
 
         // Real immutable Usage database is the only token accounting source; missing history
         // is INSUFFICIENT EVIDENCE, not zero cost.
