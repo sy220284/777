@@ -37,7 +37,7 @@ class LocalWebSearchClientTest {
                   {"title":"无效地址","url":"javascript:alert(1)","summary":"危险链接"}
                 ]}
             """.trimIndent())
-        })
+        }, Json)
         val actual = client.search("official-key", listOf("最新技术"), count = 30, needContent = true)
         assertTrue(actual.contains("来源：DeepSeek Search API"))
         assertTrue(actual.contains("[官网公告](https://example.org/news)"))
@@ -52,7 +52,7 @@ class LocalWebSearchClientTest {
     fun emptyResultsAreSuccessfulButUnverifiedSources() = runBlocking {
         val client = LocalWebSearchClient(http { request ->
             response(request, 200, """{"results":[]}""")
-        })
+        }, Json)
         val actual = client.search("key", listOf("不存在的关键词"))
         assertTrue(actual.contains("未找到可引用网页结果"))
     }
@@ -65,7 +65,7 @@ class LocalWebSearchClientTest {
             val data = Buffer().also { request.body!!.writeTo(it) }.readUtf8()
             assertTrue(data.contains("\"url\":\"https://example.org/a\""))
             response(request, 200, """{"title":"文章标题","content":"# 正文\n\n内容"}""")
-        })
+        }, Json)
         val result = client.fetch("official-key", "https://example.org/a")
         assertEquals("text/markdown; charset=utf-8", result.mediaType)
         assertTrue(result.content.contains("文章标题"))
@@ -77,7 +77,7 @@ class LocalWebSearchClientTest {
     fun invalidCredentialDoesNotLeakKeyOrImitateSuccess() = runBlocking {
         val client = LocalWebSearchClient(http { request ->
             response(request, 401, """{"error":{"message":"invalid token","code":"invalid_api_key"}}""")
-        })
+        }, Json)
         val failure = runCatching { client.search("super-secret-key", listOf("test")) }.exceptionOrNull()
         assertTrue(failure is LocalWebException)
         assertEquals("AUTH_FAILED", (failure as LocalWebException).code)
@@ -93,7 +93,7 @@ class LocalWebSearchClientTest {
                 ?.toString()?.trim('"').orEmpty()
             requests += query
             response(request, 200, """{"results":[]}""")
-        })
+        }, Json)
         client.search("key", listOf("😀".repeat(150)))
         assertEquals(1, requests.size)
         assertEquals(128, requests.single().codePointCount(0, requests.single().length))
