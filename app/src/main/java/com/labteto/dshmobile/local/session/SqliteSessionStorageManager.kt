@@ -129,6 +129,7 @@ internal class SqliteSessionStorageManager(
         try {
             val names = linkedSetOf<String>()
             var bytes = 0L
+            var lastFreeSpaceCheck = 0L
             ZipInputStream(archive).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
@@ -151,6 +152,13 @@ internal class SqliteSessionStorageManager(
                             if (n < 0) break
                             bytes += n
                             require(bytes <= MAX_UNPACKED_BYTES) { "SQLite 备份解压数据超限" }
+                            // Large stream imports must leave room for SQLite recovery and app activity.
+                            if (bytes - lastFreeSpaceCheck >= 8L * 1024L * 1024L) {
+                                check(staging.usableSpace > 64L * 1024L * 1024L) {
+                                    "本机空闲空间不足，无法安全恢复完整媒体备份"
+                                }
+                                lastFreeSpaceCheck = bytes
+                            }
                             out.write(buffer, 0, n)
                         }
                     }
