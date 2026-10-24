@@ -115,18 +115,19 @@ class LocalMediaStudioBackupInstallerAndroidTest {
             }
             assertFalse(File(root, "stolen.db").exists())
 
+            // ZipOutputStream itself rejects duplicate names, so feed two legal
+            // single-entry archives into the same receive transaction.
             val repeated = java.io.ByteArrayOutputStream()
             java.util.zip.ZipOutputStream(repeated).use { zip ->
-                repeat(2) { index ->
-                    zip.putNextEntry(java.util.zip.ZipEntry("media-studio/media-studio.sqlite"))
-                    zip.write(byteArrayOf(index.toByte()))
-                    zip.closeEntry()
-                }
+                zip.putNextEntry(java.util.zip.ZipEntry("media-studio/media-studio.sqlite"))
+                zip.write(byteArrayOf(1))
+                zip.closeEntry()
             }
             val repeatedReceiver = codec.Receiver(File(root, "import-duplicate"))
             java.util.zip.ZipInputStream(repeated.toByteArray().inputStream()).use { zip ->
                 repeatedReceiver.accept(requireNotNull(zip.nextEntry), zip)
-                zip.closeEntry()
+            }
+            java.util.zip.ZipInputStream(repeated.toByteArray().inputStream()).use { zip ->
                 assertThrows(IllegalArgumentException::class.java) {
                     repeatedReceiver.accept(requireNotNull(zip.nextEntry), zip)
                 }
