@@ -34,6 +34,7 @@ internal class SqliteSessionStorageManager(
     private val pendingRoot get() = File(context.filesDir, "local-harness/.sqlite-restore-pending-$restoreKey")
     private val snapshotFile get() = context.getDatabasePath(snapshotDatabaseName)
     private val eventFile get() = context.getDatabasePath(eventDatabaseName)
+    private val mediaBackup get() = SqliteSessionMediaArchive(context)
 
     fun status(): LocalSessionStorageStatus {
         val files = listOf(snapshotFile, eventFile).flatMap { source ->
@@ -89,6 +90,7 @@ internal class SqliteSessionStorageManager(
                     }
                     zip.closeEntry()
                 }
+                written += mediaBackup.export(zip)
             }
             return written
         } finally {
@@ -118,10 +120,18 @@ internal class SqliteSessionStorageManager(
             ZipInputStream(ByteArrayInputStream(archive)).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
+                    val mediaEntry = entry.name.startsWith(SqliteSessionMediaArchive.MEDIA_PREFIX) &&
+                        SqliteSessionMediaArchive.validFilename(
+                            entry.name.removePrefix(SqliteSessionMediaArchive.MEDIA_PREFIX))
                     require(!entry.isDirectory &&
-                        (entry.name == SNAPSHOT_ENTRY || entry.name == EVENT_ENTRY) &&
+                        (entry.name == SNAPSHOT_ENTRY || entry.name == EVENT_ENTRY ||
+                            entry.name == SqliteSessionMediaArchive.MANIFEST_ENTRY || mediaEntry) &&
                         names.add(entry.name)) { "SQLite 备份含未知或重复文件" }
-                    val target = File(staging, entry.name)
+                    val target = if (mediaEntry) File(
+                        staging, SqliteSessionMediaArchive.STAGED_MEDIA_DIR + "/" +
+                            entry.name.removePrefix(SqliteSessionMediaArchive.MEDIA_PREFIX),
+                    ) else File(staging, entry.name)
+                    target.parentFile?.mkdirs()
                     target.outputStream().buffered().use { out ->
                         val buffer = ByteArray(32 * 1024)
                         while (true) {
@@ -133,18 +143,25 @@ internal class SqliteSessionStorageManager(
                         }
                     }
                     zip.closeEntry()
-                    validateDatabase(target)
+                    if (entry.name == SNAPSHOT_ENTRY || entry.name == EVENT_ENTRY)
+                        validateDatabase(target)
                 }
             }
-            require(names == setOf(SNAPSHOT_ENTRY, EVENT_ENTRY)) {
+            require(SNAPSHOT_ENTRY in names && EVENT_ENTRY in names) {
                 "SQLite 备份缺少快照数据库或事件数据库"
             }
+            // The legacy two-DB-only archive is incomplete when it contains
+            // image references; never silently treat that as a full media restore.
+            require(SqliteSessionMediaArchive.MANIFEST_ENTRY in names) {
+                "旧 SQLite 备份不含图片原文件；请导出完整媒体备份"
+            }
+            mediaBackup.validateStaged(staging, names)
             validateTables(File(staging, SNAPSHOT_ENTRY), "session_snapshots")
             validateTables(File(staging, EVENT_ENTRY), "session_events")
             validateSnapshotEventCursors(
                 File(staging, SNAPSHOT_ENTRY), File(staging, EVENT_ENTRY),
             )
-            File(staging, "READY").writeText("sqlite-v1")
+            File(staging, "READY").writeText("sqlite-v2-media")
             check(staging.renameTo(pendingRoot)) { "SQLite 备份无法提交恢复计划" }
             return countRows(File(pendingRoot, SNAPSHOT_ENTRY), "session_snapshots")
         } finally {
@@ -160,7 +177,7 @@ internal class SqliteSessionStorageManager(
     fun applyPendingRestore(): Int {
         val ready = File(pendingRoot, "READY")
         if (!ready.isFile) return 0
-        check(ready.readText() == "sqlite-v1") { "未知的 SQLite 恢复版本" }
+        check(ready.readText() == "sqlite-v2-media") { "未知的 SQLite 恢复版本" }
         val sources = listOf(
             File(pendingRoot, SNAPSHOT_ENTRY) to snapshotFile,
             File(pendingRoot, EVENT_ENTRY) to eventFile,
@@ -179,6 +196,17 @@ internal class SqliteSessionStorageManager(
                 require(isEmptyDatabase(dst)) { "已有 SQLite 会话数据，恢复拒绝覆盖" }
             }
         }
+        val mediaNames = buildSet {
+            add(SNAPSHOT_ENTRY)
+            add(EVENT_ENTRY)
+            add(SqliteSessionMediaArchive.MANIFEST_ENTRY)
+            File(pendingRoot, SqliteSessionMediaArchive.STAGED_MEDIA_DIR)
+                .listFiles().orEmpty().forEach { add(SqliteSessionMediaArchive.MEDIA_PREFIX + it.name) }
+        }
+        mediaBackup.validateStaged(pendingRoot, mediaNames)
+        // Install and hash-verify all attachments before committing a SQLite DB
+        // that may reference them. Retrying after process death is idempotent.
+        mediaBackup.installStaged(pendingRoot)
         sources.forEach { (src, dst) ->
             if (dst.exists() && sameBytes(src, dst)) return@forEach
             dst.parentFile?.mkdirs()
