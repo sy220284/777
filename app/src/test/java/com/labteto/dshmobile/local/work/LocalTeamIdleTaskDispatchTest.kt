@@ -75,6 +75,18 @@ class LocalTeamIdleTaskDispatchTest {
     }
 
 
+    @Test fun previousUserTaskCannotAutoRestartAfterNewRootInstruction() {
+        val stale = task("task-1").copy(rootUserRevision = 7L)
+        val current = task("task-2")
+        val team = LocalTeamProjection(members = listOf(member()), tasks = listOf(stale, current))
+        assertEquals("task-2", nextIdleTeamTaskAssignment(team, activity(),
+            currentRootRevision = 8L)?.second?.id)
+        assertEquals("task-1", nextIdleTeamTaskAssignment(
+            team.copy(tasks = listOf(stale)), activity(), currentRootRevision = 7L)?.second?.id)
+        assertNull(nextIdleTeamTaskAssignment(
+            team.copy(tasks = listOf(stale)), activity(), currentRootRevision = 8L))
+    }
+
     @Test fun sameOwnerCannotRenewRootInstructionByEditingTask() {
         val start = task("task-1")
         val accepted = start.copy(revision = 2, status = LocalTeamTaskStatus.IN_PROGRESS,
