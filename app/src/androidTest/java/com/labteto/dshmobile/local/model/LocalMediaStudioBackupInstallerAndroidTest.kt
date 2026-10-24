@@ -108,6 +108,38 @@ class LocalMediaStudioBackupInstallerAndroidTest {
         } finally { root.deleteRecursively() }
     }
 
+    @Test fun conflictingExistingPaidOriginalRejectsRestoreBeforeAnyDatabaseInstall() {
+        val root = File(base.cacheDir, "restore-file-conflict-"+UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val (staging, destination) = fixture(root)
+            val target = File(destination.filesDir, "media-studio/shared-paid.png")
+            target.parentFile?.mkdirs()
+            target.writeBytes(byteArrayOf(7, 7, 7))
+            assertThrows(IllegalStateException::class.java) {
+                LocalMediaStudioBackupInstaller(destination, json).install(staging)
+            }
+            assertEquals(byteArrayOf(7, 7, 7).toList(), target.readBytes().toList())
+            assertFalse(destination.getDatabasePath("local_media_v1.db").exists())
+            assertTrue(staging.isDirectory)
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun strayWalSidecarAlwaysRefusesUnverifiedRestoration() {
+        val root = File(base.cacheDir, "restore-wal-guard-"+UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val (staging, destination) = fixture(root)
+            val db = destination.getDatabasePath("local_media_v1.db")
+            db.parentFile?.mkdirs()
+            File(db.path + "-wal").writeBytes(byteArrayOf(0, 1, 2))
+            assertThrows(IllegalStateException::class.java) {
+                LocalMediaStudioBackupInstaller(destination, json).install(staging)
+            }
+            assertFalse(db.exists())
+            assertTrue(File(db.path + "-wal").isFile)
+            assertTrue(staging.isDirectory)
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun corruptedStagingMustNotCreateAnyUserDatabaseOrFile() {
         val root = File(base.cacheDir, "restore-corrupt-"+UUID.randomUUID()).apply { mkdirs() }
         try {
