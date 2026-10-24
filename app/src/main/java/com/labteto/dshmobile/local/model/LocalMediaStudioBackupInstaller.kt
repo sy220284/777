@@ -30,7 +30,9 @@ internal class LocalMediaStudioBackupInstaller(
         val archive = LocalMediaStudioBackupSnapshot(context, json).validate(staging)
         val database = context.getDatabasePath("local_media_v1.db")
         val targetMedia = File(context.filesDir, "media-studio")
-        check(!Files.isSymbolicLink(context.filesDir.toPath()) &&
+        check(!Files.isSymbolicLink(staging.toPath()) &&
+            !Files.isSymbolicLink(context.filesDir.toPath()) &&
+            !Files.isSymbolicLink(database.parentFile.toPath()) &&
             !Files.isSymbolicLink(targetMedia.toPath())) {
             "媒体恢复目标目录不安全"
         }
@@ -40,7 +42,7 @@ internal class LocalMediaStudioBackupInstaller(
             !File(database.path + "-shm").exists()) {
             "目标媒体数据库仍有 WAL/SHM，拒绝覆盖已有创作事实"
         }
-        if (database.exists()) check(
+        if (Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)) check(
             Files.isRegularFile(database.toPath(), LinkOption.NOFOLLOW_LINKS) &&
                 sameBytes(database, archive.database)
         ) { "目标媒体数据库已有不同创作记录，禁止恢复覆盖" }
@@ -49,7 +51,7 @@ internal class LocalMediaStudioBackupInstaller(
         // Before writing anything, reject every conflicting original. No partial
         // installation can follow from a known conflict in a later item.
         pairs.forEach { (original, destination) ->
-            if (destination.exists()) check(
+            if (Files.exists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) check(
                 Files.isRegularFile(destination.toPath(), LinkOption.NOFOLLOW_LINKS) &&
                     sameBytes(original, destination)
             ) { "目标已有不同内容的付费成果：${destination.name}" }
@@ -69,7 +71,7 @@ internal class LocalMediaStudioBackupInstaller(
             "媒体恢复事务标记损坏，停止安装"
         }
         pairs.forEach { (original, destination) ->
-            if (!destination.exists()) {
+            if (!Files.exists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) {
                 val tmp = File(targetMedia, ".restore-${UUID.randomUUID()}")
                 try {
                     original.inputStream().buffered().use { input ->
@@ -83,19 +85,17 @@ internal class LocalMediaStudioBackupInstaller(
                     }
                     // Under the startup owner lease, only our restore writes these
                     // app-private targets. Refuse a newly observed conflict.
-                    check(!destination.exists()) {
+                    check(!Files.exists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) {
                         "媒体恢复过程中目标文件被创建，停止安装：${destination.name}"
                     }
-                    check(tmp.renameTo(destination)) {
-                        "媒体原文件原子安装失败：${destination.name}"
-                    }
+                    Files.move(tmp.toPath(), destination.toPath())
                 } finally { if (tmp.exists()) tmp.delete() }
             }
             check(sameBytes(original, destination)) {
                 "媒体恢复目标文件校验失败：${destination.name}"
             }
         }
-        if (!database.exists()) {
+        if (!Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)) {
             val temp = File(database.parentFile, database.name + ".restore-${UUID.randomUUID()}")
             try {
                 archive.database.inputStream().buffered().use { input ->
@@ -107,12 +107,11 @@ internal class LocalMediaStudioBackupInstaller(
                 check(sameBytes(archive.database, temp)) {
                     "媒体数据库恢复临时文件校验失败"
                 }
-                check(!database.exists() && !File(database.path + "-wal").exists()) {
+                check(!Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+                    !File(database.path + "-wal").exists()) {
                     "媒体数据库恢复期间出现已有数据，停止覆盖"
                 }
-                check(temp.renameTo(database)) {
-                    "媒体数据库原子安装失败"
-                }
+                Files.move(temp.toPath(), database.toPath())
             } finally { if (temp.exists()) temp.delete() }
         }
         check(sameBytes(database, archive.database)) {
