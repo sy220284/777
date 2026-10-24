@@ -108,12 +108,6 @@ internal class LocalWebSearchClient(
         while (true) {
             try {
                 return withCancellableHttpResponse(client.newCall(request)) { response ->
-                    val bounded = response.body?.byteStream()?.use {
-                        readBoundedWebBody(it, LOCAL_WEB_MAX_RESPONSE_BYTES)
-                    } ?: throw LocalWebException("INVALID_RESPONSE", "DeepSeek 未返回 JSON 数据")
-                    if (bounded.truncated) {
-                        throw LocalWebException("RESPONSE_TOO_LARGE", "DeepSeek 搜索/抓取响应超过大小上限")
-                    }
                     if (!response.isSuccessful) {
                         val code = when (response.code) {
                             401 -> "AUTH_FAILED"
@@ -129,6 +123,12 @@ internal class LocalWebSearchClient(
                         throw LocalWebException(code, "DeepSeek " +
                             (if (endpoint == SEARCH_ENDPOINT) "Search" else "Fetch") +
                             " 返回 HTTP " + response.code)
+                    }
+                    val bounded = response.body?.byteStream()?.use {
+                        readBoundedWebBody(it, LOCAL_WEB_MAX_RESPONSE_BYTES)
+                    } ?: throw LocalWebException("INVALID_RESPONSE", "DeepSeek 未返回 JSON 数据")
+                    if (bounded.truncated) {
+                        throw LocalWebException("RESPONSE_TOO_LARGE", "DeepSeek 搜索/抓取响应超过大小上限")
                     }
                     try {
                         json.parseToJsonElement(bounded.bytes.toString(Charsets.UTF_8)) as? JsonObject
