@@ -92,6 +92,8 @@ internal class LocalPersistentJobRecoveryCoordinator(
     private val lock = Any()
     private val pendingRecoverySessions = linkedSetOf<String>()
     private val rootAdmittedSessions = linkedSetOf<String>()
+    /** Explicit per-Agent resumes stay distinct from session-wide crash recovery. */
+    private val pendingTargetedAgents = linkedSetOf<Pair<String, String>>()
     private var recoveryJob: Job? = null
 
     suspend fun startReadonlySubagent(
@@ -283,6 +285,19 @@ internal class LocalPersistentJobRecoveryCoordinator(
         return result
     }
 
+    /**
+     * Request only the selected Agent's recovery. Never wake unrelated Jobs in the same Session.
+     * Validation of membership and resumability belongs to the AgentControl caller; this path
+     * still uses the original route, checkpoint, side-effect and ownership guards.
+     */
+    fun scheduleAgentResume(sessionId: String, agentId: String) {
+        require(sessionId.isNotBlank() && agentId.isNotBlank()) { "AGENT_RESUME_TARGET_REQUIRED" }
+        synchronized(lock) {
+            pendingTargetedAgents += sessionId to agentId
+            startRecoveryDrainLocked()
+        }
+    }
+
     fun schedule(
         sessionId: String = currentSessionId(),
         rootSliceAdmitted: Boolean = false,
@@ -292,34 +307,54 @@ internal class LocalPersistentJobRecoveryCoordinator(
         synchronized(lock) {
             pendingRecoverySessions += targetSession
             if (rootSliceAdmitted) rootAdmittedSessions += targetSession
-            if (recoveryJob?.isActive == true) return
-            recoveryJob = scope.launch {
+            startRecoveryDrainLocked()
+        }
+    }
+
+    private fun startRecoveryDrainLocked() {
+        if (recoveryJob?.isActive == true) return
+        recoveryJob = scope.launch {
                 try {
                     while (true) {
                         val next = synchronized(lock) {
-                            val session = pendingRecoverySessions.firstOrNull()
-                                ?.also { pendingRecoverySessions.remove(it) }
-                            session?.let { it to rootAdmittedSessions.remove(it) }
+                            val targeted = pendingTargetedAgents.firstOrNull()
+                                ?.also { pendingTargetedAgents.remove(it) }
+                            if (targeted != null) {
+                                Triple(targeted.first, true, targeted.second)
+                            } else {
+                                val session = pendingRecoverySessions.firstOrNull()
+                                    ?.also { pendingRecoverySessions.remove(it) }
+                                session?.let {
+                                    Triple(it, rootAdmittedSessions.remove(it), null)
+                                }
+                            }
                         } ?: break
-                        resumePass(next.first, resumeSlicePaused = next.second)
+                        resumePass(next.first, resumeSlicePaused = next.second, onlyAgentId = next.third)
                     }
                 } finally {
                     val completed = currentCoroutineContext()[Job]
                     val restart = synchronized(lock) {
                         if (recoveryJob === completed) recoveryJob = null
-                        recoveryJob == null && pendingRecoverySessions.isNotEmpty()
+                        recoveryJob == null &&
+                            (pendingRecoverySessions.isNotEmpty() || pendingTargetedAgents.isNotEmpty())
                     }
                     if (restart) {
-                        synchronized(lock) { pendingRecoverySessions.firstOrNull() }
-                            ?.let(::schedule)
+                        val session = synchronized(lock) { pendingRecoverySessions.firstOrNull() }
+                        if (session != null) schedule(session)
+                        else synchronized(lock) { pendingTargetedAgents.firstOrNull() }
+                            ?.let { scheduleAgentResume(it.first, it.second) }
                     }
                 }
             }
-        }
     }
 
-    private fun resumePass(targetSession: String, resumeSlicePaused: Boolean = false) {
+    private fun resumePass(
+        targetSession: String,
+        resumeSlicePaused: Boolean = false,
+        onlyAgentId: String? = null,
+    ) {
         jobs.resumableSnapshots().forEach { snapshot ->
+            if (onlyAgentId != null && snapshot.id != onlyAgentId) return@forEach
             // Verify identity before decoding, failing, or reclassifying a recovery record.
             if (!isJobRecoveryOwnedBySession(snapshot, targetSession, json)) return@forEach
             // Startup/UI rehydration cannot grant new model request slots.
@@ -352,12 +387,15 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
 
         val waitingForActivationStop = jobs.pendingContinuableAgentMessageSnapshots().any { snapshot ->
-            snapshot.ownerId == targetSession && snapshot.status == "interrupted"
+            snapshot.ownerId == targetSession &&
+                (onlyAgentId == null || snapshot.id == onlyAgentId) &&
+                snapshot.status == "interrupted"
         }
         if (waitingForActivationStop) {
             scope.launch {
                 delay(PERSISTENT_RECOVERY_RETRY_MILLIS)
-                schedule(targetSession)
+                if (onlyAgentId == null) schedule(targetSession)
+                else scheduleAgentResume(targetSession, onlyAgentId)
             }
         }
     }
