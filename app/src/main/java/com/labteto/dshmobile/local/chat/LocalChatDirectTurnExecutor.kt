@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalog
+
 import android.content.Context
 import com.labteto.dshmobile.local.ForegroundTokenUsageSeed
 import com.labteto.dshmobile.local.LocalModelRequestCoordinator
@@ -371,6 +373,12 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             val materializedReply = materializeLocalChatReplyMedia(
                 reply = reply,
                 workspaceRoot = File(sessionStorage.files.workspace.path),
+                onPublished = { published ->
+                    val db = requireNotNull(sessionStorage.eventLogs.sqliteDatabase) {
+                        "SQLite 资源目录不可用，模型图片已保留在本地"
+                    }
+                    SqliteLocalAssetCatalog(db).register(published)
+                },
             )
             val durableReply = materializedReply.reply
             // Neither ordinary Chat nor regenerate may commit an invisible assistant row.

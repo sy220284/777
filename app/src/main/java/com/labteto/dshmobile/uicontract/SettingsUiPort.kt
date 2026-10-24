@@ -73,7 +73,7 @@ interface SettingsUiPort {
     suspend fun compactSessionStorage(): LocalSessionStorageStatus
     suspend fun exportSessionStorage(output: OutputStream): Long
     /** Validated missing sessions are restored at next app launch, never over live event logs. */
-    suspend fun stageRestoreSessionStorage(archive: ByteArray): Int
+    suspend fun stageRestoreSessionStorage(archive: java.io.InputStream): Int
     suspend fun environmentInfo(): String
     suspend fun diagnosticReport(): String
     fun clearCredential()

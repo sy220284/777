@@ -29,6 +29,7 @@ import kotlinx.coroutines.runInterruptible
 internal class LocalAttachmentImporter(
     private val context: Context,
     private val workspace: LocalWorkspace,
+    private val onPublished: (LocalImportedAttachment) -> Unit = {},
 ) {
     suspend fun import(uri: Uri): LocalImportedAttachment {
         val resolver = context.contentResolver
@@ -158,7 +159,7 @@ internal class LocalAttachmentImporter(
         val target = File(dir, attachmentId + extension?.let { ".$it" }.orEmpty())
         commitImportedAttachmentFile(normalized.file, target)
 
-        return LocalImportedAttachment(
+        val published = LocalImportedAttachment(
             name = displayName ?: safeName,
             relativePath = target.relativeTo(File(workspace.path)).invariantSeparatorsPath,
             mediaType = mediaType,
@@ -167,6 +168,11 @@ internal class LocalAttachmentImporter(
             width = imageMetadata?.width,
             height = imageMetadata?.height,
         )
+        // Persist metadata after the content-addressed file is fully published.
+        // If the catalog is unavailable, report failure and keep the original file
+        // for safe retry; never delete shared content in a failed indexing pass.
+        onPublished(published)
+        return published
         } finally {
             incoming.delete()
             normalizedTemp?.takeIf { it != incoming }?.delete()

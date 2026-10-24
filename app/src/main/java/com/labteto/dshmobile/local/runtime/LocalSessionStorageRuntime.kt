@@ -149,7 +149,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     internal suspend fun compactStorage(): LocalSessionStorageStatus =
         withContext(Dispatchers.IO) { storageManager.compactAll() }
 
-    internal suspend fun stageRestoreStorage(archive: ByteArray): Int =
+    internal suspend fun stageRestoreStorage(archive: java.io.InputStream): Int =
         withContext(Dispatchers.IO) { storageManager.stageRestore(archive) }
 
     internal suspend fun exportStorage(output: OutputStream): Long =

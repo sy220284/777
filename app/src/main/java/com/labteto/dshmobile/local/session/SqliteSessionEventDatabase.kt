@@ -5,6 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.labteto.dshmobile.harness.session.SessionEvent
+import com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalog
 import java.util.UUID
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -22,7 +23,7 @@ class SqliteSessionEventDatabase(
     private val json: Json,
     name: String = "local_session_events_v1.db",
     private val clock: () -> Long = System::currentTimeMillis,
-) : SQLiteOpenHelper(context, name, null, 3) {
+) : SQLiteOpenHelper(context, name, null, 4) {
     init { setWriteAheadLoggingEnabled(true) }
 
     override fun onConfigure(db: SQLiteDatabase) {
@@ -51,30 +52,42 @@ class SqliteSessionEventDatabase(
         )
         createCheckpointTable(db)
         createVisibleEventIndex(db)
+        SqliteLocalAssetCatalog.createSchema(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        require(oldVersion in 1..2 && newVersion == 3) {
+        require(oldVersion in 1..3 && newVersion == 4) {
             "不支持的会话事件数据库版本：$oldVersion -> $newVersion"
         }
-        if (oldVersion == 1) createCheckpointTable(db)
-        // Upgrade existing draft databases once. New events compute the hint
-        // directly from their parsed JsonObject before the WAL transaction.
-        db.execSQL("ALTER TABLE session_events ADD COLUMN visible_hint INTEGER NOT NULL DEFAULT 0")
-        db.execSQL(
-            "UPDATE session_events SET visible_hint=1 WHERE " +
-                "event_type IN ('chat/active-transcript','work/active-transcript'," +
-                "'session/transcript-projection-baseline','session/transcript-migration-baseline') " +
-                "OR instr(payload, ?) > 0 OR " +
-                "(event_type='assistant/message' AND instr(payload, ?) > 0)",
-            arrayOf("\"transcript\":", "\"replaces\":"),
-        )
+        // Idempotent even if an older pilot schema omitted this table.
+        createCheckpointTable(db)
+
+        // Two unmerged draft schemas used version=3: one added visible_hint,
+        // the other introduced assets. Detect actual column presence instead
+        // of assuming the version number uniquely identifies those drafts.
+        val hasHint = db.rawQuery("PRAGMA table_info(session_events)", null).use { cursor ->
+            var found = false
+            while (cursor.moveToNext()) if (cursor.getString(1) == "visible_hint") found = true
+            found
+        }
+        if (!hasHint) {
+            db.execSQL("ALTER TABLE session_events ADD COLUMN visible_hint INTEGER NOT NULL DEFAULT 0")
+            db.execSQL(
+                "UPDATE session_events SET visible_hint=1 WHERE " +
+                    "event_type IN ('chat/active-transcript','work/active-transcript'," +
+                    "'session/transcript-projection-baseline','session/transcript-migration-baseline') " +
+                    "OR instr(payload, ?) > 0 OR " +
+                    "(event_type='assistant/message' AND instr(payload, ?) > 0)",
+                arrayOf("\"transcript\":", "\"replaces\":"),
+            )
+        }
         createVisibleEventIndex(db)
+        SqliteLocalAssetCatalog.createSchema(db)
     }
 
     private fun createVisibleEventIndex(db: SQLiteDatabase) {
         db.execSQL(
-            "CREATE INDEX session_events_visible_recent " +
+            "CREATE INDEX IF NOT EXISTS session_events_visible_recent " +
                 "ON session_events(session_id,visible_hint,sequence DESC)"
         )
     }
@@ -153,6 +166,9 @@ class SqliteSessionEventDatabase(
                     put("payload", payload.toString())
                     put("visible_hint", if (isVisibleTranscriptCandidate(type, payload)) 1 else 0)
                 })
+                SqliteLocalAssetCatalog.indexCommittedMessageAssets(
+                    database, sessionId, sequence, type, payload,
+                )
                 SessionEvent(sequence, type, createdAt, payload)
             }
             database.setTransactionSuccessful()
@@ -163,12 +179,6 @@ class SqliteSessionEventDatabase(
         } finally { mutation.unlock() }
     }
 
-    /**
-     * One-time, atomic adoption of an older file EventLog. Historical sequence numbers
-     * and timestamps are preserved: checkpoint cursors must not move during migration.
-     * The marker shares the same transaction, so process death can only leave none
-     * or a complete import. Never merge unrelated live SQL history under the same ID.
-     */
     /**
      * Completion is stored in the Event database, not a detached preference file.
      * Deleted sessions must never be resurrected from retained legacy source files,

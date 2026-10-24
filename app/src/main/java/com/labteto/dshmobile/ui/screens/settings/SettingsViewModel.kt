@@ -352,20 +352,9 @@ class SettingsViewModel @Inject constructor(
 
     /** Validates the archive in the existing Session owner; staging never overwrites live chats. */
     suspend fun importLocalSessionStorage(uri: Uri): Int = withContext(Dispatchers.IO) {
-        val archive = appContext.contentResolver.openInputStream(uri)?.use { input ->
-            val output = java.io.ByteArrayOutputStream()
-            val chunk = ByteArray(16 * 1024)
-            var count = 0L
-            while (true) {
-                val n = input.read(chunk)
-                if (n < 0) break
-                count += n
-                require(count <= 64L * 1024L * 1024L) { "会话备份不能超过 64 MiB" }
-                output.write(chunk, 0, n)
-            }
-            output.toByteArray()
+        appContext.contentResolver.openInputStream(uri)?.use { input ->
+            localHarness.stageRestoreSessionStorage(input)
         } ?: error("无法读取会话备份")
-        localHarness.stageRestoreSessionStorage(archive)
     }
 
     suspend fun environmentInfo(): String = localHarness.environmentInfo()

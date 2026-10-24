@@ -4,6 +4,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
 import java.util.UUID
@@ -34,6 +35,7 @@ internal class SqliteSessionStorageManager(
     private val pendingRoot get() = File(context.filesDir, "local-harness/.sqlite-restore-pending-$restoreKey")
     private val snapshotFile get() = context.getDatabasePath(snapshotDatabaseName)
     private val eventFile get() = context.getDatabasePath(eventDatabaseName)
+    private val mediaBackup get() = SqliteSessionMediaArchive(context)
 
     fun status(): LocalSessionStorageStatus {
         val files = listOf(snapshotFile, eventFile).flatMap { source ->
@@ -97,6 +99,7 @@ internal class SqliteSessionStorageManager(
             }
             validateSnapshotEventCursors(snapshotCopy, eventCopy)
             var written = 0L
+            // ZIP bytes stream to the destination; no whole-archive memory buffer.
             ZipOutputStream(output.buffered()).use { zip ->
                 listOf(snapshotCopy, eventCopy).forEach { source ->
                     zip.putNextEntry(ZipEntry(source.name))
@@ -104,6 +107,10 @@ internal class SqliteSessionStorageManager(
                         written += input.copyTo(zip)
                     }
                     zip.closeEntry()
+                }
+                written += mediaBackup.export(zip, eventCopy)
+                check(written <= MAX_UNPACKED_BYTES) {
+                    "完整 SQLite 媒体备份解压体积超过当前恢复上限"
                 }
             }
             return written
@@ -119,9 +126,15 @@ internal class SqliteSessionStorageManager(
         validateDatabase(destination)
     }
 
-    @Synchronized
+    /** Compatibility entry for existing in-memory tests and callers. */
     fun stageRestore(archive: ByteArray): Int {
         require(archive.isNotEmpty() && archive.size <= MAX_ZIP_BYTES) { "SQLite 备份压缩包为空或超限" }
+        return stageRestore(ByteArrayInputStream(archive))
+    }
+
+    /** Stage SAF/file backups directly from a stream, independent of ZIP size. */
+    @Synchronized
+    fun stageRestore(archive: InputStream): Int {
         require(!pendingRoot.exists()) { "已有待恢复数据，请重启应用处理" }
         check(snapshots.readSummaries().isEmpty() && restorableEmptyEditor(events.readableDatabase)) {
             "为防止覆盖现有会话，SQLite 备份目前只允许恢复到空会话库"
@@ -131,13 +144,22 @@ internal class SqliteSessionStorageManager(
         try {
             val names = linkedSetOf<String>()
             var bytes = 0L
-            ZipInputStream(ByteArrayInputStream(archive)).use { zip ->
+            var lastFreeSpaceCheck = 0L
+            ZipInputStream(archive).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
+                    val mediaEntry = entry.name.startsWith(SqliteSessionMediaArchive.MEDIA_PREFIX) &&
+                        SqliteSessionMediaArchive.validFilename(
+                            entry.name.removePrefix(SqliteSessionMediaArchive.MEDIA_PREFIX))
                     require(!entry.isDirectory &&
-                        (entry.name == SNAPSHOT_ENTRY || entry.name == EVENT_ENTRY) &&
+                        (entry.name == SNAPSHOT_ENTRY || entry.name == EVENT_ENTRY ||
+                            entry.name == SqliteSessionMediaArchive.MANIFEST_ENTRY || mediaEntry) &&
                         names.add(entry.name)) { "SQLite 备份含未知或重复文件" }
-                    val target = File(staging, entry.name)
+                    val target = if (mediaEntry) File(
+                        staging, SqliteSessionMediaArchive.STAGED_MEDIA_DIR + "/" +
+                            entry.name.removePrefix(SqliteSessionMediaArchive.MEDIA_PREFIX),
+                    ) else File(staging, entry.name)
+                    target.parentFile?.mkdirs()
                     target.outputStream().buffered().use { out ->
                         val buffer = ByteArray(32 * 1024)
                         while (true) {
@@ -145,22 +167,36 @@ internal class SqliteSessionStorageManager(
                             if (n < 0) break
                             bytes += n
                             require(bytes <= MAX_UNPACKED_BYTES) { "SQLite 备份解压数据超限" }
+                            // Large stream imports must leave room for SQLite recovery and app activity.
+                            if (bytes - lastFreeSpaceCheck >= 8L * 1024L * 1024L) {
+                                check(staging.usableSpace > 64L * 1024L * 1024L) {
+                                    "本机空闲空间不足，无法安全恢复完整媒体备份"
+                                }
+                                lastFreeSpaceCheck = bytes
+                            }
                             out.write(buffer, 0, n)
                         }
                     }
                     zip.closeEntry()
-                    validateDatabase(target)
+                    if (entry.name == SNAPSHOT_ENTRY || entry.name == EVENT_ENTRY)
+                        validateDatabase(target)
                 }
             }
-            require(names == setOf(SNAPSHOT_ENTRY, EVENT_ENTRY)) {
+            require(SNAPSHOT_ENTRY in names && EVENT_ENTRY in names) {
                 "SQLite 备份缺少快照数据库或事件数据库"
             }
+            // The legacy two-DB-only archive is incomplete when it contains
+            // image references; never silently treat that as a full media restore.
+            require(SqliteSessionMediaArchive.MANIFEST_ENTRY in names) {
+                "旧 SQLite 备份不含图片原文件；请导出完整媒体备份"
+            }
+            mediaBackup.validateStaged(staging, names)
             validateTables(File(staging, SNAPSHOT_ENTRY), "session_snapshots")
             validateTables(File(staging, EVENT_ENTRY), "session_events")
             validateSnapshotEventCursors(
                 File(staging, SNAPSHOT_ENTRY), File(staging, EVENT_ENTRY),
             )
-            File(staging, "READY").writeText("sqlite-v1")
+            File(staging, "READY").writeText("sqlite-v2-media")
             check(staging.renameTo(pendingRoot)) { "SQLite 备份无法提交恢复计划" }
             return countRows(File(pendingRoot, SNAPSHOT_ENTRY), "session_snapshots")
         } finally {
@@ -176,7 +212,7 @@ internal class SqliteSessionStorageManager(
     fun applyPendingRestore(): Int {
         val ready = File(pendingRoot, "READY")
         if (!ready.isFile) return 0
-        check(ready.readText() == "sqlite-v1") { "未知的 SQLite 恢复版本" }
+        check(ready.readText() == "sqlite-v2-media") { "未知的 SQLite 恢复版本" }
         val sources = listOf(
             File(pendingRoot, SNAPSHOT_ENTRY) to snapshotFile,
             File(pendingRoot, EVENT_ENTRY) to eventFile,
@@ -194,6 +230,17 @@ internal class SqliteSessionStorageManager(
                 }
             }
         }
+        val mediaNames = buildSet {
+            add(SNAPSHOT_ENTRY)
+            add(EVENT_ENTRY)
+            add(SqliteSessionMediaArchive.MANIFEST_ENTRY)
+            File(pendingRoot, SqliteSessionMediaArchive.STAGED_MEDIA_DIR)
+                .listFiles().orEmpty().forEach { add(SqliteSessionMediaArchive.MEDIA_PREFIX + it.name) }
+        }
+        mediaBackup.validateStaged(pendingRoot, mediaNames)
+        // Install and hash-verify all attachments before committing a SQLite DB
+        // that may reference them. Retrying after process death is idempotent.
+        mediaBackup.installStaged(pendingRoot)
         sources.forEach { (src, dst) ->
             if (dst.exists() && sameBytes(src, dst)) return@forEach
             dst.parentFile?.mkdirs()
@@ -272,6 +319,14 @@ internal class SqliteSessionStorageManager(
                 if (rows.moveToFirst()) rows.getInt(0) else 0
             }
         }
+
+    private fun hasRegisteredAssets(db: SQLiteDatabase): Boolean {
+        val exists = db.rawQuery(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='local_assets'", null,
+        ).use { it.moveToFirst() }
+        if (!exists) return false
+        return db.rawQuery("SELECT 1 FROM local_assets LIMIT 1", null).use { it.moveToFirst() }
+    }
 
     private fun settleStoppedWal(file: File) {
         if (!File(file.path + "-wal").exists() && !File(file.path + "-shm").exists()) return
@@ -359,6 +414,7 @@ internal class SqliteSessionStorageManager(
         const val SNAPSHOT_ENTRY = "snapshot.sqlite"
         const val EVENT_ENTRY = "events.sqlite"
         const val MAX_ZIP_BYTES = 128 * 1024 * 1024
-        const val MAX_UNPACKED_BYTES = 512L * 1024L * 1024L
+        // Bounded for malformed ZIP protection; streaming avoids RAM proportional to archive size.
+        const val MAX_UNPACKED_BYTES = 64L * 1024L * 1024L * 1024L
     }
 }
