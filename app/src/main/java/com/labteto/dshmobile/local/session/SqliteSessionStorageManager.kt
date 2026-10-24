@@ -341,10 +341,10 @@ internal class SqliteSessionStorageManager(
             add(SNAPSHOT_ENTRY)
             add(EVENT_ENTRY)
             add(SqliteSessionMediaArchive.MANIFEST_ENTRY)
+            if (File(pendingRoot, SCOPE_ENTRY).isFile) add(SCOPE_ENTRY)
             File(pendingRoot, SqliteSessionMediaArchive.STAGED_MEDIA_DIR)
                 .listFiles().orEmpty().forEach { add(SqliteSessionMediaArchive.MEDIA_PREFIX + it.name) }
         }
-        if (File(pendingRoot, SCOPE_ENTRY).isFile) mediaNames += SCOPE_ENTRY
         validateArchiveScope(pendingRoot, mediaNames)
         mediaBackup.validateStaged(pendingRoot, mediaNames)
         // Durable fence: never allow UI cancellation after any installed media/DB bytes.
