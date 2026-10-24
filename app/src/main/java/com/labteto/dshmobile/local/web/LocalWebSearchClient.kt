@@ -9,6 +9,7 @@ import java.net.URI
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -33,6 +34,8 @@ internal class LocalWebSearchClient(
         @Suppress("UNUSED_PARAMETER") usageContext: TokenUsageContext? = null,
         count: Int = 10,
         needContent: Boolean = false,
+        oriQuestion: String? = null,
+        localization: String? = null,
     ): String = withContext(Dispatchers.IO) {
         require(count in 1..50) { "DeepSeek 搜索结果数量必须为 1～50" }
         val clean = queries.map(String::trim).filter(String::isNotBlank).distinct().take(4)
@@ -45,12 +48,20 @@ internal class LocalWebSearchClient(
                 put("query", normalized)
                 put("count", count)
                 put("need_content", needContent)
+                oriQuestion?.trim()?.takeIf(String::isNotBlank)?.let { original ->
+                    require(original.codePointCount(0, original.length) <= 128) {
+                        "用户原始问题 ori_question 超出官方 128 字符限制"
+                    }
+                    put("ori_question", original)
+                }
+                localization?.trim()?.takeIf(String::isNotBlank)?.let { put("localization", it) }
             }
             val result = postJson(apiKey, SEARCH_ENDPOINT, payload)
             val rows = result["results"] as? JsonArray
                 ?: throw LocalWebException("INVALID_RESPONSE", "DeepSeek Search 缺少 results 数组")
             if (rows.isNotEmpty()) onBillableResult("search")
-            formatDeepSeekSearch(normalized, result, needContent)
+            val rendered = formatDeepSeekSearch(normalized, result, needContent)
+            if (normalized == query) rendered else "搜索词超过 DeepSeek 128 字符限制，已截取前 128 字符。\n" + rendered
         }.joinToString("\n\n")
     }
 
@@ -76,57 +87,71 @@ internal class LocalWebSearchClient(
         )
     }
 
-    private suspend fun postJson(apiKey: String, endpoint: String, payload: JsonObject, timeoutSeconds: Long = 45L): JsonObject {
+    private suspend fun postJson(
+        apiKey: String,
+        endpoint: String,
+        payload: JsonObject,
+        timeoutSeconds: Long = 45L,
+    ): JsonObject {
         val request = Request.Builder()
             .url(endpoint)
             .header("Authorization", "Bearer " + apiKey)
             .header("User-Agent", LOCAL_WEB_USER_AGENT)
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
-        return try {
-            withCancellableHttpResponse(http.newBuilder()
-                .callTimeout(timeoutSeconds.coerceIn(15L, 900L), java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(timeoutSeconds.coerceIn(15L, 900L), java.util.concurrent.TimeUnit.SECONDS)
-                .build().newCall(request)) { response ->
-                val bounded = response.body?.byteStream()?.use {
-                    readBoundedWebBody(it, LOCAL_WEB_MAX_RESPONSE_BYTES)
-                } ?: throw LocalWebException("INVALID_RESPONSE", "DeepSeek 未返回 JSON 数据")
-                if (bounded.truncated) {
-                    throw LocalWebException("RESPONSE_TOO_LARGE", "DeepSeek 搜索/抓取响应超过大小上限")
-                }
-                if (!response.isSuccessful) {
-                    val code = when (response.code) {
-                        401 -> "AUTH_FAILED"
-                        402 -> "INSUFFICIENT_BALANCE"
-                        408 -> "TIMEOUT"
-                        429 -> "RATE_LIMITED"
-                        403 -> "ACCESS_DENIED"
-                        404 -> "NOT_FOUND"
-                        413 -> "REQUEST_TOO_LARGE"
-                        in 400..499 -> "HTTP_4XX"
-                        else -> "HTTP_5XX"
+        val timeout = timeoutSeconds.coerceIn(15L, 900L)
+        val client = http.newBuilder()
+            .callTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        var attempt = 0
+        while (true) {
+            try {
+                return withCancellableHttpResponse(client.newCall(request)) { response ->
+                    val bounded = response.body?.byteStream()?.use {
+                        readBoundedWebBody(it, LOCAL_WEB_MAX_RESPONSE_BYTES)
+                    } ?: throw LocalWebException("INVALID_RESPONSE", "DeepSeek 未返回 JSON 数据")
+                    if (bounded.truncated) {
+                        throw LocalWebException("RESPONSE_TOO_LARGE", "DeepSeek 搜索/抓取响应超过大小上限")
                     }
-                    throw LocalWebException(code, "DeepSeek " +
-                        (if (endpoint == SEARCH_ENDPOINT) "Search" else "Fetch") +
-                        " 返回 HTTP " + response.code)
+                    if (!response.isSuccessful) {
+                        val code = when (response.code) {
+                            401 -> "AUTH_FAILED"
+                            402 -> "INSUFFICIENT_BALANCE"
+                            403 -> "ACCESS_DENIED"
+                            404 -> "NOT_FOUND"
+                            408 -> "TIMEOUT"
+                            413 -> "REQUEST_TOO_LARGE"
+                            429 -> "RATE_LIMITED"
+                            in 400..499 -> "HTTP_4XX"
+                            else -> "HTTP_5XX"
+                        }
+                        throw LocalWebException(code, "DeepSeek " +
+                            (if (endpoint == SEARCH_ENDPOINT) "Search" else "Fetch") +
+                            " 返回 HTTP " + response.code)
+                    }
+                    try {
+                        json.parseToJsonElement(bounded.bytes.toString(Charsets.UTF_8)) as? JsonObject
+                            ?: throw LocalWebException("INVALID_RESPONSE", "DeepSeek 响应不是 JSON 对象")
+                    } catch (error: LocalWebException) {
+                        throw error
+                    } catch (error: Exception) {
+                        throw LocalWebException("INVALID_RESPONSE", "DeepSeek 响应不是有效的 JSON", error)
+                    }
                 }
-                try {
-                    json.parseToJsonElement(bounded.bytes.toString(Charsets.UTF_8)) as? JsonObject
-                        ?: throw LocalWebException("INVALID_RESPONSE", "DeepSeek 响应不是 JSON 对象")
-                } catch (error: LocalWebException) {
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: LocalWebException) {
+                if (error.code !in setOf("TIMEOUT", "RATE_LIMITED", "HTTP_5XX") || attempt >= 2) {
                     throw error
-                } catch (error: Exception) {
-                    throw LocalWebException("INVALID_RESPONSE", "DeepSeek 响应不是有效的 JSON", error)
                 }
+                attempt += 1
+                delay(attempt * 400L)
+            } catch (error: SocketTimeoutException) {
+                throw LocalWebException("TIMEOUT", "DeepSeek 搜索/抓取超时", error)
+            } catch (error: java.io.IOException) {
+                throw LocalWebException("NETWORK_ERROR", "DeepSeek 搜索/抓取网络异常：" + error.message, error)
             }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: LocalWebException) {
-            throw error
-        } catch (error: SocketTimeoutException) {
-            throw LocalWebException("TIMEOUT", "DeepSeek 搜索/抓取超时", error)
-        } catch (error: java.io.IOException) {
-            throw LocalWebException("NETWORK_ERROR", "DeepSeek 搜索/抓取网络异常：" + error.message, error)
         }
     }
 
