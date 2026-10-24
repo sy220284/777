@@ -475,6 +475,9 @@ internal class LocalAgentTeamRuntime(
                 id = args.requiredTeamString("task_id"),
                 includeDeleted = true,
             )
+            "team_task_evidence" -> renderTaskCompletionEvidence(
+                binding.sessionId, args.requiredTeamString("task_id"),
+            )
             "team_task_list" -> renderTasks(binding.sessionId)
             "team_task_update" -> updateTask(
                 sessionId = binding.sessionId,
@@ -1737,6 +1740,63 @@ internal class LocalAgentTeamRuntime(
                 append("\nerror=")
                 append(it)
             }
+        }
+    }
+
+    /**
+     * Recheck the persisted proof pointer from the original Session EventLog.
+     * This validates event provenance and freshness, not artifact content or Goal correctness.
+     */
+    private fun renderTaskCompletionEvidence(sessionId: String, taskId: String): String {
+        val state = project(sessionId)
+        require(state.failure == null) { "TEAM_PROJECTION_INVALID" }
+        val task = state.tasks.singleOrNull { it.id == taskId }
+            ?: error("TEAM_TASK_NOT_FOUND")
+        require(task.status == LocalTeamTaskStatus.COMPLETED) {
+            "TEAM_TASK_EVIDENCE_NOT_COMPLETED"
+        }
+        val resultId = task.completionResultId
+        val seq = task.completionEvidenceSequence
+        if (resultId == null || seq == null) {
+            return "task_id=$taskId\nevidence_state=legacy_unknown" +
+                "\ncontent_verified=false\ngoal_accepted=false"
+        }
+        val log = eventLogFor(sessionId)
+        val member = state.members.singleOrNull { it.id == task.ownerId }
+        val candidate = log.pageBeforeNewestFirst(
+            sequenceExclusive = if (seq == Long.MAX_VALUE) Long.MAX_VALUE else seq + 1L,
+            limit = 1,
+        ).singleOrNull()
+        val checkpointValid = candidate?.let { event ->
+            event.sequence == seq &&
+                event.type == LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT &&
+                event.data["background_job_id"]?.jsonPrimitive?.contentOrNull == member?.jobId &&
+                resultIdentity(event.data) == resultId &&
+                !event.data["terminal_output"]?.jsonPrimitive?.contentOrNull.isNullOrBlank() &&
+                isFirstResultCheckpoint(log, event)
+        } == true
+        val priorOwnedTask = if (checkpointValid) log.latestMatching(
+            setOf(TEAM_TASK_EVENT), seq,
+        ) { data ->
+            (data["task"] as? JsonObject)?.let { raw ->
+                raw["id"]?.jsonPrimitive?.contentOrNull == taskId &&
+                    raw["status"]?.jsonPrimitive?.contentOrNull == "in_progress" &&
+                    raw["ownerId"]?.jsonPrimitive?.contentOrNull == task.ownerId
+            } == true
+        } else null
+        val bindingValid = checkpointValid && priorOwnedTask != null &&
+            priorOwnedTask.sequence < seq
+        val rootCurrent = task.rootUserRevision?.let {
+            it == workflowUserRevision(log)
+        }
+        return buildString {
+            append("task_id=").append(taskId)
+            append("\nresult_id=").append(resultId)
+            append("\nevidence_sequence=").append(seq)
+            append("\ncheckpoint_binding_valid=").append(bindingValid)
+            append("\nowner_job=").append(member?.jobId ?: "missing")
+            append("\nroot_instruction_current=").append(rootCurrent ?: "legacy_unknown")
+            append("\ncontent_verified=false\nindependent_reviewed=false\ngoal_accepted=false")
         }
     }
 
