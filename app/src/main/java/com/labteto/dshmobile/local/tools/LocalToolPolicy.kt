@@ -118,7 +118,7 @@ internal object LocalToolPolicy {
         "environment_info", "capability_search", "get_goal", "skill", "extension_inspect", "list_subagent_models", "list_agents", "agent_tree", "agent_tree",
         "session_event_search", "session_search", "memory_search", "memory_list",
         "session_trace", "session_event_trace", "session_event_read",
-        "team_members", "team_member_status", "team_messages", "team_wait_for_message",
+        "team_members", "team_member_status", "team_messages", "team_message_receipt", "team_wait_for_message",
         "team_task_get", "team_task_list", "team_wait" -> ToolAccess.READ_ONLY
         else -> error("内置工具尚未声明权限：$name")
     }
@@ -186,7 +186,7 @@ internal object LocalToolPolicy {
             "agent_tree" -> setOf("代理树", "主子代理关系", "运行拓扑", "agent tree", "agent lineage")
             "workflow" -> setOf("工作流", "workflow", "流水线", "pipeline", "并行任务")
             "team_members", "team_member_status", "team_create_member", "team_start_member",
-            "team_spawn", "team_send_message", "team_messages", "team_wait_for_message",
+            "team_spawn", "team_send_message", "team_messages", "team_message_receipt", "team_wait_for_message",
             "team_task_create", "team_task_get", "team_task_list", "team_task_update",
             "team_interrupt", "team_disable_member", "team_dismiss_member", "team_stop_all",
             "team_wait" -> setOf(

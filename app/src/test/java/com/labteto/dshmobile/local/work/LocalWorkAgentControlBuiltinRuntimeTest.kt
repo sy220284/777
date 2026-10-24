@@ -25,6 +25,7 @@ class LocalWorkAgentControlBuiltinRuntimeTest {
                 "team_spawn",
                 "team_send_message",
                 "team_messages",
+                "team_message_receipt",
                 "team_wait_for_message",
                 "team_task_create",
                 "team_task_get",

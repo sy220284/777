@@ -45,6 +45,13 @@ class LocalToolPolicyTest {
         }
     }
 
+    @Test fun teamMessageReceiptHasReadOnlyOptionalPolicy() {
+        assertEquals(ToolAccess.READ_ONLY, LocalToolPolicy.access("team_message_receipt"))
+        assertEquals(ToolExposure.OPTIONAL, LocalToolPolicy.exposure("team_message_receipt"))
+        assertEquals(ToolApprovalPolicy.NEVER, LocalToolPolicy.approval("team_message_receipt"))
+        assertEquals(LocalAutoApprovalScope.READ_ONLY, LocalToolPolicy.autoApprovalScope("team_message_receipt"))
+    }
+
     @Test fun mediaToolsHaveExplicitBillingAndReadOnlyBoundaries() {
         assertEquals(ToolAccess.PRIVILEGED, LocalToolPolicy.access("media_image_create"))
         assertEquals(ToolApprovalPolicy.ALWAYS, LocalToolPolicy.approval("media_image_create"))
