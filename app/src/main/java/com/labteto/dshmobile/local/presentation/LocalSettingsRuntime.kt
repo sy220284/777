@@ -86,7 +86,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     override suspend fun sessionStorageStatus(): LocalSessionStorageStatus = sessionStorage.storageStatus()
     override suspend fun compactSessionStorage(): LocalSessionStorageStatus = sessionStorage.compactStorage()
     override suspend fun exportSessionStorage(output: OutputStream) = sessionStorage.exportStorage(output)
-    override suspend fun stageRestoreSessionStorage(archive: ByteArray) =
+    override suspend fun stageRestoreSessionStorage(archive: java.io.InputStream) =
         sessionStorage.stageRestoreStorage(archive)
     override suspend fun environmentInfo() = diagnostics.environmentInfo()
     override suspend fun diagnosticReport() = diagnostics.diagnosticReport()
