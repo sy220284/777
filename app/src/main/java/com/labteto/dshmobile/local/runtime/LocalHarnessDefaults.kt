@@ -48,7 +48,7 @@ internal val SUBAGENT_EXCLUDED_TOOLS = setOf(
     "list_agents", "agent_tree", "agent_inspect", "agent_watch", "agent_resume", "agent_close", "send_message", "interrupt_agent", "list_subagent_models",
     "team_members", "team_member_status", "team_create_member", "team_start_member",
     "team_spawn", "team_send_message", "team_request_shutdown", "team_messages", "team_message_receipt", "team_wait_for_message",
-    "team_task_create", "team_task_get", "team_task_list", "team_task_update",
+    "team_task_create", "team_task_get", "team_task_list", "team_task_evidence", "team_task_update",
     "team_interrupt", "team_disable_member", "team_dismiss_member", "team_stop_all", "team_wait",
     "schedule_task", "schedule_recurring_task", "cancel_scheduled_task",
     "webhook_start", "webhook_stop", "webhook_copy_token", "webhook_rotate_token",
