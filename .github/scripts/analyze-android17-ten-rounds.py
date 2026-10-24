@@ -8,7 +8,8 @@ from pathlib import Path
 
 FIELDS = ("round", "scenario", "api", "samples", "p50_ms", "p95_ms", "max_ms",
           "refresh_hz", "observed_fps_p50", "jank_pct", "peak_pss_kib",
-          "peak_java_used_kib", "sample_quality", "valid_vsync_intervals",
+          "peak_java_used_kib", "sample_pss_kib", "sample_java_used_kib",
+          "sample_quality", "valid_vsync_intervals",
           "max_visible_index")
 EXPECTED = {
     "work_2000_events_cold_projection",
@@ -44,6 +45,15 @@ def parse(path, round_number, api):
             for field in ("samples", "p50_ms", "p95_ms"):
                 if field not in row:
                     raise ValueError(f"round {round_number}: missing {field} in {scenario}")
+            if scenario in {
+                "work_2000_events_cold_projection",
+                "work_2000_events_incremental_projection",
+                "chat_10000_tool_rows_timeline_materialization",
+            }:
+                for field in ("sample_pss_kib", "sample_java_used_kib"):
+                    if int(row.get(field, "0")) <= 0:
+                        raise ValueError(
+                            f"round {round_number}: missing/invalid {field} in {scenario}")
             continue
         quality = row.get("sample_quality")
         frames = int(row.get("samples", -1))
@@ -131,6 +141,14 @@ def main():
             by_scenario[scenario] = {
                 field: summarize(subset, field) for field in ("p50_ms", "p95_ms")
             }
+            if scenario in {
+                "work_2000_events_cold_projection",
+                "work_2000_events_incremental_projection",
+                "chat_10000_tool_rows_timeline_materialization",
+            }:
+                by_scenario[scenario]["sample_pss_kib"] = summarize(subset, "sample_pss_kib")
+                by_scenario[scenario]["sample_java_used_kib"] = summarize(
+                    subset, "sample_java_used_kib")
             metric = by_scenario[scenario]["p50_ms"]
             unit = "ms"
         cv = f"{metric['cv_percent']:.2f}%" if metric["cv_percent"] is not None else "—"
@@ -141,6 +159,22 @@ def main():
             f"{metric['min']:.3f}–{metric['max']:.3f} {unit} | {cv} | {change_label} |"
         )
 
+    table.extend([
+        "",
+        "### Work/Chat 运行结束时内存快照（10 轮中位数；非峰值）",
+        "| 场景 | 进程 PSS KiB | Java 堆占用 KiB |",
+        "| --- | ---: | ---: |",
+    ])
+    for scenario in (
+        "work_2000_events_cold_projection",
+        "work_2000_events_incremental_projection",
+        "chat_10000_tool_rows_timeline_materialization",
+    ):
+        memory = by_scenario[scenario]
+        table.append(
+            f"| {scenario} | {memory['sample_pss_kib']['median']:.0f} "
+            f"| {memory['sample_java_used_kib']['median']:.0f} |"
+        )
     scroll = by_scenario["work_timeline_scroll_frames"]
     summary = {
         "android_api": api,
