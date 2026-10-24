@@ -1512,8 +1512,7 @@ internal class LocalAgentTeamRuntime(
                     require(current.status == LocalTeamTaskStatus.IN_PROGRESS) {
                         "TEAM_TASK_STATUS_INVALID：只有 in_progress 任务可以 release"
                     }
-                    next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null, autoDispatchMessageId = null,
-                        rootUserRevision = null)
+                    next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null, autoDispatchMessageId = null)
                 }
                 "complete" -> {
                     require(current.status == LocalTeamTaskStatus.IN_PROGRESS) {
