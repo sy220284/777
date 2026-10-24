@@ -120,8 +120,7 @@ internal class SqliteSessionStorageManager(
     @Synchronized
     fun stageRestore(archive: InputStream): Int {
         require(!pendingRoot.exists()) { "已有待恢复数据，请重启应用处理" }
-        check(snapshots.readSummaries().isEmpty() && events.sessionCount() == 0 &&
-            !hasRegisteredAssets(events.readableDatabase)) {
+        check(snapshots.readSummaries().isEmpty() && restorableEmptyEditor(events.readableDatabase)) {
             "为防止覆盖现有会话，SQLite 备份目前只允许恢复到空会话库"
         }
         val staging = File(context.filesDir, "local-harness/.sqlite-restore-${UUID.randomUUID()}")
@@ -332,6 +331,26 @@ internal class SqliteSessionStorageManager(
         }
     }
 
+    /**
+     * A deleted final Session can leave an unstarted editor's model-selection
+     * event and orphan asset catalog rows. Those are not conversation facts.
+     * Keep every original media file: physical GC remains disabled.
+     */
+    private fun restorableEmptyEditor(db: SQLiteDatabase): Boolean {
+        val onlySelection = db.rawQuery(
+            "SELECT 1 FROM session_events WHERE event_type != ? LIMIT 1",
+            arrayOf(com.labteto.dshmobile.local.model.LOCAL_SESSION_MODEL_SELECTION_EVENT),
+        ).use { !it.moveToFirst() }
+        if (!onlySelection) return false
+        val referencesPresent = db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='local_asset_references'",
+            null,
+        ).use { it.moveToFirst() }
+        return !referencesPresent || db.rawQuery(
+            "SELECT 1 FROM local_asset_references LIMIT 1", null,
+        ).use { !it.moveToFirst() }
+    }
+
     private fun isEmptyDatabase(file: File): Boolean {
         if (!file.exists()) return true
         // Only a recognized, genuinely empty session database may be replaced.
@@ -349,8 +368,8 @@ internal class SqliteSessionStorageManager(
                 ).use { exists ->
                     if (!exists.moveToFirst()) false else {
                         db.rawQuery("SELECT 1 FROM $requiredTable LIMIT 1", null).use { rows ->
-                            !rows.moveToFirst() &&
-                                (requiredTable != "session_events" || !hasRegisteredAssets(db))
+                            !rows.moveToFirst() ||
+                                (requiredTable == "session_events" && restorableEmptyEditor(db))
                         }
                     }
                 }
