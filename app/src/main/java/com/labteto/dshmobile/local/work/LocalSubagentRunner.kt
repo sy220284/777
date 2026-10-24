@@ -39,6 +39,7 @@ import com.labteto.dshmobile.local.agent.filterLocalSubagentSchemas
 import com.labteto.dshmobile.local.agent.LocalSubagentResult
 import com.labteto.dshmobile.local.agent.LocalSubagentStatus
 import com.labteto.dshmobile.local.agent.LocalSubagentToolCallPolicy
+import com.labteto.dshmobile.local.agent.LocalRecursiveReadOnlyToolScope
 import com.labteto.dshmobile.local.agent.LocalStructuredSubagentOutputException
 import com.labteto.dshmobile.local.agent.validateLocalStructuredSubagentOutput
 import com.labteto.dshmobile.local.agent.buildLocalSubagentInitialHistory
@@ -324,7 +325,10 @@ internal class LocalSubagentRunner(
             val team = if (capabilities.teamManaged && backgroundJobId != null)
                 teamSchemas?.invoke().orEmpty() else emptyList()
             val nested = if (canDelegateNested) nestedReadonlySchemas?.invoke().orEmpty() else emptyList()
-            return JsonArray(normal + team + nested)
+            return LocalRecursiveReadOnlyToolScope.visibleSchemas(
+                JsonArray(normal + team + nested),
+                capabilities,
+            )
         }
         val initialToolSchemas = executionSchemas(
             allowMutation,
@@ -636,7 +640,8 @@ internal class LocalSubagentRunner(
                 tools = AgentToolExecutor { call ->
                     executionFence()
                     currentCoroutineContext().ensureActive()
-                    toolCallPolicy.rejection(call)
+                    LocalRecursiveReadOnlyToolScope.rejection(call.name, capabilities)
+                        ?: toolCallPolicy.rejection(call)
                         ?: if (capabilities.teamManaged && call.name == "capability_search") {
                             AgentToolResult(
                                 content = "额外的 MCP、LSP、GitHub 等扩展由主代理评估并显式授权；请向主代理申请所需工具。",
