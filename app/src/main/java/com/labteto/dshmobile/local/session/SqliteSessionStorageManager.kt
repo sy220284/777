@@ -108,6 +108,9 @@ internal class SqliteSessionStorageManager(
                     zip.closeEntry()
                 }
                 written += mediaBackup.export(zip, eventCopy)
+                check(written <= MAX_UNPACKED_BYTES) {
+                    "完整 SQLite 媒体备份解压体积超过当前恢复上限"
+                }
             }
             return written
         } finally {
