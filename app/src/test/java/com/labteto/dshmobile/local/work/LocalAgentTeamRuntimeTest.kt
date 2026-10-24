@@ -88,6 +88,15 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(f.runtime.project("lead-address").deliveredMessageIds, cold.project("lead-address").deliveredMessageIds)
     }
 
+    @Test fun memberOnlyShutdownResponseIsRoutedToAuthenticatedTeamRuntime() {
+        assertTrue("team_respond_shutdown" in LocalAgentTeamContract.MEMBER_TOOL_NAMES)
+        assertTrue(LocalAgentTeamContract.isTeamChildControlCall("team_respond_shutdown"))
+        assertTrue(LocalAgentTeamContract.isTeamChildControlCall("team_send_message"))
+        assertTrue(LocalAgentTeamContract.isTeamChildControlCall("team_request_shutdown"))
+        assertTrue(!LocalAgentTeamContract.isTeamChildControlCall("read"))
+        assertTrue("team_respond_shutdown" !in LocalAgentTeamContract.TOOL_NAMES)
+    }
+
     @Test
     fun shutdownRequestThroughRealLeadToolIsAuthenticatedAndNeverImplicitlyDismissesMember() = runBlocking {
         val session = "typed-shutdown-admission"
