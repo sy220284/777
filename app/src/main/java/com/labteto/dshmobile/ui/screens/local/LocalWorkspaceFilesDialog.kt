@@ -309,6 +309,23 @@ internal fun LocalWorkspaceFilesDialog(
                     )
                 }
 
+                // Work owns the report contents; the existing Workspace file UI only opens
+                // their human-readable projection, without obtaining a second fact owner.
+                if (preview == null && mode == LocalFilesMode.WORKSPACE &&
+                    workspace.any { it.path == "自我改进/00-自我改进总览.md" }) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        SyButton(
+                            text = stringResource(R.string.local_improvement_archive),
+                            onClick = { scope.launch { openPreview("自我改进/00-自我改进总览.md") } },
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                        )
+                    }
+                }
+
                 if (preview == null) SySearchField(query, { query = it },
                     placeholder = stringResource(R.string.fluid_files_search),
                     modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd))

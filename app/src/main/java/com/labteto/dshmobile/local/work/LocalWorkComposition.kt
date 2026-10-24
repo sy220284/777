@@ -10,6 +10,9 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.LocalToolApprovalRuntime
 import com.labteto.dshmobile.local.LocalToolCompositionRoot
 import com.labteto.dshmobile.local.context.ContextComposer
+import com.labteto.dshmobile.local.work.improvement.LocalWorkStrategyLearning
+import com.labteto.dshmobile.local.work.improvement.LocalWorkStrategyEvaluation
+import com.labteto.dshmobile.local.work.improvement.LocalWorkImprovementArchive
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.memory.MemoryManager
@@ -53,6 +56,8 @@ internal class LocalWorkComposition @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val modelGateway: LocalModelGateway,
+    private val auxiliaryModel: com.labteto.dshmobile.local.model.LocalAuxiliaryModelRequestRuntime,
+    private val usageAnalytics: com.labteto.dshmobile.local.TokenUsageAnalyticsStore,
     mediaRuntime: Provider<LocalMediaCreationRuntime>,
     modelRequests: LocalModelRequestCoordinator,
     usageTracker: DeepSeekUsageTracker,
@@ -70,10 +75,32 @@ internal class LocalWorkComposition @Inject constructor(
     private val pinnedInvocations: com.labteto.dshmobile.local.tools.LocalPinnedInvocationStore,
     json: Json,
 ) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val improvementLearning by lazy {
+        LocalWorkStrategyLearning(sessionStorage, modelGateway, auxiliaryModel, usageTracker)
+    }
+    private val improvementEvaluation by lazy {
+        LocalWorkStrategyEvaluation(sessionStorage, usageAnalytics)
+    }
+    private val improvementArchive = LocalWorkImprovementArchive(
+        workspace = sessionStorage.files.workspace,
+        eventLogs = sessionStorage.eventLogs,
+    )
+
+    init {
+        scope.launch {
+            runCatching { improvementArchive.refresh() }
+                .onFailure {
+                    com.labteto.dshmobile.observability.AppLog.failure(
+                        "WorkImprovement", "initialize_archive", it)
+                    runtimeStateStore.projection.publishError("自我改进档案同步失败：" + it.message.orEmpty().take(160))
+                }
+        }
+    }
+
     private val workMediaTools = LocalWorkMediaToolRuntime(modelGateway, mediaRuntime)
     private val backgroundTools = LocalWorkBackgroundToolExecutor(runtimeStateStore, sessionStorage,
         approvalPreferences, tools, toolApproval)
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val toolResultRuntime = LocalWorkToolResultRuntime(
         runtimeStateStore = runtimeStateStore,
         toolOutputStore = tools.toolOutputStore,
@@ -295,7 +322,27 @@ internal class LocalWorkComposition @Inject constructor(
         workSessionProjection = workSessionProjection,
         workToolResultRuntime = toolResultRuntime,
         workTurnToolRuntime = turnToolRuntime,
+        improvementArchive = improvementArchive,
         replyDocuments = replyDocuments,
+        onTurnSettled = { binding, sourceRunId, selectedAdvice ->
+            scope.launch {
+                try {
+                    if (selectedAdvice == null) improvementLearning.reflect(binding, sourceRunId)
+                    else improvementEvaluation.evaluate(binding, sourceRunId, selectedAdvice)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (error: Throwable) {
+                    com.labteto.dshmobile.observability.AppLog.failure(
+                        "WorkImprovement", "reflect_candidate", error)
+                }
+                runCatching { improvementArchive.refresh() }
+                    .onFailure {
+                        com.labteto.dshmobile.observability.AppLog.failure(
+                            "WorkImprovement", "refresh_archive", it)
+                        runtimeStateStore.projection.publishError("自我改进档案同步失败：" + it.message.orEmpty().take(160))
+                    }
+            }
+        },
         onRootExecutionSliceStarted = { binding ->
             persistentJobs.schedule(binding.sessionId, rootSliceAdmitted = true)
             subagents.resumePendingWorkflows(binding)

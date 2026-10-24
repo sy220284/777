@@ -15,6 +15,14 @@
 4. LSP 先使用项目里兼容的 `node_modules`，然后使用 App 已安装的共享服务；都没有时，TypeScript/JavaScript 或 Python 的首次语义调用可申请按需安装。拒绝、失败时用 `read` / `grep` / 构建测试继续任务。
 5. `lsp_diagnostics` 返回“待发布/超时”不等于“没有诊断”；应检查状态和明确错误，不要反复做同一无效操作。
 
+## 已注册能力如何变成可调用工具
+
+- `capability_search` 查的是当前真实 ToolRegistry，包括 Android 运行时、GitHub、LSP、MCP 和内置工具。搜索到的可选能力会优先进入下一步工具定义；**发现结果不能代替下一轮实际模型工具表**，如果预算/连接/权限不允许，仍须按返回原因处理。
+- 只使用下一步实际暴露的精确工具名和 Schema 参数；`TOOL_NOT_EXPOSED` 代表本轮没有提供，不一定是没有安装；`UNKNOWN_TOOL` 代表注册表没有该名称，必须先重新发现。
+- 已实现的历史技能浏览命令 `list_skills` 和 `read_skill` 通过正式 `skill` 工具调用；列出技能可使用 `skill` 空参数或查询参数，读取文档使用 `skill` 的 `name` 字段。适用范围与普通 `skill` 完全相同，不能借别名绕过可见性和授权。
+- `INVALID_TOOL_ARGUMENTS` 返回真实 Schema 的字段/必填信息。数组传 JSON 数组，不能把 Shell 文本当成 `process_exec` 的数组式 `command`；Android Shell 的 `bash` 使用字符串 `command`。这两项使用不同工具契约，不做危险的自动转换。
+- 工具报告失败后先检查 `errorCode`、执行是否已开始及副作用状态，再决定是否重新调用；不要因为输出提及“成功”就跳过真实验收，更不要重新提交未知状态的付费/写入操作。
+
 ## 自建脚本
 - 先用 `read` 查看脚本，检查参数和实际运行时；JavaScript 使用 `node .dsh/tools/脚本.js`，Python 使用 `python3 .dsh/tools/脚本.py`。
 - Android 应用可写目录下的 shell/npm bin 包装文件可能不能直接执行；使用 777 自带的 Node/Python 解释器运行对应源文件。

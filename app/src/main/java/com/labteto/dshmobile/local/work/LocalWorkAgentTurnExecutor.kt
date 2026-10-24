@@ -19,6 +19,8 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.agent.localAgentRunPolicy
 import com.labteto.dshmobile.local.context.ContextComposer
+import com.labteto.dshmobile.local.work.improvement.LocalWorkImprovementArchive
+import com.labteto.dshmobile.local.work.improvement.WorkImprovementAdvice
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalImageCapability
 import com.labteto.dshmobile.local.model.LocalModelGateway
@@ -39,6 +41,7 @@ import com.labteto.dshmobile.local.model.prepareLocalMultimodalMessages
 import com.labteto.dshmobile.local.recordForeground
 import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
 import com.labteto.dshmobile.local.model.toRunModelSurface
+import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.model.withModelToolCallEventData
 import com.labteto.dshmobile.observability.AppLog
@@ -99,7 +102,9 @@ internal class LocalWorkAgentTurnExecutor(
     private val workSessionProjection: LocalWorkSessionProjectionRuntime,
     private val workToolResultRuntime: LocalWorkToolResultRuntime,
     private val workTurnToolRuntime: LocalWorkTurnToolRuntime,
+    private val improvementArchive: LocalWorkImprovementArchive,
     private val replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
+    private val onTurnSettled: (LocalWorkRunBinding, String, WorkImprovementAdvice?) -> Unit = { _, _, _ -> },
     private val onRootExecutionSliceStarted: suspend (LocalWorkRunBinding) -> Unit = {},
 ) {
     init { LocalWorkSummarySettings.attach(context) }
@@ -139,6 +144,9 @@ internal class LocalWorkAgentTurnExecutor(
         var foregroundLease: LocalExecutionService.Companion.TurnLease? = null
         var serviceReleased = false
         var cpuProjection: Job? = null
+        // Publish the settled identity outside the Session owner's lexical scope.
+        var settledRunId: String? = null
+        var settledImprovement: WorkImprovementAdvice? = null
         try {
             LocalSessionRuntimeRegistry.withOwner(
                 binding.sessionId,
@@ -266,6 +274,7 @@ internal class LocalWorkAgentTurnExecutor(
                 contextChars = runSnapshot.kernel.contextChars,
                 parentRunId = continuationParentRunId,
             )
+            settledRunId = runContext.runId
             var lastModelError: LocalModelException? = null
             val taskRunId = com.labteto.dshmobile.local.usage.resolveTokenUsageTaskRunId(runEventLog, runContext.runId)
             val progressTracker = LocalAgentProgressTracker()
@@ -276,6 +285,9 @@ internal class LocalWorkAgentTurnExecutor(
             var hadToolFailure = false
             var completedGoalDisposition: LocalWorkGoalDisposition? = null
             var approvedPlanPromptPending = false
+            var improvementChecked = false
+            var selectedImprovement: WorkImprovementAdvice? = null
+            var improvementGoalId: String? = null
 
             fun settlePendingTools(reason: String) {
                 val settlements = pendingToolSettlements(
@@ -376,6 +388,54 @@ internal class LocalWorkAgentTurnExecutor(
                             ),
                         )
                         projectedSteeringRevision = observedSteer
+                    }
+                    // An unverified strategy can be tried only on a naturally
+                    // requested Goal with the identical acceptance contract as its verified
+                    // source. No duplicate execution, permission change or stable prompt edit.
+                    val liveGoal = snapshot.work.goal
+                    if (!improvementChecked && liveGoal?.status == "active" && liveGoal.id.isNotBlank()) {
+                        improvementChecked = true
+                        improvementArchive.adviceFor(
+                            liveGoal,
+                            snapshot.projectId ?: "",
+                            snapshot.modelState.model,
+                            snapshot.modelState.modelSelection.activeProfileId ?: "",
+                            snapshot.modelState.modelSelection.activeProfile?.routeFingerprint().orEmpty(),
+                        )?.let { advice ->
+                            selectedImprovement = advice
+                            settledImprovement = advice
+                            improvementGoalId = liveGoal.id
+                            runEventLog.append(
+                                if (advice.active) "work/improvement-applied" else "work/improvement-trial",
+                                buildJsonObject {
+                                    put("candidate_id", advice.id)
+                                    put("run_id", runContext.runId)
+                                    put("goal_id", liveGoal.id)
+                                    put("goal_revision", liveGoal.revision)
+                                    put("steering_revision", binding.steeringRevision.value)
+                                    put("goal_signature", advice.goalSignature)
+                                    put("origin_session", advice.sourceSession)
+                                    put("status", if (advice.active) "active" else "experimental")
+                                },
+                            )
+                        }
+                    }
+                    selectedImprovement?.let { advice ->
+                        if (liveGoal?.id == improvementGoalId &&
+                            snapshot.modelState.model == advice.model &&
+                            (snapshot.modelState.modelSelection.activeProfileId ?: "") == advice.profileId &&
+                            snapshot.modelState.modelSelection.activeProfile?.routeFingerprint().orEmpty() == advice.routeFingerprint) {
+                            val marker = "[可选工作方法建议：" + advice.id + "]"
+                            if (marker !in workPromptContext.dynamic) {
+                                workPromptContext = workPromptContext.copy(
+                                    dynamic = workPromptContext.dynamic + "\n\n" + marker +
+                                        "\n来自历史工作证据的" +
+                                        (if (advice.active) "已采纳方法" else "待验证实验候选") +
+                                        "；仅作为辅助建议，用户要求与已有权限/验收规则优先。\n" +
+                                        advice.guidance,
+                                )
+                            }
+                        }
                     }
                     val skillGuidance = resolveLocalWorkSkillGuidance(
                         sessionStorage.files.workspace, effectiveSkillInput,
@@ -601,12 +661,14 @@ internal class LocalWorkAgentTurnExecutor(
                 },
                 toolBatch = AgentToolBatchExecutor { calls ->
                     agentRunCoordinator.ensureCurrentOwner(runContext)
-                    workTurnToolRuntime.executeBatch(
-                        binding = binding,
-                        calls = calls.map { it.toLocalToolCall() },
-                        allowMutation = true,
-                        superseded = { binding.steeringRevision.value != latestAcceptedSamplingRevision },
-                    ).map { (_, result) -> result }
+                    modelToolStepSurface.executeVisibleBatch(calls) { visibleCalls ->
+                        workTurnToolRuntime.executeBatch(
+                            binding = binding,
+                            calls = visibleCalls.map { it.toLocalToolCall() },
+                            allowMutation = true,
+                            superseded = { binding.steeringRevision.value != latestAcceptedSamplingRevision },
+                        ).map { (_, result) -> result }
+                    }
                 },
                 isParallelTool = { call ->
                     modelToolStepSurface.allows(call.name) &&
@@ -1038,7 +1100,14 @@ internal class LocalWorkAgentTurnExecutor(
                 if (!serviceReleased) foregroundLease?.release(LocalExecutionService.OUTCOME_FAILED)
             }
         } finally {
-            if (ownerJob != null) workRunRegistry.releaseCompletedTurn(binding, ownerJob)
+            if (ownerJob != null) {
+                workRunRegistry.releaseCompletedTurn(binding, ownerJob)
+                // Derived human-readable archive refresh is independent of task success and
+                // cannot mutate the completed run, replay tools, or change goal admission.
+                settledRunId?.let { runId ->
+                    onTurnSettled(binding, runId, settledImprovement)
+                }
+            }
         }
     }
 }

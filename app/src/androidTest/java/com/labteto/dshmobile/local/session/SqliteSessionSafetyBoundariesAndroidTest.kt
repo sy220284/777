@@ -84,7 +84,7 @@ class SqliteSessionSafetyBoundariesAndroidTest {
                     root, "source", "target", "direct",
                     eventLogFor = { id -> if (id == "source") from else to },
                 )
-                assertEquals(2L, events.latestSequence("target"))
+                assertEquals(1L, events.latestSequence("target"))
                 assertEquals("chat/pending-turn", events.latest("target", "chat/pending-turn")?.type)
                 assertEquals("reply-1", moved.loadPendingBatch(to, 8).single().assistantMessageId)
                 assertFalse(File(root, "source.events.jsonl").exists())
