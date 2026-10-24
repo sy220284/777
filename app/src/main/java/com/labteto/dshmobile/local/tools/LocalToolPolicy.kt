@@ -48,7 +48,7 @@ internal object LocalToolPolicy {
         "todo_write", "create_goal", "get_goal", "update_goal",
         "skill", "skill_create", "skill_update", "skill_rollback", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local", "extension_record", "extension_inspect", "subagent_fork", "list_agents", "agent_tree", "send_message",
         "interrupt_agent", "workflow", "team_members", "team_member_status",
-        "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown",
+        "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown", "team_respond_shutdown",
         "team_messages", "team_message_receipt", "team_wait_for_message", "team_task_create", "team_task_get",
         "team_task_list", "team_task_update", "team_interrupt", "team_disable_member",
         "team_dismiss_member", "team_stop_all", "team_wait",
@@ -108,7 +108,7 @@ internal object LocalToolPolicy {
         "ask_user_question", "memory_remember", "memory_update", "memory_forget" -> ToolAccess.SESSION_WRITE
         "bash", "job_kill" -> ToolAccess.PROCESS
         "subagent", "subagent_fork", "workflow", "send_message", "interrupt_agent",
-        "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown",
+        "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown", "team_respond_shutdown",
         "team_task_create", "team_task_update", "team_interrupt", "team_disable_member",
         "team_dismiss_member", "team_stop_all" -> ToolAccess.AGENT_CONTROL
         "web_search", "web_fetch", "network_diagnose" -> ToolAccess.NETWORK
@@ -138,7 +138,7 @@ internal object LocalToolPolicy {
             "extension_record", "extension_inspect", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local" -> "扩展能力"
             "subagent", "subagent_fork", "workflow", "list_subagent_models", "list_agents", "agent_tree",
             "send_message", "interrupt_agent", "team_members", "team_member_status",
-            "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown",
+            "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown", "team_respond_shutdown",
             "team_messages", "team_message_receipt", "team_wait_for_message", "team_task_create", "team_task_get",
             "team_task_list", "team_task_update", "team_interrupt", "team_disable_member",
             "team_dismiss_member", "team_stop_all", "team_wait" -> "智能体"
@@ -186,7 +186,7 @@ internal object LocalToolPolicy {
             "agent_tree" -> setOf("代理树", "主子代理关系", "运行拓扑", "agent tree", "agent lineage")
             "workflow" -> setOf("工作流", "workflow", "流水线", "pipeline", "并行任务")
             "team_members", "team_member_status", "team_create_member", "team_start_member",
-            "team_spawn", "team_send_message", "team_request_shutdown", "team_messages", "team_message_receipt", "team_wait_for_message",
+            "team_spawn", "team_send_message", "team_request_shutdown", "team_respond_shutdown", "team_messages", "team_message_receipt", "team_wait_for_message",
             "team_task_create", "team_task_get", "team_task_list", "team_task_update",
             "team_interrupt", "team_disable_member", "team_dismiss_member", "team_stop_all",
             "team_wait" -> setOf(
