@@ -149,7 +149,7 @@ internal class LocalMediaStudioBackupInstaller(
     }
 
     private fun sameBytes(a: File, b: File): Boolean =
-        a.isFile && b.isFile && a.length() == b.length() && hash(a) == hash(b)
+        a.isFile && b.isFile && a.length() == b.length() && hash(a).contentEquals(hash(b))
 
     private fun hash(file: File): ByteArray {
         val digest = MessageDigest.getInstance("SHA-256")
