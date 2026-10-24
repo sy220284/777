@@ -27,6 +27,7 @@ internal object LocalAgentTeamContract {
             "team_start_member",
             "team_spawn",
             "team_send_message",
+            "team_message_receipt",
             "team_messages",
             "team_wait_for_message",
             "team_task_create",

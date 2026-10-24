@@ -359,6 +359,11 @@ internal class LocalAgentTeamRuntime(
                 targetName = args.requiredTeamString("target"),
                 message = args.requiredTeamString("message"),
             )
+            "team_message_receipt" -> readLocalTeamMessageReceipt(
+                log = eventLogFor(binding.sessionId),
+                sessionId = binding.sessionId,
+                id = args.requiredTeamString("message_id"),
+            ).render()
             "team_messages" -> renderMailbox(binding.sessionId, binding.sessionId,
                 args["after_sequence"]?.jsonPrimitive?.longOrNull ?: -1L, DEFAULT_AGENT_MESSAGE_LIMIT) + "\n" + renderAgentMessages(
                 sessionId = binding.sessionId,

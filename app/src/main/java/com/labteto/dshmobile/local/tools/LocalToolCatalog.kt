@@ -342,6 +342,9 @@ object LocalToolCatalog {
             "target" to string("teammate 名称"),
             "message" to string("消息内容"),
         ), listOf("target", "message")))
+        add(tool("team_message_receipt", "查询持久 Team 消息的排队、投递与历史检查点，不能证明模型已处理或任务完成", properties(
+            "message_id" to string("team-msg-* 持久消息ID"),
+        ), listOf("message_id")))
         add(tool("team_messages", "读取 Team 成员独立结果消息流；返回 durable EventLog sequence 作为结果游标", properties(
             "target" to string("可选；限定 teammate 名称"),
             "after_sequence" to integer("可选；仅返回该 EventLog sequence 之后的结果"),

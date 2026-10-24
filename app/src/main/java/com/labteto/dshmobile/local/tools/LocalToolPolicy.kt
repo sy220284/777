@@ -49,7 +49,7 @@ internal object LocalToolPolicy {
         "skill", "skill_create", "skill_update", "skill_rollback", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local", "extension_record", "extension_inspect", "subagent_fork", "list_agents", "agent_tree", "send_message",
         "interrupt_agent", "workflow", "team_members", "team_member_status",
         "team_create_member", "team_start_member", "team_spawn", "team_send_message",
-        "team_messages", "team_wait_for_message", "team_task_create", "team_task_get",
+        "team_messages", "team_message_receipt", "team_wait_for_message", "team_task_create", "team_task_get",
         "team_task_list", "team_task_update", "team_interrupt", "team_disable_member",
         "team_dismiss_member", "team_stop_all", "team_wait",
         "memory_search", "memory_list", "memory_remember",
@@ -139,7 +139,7 @@ internal object LocalToolPolicy {
             "subagent", "subagent_fork", "workflow", "list_subagent_models", "list_agents", "agent_tree",
             "send_message", "interrupt_agent", "team_members", "team_member_status",
             "team_create_member", "team_start_member", "team_spawn", "team_send_message",
-            "team_messages", "team_wait_for_message", "team_task_create", "team_task_get",
+            "team_messages", "team_message_receipt", "team_wait_for_message", "team_task_create", "team_task_get",
             "team_task_list", "team_task_update", "team_interrupt", "team_disable_member",
             "team_dismiss_member", "team_stop_all", "team_wait" -> "智能体"
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" -> "记忆"
