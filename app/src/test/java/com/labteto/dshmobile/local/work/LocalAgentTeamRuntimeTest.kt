@@ -588,6 +588,81 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun memberAcknowledgesOnlyPreviouslyObservedOwnMessageAndReplayIsIdempotent() = runBlocking {
+        val session = "team-member-handling-ack"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        val id = "team-msg-11223344556677889900"
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
+            teamMessage(session, id, "member-1", "处理已经交给你的核验工作"))
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED,
+            teamDelivered(session, id, "member-1"))
+        val owners = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
+        val identity = com.labteto.dshmobile.harness.agent.AgentRunIdentity(
+            session, "child:sa-team-1", "ack-run")
+        owners.claim(identity) {}
+        suspend fun ack(outcome: String, reason: String = "") =
+            f.runtime.executeMember(session, "job-team-1", memberTestToolCall(
+                "ack-$outcome", "team_ack_message", buildJsonObject {
+                    put("message_id", id); put("outcome", outcome); put("reason", reason)
+                },
+            ))
+        kotlinx.coroutines.withContext(owners.executionContext(identity)) {
+            val premature = runCatching { ack("handled") }.exceptionOrNull()
+            assertTrue(premature?.message.orEmpty().contains("TEAM_MESSAGE_ACK_MODEL_REPLY_REQUIRED"))
+            assertTrue(f.runtime.project(session).messageAcknowledgements.isEmpty())
+        }
+        f.log.append(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint("job-team-1", "sa-team-1", 2,
+                emptyList(), setOf(id)))
+        f.log.append(LOCAL_SUBAGENT_INBOX_MODEL_REPLY_EVENT, buildJsonObject {
+            put("background_job_id", "job-team-1")
+            put("message_ids", JsonArray(listOf(JsonPrimitive(id))))
+            put("step", 2)
+        })
+        kotlinx.coroutines.withContext(owners.executionContext(identity)) {
+            assertTrue(ack("handled").contains("不代表任务成果已验收"))
+            assertTrue(ack("handled").contains("无重复事件"))
+            val conflict = runCatching {
+                ack("cannot_handle", "改变已经提交的声明")
+            }.exceptionOrNull()
+            assertTrue(conflict?.message.orEmpty().contains("TEAM_MESSAGE_ACK_CONFLICT"))
+        }
+        assertEquals(1, f.runtime.project(session).messageAcknowledgements.size)
+        assertEquals("member-1", f.runtime.project(session).deliveredMessageTargets[id])
+        assertEquals("member_handled_reported",
+            readLocalTeamMessageReceipt(f.log, session, id).status)
+        val cold = LocalAgentTeamRuntime(f.jobs,
+            { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
+            { _, _, _ -> JobMessageAdmission(false, false, false, "unused") },
+            { f.log }, SessionProjectionRegistry())
+        assertNull(cold.project(session).failure)
+        assertEquals(f.runtime.project(session).messageAcknowledgements,
+            cold.project(session).messageAcknowledgements)
+    }
+
+    @Test
+    fun forgedRecipientAckFailsProjectionBeforeClaimingAnyHandling() {
+        val session = "team-forged-handling-ack"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        val id = "team-msg-99887766554433221100"
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
+            teamMessage(session, id, "member-1", "秘密消息"))
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED,
+            teamDelivered(session, id, "member-1"))
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_ACKNOWLEDGED, buildJsonObject {
+            put("version", LocalAgentTeamContract.TEAM_EVENT_VERSION)
+            put("teamId", session)
+            put("messageId", id)
+            put("memberId", "member-2")
+            put("outcome", "handled")
+        })
+        assertTrue(f.runtime.project(session).failure.orEmpty()
+            .contains("TEAM_MESSAGE_ACK_WRONG_RECIPIENT"))
+    }
+
+    @Test
     fun trustedMembersSendPeerLeadAndReadOwnDurableMailbox() = runBlocking {
         val received = mutableListOf<QueuedAgentInput>()
         val leadInbox = mutableListOf<QueuedAgentInput>()
