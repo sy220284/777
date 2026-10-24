@@ -295,6 +295,11 @@ internal class LocalAgentTeamRuntime(
                             ?: error("TEAM_TASK_NOT_FOUND")
                         val action = args.requiredTeamString("action").trim().lowercase()
                         require(action in setOf("claim", "release", "complete")) { "TEAM_MEMBER_PERMISSION_DENIED" }
+                        if (action == "claim" && task.rootUserRevision != null) {
+                            require(task.rootUserRevision == workflowUserRevision(eventLogFor(sessionId))) {
+                                "TEAM_TASK_ROOT_REAUTHORIZATION_REQUIRED：请主代理重新授权旧任务"
+                            }
+                        }
                         require(if (action == "claim") task.ownerId == null else task.ownerId == member.id) {
                             "TEAM_MEMBER_PERMISSION_DENIED：不能控制他人的任务"
                         }
