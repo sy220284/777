@@ -134,8 +134,124 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(LocalTeamMemberPhase.ACTIVE, f.runtime.project(session).members.single().phase)
         assertEquals(1, delivered.size)
         assertTrue(delivered.single().agentSource.toString().contains("shutdown_request"))
-        assertTrue(delivered.single().modelMessage.toString().contains("不会自动终止"))
+        assertTrue(delivered.single().modelMessage.toString().contains("team_respond_shutdown"))
         assertNull(f.runtime.project(session).failure)
+    }
+
+    @Test
+    fun structuredShutdownApprovalDissolvesMemberAndNotifiesLeadExactlyOnce() = runBlocking {
+        val session = "structured-shutdown-approved"
+        val leadInputs = mutableListOf<QueuedAgentInput>()
+        val f = fixture(session,
+            sender = { _, _, _ -> JobMessageAdmission(true, false, false, "accepted") },
+            leadSender = { _, input -> leadInputs += input; true },
+        )
+        appendActiveMember(f.log, session)
+        startLiveChild(f, session)
+        val binding = LocalWorkRunBinding(
+            sessionId = session,
+            initialState = LocalHarnessState(sessionId = session, usageMode = LocalUsageMode.WORK).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = session, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = session, maxPendingInputs = 8),
+            eventLog = f.log,
+        )
+        f.runtime.execute(memberTestToolCall("shutdown-start", "team_request_shutdown", buildJsonObject {
+            put("target", "worker"); put("reason", "完成工作并交接")
+        }), binding)
+        val request = requireNotNull(f.log.latestMatching(
+            setOf(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED),
+        ) { event -> LocalAgentTeamEventCodec.decodeMessage(event).kind == LocalTeamMessageKind.SHUTDOWN_REQUEST })
+        val requestId = LocalAgentTeamEventCodec.decodeMessage(request.data).id
+        val owners = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
+        val identity = com.labteto.dshmobile.harness.agent.AgentRunIdentity(session, "child:sa-team-1", "shutdown-run")
+        owners.claim(identity) {}
+        val response = kotlinx.coroutines.withContext(owners.executionContext(identity)) {
+            f.runtime.executeMember(session, "job-team-1", memberTestToolCall(
+                "shutdown-confirm", "team_respond_shutdown", buildJsonObject {
+                    put("request_id", requestId); put("approve", true)
+                },
+            ))
+        }
+        assertTrue(response.contains("approved=true"))
+        val state = f.runtime.project(session)
+        assertNull(state.failure)
+        assertEquals(LocalTeamMemberPhase.DISMISSED, state.members.single().phase)
+        assertEquals(1, state.shutdownResponses.size)
+        assertEquals(requestId, state.shutdownResponses.single().requestId)
+        assertEquals(1, leadInputs.size)
+        assertTrue(leadInputs.single().modelMessage.toString().contains("team_shutdown_response"))
+        f.runtime.recoverMailbox(session)
+        assertEquals(1, leadInputs.size)
+        assertEquals(1, f.runtime.project(session).shutdownResponses.size)
+        assertEquals(LocalTeamMemberPhase.DISMISSED, f.runtime.project(session).members.single().phase)
+    }
+
+    @Test
+    fun shutdownRejectRequiresReasonAndOnlyOriginalTargetCanRespond() = runBlocking {
+        val session = "structured-shutdown-rejected"
+        val sent = mutableListOf<QueuedAgentInput>()
+        val f = fixture(session,
+            sender = { _, _, _ -> JobMessageAdmission(true, false, false, "accepted") },
+            leadSender = { _, input -> sent += input; true },
+        )
+        appendActiveMember(f.log, session)
+        startLiveChild(f, session)
+        val binding = LocalWorkRunBinding(
+            sessionId = session,
+            initialState = LocalHarnessState(sessionId = session, usageMode = LocalUsageMode.WORK).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = session, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = session, maxPendingInputs = 8),
+            eventLog = f.log,
+        )
+        f.runtime.execute(memberTestToolCall("shutdown-start", "team_request_shutdown", buildJsonObject {
+            put("target", "worker"); put("reason", "请求停止")
+        }), binding)
+        val request = requireNotNull(f.log.latestMatching(setOf(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED)) {
+            LocalAgentTeamEventCodec.decodeMessage(it).kind == LocalTeamMessageKind.SHUTDOWN_REQUEST
+        })
+        val requestId = LocalAgentTeamEventCodec.decodeMessage(request.data).id
+        val owners = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
+        val identity = com.labteto.dshmobile.harness.agent.AgentRunIdentity(session, "child:sa-team-1", "reject-run")
+        owners.claim(identity) {}
+        kotlinx.coroutines.withContext(owners.executionContext(identity)) {
+            val empty = runCatching {
+                f.runtime.executeMember(session, "job-team-1", memberTestToolCall(
+                    "reject-no-reason", "team_respond_shutdown", buildJsonObject {
+                        put("request_id", requestId); put("approve", false)
+                    },
+                ))
+            }.exceptionOrNull()
+            assertNotNull(empty)
+            assertEquals(0, f.runtime.project(session).shutdownResponses.size)
+            val wrong = runCatching {
+                f.runtime.executeMember(session, "job-team-1", memberTestToolCall(
+                    "reject-wrong", "team_respond_shutdown", buildJsonObject {
+                        put("request_id", "team-msg-another"); put("approve", false); put("reason", "处理中")
+                    },
+                ))
+            }.exceptionOrNull()
+            assertNotNull(wrong)
+            f.runtime.executeMember(session, "job-team-1", memberTestToolCall(
+                "reject-valid", "team_respond_shutdown", buildJsonObject {
+                    put("request_id", requestId); put("approve", false); put("reason", "仍需交接证据")
+                },
+            ))
+            val repeated = runCatching {
+                f.runtime.executeMember(session, "job-team-1", memberTestToolCall(
+                    "reject-duplicate", "team_respond_shutdown", buildJsonObject {
+                        put("request_id", requestId); put("approve", false); put("reason", "重复")
+                    },
+                ))
+            }.exceptionOrNull()
+            assertNotNull(repeated)
+        }
+        assertNull(f.runtime.project(session).failure)
+        assertEquals(LocalTeamMemberPhase.ACTIVE, f.runtime.project(session).members.single().phase)
+        assertEquals(1, f.runtime.project(session).shutdownResponses.size)
+        assertEquals(false, f.runtime.project(session).shutdownResponses.single().approved)
+        assertEquals(1, sent.size)
+        f.runtime.recoverMailbox(session)
+        assertEquals(1, sent.size)
     }
 
     @Test
