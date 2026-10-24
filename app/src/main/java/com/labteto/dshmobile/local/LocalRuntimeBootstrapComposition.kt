@@ -3,11 +3,6 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.persistence.LocalHarnessPreferences
 import android.content.Context
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
-import com.labteto.dshmobile.local.attachment.cleanupLocalImageAttachments
-import com.labteto.dshmobile.local.attachment.collectLocalImageAttachmentReferences
-import com.labteto.dshmobile.local.attachment.collectAuthoritativeLocalImageAttachmentReferences
-import com.labteto.dshmobile.local.runtime.ATTACHMENT_GC_INTERVAL_MILLIS
-import com.labteto.dshmobile.local.runtime.KEY_ATTACHMENT_GC_AT
 import com.labteto.dshmobile.local.runtime.LocalBundledRuntimeManager
 import com.labteto.dshmobile.local.runtime.LocalRuntimeBootstrapPort
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -15,10 +10,8 @@ import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.prepareLocalHarnessStartup
 import com.labteto.dshmobile.local.session.LocalSessionDeletionCleanup
 import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
-import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
 import com.labteto.dshmobile.local.work.LocalWorkComposition
-import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
@@ -27,9 +20,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /** App-level construction root for Runtime startup contributors. */
 @Singleton
@@ -44,7 +34,6 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
     private val tools: LocalToolCompositionRoot,
     private val skillManager: com.labteto.dshmobile.local.tools.LocalSkillManager,
     private val work: LocalWorkComposition,
-    private val workRuns: LocalWorkRunRegistry,
     private val foregroundWake: LocalForegroundTurnWakeCoordinator,
     private val foregroundSessionLoader: LocalForegroundSessionLoader,
     private val chatStyleGuardSettings: LocalChatStyleGuardSettingsPort,
@@ -124,72 +113,10 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
         }
         foregroundWake.startNextIfIdle()?.start()
         work.schedulePersistentRecovery()
-        scope.launch(kotlinx.coroutines.Dispatchers.IO) { cleanupLocalImagesIfDue() }
+        // Destructive image GC stays disabled until all persisted media formats,
+        // in-flight drafts and concurrent attachment writers share a complete
+        // authoritative liveness barrier. A stale reference scan must never delete
+        // user images. Image import, load and manual export remain available.
     }
 
-    private fun cleanupLocalImagesIfDue() {
-        // Never prune attachments while a Work or foreground turn may still be
-        // writing files that have not reached the durable SQLite event stream.
-        if (workRuns.anyLive() || runtimeStateStore.foregroundRunHandle.hasLiveJob()) return
-        val now = System.currentTimeMillis()
-        val last = preferences.getLong(KEY_ATTACHMENT_GC_AT, 0L)
-        if (now - last < ATTACHMENT_GC_INTERVAL_MILLIS) return
-        val currentSessionId = runtimeStateStore.currentSessionId
-        runCatching {
-            // A partially migrated/missing authority is a hard stop for destructive GC.
-            // The legacy JSONL directory cannot enumerate SQLite-owned sessions.
-            check(sessionStorage.eventLogs.sqliteDatabase != null) {
-                "SQLite 会话事件权威来源不可用，附件回收已停止"
-            }
-            // Pending editors can carry images outside the saved Session snapshot.
-            // Until draft attachments have an indexed authority, fail closed.
-            check(pendingSessions.entries().isEmpty()) {
-                "存在未提交的会话草稿，延后图片回收以免误删"
-            }
-            val ids = buildSet {
-                addAll(sessionStorage.eventLogs.historicalSources().map { it.id })
-                addAll(sessionStorage.coordinator.summaries().map { it.id })
-                addAll(pendingSessions.entries().keys)
-                add(currentSessionId)
-            }
-            val refs = collectAuthoritativeLocalImageAttachmentReferences(
-                sessionIds = ids,
-                currentSessionId = currentSessionId,
-                readEventReferences = { id ->
-                    // Scoped reader does not evict any foreground EventLog adapter.
-                    sessionStorage.eventLogs.readHistorical(id) { log ->
-                        log.withEvents { events ->
-                            collectLocalImageAttachmentReferences(events)
-                        }
-                    }
-                },
-                readSnapshot = { id ->
-                    sessionStorage.coordinator.read(id)?.let { snapshot ->
-                        json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject
-                    }
-                },
-                foregroundMessages = runtimeStateStore.foregroundRunHandle.modelHistory.snapshot(),
-            )
-            val result = cleanupLocalImageAttachments(
-                workspaceRoot = File(workspace.path),
-                references = refs,
-            )
-            if (result.deletedFiles > 0) {
-                sessionStorage.eventLogs.get(currentSessionId).append("attachment/gc", buildJsonObject {
-                    put("status", "completed")
-                    put("deleted_files", result.deletedFiles)
-                    put("deleted_bytes", result.deletedBytes)
-                    put("retained_image_bytes", result.retainedImageBytes)
-                })
-            }
-        }.onSuccess {
-            preferences.edit().putLong(KEY_ATTACHMENT_GC_AT, now).apply()
-        }.onFailure { failure ->
-            // Do not stamp the GC time: retry after recovery instead of silently
-            // deleting files whose SQLite owner could not be enumerated/read.
-            com.labteto.dshmobile.observability.AppLog.warn(
-                "AttachmentGC", "SQLite 引用扫描不完整；本轮没有完成附件清理", failure,
-            )
-        }
-    }
 }
