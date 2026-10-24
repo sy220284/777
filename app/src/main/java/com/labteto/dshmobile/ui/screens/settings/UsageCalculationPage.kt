@@ -55,6 +55,7 @@ import com.labteto.dshmobile.local.TokenUsageGroupSummary
 import com.labteto.dshmobile.local.TokenUsageModeAnalytics
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
+import com.labteto.dshmobile.local.web.LocalSearchUsageSnapshot
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SySegmentedTabs
@@ -100,6 +101,7 @@ internal fun UsageCalculationPage(
     usage: DeepSeekUsageSnapshot,
     onOpenPricing: () -> Unit,
     analytics: TokenUsageAnalyticsSnapshot = TokenUsageAnalyticsSnapshot(),
+    searchUsage: LocalSearchUsageSnapshot = LocalSearchUsageSnapshot(),
     onOpenGroup: (TokenUsageGroupKind, String, String) -> Unit = { _, _, _ -> },
     configuredModels: List<String> = emptyList(),
     selectedModel: String? = null,
@@ -166,10 +168,18 @@ internal fun UsageCalculationPage(
         labels = listOf(
             stringResource(R.string.usage_mode_chat),
             stringResource(R.string.usage_mode_work),
+            stringResource(R.string.usage_mode_search),
         ),
         selectedIndex = modeIndex,
         onSelect = { modeIndex = it },
+        modifier = Modifier.fillMaxWidth().testTag("usage-mode-tabs"),
     )
+
+    if (modeIndex == 2) {
+        UsageSearchSection(searchUsage, range.days)
+        UsageRangeSelector(selectedIndex = rangeIndex, onSelect = { rangeIndex = it })
+        return
+    }
 
     SectionHeading(stringResource(R.string.usage_mode_detail))
     Row(
