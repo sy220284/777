@@ -69,7 +69,7 @@ class SqliteStorageArchiveAndroidTest {
                 }
             }
             assertTrue("Media Studio exclusion must be machine-readable",
-                scopeText.orEmpty().contains("\\\"mediaStudio\\\":false"))
+                scopeText.orEmpty().contains("\"mediaStudio\":false"))
             SqliteSessionSnapshotStore(context, Json, dstSnap).use { snapshots ->
                 SqliteSessionEventDatabase(context, Json, dstEvent).use { events ->
                     val restore = SqliteSessionStorageManager(context, snapshots, events,
