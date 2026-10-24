@@ -62,6 +62,7 @@ internal class LocalSubagentRunnerFactory(
     private val teamSchemas: (() -> JsonArray)? = null,
     private val nestedReadonlySchemas: (() -> JsonArray)? = null,
     private val executeTeamTool: (suspend (String, String, LocalToolCall) -> AgentToolResult)? = null,
+    private val requireTeamRootAuthorization: ((String, String) -> Unit)? = null,
     private val importToolImages: suspend (com.labteto.dshmobile.harness.tools.ToolRichContent?) -> List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = { emptyList() },
 ) {
     fun createBound(
