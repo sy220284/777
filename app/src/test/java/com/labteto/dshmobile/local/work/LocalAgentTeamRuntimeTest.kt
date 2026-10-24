@@ -34,6 +34,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -2527,14 +2529,14 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(3, state.tasks.first { it.id == "task-1" }.revision)
         val proof = state.tasks.first { it.id == "task-1" }
         assertEquals("verified", proof.completionResultId)
-        val checkpoint = f.log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
+        val checkpoint = fixture.log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
             data["result_id"]?.jsonPrimitive?.contentOrNull == "verified"
         }
         assertEquals(checkpoint?.sequence, proof.completionEvidenceSequence)
         val cold = LocalAgentTeamRuntime(
-            f.jobs, { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
+            fixture.jobs, { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
             { _, _, _ -> JobMessageAdmission(false, false, false, "unused") },
-            { f.log }, SessionProjectionRegistry(),
+            { fixture.log }, SessionProjectionRegistry(),
         )
         val recovered = cold.project(session).tasks.first { it.id == "task-1" }
         assertEquals(proof.completionResultId, recovered.completionResultId)
