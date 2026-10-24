@@ -1549,7 +1549,7 @@ class LocalAgentTeamRuntimeTest {
         val response = f.runtime.execute(
             memberTestToolCall("start-verifier", "team_start_member", buildJsonObject {
                 put("target", "verifier")
-                put("task", "audit"
+                put("task", "audit")
             }), binding,
         )
         assertTrue(response.orEmpty().contains("TEAM_MEMBER_START_REJECTED"))
