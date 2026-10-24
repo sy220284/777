@@ -983,6 +983,21 @@ fun SettingsScreen(
                             },
                             onExport = { sessionStorageExporter.launch("777-local-sessions.zip") },
                             onRestore = { sessionStorageImporter.launch(arrayOf("application/zip", "application/octet-stream")) },
+                            onCancelRestore = {
+                                scope.launch {
+                                    localSessionStorageBusy = true
+                                    try {
+                                        if (viewModel.cancelStagedSessionRestore()) {
+                                            toast.second("已取消未开始的备份恢复")
+                                            localSessionStorageStatus = viewModel.localSessionStorageStatus()
+                                        }
+                                    } catch (error: Exception) {
+                                        toast.second(error.message ?: "无法取消已开始的恢复")
+                                    } finally {
+                                        localSessionStorageBusy = false
+                                    }
+                                }
+                            },
                             onCleanup = onClose,
                         )
                     }
