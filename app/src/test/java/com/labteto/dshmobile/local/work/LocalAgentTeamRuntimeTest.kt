@@ -304,6 +304,80 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun idleTeammateAutoClaimsTaskOnceAndColdRecoveryRepairsUndeliveredReservation() = runBlocking {
+        val session = "team-idle-auto-dispatch"
+        lateinit var manager: LocalJobManager
+        val f = fixture(session, sender = { jobId, input, owner ->
+            manager.sendInput(jobId, input, owner)
+        })
+        manager = f.jobs
+        appendActiveMember(f.log, session)
+        val initial = f.jobs.startPersistentResult(
+            label = "member first turn",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = session,
+            continuable = true,
+            requestedId = "job-team-1",
+        ) { _, _ -> "first task finished" }
+        assertTrue(initial.accepted)
+        kotlinx.coroutines.withTimeout(3_000L) {
+            while (f.jobs.snapshotInfos().first { it.id == "job-team-1" }.status !in
+                setOf("completed", "dormant")) kotlinx.coroutines.yield()
+        }
+
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT, task(
+            session, "task-1", 1, emptyList(), subject = "Review evidence",
+        ))
+        f.runtime.recoverMailbox(session)
+        val claimed = f.runtime.project(session).tasks.single()
+        assertEquals(LocalTeamTaskStatus.IN_PROGRESS, claimed.status)
+        assertEquals("member-1", claimed.ownerId)
+        assertNotNull(claimed.autoDispatchMessageId)
+        val queued = f.runtime.project(session).deliveredMessageIds.toSet()
+        assertEquals(setOf(claimed.autoDispatchMessageId), queued)
+        assertEquals(1, f.jobs.peekMessages("job-team-1").size)
+        f.runtime.recoverMailbox(session)
+        assertEquals(queued, f.runtime.project(session).deliveredMessageIds.toSet())
+        assertEquals(1, f.jobs.peekMessages("job-team-1").size)
+
+        // Rebuild an accepted claim whose process was killed before queue append.
+        val session2 = "team-idle-replay-gap"
+        lateinit var manager2: LocalJobManager
+        val f2 = fixture(session2, sender = { jobId, input, owner ->
+            manager2.sendInput(jobId, input, owner)
+        })
+        manager2 = f2.jobs
+        appendActiveMember(f2.log, session2)
+        val started = f2.jobs.startPersistentResult(
+            label = "member interrupted between reservation and outbox",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = session2,
+            continuable = true,
+            requestedId = "job-team-1",
+        ) { _, _ -> "first task finished" }
+        assertTrue(started.accepted)
+        kotlinx.coroutines.withTimeout(3_000L) {
+            while (f2.jobs.snapshotInfos().first { it.id == "job-team-1" }.status !in
+                setOf("completed", "dormant")) kotlinx.coroutines.yield()
+        }
+        val reserved = LocalTeamTaskSnapshot(
+            id = "task-1", revision = 2, subject = "Review evidence", description = "",
+            status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = "member-1",
+            autoDispatchMessageId = "team-msg-1234567890abcdef1234",
+        )
+        f2.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { reserved.toEvent(session2) })
+        f2.runtime.recoverMailbox(session2)
+        assertEquals(setOf("team-msg-1234567890abcdef1234"),
+            f2.runtime.project(session2).deliveredMessageIds.toSet())
+        assertEquals(1, f2.jobs.peekMessages("job-team-1").size)
+        f2.runtime.recoverMailbox(session2)
+        assertEquals(1, f2.jobs.peekMessages("job-team-1").size)
+    }
+
+    @Test
     fun teamWaitReportsDurableChangeThroughRealLeadTool() = runBlocking {
         val session = "team-wait-transition-contract"
         val fixture = fixture(session)
