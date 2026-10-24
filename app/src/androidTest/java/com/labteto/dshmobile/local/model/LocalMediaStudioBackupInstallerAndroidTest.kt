@@ -59,6 +59,81 @@ class LocalMediaStudioBackupInstallerAndroidTest {
         return staging to sandbox(File(root, "destination").apply { mkdirs() })
     }
 
+    @Test fun zipMediaSectionRoundTripsWithUnrelatedSessionEntries() {
+        val root = File(base.cacheDir, "media-zip-roundtrip-"+UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val (staging, destination) = fixture(root)
+            val codec = LocalMediaStudioZipEntries(destination, json)
+            val buffer = java.io.ByteArrayOutputStream()
+            java.util.zip.ZipOutputStream(buffer).use { zip ->
+                zip.putNextEntry(java.util.zip.ZipEntry("snapshot.sqlite"))
+                zip.write(byteArrayOf(3, 1, 4))
+                zip.closeEntry()
+                assertTrue(codec.writeInto(zip,
+                    LocalMediaStudioBackupSnapshot(destination, json).validate(staging)) > 0)
+            }
+            val extracted = File(root, "extracted")
+            val receiver = codec.Receiver(extracted)
+            var unrelated = 0
+            java.util.zip.ZipInputStream(buffer.toByteArray().inputStream()).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    if (entry.name.startsWith(LocalMediaStudioZipEntries.PREFIX)) {
+                        receiver.accept(entry, zip)
+                    } else {
+                        unrelated++
+                    }
+                    zip.closeEntry()
+                }
+            }
+            assertEquals(1, unrelated)
+            assertEquals(1, receiver.validateStaged().mediaFiles.size)
+            assertEquals(2, LocalMediaStudioBackupInstaller(destination, json).install(extracted))
+            assertEquals(byteArrayOf(1, 3, 5, 7).toList(),
+                File(destination.filesDir, "media-studio/shared-paid.png").readBytes().toList())
+            assertTrue(staging.isDirectory) // Export must not mutate its source snapshot.
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun zipReceiverRejectsTraversalAndDuplicateMediaEntries() {
+        val root = File(base.cacheDir, "media-zip-reject-"+UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val destination = sandbox(File(root, "destination").apply { mkdirs() })
+            val codec = LocalMediaStudioZipEntries(destination, json)
+            val traversal = java.io.ByteArrayOutputStream()
+            java.util.zip.ZipOutputStream(traversal).use { zip ->
+                zip.putNextEntry(java.util.zip.ZipEntry("media-studio/media/../../stolen.db"))
+                zip.write(byteArrayOf(1))
+                zip.closeEntry()
+            }
+            val receiver = codec.Receiver(File(root, "import-traversal"))
+            java.util.zip.ZipInputStream(traversal.toByteArray().inputStream()).use { zip ->
+                val entry = requireNotNull(zip.nextEntry)
+                assertThrows(IllegalArgumentException::class.java) {
+                    receiver.accept(entry, zip)
+                }
+            }
+            assertFalse(File(root, "stolen.db").exists())
+
+            val repeated = java.io.ByteArrayOutputStream()
+            java.util.zip.ZipOutputStream(repeated).use { zip ->
+                repeat(2) { index ->
+                    zip.putNextEntry(java.util.zip.ZipEntry("media-studio/media-studio.sqlite"))
+                    zip.write(byteArrayOf(index.toByte()))
+                    zip.closeEntry()
+                }
+            }
+            val repeatedReceiver = codec.Receiver(File(root, "import-duplicate"))
+            java.util.zip.ZipInputStream(repeated.toByteArray().inputStream()).use { zip ->
+                repeatedReceiver.accept(requireNotNull(zip.nextEntry), zip)
+                zip.closeEntry()
+                assertThrows(IllegalArgumentException::class.java) {
+                    repeatedReceiver.accept(requireNotNull(zip.nextEntry), zip)
+                }
+            }
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun emptyInstallRestoresAllRecordsAndSharedOriginalOnlyOnce() {
         val root = File(base.cacheDir, "restore-"+UUID.randomUUID()).apply { mkdirs() }
         try {
