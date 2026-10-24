@@ -89,6 +89,25 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
                 com.labteto.dshmobile.observability.AppLog.warn("MemoryDiaryRecovery", "关联日记清理待恢复：${it.message}")
             }
         }
+        // Resolve durable deletion intents BEFORE any foreground Chat/Work restore.
+        // A deleted snapshot's leftover events must never be repaired or admitted as
+        // a new active conversation on the same startup.
+        val deletionFailures = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            LocalSessionDeletionCleanup(
+                sessionsRoot,
+                sessionStorage.eventLogs::clearAndEvict,
+                tools.toolOutputStore::deleteSession,
+                sessionStorage.coordinator::hasDurableSnapshot,
+            ).recoverPending()
+        }
+        deletionFailures.forEach { (id, failure) ->
+            com.labteto.dshmobile.observability.AppLog.warn(
+                "SessionDeletion", "会话关联数据清理待重试 session=$id", failure,
+            )
+        }
+        check(deletionFailures.none { it.first == initialSessionId }) {
+            "当前会话仍有未完成的删除清理；已停止恢复以避免重放已删除事件"
+        }
         if (sessionStorage.coordinator.read(initialSessionId) == null &&
             pendingSessions.modeFor(initialSessionId) == null) {
             pendingSessions.remember(initialSessionId, runtimeStateStore.state.value.usageMode)
@@ -100,22 +119,6 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
         )
         runtimeStateStore.projection.update { current ->
             if (current.loading) current.copy(loading = false) else current
-        }
-        // Complete sidecar deletions interrupted by process death. A surviving snapshot blocks
-        // cleanup, so a failed delete cannot erase a still-existing user's conversation.
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            LocalSessionDeletionCleanup(
-                sessionsRoot,
-                sessionStorage.eventLogs::clearAndEvict,
-                tools.toolOutputStore::deleteSession,
-                sessionStorage.coordinator::hasDurableSnapshot,
-            ).recoverPending().forEach { (id, failure) ->
-                com.labteto.dshmobile.observability.AppLog.warn(
-                    "SessionDeletion",
-                    "会话关联数据清理待重试 session=$id",
-                    failure,
-                )
-            }
         }
         foregroundWake.startNextIfIdle()?.start()
         work.schedulePersistentRecovery()
