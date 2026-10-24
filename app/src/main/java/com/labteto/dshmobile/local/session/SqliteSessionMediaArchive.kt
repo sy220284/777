@@ -1,10 +1,10 @@
 package com.labteto.dshmobile.local.session
 
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.LinkOption
-import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -25,7 +25,7 @@ internal class SqliteSessionMediaArchive(
     private val directory get() = File(workspace, ".dsh/attachments")
 
     /** Write all media bytes and a complete manifest, rejecting unsafe/unreadable files. */
-    fun export(zip: ZipOutputStream): Long {
+    fun export(zip: ZipOutputStream, eventSnapshot: File): Long {
         val dir = directory
         if (dir.exists()) {
             check(!Files.isSymbolicLink(dir.toPath()) &&
@@ -35,10 +35,19 @@ internal class SqliteSessionMediaArchive(
         val files = if (dir.exists()) requireNotNull(dir.listFiles()) {
             "附件目录无法完整枚举，已取消备份"
         }.toList() else emptyList()
-        check(files.size <= MAX_MEDIA_FILES) { "附件数量超过备份上限" }
+        // Published content-addressed files are immutable. Hidden .incoming-,
+        // .normalized- and .generated- are uncommitted temporary writes.
+        val committed = files.filterNot {
+            it.name.startsWith(".incoming-") ||
+                it.name.startsWith(".normalized-") ||
+                it.name.startsWith(".generated-") ||
+                it.name.startsWith(".restore-")
+        }
+        check(committed.size <= MAX_MEDIA_FILES) { "附件数量超过备份上限" }
+        val indexed = linkedMapOf<String, Pair<Long, String>>()
         val manifest = StringBuilder()
         var written = 0L
-        for (file in files.sortedBy(File::getName)) {
+        for (file in committed.sortedBy(File::getName)) {
             check(validFilename(file.name) && !file.name.startsWith(".") &&
                 Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS)) {
                 "附件目录包含不安全或未提交的文件，已取消备份：${file.name}"
@@ -73,8 +82,10 @@ internal class SqliteSessionMediaArchive(
             }
             manifest.append(file.name).append('\t').append(size)
                 .append('\t').append(hex).append('\n')
+            indexed[file.name] = size to hex
             written += size
         }
+        verifyCatalogLocations(eventSnapshot, indexed)
         zip.putNextEntry(ZipEntry(MANIFEST_ENTRY))
         val payload = manifest.toString().toByteArray(Charsets.UTF_8)
         zip.write(payload)
@@ -95,6 +106,7 @@ internal class SqliteSessionMediaArchive(
         val lines = manifest.readLines(Charsets.UTF_8).filter(String::isNotEmpty)
         check(lines.size <= MAX_MEDIA_FILES) { "媒体清单条目过多" }
         val expected = linkedSetOf<String>()
+        val indexed = linkedMapOf<String, Pair<Long, String>>()
         var total = 0L
         for (line in lines) {
             val parts = line.split('\t')
@@ -118,10 +130,48 @@ internal class SqliteSessionMediaArchive(
             if (SHA256.matches(namedDigest)) check(namedDigest == parts[2]) {
                 "媒体文件名与内容哈希不符"
             }
+            indexed[filename] = size to parts[2]
         }
         require(archiveNames == expected.mapTo(mutableSetOf()) { "$MEDIA_PREFIX$it" } +
             setOf(MANIFEST_ENTRY, "snapshot.sqlite", "events.sqlite")) {
             "SQLite 备份缺少媒体文件或包含多余成员"
+        }
+        verifyCatalogLocations(File(staging, "events.sqlite"), indexed)
+    }
+
+    private fun verifyCatalogLocations(
+        eventSnapshot: File,
+        files: Map<String, Pair<Long, String>>,
+    ) {
+        SQLiteDatabase.openDatabase(
+            eventSnapshot.path, null, SQLiteDatabase.OPEN_READONLY,
+        ).use { db ->
+            val table = db.rawQuery(
+                "SELECT name FROM sqlite_master WHERE type='table' " +
+                    "AND name='local_asset_locations'", null,
+            ).use { it.moveToFirst() }
+            val source = if (table) "local_asset_locations" else "local_assets"
+            val present = db.rawQuery(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                arrayOf(source),
+            ).use { it.moveToFirst() }
+            if (!present) return@use
+            db.rawQuery(
+                "SELECT relative_path,asset_id,byte_size FROM $source", null,
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    val path = cursor.getString(0)
+                    val assetId = cursor.getString(1)
+                    val size = cursor.getLong(2)
+                    require(path.startsWith(".dsh/attachments/") &&
+                        SHA256.matches(assetId)) { "资源索引包含非法本地附件路径" }
+                    val filename = path.removePrefix(".dsh/attachments/")
+                    require(validFilename(filename) &&
+                        files[filename] == (size to assetId)) {
+                        "数据库登记的附件缺失、大小不符或校验码不符：$filename"
+                    }
+                }
+            }
         }
     }
 
