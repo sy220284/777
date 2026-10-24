@@ -99,6 +99,89 @@ class SqliteSessionEventDatabaseAndroidTest {
         }
     }
 
+    @Test fun indexedVisiblePagingSkipsIrrelevantWorkEventsAndHonorsRewriteBoundary() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "sqlite-visible-test-${UUID.randomUUID()}.db"
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { db ->
+                db.append("history", "user/message", buildJsonObject {
+                    put("transcript", kotlinx.serialization.json.buildJsonArray {
+                        add(buildJsonObject {
+                            put("id", "before")
+                            put("role", "user")
+                            put("content", "before")
+                            put("created_at", 1)
+                        })
+                    })
+                })
+                repeat(160) { i ->
+                    db.append("history", "tool/result", buildJsonObject { put("index", i) })
+                }
+                db.append("history", "assistant/message", buildJsonObject { put("replaces", "before") })
+                db.append("history", "chat/active-transcript", buildJsonObject {})
+                db.append("history", "transcript/batch", buildJsonObject {
+                    put("transcript", kotlinx.serialization.json.buildJsonArray {
+                        add(buildJsonObject {
+                            put("id", "after")
+                            put("role", "assistant")
+                            put("content", "after")
+                            put("created_at", 2)
+                        })
+                    })
+                })
+                val visible = db.pageVisibleBeforeNewestFirst("history", limit = 3)
+                assertEquals(listOf("transcript/batch", "chat/active-transcript", "assistant/message"),
+                    visible.map { it.type })
+                assertEquals(0L, db.pageVisibleBeforeNewestFirst(
+                    "history", beforeSequenceExclusive = visible.last().sequence, limit = 1,
+                ).single().sequence)
+                assertEquals(163L, db.latestSequence("history"))
+                assertEquals(listOf(0L, 161L, 162L, 163L),
+                    db.visibleEventsAfter("history", -1L).map { it.sequence })
+                assertEquals(listOf(161L, 162L, 163L),
+                    db.visibleEventsAfter("history", 0L).map { it.sequence })
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
+    @Test fun upgradingV2DatabaseRebuildsVisibleHintsWithoutDroppingEvents() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "sqlite-visible-upgrade-${UUID.randomUUID()}.db"
+        try {
+            val location = context.getDatabasePath(name)
+            location.parentFile?.mkdirs()
+            android.database.sqlite.SQLiteDatabase.openOrCreateDatabase(location, null).use { db ->
+                db.execSQL("CREATE TABLE session_event_cursors (" +
+                    "session_id TEXT PRIMARY KEY NOT NULL, next_sequence INTEGER NOT NULL, " +
+                    "instance TEXT NOT NULL)")
+                db.execSQL("CREATE TABLE session_events (" +
+                    "session_id TEXT NOT NULL REFERENCES session_event_cursors(session_id) ON DELETE CASCADE," +
+                    "sequence INTEGER NOT NULL, event_type TEXT NOT NULL, created_at INTEGER NOT NULL," +
+                    "schema_version INTEGER NOT NULL, payload TEXT NOT NULL," +
+                    "PRIMARY KEY(session_id,sequence))")
+                db.execSQL("INSERT INTO session_event_cursors VALUES ('legacy',3,'v2-generation')")
+                db.execSQL("INSERT INTO session_events VALUES " +
+                    "('legacy',0,'user/message',1,1,'{\"transcript\":[]}')," +
+                    "('legacy',1,'tool/result',2,1,'{\"note\":1}')," +
+                    "('legacy',2,'assistant/message',3,1,'{\"replaces\":\"old\"}')")
+                db.version = 2
+            }
+            SqliteSessionEventDatabase(context, Json, name).use { db ->
+                assertEquals(2L, db.latestSequence("legacy"))
+                assertEquals(listOf(2L, 0L),
+                    db.pageVisibleBeforeNewestFirst("legacy", limit = 10).map { it.sequence })
+                assertEquals(3L, db.append("legacy", "chat/active-transcript",
+                    buildJsonObject {}).sequence)
+                assertEquals(listOf(3L, 2L, 0L),
+                    db.pageVisibleBeforeNewestFirst("legacy", limit = 10).map { it.sequence })
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
     @Test fun eventSequencesAndIndexedPagesSurviveReopen() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "sqlite-events-test-${UUID.randomUUID()}.db"

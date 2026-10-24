@@ -172,7 +172,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
         }
         // Do not decode thousands of tool/chat events which the two control
         // reducers ignore. Indexed SQL fetch preserves the original global order.
-        val controlTail = log.controlEventsAfter(
+        val controlTail = log.eventsOfTypesAfter(
             projectionCursor, LOCAL_CHAT_CONTROL_EVENT_TYPES + LOCAL_WORK_CONTROL_EVENT_TYPES,
         )
         val projectedChatControls = projectChatSessionControls(stored, controlTail)
@@ -456,7 +456,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
     }
 }
 
-private fun loadModelHistoryReplayEvents(
+internal fun loadModelHistoryReplayEvents(
     eventLog: LocalSessionEventLog,
     codec: ModelHistoryCheckpointCodec,
     legacyFallback: List<JsonObject>,
@@ -467,12 +467,22 @@ private fun loadModelHistoryReplayEvents(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
             beforeSequenceExclusive = beforeSequence,
         ) ?: break
-        if (codec.decode(checkpoint.data) != null) {
-            return eventLog.snapshotAfter(checkpoint.sequence - 1L)
+        val decoded = codec.decodeCheckpoint(checkpoint.data)
+        // A checkpoint cannot cover a future event; retain the next older valid
+        // one instead of potentially replaying tool effects from bad metadata.
+        if (decoded != null &&
+            (decoded.asOfSequence == null || decoded.asOfSequence < checkpoint.sequence)
+        ) {
+            // Some checkpoints deliberately snapshot history at a watermark older
+            // than their own durable sequence. Include every subsequent semantic
+            // event to avoid losing a queued input committed in between.
+            val watermark = decoded.asOfSequence ?: (checkpoint.sequence - 1L)
+            return eventLog.eventsOfTypesAfter(watermark, LOCAL_MODEL_HISTORY_REPLAY_TYPES)
         }
         beforeSequence = checkpoint.sequence
     }
-    return if (legacyFallback.isNotEmpty()) emptyList() else eventLog.snapshot()
+    return if (legacyFallback.isNotEmpty()) emptyList()
+        else eventLog.eventsOfTypesAfter(-1L, LOCAL_MODEL_HISTORY_REPLAY_TYPES)
 }
 
 private fun buildRecoveredToolResultMessages(

@@ -110,6 +110,38 @@ class LocalSessionRepositoryTest {
         assertEquals(null, repository.read("gone"))
     }
 
+    @Test fun queuedPreviewReturnsTwelveActualDialogueRowsDespiteToolMessages() = runTest {
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        val window = (0 until 48).map { i ->
+            LocalHarnessMessage(
+                id = "m$i",
+                role = when (i % 4) {
+                    0 -> "tool"
+                    1 -> "user"
+                    2 -> "progress"
+                    else -> "assistant"
+                },
+                content = "line-$i",
+            )
+        }
+        repository.enqueue(LocalHarnessSession(id = "preview", transcriptWindow = window))
+        val expected = window.filter { it.role == "user" || it.role == "assistant" }
+            .takeLast(12).map { it.id }
+        assertEquals(expected, repository.preview("preview", 12).map { it.id })
+    }
+
+    @Test fun primaryKeyNavigationAdmissionRespectsQueuedAndDeletedSessions() = runTest {
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        assertFalse(repository.containsForNavigation("new"))
+        repository.enqueue(LocalHarnessSession(id = "new", title = "已接收待落盘"))
+        assertTrue(repository.containsForNavigation("new"))
+        runCurrent()
+        assertTrue(repository.containsForNavigation("new"))
+        repository.delete("new")
+        assertFalse(repository.containsForNavigation("new"))
+        assertFalse(repository.hasDurableSnapshot("new"))
+    }
+
     @Test fun readPrefersNewestQueuedSnapshotBeforeWriterRuns() = runTest {
         val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
         repository.enqueue(

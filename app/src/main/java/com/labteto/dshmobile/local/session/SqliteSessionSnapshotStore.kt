@@ -259,6 +259,15 @@ internal class SqliteSessionSnapshotStore(
         }
     }
 
+    override fun containsSnapshotId(id: String): Boolean {
+        validateId(id)
+        return readableDatabase.rawQuery(
+            "SELECT 1 FROM session_snapshots WHERE id=? LIMIT 1", arrayOf(id),
+        ).use { rows -> rows.moveToFirst() }
+    }
+
+    // Deletion recovery deliberately keeps the strict decoder: corruption
+    // must block clearing still-recoverable event and tool-output facts.
     override fun hasRecoverableSnapshot(id: String): Boolean = read(id) != null
 
     private fun validateId(id: String) {

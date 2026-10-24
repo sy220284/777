@@ -488,7 +488,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         ),
     ) { LocalSessionAttachmentDraftCache() }
     val attachments = attachmentDrafts.forSession(state.sessionId)
-    val listState = rememberLazyListState()
+    // Each conversation owns its scroll position. A shared list state can
+    // flash the prior session's index before the new tail is positioned.
+    val listState = androidx.compose.runtime.key(state.sessionId) { rememberLazyListState() }
     val workTailFollowing = remember(state.sessionId) { mutableStateOf(false) }
     val workReaderPaused = remember(state.sessionId) { mutableStateOf(false) }
     var composerTailViewportAnchor by remember(state.sessionId) { mutableStateOf<Int?>(null) }

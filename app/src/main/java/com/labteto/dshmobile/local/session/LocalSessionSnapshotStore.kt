@@ -21,6 +21,8 @@ internal interface LocalSessionSnapshotStore {
     fun ids(): List<String>
     /** Monotonic storage revision used to validate the derived summary cache. */
     fun lastModified(id: String): Long?
+    /** Primary-key existence for navigation; avoids decoding full snapshots. */
+    fun containsSnapshotId(id: String): Boolean = hasRecoverableSnapshot(id)
     fun hasRecoverableSnapshot(id: String): Boolean
     /** Native summaries share the same transaction as the session snapshot. */
     val nativeSummaries: Boolean get() = false
