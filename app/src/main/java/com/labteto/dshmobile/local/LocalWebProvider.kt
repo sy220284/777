@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local
 
 import android.content.Context
 import com.labteto.dshmobile.core.net.withCancellableHttpResponse
-import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.runtime.DEFAULT_DOWNLOAD_BYTES
 import com.labteto.dshmobile.local.runtime.MAX_DOWNLOAD_BYTES
 import com.labteto.dshmobile.local.web.BoundedWebBody
@@ -43,9 +42,8 @@ class LocalWebProvider @Inject constructor(
     @ApplicationContext context: Context,
     http: OkHttpClient,
     json: Json,
-    usageTracker: DeepSeekUsageTracker,
 ) {
-    private val searchClient = LocalWebSearchClient(http, json, usageTracker)
+    private val searchClient = LocalWebSearchClient(http, json)
     private val keylessSearchClient = LocalKeylessWebSearchClient(http)
     private val targetResolver = com.labteto.dshmobile.local.web.LocalWebTargetResolver(context, http)
     private val diagnostics = LocalWebDiagnostics(targetResolver)
