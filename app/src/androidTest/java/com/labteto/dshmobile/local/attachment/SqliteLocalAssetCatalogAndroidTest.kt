@@ -126,6 +126,70 @@ class SqliteLocalAssetCatalogAndroidTest {
         }
     }
 
+    @Test fun duplicateContentUnderTwoSafeExtensionsKeepsBothLocations() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "asset-alias-${UUID.randomUUID()}.db"
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { events ->
+                val catalog = SqliteLocalAssetCatalog(events)
+                val first = image.copy(
+                    mediaType = "text/plain",
+                    relativePath = ".dsh/attachments/$digest.txt",
+                )
+                val second = image.copy(
+                    mediaType = "text/csv",
+                    relativePath = ".dsh/attachments/$digest.csv",
+                )
+                catalog.register(first)
+                catalog.register(second)
+                catalog.register(second)
+                assertEquals(
+                    listOf(second.relativePath, first.relativePath),
+                    catalog.locations(digest),
+                )
+                assertEquals(first.bytes, catalog.asset(digest)?.bytes)
+                assertTrue(runCatching {
+                    catalog.register(second.copy(bytes = second.bytes + 1))
+                }.isFailure)
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
+    @Test fun eventIndexReadsRealTranscriptBlocksAndToolImages() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "asset-blocks-${UUID.randomUUID()}.db"
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { events ->
+                val catalog = SqliteLocalAssetCatalog(events)
+                catalog.register(image)
+                val payload = buildJsonObject {
+                    put("transcript", buildJsonArray {
+                        add(buildJsonObject {
+                            put("blocks", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("kind", "image")
+                                    put("path", image.relativePath)
+                                    put("attachment_id", digest)
+                                    put("media_type", "image/png")
+                                })
+                            })
+                        })
+                    })
+                }
+                events.append("transcript", "user/message", payload)
+                events.append("transcript", "tool/result", payload)
+                events.append("transcript", "agent/inbox/spliced", payload)
+                assertEquals(3L, catalog.referenceCount(digest))
+                events.clearSession("transcript")
+                assertEquals(0L, catalog.referenceCount(digest))
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
     @Test fun realImageImporterPublishesAndRegistersFileMetadata() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val unique = UUID.randomUUID().toString()
@@ -157,7 +221,49 @@ class SqliteLocalAssetCatalogAndroidTest {
         }
     }
 
-    @Test fun v2DatabaseUpgradesToAssetCatalogWithoutDiscardingEvents() {
+    @Test fun v3UpgradeRetainsCanonicalAssetLocation() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "asset-v3-${UUID.randomUUID()}.db"
+        try {
+            val file = context.getDatabasePath(name)
+            file.parentFile?.mkdirs()
+            SQLiteDatabase.openOrCreateDatabase(file, null).use { old ->
+                old.execSQL(
+                    "CREATE TABLE session_event_cursors (" +
+                        "session_id TEXT PRIMARY KEY NOT NULL, next_sequence INTEGER NOT NULL, instance TEXT NOT NULL)"
+                )
+                old.execSQL(
+                    "CREATE TABLE session_events (" +
+                        "session_id TEXT NOT NULL REFERENCES session_event_cursors(session_id) ON DELETE CASCADE," +
+                        "sequence INTEGER NOT NULL, event_type TEXT NOT NULL, created_at INTEGER NOT NULL," +
+                        "schema_version INTEGER NOT NULL, payload TEXT NOT NULL," +
+                        "PRIMARY KEY(session_id,sequence))"
+                )
+                old.execSQL(
+                    "CREATE TABLE local_assets (" +
+                        "asset_id TEXT PRIMARY KEY NOT NULL, relative_path TEXT NOT NULL," +
+                        "media_type TEXT NOT NULL, byte_size INTEGER NOT NULL," +
+                        "storage_kind TEXT NOT NULL, state TEXT NOT NULL, created_at INTEGER NOT NULL)"
+                )
+                old.execSQL(
+                    "INSERT INTO local_assets VALUES (?,?,?,?,?,?,?)",
+                    arrayOf(digest, image.relativePath, image.mediaType, image.bytes, "file", "present", 1L),
+                )
+                old.version = 3
+            }
+            SqliteSessionEventDatabase(context, Json, name).use { upgraded ->
+                val catalog = SqliteLocalAssetCatalog(upgraded)
+                assertEquals(listOf(image.relativePath), catalog.locations(digest))
+                assertEquals(image.bytes, catalog.asset(digest)?.bytes)
+                catalog.register(image.copy(relativePath = ".dsh/attachments/$digest.jpg"))
+                assertEquals(2, catalog.locations(digest).size)
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
+    @Test fun v2DatabaseUpgradesToV4WithoutDiscardingEvents() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "asset-upgrade-${UUID.randomUUID()}.db"
         try {
