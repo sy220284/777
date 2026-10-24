@@ -74,7 +74,7 @@ class SqliteSessionMediaRestoreAndroidTest {
                     val destination = SqliteSessionStorageManager(
                         context, snapshots, events, targetSnap, targetEvents, unique,
                     )
-                    assertEquals(0, destination.stageRestore(archive))
+                    assertEquals(0, destination.stageRestore(ByteArrayInputStream(archive)))
                     assertTrue(File(pending, "READY").isFile)
                 }
             }
