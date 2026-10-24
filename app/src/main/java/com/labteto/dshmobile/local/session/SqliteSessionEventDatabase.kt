@@ -169,6 +169,20 @@ class SqliteSessionEventDatabase(
      * The marker shares the same transaction, so process death can only leave none
      * or a complete import. Never merge unrelated live SQL history under the same ID.
      */
+    internal fun legacyImportCommitted(sessionId: String): Boolean {
+        validateSessionId(sessionId)
+        val db = readableDatabase
+        val table = db.rawQuery(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_legacy_imports'",
+            null,
+        ).use { it.moveToFirst() }
+        if (!table) return false
+        return db.rawQuery(
+            "SELECT 1 FROM session_legacy_imports WHERE session_id=?",
+            arrayOf(sessionId),
+        ).use { it.moveToFirst() }
+    }
+
     internal fun importLegacyEvents(sessionId: String, legacy: LocalSessionEventLog) {
         validateSessionId(sessionId)
         val mutation = SqliteSessionConsistencyGate.acquireMutation()
@@ -184,7 +198,7 @@ class SqliteSessionEventDatabase(
                 ).use { rows -> if (rows.moveToFirst()) rows.getLong(0) else null }
                 val historicalLatest = legacy.latestSequence()
                 if (imported != null) {
-                    check(imported == historicalLatest && latestSequence(sessionId) == imported) {
+                    check(imported == historicalLatest && latestSequence(sessionId) >= imported) {
                         "旧会话 $sessionId 已迁移后源文件发生变化；保留双份数据并停止启动"
                     }
                     db.setTransactionSuccessful()
