@@ -2284,6 +2284,40 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun releasedOrReassignedTaskCannotKeepOldAgentRunAuthorized() {
+        val session = "team-old-run-after-release"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 1, emptyList()))
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 2, emptyList(), status = "in_progress", ownerId = "member-1"))
+        f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 3, emptyList(), status = "pending"))
+        assertTrue(runCatching {
+            f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+        }.exceptionOrNull() is LocalWorkflowSuperseded)
+
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 4, emptyList(), status = "in_progress", ownerId = "member-1"))
+        f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+
+        f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            member(session, "member-2", "peer", "provisioning"))
+        f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            member(session, "member-2", "peer", "active"))
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 5, emptyList(), status = "in_progress", ownerId = "member-2"))
+        assertTrue(runCatching {
+            f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+        }.exceptionOrNull() is LocalWorkflowSuperseded)
+        f.runtime.requireCurrentRootAuthorization(session, "job-team-2")
+        assertNull(f.runtime.project(session).failure)
+    }
+
+    @Test
     fun teamRootFenceAllowsProvisioningButRejectsDismissedMembership() {
         val session = "team-root-provisioning"
         val f = fixture(session)
