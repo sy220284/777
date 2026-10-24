@@ -22,6 +22,8 @@ internal object LocalAgentTeamContract {
             TEAM_SHUTDOWN_RESPONSE,
         )
         val MEMBER_TOOL_NAMES = com.labteto.dshmobile.local.tools.LocalTeamMemberToolContract.NAMES
+        /** All Team-managed child calls must enter the authenticated member dispatcher. */
+        fun isTeamChildControlCall(name: String): Boolean = name in TOOL_NAMES || name in MEMBER_TOOL_NAMES
         val TOOL_NAMES = setOf(
             "team_members",
             "team_member_status",
