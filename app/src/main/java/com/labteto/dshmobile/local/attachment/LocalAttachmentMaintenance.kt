@@ -64,6 +64,38 @@ internal fun mergeLocalImageAttachmentReferences(
     return LocalImageAttachmentReferences(ids, paths)
 }
 
+/**
+ * Resolve image liveness from the durable Session authority, never from a legacy
+ * .events.jsonl directory listing. An unreadable event stream or snapshot aborts
+ * the complete GC pass instead of treating its attachments as unused.
+ *
+ * Both the event stream and snapshot matter: a migrated or not-yet-projected
+ * conversation can retain image refs in either representation.
+ */
+internal fun collectAuthoritativeLocalImageAttachmentReferences(
+    sessionIds: Set<String>,
+    currentSessionId: String,
+    readEventReferences: (String) -> LocalImageAttachmentReferences,
+    readSnapshot: (String) -> JsonObject?,
+    foregroundMessages: List<JsonObject> = emptyList(),
+): LocalImageAttachmentReferences {
+    require(currentSessionId in sessionIds) { "当前会话必须纳入附件引用扫描" }
+    val references = mutableListOf<LocalImageAttachmentReferences>()
+    sessionIds.forEach { id ->
+        // No per-session runCatching here: one incomplete scan must disable deletion.
+        references += readEventReferences(id)
+        readSnapshot(id)?.let { snapshot ->
+            references += collectLocalImageAttachmentReferences(
+                events = emptySequence(), extraMessages = listOf(snapshot),
+            )
+        }
+    }
+    references += collectLocalImageAttachmentReferences(
+        events = emptySequence(), extraMessages = foregroundMessages,
+    )
+    return mergeLocalImageAttachmentReferences(references)
+}
+
 internal fun cleanupLocalImageAttachments(
     workspaceRoot: File,
     references: LocalImageAttachmentReferences,
@@ -120,6 +152,9 @@ internal fun cleanupLocalImageAttachments(
     if (totalBytes > maxImageBytes) {
         unreferenced
             .filter(File::exists)
+            // Files created just before their event/snapshot commit must not be
+            // removed by immediate cache-pressure GC.
+            .filter { file -> nowMillis - file.lastModified() >= DEFAULT_LOCAL_IMAGE_QUOTA_GRACE_MILLIS }
             .sortedBy(File::lastModified)
             .forEach { file ->
                 if (totalBytes > maxImageBytes) delete(file)
@@ -135,3 +170,6 @@ internal fun cleanupLocalImageAttachments(
 
 internal const val DEFAULT_LOCAL_IMAGE_CACHE_BYTES = 512L * 1024L * 1024L
 internal const val DEFAULT_LOCAL_IMAGE_GRACE_MILLIS = 7L * 24L * 60L * 60L * 1000L
+
+/** Conservative allowance for an in-flight attachment to become durable. */
+internal const val DEFAULT_LOCAL_IMAGE_QUOTA_GRACE_MILLIS = 60L * 60L * 1000L
