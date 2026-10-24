@@ -154,6 +154,14 @@ class LocalSessionEventLog(
             .map { it.toLocalEvent() }
     }
 
+    /**
+     * Native SQL skips events without a visible transcript or rewrite semantics.
+     * File-based tests retain the conservative full replay contract.
+     */
+    internal fun visibleTranscriptEventsAfter(sequenceExclusive: Long): List<Event> =
+        (if (sqlite != null) sqlite.visibleEventsAfter(sqliteId, sequenceExclusive)
+        else fileLog().snapshotAfter(sequenceExclusive)).map { it.toLocalEvent() }
+
     fun snapshotAfter(sequenceExclusive: Long): List<Event> = if (sqlite != null) buildList {
         sqlite.forEachAfter(sqliteId, sequenceExclusive) { add(it.toLocalEvent()) }
     } else fileLog().snapshotAfter(sequenceExclusive).map { it.toLocalEvent() }

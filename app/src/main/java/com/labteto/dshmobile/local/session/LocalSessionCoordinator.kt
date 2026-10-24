@@ -113,7 +113,9 @@ internal class LocalSessionCoordinator(
                 "会话投影游标 $cursor 超出事件日志末尾 $durableLatest；已停止自动恢复以保护历史",
             )
         }
-        val tailEvents = eventLog.snapshotAfter(cursor)
+        // During a cold session switch, tool/step/ledger events can vastly
+        // outnumber visible transcript updates. Decode only visible candidates.
+        val tailEvents = eventLog.visibleTranscriptEventsAfter(cursor)
         val projected = projectSessionTranscriptTail(
             snapshotMessages = baseWindow,
             events = tailEvents,
@@ -136,16 +138,20 @@ internal class LocalSessionCoordinator(
             // actual active transcript at use time, so old storage must not disable them.
             branchingEligible = true,
         )
+        // Mark every already committed event through the stable pre-query high
+        // watermark as considered, including the invisible events skipped by
+        // SQL. Never advance past a visible event actually projected.
+        val replayedThrough = maxOf(projected.projectedThroughSequence, durableLatest)
         return LocalSessionTranscriptRestore(
             messages = projected.messages,
             index = projectedIndex,
-            projectedThroughSequence = projected.projectedThroughSequence,
+            projectedThroughSequence = replayedThrough,
             needsPersist = migration != null ||
                 legacyBaseline != null ||
                 stored.messages.isNotEmpty() ||
                 stored.transcriptWindow != projected.messages ||
                 stored.transcriptIndex != projectedIndex ||
-                projected.projectedThroughSequence != stored.transcriptProjectedThroughSequence,
+                replayedThrough != stored.transcriptProjectedThroughSequence,
         )
     }
 

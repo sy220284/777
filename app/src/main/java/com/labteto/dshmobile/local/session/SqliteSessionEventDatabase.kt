@@ -248,6 +248,19 @@ class SqliteSessionEventDatabase(
         )
     }
 
+    /** Indexed forward replay for user-visible transcript projections. */
+    fun visibleEventsAfter(
+        sessionId: String, sequenceExclusive: Long,
+    ): List<SessionEvent> {
+        validateSessionId(sessionId)
+        return queryPage(
+            "SELECT sequence,event_type,created_at,schema_version,payload " +
+                "FROM session_events WHERE session_id=? AND visible_hint=1 AND sequence>? " +
+                "ORDER BY sequence ASC",
+            arrayOf(sessionId, sequenceExclusive.toString()),
+        )
+    }
+
     /** Most recent bounded window returned in chronological order by SQLite itself. */
     fun pageBeforeChronological(
         sessionId: String, beforeSequenceExclusive: Long = Long.MAX_VALUE, limit: Int = 80,

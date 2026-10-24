@@ -136,6 +136,10 @@ class SqliteSessionEventDatabaseAndroidTest {
                     "history", beforeSequenceExclusive = visible.last().sequence, limit = 1,
                 ).single().sequence)
                 assertEquals(163L, db.latestSequence("history"))
+                assertEquals(listOf(0L, 161L, 162L, 163L),
+                    db.visibleEventsAfter("history", -1L).map { it.sequence })
+                assertEquals(listOf(161L, 162L, 163L),
+                    db.visibleEventsAfter("history", 0L).map { it.sequence })
             }
         } finally {
             context.deleteDatabase(name)
