@@ -121,7 +121,14 @@ class SqliteSessionMediaArchiveAndroidTest {
                 SqliteSessionMediaArchive(context, root).validateStaged(stage, names)
             }.isFailure)
             unsafe.delete()
+            // Uncommitted temporary imports are intentionally excluded.
             File(directory, ".incoming-incomplete").writeBytes(byteArrayOf(3))
+            ZipOutputStream(ByteArrayOutputStream()).use { zip ->
+                SqliteSessionMediaArchive(context, root).export(zip, eventDb(root))
+            }
+            // Unknown published-looking nested paths must fail rather than be
+            // silently excluded from what the user believes is a full backup.
+            File(directory, "unsafe-subdirectory").mkdir()
             assertTrue(runCatching {
                 ZipOutputStream(ByteArrayOutputStream()).use { zip ->
                     SqliteSessionMediaArchive(context, root).export(zip, eventDb(root))
