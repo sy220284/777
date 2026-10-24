@@ -20,11 +20,16 @@ internal data class LocalTeamMessageReceipt(
     val historyCheckpointSequence: Long?,
     val historyWindowComplete: Boolean,
     val modelReplySequence: Long? = null,
+    val memberAcknowledgedSequence: Long? = null,
+    val memberAcknowledgedOutcome: String? = null,
+    val memberAcknowledgedReason: String? = null,
 ) {
     val status: String get() = when {
         !historyWindowComplete -> "unknown_history_window"
         queuedSequence == null -> "not_found"
         discardedSequence != null -> "discarded"
+        memberAcknowledgedSequence != null -> if (memberAcknowledgedOutcome == "handled")
+            "member_handled_reported" else "member_cannot_handle_reported"
         modelReplySequence != null -> "model_reply_observed"
         historyCheckpointSequence != null -> "checkpointed_in_model_history"
         deliveredSequence != null -> "accepted_by_inbox"
@@ -43,9 +48,13 @@ internal data class LocalTeamMessageReceipt(
         discardedSequence?.let { append("discarded_sequence=").append(it).append("\n") }
         historyCheckpointSequence?.let { append("history_checkpoint_sequence=").append(it).append("\n") }
         modelReplySequence?.let { append("model_reply_sequence=").append(it).append("\n") }
+        memberAcknowledgedSequence?.let { append("member_ack_sequence=").append(it).append("\n") }
+        memberAcknowledgedOutcome?.let { append("member_ack_outcome=").append(it).append("\n") }
+        memberAcknowledgedReason?.let { append("member_ack_reason=").append(it).append("\n") }
         append("model_reply_observed means the request included the exact message and a subsequent ")
         append("model reply was durably observed; it does not prove comprehension, ")
-        append("task completion or user authorization")
+        append("task completion or user authorization; a member-handled report is an explicit ") 
+        append("member declaration, never independent proof of verified task completion")
     }
 }
 
@@ -62,6 +71,7 @@ internal fun projectLocalTeamMessageReceipt(
     var target: String? = null
     val checkpointJobs = mutableListOf<Pair<String, Long>>()
     val replyJobs = mutableListOf<Pair<String, Long>>()
+    val ackReports = mutableListOf<Triple<String, Long, Pair<String, String>>>()
     for (event in events) {
         val data = event.data
         when (event.type) {
@@ -85,6 +95,16 @@ internal fun projectLocalTeamMessageReceipt(
                     data["messageId"]?.jsonPrimitive?.contentOrNull == id &&
                     (discarded == null || event.sequence > discarded)
                 ) discarded = event.sequence
+            }
+            LocalAgentTeamContract.TEAM_MESSAGE_ACKNOWLEDGED -> {
+                if (data["teamId"]?.jsonPrimitive?.contentOrNull != sessionId ||
+                    data["messageId"]?.jsonPrimitive?.contentOrNull != id) continue
+                val member = data["memberId"]?.jsonPrimitive?.contentOrNull ?: continue
+                val outcome = data["outcome"]?.jsonPrimitive?.contentOrNull ?: continue
+                val reason = data["reason"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                if (outcome in setOf("handled", "cannot_handle")) {
+                    ackReports += Triple(member, event.sequence, outcome to reason)
+                }
             }
             LOCAL_SUBAGENT_INBOX_MODEL_REPLY_EVENT -> {
                 val submitted = data["message_ids"] as? JsonArray ?: continue
@@ -114,6 +134,11 @@ internal fun projectLocalTeamMessageReceipt(
     val reply = replyJobs.asSequence()
         .filter { it.first == expectedJob && queuedAt != null && it.second >= queuedAt }
         .maxOfOrNull { it.second }
+    val acknowledgment = ackReports.asSequence()
+        .filter { (member, sequence, _) ->
+            member == target && reply != null && sequence > reply && delivered != null &&
+                sequence > delivered
+        }.maxByOrNull { it.second }
     // Do not conclude delivery from a checkpoint alone if the queued event was outside the scan.
     return LocalTeamMessageReceipt(
         id = id,
@@ -124,6 +149,9 @@ internal fun projectLocalTeamMessageReceipt(
         historyCheckpointSequence = if (queued != null) checkpoint else null,
         historyWindowComplete = historyWindowComplete,
         modelReplySequence = if (checkpoint != null) reply else null,
+        memberAcknowledgedSequence = acknowledgment?.second,
+        memberAcknowledgedOutcome = acknowledgment?.third?.first,
+        memberAcknowledgedReason = acknowledgment?.third?.second,
     )
 }
 
