@@ -153,6 +153,9 @@ internal class LocalSubagentRunnerFactory(
             )
         },
         executeTeamTool = executeTeamTool?.let { executor -> { jobId, call -> executor(runSessionId(), jobId, call) } },
+        requireTeamRootAuthorization = requireTeamRootAuthorization?.let { check ->
+            { jobId -> check(runSessionId(), jobId) }
+        },
         importToolImages = importToolImages,
         state = runnerState,
         jobs = jobs,
