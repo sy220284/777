@@ -4,7 +4,6 @@ import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 import com.labteto.dshmobile.local.LocalWebException
 import com.labteto.dshmobile.local.LocalWebFetchResult
 import com.labteto.dshmobile.local.TokenUsageContext
-import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import java.net.SocketTimeoutException
 import java.net.URI
 import kotlinx.coroutines.CancellationException
@@ -26,7 +25,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 internal class LocalWebSearchClient(
     private val http: OkHttpClient,
     private val json: Json,
-    @Suppress("UNUSED_PARAMETER") usageTracker: DeepSeekUsageTracker,
 ) {
     suspend fun search(
         apiKey: String,
