@@ -279,6 +279,9 @@ internal object LocalAgentTeamReducer {
             "TEAM_TASK_BLOCKER_DUPLICATE"
         }
         require(next.writeScopes.size <= MAX_WRITE_SCOPES) { "TEAM_TASK_WRITE_SCOPE_LIMIT" }
+        require(next.rootUserRevision == null || next.rootUserRevision >= -1L) {
+            "TEAM_TASK_USER_REVISION_INVALID"
+        }
         require(next.autoDispatchMessageId == null ||
             (next.status == LocalTeamTaskStatus.IN_PROGRESS && next.ownerId != null)) {
             "TEAM_TASK_AUTO_DISPATCH_STATE_INVALID"
