@@ -4,6 +4,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
 import java.util.UUID
@@ -82,24 +83,8 @@ internal class SqliteSessionStorageManager(
             }
             validateSnapshotEventCursors(snapshotCopy, eventCopy)
             var written = 0L
-            // An exported backup must fit the same limit as stageRestore(ByteArray).
-            // Fail the export explicitly rather than returning an unrestorable ZIP.
-            val bounded = object : java.io.FilterOutputStream(output) {
-                var count = 0L
-                override fun write(value: Int) {
-                    check(count < MAX_ZIP_BYTES) { "完整 SQLite 媒体备份超过当前恢复包上限" }
-                    out.write(value)
-                    count++
-                }
-                override fun write(bytes: ByteArray, offset: Int, length: Int) {
-                    check(length >= 0 && count + length <= MAX_ZIP_BYTES) {
-                        "完整 SQLite 媒体备份超过当前恢复包上限"
-                    }
-                    out.write(bytes, offset, length)
-                    count += length
-                }
-            }
-            ZipOutputStream(bounded.buffered()).use { zip ->
+            // ZIP bytes stream to the destination; no whole-archive memory buffer.
+            ZipOutputStream(output.buffered()).use { zip ->
                 listOf(snapshotCopy, eventCopy).forEach { source ->
                     zip.putNextEntry(ZipEntry(source.name))
                     source.inputStream().buffered().use { input ->
@@ -125,9 +110,15 @@ internal class SqliteSessionStorageManager(
         validateDatabase(destination)
     }
 
-    @Synchronized
+    /** Compatibility entry for existing in-memory tests and callers. */
     fun stageRestore(archive: ByteArray): Int {
         require(archive.isNotEmpty() && archive.size <= MAX_ZIP_BYTES) { "SQLite 备份压缩包为空或超限" }
+        return stageRestore(ByteArrayInputStream(archive))
+    }
+
+    /** Stage SAF/file backups directly from a stream, independent of ZIP size. */
+    @Synchronized
+    fun stageRestore(archive: InputStream): Int {
         require(!pendingRoot.exists()) { "已有待恢复数据，请重启应用处理" }
         check(snapshots.readSummaries().isEmpty() && events.sessionCount() == 0 &&
             !hasRegisteredAssets(events.readableDatabase)) {
@@ -138,7 +129,7 @@ internal class SqliteSessionStorageManager(
         try {
             val names = linkedSetOf<String>()
             var bytes = 0L
-            ZipInputStream(ByteArrayInputStream(archive)).use { zip ->
+            ZipInputStream(archive).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
                     val mediaEntry = entry.name.startsWith(SqliteSessionMediaArchive.MEDIA_PREFIX) &&
@@ -362,6 +353,7 @@ internal class SqliteSessionStorageManager(
         const val SNAPSHOT_ENTRY = "snapshot.sqlite"
         const val EVENT_ENTRY = "events.sqlite"
         const val MAX_ZIP_BYTES = 128 * 1024 * 1024
-        const val MAX_UNPACKED_BYTES = 512L * 1024L * 1024L
+        // Bounded for malformed ZIP protection; streaming avoids RAM proportional to archive size.
+        const val MAX_UNPACKED_BYTES = 64L * 1024L * 1024L * 1024L
     }
 }
