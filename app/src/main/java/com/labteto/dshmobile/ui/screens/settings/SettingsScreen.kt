@@ -297,6 +297,26 @@ fun SettingsScreen(
         }
     }
 
+    val legacyStorageImporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            localSessionStorageBusy = true
+            try {
+                val sessions = viewModel.importLegacySessionStorage(uri)
+                localSessionStorageStatus = viewModel.localSessionStorageStatus()
+                toast.second("旧版 ZIP 已转换为 SQLite 恢复计划：$sessions 个会话。旧归档不含完整媒体原件，请自行保留素材备份；重启后生效")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                AppLog.failure("Settings", "stage_legacy_session_restore", error)
+                toast.second(error.message ?: "旧版 ZIP 转换失败")
+            } finally {
+                localSessionStorageBusy = false
+            }
+        }
+    }
+
     fun navigateBack() {
         if (page == SettingsDestination.USAGE_DETAIL && usageDetailBackSelection != null) {
             usageDetailSelection = usageDetailBackSelection
@@ -984,6 +1004,9 @@ fun SettingsScreen(
                             },
                             onExport = { sessionStorageExporter.launch("777-local-sessions.zip") },
                             onRestore = { sessionStorageImporter.launch(arrayOf("application/zip", "application/octet-stream")) },
+                            onLegacyRestore = {
+                                legacyStorageImporter.launch(arrayOf("application/zip", "application/octet-stream"))
+                            },
                             onCancelRestore = {
                                 scope.launch {
                                     localSessionStorageBusy = true
