@@ -15,6 +15,34 @@ import org.junit.rules.TemporaryFolder
 class LocalWorkOpenGraphProjectionTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    @Test fun evictedToolLedgersRecoverFromSparseOffsetsAfterLongHistory() {
+        val log = LocalSessionEventLog(File(temporary.root, "sparse-cold-job.jsonl"), Json)
+        try {
+            repeat(5_000) {
+                log.append("unrelated", buildJsonObject { put("number", it) })
+            }
+            fun startJob(job: String, run: String) {
+                log.append("agent/subagent-run-checkpoint", buildJsonObject {
+                    put("agent_id", localPersistentSubagentId(job)); put("run_id", run)
+                })
+                log.append("tool/execution-started", buildJsonObject {
+                    put("id", "write"); put("execution_id", job); put("read_only", false)
+                    put("attributes", buildJsonObject { put("run_id", run) })
+                })
+            }
+            startJob("job-a", "run-a")
+            startJob("job-b", "run-b")
+            val projection = LocalWorkOpenGraphProjection(maxCachedFacts = 1)
+            val initial = projection.toolAttempts(log, "job-a")
+            assertTrue(initial.single().unresolvedExternalEffect)
+            assertEquals(1, projection.toolAttempts(log, "job-b").size)
+            assertEquals(initial, projection.toolAttempts(log, "job-a"))
+            assertEquals(0, projection.lastRefreshEvents)
+            assertEquals(log.latestSequence(), projection.indexedThroughSequence())
+            assertTrue(projection.cachedFactCount() <= 1)
+        } finally { log.close() }
+    }
+
     @Test fun incrementallyReadsNewFactsAndInvalidatesAfterClear() {
         val log = LocalSessionEventLog(File(temporary.root, "facts.jsonl"), Json)
         val projection = LocalWorkOpenGraphProjection()
