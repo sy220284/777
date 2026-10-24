@@ -59,6 +59,16 @@ class LocalToolPolicyTest {
         assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope("team_respond_shutdown"))
     }
 
+    @Test fun memberMessageAcknowledgementHasExplicitNarrowAgentControlPolicy() {
+        assertEquals(ToolAccess.AGENT_CONTROL, LocalToolPolicy.access("team_ack_message"))
+        assertEquals(ToolExposure.OPTIONAL, LocalToolPolicy.exposure("team_ack_message"))
+        assertEquals(ToolApprovalPolicy.NEVER, LocalToolPolicy.approval("team_ack_message"))
+        assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope("team_ack_message"))
+        assertTrue("team_ack_message" in com.labteto.dshmobile.local.tools.LocalTeamMemberToolContract.NAMES)
+        assertTrue("team_ack_message" !in com.labteto.dshmobile.local.work.LocalAgentTeamContract.TOOL_NAMES)
+        assertTrue(com.labteto.dshmobile.local.work.LocalAgentTeamContract.isTeamChildControlCall("team_ack_message"))
+    }
+
     @Test fun mediaToolsHaveExplicitBillingAndReadOnlyBoundaries() {
         assertEquals(ToolAccess.PRIVILEGED, LocalToolPolicy.access("media_image_create"))
         assertEquals(ToolApprovalPolicy.ALWAYS, LocalToolPolicy.approval("media_image_create"))
