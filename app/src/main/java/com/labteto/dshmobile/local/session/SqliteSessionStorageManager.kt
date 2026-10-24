@@ -40,7 +40,9 @@ internal class SqliteSessionStorageManager(
             listOf(source, File(source.path + "-wal"), File(source.path + "-shm"))
         }
         return LocalSessionStorageStatus(
-            totalBytes = files.sumOf { if (it.isFile) it.length() else 0L },
+            totalBytes = files.sumOf { if (it.isFile) it.length() else 0L } +
+                File(context.filesDir, "local-harness/workspace/.dsh/attachments")
+                    .listFiles().orEmpty().sumOf { if (it.isFile) it.length() else 0L },
             freeBytes = context.filesDir.usableSpace,
             budgetBytes = LocalSessionStorageStatus.DEFAULT_BUDGET_BYTES,
             sessionCount = snapshots.readSummaries().size,
@@ -55,10 +57,11 @@ internal class SqliteSessionStorageManager(
         val mediaRoot = File(context.filesDir, "local-harness/workspace/.dsh/attachments")
         val mediaBytes = mediaRoot.listFiles().orEmpty()
             .sumOf { if (it.isFile) it.length() else 0L }
-        val total = core.totalBytes + mediaBytes
+        val total = core.totalBytes
+        val databaseBytes = core.totalBytes - mediaBytes
         val warning = if (total >= core.budgetBytes || core.lowFreeSpace) "（空间偏紧）" else ""
         val mib = 1024L * 1024L
-        return "会话存储：${total / mib} MiB（SQLite及WAL ${core.totalBytes / mib} MiB，附件 ${mediaBytes / mib} MiB），" +
+        return "会话存储：${total / mib} MiB（SQLite及WAL ${databaseBytes / mib} MiB，附件 ${mediaBytes / mib} MiB），" +
             "设备可用 ${core.freeBytes / mib} MiB${warning}"
     }
 
