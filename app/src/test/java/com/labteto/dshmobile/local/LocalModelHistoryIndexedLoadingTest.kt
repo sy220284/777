@@ -18,7 +18,7 @@ class LocalModelHistoryIndexedLoadingTest {
             val log = LocalSessionEventLog(File(dir, "events.jsonl"), Json)
             log.append("user/message", buildJsonObject { put("content", "Before checkpoint") })
             val codec = ModelHistoryCheckpointCodec()
-            log.append(codec.EVENT_TYPE, codec.encode(
+            log.append(ModelHistoryCheckpointCodec.EVENT_TYPE, codec.encode(
                 messages = emptyList(), reason = "pre-turn", asOfSequence = -1L,
             ))
             repeat(120) { i -> log.append("step/end", buildJsonObject { put("iteration", i) }) }
@@ -29,7 +29,7 @@ class LocalModelHistoryIndexedLoadingTest {
 
             val indexed = loadModelHistoryReplayEvents(log, codec, emptyList())
             assertEquals(
-                listOf("user/message", codec.EVENT_TYPE, "assistant/message"),
+                listOf("user/message", ModelHistoryCheckpointCodec.EVENT_TYPE, "assistant/message"),
                 indexed.map { it.type },
             )
             val reconstructed = restoreLocalModelHistory(indexed, emptyList(), codec)
@@ -47,12 +47,12 @@ class LocalModelHistoryIndexedLoadingTest {
         try {
             val log = LocalSessionEventLog(File(dir, "events.jsonl"), Json)
             val codec = ModelHistoryCheckpointCodec()
-            val first = log.append(codec.EVENT_TYPE, codec.encode(
+            val first = log.append(ModelHistoryCheckpointCodec.EVENT_TYPE, codec.encode(
                 messages = emptyList(), reason = "valid", asOfSequence = -1L,
             ))
             log.append("user/message", buildJsonObject { put("content", "Retained") })
             // This checkpoint falsely claims it has materialized a later event.
-            log.append(codec.EVENT_TYPE, codec.encode(
+            log.append(ModelHistoryCheckpointCodec.EVENT_TYPE, codec.encode(
                 messages = emptyList(), reason = "future", asOfSequence = 100L,
             ))
             val recovered = loadModelHistoryReplayEvents(log, codec, emptyList())
