@@ -9,6 +9,8 @@ import com.labteto.dshmobile.local.web.LOCAL_WEB_MAX_RESPONSE_BYTES
 import com.labteto.dshmobile.local.web.LOCAL_WEB_USER_AGENT
 import com.labteto.dshmobile.local.web.LocalWebDiagnostics
 import com.labteto.dshmobile.local.web.LocalWebSearchClient
+import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
+import com.labteto.dshmobile.local.web.LocalSearchUsageStore
 import com.labteto.dshmobile.local.web.LocalKeylessWebSearchClient
 import com.labteto.dshmobile.local.web.isRetryableWebTransportFailure
 import com.labteto.dshmobile.local.web.isTextualWebMediaType
@@ -42,9 +44,11 @@ class LocalWebProvider @Inject constructor(
     @ApplicationContext context: Context,
     http: OkHttpClient,
     json: Json,
+    private val searchUsage: LocalSearchUsageStore,
+    private val networkSettings: LocalNetworkSearchSettings,
 ) {
-    private val searchClient = LocalWebSearchClient(http, json)
-    private val keylessSearchClient = LocalKeylessWebSearchClient(http)
+    private val searchClient = LocalWebSearchClient(http, json) { searchUsage.record("deepseek", it) }
+    private val keylessSearchClient = LocalKeylessWebSearchClient(http) { searchUsage.record("bing", "search") }
     private val targetResolver = com.labteto.dshmobile.local.web.LocalWebTargetResolver(context, http)
     private val diagnostics = LocalWebDiagnostics(targetResolver)
 
@@ -312,7 +316,12 @@ class LocalWebProvider @Inject constructor(
         provider: String = "auto",
     ): String {
         require(provider in setOf("auto", "bing", "deepseek")) { "未知网页搜索服务：" + provider }
+        if (!networkSettings.isEnabled()) throw LocalWebException("NETWORK_SEARCH_DISABLED", "网络搜索已关闭")
         if (provider == "bing") return keylessSearchClient.search(queries)
+        if (!networkSettings.isDeepSeekPreferred()) {
+            if (provider == "deepseek") throw LocalWebException("PAID_SEARCH_DISABLED", "请先在能力中心开启 DeepSeek 付费搜索")
+            return keylessSearchClient.search(queries)
+        }
         val key = fallbackKey()
         if (provider == "deepseek") {
             if (key.isNullOrBlank()) throw LocalWebException(
@@ -343,12 +352,17 @@ class LocalWebProvider @Inject constructor(
     }
 
     /** Only a public validated target is passed to the official DeepSeek Fetch API. */
-    suspend fun fetchViaDeepSeek(apiKey: String, input: String): LocalWebFetchResult {
+    suspend fun fetchViaDeepSeek(
+        apiKey: String, input: String, maxBytes: Int = LOCAL_WEB_MAX_RESPONSE_BYTES,
+        timeoutSeconds: Long = 45L,
+    ): LocalWebFetchResult {
+        if (!networkSettings.isEnabled()) throw LocalWebException("NETWORK_SEARCH_DISABLED", "网络搜索已关闭")
+        if (!networkSettings.isDeepSeekPreferred()) throw LocalWebException("PAID_SEARCH_DISABLED", "请先在能力中心开启 DeepSeek 付费搜索")
         val uri = validateTarget(input).uri
         require(uri.toString().length <= 8192 && uri.userInfo == null) {
             "DeepSeek Fetch URL 必须是不含用户信息、长度不超过 8192 的公开 HTTP/HTTPS 地址"
         }
-        return searchClient.fetch(apiKey, uri.toString())
+        return searchClient.fetch(apiKey, uri.toString(), maxBytes, timeoutSeconds)
     }
 
     fun fallbackQuery(input: String): String {
