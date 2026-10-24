@@ -18,6 +18,7 @@ import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
 import com.labteto.dshmobile.local.work.LocalWorkComposition
+import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
@@ -43,6 +44,7 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
     private val tools: LocalToolCompositionRoot,
     private val skillManager: com.labteto.dshmobile.local.tools.LocalSkillManager,
     private val work: LocalWorkComposition,
+    private val workRuns: LocalWorkRunRegistry,
     private val foregroundWake: LocalForegroundTurnWakeCoordinator,
     private val foregroundSessionLoader: LocalForegroundSessionLoader,
     private val chatStyleGuardSettings: LocalChatStyleGuardSettingsPort,
@@ -126,6 +128,9 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
     }
 
     private fun cleanupLocalImagesIfDue() {
+        // Never prune attachments while a Work or foreground turn may still be
+        // writing files that have not reached the durable SQLite event stream.
+        if (workRuns.anyLive() || runtimeStateStore.foregroundRunHandle.hasLiveJob()) return
         val now = System.currentTimeMillis()
         val last = preferences.getLong(KEY_ATTACHMENT_GC_AT, 0L)
         if (now - last < ATTACHMENT_GC_INTERVAL_MILLIS) return
@@ -135,6 +140,11 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
             // The legacy JSONL directory cannot enumerate SQLite-owned sessions.
             check(sessionStorage.eventLogs.sqliteDatabase != null) {
                 "SQLite 会话事件权威来源不可用，附件回收已停止"
+            }
+            // Pending editors can carry images outside the saved Session snapshot.
+            // Until draft attachments have an indexed authority, fail closed.
+            check(pendingSessions.entries().isEmpty()) {
+                "存在未提交的会话草稿，延后图片回收以免误删"
             }
             val ids = buildSet {
                 addAll(sessionStorage.eventLogs.historicalSources().map { it.id })
