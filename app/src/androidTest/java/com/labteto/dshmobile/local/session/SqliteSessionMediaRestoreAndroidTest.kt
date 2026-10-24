@@ -74,6 +74,15 @@ class SqliteSessionMediaRestoreAndroidTest {
                     val destination = SqliteSessionStorageManager(
                         context, snapshots, events, targetSnap, targetEvents, unique,
                     )
+                    // Deleted last Session can leave a new empty editor model selection
+                    // and globally indexed, unreferenced media. Neither is a live chat.
+                    events.append("empty-editor", "session/model-selection",
+                        buildJsonObject { put("profile_id", "test-profile") })
+                    val catalog = SqliteLocalAssetCatalog(events)
+                    catalog.register(LocalImportedAttachment(
+                        name = "test.png", relativePath = ".dsh/attachments/$digest.png",
+                        mediaType = "image/png", bytes = bytes.size.toLong(), attachmentId = digest,
+                    ))
                     assertEquals(0, destination.stageRestore(ByteArrayInputStream(archive)))
                     assertTrue(File(pending, "READY").isFile)
                 }
