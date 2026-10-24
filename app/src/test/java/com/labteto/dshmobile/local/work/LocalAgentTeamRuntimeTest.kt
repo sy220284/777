@@ -2308,6 +2308,7 @@ class LocalAgentTeamRuntimeTest {
             put("content", "实际工具观测结果")
         })
         assertEquals(originalRevision, workflowUserRevision(f.log))
+        f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
         // Even a newer child result cannot override an intervening USER instruction.
         f.log.append("user/message", buildJsonObject { put("content", "撤销旧任务，改做别的") })
         assertTrue(workflowUserRevision(f.log) > originalRevision)
