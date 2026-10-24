@@ -49,6 +49,19 @@ class LocalAgentSubtreeAdmissionTest {
         assertEquals(1, root.capabilities.depth)
     }
 
+    @Test fun leafCannotRetainDelegationAndInheritsNoMutationGrant() {
+        val parent = LocalSubagentCapabilities(
+            depth = 2, maxDepth = 3, allowMutation = false,
+            toolAllowlist = setOf("read", "subagent"),
+        )
+        val leaf = compileNestedReadonlyCapabilities(parent)
+        assertEquals(3, leaf.depth)
+        assertEquals(setOf("read"), leaf.toolAllowlist)
+        assertFalse(leaf.allowMutation)
+        assertFalse(leaf.continuable)
+        assertTrue(runCatching { compileNestedReadonlyCapabilities(leaf) }.isFailure)
+    }
+
     @Test fun concurrentDescendantBudgetHasFixedHardCap() {
         val budget = LocalAgentSubtreeBudget(maxDescendants = 2)
         budget.claim()

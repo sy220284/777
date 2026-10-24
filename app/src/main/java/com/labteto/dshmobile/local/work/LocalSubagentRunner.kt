@@ -27,6 +27,7 @@ import com.labteto.dshmobile.local.agent.LocalSubagentCompactionPolicy
 import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.LocalAgentSubtreeBudget
+import com.labteto.dshmobile.local.agent.compileNestedReadonlyCapabilities
 import com.labteto.dshmobile.local.agent.bindLocalAgentRole
 import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
@@ -669,16 +670,7 @@ internal class LocalSubagentRunner(
                                     modelOverride = runProfile.id,
                                     maxSteps = childSteps,
                                     parentLink = parent,
-                                    capabilities = capabilities.copy(
-                                        allowMutation = false,
-                                        continuable = false,
-                                        virtualScreen = false,
-                                        historyMode = LocalSubagentHistoryMode.ISOLATED,
-                                        depth = capabilities.depth + 1,
-                                        teamManaged = false,
-                                        outputSchema = null,
-                                        initialOptionalTools = emptySet(),
-                                    ),
+                                    capabilities = compileNestedReadonlyCapabilities(capabilities),
                                 )
                                 val child = withTimeoutOrNull(30_000L) {
                                     runResult(
