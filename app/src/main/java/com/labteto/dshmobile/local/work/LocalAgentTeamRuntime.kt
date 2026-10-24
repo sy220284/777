@@ -1499,17 +1499,26 @@ internal class LocalAgentTeamRuntime(
                         "TEAM_TASK_BLOCKED：依赖尚未完成"
                     }
                     val member = resolveOwner(state, ownerName)
-                    next.copy(status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = member.id, autoDispatchMessageId = null)
+                    next.copy(status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = member.id, autoDispatchMessageId = null,
+                        rootUserRevision = workflowUserRevision(eventLogFor(sessionId)))
                 }
                 "release" -> {
                     require(current.status == LocalTeamTaskStatus.IN_PROGRESS) {
                         "TEAM_TASK_STATUS_INVALID：只有 in_progress 任务可以 release"
                     }
-                    next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null, autoDispatchMessageId = null)
+                    next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null, autoDispatchMessageId = null,
+                        rootUserRevision = null)
                 }
                 "complete" -> {
                     require(current.status == LocalTeamTaskStatus.IN_PROGRESS) {
                         "TEAM_TASK_STATUS_INVALID：只有 in_progress 任务可以 complete"
+                    }
+                    // A newer USER instruction invalidates evidence from the old task owner epoch.
+                    // Legacy records without this field preserve their historical behavior.
+                    current.rootUserRevision?.let { admitted ->
+                        require(admitted == workflowUserRevision(eventLogFor(sessionId))) {
+                            "TEAM_TASK_ROOT_INSTRUCTION_SUPERSEDED：用户指令已变化，请由主代理重新授权"
+                        }
                     }
                     val verifiedResultId = resultId?.takeIf(String::isNotBlank)
                         ?: error("TEAM_TASK_RESULT_REQUIRED：complete 必须提供已核验的 result_id")
@@ -1524,7 +1533,8 @@ internal class LocalAgentTeamRuntime(
                     require(current.status == LocalTeamTaskStatus.COMPLETED) {
                         "TEAM_TASK_STATUS_INVALID：只有 completed 任务可以 reopen"
                     }
-                    next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null, autoDispatchMessageId = null)
+                    next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null, autoDispatchMessageId = null,
+                        rootUserRevision = null)
                 }
                 "reassign" -> {
                     require(
@@ -1535,13 +1545,15 @@ internal class LocalAgentTeamRuntime(
                     }
                     val requestedOwner = ownerName?.trim()?.takeIf(String::isNotBlank)
                     if (requestedOwner == null) {
-                        next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null, autoDispatchMessageId = null)
+                        next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null, autoDispatchMessageId = null,
+                        rootUserRevision = null)
                     } else {
                         require(dependenciesReady(current, state.tasks)) {
                             "TEAM_TASK_BLOCKED：依赖尚未完成"
                         }
                         val member = resolveOwner(state, requestedOwner)
-                        next.copy(status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = member.id, autoDispatchMessageId = null)
+                        next.copy(status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = member.id, autoDispatchMessageId = null,
+                        rootUserRevision = workflowUserRevision(eventLogFor(sessionId)))
                     }
                 }
                 "delete" -> {
@@ -1554,7 +1566,8 @@ internal class LocalAgentTeamRuntime(
                         "TEAM_TASK_DELETE_BLOCKED：仍被依赖：" +
                             dependents.joinToString(",") { it.id }
                     }
-                    next.copy(status = LocalTeamTaskStatus.DELETED, ownerId = null, autoDispatchMessageId = null)
+                    next.copy(status = LocalTeamTaskStatus.DELETED, ownerId = null, autoDispatchMessageId = null,
+                        rootUserRevision = null)
                 }
                 "set_dependencies" -> next.copy(
                     blockedBy = normalizeTaskIds(
