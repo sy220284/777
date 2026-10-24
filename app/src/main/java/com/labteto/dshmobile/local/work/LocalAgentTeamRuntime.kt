@@ -33,6 +33,7 @@ import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_DISC
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_QUEUED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_ACKNOWLEDGED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_TASK_EVENT
+import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_TASK_REVIEW_EVENT
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_SHUTDOWN_RESPONSE
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TOOL_NAMES
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.WAIT_POLL_MS
@@ -181,6 +182,18 @@ internal data class LocalTeamMessageAckSnapshot(
     val reason: String = "",
 )
 
+@Serializable
+internal data class LocalTeamTaskReviewSnapshot(
+    val taskId: String,
+    val taskRevision: Int,
+    val taskResultId: String,
+    val reviewerId: String,
+    val reviewResultId: String,
+    val reviewEvidenceSequence: Long,
+    val verdict: String,
+    val reason: String,
+)
+
 internal data class LocalTeamAgentMessageSnapshot(
     val id: String,
     val sequence: Long,
@@ -195,6 +208,8 @@ internal data class LocalTeamAgentMessageSnapshot(
 internal data class LocalTeamProjection(
     val members: List<LocalTeamMemberSnapshot> = emptyList(),
     val tasks: List<LocalTeamTaskSnapshot> = emptyList(),
+    /** Explicit independent reviewer declarations, replayed from the same Team EventLog. */
+    val taskReviews: List<LocalTeamTaskReviewSnapshot> = emptyList(),
     val pendingMessages: List<LocalTeamMessageSnapshot> = emptyList(),
     val deliveredMessageIds: List<String> = emptyList(),
     /** Rebuilt from delivery events to authenticate later member acknowledgements. */
@@ -477,6 +492,14 @@ internal class LocalAgentTeamRuntime(
             )
             "team_task_evidence" -> renderTaskCompletionEvidence(
                 binding.sessionId, args.requiredTeamString("task_id"),
+            )
+            "team_task_review" -> recordIndependentTaskReview(
+                sessionId = binding.sessionId,
+                taskId = args.requiredTeamString("task_id"),
+                expectedRevision = args["expected_revision"]?.jsonPrimitive?.intOrNull
+                    ?: error("TEAM_TASK_REVIEW_REVISION_REQUIRED"),
+                reviewerName = args.requiredTeamString("reviewer"),
+                reviewResultId = args.requiredTeamString("review_result_id"),
             )
             "team_task_list" -> renderTasks(binding.sessionId)
             "team_task_update" -> updateTask(
