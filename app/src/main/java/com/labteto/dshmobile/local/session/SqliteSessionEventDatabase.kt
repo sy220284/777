@@ -59,7 +59,8 @@ class SqliteSessionEventDatabase(
         require(oldVersion in 1..3 && newVersion == 4) {
             "不支持的会话事件数据库版本：$oldVersion -> $newVersion"
         }
-        if (oldVersion < 2) createCheckpointTable(db)
+        // Idempotent even if an older pilot schema omitted this table.
+        createCheckpointTable(db)
 
         // Two unmerged draft schemas used version=3: one added visible_hint,
         // the other introduced assets. Detect actual column presence instead
