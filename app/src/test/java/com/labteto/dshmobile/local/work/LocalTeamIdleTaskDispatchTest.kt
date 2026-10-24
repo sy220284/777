@@ -74,6 +74,31 @@ class LocalTeamIdleTaskDispatchTest {
         ))
     }
 
+
+    @Test fun replayRejectsReplacedAutoDispatchIdentityAndOwner() {
+        val first = task("task-1")
+        val reserved = first.copy(
+            revision = 2, status = LocalTeamTaskStatus.IN_PROGRESS,
+            ownerId = "member-1", autoDispatchMessageId = "team-msg-1234567890abcdef1234",
+        )
+        LocalAgentTeamReducer.validateTaskTransition(listOf(first), first, reserved)
+        val replaced = reserved.copy(
+            revision = 3, autoDispatchMessageId = "team-msg-1234567890abcdef9999",
+        )
+        val replacedFailure = runCatching {
+            LocalAgentTeamReducer.validateTaskTransition(listOf(reserved), reserved, replaced)
+        }.exceptionOrNull()
+        assertNotNull(replacedFailure)
+        assertEquals("TEAM_TASK_AUTO_DISPATCH_REPLACED", replacedFailure?.message)
+
+        val changedOwner = reserved.copy(revision = 3, ownerId = "member-other")
+        val ownerFailure = runCatching {
+            LocalAgentTeamReducer.validateTaskTransition(listOf(reserved), reserved, changedOwner)
+        }.exceptionOrNull()
+        assertNotNull(ownerFailure)
+        assertEquals("TEAM_TASK_AUTO_OWNER_CHANGED", ownerFailure?.message)
+    }
+
     @Test fun autoDispatchIdentitySurvivesEventRoundTripAndLegacyHasNoIntent() {
         val reserved = task("task-3").copy(
             revision = 2,
