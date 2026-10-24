@@ -32,6 +32,49 @@ class LocalAgentMessageDeliveryModeTest {
         assertFalse(shouldWakeAgentAfterAcceptedMessage(mode, accepted = true, requiresResume = false))
     }
 
+    @Test fun queueOnlyReceiptMustNotPromiseDeliveryOrFutureActivation() {
+        val receipt = renderLocalAgentMessageSubmission(
+            messageId = "msg-01",
+            mode = LocalAgentMessageDeliveryMode.QUEUE_ONLY,
+            accepted = true, duplicate = false, requiresResume = true,
+        )
+        assertTrue(receipt.contains("accepted=true"))
+        assertTrue(receipt.contains("delivery_mode=queue_only"))
+        assertTrue(receipt.contains("wake_requested=false"))
+        assertTrue(receipt.contains("processing_status=unverified"))
+        assertTrue(receipt.contains("completion_status=unverified"))
+        assertFalse(receipt.contains("已发送给"))
+    }
+
+    @Test fun triggerTurnReportsWakeRequestButNeverFakesSuccessfulActivation() {
+        val receipt = renderLocalAgentMessageSubmission(
+            messageId = "msg-02",
+            mode = LocalAgentMessageDeliveryMode.TRIGGER_TURN,
+            accepted = true, duplicate = false, requiresResume = true,
+        )
+        assertTrue(receipt.contains("wake_requested=true"))
+        assertTrue(receipt.contains("processing_status=unverified"))
+        val rejected = renderLocalAgentMessageSubmission(
+            messageId = "msg-03",
+            mode = LocalAgentMessageDeliveryMode.TRIGGER_TURN,
+            accepted = false, duplicate = false, requiresResume = true,
+            rejection = "inbox full",
+        )
+        assertTrue(rejected.contains("accepted=false"))
+        assertTrue(rejected.contains("wake_requested=false"))
+        assertTrue(rejected.contains("reason=inbox full"))
+    }
+
+    @Test fun duplicateAcceptanceIsNotASecondProcessingAcknowledgement() {
+        val receipt = renderLocalAgentMessageSubmission(
+            messageId = "msg-04",
+            mode = LocalAgentMessageDeliveryMode.QUEUE_ONLY,
+            accepted = true, duplicate = true, requiresResume = false,
+        )
+        assertTrue(receipt.contains("duplicate=true"))
+        assertTrue(receipt.contains("processing_status=unverified"))
+    }
+
     @Test fun unknownDeliveryModeFailsClosedBeforeAnyJobSideEffect() {
         for (input in listOf("wake", "resume", "force", "root", "none")) {
             assertTrue(input, runCatching {

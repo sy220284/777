@@ -257,7 +257,15 @@ internal class LocalPersistentJobRecoveryCoordinator(
             content = message,
             memoryInput = message,
         )
-        return sendInput(agentId, input, sessionId, mode).message
+        val admission = sendInput(agentId, input, sessionId, mode)
+        return renderLocalAgentMessageSubmission(
+            messageId = input.id,
+            mode = mode,
+            accepted = admission.accepted,
+            duplicate = admission.duplicate,
+            requiresResume = admission.requiresResume,
+            rejection = admission.message.takeIf { !admission.accepted },
+        )
     }
 
     fun sendInput(
