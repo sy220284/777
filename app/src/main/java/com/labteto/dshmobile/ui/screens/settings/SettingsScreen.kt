@@ -284,6 +284,7 @@ fun SettingsScreen(
             localSessionStorageBusy = true
             try {
                 val sessions = viewModel.importLocalSessionStorage(uri)
+                localSessionStorageStatus = viewModel.localSessionStorageStatus()
                 toast.second("已验证并安排恢复 $sessions 个会话，重启应用后生效")
             } catch (cancelled: CancellationException) {
                 throw cancelled
