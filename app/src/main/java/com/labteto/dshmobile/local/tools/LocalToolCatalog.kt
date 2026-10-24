@@ -343,6 +343,11 @@ object LocalToolCatalog {
             "target" to string("teammate 名称"),
             "message" to string("消息内容"),
         ), listOf("target", "message")))
+        add(tool("team_respond_shutdown", "团队成员批准或拒绝受信 Lead 的关闭请求；只有请求目标本人可回应，批准后撤销成员身份", properties(
+            "request_id" to string("已投递的 team-msg-* 关闭请求ID"),
+            "approve" to boolean("true 同意关闭；false 拒绝关闭"),
+            "reason" to string("拒绝关闭时必填的理由；批准时可选"),
+        ), listOf("request_id", "approve")))
         add(tool("team_request_shutdown", "Lead 向指定成员发出经过来源验证的关闭请求；优先交给成员模型自行决定，不会直接禁用成员", properties(
             "target" to string("active teammate 名称"),
             "reason" to string("申请关闭的理由及应完成的交接"),
