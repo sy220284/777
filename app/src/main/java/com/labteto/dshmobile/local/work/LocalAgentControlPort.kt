@@ -6,6 +6,7 @@ import com.labteto.dshmobile.local.agent.buildLocalDelegatedLaunchSpec
 import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
+import com.labteto.dshmobile.local.model.LocalToolCall
 import kotlinx.serialization.json.JsonObject
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -49,6 +50,8 @@ internal data class LocalAgentDispatchRequest(
  * Owner of execution facts remains the existing Job/Session/Run/Tool capabilities.
  */
 internal interface LocalAgentControlPort {
+    /** Single Lead-side Team admission through the existing Team owner and EventLog. */
+    suspend fun executeTeam(binding: LocalWorkRunBinding, call: LocalToolCall): String?
     suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String
     fun list(sessionId: String): String
     fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String
@@ -109,7 +112,11 @@ internal class LocalWorkAgentControlRuntime(
     private val jobs: LocalJobManager,
     private val subagents: LocalWorkSubagentRuntime,
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
+    private val teams: LocalAgentTeamRuntime,
 ) : LocalAgentControlPort {
+    override suspend fun executeTeam(binding: LocalWorkRunBinding, call: LocalToolCall): String? =
+        teams.execute(call, binding)
+
     override suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String {
         val parent = captureLocalAgentParentLink(request.parentToolCallId)
         require(parent == null || parent.sessionId == binding.sessionId) { "AGENT_PARENT_SESSION_MISMATCH" }
