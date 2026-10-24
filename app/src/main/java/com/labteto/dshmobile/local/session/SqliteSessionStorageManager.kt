@@ -10,6 +10,10 @@ import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.longOrNull
 
 /**
  * New SQLite-only session storage administration. No legacy JSONL/JSON export,
@@ -61,15 +65,21 @@ internal class SqliteSessionStorageManager(
     }
 
     fun exportAll(output: OutputStream): Long {
-        val archiveLease = SqliteSessionConsistencyGate.acquireExclusive()
-        try {
         val staging = File(context.cacheDir, "sqlite-session-export-${UUID.randomUUID()}")
         check(staging.mkdirs()) { "无法创建 SQLite 备份工作目录" }
         val snapshotCopy = File(staging, SNAPSHOT_ENTRY)
         val eventCopy = File(staging, EVENT_ENTRY)
         try {
-            backup(snapshots.readableDatabase, snapshotCopy)
-            backup(events.readableDatabase, eventCopy)
+            // Freeze the pair during both SQLite snapshots only. Slow ZIP/USB
+            // streaming must not block fresh messages or Work event writes.
+            val archiveLease = SqliteSessionConsistencyGate.acquireExclusive()
+            try {
+                backup(snapshots.readableDatabase, snapshotCopy)
+                backup(events.readableDatabase, eventCopy)
+            } finally {
+                archiveLease.unlock()
+            }
+            validateSnapshotEventCursors(snapshotCopy, eventCopy)
             var written = 0L
             ZipOutputStream(output.buffered()).use { zip ->
                 listOf(snapshotCopy, eventCopy).forEach { source ->
@@ -84,7 +94,6 @@ internal class SqliteSessionStorageManager(
         } finally {
             staging.deleteRecursively()
         }
-        } finally { archiveLease.unlock() }
     }
 
     private fun backup(db: SQLiteDatabase, destination: File) {
@@ -132,6 +141,9 @@ internal class SqliteSessionStorageManager(
             }
             validateTables(File(staging, SNAPSHOT_ENTRY), "session_snapshots")
             validateTables(File(staging, EVENT_ENTRY), "session_events")
+            validateSnapshotEventCursors(
+                File(staging, SNAPSHOT_ENTRY), File(staging, EVENT_ENTRY),
+            )
             File(staging, "READY").writeText("sqlite-v1")
             check(staging.renameTo(pendingRoot)) { "SQLite 备份无法提交恢复计划" }
             return countRows(File(pendingRoot, SNAPSHOT_ENTRY), "session_snapshots")
@@ -178,6 +190,45 @@ internal class SqliteSessionStorageManager(
         val count = countRows(File(pendingRoot, SNAPSHOT_ENTRY), "session_snapshots")
         check(pendingRoot.deleteRecursively()) { "SQLite 数据已恢复，但待恢复标记未能删除" }
         return count
+    }
+
+    /**
+     * A backup whose snapshot cursor is ahead of its event authority is unsafe:
+     * replay after restore could repeat effects or omit committed messages.
+     * Validate user-imported ZIPs as well as locally exported pairs.
+     */
+    private fun validateSnapshotEventCursors(snapshotCopy: File, eventCopy: File) {
+        SQLiteDatabase.openDatabase(
+            snapshotCopy.path, null, SQLiteDatabase.OPEN_READONLY,
+        ).use { snapshotsDb ->
+            SQLiteDatabase.openDatabase(
+                eventCopy.path, null, SQLiteDatabase.OPEN_READONLY,
+            ).use { eventsDb ->
+                snapshotsDb.rawQuery(
+                    "SELECT id,payload FROM session_snapshots", null,
+                ).use { rows ->
+                    while (rows.moveToNext()) {
+                        val id = rows.getString(0)
+                        val payload = Json.parseToJsonElement(rows.getString(1)).jsonObject
+                        val latest = eventsDb.rawQuery(
+                            "SELECT next_sequence FROM session_event_cursors WHERE session_id=?",
+                            arrayOf(id),
+                        ).use { cursor ->
+                            if (cursor.moveToFirst()) cursor.getLong(0) - 1L else -1L
+                        }
+                        listOf(
+                            "transcriptProjectedThroughSequence",
+                            "controlProjectedThroughSequence",
+                        ).forEach { key ->
+                            val value = (payload[key] as? JsonPrimitive)?.longOrNull
+                            check(value == null || value in -1L..latest) {
+                                "SQLite 备份会话 $id 的 $key 游标越界：$value（日志末尾 $latest）"
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun validateDatabase(file: File) {
