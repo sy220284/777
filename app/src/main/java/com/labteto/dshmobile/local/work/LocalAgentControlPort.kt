@@ -142,6 +142,12 @@ internal class LocalWorkAgentControlRuntime(
         } ?: error("AGENT_TARGET_NOT_FOUND：目标不属于当前 Work 会话或不是后台代理")
     }
 
+    private fun requireStandaloneAgent(info: LocalJobInfo) {
+        require(!LocalAgentTeamContract.isTeamJobId(info.id)) {
+            "AGENT_TEAM_LIFECYCLE_VIA_TEAM_PORT：Team 成员只能走 team_interrupt / team_dismiss_member"
+        }
+    }
+
     override fun inspect(sessionId: String, agentId: String): String {
         val info = requireOwnedAgent(sessionId, agentId)
         val snapshot = jobs.snapshots().singleOrNull {
@@ -162,17 +168,19 @@ internal class LocalWorkAgentControlRuntime(
 
     override fun interrupt(sessionId: String, agentId: String): String {
         val info = requireOwnedAgent(sessionId, agentId)
+        requireStandaloneAgent(info)
         require(info.continuable) { "AGENT_NOT_CONTINUABLE：非持久代理不可安全暂停，可使用 agent_close 永久关闭" }
         return jobs.interruptContinuableAgent(agentId, sessionId)
     }
 
     override fun close(sessionId: String, agentId: String): String {
-        requireOwnedAgent(sessionId, agentId)
+        requireStandaloneAgent(requireOwnedAgent(sessionId, agentId))
         return jobs.kill(agentId, sessionId)
     }
 
     override fun resume(sessionId: String, agentId: String): String {
         val info = requireOwnedAgent(sessionId, agentId)
+        requireStandaloneAgent(info)
         val snapshot = jobs.snapshots().singleOrNull {
             it.id == agentId && it.ownerId == sessionId
         } ?: error("AGENT_SNAPSHOT_NOT_FOUND")
@@ -185,7 +193,7 @@ internal class LocalWorkAgentControlRuntime(
         require(info.pendingMessageCount > 0 || info.status == "waiting_slice") {
             "AGENT_RESUME_INPUT_REQUIRED：需先有持久消息或等待中的安全执行片"
         }
-        persistentJobs.schedule(sessionId, rootSliceAdmitted = true)
+        persistentJobs.scheduleAgentResume(sessionId, agentId)
         return "agent_id=$agentId\nresume_requested=true\nresume_admitted=unverified" +
             "\nstatus_before=" + info.status +
             "\n说明=恢复必须通过原 Job 检查点、模型路由与授权安全闸门"
