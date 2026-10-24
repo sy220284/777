@@ -7,6 +7,9 @@ import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import kotlinx.serialization.json.JsonObject
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 
 /** Typed control command. Model schemas are parsed only by the model-facing adapter. */
 internal enum class LocalAgentDispatchKind { READONLY_FOREGROUND, READONLY_BACKGROUND, FORK }
@@ -60,6 +63,8 @@ internal interface LocalAgentControlPort {
      * authorizes control over another session or an unrelated background process.
      */
     fun inspect(sessionId: String, agentId: String): String
+    /** Bounded cancellation-aware long poll for changes to one owned Agent. */
+    suspend fun watch(sessionId: String, agentId: String, afterCursor: String, maxWaitMs: Int): String
     /** Stop this Activation without deleting the resumable Agent identity/Inbox. */
     fun interrupt(sessionId: String, agentId: String): String
     /** Terminal cancellation; unlike interrupt, this clears the durable Inbox. */
@@ -80,6 +85,10 @@ internal fun requireOwnedAgentInfo(
         it.id == agentId && it.ownerSessionId == sessionId && it.isAgent
     } ?: error("AGENT_TARGET_NOT_FOUND：目标不属于当前 Work 会话或不是后台代理")
 }
+
+/** Cursor is a projection, never a new durable execution state or a receipt for model work. */
+internal fun localAgentObservationCursor(info: LocalJobInfo): String =
+    "${info.id}:${info.updatedAt}:${info.status}:${info.pendingMessageCount}"
 
 internal fun validateAgentResumeAdmission(
     info: LocalJobInfo,
@@ -184,9 +193,33 @@ internal class LocalWorkAgentControlRuntime(
             append("\ncontinuable=").append(info.continuable)
             append("\npending_messages=").append(info.pendingMessageCount)
             append("\nupdated_at=").append(info.updatedAt)
+            append("\nobservation_cursor=").append(localAgentObservationCursor(info))
             append("\nresume_kind=").append(snapshot.resumeKind ?: "none")
             append("\nlatest_output=").append(snapshot.output.take(1_500))
             append("\nexecution_result_verified=false")
+        }
+    }
+
+    override suspend fun watch(
+        sessionId: String,
+        agentId: String,
+        afterCursor: String,
+        maxWaitMs: Int,
+    ): String {
+        require(afterCursor.isNotBlank()) { "AGENT_WATCH_CURSOR_REQUIRED：先调用 agent_inspect" }
+        require(maxWaitMs in 0..20_000) { "AGENT_WATCH_TIMEOUT_INVALID" }
+        val started = System.nanoTime()
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val now = requireOwnedAgent(sessionId, agentId)
+            if (localAgentObservationCursor(now) != afterCursor) {
+                return "changed=true\n" + inspect(sessionId, agentId)
+            }
+            val elapsed = ((System.nanoTime() - started) / 1_000_000L).coerceAtLeast(0L)
+            if (elapsed >= maxWaitMs) {
+                return "changed=false\n" + inspect(sessionId, agentId)
+            }
+            delay(minOf(200L, maxWaitMs - elapsed))
         }
     }
 
