@@ -99,6 +99,40 @@ class LocalTeamInboxOrderingTest {
             priority.map(QueuedAgentInput::id))
     }
 
+    @Test fun shutdownControlReceiptRequiresExactAuthenticatedModelInput() {
+        val content = "[Team 关闭请求；来自受信任 Lead 协调通道；消息ID=team-msg-shutdown01。请判断并回复]"
+        val expected = buildJsonObject {
+            put("role", "user")
+            put("content", content)
+        }
+        val control = QueuedAgentInput(
+            id = "team-msg-shutdown01", content = "do handoff", memoryInput = "",
+            kind = QueuedAgentInputKind.AGENT_MESSAGE,
+            agentSource = buildJsonObject {
+                put("team_id", session)
+                put("sender_id", session)
+                put("message_id", "team-msg-shutdown01")
+                put("control_kind", "shutdown_request")
+            },
+            modelMessage = expected,
+        )
+        assertEquals(setOf("team-msg-shutdown01"),
+            submittedLocalTeamMessageIds(listOf(control), listOf(expected)))
+        assertEquals(emptySet<String>(),
+            submittedLocalTeamMessageIds(listOf(control), listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "not actually submitted")
+            })))
+        val impersonation = control.copy(agentSource = buildJsonObject {
+            put("team_id", session)
+            put("sender_id", "peer-agent")
+            put("message_id", "team-msg-shutdown01")
+            put("control_kind", "shutdown_request")
+        })
+        assertEquals(emptySet<String>(), submittedLocalTeamMessageIds(
+            listOf(impersonation), listOf(expected)))
+    }
+
     @Test fun singleMessageAndEmptyBatchRemainUnchanged() {
         val message = teamMessage("single", session)
         assertSame(message, orderLocalTeamInboxBatch(listOf(message), session).single())

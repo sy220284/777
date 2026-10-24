@@ -74,7 +74,14 @@ internal fun submittedLocalTeamMessageIds(
     val expected = modelMessageForAgentInput(message)
     val content = (expected["content"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull.orEmpty()
     // The trusted Team Runtime creates this unique envelope, not the agent-authored message body.
-    content.startsWith("[代理协作数据；") &&
-        content.contains("消息ID=${message.id}；") &&
-        modelInput.any { it == expected }
+    val source = message.agentSource
+    val shutdownRequest = (source?.get("control_kind") as? kotlinx.serialization.json.JsonPrimitive)
+        ?.contentOrNull == "shutdown_request"
+    val isAuthenticatedShutdown = shutdownRequest &&
+        (source?.get("sender_id") as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull ==
+            (source?.get("team_id") as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull &&
+        content.startsWith("[Team 关闭请求；") && content.contains("消息ID=${message.id}。")
+    val ordinaryMessage = !shutdownRequest &&
+        content.startsWith("[代理协作数据；") && content.contains("消息ID=${message.id}；")
+    (ordinaryMessage || isAuthenticatedShutdown) && modelInput.any { it == expected }
 }.map(QueuedAgentInput::id).toSet()
