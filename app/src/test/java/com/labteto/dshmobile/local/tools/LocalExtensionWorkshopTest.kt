@@ -63,13 +63,29 @@ class LocalExtensionWorkshopTest {
         workshop.createMcp("api-helper", "node", "console.log('v1')")
         val result = workshop.reviseMcp("api-helper", "console.log('v2')")
         val hash = Regex("旧版本 ([0-9a-f]{16})").find(result)!!.groupValues[1]
-        assertTrue(workspace.readRaw(".dsh/extensions/mcp-api-helper/server.js").contains("v2"))
+        assertTrue(java.io.File(workshop.launchCommand("api-helper").first.last()).readText().contains("v2"))
         assertEquals("node", workshop.launchCommand("api-helper").first.first())
         workshop.rollbackMcp("api-helper", hash)
-        assertTrue(workspace.readRaw(".dsh/extensions/mcp-api-helper/server.js").contains("v1"))
+        assertTrue(java.io.File(workshop.launchCommand("api-helper").first.last()).readText().contains("v1"))
         assertThrows(IllegalArgumentException::class.java) {
             workshop.rollbackMcp("api-helper", "0011223344556677")
         }
+    }
+
+    @Test fun interruptedMcpUpdateBeforeManifestCommitKeepsOldVersionRunnable() = withWorkspace { workshop, workspace ->
+        workshop.createMcp("safe-helper", "python3", "print('old')")
+        val original = workshop.launchCommand("safe-helper").first.last()
+        val next = "print('new')"
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(next.toByteArray()).joinToString("") { "%02x".format(it) }
+        // Simulate a crash after the immutable source was published but before the
+        // manifest's atomic commit; the manifest still names the old verified source.
+        workspace.write(".dsh/extensions/mcp-safe-helper/revisions/$digest.py", next)
+        val reloaded = LocalExtensionWorkshop(workspace)
+        assertEquals(original, reloaded.launchCommand("safe-helper").first.last())
+        assertTrue(reloaded.reviseMcp("safe-helper", next).contains("源码已更新"))
+        assertTrue(java.io.File(reloaded.launchCommand("safe-helper").first.last())
+            .readText().contains("new"))
     }
 
     @Test fun recordsHaveEvidenceButDoNotClaimLiveRegistration() = withWorkspace { workshop, workspace ->

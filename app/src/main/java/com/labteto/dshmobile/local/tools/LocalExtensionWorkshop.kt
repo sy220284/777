@@ -85,7 +85,15 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         val sourcePath = requireNotNull(manifest["source_path"]?.jsonPrimitive?.content)
         val expected = ".dsh/extensions/mcp-$id/" +
             if (interpreter == "node") "server.js" else "server.py"
-        require(sourcePath == expected) { "MCP 入口路径不符合安装清单" }
+        // Older manifests use server.js/server.py. New versions live at immutable paths.
+        // Manifest replacement is the only active-version commit step.
+        val suffix = if (interpreter == "node") "js" else "py"
+        val digest = manifest["source_sha256"]?.jsonPrimitive?.content.orEmpty()
+        val immutable = ".dsh/extensions/mcp-$id/revisions/$digest.$suffix"
+        require(Regex("[a-f0-9]{64}").matches(digest) &&
+            (sourcePath == expected || sourcePath == immutable)) {
+            "MCP 入口路径不符合安装清单"
+        }
         val source = workspace.readRaw(sourcePath)
         require(fullSha(source) == manifest["source_sha256"]?.jsonPrimitive?.content) {
             "MCP 源码已改变，必须审核并重新生成匹配的清单后才能启动"
@@ -100,8 +108,12 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
             "MCP 新源码不能为空或超过 128 KB"
         }
         val filename = command.last()
-        val previous = workspace.readRaw(".dsh/extensions/mcp-$id/" +
-            if (filename.endsWith(".js")) "server.js" else "server.py")
+        val previousManifest = Json.parseToJsonElement(
+            workspace.readRaw(".dsh/extensions/mcp-$id/manifest.json")
+        ).jsonObject
+        val previous = workspace.readRaw(
+            requireNotNull(previousManifest["source_path"]?.jsonPrimitive?.content)
+        )
         val oldVersion = sha(previous)
         val suffix = if (filename.endsWith(".js")) "js" else "py"
         val backup = ".dsh/extensions/mcp-$id/revisions/$oldVersion.$suffix"
@@ -123,7 +135,10 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         val path = ".dsh/extensions/mcp-$id/revisions/$revision.$suffix"
         val backup = workspace.readRaw(path)
         require(sha(backup) == revision) { "MCP 版本备份内容校验失败" }
-        val currentPath = ".dsh/extensions/mcp-$id/server.$suffix"
+        val currentManifest = Json.parseToJsonElement(
+            workspace.readRaw(".dsh/extensions/mcp-$id/manifest.json")
+        ).jsonObject
+        val currentPath = requireNotNull(currentManifest["source_path"]?.jsonPrimitive?.content)
         val current = workspace.readRaw(currentPath)
         val currentVersion = sha(current)
         val currentBackup = ".dsh/extensions/mcp-$id/revisions/$currentVersion.$suffix"
@@ -141,17 +156,32 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         require(old["server_id"]?.jsonPrimitive?.content == id) { "MCP 清单标识不一致" }
         val interpreter = requireNotNull(old["interpreter"]?.jsonPrimitive?.content)
         require(interpreter in setOf("node", "python3")) { "MCP 运行时不支持" }
-        val sourcePath = ".dsh/extensions/mcp-$id/" +
-            if (interpreter == "node") "server.js" else "server.py"
-        require(old["source_path"]?.jsonPrimitive?.content == sourcePath) { "MCP 清单路径无效" }
-        workspace.write(sourcePath, source)
+        val suffix = if (interpreter == "node") "js" else "py"
+        val currentPath = requireNotNull(old["source_path"]?.jsonPrimitive?.content)
+        val legacy = ".dsh/extensions/mcp-$id/server.$suffix"
+        val currentDigest = old["source_sha256"]?.jsonPrimitive?.content.orEmpty()
+        require(currentPath == legacy ||
+            currentPath == ".dsh/extensions/mcp-$id/revisions/$currentDigest.$suffix") {
+            "MCP 清单路径无效"
+        }
+        val nextDigest = fullSha(source)
+        val sourcePath = ".dsh/extensions/mcp-$id/revisions/$nextDigest.$suffix"
+        val immutableFile = File(workspace.path, sourcePath)
+        // Preserve the old active file; process death before manifest commit leaves it usable.
+        if (immutableFile.exists()) {
+            require(workspace.readRaw(sourcePath) == source) { "MCP 版本哈希文件已被修改" }
+        } else {
+            workspace.write(sourcePath, source)
+        }
+        require(fullSha(workspace.readRaw(sourcePath)) == nextDigest) { "MCP 新版本内容校验失败" }
         val manifest = buildJsonObject {
             put("schema_version", 1)
             put("server_id", id)
             put("interpreter", interpreter)
             put("source_path", sourcePath)
-            put("source_sha256", fullSha(source))
+            put("source_sha256", nextDigest)
         }
+        // One atomic manifest update selects a fully written, hash-verified version.
         workspace.write(manifestPath, manifest.toString() + "\n")
         require(launchCommand(id).first.size == 2) { "MCP 更新内容校验失败" }
     }
