@@ -73,6 +73,8 @@ internal class LocalSessionCoordinator(
 
     fun hasDurableSnapshot(id: String): Boolean = repository.hasDurableSnapshot(id)
 
+    fun containsForNavigation(id: String): Boolean = repository.containsForNavigation(id)
+
     fun releaseDeletionBarrier(ids: Set<String>) = repository.releaseDeletionBarrier(ids)
 
     fun summaries(): List<LocalSessionSummary> = repository.summaries()

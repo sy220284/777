@@ -32,9 +32,11 @@ class SqliteSessionSafetyBoundariesAndroidTest {
             SqliteSessionSnapshotStore(context, Json, snapName).use { snapshots ->
                 SqliteSessionEventDatabase(context, Json, eventName).use { events ->
                     val stored = LocalHarnessSession(id = "guarded")
+                    assertTrue(!snapshots.containsSnapshotId("guarded"))
                     snapshots.write("guarded",
                         Json.encodeToJsonElement(LocalHarnessSession.serializer(), stored).jsonObject,
                         1L)
+                    assertTrue(snapshots.containsSnapshotId("guarded"))
                     events.append("guarded", "turn/start", buildJsonObject {})
                     val cleanup = LocalSessionDeletionCleanup(
                         sessionsRoot = root,
@@ -49,6 +51,7 @@ class SqliteSessionSafetyBoundariesAndroidTest {
                     assertEquals(0L, events.latestSequence("guarded"))
                     assertTrue(File(root, ".pending-deletions/guarded.pending").exists())
                     snapshots.delete("guarded")
+                    assertFalse(snapshots.containsSnapshotId("guarded"))
                     assertTrue(cleanup.recoverPending().isEmpty())
                     assertEquals(-1L, events.latestSequence("guarded"))
                     assertFalse(File(root, ".pending-deletions/guarded.pending").exists())

@@ -130,6 +130,18 @@ class LocalSessionRepositoryTest {
         assertEquals(expected, repository.preview("preview", 12).map { it.id })
     }
 
+    @Test fun primaryKeyNavigationAdmissionRespectsQueuedAndDeletedSessions() = runTest {
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        assertFalse(repository.containsForNavigation("new"))
+        repository.enqueue(LocalHarnessSession(id = "new", title = "已接收待落盘"))
+        assertTrue(repository.containsForNavigation("new"))
+        runCurrent()
+        assertTrue(repository.containsForNavigation("new"))
+        repository.delete("new")
+        assertFalse(repository.containsForNavigation("new"))
+        assertFalse(repository.hasDurableSnapshot("new"))
+    }
+
     @Test fun readPrefersNewestQueuedSnapshotBeforeWriterRuns() = runTest {
         val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
         repository.enqueue(

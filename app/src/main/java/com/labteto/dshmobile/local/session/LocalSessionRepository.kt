@@ -251,6 +251,17 @@ internal class LocalSessionRepository(
         }
     }
 
+    /**
+     * Navigation admission is a primary-key probe, not a full summaries scan.
+     * The per-session lock fences concurrent destructive transitions.
+     */
+    fun containsForNavigation(id: String): Boolean = synchronized(sessionLock(id)) {
+        val (deleted, accepted) = synchronized(lock) {
+            (id in deletedIds) to (id in latestSnapshots || id in pending)
+        }
+        !deleted && (accepted || snapshotStore.containsSnapshotId(id))
+    }
+
     // Query durable authority, never pending UI state or a legacy filename.
     // A corrupt persisted row throws and blocks deletion rather than clearing its events.
     fun hasDurableSnapshot(id: String): Boolean = synchronized(sessionLock(id)) {
