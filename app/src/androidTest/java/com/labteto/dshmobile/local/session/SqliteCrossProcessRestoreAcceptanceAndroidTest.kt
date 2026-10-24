@@ -33,8 +33,15 @@ class SqliteCrossProcessRestoreAcceptanceAndroidTest {
     )
     private fun marker(): File = File(context().filesDir, "local-harness/process-restore-marker")
     private fun requirePhase(phase: String) {
-        assumeTrue("Run with -e dsh_acceptance $phase, separated by adb force-stop",
-            InstrumentationRegistry.getArguments().getString("dsh_acceptance") == phase)
+        val requested = InstrumentationRegistry.getArguments().getString("dsh_acceptance")
+        // Ordinary full-suite discovery cannot satisfy the external process
+        // boundary, so it skips here. The separate acceptance script passes a
+        // phase explicitly and MUST fail on any wrong phase, never silently skip.
+        if (requested == null) {
+            assumeTrue("Requires separate ADB force-stop phase: $phase", false)
+        } else {
+            assertEquals("Incorrect process-boundary phase", phase, requested)
+        }
     }
 
     @Test fun stageRestoreForExternalProcessRestart() {
