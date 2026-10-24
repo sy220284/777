@@ -57,6 +57,7 @@ internal data class LocalMaterializedChatReply(
 internal suspend fun materializeLocalChatReplyMedia(
     reply: LocalModelReply,
     workspaceRoot: File,
+    onPublished: (LocalImportedAttachment) -> Unit = {},
 ): LocalMaterializedChatReply = withContext(Dispatchers.IO) {
     val canonical = reply.canonicalMessage
     val images = canonical?.content
@@ -77,7 +78,7 @@ internal suspend fun materializeLocalChatReplyMedia(
             workspaceRoot = workspaceRoot,
             dataUrl = image.dataUrl,
             ordinal = index + 1,
-        )
+        ).also(onPublished)
     }
     val canonicalText = canonical?.content
         ?.filterIsInstance<LocalCanonicalContent.Text>()
