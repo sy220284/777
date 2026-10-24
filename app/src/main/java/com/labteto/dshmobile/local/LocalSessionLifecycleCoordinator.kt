@@ -480,6 +480,7 @@ internal class LocalSessionLifecycleCoordinator(
                         sessionsRoot = sessionsRoot,
                         clearEvents = beforeEventLogsDeleted,
                         clearToolOutputs = toolOutputStore::deleteSession,
+                        persistedSnapshotExists = sessionCoordinator::hasDurableSnapshot,
                     )
                     val durableDeletedIds = linkedSetOf<String>()
                     try {

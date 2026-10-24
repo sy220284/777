@@ -50,6 +50,7 @@ internal sealed interface LocalChatSessionModeRoute {
  */
 internal class LocalChatSessionLifecyclePlanner(
     private val personaStore: ChatPersonaStore,
+    private val eventLogFor: ((String) -> com.labteto.dshmobile.local.session.LocalSessionEventLog)? = null,
 ) {
     internal fun acceptsCreateSpec(
         usageMode: LocalUsageMode,
@@ -169,6 +170,7 @@ internal class LocalChatSessionLifecyclePlanner(
                 nextSessionId,
                 "direct",
                 activeBranchMessageIds,
+                eventLogFor,
             )
             else -> ChatContextState()
         }
@@ -185,6 +187,7 @@ internal class LocalChatSessionLifecyclePlanner(
                     nextSessionId,
                     "group",
                     activeBranchMessageIds,
+                    eventLogFor,
                 ),
             )
         } else {

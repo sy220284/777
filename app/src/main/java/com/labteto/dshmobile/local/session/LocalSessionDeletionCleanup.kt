@@ -12,6 +12,11 @@ internal class LocalSessionDeletionCleanup(
     private val sessionsRoot: File,
     private val clearEvents: (Set<String>) -> Unit,
     private val clearToolOutputs: (String) -> Unit,
+    // Production MUST supply SQLite authority; old JSON files are only a JVM test adapter.
+    private val persistedSnapshotExists: (String) -> Boolean = { id ->
+        File(sessionsRoot, "$id.json").exists() ||
+            File(sessionsRoot, "$id.backup.json").exists()
+    },
 ) {
     private val journal = File(sessionsRoot, ".pending-deletions")
 
@@ -23,7 +28,7 @@ internal class LocalSessionDeletionCleanup(
 
     fun cleanupCommitted(id: String) {
         require(VALID_ID.matches(id)) { "非法会话编号：$id" }
-        check(!hasSnapshot(id)) { "会话快照仍存在，禁止清除关联数据：$id" }
+        check(!persistedSnapshotExists(id)) { "会话快照仍存在，禁止清除关联数据：$id" }
         clearEvents(setOf(id))
         clearToolOutputs(id)
         sessionsRoot.listFiles().orEmpty()
@@ -66,7 +71,7 @@ internal class LocalSessionDeletionCleanup(
                 val id = marker.name.removeSuffix(".pending")
                 if (!VALID_ID.matches(id)) return@forEach
                 // A failed primary deletion must never consume a recoverable session's history.
-                if (hasSnapshot(id)) return@forEach
+                if (persistedSnapshotExists(id)) return@forEach
                 try {
                     cleanupCommitted(id)
                 } catch (failure: Exception) {
@@ -75,10 +80,6 @@ internal class LocalSessionDeletionCleanup(
             }
         return failures
     }
-
-    private fun hasSnapshot(id: String): Boolean =
-        File(sessionsRoot, "$id.json").exists() ||
-            File(sessionsRoot, "$id.backup.json").exists()
 
     private companion object {
         val VALID_ID = Regex("[A-Za-z0-9._-]{1,128}")

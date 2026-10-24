@@ -251,6 +251,12 @@ internal class LocalSessionRepository(
         }
     }
 
+    // Query durable authority, never pending UI state or a legacy filename.
+    // A corrupt persisted row throws and blocks deletion rather than clearing its events.
+    fun hasDurableSnapshot(id: String): Boolean = synchronized(sessionLock(id)) {
+        snapshotStore.hasRecoverableSnapshot(id)
+    }
+
     fun read(id: String): LocalHarnessSession? = readWithLegacyApproval(id)?.session
 
     fun preview(id: String, limit: Int = 12): List<LocalHarnessMessage> {

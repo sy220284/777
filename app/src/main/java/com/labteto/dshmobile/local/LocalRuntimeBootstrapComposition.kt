@@ -108,6 +108,7 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
                 sessionsRoot,
                 sessionStorage.eventLogs::clearAndEvict,
                 tools.toolOutputStore::deleteSession,
+                sessionStorage.coordinator::hasDurableSnapshot,
             ).recoverPending().forEach { (id, failure) ->
                 com.labteto.dshmobile.observability.AppLog.warn(
                     "SessionDeletion",
