@@ -99,6 +99,63 @@ class LocalWebSearchClientTest {
         assertEquals(128, requests.single().codePointCount(0, requests.single().length))
     }
 
+    @Test
+    fun billingOnlyCountsNonEmptyResultsAndValidFetchContent() = runBlocking {
+        val charges = mutableListOf<String>()
+        val client = LocalWebSearchClient(http { request ->
+            if (request.url.encodedPath.endsWith("/search")) {
+                response(request, 200, """{"results":[]}""")
+            } else {
+                response(request, 200, """{"title":"案例","content":"# 正文"}""")
+            }
+        }, Json) { charges += it }
+        client.search("key", listOf("没有结果"))
+        assertTrue(charges.isEmpty())
+        client.fetch("key", "https://example.com")
+        assertEquals(listOf("fetch"), charges)
+    }
+
+    @Test
+    fun retriesRateLimitWithoutDoubleBillingAndForwardsOfficialFields() = runBlocking {
+        var attempts = 0
+        var charges = 0
+        val client = LocalWebSearchClient(http { request ->
+            attempts += 1
+            if (attempts == 1) {
+                response(request, 429, """{"error":{"code":"rate_limit_exceeded"}}""")
+            } else {
+                val body = Buffer().also { request.body!!.writeTo(it) }.readUtf8()
+                assertTrue(body.contains("\"ori_question\":\"用户原始提问\""))
+                assertTrue(body.contains("\"localization\":\"8.8.8.8\""))
+                response(request, 200,
+                    """{"results":[{"title":"事实","url":"https://example.com","summary":"摘要"}]}""")
+            }
+        }, Json) { if (it == "search") charges++ }
+        client.search(
+            "key", listOf("查询"), oriQuestion = "用户原始提问", localization = "8.8.8.8",
+        )
+        assertEquals(2, attempts)
+        assertEquals(1, charges)
+    }
+
+    @Test
+    fun fetchRespectsRequestedSizeWithoutClaimingCompleteContent() = runBlocking {
+        val client = LocalWebSearchClient(http { request ->
+            val body = Json.encodeToString(
+                kotlinx.serialization.json.JsonObject.serializer(),
+                buildJsonObject {
+                    put("title", "")
+                    put("content", "a".repeat(20000))
+                },
+            )
+            response(request, 200, body)
+        }, Json)
+        val result = client.fetch("key", "https://example.com/long", maxBytes = 16 * 1024)
+        assertTrue(result.truncated)
+        assertEquals(16 * 1024, result.bytesRead)
+        assertEquals(20_000L, result.totalBytes)
+    }
+
     private fun http(reply: (okhttp3.Request) -> Response): OkHttpClient =
         OkHttpClient.Builder().addInterceptor { chain -> reply(chain.request()) }.build()
 
