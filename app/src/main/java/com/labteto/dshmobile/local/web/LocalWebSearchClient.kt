@@ -1,27 +1,20 @@
 package com.labteto.dshmobile.local.web
 
 import com.labteto.dshmobile.core.net.withCancellableHttpResponse
-import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.LocalWebException
-import com.labteto.dshmobile.local.TokenUsageAction
+import com.labteto.dshmobile.local.LocalWebFetchResult
 import com.labteto.dshmobile.local.TokenUsageContext
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
-import com.labteto.dshmobile.local.model.LocalModelAuthKind
-import com.labteto.dshmobile.local.model.LocalModelProtocol
-import com.labteto.dshmobile.local.model.LocalModelRouteIdentity
-import com.labteto.dshmobile.local.model.parseDeepSeekAnthropicUsage
 import java.net.SocketTimeoutException
-import java.util.UUID
+import java.net.URI
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
@@ -29,145 +22,145 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
-/** DeepSeek auxiliary search wire format, result projection and actual API usage attribution. */
+/** Native DeepSeek Search/Fetch APIs; no model completion or token usage. */
 internal class LocalWebSearchClient(
     private val http: OkHttpClient,
     private val json: Json,
-    private val usageTracker: DeepSeekUsageTracker,
+    @Suppress("UNUSED_PARAMETER") usageTracker: DeepSeekUsageTracker,
 ) {
-    /** Exact DeepSeek auxiliary-search wire format used by the official provider. */
     suspend fun search(
         apiKey: String,
         queries: List<String>,
-        usageContext: TokenUsageContext? = null,
+        @Suppress("UNUSED_PARAMETER") usageContext: TokenUsageContext? = null,
+        count: Int = 10,
+        needContent: Boolean = false,
     ): String = withContext(Dispatchers.IO) {
-        val clean = queries.map(String::trim).filter(String::isNotEmpty).distinct().take(MAX_QUERIES)
+        require(count in 1..50) { "DeepSeek 搜索结果数量必须为 1～50" }
+        val clean = queries.map(String::trim).filter(String::isNotBlank).distinct().take(4)
         require(clean.isNotEmpty()) { "至少需要一个搜索词" }
-        val outputs = clean.map { query -> searchOne(apiKey, query, usageContext) }
-        outputs.joinToString("\n\n")
+        clean.map { query ->
+            val normalized = if (query.codePointCount(0, query.length) > 128) {
+                query.substring(0, query.offsetByCodePoints(0, 128))
+            } else query
+            val payload = buildJsonObject {
+                put("query", normalized)
+                put("count", count)
+                put("need_content", needContent)
+            }
+            formatDeepSeekSearch(normalized, postJson(apiKey, SEARCH_ENDPOINT, payload), needContent)
+        }.joinToString("\n\n")
     }
 
-    private suspend fun searchOne(
-        apiKey: String,
-        query: String,
-        usageContext: TokenUsageContext?,
-    ): String {
-        val payload = buildJsonObject {
-            put("model", SEARCH_MODEL)
-            put("max_tokens", 4096)
-            put("messages", buildJsonArray {
-                add(buildJsonObject {
-                    put("role", "user")
-                    put("content", buildJsonArray {
-                        add(buildJsonObject {
-                            put("type", "text")
-                            put("text", "Perform a web search for the query: $query")
-                        })
-                    })
-                })
-            })
-            put("tools", buildJsonArray {
-                add(buildJsonObject {
-                    put("type", "web_search_20250305")
-                    put("name", "web_search")
-                    put("max_uses", 5)
-                })
-            })
-        }
+    suspend fun fetch(apiKey: String, url: String): LocalWebFetchResult = withContext(Dispatchers.IO) {
+        val root = postJson(apiKey, FETCH_ENDPOINT, buildJsonObject { put("url", url) })
+        val body = root["content"]?.jsonPrimitive?.contentOrNull
+            ?: throw LocalWebException("INVALID_RESPONSE", "DeepSeek Fetch 缺少网页正文")
+        if (body.isBlank()) throw LocalWebException("EMPTY_BODY", "DeepSeek Fetch 未返回可读正文")
+        val title = root["title"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val markdown = if (title.isBlank()) body else "标题：" + title + "\n\n" + body
+        val bytes = markdown.toByteArray(Charsets.UTF_8)
+        LocalWebFetchResult(
+            url = url,
+            mediaType = "text/markdown; charset=utf-8",
+            content = markdown,
+            bytesRead = bytes.size,
+            totalBytes = bytes.size.toLong(),
+            truncated = false,
+        )
+    }
+
+    private suspend fun postJson(apiKey: String, endpoint: String, payload: JsonObject): JsonObject {
         val request = Request.Builder()
-            .url(SEARCH_ENDPOINT)
-            .header("x-api-key", apiKey)
-            .header("Authorization", "Bearer $apiKey")
-            .header("anthropic-version", "2023-06-01")
+            .url(endpoint)
+            .header("Authorization", "Bearer " + apiKey)
             .header("User-Agent", LOCAL_WEB_USER_AGENT)
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
         return try {
             withCancellableHttpResponse(http.newCall(request)) { response ->
-                val bounded = response.body?.byteStream()?.use { readBoundedWebBody(it, LOCAL_WEB_MAX_RESPONSE_BYTES) }
-                if (bounded?.truncated == true) throw LocalWebException("RESPONSE_TOO_LARGE", "网页搜索响应超过 ${LOCAL_WEB_MAX_RESPONSE_BYTES} 字节上限")
-                val body = bounded?.bytes?.toString(Charsets.UTF_8).orEmpty()
-                if (!response.isSuccessful) {
-                    val code = if (response.code in 400..499) "HTTP_4XX" else "HTTP_5XX"
-                    throw LocalWebException(code, "网页搜索失败（HTTP ${response.code}）：${body.take(500)}")
+                val bounded = response.body?.byteStream()?.use {
+                    readBoundedWebBody(it, LOCAL_WEB_MAX_RESPONSE_BYTES)
+                } ?: throw LocalWebException("INVALID_RESPONSE", "DeepSeek 未返回 JSON 数据")
+                if (bounded.truncated) {
+                    throw LocalWebException("RESPONSE_TOO_LARGE", "DeepSeek 搜索/抓取响应超过大小上限")
                 }
-                val root = json.parseToJsonElement(body).jsonObject
-                usageTracker.record(
-                    model = SEARCH_MODEL,
-                    usage = parseDeepSeekAnthropicUsage(root),
-                    requestId = UUID.randomUUID().toString(),
-                    context = usageContext?.copy(
-                        action = TokenUsageAction.WEB_SEARCH,
-                        taskLabel = usageContext.taskLabel ?: query.take(120),
-                    ) ?: TokenUsageContext(
-                        mode = LocalUsageMode.WORK,
-                        action = TokenUsageAction.WEB_SEARCH,
-                        taskLabel = query.take(120),
-                    ),
-                    route = LocalModelRouteIdentity(
-                        provider = "DeepSeek",
-                        model = SEARCH_MODEL,
-                        baseUrl = "https://api.deepseek.com",
-                        authKind = LocalModelAuthKind.API_KEY.name,
-                        protocol = LocalModelProtocol.ANTHROPIC_MESSAGES.name,
-                    ),
-                )
-                formatSearch(query, root)
+                if (!response.isSuccessful) {
+                    val code = when (response.code) {
+                        401 -> "AUTH_FAILED"
+                        402 -> "INSUFFICIENT_BALANCE"
+                        408, 429 -> "RATE_LIMITED"
+                        in 400..499 -> "HTTP_4XX"
+                        else -> "HTTP_5XX"
+                    }
+                    throw LocalWebException(code, "DeepSeek " +
+                        (if (endpoint == SEARCH_ENDPOINT) "Search" else "Fetch") +
+                        " 返回 HTTP " + response.code)
+                }
+                try {
+                    json.parseToJsonElement(bounded.bytes.toString(Charsets.UTF_8)) as? JsonObject
+                        ?: throw LocalWebException("INVALID_RESPONSE", "DeepSeek 响应不是 JSON 对象")
+                } catch (error: LocalWebException) {
+                    throw error
+                } catch (error: Exception) {
+                    throw LocalWebException("INVALID_RESPONSE", "DeepSeek 响应不是有效的 JSON", error)
+                }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: LocalWebException) {
             throw error
         } catch (error: SocketTimeoutException) {
-            throw LocalWebException("TIMEOUT", "网页搜索连接超时", error)
+            throw LocalWebException("TIMEOUT", "DeepSeek 搜索/抓取超时", error)
         } catch (error: java.io.IOException) {
-            throw LocalWebException("NETWORK_ERROR", "网页搜索网络异常：${error.message}", error)
-        }
-    }
-
-    private fun formatSearch(query: String, root: JsonObject): String {
-        val blocks = root["content"]?.jsonArray ?: JsonArray(emptyList())
-        val snippets = linkedMapOf<String, String>()
-        val answer = mutableListOf<String>()
-        blocks.forEach { element ->
-            val block = element.jsonObject
-            if (block["type"]?.jsonPrimitive?.contentOrNull == "text") {
-                block["text"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)?.let(answer::add)
-                block["citations"]?.jsonArray.orEmpty().forEach { citationElement ->
-                    val citation = citationElement.jsonObject
-                    val url = citation["url"]?.jsonPrimitive?.contentOrNull
-                    val text = citation["cited_text"]?.jsonPrimitive?.contentOrNull
-                    if (!url.isNullOrBlank() && !text.isNullOrBlank()) snippets.putIfAbsent(url, text)
-                }
-            }
-        }
-        val seen = linkedSetOf<String>()
-        val sources = mutableListOf<String>()
-        blocks.filter { it.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "web_search_tool_result" }
-            .flatMap { it.jsonObject["content"]?.jsonArray.orEmpty() }
-            .forEach { resultElement ->
-                val result = resultElement.jsonObject
-                if (result["type"]?.jsonPrimitive?.contentOrNull != "web_search_result") return@forEach
-                val url = result["url"]?.jsonPrimitive?.contentOrNull ?: return@forEach
-                if (!seen.add(url) || sources.size >= MAX_RESULTS) return@forEach
-                val title = result["title"]?.jsonPrimitive?.contentOrNull ?: url
-                val age = result["page_age"]?.jsonPrimitive?.contentOrNull?.let { " · $it" }.orEmpty()
-                val snippet = snippets[url]?.replace(Regex("\\s+"), " ")?.take(500)?.let { "\n  $it" }.orEmpty()
-                sources += "- [$title]($url)$age$snippet"
-            }
-        if (sources.isEmpty()) {
-            return "搜索：$query\n未找到公开可引用结果。目标可能不存在、属于私有资源，或名称/地址有误；请核对后重试。"
-        }
-        return buildString {
-            append("搜索：").append(query).append('\n')
-            if (answer.isNotEmpty()) append(answer.joinToString("\n").take(4_000)).append('\n')
-            append(sources.joinToString("\n"))
+            throw LocalWebException("NETWORK_ERROR", "DeepSeek 搜索/抓取网络异常：" + error.message, error)
         }
     }
 
     private companion object {
-        const val SEARCH_ENDPOINT = "https://api.deepseek.com/anthropic/v1/messages"
-        const val SEARCH_MODEL = "deepseek-flash"
-        const val MAX_QUERIES = 4
-        const val MAX_RESULTS = 10
+        const val SEARCH_ENDPOINT = "https://api.deepseek.com/v1/tools/search"
+        const val FETCH_ENDPOINT = "https://api.deepseek.com/v1/tools/fetch"
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
+    }
+}
+
+/** Preserve URL provenance and rankings; page content is untrusted reference data. */
+internal fun formatDeepSeekSearch(query: String, root: JsonObject, needContent: Boolean): String {
+    val entries = root["results"] as? JsonArray
+        ?: throw LocalWebException("INVALID_RESPONSE", "DeepSeek Search 缺少 results 数组")
+    val seen = linkedSetOf<String>()
+    val sources = mutableListOf<String>()
+    for (item in entries) {
+        val result = item as? JsonObject ?: continue
+        val url = result["url"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val title = result["title"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val validUrl = runCatching {
+            val uri = URI(url)
+            (uri.scheme == "http" || uri.scheme == "https") &&
+                !uri.host.isNullOrBlank() && uri.userInfo == null
+        }.getOrDefault(false)
+        if (!validUrl || title.isBlank() || !seen.add(url)) continue
+        val date = result["date"]?.jsonPrimitive?.contentOrNull?.take(25)
+        val site = result["site_name"]?.jsonPrimitive?.contentOrNull?.take(80)
+        val authority = result["authority"]?.jsonPrimitive?.contentOrNull
+        val score = result["rerank_score"]?.jsonPrimitive?.contentOrNull
+        val summary = result["summary"]?.jsonPrimitive?.contentOrNull
+            ?.ifBlank { null } ?: result["snippet"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val metadata = listOfNotNull(site, date, authority?.let { "权威度 " + it }, score?.let { "相关分 " + it })
+        val safeTitle = title.take(180).replace("[", "［").replace("]", "］")
+        sources += buildString {
+            append("- [").append(safeTitle).append("](").append(url).append(")")
+            if (metadata.isNotEmpty()) append(" · ").append(metadata.joinToString(" · "))
+            if (summary.isNotBlank()) append("\n  ").append(summary.replace(Regex("\\s+"), " ").take(850))
+            if (needContent) {
+                result["content"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)?.let {
+                    append("\n  正文摘录：").append(it.take(1600))
+                }
+            }
+        }
+    }
+    return if (sources.isEmpty()) {
+        "搜索：" + query + "\n来源：DeepSeek Search API\n未找到可引用网页结果。"
+    } else {
+        "搜索：" + query + "\n来源：DeepSeek Search API（网页内容未经信任）\n" + sources.joinToString("\n")
     }
 }
