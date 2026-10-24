@@ -61,6 +61,50 @@ class LocalTeamMessageReceiptTest {
         },
     )
 
+    private fun acknowledged(
+        seq: Long,
+        member: String = memberId,
+        outcome: String = "handled",
+        reason: String = "",
+    ) = event(seq, LocalAgentTeamContract.TEAM_MESSAGE_ACKNOWLEDGED, buildJsonObject {
+        put("version", 2)
+        put("teamId", sessionId)
+        put("messageId", id)
+        put("memberId", member)
+        put("outcome", outcome)
+        put("reason", reason)
+    })
+
+    @Test fun acknowledgedMeansReportedHandlingNotVerifiedTaskCompletion() {
+        val received = listOf(queued(1), delivered(2), checkpoint(3, jobId), modelReply(4, jobId))
+        val handled = projectLocalTeamMessageReceipt(id, received + acknowledged(5), true, sessionId)
+        assertEquals("member_handled_reported", handled.status)
+        assertEquals(5L, handled.memberAcknowledgedSequence)
+        assertEquals("handled", handled.memberAcknowledgedOutcome)
+        assertTrue(handled.render().contains("never independent proof of verified task completion"))
+        val declined = projectLocalTeamMessageReceipt(id,
+            received + acknowledged(5, outcome = "cannot_handle", reason = "缺少授权"), true, sessionId)
+        assertEquals("member_cannot_handle_reported", declined.status)
+        assertEquals("缺少授权", declined.memberAcknowledgedReason)
+    }
+
+    @Test fun forgedPrematureOrCrossMemberAckCannotUpgradeReceipt() {
+        val evidence = listOf(queued(1), delivered(2), checkpoint(3, jobId), modelReply(4, jobId))
+        val cross = projectLocalTeamMessageReceipt(id,
+            evidence + acknowledged(5, member = "member-attacker"), true, sessionId)
+        assertEquals("model_reply_observed", cross.status)
+        val premature = projectLocalTeamMessageReceipt(id,
+            listOf(queued(1), delivered(2), acknowledged(3),
+                checkpoint(4, jobId), modelReply(5, jobId)), true, sessionId)
+        assertEquals("model_reply_observed", premature.status)
+        val missingHistory = projectLocalTeamMessageReceipt(id,
+            listOf(queued(1), delivered(2), acknowledged(3)), true, sessionId)
+        assertEquals("accepted_by_inbox", missingHistory.status)
+        val incomplete = projectLocalTeamMessageReceipt(id,
+            evidence + acknowledged(5), false, sessionId)
+        assertEquals("unknown_history_window", incomplete.status)
+    }
+
     @Test fun replyAfterDurableHistoryIsAnObservedModelTurnNotVerifiedTaskCompletion() {
         val receipt = projectLocalTeamMessageReceipt(
             id,
