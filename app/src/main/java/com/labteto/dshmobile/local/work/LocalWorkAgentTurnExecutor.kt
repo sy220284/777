@@ -503,7 +503,8 @@ internal class LocalWorkAgentTurnExecutor(
                     val durableRequestMessages = withWorkTurnContext(
                         withLocalWorkExecutionMode(runHistory.snapshot()),
                         workPromptContext.stable,
-                        workPromptContext.dynamic + improvementGuidance + "\n" + com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
+                        workPromptContext.dynamic + improvementGuidance + "\n" + LOCAL_WORK_CAPABILITY_RECOVERY_GUIDANCE + "\n" +
+                            com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
                         workPromptContext.skill,
                     )
                     val selectedMode = resolveLocalImageInputMode(
@@ -1103,11 +1104,8 @@ internal class LocalWorkAgentTurnExecutor(
         } finally {
             if (ownerJob != null) {
                 workRunRegistry.releaseCompletedTurn(binding, ownerJob)
-                // Derived human-readable archive refresh is independent of task success and
-                // cannot mutate the completed run, replay tools, or change goal admission.
-                settledRunId?.let { runId ->
-                    onTurnSettled(binding, runId, settledImprovement)
-                }
+                // Derived archive refresh does not change the completed Work result.
+                settledRunId?.let { runId -> onTurnSettled(binding, runId, settledImprovement) }
             }
         }
     }

@@ -20,8 +20,8 @@ import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalSessionAccessCoordinator
 import com.labteto.dshmobile.local.session.LocalSessionAccessScope
 import com.labteto.dshmobile.local.tools.LocalFileInspector
+import com.labteto.dshmobile.local.tools.LocalExtensionWorkshop
 import com.labteto.dshmobile.local.tools.LocalShellTool
-import com.labteto.dshmobile.local.tools.localBuiltinStructuredResult
 import com.labteto.dshmobile.local.tools.toolCapabilityTarget
 import kotlinx.coroutines.currentCoroutineContext
 import com.labteto.dshmobile.local.tools.boolean
@@ -70,6 +70,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
     private val jobs get() = runtimeStateStore.jobManager
     private val workspace get() = sessionStorage.files.workspace
     private val fileInspector by lazy { LocalFileInspector(File(workspace.path)) }
+    private val extensionWorkshop by lazy { LocalExtensionWorkshop(workspace) }
     private val usageBridge by lazy {
         LocalTokenUsageContextBridge(
             sessionFacts = { sessionId ->
@@ -122,7 +123,15 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
             return LocalShellTool.executeResult(call.arguments, workspace, jobs, executionSessionId)
         }
         val output = execute(call, allowMutation, executionSessionId)
-        return localBuiltinStructuredResult(call.name, output)
+        if (call.name == "apply_patch") {
+            val code = when {
+                output.startsWith("[apply_patch][CHECK_FAILED]") -> "PATCH_CHECK_FAILED"
+                output.startsWith("[apply_patch][APPLY_FAILED]") -> "PATCH_APPLY_FAILED"
+                else -> null
+            }
+            if (code != null) return com.labteto.dshmobile.harness.tools.ToolResult(output, isError = true, errorCode = code)
+        }
+        return com.labteto.dshmobile.harness.tools.ToolResult(output)
     }
 
     internal suspend fun execute(
@@ -313,6 +322,54 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                     root.execution.searchCapabilities(args.string("query"), target)
                 }
             }
+            "skill_create" -> {
+                require(allowMutation) { "当前子任务没有写入技能的权限" }
+                extensionWorkshop.createSkill(args.string("id"), args.string("display_name"),
+                    args.string("description"), args.string("instructions"))
+            }
+            "skill_update" -> {
+                require(allowMutation) { "当前子任务没有修改技能的权限" }
+                extensionWorkshop.reviseSkill(args.string("id"), args.string("document"))
+            }
+            "skill_rollback" -> {
+                require(allowMutation) { "当前子任务没有回退技能的权限" }
+                extensionWorkshop.rollbackSkill(args.string("id"), args.string("revision"))
+            }
+            "mcp_create_local" -> {
+                require(allowMutation) { "当前子任务不能创建 MCP 代码" }
+                extensionWorkshop.createMcp(
+                    args.string("id"), args.string("interpreter"), args.string("source"),
+                )
+            }
+            "mcp_update_local" -> {
+                require(allowMutation) { "当前子任务不能修改 MCP" }
+                extensionWorkshop.reviseMcp(args.string("id"), args.string("source"))
+            }
+            "mcp_rollback_local" -> {
+                require(allowMutation) { "当前子任务不能回退 MCP" }
+                extensionWorkshop.rollbackMcp(args.string("id"), args.string("revision"))
+            }
+            "mcp_start_local" -> {
+                require(allowMutation) { "当前子任务不能启动 MCP" }
+                val id = args.string("id")
+                val (command, directory) = extensionWorkshop.launchCommand(id)
+                val connection = root.plugins.connectMcpStdio(id, command, directory)
+                val liveNames = root.registry.names().filter { it.startsWith("mcp_${id}_") }
+                require(liveNames.isNotEmpty()) { "MCP 连接返回但没有注册任何可调用工具：$id" }
+                extensionWorkshop.record("mcp", id, "registered",
+                    "本地服务启动完成，登记 ${liveNames.size} 个工具；业务调用效果待测",
+                    ".dsh/extensions/mcp-$id/manifest.json")
+                "$connection；当前已注册工具：${liveNames.joinToString(", ")}；真实业务调用尚未验证。"
+            }
+            "extension_record" -> {
+                require(allowMutation) { "当前子任务没有登记扩展的权限" }
+                extensionWorkshop.record(args.string("kind"), args.string("id"), args.string("phase"),
+                    args.string("summary"), args.string("evidence_path"))
+            }
+            "extension_inspect" -> extensionWorkshop.inspect(
+                args.string("kind"), args.string("id"),
+                root.registry.names().toSet(), root.plugins.installedPluginIds().toSet(),
+            )
             "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let(::readAuthorizedSkill)
                 ?: workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
             "list_skills" -> workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())

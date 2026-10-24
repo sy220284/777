@@ -15,8 +15,8 @@ import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.tools.LocalToolCatalog
-import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
+import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import com.labteto.dshmobile.local.work.LocalWorkState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -33,6 +33,109 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
+
+    @Test
+    fun explicitlyDiscoveredCapabilitySurvivesLaterWorkStepHeuristicRefresh() {
+        val registry = ToolRegistry().apply {
+            register(tool(name = "process_exec", access = ToolAccess.PROCESS,
+                approval = ToolApprovalPolicy.ALWAYS, exposure = ToolExposure.OPTIONAL,
+                family = "运行时", keywords = setOf("执行命令")) { ToolResult("ok") })
+            repeat(300) { index ->
+                register(tool(name = "search_batch_$index", access = ToolAccess.READ_ONLY,
+                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                    family = "搜索扩展", keywords = setOf("代码搜索")) { ToolResult("ok") })
+            }
+        }
+        val coordinator = coordinator(registry)
+        // User task heuristics may select many expensive optional tool definitions first.
+        coordinator.enableTaskRelevantOptionalTools("代码搜索")
+        assertFalse("process_exec" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
+        coordinator.searchCapabilities("process_exec")
+        assertTrue("process_exec" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
+
+        // A later Work model step must append task-relevant registered tools without
+        // moving the explicit capability_search choice behind hundreds of heuristic hits.
+        coordinator.enableTaskRelevantOptionalTools("代码搜索", prioritize = false)
+        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
+        assertTrue("process_exec" in visible)
+        assertEquals("process_exec", visible.first())
+        // A new user turn deliberately gets to reorder relevance again.
+        coordinator.enableTaskRelevantOptionalTools("代码搜索", prioritize = true)
+        assertEquals("search_batch_0", coordinator.enabledOptionalSnapshot().first())
+    }
+
+
+    @Test
+    fun wrongToolArgumentsGetRealSchemaGuidanceBeforeAnyExecutorRuns() = runBlocking {
+        var executions = 0
+        val tool = tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+            executions++
+            ToolResult("should never execute")
+        }.copy(schema = functionToolSchema(
+            name = "read",
+            description = "Read the requested workspace file.",
+            properties = com.labteto.dshmobile.harness.tools.simpleToolProperties(
+                mapOf("path" to "string", "lines" to "array"),
+            ),
+            required = setOf("path"),
+        ))
+        val registry = ToolRegistry().apply { register(tool) }
+        val failed = coordinator(registry).executeScoped(
+            original = LocalToolCall(
+                "wrong-shape", "read",
+                buildJsonObject { put("lines", "this is not an array") },
+                """{"lines":"this is not an array"}""",
+            ),
+            sessionId = "work", allowMutation = false, planModeEnabled = false,
+            approval = { _, _, _ -> error("invalid arguments must never reach approval") },
+        )
+        assertTrue(failed.isError)
+        assertEquals("INVALID_TOOL_ARGUMENTS", failed.errorCode)
+        assertEquals(0, executions)
+        assertEquals(AgentToolSideEffect.NONE, failed.sideEffect)
+        assertTrue(failed.recoveryHint.orEmpty().contains("path"))
+        assertTrue(failed.recoveryHint.orEmpty().contains("lines:array"))
+        assertTrue(failed.recoveryHint.orEmpty().contains("本轮实际提供"))
+    }
+
+
+    @Test
+    fun registeredOptionalCommandBecomesExecutableAfterModelDiscovery() = runBlocking {
+        var executed = 0
+        val registry = ToolRegistry().apply {
+            register(tool("process_exec", ToolAccess.PROCESS, ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL, family = "运行时",
+                keywords = setOf("运行命令")) {
+                executed++
+                ToolResult("real-execution-receipt")
+            })
+        }
+        val executor = coordinator(registry)
+        val projection = LocalToolSchemaProjection(registry, executor)
+        val surface = LocalModelToolStepSurface()
+        val policy = localAgentRunPolicy(LocalUsageMode.WORK)
+        val state = com.labteto.dshmobile.local.model.LocalModelState()
+
+        surface.capture(projection.modelSchemas(policy, state, false, emptyList()))
+        assertFalse(surface.allows("process_exec"))
+
+        val discovered = executor.searchCapabilities("process_exec")
+        assertTrue(discovered.contains("process_exec"))
+        surface.capture(projection.modelSchemas(
+            policy, state, false, emptyList(), executor.enabledOptionalSnapshot(),
+        ))
+        assertTrue(surface.allows("process_exec"))
+        val result = executor.executeScoped(
+            LocalToolCall("dynamic-call", "process_exec", JsonObject(emptyMap()), "{}"),
+            sessionId = "work", allowMutation = true, planModeEnabled = false,
+            approval = { _, _, _ -> true },
+        )
+        assertFalse(result.isError)
+        assertEquals("real-execution-receipt", result.content)
+        assertEquals(1, executed)
+    }
+
+
     @Test fun cancellationRetiresTheRealExecutingBody() = runBlocking {
         val started = CompletableDeferred<Unit>()
         val changes = mutableListOf<Boolean>()
@@ -217,6 +320,37 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun dynamicallyRegisteredMcpToolsArePromotedWithoutGuessingOrCrossServerLeakage() {
+        val registry = ToolRegistry().apply {
+            repeat(180) { index ->
+                register(tool("older_$index", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL, keywords = setOf("old")) { ToolResult("old") })
+            }
+        }
+        val discovery = com.labteto.dshmobile.local.work.LocalWorkRunMcpDiscovery()
+        assertTrue(discovery.observe(registry).isEmpty())
+        registry.register(tool("mcp_x_twitter_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
+            exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("x-twitter")) { ToolResult("post") })
+        registry.register(tool("mcp_other_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
+            exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("other")) { ToolResult("other") })
+        registry.register(tool("mcp_fake_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
+            exposure = ToolExposure.OPTIONAL, family = "Other", keywords = setOf("fake")) { ToolResult("fake") })
+        val created = discovery.observe(registry)
+        assertEquals(listOf("mcp_x_twitter_x_post", "mcp_other_x_post"), created)
+        val coordinator = coordinator(registry)
+        coordinator.enableOptionalTools((0 until 180).map { "older_$it" })
+        coordinator.prioritizeRunCreatedMcpTools(created)
+        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
+        assertTrue("mcp_x_twitter_x_post" in visible)
+        assertTrue("mcp_other_x_post" in visible)
+        assertFalse("mcp_fake_x_post" in visible)
+        assertEquals("mcp_x_twitter_x_post", coordinator.enabledOptionalSnapshot().first())
+        assertEquals(created, discovery.observe(registry))
+        registry.unregister("mcp_x_twitter_x_post")
+        assertEquals(listOf("mcp_other_x_post"), discovery.observe(registry))
+    }
+
+    @Test
     fun pinnedImagegenMakesRealMediaToolsVisibleAcrossStepsWithoutAutoSubmitting() = runBlocking {
         val registry = ToolRegistry().apply {
             for (name in listOf("media_image_options", "media_image_create", "media_image_status")) {
@@ -294,36 +428,6 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
-    fun explicitlyDiscoveredCapabilitySurvivesLaterWorkStepHeuristicRefresh() {
-        val registry = ToolRegistry().apply {
-            register(tool(name = "process_exec", access = ToolAccess.PROCESS,
-                approval = ToolApprovalPolicy.ALWAYS, exposure = ToolExposure.OPTIONAL,
-                family = "运行时", keywords = setOf("执行命令")) { ToolResult("ok") })
-            repeat(300) { index ->
-                register(tool(name = "search_batch_$index", access = ToolAccess.READ_ONLY,
-                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                    family = "搜索扩展", keywords = setOf("代码搜索")) { ToolResult("ok") })
-            }
-        }
-        val coordinator = coordinator(registry)
-        // User task heuristics may select many expensive optional tool definitions first.
-        coordinator.enableTaskRelevantOptionalTools("代码搜索")
-        assertFalse("process_exec" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
-        coordinator.searchCapabilities("process_exec")
-        assertTrue("process_exec" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
-
-        // A later Work model step must append task-relevant registered tools without
-        // moving the explicit capability_search choice behind hundreds of heuristic hits.
-        coordinator.enableTaskRelevantOptionalTools("代码搜索", prioritize = false)
-        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
-        assertTrue("process_exec" in visible)
-        assertEquals("process_exec", visible.first())
-        // A new user turn deliberately gets to reorder relevance again.
-        coordinator.enableTaskRelevantOptionalTools("代码搜索", prioritize = true)
-        assertEquals("search_batch_0", coordinator.enabledOptionalSnapshot().first())
-    }
-
-    @Test
     fun currentTaskReordersPreviouslySelectedToolsAheadOfOlderWork() {
         val registry = ToolRegistry().apply {
             repeat(200) { index ->
@@ -379,6 +483,17 @@ class LocalToolExecutionCoordinatorTest {
         assertFalse("web_search" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
         coordinator.searchCapabilities("联网")
         assertFalse("web_search" in coordinator.enabledOptionalSnapshot())
+    }
+
+    @Test
+    fun unknownCapabilityOffersAnExecutableBootstrapPathWithoutPretendingRegistration() {
+        val coordinator = coordinator(ToolRegistry())
+        val result = coordinator.searchCapabilities("尚未实现的 X 平台连接器")
+        assertTrue(result.contains("没有精确匹配"))
+        assertTrue(result.contains("GitHub"))
+        assertTrue(result.contains("MCP stdio"))
+        assertTrue(result.contains("下一模型步骤"))
+        assertFalse(coordinator.enabledOptionalSnapshot().any { it.startsWith("mcp_") })
     }
 
     @Test
@@ -559,39 +674,6 @@ class LocalToolExecutionCoordinatorTest {
         assertTrue(result.isError)
         assertEquals("UNKNOWN_TOOL", result.errorCode)
         assertTrue(result.recoveryHint.orEmpty().contains("capability_search"))
-    }
-
-    @Test
-    fun wrongToolArgumentsGetRealSchemaGuidanceBeforeAnyExecutorRuns() = runBlocking {
-        var executions = 0
-        val tool = tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
-            executions++
-            ToolResult("should never execute")
-        }.copy(schema = functionToolSchema(
-            name = "read",
-            description = "Read the requested workspace file.",
-            properties = com.labteto.dshmobile.harness.tools.simpleToolProperties(
-                mapOf("path" to "string", "lines" to "array"),
-            ),
-            required = setOf("path"),
-        ))
-        val registry = ToolRegistry().apply { register(tool) }
-        val failed = coordinator(registry).executeScoped(
-            original = LocalToolCall(
-                "wrong-shape", "read",
-                buildJsonObject { put("lines", "this is not an array") },
-                """{"lines":"this is not an array"}""",
-            ),
-            sessionId = "work", allowMutation = false, planModeEnabled = false,
-            approval = { _, _, _ -> error("invalid arguments must never reach approval") },
-        )
-        assertTrue(failed.isError)
-        assertEquals("INVALID_TOOL_ARGUMENTS", failed.errorCode)
-        assertEquals(0, executions)
-        assertEquals(AgentToolSideEffect.NONE, failed.sideEffect)
-        assertTrue(failed.recoveryHint.orEmpty().contains("path"))
-        assertTrue(failed.recoveryHint.orEmpty().contains("lines:array"))
-        assertTrue(failed.recoveryHint.orEmpty().contains("本轮实际提供"))
     }
 
     @Test
@@ -1372,42 +1454,6 @@ class LocalToolExecutionCoordinatorTest {
         )
         assertEquals(visible, detachedEnabled)
         assertFalse("process_exec" in visible)
-    }
-
-    @Test
-    fun registeredOptionalCommandBecomesExecutableAfterModelDiscovery() = runBlocking {
-        var executed = 0
-        val registry = ToolRegistry().apply {
-            register(tool("process_exec", ToolAccess.PROCESS, ToolApprovalPolicy.ALWAYS,
-                exposure = ToolExposure.OPTIONAL, family = "运行时",
-                keywords = setOf("运行命令")) {
-                executed++
-                ToolResult("real-execution-receipt")
-            })
-        }
-        val executor = coordinator(registry)
-        val projection = LocalToolSchemaProjection(registry, executor)
-        val surface = LocalModelToolStepSurface()
-        val policy = localAgentRunPolicy(LocalUsageMode.WORK)
-        val state = com.labteto.dshmobile.local.model.LocalModelState()
-
-        surface.capture(projection.modelSchemas(policy, state, false, emptyList()))
-        assertFalse(surface.allows("process_exec"))
-
-        val discovered = executor.searchCapabilities("process_exec")
-        assertTrue(discovered.contains("process_exec"))
-        surface.capture(projection.modelSchemas(
-            policy, state, false, emptyList(), executor.enabledOptionalSnapshot(),
-        ))
-        assertTrue(surface.allows("process_exec"))
-        val result = executor.executeScoped(
-            LocalToolCall("dynamic-call", "process_exec", JsonObject(emptyMap()), "{}"),
-            sessionId = "work", allowMutation = true, planModeEnabled = false,
-            approval = { _, _, _ -> true },
-        )
-        assertFalse(result.isError)
-        assertEquals("real-execution-receipt", result.content)
-        assertEquals(1, executed)
     }
 
     @Test
