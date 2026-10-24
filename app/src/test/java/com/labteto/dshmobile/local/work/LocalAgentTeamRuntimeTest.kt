@@ -2635,6 +2635,7 @@ class LocalAgentTeamRuntimeTest {
                 buildJsonObject { put("task_id", "task-1") }, "{}"), binding,
         ).orEmpty()
         assertTrue(evidence.contains("independent_reviewer_reported=true"))
+        assertTrue(evidence.contains("review_evidence_binding_valid=true"))
         assertTrue(evidence.contains("reviewer_declared_verdict=approve"))
         assertTrue(evidence.contains("content_verified=false"))
         val cold = LocalAgentTeamRuntime(f.jobs,
