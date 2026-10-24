@@ -30,7 +30,12 @@ import java.util.Locale
 
 /** Search requests are not model tokens: render them on their own statistics surface. */
 @Composable
-internal fun UsageSearchSection(usage: LocalSearchUsageSnapshot, rangeDays: Int) {
+internal fun UsageSearchSection(
+    usage: LocalSearchUsageSnapshot,
+    rangeDays: Int,
+    rangeIndex: Int,
+    onSelectRange: (Int) -> Unit,
+) {
     val colors = LocalSyColors.current
     val today = LocalDate.now().toEpochDay()
     val todayUsage = usage.days.firstOrNull { it.epochDay == today }
@@ -89,6 +94,7 @@ internal fun UsageSearchSection(usage: LocalSearchUsageSnapshot, rangeDays: Int)
         )
     }
     SectionHeading(stringResource(R.string.usage_search_daily))
+    UsageRangeSelector(selectedIndex = rangeIndex, onSelect = onSelectRange)
     val window = rangeDays.coerceIn(7, 90)
     val byDay = usage.days.associateBy { it.epochDay }
     val points = (window - 1 downTo 0).map { offset ->
