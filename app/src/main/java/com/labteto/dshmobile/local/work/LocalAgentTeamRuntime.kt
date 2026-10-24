@@ -591,6 +591,8 @@ internal class LocalAgentTeamRuntime(
                 ready = isReady(task, state.tasks),
                 writeConflict = writeScopeWarnings(task, state.tasks).isNotEmpty(),
                 revision = task.revision,
+                completionResultId = task.completionResultId,
+                completionEvidenceSequence = task.completionEvidenceSequence,
             )
         }
         return LocalAgentTeamUiState(
@@ -2170,6 +2172,8 @@ internal class LocalAgentTeamRuntime(
             append(task.subject)
             append(" | ready=$ready")
             owner?.let { append(" | owner=$it") }
+            task.completionResultId?.let { append(" | completion_result_id=$it") }
+            task.completionEvidenceSequence?.let { append(" | completion_evidence_seq=$it") }
             if (task.blockedBy.isNotEmpty()) append(" | blockedBy=${task.blockedBy.joinToString(",")}")
             if (task.writeScopes.isNotEmpty()) append(" | writeScopes=${task.writeScopes.joinToString(",")}")
             if (warnings.isNotEmpty()) append(" | warnings=${warnings.joinToString(";")}")
