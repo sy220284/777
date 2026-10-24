@@ -4,6 +4,12 @@ import android.content.ContentValues
 import android.database.sqlite.SQLiteDatabase
 import com.labteto.dshmobile.local.session.SqliteSessionConsistencyGate
 import com.labteto.dshmobile.local.session.SqliteSessionEventDatabase
+import com.labteto.dshmobile.local.model.LOCAL_IMAGE_REF
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 /**
  * Incrementally populated local asset metadata catalog, stored IN the authoritative
@@ -120,6 +126,51 @@ internal class SqliteLocalAssetCatalog(
         private val SESSION_ID = Regex("[A-Za-z0-9._-]{1,128}")
         private val MESSAGE_ID = Regex("[A-Za-z0-9._:-]{1,160}")
         private val REFERENCE_KIND = Regex("[a-z_]{2,36}")
+
+        /**
+         * Called WITHIN the same SQL transaction that appends a user/assistant
+         * message event. Only assets already published and registered are indexed.
+         * Missing legacy/generated assets are left for the non-destructive backfill.
+         */
+        fun indexCommittedMessageAssets(
+            db: SQLiteDatabase,
+            sessionId: String,
+            sequence: Long,
+            eventType: String,
+            payload: JsonObject,
+        ) {
+            val kind = when (eventType) {
+                "user/message" -> "user_image"
+                "assistant/message" -> "assistant_image"
+                else -> return
+            }
+            val digests = linkedSetOf<String>()
+            fun visit(element: JsonElement?) {
+                when (element) {
+                    is JsonObject -> {
+                        if ((element["type"] as? JsonPrimitive)?.contentOrNull == LOCAL_IMAGE_REF) {
+                            val hash = (element["attachmentId"] as? JsonPrimitive)?.contentOrNull
+                            if (hash != null && SHA256.matches(hash)) digests += hash
+                        }
+                        element.values.forEach(::visit)
+                    }
+                    is JsonArray -> element.forEach(::visit)
+                    else -> Unit
+                }
+            }
+            visit(payload)
+            digests.forEach { digest ->
+                // SELECT from local_assets gives an intentional no-op for assets
+                // that were generated before catalog registration, preserving
+                // the durable event even with incomplete metadata coverage.
+                db.execSQL(
+                    "INSERT OR IGNORE INTO local_asset_references " +
+                        "(session_id,message_id,asset_id,reference_kind) " +
+                        "SELECT ?,?,?,? FROM local_assets WHERE asset_id=?",
+                    arrayOf(sessionId, "event-$sequence", digest, kind, digest),
+                )
+            }
+        }
 
         fun createSchema(db: SQLiteDatabase) {
             db.execSQL(
