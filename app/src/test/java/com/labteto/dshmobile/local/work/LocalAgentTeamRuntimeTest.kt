@@ -332,6 +332,7 @@ class LocalAgentTeamRuntimeTest {
         assertTrue(result.contains("event_seq="))
         assertTrue(result.contains("from_seq="))
         assertTrue(result.contains("member_changes=none"))
+        assertTrue(result.contains("task_changes=task-1:new->pending@r1,owner=none"))
         assertTrue(result.contains("task_completion=unverified"))
     }
 

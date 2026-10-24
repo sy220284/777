@@ -1799,6 +1799,15 @@ internal class LocalAgentTeamRuntime(
         return LocalTeamWaitSnapshot(
             eventSequence = eventLogFor(sessionId).latestSequence(),
             members = activity,
+            tasks = team.tasks.filter { it.status != LocalTeamTaskStatus.DELETED }
+                .map {
+                    LocalTeamWaitTaskState(
+                        id = it.id,
+                        status = it.status.name.lowercase(),
+                        revision = it.revision,
+                        ownerId = it.ownerId,
+                    )
+                }.sortedBy(LocalTeamWaitTaskState::id),
         )
     }
 

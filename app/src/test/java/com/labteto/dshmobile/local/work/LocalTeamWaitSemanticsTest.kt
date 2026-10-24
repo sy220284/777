@@ -28,6 +28,21 @@ class LocalTeamWaitSemanticsTest {
         assertTrue(description.contains("member_count=0"))
     }
 
+    @Test fun reportsTaskClaimAndReleaseWithoutTreatingThemAsVerifiedCompletion() {
+        val previous = LocalTeamWaitSnapshot(8, emptyList(),
+            listOf(LocalTeamWaitTaskState("task-1", "pending", 1, null)))
+        val claimed = LocalTeamWaitSnapshot(9, emptyList(),
+            listOf(LocalTeamWaitTaskState("task-1", "in_progress", 2, "member-1")))
+        val released = LocalTeamWaitSnapshot(10, emptyList(),
+            listOf(LocalTeamWaitTaskState("task-1", "pending", 3, null)))
+        assertTrue(renderLocalTeamWaitTransition(previous, claimed)
+            .contains("task-1:pending->in_progress@r2,owner=member-1"))
+        assertTrue(renderLocalTeamWaitTransition(claimed, released)
+            .contains("task-1:in_progress->pending@r3,owner=none"))
+        assertTrue(renderLocalTeamWaitTransition(previous, claimed)
+            .contains("task_completion=unverified"))
+    }
+
     @Test fun preservesStableIdentityWhenNewTurnStarts() {
         val previous = LocalTeamWaitSnapshot(12, listOf(member("idle")))
         val current = LocalTeamWaitSnapshot(13, listOf(member("running")))
