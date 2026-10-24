@@ -250,22 +250,24 @@ internal class LocalPersistentJobRecoveryCoordinator(
         agentId: String,
         message: String,
         sessionId: String,
+        mode: LocalAgentMessageDeliveryMode = LocalAgentMessageDeliveryMode.TRIGGER_TURN,
     ): String {
         val input = QueuedAgentInput(
             id = "msg-" + java.util.UUID.randomUUID().toString().replace("-", "").take(16),
             content = message,
             memoryInput = message,
         )
-        return sendInput(agentId, input, sessionId).message
+        return sendInput(agentId, input, sessionId, mode).message
     }
 
     fun sendInput(
         agentId: String,
         input: QueuedAgentInput,
         sessionId: String,
+        mode: LocalAgentMessageDeliveryMode = LocalAgentMessageDeliveryMode.TRIGGER_TURN,
     ): JobMessageAdmission {
         val result = jobs.sendInput(agentId, input, sessionId)
-        if (result.accepted && result.requiresResume) {
+        if (shouldWakeAgentAfterAcceptedMessage(mode, result.accepted, result.requiresResume)) {
             schedule(sessionId)
         }
         return result

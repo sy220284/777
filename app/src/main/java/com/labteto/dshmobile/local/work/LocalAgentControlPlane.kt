@@ -134,7 +134,12 @@ internal class LocalAgentControlPlane(
             }
             "list_agents" -> control.list(run.sessionId)
             "agent_tree" -> control.tree(run, args.int("max_nodes", 100))
-            "send_message" -> control.send(run.sessionId, args.string("agent_id"), args.string("message"))
+            "send_message" -> control.send(
+                run.sessionId,
+                args.string("agent_id"),
+                args.string("message"),
+                LocalAgentMessageDeliveryMode.fromWire(args.optionalString("delivery_mode")),
+            )
             "interrupt_agent" -> control.interrupt(run.sessionId, args.string("agent_id"))
             "workflow" -> subagents.runWorkflow(
                 resumeGraphId = args.optionalString("resume_graph_id"),
