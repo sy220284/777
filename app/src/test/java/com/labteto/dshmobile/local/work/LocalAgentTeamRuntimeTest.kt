@@ -160,7 +160,7 @@ class LocalAgentTeamRuntimeTest {
         }), binding)
         val request = requireNotNull(f.log.latestMatching(
             setOf(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED),
-        ) { event -> LocalAgentTeamEventCodec.decodeMessage(event).kind == LocalTeamMessageKind.SHUTDOWN_REQUEST })
+        ) { event -> LocalAgentTeamEventCodec.decodeMessage(event.data).kind == LocalTeamMessageKind.SHUTDOWN_REQUEST })
         val requestId = LocalAgentTeamEventCodec.decodeMessage(request.data).id
         val owners = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
         val identity = com.labteto.dshmobile.harness.agent.AgentRunIdentity(session, "child:sa-team-1", "shutdown-run")
@@ -483,6 +483,8 @@ class LocalAgentTeamRuntimeTest {
             status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = "member-1",
             autoDispatchMessageId = "team-msg-1234567890abcdef1234",
         )
+        f2.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session2, "task-1", 1, emptyList(), subject = "Review evidence"))
         f2.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
             with(LocalAgentTeamEventCodec) { reserved.toEvent(session2) })
         f2.runtime.recoverMailbox(session2)
