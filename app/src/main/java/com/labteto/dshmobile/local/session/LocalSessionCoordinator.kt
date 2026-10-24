@@ -26,6 +26,18 @@ internal fun requireSessionSnapshotCursorsWithinLog(
     }
 }
 
+/**
+ * Advance past invisible event rows only after every indexed visible candidate
+ * was successfully projected. A malformed transcript freezes the durable
+ * cursor before that event so a later restart can retry it without data loss.
+ */
+internal fun safeTranscriptReplayHighWatermark(
+    projectedThrough: Long,
+    latestCandidateSequence: Long,
+    durableLatest: Long,
+): Long = if (projectedThrough < latestCandidateSequence) projectedThrough
+    else maxOf(projectedThrough, durableLatest)
+
 internal data class LocalSessionTranscriptRestore(
     val messages: List<LocalHarnessMessage>,
     val index: LocalTranscriptRuntimeIndex,
@@ -60,6 +72,8 @@ internal class LocalSessionCoordinator(
     fun delete(id: String): Boolean = repository.delete(id)
 
     fun hasDurableSnapshot(id: String): Boolean = repository.hasDurableSnapshot(id)
+
+    fun containsForNavigation(id: String): Boolean = repository.containsForNavigation(id)
 
     fun releaseDeletionBarrier(ids: Set<String>) = repository.releaseDeletionBarrier(ids)
 
@@ -113,7 +127,9 @@ internal class LocalSessionCoordinator(
                 "会话投影游标 $cursor 超出事件日志末尾 $durableLatest；已停止自动恢复以保护历史",
             )
         }
-        val tailEvents = eventLog.snapshotAfter(cursor)
+        // During a cold session switch, tool/step/ledger events can vastly
+        // outnumber visible transcript updates. Decode only visible candidates.
+        val tailEvents = eventLog.visibleTranscriptEventsAfter(cursor)
         val projected = projectSessionTranscriptTail(
             snapshotMessages = baseWindow,
             events = tailEvents,
@@ -127,25 +143,35 @@ internal class LocalSessionCoordinator(
             stored.transcriptWindow.isNotEmpty() -> buildLocalTranscriptRuntimeIndex(stored.transcriptWindow)
             else -> LocalTranscriptRuntimeIndex()
         }
+        // A malformed visible event stops transcript replay. Keep its event
+        // and later candidates out of the derived index as well.
         val projectedIndex = projectLocalTranscriptRuntimeIndexTail(
             snapshot = indexBase,
-            events = tailEvents,
+            events = tailEvents.takeWhile { it.sequence <= projected.projectedThroughSequence },
             sequenceExclusive = cursor,
         ).copy(
             // Old builds could persist false forever. Current edit/variant actions validate the
             // actual active transcript at use time, so old storage must not disable them.
             branchingEligible = true,
         )
+        // Mark every already committed event through the stable pre-query high
+        // watermark as considered, including the invisible events skipped by
+        // SQL. Never advance past a visible event actually projected.
+        val replayedThrough = safeTranscriptReplayHighWatermark(
+            projectedThrough = projected.projectedThroughSequence,
+            latestCandidateSequence = tailEvents.lastOrNull()?.sequence ?: cursor,
+            durableLatest = durableLatest,
+        )
         return LocalSessionTranscriptRestore(
             messages = projected.messages,
             index = projectedIndex,
-            projectedThroughSequence = projected.projectedThroughSequence,
+            projectedThroughSequence = replayedThrough,
             needsPersist = migration != null ||
                 legacyBaseline != null ||
                 stored.messages.isNotEmpty() ||
                 stored.transcriptWindow != projected.messages ||
                 stored.transcriptIndex != projectedIndex ||
-                projected.projectedThroughSequence != stored.transcriptProjectedThroughSequence,
+                replayedThrough != stored.transcriptProjectedThroughSequence,
         )
     }
 

@@ -145,7 +145,7 @@ class LocalSessionEventLog(
         }
     }
 
-    fun controlEventsAfter(
+    fun eventsOfTypesAfter(
         sequenceExclusive: Long, types: Set<String>,
     ): List<Event> {
         require(types.isNotEmpty())
@@ -153,6 +153,14 @@ class LocalSessionEventLog(
         else fileLog().snapshotAfter(sequenceExclusive).filter { it.type in types })
             .map { it.toLocalEvent() }
     }
+
+    /**
+     * Native SQL skips events without a visible transcript or rewrite semantics.
+     * File-based tests retain the conservative full replay contract.
+     */
+    internal fun visibleTranscriptEventsAfter(sequenceExclusive: Long): List<Event> =
+        (if (sqlite != null) sqlite.visibleEventsAfter(sqliteId, sequenceExclusive)
+        else fileLog().snapshotAfter(sequenceExclusive)).map { it.toLocalEvent() }
 
     fun snapshotAfter(sequenceExclusive: Long): List<Event> = if (sqlite != null) buildList {
         sqlite.forEachAfter(sqliteId, sequenceExclusive) { add(it.toLocalEvent()) }
@@ -171,6 +179,17 @@ class LocalSessionEventLog(
     ): List<Event> = (if (sqlite != null)
         sqlite.pageBeforeChronological(sqliteId, sequenceExclusive, limit)
         else fileLog().pageBeforeChronological(sequenceExclusive, limit)).map { it.toLocalEvent() }
+
+    /**
+     * Transcript-only reverse feed. Native SQLite uses the visible-hint index;
+     * file-backed JVM contracts retain the original full event scan.
+     */
+    internal fun pageVisibleTranscriptBefore(
+        sequenceExclusive: Long = Long.MAX_VALUE,
+        limit: Int = 80,
+    ): List<Event> = (if (sqlite != null)
+        sqlite.pageVisibleBeforeNewestFirst(sqliteId, sequenceExclusive, limit)
+        else fileLog().pageBeforeNewestFirst(sequenceExclusive, limit)).map { it.toLocalEvent() }
 
     /** 按 sequence 递减返回旧事件页，适合从最新事件向历史倒查。 */
     fun pageBeforeNewestFirst(

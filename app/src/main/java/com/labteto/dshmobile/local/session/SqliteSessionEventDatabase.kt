@@ -22,7 +22,7 @@ class SqliteSessionEventDatabase(
     private val json: Json,
     name: String = "local_session_events_v1.db",
     private val clock: () -> Long = System::currentTimeMillis,
-) : SQLiteOpenHelper(context, name, null, 2) {
+) : SQLiteOpenHelper(context, name, null, 3) {
     init { setWriteAheadLoggingEnabled(true) }
 
     override fun onConfigure(db: SQLiteDatabase) {
@@ -42,21 +42,49 @@ class SqliteSessionEventDatabase(
                 "session_id TEXT NOT NULL REFERENCES session_event_cursors(session_id) ON DELETE CASCADE, " +
                 "sequence INTEGER NOT NULL, event_type TEXT NOT NULL, " +
                 "created_at INTEGER NOT NULL, schema_version INTEGER NOT NULL, " +
-                "payload TEXT NOT NULL, PRIMARY KEY(session_id, sequence))"
+                "payload TEXT NOT NULL, visible_hint INTEGER NOT NULL DEFAULT 0, " +
+                "PRIMARY KEY(session_id, sequence))"
         )
         db.execSQL(
             "CREATE INDEX session_event_type_latest " +
                 "ON session_events(session_id, event_type, sequence DESC)"
         )
         createCheckpointTable(db)
+        createVisibleEventIndex(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        require(oldVersion == 1 && newVersion == 2) {
+        require(oldVersion in 1..2 && newVersion == 3) {
             "不支持的会话事件数据库版本：$oldVersion -> $newVersion"
         }
-        createCheckpointTable(db)
+        if (oldVersion == 1) createCheckpointTable(db)
+        // Upgrade existing draft databases once. New events compute the hint
+        // directly from their parsed JsonObject before the WAL transaction.
+        db.execSQL("ALTER TABLE session_events ADD COLUMN visible_hint INTEGER NOT NULL DEFAULT 0")
+        db.execSQL(
+            "UPDATE session_events SET visible_hint=1 WHERE " +
+                "event_type IN ('chat/active-transcript','work/active-transcript'," +
+                "'session/transcript-projection-baseline','session/transcript-migration-baseline') " +
+                "OR instr(payload, ?) > 0 OR " +
+                "(event_type='assistant/message' AND instr(payload, ?) > 0)",
+            arrayOf("\"transcript\":", "\"replaces\":"),
+        )
+        createVisibleEventIndex(db)
     }
+
+    private fun createVisibleEventIndex(db: SQLiteDatabase) {
+        db.execSQL(
+            "CREATE INDEX session_events_visible_recent " +
+                "ON session_events(session_id,visible_hint,sequence DESC)"
+        )
+    }
+
+    private fun isVisibleTranscriptCandidate(type: String, data: JsonObject): Boolean =
+        "transcript" in data ||
+            (type == "assistant/message" && "replaces" in data) ||
+            type == "chat/active-transcript" || type == "work/active-transcript" ||
+            type == "session/transcript-projection-baseline" ||
+            type == "session/transcript-migration-baseline"
 
     private fun createCheckpointTable(db: SQLiteDatabase) {
         db.execSQL(
@@ -123,6 +151,7 @@ class SqliteSessionEventDatabase(
                     put("created_at", createdAt)
                     put("schema_version", EVENT_SCHEMA_VERSION)
                     put("payload", payload.toString())
+                    put("visible_hint", if (isVisibleTranscriptCandidate(type, payload)) 1 else 0)
                 })
                 SessionEvent(sequence, type, createdAt, payload)
             }
@@ -198,6 +227,37 @@ class SqliteSessionEventDatabase(
                 "FROM session_events WHERE session_id=? AND sequence<? " +
                 "ORDER BY sequence DESC LIMIT ?",
             arrayOf(sessionId, beforeSequenceExclusive.toString(), limit.toString()),
+        )
+    }
+
+    /**
+     * Indexed transcript paging skips irrelevant tool, model and Work ledger
+     * rows without decoding them. Rewrite boundaries and replacement markers
+     * remain visible even with empty transcript payloads.
+     */
+    fun pageVisibleBeforeNewestFirst(
+        sessionId: String, beforeSequenceExclusive: Long = Long.MAX_VALUE, limit: Int = 80,
+    ): List<SessionEvent> {
+        validateSessionId(sessionId)
+        require(limit in 1..MAX_PAGE) { "事件分页大小不合法" }
+        return queryPage(
+            "SELECT sequence,event_type,created_at,schema_version,payload " +
+                "FROM session_events WHERE session_id=? AND visible_hint=1 AND sequence<? " +
+                "ORDER BY sequence DESC LIMIT ?",
+            arrayOf(sessionId, beforeSequenceExclusive.toString(), limit.toString()),
+        )
+    }
+
+    /** Indexed forward replay for user-visible transcript projections. */
+    fun visibleEventsAfter(
+        sessionId: String, sequenceExclusive: Long,
+    ): List<SessionEvent> {
+        validateSessionId(sessionId)
+        return queryPage(
+            "SELECT sequence,event_type,created_at,schema_version,payload " +
+                "FROM session_events WHERE session_id=? AND visible_hint=1 AND sequence>? " +
+                "ORDER BY sequence ASC",
+            arrayOf(sessionId, sequenceExclusive.toString()),
         )
     }
 

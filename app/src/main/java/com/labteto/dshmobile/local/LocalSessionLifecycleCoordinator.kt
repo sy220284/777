@@ -333,10 +333,10 @@ internal class LocalSessionLifecycleCoordinator(
     private fun isKnownSession(sessionId: String): Boolean =
         pendingSessions.modeFor(sessionId) != null ||
             state.value.sessions.any { it.id == sessionId } ||
-            sessionCoordinator.summaries().any { it.id == sessionId }
+            sessionCoordinator.containsForNavigation(sessionId)
 
     fun switchSession(sessionId: String): Boolean {
-        if (sessionId.isBlank()) return false
+        if (!sessionId.matches(Regex("[A-Za-z0-9._-]{1,128}"))) return false
         // This synchronous UI/SessionUiPort entrypoint only queues the desired identity.
         // Validating a cold deep link may scan session JSON and must run on the Session IO
         // owner with the rest of navigation, never while the UI command lock is held.
@@ -358,8 +358,8 @@ internal class LocalSessionLifecycleCoordinator(
             try {
                 transitionMutex.withLock {
                     try {
-                        if (sessionCoordinator.summaries().none { it.id == sessionId } &&
-                            pendingSessions.modeFor(sessionId) == null) {
+                        if (pendingSessions.modeFor(sessionId) == null &&
+                            !sessionCoordinator.containsForNavigation(sessionId)) {
                             state.update { it.copy(error = "目标会话已不存在，请从历史记录重新选择") }
                             return@withLock
                         }
