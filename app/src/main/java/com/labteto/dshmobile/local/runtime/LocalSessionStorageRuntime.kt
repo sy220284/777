@@ -86,7 +86,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
                 json = json,
                 snapshots = sqliteSnapshots,
                 events = requireNotNull(eventLogs.sqliteDatabase),
-            ).migrate(runtimeStateStore.currentSessionId)
+            ).migrate()
         } catch (failure: Exception) {
             runtimeStateStore.projection.publishError(
                 "旧会话迁移未完成，原历史仍保留：${failure.message ?: "请检查存储"}",
