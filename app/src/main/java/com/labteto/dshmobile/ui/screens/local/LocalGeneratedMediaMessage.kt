@@ -903,13 +903,17 @@ internal fun InlineSpeechPlayer(file: File) {
     var error by remember(file.absolutePath) { mutableStateOf<String?>(null) }
     // The resource holder and its DisposableEffect must have the same file identity.
     val playerHolder = remember(file.absolutePath) { mutableStateOf<MediaPlayer?>(null) }
+    val playerOwner = remember(file.absolutePath) { InlineSpeechPlayerOwner() }
     var player by playerHolder
     val lifecycleOwner = LocalLifecycleOwner.current
     var durationMs by remember(file.absolutePath) { mutableStateOf(0) }
     var positionMs by remember(file.absolutePath) { mutableStateOf(0) }
     // The effect must release the latest player, not the null initial composition snapshot.
     DisposableEffect(file.absolutePath) {
-        onDispose { playerHolder.value?.release(); playerHolder.value = null }
+        onDispose {
+            playerOwner.dispose()
+            playerHolder.value = null
+        }
     }
     DisposableEffect(lifecycleOwner, file.absolutePath) {
         val listener = LifecycleEventObserver { _, event ->
@@ -955,10 +959,12 @@ internal fun InlineSpeechPlayer(file: File) {
                     if (current == null) {
                         val created = MediaPlayer()
                         created.setOnCompletionListener {
+                            if (!playerOwner.owns(created)) return@setOnCompletionListener
                             playing = false
                             positionMs = durationMs
                         }
                         created.setOnPreparedListener { ready ->
+                            if (!playerOwner.owns(ready)) return@setOnPreparedListener
                             preparing = false
                             durationMs = ready.duration.coerceAtLeast(0)
                             // Async preparation can complete after the app leaves the foreground.
@@ -973,21 +979,23 @@ internal fun InlineSpeechPlayer(file: File) {
                                 .onFailure { failure ->
                                     playing = false
                                     error = failure.message ?: resources.getString(R.string.media_chat_audio_failed)
-                                    runCatching { ready.release() }
+                                    playerOwner.releaseIfOwned(ready)
                                     player = null
                                 }
                         }
                         created.setOnErrorListener { _, _, _ ->
+                            if (!playerOwner.owns(created)) return@setOnErrorListener true
                             preparing = false
                             playing = false
                             durationMs = 0
                             positionMs = 0
                             error = resources.getString(R.string.media_chat_audio_failed)
+                            playerOwner.releaseIfOwned(created)
                             player = null
-                            runCatching { created.release() }
                             true
                         }
                         // Own the player before I/O so failed setDataSource cannot leak it.
+                        playerOwner.attach(created)
                         player = created
                         created.setDataSource(file.absolutePath)
                         preparing = true
@@ -1004,7 +1012,7 @@ internal fun InlineSpeechPlayer(file: File) {
                     preparing = false
                     playing = false
                     error = failure.message ?: resources.getString(R.string.media_chat_audio_failed)
-                    runCatching { player?.release() }
+                    player?.let { playerOwner.releaseIfOwned(it) }
                     player = null
                 }
             },
