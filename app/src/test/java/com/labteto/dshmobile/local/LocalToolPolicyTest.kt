@@ -138,6 +138,17 @@ class LocalToolPolicyTest {
         assertFalse(LocalToolPolicy.isVisibleCall("process_exec", setOf("read", "grep")))
     }
 
+    @Test fun historicalSkillCommandNamesResolveToOneRegisteredContract() {
+        for (legacy in listOf("list_skills", "read_skill")) {
+            assertEquals("skill", LocalToolPolicy.canonical(legacy))
+            assertEquals(LocalToolPolicy.access("skill"), LocalToolPolicy.access(legacy))
+            assertEquals(LocalToolPolicy.approval("skill"), LocalToolPolicy.approval(legacy))
+            assertEquals(LocalToolPolicy.exposure("skill"), LocalToolPolicy.exposure(legacy))
+            assertTrue(LocalToolPolicy.isVisibleCall(legacy, setOf("skill")))
+            assertFalse(LocalToolPolicy.isVisibleCall(legacy, setOf("read")))
+        }
+    }
+
     @Test fun shellRemainsHighRiskWhileGlobalAutoApprovalMayApproveIt() {
         assertEquals(ToolApprovalPolicy.ALWAYS, LocalToolPolicy.approval("bash"))
         assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope("bash"))

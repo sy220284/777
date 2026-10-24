@@ -529,6 +529,7 @@ internal fun actionLabel(action: TokenUsageAction): String = stringResource(
         TokenUsageAction.PERSONA_INSPECTION -> R.string.usage_action_persona_inspection
         TokenUsageAction.WORK_SUMMARY -> R.string.usage_action_work_summary
         TokenUsageAction.WORK_MAIN -> R.string.usage_action_work_main
+        TokenUsageAction.WORK_IMPROVEMENT -> R.string.usage_action_work_improvement
         TokenUsageAction.WORK_SUBAGENT -> R.string.usage_action_work_subagent
         TokenUsageAction.AUTOMATION -> R.string.usage_action_automation
         TokenUsageAction.AUTOMATION_CHAT -> R.string.usage_action_automation_chat

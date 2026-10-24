@@ -28,6 +28,9 @@ internal object LocalToolPolicy {
         "read_file" to "read", "write_file" to "write", "edit_file" to "edit",
         "glob_files" to "glob", "search_text" to "grep", "run_shell" to "bash",
         "spawn_subagent" to "subagent", "fork_subagent" to "subagent_fork",
+        // Older skill browsing/reading commands are semantically equivalent to the current
+        // skill(name?) tool; keep one registered schema and one permission/approval owner.
+        "list_skills" to "skill", "read_skill" to "skill",
     )
     fun canonical(name: String): String = aliases[name] ?: name
 

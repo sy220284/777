@@ -21,6 +21,7 @@ import com.labteto.dshmobile.local.session.LocalSessionAccessCoordinator
 import com.labteto.dshmobile.local.session.LocalSessionAccessScope
 import com.labteto.dshmobile.local.tools.LocalFileInspector
 import com.labteto.dshmobile.local.tools.LocalShellTool
+import com.labteto.dshmobile.local.tools.localBuiltinStructuredResult
 import com.labteto.dshmobile.local.tools.toolCapabilityTarget
 import kotlinx.coroutines.currentCoroutineContext
 import com.labteto.dshmobile.local.tools.boolean
@@ -121,15 +122,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
             return LocalShellTool.executeResult(call.arguments, workspace, jobs, executionSessionId)
         }
         val output = execute(call, allowMutation, executionSessionId)
-        if (call.name == "apply_patch") {
-            val code = when {
-                output.startsWith("[apply_patch][CHECK_FAILED]") -> "PATCH_CHECK_FAILED"
-                output.startsWith("[apply_patch][APPLY_FAILED]") -> "PATCH_APPLY_FAILED"
-                else -> null
-            }
-            if (code != null) return com.labteto.dshmobile.harness.tools.ToolResult(output, isError = true, errorCode = code)
-        }
-        return com.labteto.dshmobile.harness.tools.ToolResult(output)
+        return localBuiltinStructuredResult(call.name, output)
     }
 
     internal suspend fun execute(
