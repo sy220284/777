@@ -324,6 +324,11 @@ internal class LocalAgentTeamRuntime(
             call.arguments["after_sequence"]?.jsonPrimitive?.longOrNull?.takeIf { it >= 0L }
                 ?: eventLogFor(binding.sessionId).latestSequence()
         } else -1L
+        // Capture the watch fence before the first suspension. Otherwise a fast child
+        // completion during projection admission is lost and the Lead waits unnecessarily.
+        val teamWaitBaseline = if (call.name == "team_wait") {
+            runCatching { teamChangeFingerprint(binding.sessionId) }.getOrNull()
+        } else null
         awaitProjection(binding.sessionId)
         if (call.name in MUTATING_TOOL_NAMES) {
             synchronizeTeamRuntime(binding.sessionId)
@@ -442,6 +447,7 @@ internal class LocalAgentTeamRuntime(
                 sessionId = binding.sessionId,
                 timeoutMs = (args["timeout_ms"]?.jsonPrimitive?.intOrNull ?: 10_000)
                     .coerceIn(MIN_WAIT_MS, MAX_WAIT_MS),
+                baseline = teamWaitBaseline,
             )
             else -> error("未覆盖的 Agent Team 工具：${call.name}")
             }
@@ -1758,36 +1764,41 @@ internal class LocalAgentTeamRuntime(
         }
     }
 
-    private suspend fun waitForChange(sessionId: String, timeoutMs: Int): String {
-        val baseline = teamChangeFingerprint(sessionId)
+    private suspend fun waitForChange(
+        sessionId: String,
+        timeoutMs: Int,
+        baseline: LocalTeamWaitSnapshot?,
+    ): String {
+        val before = baseline ?: teamChangeFingerprint(sessionId)
+        // First compare immediately after admission: the child may already have gone idle.
+        val first = teamChangeFingerprint(sessionId)
+        if (first != before) return renderLocalTeamWaitTransition(before, first)
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             currentCoroutineContext().ensureActive()
             delay(WAIT_POLL_MS)
             val next = teamChangeFingerprint(sessionId)
-            if (next != baseline) {
-                return "Team 状态已变化：event_seq=${next.eventSequence}"
-            }
+            if (next != before) return renderLocalTeamWaitTransition(before, next)
         }
-        return "Team 等待超时：${timeoutMs}ms"
+        return "Team 等待超时：${timeoutMs}ms | event_seq=${before.eventSequence}"
     }
 
-    private data class TeamChangeFingerprint(
-        val eventSequence: Long,
-        val memberActivity: List<String>,
-    )
-
-    private fun teamChangeFingerprint(sessionId: String): TeamChangeFingerprint {
-        val memberJobs = project(sessionId).members.map(LocalTeamMemberSnapshot::jobId).toSet()
-        val activity = jobs.snapshotInfos()
-            .asSequence()
-            .filter { it.id in memberJobs }
-            .sortedBy { it.id }
-            .map { "${it.id}:${it.status}" }
-            .toList()
-        return TeamChangeFingerprint(
+    private fun teamChangeFingerprint(sessionId: String): LocalTeamWaitSnapshot {
+        val team = project(sessionId)
+        val runtimeJobs = jobs.snapshotInfos()
+        // Reuse the authoritative activity projection. Job status is retained only for
+        // diagnostics, never persisted as a second member lifecycle state.
+        val activity = projectLocalAgentTeamActivity(team, runtimeJobs).members
+            .map { member ->
+                LocalTeamWaitMemberState(
+                    id = member.memberId,
+                    name = member.memberName,
+                    activity = member.activity.name.lowercase(),
+                )
+            }.sortedBy(LocalTeamWaitMemberState::id)
+        return LocalTeamWaitSnapshot(
             eventSequence = eventLogFor(sessionId).latestSequence(),
-            memberActivity = activity,
+            members = activity,
         )
     }
 
