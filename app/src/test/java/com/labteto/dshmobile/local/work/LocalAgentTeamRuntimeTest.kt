@@ -2302,6 +2302,41 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun teammateCannotSelfAuthorizeTaskFromSupersededUserInstruction() = runBlocking {
+        val session = "team-member-root-revoked"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        f.log.append("user/message", buildJsonObject { put("content", "原任务") })
+        val priorRevision = workflowUserRevision(f.log)
+        val pending = LocalTeamTaskSnapshot(
+            id = "task-1", revision = 1, subject = "原任务", description = "",
+            status = LocalTeamTaskStatus.PENDING, rootUserRevision = priorRevision,
+        )
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { pending.toEvent(session) })
+        f.log.append("user/message", buildJsonObject { put("content", "撤销旧任务") })
+        val owners = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
+        val identity = com.labteto.dshmobile.harness.agent.AgentRunIdentity(
+            session, "child:sa-team-1", "superseded-run")
+        owners.claim(identity) {}
+        val result = kotlinx.coroutines.withContext(owners.executionContext(identity)) {
+            runCatching {
+                f.runtime.executeMember(session, "job-team-1", memberTestToolCall(
+                    "stale-claim", "team_task_update", buildJsonObject {
+                        put("task_id", "task-1"); put("expected_revision", 1); put("action", "claim")
+                    },
+                ))
+            }
+        }
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message.orEmpty()
+            .contains("TEAM_TASK_ROOT_REAUTHORIZATION_REQUIRED"))
+        assertEquals(LocalTeamTaskStatus.PENDING, f.runtime.project(session).tasks.single().status)
+        assertEquals(priorRevision, f.runtime.project(session).tasks.single().rootUserRevision)
+        assertNull(f.runtime.project(session).failure)
+    }
+
+    @Test
     fun newerUserInstructionRejectsPreviouslyAuthorizedTeamResult() = runBlocking {
         val session = "team-root-authorization"
         val f = fixture(session)
