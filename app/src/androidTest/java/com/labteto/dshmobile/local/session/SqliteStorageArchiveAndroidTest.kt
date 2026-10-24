@@ -95,6 +95,15 @@ class SqliteStorageArchiveAndroidTest {
                     assertEquals(1, manager.stageRestore(bytes.toByteArray()))
                 }
             }
+            // Fault injection: simulate process death after the snapshot SQLite file
+            // was installed but before the event database was installed.
+            // The next launch must recognize the identical file and finish the
+            // outstanding event copy rather than failing or deleting existing data.
+            val stagedSnapshot = java.io.File(
+                context.filesDir, "local-harness/.sqlite-restore-pending-$restoreKey/snapshot.sqlite",
+            )
+            assertTrue(stagedSnapshot.isFile)
+            stagedSnapshot.copyTo(context.getDatabasePath(dstSnapshot), overwrite = true)
             // Process-start boundary: both target SQLite helpers were closed above.
             val installer = SqliteSessionStorageManager(
                 context,
