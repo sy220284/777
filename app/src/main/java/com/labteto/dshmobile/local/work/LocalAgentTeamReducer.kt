@@ -17,6 +17,7 @@ import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MEMBER_EVENT
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_DISCARDED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_QUEUED
+import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_ACKNOWLEDGED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_TASK_EVENT
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_SHUTDOWN_RESPONSE
 import com.labteto.dshmobile.local.work.LocalAgentTeamEventCodec.decodeMember
@@ -119,6 +120,40 @@ internal object LocalAgentTeamReducer {
                     advanced.copy(shutdownResponses = state.shutdownResponses +
                         LocalTeamShutdownResponseSnapshot(requestId, memberId, approved, reason))
                 }
+                TEAM_MESSAGE_ACKNOWLEDGED -> {
+                    validateTeamEnvelope(event.data)
+                    val id = event.data["messageId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_MESSAGE_ACK_ID_REQUIRED")
+                    require(id.matches(Regex("team-msg-[a-zA-Z0-9_-]{1,64}"))) {
+                        "TEAM_MESSAGE_ACK_ID_INVALID"
+                    }
+                    val memberId = event.data["memberId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_MESSAGE_ACK_MEMBER_REQUIRED")
+                    val outcome = event.data["outcome"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_MESSAGE_ACK_OUTCOME_REQUIRED")
+                    require(outcome in setOf("handled", "cannot_handle")) {
+                        "TEAM_MESSAGE_ACK_OUTCOME_INVALID"
+                    }
+                    val reason = event.data["reason"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                    require(reason.toByteArray(Charsets.UTF_8).size <= LocalAgentTeamContract.MAX_ERROR_CHARS) {
+                        "TEAM_MESSAGE_ACK_REASON_TOO_LONG"
+                    }
+                    require(outcome != "cannot_handle" || reason.isNotBlank()) {
+                        "TEAM_MESSAGE_ACK_REASON_REQUIRED"
+                    }
+                    require(id in state.deliveredMessageIds &&
+                        state.deliveredMessageTargets[id] == memberId) {
+                        "TEAM_MESSAGE_ACK_WRONG_RECIPIENT"
+                    }
+                    require(state.members.any {
+                        it.id == memberId && it.phase == LocalTeamMemberPhase.ACTIVE
+                    }) { "TEAM_MESSAGE_ACK_MEMBER_NOT_ACTIVE" }
+                    require(state.messageAcknowledgements.none { it.messageId == id }) {
+                        "TEAM_MESSAGE_ACK_DUPLICATE"
+                    }
+                    advanced.copy(messageAcknowledgements = state.messageAcknowledgements +
+                        LocalTeamMessageAckSnapshot(id, memberId, outcome, reason))
+                }
                 TEAM_MESSAGE_DELIVERED -> {
                     validateTeamEnvelope(event.data)
                     val id = event.data["messageId"]?.jsonPrimitive?.contentOrNull
@@ -139,6 +174,7 @@ internal object LocalAgentTeamReducer {
                     advanced.copy(
                         pendingMessages = state.pendingMessages.filterNot { it.id == id },
                         deliveredMessageIds = state.deliveredMessageIds + id,
+                        deliveredMessageTargets = state.deliveredMessageTargets + (id to targetId),
                     )
                 }
                 TEAM_MESSAGE_DISCARDED -> {
@@ -190,6 +226,14 @@ internal object LocalAgentTeamReducer {
                 TEAM_SHUTDOWN_RESPONSE -> LocalAgentTeamActivityUiState(
                     event.sequence, "message", "成员关闭请求已有结构化回复",
                     if (event.data["approved"]?.jsonPrimitive?.booleanOrNull == true) "approved" else "rejected",
+                    next.members.firstOrNull {
+                        it.id == event.data["memberId"]?.jsonPrimitive?.contentOrNull
+                    }?.name,
+                )
+                TEAM_MESSAGE_ACKNOWLEDGED -> LocalAgentTeamActivityUiState(
+                    event.sequence, "message",
+                    "成员显式声明消息处理结果（非任务完成证明）",
+                    event.data["outcome"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                     next.members.firstOrNull {
                         it.id == event.data["memberId"]?.jsonPrimitive?.contentOrNull
                     }?.name,
