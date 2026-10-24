@@ -4,6 +4,7 @@ import android.content.Context
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.LinkOption
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -17,8 +18,10 @@ import java.util.zip.ZipOutputStream
  *
  * This is NOT a workspace export: only the app-owned .dsh/attachments directory.
  */
-internal class SqliteSessionMediaArchive(private val context: Context) {
-    private val workspace get() = File(context.filesDir, "local-harness/workspace")
+internal class SqliteSessionMediaArchive(
+    context: Context,
+    private val workspace: File = File(context.filesDir, "local-harness/workspace"),
+) {
     private val directory get() = File(workspace, ".dsh/attachments")
 
     /** Write all media bytes and a complete manifest, rejecting unsafe/unreadable files. */
@@ -29,7 +32,9 @@ internal class SqliteSessionMediaArchive(private val context: Context) {
                 !Files.isSymbolicLink(dir.parentFile.toPath()) &&
                 dir.isDirectory) { "本地附件目录不是安全目录，已取消备份" }
         }
-        val files = dir.listFiles()?.toList().orEmpty()
+        val files = if (dir.exists()) requireNotNull(dir.listFiles()) {
+            "附件目录无法完整枚举，已取消备份"
+        }.toList() else emptyList()
         check(files.size <= MAX_MEDIA_FILES) { "附件数量超过备份上限" }
         val manifest = StringBuilder()
         var written = 0L
@@ -146,7 +151,11 @@ internal class SqliteSessionMediaArchive(private val context: Context) {
                 try {
                     file.copyTo(tmp, overwrite = false)
                     check(sameBytes(file, tmp)) { "媒体恢复临时文件校验失败" }
-                    check(tmp.renameTo(dest)) { "媒体恢复提交失败：${file.name}" }
+                    try {
+                        Files.move(tmp.toPath(), dest.toPath())
+                    } catch (ex: java.nio.file.FileAlreadyExistsException) {
+                        check(sameBytes(file, dest)) { "恢复期间存在相同路径的不同附件" }
+                    }
                 } finally { tmp.delete() }
             }
         }
