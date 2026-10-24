@@ -52,6 +52,13 @@ class LocalToolPolicyTest {
         assertEquals(LocalAutoApprovalScope.READ_ONLY, LocalToolPolicy.autoApprovalScope("team_message_receipt"))
     }
 
+    @Test fun shutdownResponseOnlyExposesAnAuthenticatedMemberControlCapability() {
+        assertEquals(ToolAccess.AGENT_CONTROL, LocalToolPolicy.access("team_respond_shutdown"))
+        assertEquals(ToolExposure.OPTIONAL, LocalToolPolicy.exposure("team_respond_shutdown"))
+        assertEquals(ToolApprovalPolicy.NEVER, LocalToolPolicy.approval("team_respond_shutdown"))
+        assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope("team_respond_shutdown"))
+    }
+
     @Test fun mediaToolsHaveExplicitBillingAndReadOnlyBoundaries() {
         assertEquals(ToolAccess.PRIVILEGED, LocalToolPolicy.access("media_image_create"))
         assertEquals(ToolApprovalPolicy.ALWAYS, LocalToolPolicy.approval("media_image_create"))
