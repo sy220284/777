@@ -75,6 +75,7 @@ interface SettingsUiPort {
     /** Validated missing sessions are restored at next app launch, never over live event logs. */
     suspend fun stageRestoreSessionStorage(archive: java.io.InputStream): Int
     suspend fun cancelStagedSessionRestore(): Boolean
+    suspend fun stageLegacySessionRestore(archive: java.io.InputStream): Int
     suspend fun environmentInfo(): String
     suspend fun diagnosticReport(): String
     fun clearCredential()
