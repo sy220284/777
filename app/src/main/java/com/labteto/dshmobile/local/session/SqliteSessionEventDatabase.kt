@@ -85,6 +85,8 @@ class SqliteSessionEventDatabase(
         require(entries.all { (type, _) -> type.isNotBlank() && type.length <= MAX_TYPE_LENGTH }) {
             "事件类型不合法"
         }
+        val mutation = SqliteSessionConsistencyGate.acquireMutation()
+        try {
         val database = writableDatabase
         database.beginTransactionNonExclusive()
         try {
@@ -129,6 +131,7 @@ class SqliteSessionEventDatabase(
         } finally {
             database.endTransaction()
         }
+        } finally { mutation.unlock() }
     }
 
     /** Source generations allow derived Work reports to detect deletion/recreation and append. */
@@ -278,6 +281,8 @@ class SqliteSessionEventDatabase(
         require(checkpoint.payload.toByteArray(Charsets.UTF_8).size <= MAX_CHECKPOINT_BYTES) {
             "投影检查点超过 8 MiB 上限"
         }
+        val mutation = SqliteSessionConsistencyGate.acquireMutation()
+        try {
         val db = writableDatabase
         db.beginTransactionNonExclusive()
         try {
@@ -323,19 +328,21 @@ class SqliteSessionEventDatabase(
         } finally {
             db.endTransaction()
         }
+        } finally { mutation.unlock() }
     }
 
     /** Cross-process writer lease for process-loss repair and semantic rewrite. */
     fun <T> withWriterLease(block: () -> T): T {
-        val db = writableDatabase
-        db.beginTransactionNonExclusive()
+        val mutation = SqliteSessionConsistencyGate.acquireMutation()
         try {
-            val result = block()
-            db.setTransactionSuccessful()
-            return result
-        } finally {
-            db.endTransaction()
-        }
+            val db = writableDatabase
+            db.beginTransactionNonExclusive()
+            try {
+                val result = block()
+                db.setTransactionSuccessful()
+                return result
+            } finally { db.endTransaction() }
+        } finally { mutation.unlock() }
     }
 
     /** The cursor is valid only for the duration of the consumer callback. */
@@ -476,7 +483,9 @@ class SqliteSessionEventDatabase(
 
     fun clearSession(sessionId: String) {
         validateSessionId(sessionId)
-        writableDatabase.delete("session_event_cursors", "session_id=?", arrayOf(sessionId))
+        val mutation = SqliteSessionConsistencyGate.acquireMutation()
+        try { writableDatabase.delete("session_event_cursors", "session_id=?", arrayOf(sessionId)) }
+        finally { mutation.unlock() }
     }
 
     private fun validateCheckpointName(name: String) {

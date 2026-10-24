@@ -114,6 +114,8 @@ internal class SqliteSessionSnapshotStore(
         val summary = projectLocalSessionSummary(snapshot, domainCodecs)
         val preview = snapshot.transcriptWindow.ifEmpty { snapshot.messages }
             .takeLast(MAX_PREVIEW_MESSAGES)
+        val mutation = SqliteSessionConsistencyGate.acquireMutation()
+        try {
         val db = writableDatabase
         db.beginTransactionNonExclusive()
         try {
@@ -168,11 +170,14 @@ internal class SqliteSessionSnapshotStore(
         } finally {
             db.endTransaction()
         }
+        } finally { mutation.unlock() }
     }
 
     override fun delete(id: String): Boolean {
         validateId(id)
-        return writableDatabase.delete("session_snapshots", "id=?", arrayOf(id)) > 0
+        val mutation = SqliteSessionConsistencyGate.acquireMutation()
+        return try { writableDatabase.delete("session_snapshots", "id=?", arrayOf(id)) > 0 }
+        finally { mutation.unlock() }
     }
 
     override val nativeSummaries: Boolean get() = true

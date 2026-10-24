@@ -46,7 +46,8 @@ internal class SqliteSessionStorageManager(
     }
 
     suspend fun compactAll(): LocalSessionStorageStatus {
-        // Maintenance is explicit and never on the navigation / main-thread path.
+        val maintenance = SqliteSessionConsistencyGate.acquireExclusive()
+        try {
         listOf(snapshots.writableDatabase, events.writableDatabase).forEach { db ->
             db.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", null).use { result ->
                 if (result.moveToFirst()) {
@@ -56,9 +57,12 @@ internal class SqliteSessionStorageManager(
             db.execSQL("VACUUM")
         }
         return status()
+        } finally { maintenance.unlock() }
     }
 
     fun exportAll(output: OutputStream): Long {
+        val archiveLease = SqliteSessionConsistencyGate.acquireExclusive()
+        try {
         val staging = File(context.cacheDir, "sqlite-session-export-${UUID.randomUUID()}")
         check(staging.mkdirs()) { "无法创建 SQLite 备份工作目录" }
         val snapshotCopy = File(staging, SNAPSHOT_ENTRY)
@@ -80,6 +84,7 @@ internal class SqliteSessionStorageManager(
         } finally {
             staging.deleteRecursively()
         }
+        } finally { archiveLease.unlock() }
     }
 
     private fun backup(db: SQLiteDatabase, destination: File) {

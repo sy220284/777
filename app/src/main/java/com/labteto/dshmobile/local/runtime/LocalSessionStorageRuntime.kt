@@ -67,9 +67,13 @@ class LocalSessionStorageRuntime @Inject internal constructor(
 
     init {
         // Apply staged imports before any repository or event reader opens the session directory.
-        runCatching { storageManager.applyPendingRestore() }.onFailure { failure ->
+        try {
+            storageManager.applyPendingRestore()
+        } catch (failure: Exception) {
             runtimeStateStore.projection.publishError(
                 "会话备份恢复未全部完成：${failure.message ?: "请检查本地存储"}")
+            // Never expose a possibly half-installed pair of SQLite databases.
+            throw IllegalStateException("SQLite 恢复未完成，禁止启动不一致会话", failure)
         }
         repository = LocalSessionRepository(
             root = sessionsRoot,
