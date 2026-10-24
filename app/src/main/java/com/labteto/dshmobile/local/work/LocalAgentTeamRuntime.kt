@@ -59,6 +59,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -336,8 +337,9 @@ internal class LocalAgentTeamRuntime(
             synchronizeTeamRuntime(binding.sessionId)
         }
         val args = call.arguments
+        var commandCompleted = false
         return try {
-            when (call.name) {
+            val output = when (call.name) {
             "team_members" -> renderMembers(binding.sessionId)
             "team_member_status" -> renderMemberStatus(
                 sessionId = binding.sessionId,
@@ -453,8 +455,11 @@ internal class LocalAgentTeamRuntime(
             )
             else -> error("未覆盖的 Agent Team 工具：${call.name}")
             }
+            commandCompleted = true
+            output
         } finally {
-            if (call.name in setOf("team_task_create", "team_task_update", "team_start_member", "team_spawn")) {
+            if (commandCompleted && currentCoroutineContext().isActive &&
+                call.name in setOf("team_task_create", "team_task_update", "team_start_member", "team_spawn")) {
                 reconcileIdleTeamTasks(binding.sessionId)
             }
             binding.workState.update { current ->
