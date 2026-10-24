@@ -26,6 +26,18 @@ internal fun requireSessionSnapshotCursorsWithinLog(
     }
 }
 
+/**
+ * Advance past invisible event rows only after every indexed visible candidate
+ * was successfully projected. A malformed transcript freezes the durable
+ * cursor before that event so a later restart can retry it without data loss.
+ */
+internal fun safeTranscriptReplayHighWatermark(
+    projectedThrough: Long,
+    latestCandidateSequence: Long,
+    durableLatest: Long,
+): Long = if (projectedThrough < latestCandidateSequence) projectedThrough
+    else maxOf(projectedThrough, durableLatest)
+
 internal data class LocalSessionTranscriptRestore(
     val messages: List<LocalHarnessMessage>,
     val index: LocalTranscriptRuntimeIndex,
@@ -129,9 +141,11 @@ internal class LocalSessionCoordinator(
             stored.transcriptWindow.isNotEmpty() -> buildLocalTranscriptRuntimeIndex(stored.transcriptWindow)
             else -> LocalTranscriptRuntimeIndex()
         }
+        // A malformed visible event stops transcript replay. Keep its event
+        // and later candidates out of the derived index as well.
         val projectedIndex = projectLocalTranscriptRuntimeIndexTail(
             snapshot = indexBase,
-            events = tailEvents,
+            events = tailEvents.takeWhile { it.sequence <= projected.projectedThroughSequence },
             sequenceExclusive = cursor,
         ).copy(
             // Old builds could persist false forever. Current edit/variant actions validate the
@@ -141,7 +155,11 @@ internal class LocalSessionCoordinator(
         // Mark every already committed event through the stable pre-query high
         // watermark as considered, including the invisible events skipped by
         // SQL. Never advance past a visible event actually projected.
-        val replayedThrough = maxOf(projected.projectedThroughSequence, durableLatest)
+        val replayedThrough = safeTranscriptReplayHighWatermark(
+            projectedThrough = projected.projectedThroughSequence,
+            latestCandidateSequence = tailEvents.lastOrNull()?.sequence ?: cursor,
+            durableLatest = durableLatest,
+        )
         return LocalSessionTranscriptRestore(
             messages = projected.messages,
             index = projectedIndex,
