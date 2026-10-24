@@ -127,6 +127,8 @@ internal data class LocalTeamTaskSnapshot(
     val ownerId: String? = null,
     val blockedBy: List<String> = emptyList(),
     val writeScopes: List<String> = emptyList(),
+    /** Outbox identity persisted with an automatic Task reservation. */
+    val autoDispatchMessageId: String? = null,
 )
 
 @Serializable
@@ -282,8 +284,8 @@ internal class LocalAgentTeamRuntime(
                 }
             }
         }
-        // Accepted mailbox work belongs to Team persistence, independent of the sender activation.
-        // Never call the foreground Inbox while holding ownership or commandLock.
+        // Work can become eligible after this member settles a dependency.
+        reconcileIdleTeamTasks(sessionId)
         deliverLeadMailbox(sessionId)
         return result
     }
@@ -452,6 +454,9 @@ internal class LocalAgentTeamRuntime(
             else -> error("未覆盖的 Agent Team 工具：${call.name}")
             }
         } finally {
+            if (call.name in setOf("team_task_create", "team_task_update", "team_start_member", "team_spawn")) {
+                reconcileIdleTeamTasks(binding.sessionId)
+            }
             binding.workState.update { current ->
                 current.copy(team = uiState(binding.sessionId))
             }
@@ -1066,6 +1071,8 @@ internal class LocalAgentTeamRuntime(
 
     fun recoverMailbox(sessionId: String) {
         recoverMemberMailbox(sessionId)
+        reconcileIdleTeamTasks(sessionId)
+        recoverMemberMailbox(sessionId)
         deliverLeadMailbox(sessionId)
     }
 
@@ -1157,8 +1164,74 @@ internal class LocalAgentTeamRuntime(
             }
     }
 
+    /**
+     * Claim the durable task revision before sending its Team message. A crash after the
+     * reservation is repaired from the persisted autoDispatchMessageId on cold recovery.
+     */
+    private fun reconcileIdleTeamTasks(sessionId: String) = synchronized(commandLock) {
+        var state = project(sessionId)
+        if (state.failure != null) return@synchronized
+        state.tasks.filter {
+            it.status == LocalTeamTaskStatus.IN_PROGRESS && it.autoDispatchMessageId != null
+        }.forEach { task ->
+            state = project(sessionId)
+            val member = state.members.singleOrNull {
+                it.id == task.ownerId && it.phase == LocalTeamMemberPhase.ACTIVE
+            } ?: return@forEach
+            ensureAutoTaskMessage(sessionId, member, task)
+        }
+        while (true) {
+            state = project(sessionId)
+            val assignment = nextIdleTeamTaskAssignment(
+                state, projectLocalAgentTeamActivity(state, jobs.snapshotInfos()),
+            ) ?: break
+            val (member, task) = assignment
+            val revision = task.revision + 1
+            val identity = "$sessionId:${member.id}:${task.id}:$revision"
+            val messageId = "team-msg-" + UUID.nameUUIDFromBytes(
+                identity.toByteArray(Charsets.UTF_8),
+            ).toString().replace("-", "").take(20)
+            val reserved = task.copy(
+                revision = revision,
+                status = LocalTeamTaskStatus.IN_PROGRESS,
+                ownerId = member.id,
+                autoDispatchMessageId = messageId,
+            )
+            validateTaskTransition(state.tasks, previous = task, next = reserved)
+            appendTask(sessionId, reserved)
+            ensureAutoTaskMessage(sessionId, member, reserved)
+        }
+    }
+
+    private fun ensureAutoTaskMessage(
+        sessionId: String,
+        member: LocalTeamMemberSnapshot,
+        task: LocalTeamTaskSnapshot,
+    ) {
+        val id = requireNotNull(task.autoDispatchMessageId)
+        val state = project(sessionId)
+        if (id in state.deliveredMessageIds || id in state.discardedMessageIds) return
+        var message = state.pendingMessages.singleOrNull { it.id == id }
+        if (message == null) {
+            message = LocalTeamMessageSnapshot(
+                id = id,
+                senderId = sessionId,
+                senderName = "lead",
+                targetId = member.id,
+                content = "团队任务自动分派；task_id=${task.id}；认领版本=${task.revision}。" +
+                    "请执行：${task.subject}\n${task.description}\n" +
+                    "完成后向 @lead 发送可核验证据，任务结算需要归属正确的新鲜结果 ID。" +
+                    "本消息不增加工具或写入权限。",
+            )
+            teamInboxInput(message, sessionId)
+            eventLogFor(sessionId).append(TEAM_MESSAGE_QUEUED, message.toEvent(sessionId))
+        }
+        deliverMessage(sessionId, message, member)
+    }
+
     private fun synchronizeTeamRuntime(sessionId: String) {
         recoverMemberMailbox(sessionId)
+        reconcileIdleTeamTasks(sessionId)
     }
 
     private fun reconcileMemberOutcomes(sessionId: String) {
@@ -1225,6 +1298,7 @@ internal class LocalAgentTeamRuntime(
                         revision = current.revision + 1,
                         status = LocalTeamTaskStatus.PENDING,
                         ownerId = null,
+                        autoDispatchMessageId = null,
                     )
                     validateTaskTransition(currentState.tasks, previous = current, next = released)
                     appendTask(sessionId, released)
@@ -1305,13 +1379,13 @@ internal class LocalAgentTeamRuntime(
                         "TEAM_TASK_BLOCKED：依赖尚未完成"
                     }
                     val member = resolveOwner(state, ownerName)
-                    next.copy(status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = member.id)
+                    next.copy(status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = member.id, autoDispatchMessageId = null)
                 }
                 "release" -> {
                     require(current.status == LocalTeamTaskStatus.IN_PROGRESS) {
                         "TEAM_TASK_STATUS_INVALID：只有 in_progress 任务可以 release"
                     }
-                    next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null)
+                    next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null, autoDispatchMessageId = null)
                 }
                 "complete" -> {
                     require(current.status == LocalTeamTaskStatus.IN_PROGRESS) {
@@ -1324,13 +1398,13 @@ internal class LocalAgentTeamRuntime(
                     require(hasFreshTaskResult(sessionId, current, owner.jobId, verifiedResultId)) {
                         "TEAM_TASK_RESULT_STALE：结果必须属于当前负责人且晚于当前任务 revision"
                     }
-                    next.copy(status = LocalTeamTaskStatus.COMPLETED)
+                    next.copy(status = LocalTeamTaskStatus.COMPLETED, autoDispatchMessageId = null)
                 }
                 "reopen" -> {
                     require(current.status == LocalTeamTaskStatus.COMPLETED) {
                         "TEAM_TASK_STATUS_INVALID：只有 completed 任务可以 reopen"
                     }
-                    next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null)
+                    next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null, autoDispatchMessageId = null)
                 }
                 "reassign" -> {
                     require(
@@ -1341,13 +1415,13 @@ internal class LocalAgentTeamRuntime(
                     }
                     val requestedOwner = ownerName?.trim()?.takeIf(String::isNotBlank)
                     if (requestedOwner == null) {
-                        next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null)
+                        next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null, autoDispatchMessageId = null)
                     } else {
                         require(dependenciesReady(current, state.tasks)) {
                             "TEAM_TASK_BLOCKED：依赖尚未完成"
                         }
                         val member = resolveOwner(state, requestedOwner)
-                        next.copy(status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = member.id)
+                        next.copy(status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = member.id, autoDispatchMessageId = null)
                     }
                 }
                 "delete" -> {
@@ -1360,7 +1434,7 @@ internal class LocalAgentTeamRuntime(
                         "TEAM_TASK_DELETE_BLOCKED：仍被依赖：" +
                             dependents.joinToString(",") { it.id }
                     }
-                    next.copy(status = LocalTeamTaskStatus.DELETED, ownerId = null)
+                    next.copy(status = LocalTeamTaskStatus.DELETED, ownerId = null, autoDispatchMessageId = null)
                 }
                 "set_dependencies" -> next.copy(
                     blockedBy = normalizeTaskIds(
@@ -1771,12 +1845,14 @@ internal class LocalAgentTeamRuntime(
     ): String {
         val before = baseline ?: teamChangeFingerprint(sessionId)
         // First compare immediately after admission: the child may already have gone idle.
+        reconcileIdleTeamTasks(sessionId)
         val first = teamChangeFingerprint(sessionId)
         if (first != before) return renderLocalTeamWaitTransition(before, first)
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             currentCoroutineContext().ensureActive()
             delay(WAIT_POLL_MS)
+            reconcileIdleTeamTasks(sessionId)
             val next = teamChangeFingerprint(sessionId)
             if (next != before) return renderLocalTeamWaitTransition(before, next)
         }
