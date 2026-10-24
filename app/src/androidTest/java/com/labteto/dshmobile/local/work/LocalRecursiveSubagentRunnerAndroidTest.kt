@@ -226,7 +226,8 @@ class LocalRecursiveSubagentRunnerAndroidTest {
             val children = tree.nodes.filter { it.agentId != null }
             assertEquals(3, children.size)
             assertTrue(children.all { it.parentRunId != null && tree.nodes.any { node -> node.runId == it.parentRunId } })
-            if (cancelAtLeaf) assertTrue(children.none { it.status == "completed" })
+            if (cancelAtLeaf) assertTrue("Cancelled descendants must have durable terminal checkpoints",
+                children.all { it.status == "cancelled" })
             else assertTrue(children.all { it.status == "completed" })
             assertEquals(0, scheduler.snapshot().activeAgents)
             assertEquals(0, scheduler.snapshot().activeModelRequests)
