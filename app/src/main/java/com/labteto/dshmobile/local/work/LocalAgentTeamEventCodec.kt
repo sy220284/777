@@ -51,6 +51,7 @@ internal object LocalAgentTeamEventCodec {
             put("blockedBy", JsonArray(blockedBy.map(::JsonPrimitive)))
             put("writeScopes", JsonArray(writeScopes.map(::JsonPrimitive)))
             autoDispatchMessageId?.let { put("autoDispatchMessageId", it) }
+            rootUserRevision?.let { put("rootUserRevision", it) }
         })
     }
 
