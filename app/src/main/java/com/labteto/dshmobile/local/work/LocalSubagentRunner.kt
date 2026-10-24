@@ -640,7 +640,7 @@ internal class LocalSubagentRunner(
                 tools = AgentToolExecutor { call ->
                     executionFence()
                     currentCoroutineContext().ensureActive()
-                    LocalRecursiveReadOnlyToolScope.rejection(call.name, capabilities)
+                    LocalRecursiveReadOnlyToolScope.rejection(call, capabilities)
                         ?: toolCallPolicy.rejection(call)
                         ?: if (capabilities.teamManaged && call.name == "capability_search") {
                             AgentToolResult(

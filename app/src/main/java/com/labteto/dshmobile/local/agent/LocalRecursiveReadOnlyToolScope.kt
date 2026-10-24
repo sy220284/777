@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.local.agent
 
 import com.labteto.dshmobile.harness.agent.AgentToolResult
+import com.labteto.dshmobile.harness.agent.AgentToolCall
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -26,11 +29,37 @@ internal object LocalRecursiveReadOnlyToolScope {
 
     fun visibleSchemas(source: JsonArray, capabilities: LocalSubagentCapabilities): JsonArray {
         if (capabilities.maxDepth <= 1) return source
-        return JsonArray(source.filter { raw ->
-            val function = (raw as? JsonObject)?.get("function") as? JsonObject
-            val name = function?.get("name")?.jsonPrimitive?.contentOrNull
-            name != null && permits(name, capabilities)
+        return JsonArray(source.mapNotNull { raw ->
+            val schema = raw as? JsonObject ?: return@mapNotNull null
+            val function = schema["function"] as? JsonObject ?: return@mapNotNull null
+            val name = function["name"]?.jsonPrimitive?.contentOrNull
+                ?: return@mapNotNull null
+            if (!permits(name, capabilities)) return@mapNotNull null
+            if (name != "web_fetch") return@mapNotNull schema
+            // The recursive tree cannot detach fetches into unrelated background jobs.
+            val params = function["parameters"] as? JsonObject ?: return@mapNotNull schema
+            val properties = params["properties"] as? JsonObject ?: return@mapNotNull schema
+            val stripped = JsonObject(properties - "run_in_background")
+            val narrowParams = JsonObject(params + ("properties" to stripped))
+            val narrowFunction = JsonObject(function + ("parameters" to narrowParams))
+            JsonObject(schema + ("function" to narrowFunction))
         })
+    }
+
+    fun rejection(call: AgentToolCall, capabilities: LocalSubagentCapabilities): AgentToolResult? {
+        rejection(call.name, capabilities)?.let { return it }
+        if (capabilities.maxDepth > 1 && call.name == "web_fetch" &&
+            "run_in_background" in call.arguments) {
+            val value = call.arguments["run_in_background"] as? JsonPrimitive
+            if (value?.booleanOrNull != false) {
+                return AgentToolResult(
+                    content = "NESTED_READONLY_BACKGROUND_BLOCKED：递归代理禁止创建后台网络任务",
+                    isError = true,
+                    errorCode = "NESTED_READONLY_BACKGROUND_BLOCKED",
+                )
+            }
+        }
+        return null
     }
 
     fun rejection(name: String, capabilities: LocalSubagentCapabilities): AgentToolResult? {
