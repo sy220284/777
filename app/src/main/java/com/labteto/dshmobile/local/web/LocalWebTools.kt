@@ -40,7 +40,7 @@ internal class LocalWebTools(
             require(format == "text") { "DeepSeek Fetch 仅返回 Markdown，不能使用 raw 格式" }
             val key = searchKeyProvider()
                 ?: throw LocalWebException("FETCH_UNAVAILABLE", "DeepSeek Fetch 需要单独配置官方 DeepSeek API Key")
-            return formatFetchedWeb(web.fetchViaDeepSeek(key, input), format, allowArtifactWrite)
+            return formatFetchedWeb(web.fetchViaDeepSeek(key, input, maxBytes, timeoutSeconds), format, allowArtifactWrite)
         }
         return try {
             formatFetchedWeb(
@@ -62,7 +62,7 @@ internal class LocalWebTools(
                 if (!key.isNullOrBlank()) {
                     try {
                         return "[web_fetch][" + error.code + "] 直接抓取失败，已使用 DeepSeek Fetch。\n" +
-                            formatFetchedWeb(web.fetchViaDeepSeek(key, input), format, allowArtifactWrite)
+                            formatFetchedWeb(web.fetchViaDeepSeek(key, input, maxBytes, timeoutSeconds), format, allowArtifactWrite)
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
