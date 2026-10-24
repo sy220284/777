@@ -182,14 +182,13 @@ internal class SqliteSessionStorageManager(
             validateDatabase(src)
             // Never replace a live/user-owned database. Already installed bytes
             // are safe only when identical to the staged, verified source.
-            if (dst.exists() && !sameBytes(src, dst)) {
-                // WAL sidecars may contain the only committed copy of an event.
-                // Do not overwrite a database whose sidecars are still present.
-                check(!File(dst.path + "-wal").exists() &&
-                    !File(dst.path + "-shm").exists()) {
-                    "SQLite WAL 尚未安全关闭，恢复拒绝覆盖"
+            if (dst.exists()) {
+                // A killed process can leave a valid EMPTY WAL database with sidecars.
+                // Let SQLite recover/checkpoint it; never discard a WAL before reading it.
+                settleStoppedWal(dst)
+                if (!sameBytes(src, dst)) {
+                    require(isEmptyDatabase(dst)) { "已有 SQLite 会话数据，恢复拒绝覆盖" }
                 }
-                require(isEmptyDatabase(dst)) { "已有 SQLite 会话数据，恢复拒绝覆盖" }
             }
         }
         sources.forEach { (src, dst) ->
@@ -270,6 +269,25 @@ internal class SqliteSessionStorageManager(
                 if (rows.moveToFirst()) rows.getInt(0) else 0
             }
         }
+
+    private fun settleStoppedWal(file: File) {
+        if (!File(file.path + "-wal").exists() && !File(file.path + "-shm").exists()) return
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            db.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", null).use { result ->
+                check(result.moveToFirst() && result.getInt(0) == 0) {
+                    "恢复前 SQLite 仍被写入者占用"
+                }
+            }
+            db.rawQuery("PRAGMA journal_mode=DELETE", null).use { result ->
+                check(result.moveToFirst() && result.getString(0).equals("delete", true)) {
+                    "恢复前 SQLite WAL 未完成安全关闭"
+                }
+            }
+        }
+        check(!File(file.path + "-wal").exists()) {
+            "SQLite WAL 已结算但仍存在，拒绝覆盖数据库"
+        }
+    }
 
     private fun isEmptyDatabase(file: File): Boolean {
         if (!file.exists()) return true
