@@ -296,39 +296,61 @@ class LocalWebProvider @Inject constructor(
         apiKey: String,
         queries: List<String>,
         usageContext: TokenUsageContext? = null,
-    ): String = searchClient.search(apiKey, queries, usageContext)
+        count: Int = 10,
+        needContent: Boolean = false,
+    ): String = searchClient.search(apiKey, queries, usageContext, count, needContent)
 
-    /** A keyless search first; an explicitly configured DeepSeek credential is only a fallback. */
+    /**
+     * A configured official DeepSeek credential enables native Search.
+     * With no key, the same tools remain usable through the free Bing RSS channel.
+     * Explicit provider selection lets callers avoid billable DeepSeek requests.
+     */
     suspend fun searchWithFallback(
         queries: List<String>,
         usageContext: TokenUsageContext? = null,
         fallbackKey: suspend () -> String? = { null },
+        count: Int = 10,
+        needContent: Boolean = false,
+        provider: String = "auto",
     ): String {
+        require(provider in setOf("auto", "bing", "deepseek")) { "未知网页搜索服务：" + provider }
+        if (provider == "bing") return keylessSearchClient.search(queries)
+        val key = fallbackKey()
+        if (provider == "deepseek") {
+            if (key.isNullOrBlank()) throw LocalWebException(
+                "SEARCH_UNAVAILABLE", "DeepSeek 搜索需要单独配置官方 DeepSeek API Key",
+            )
+            return searchClient.search(key, queries, usageContext, count, needContent)
+        }
+        if (key.isNullOrBlank()) return keylessSearchClient.search(queries)
         return try {
-            keylessSearchClient.search(queries)
+            searchClient.search(key, queries, usageContext, count, needContent)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
-        } catch (publicFailure: Exception) {
-            val key = fallbackKey()
-                ?: throw LocalWebException(
-                    "SEARCH_UNAVAILABLE",
-                    "免密搜索失败，且未配置可用的备用搜索服务：" +
-                        (publicFailure.message ?: "网络不可达").take(220),
-                    publicFailure,
-                )
+        } catch (deepSeekFailure: Exception) {
             try {
-                searchClient.search(key, queries, usageContext)
+                keylessSearchClient.search(queries)
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
-            } catch (fallbackFailure: Exception) {
+            } catch (publicFailure: Exception) {
                 throw LocalWebException(
                     "SEARCH_UNAVAILABLE",
-                    "免密搜索及备用 DeepSeek 搜索均失败：" +
-                        (fallbackFailure.message ?: "服务不可达").take(220),
-                    fallbackFailure,
+                    "DeepSeek 与 Bing 搜索均失败：DeepSeek " +
+                        deepSeekFailure.message.orEmpty().take(120) + "；Bing " +
+                        publicFailure.message.orEmpty().take(120),
+                    publicFailure,
                 )
             }
         }
+    }
+
+    /** Only a public validated target is passed to the official DeepSeek Fetch API. */
+    suspend fun fetchViaDeepSeek(apiKey: String, input: String): LocalWebFetchResult {
+        val uri = validateTarget(input).uri
+        require(uri.toString().length <= 8192 && uri.userInfo == null) {
+            "DeepSeek Fetch URL 必须是不含用户信息、长度不超过 8192 的公开 HTTP/HTTPS 地址"
+        }
+        return searchClient.fetch(apiKey, uri.toString())
     }
 
     fun fallbackQuery(input: String): String {
