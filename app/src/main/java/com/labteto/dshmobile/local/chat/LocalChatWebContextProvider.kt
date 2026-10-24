@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.chat
 import com.labteto.dshmobile.local.LocalModelConfigurationCoordinator
 import com.labteto.dshmobile.local.LocalWebProvider
 import com.labteto.dshmobile.local.LocalWebException
+import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import java.net.URI
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -13,6 +14,7 @@ import kotlinx.coroutines.CancellationException
 internal class LocalChatWebContextProvider @Inject constructor(
     private val web: LocalWebProvider,
     private val configuration: LocalModelConfigurationCoordinator,
+    private val networkSettings: LocalNetworkSearchSettings,
 ) {
     private data class CachedSearch(val storedAtNanos: Long, val content: String)
     private val cacheLock = Any()
@@ -20,6 +22,7 @@ internal class LocalChatWebContextProvider @Inject constructor(
 
     suspend fun forInput(input: String, persona: PersonaProfile? = null): String {
         val lookup = chatWebLookup(input, persona) ?: return ""
+        if (!networkSettings.isEnabled()) return ""
         val result = try {
             when (lookup) {
                 is ChatWebLookup.Page -> {
