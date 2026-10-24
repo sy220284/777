@@ -86,6 +86,10 @@ class LocalTeamMessageReceiptTest {
             listOf(delivered(2), checkpoint(3, jobId)), false, sessionId)
         assertEquals("unknown_history_window", partial.status)
         assertFalse(partial.historyWindowComplete)
+        val observedButIncomplete = projectLocalTeamMessageReceipt(id,
+            listOf(queued(1), delivered(2)), false, sessionId)
+        assertEquals("unknown_history_window", observedButIncomplete.status)
+        assertEquals(2L, observedButIncomplete.deliveredSequence)
         val absent = projectLocalTeamMessageReceipt(id, emptyList(), true, sessionId)
         assertEquals("not_found", absent.status)
     }

@@ -21,7 +21,8 @@ internal data class LocalTeamMessageReceipt(
     val historyWindowComplete: Boolean,
 ) {
     val status: String get() = when {
-        queuedSequence == null -> if (historyWindowComplete) "not_found" else "unknown_history_window"
+        !historyWindowComplete -> "unknown_history_window"
+        queuedSequence == null -> "not_found"
         discardedSequence != null -> "discarded"
         historyCheckpointSequence != null -> "checkpointed_in_model_history"
         deliveredSequence != null -> "accepted_by_inbox"
@@ -119,12 +120,22 @@ internal fun readLocalTeamMessageReceipt(
     require(id.matches(Regex("team-msg-[a-zA-Z0-9_-]{1,64}"))) { "TEAM_MESSAGE_RECEIPT_ID_INVALID" }
     val seen = ArrayList<LocalSessionEventLog.Event>()
     var cursor = Long.MAX_VALUE
+    var expectedSequence = log.latestSequence()
     var complete = false
+    var invalidGap = false
     while (seen.size < maxEvents) {
         val pageSize = minOf(160, maxEvents - seen.size)
         val page = log.pageBeforeNewestFirst(cursor, pageSize)
         if (page.isEmpty()) { complete = true; break }
         check(page.last().sequence < cursor) { "TEAM_RECEIPT_EVENT_SCAN_STALLED" }
+        for (event in page) {
+            if (event.sequence != expectedSequence) {
+                invalidGap = true
+                break
+            }
+            expectedSequence--
+        }
+        if (invalidGap) break
         seen.addAll(page)
         cursor = page.last().sequence
         if (page.size < pageSize || cursor <= 0L) { complete = true; break }
