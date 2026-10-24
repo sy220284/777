@@ -2547,6 +2547,105 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun independentVerifierUsesOwnStructuredModelCheckpointAndReplaysExactlyOnce() = runBlocking {
+        val session = "team-independent-verifier"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        startLiveChild(f, session)
+        val reviewer = LocalTeamMemberSnapshot(
+            id = "member-2", jobId = "job-team-2", name = "auditor",
+            description = "独立核验", provider = "local-subagent",
+            context = LocalTeamMemberContext.FRESH,
+            phase = LocalTeamMemberPhase.PROVISIONING, role = "verify",
+        )
+        f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            with(LocalAgentTeamEventCodec) { reviewer.toEvent(session) })
+        f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            with(LocalAgentTeamEventCodec) {
+                reviewer.copy(phase = LocalTeamMemberPhase.ACTIVE).toEvent(session)
+            })
+        f.jobs.startPersistent(label = "子代理：auditor", resumeKind = "subagent_readonly",
+            resumePayload = "{}", ownerSessionId = session, continuable = true,
+            requestedId = "job-team-2") { _, _ -> awaitCancellation() }
+
+        val pending = LocalTeamTaskSnapshot(
+            id = "task-1", revision = 1, subject = "审计的任务", description = "",
+            status = LocalTeamTaskStatus.PENDING,
+        )
+        val running = pending.copy(
+            revision = 2, status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = "member-1",
+        )
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { pending.toEvent(session) })
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { running.toEvent(session) })
+        f.log.append(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint("job-team-1", "sa-team-1", 1,
+                emptyList(), emptySet(), terminalOutput = "原任务模型结果",
+                resultId = "worker-proof"))
+        val originalProof = f.log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) {
+            it["result_id"]?.jsonPrimitive?.contentOrNull == "worker-proof"
+        }!!
+        val completed = running.copy(
+            revision = 3, status = LocalTeamTaskStatus.COMPLETED,
+            completionResultId = "worker-proof",
+            completionEvidenceSequence = originalProof.sequence,
+        )
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { completed.toEvent(session) })
+        val binding = teamBinding(f, session)
+        suspend fun review(id: String, member: String = "auditor") = f.runtime.execute(
+            LocalToolCall(id, "team_task_review", buildJsonObject {
+                put("task_id", "task-1")
+                put("expected_revision", 3)
+                put("reviewer", member)
+                put("review_result_id", id)
+            }, "{}"), binding,
+        )
+        assertTrue(runCatching { review("missing-proof") }.isFailure)
+        assertTrue(runCatching { review("wrong-member", "worker") }.exceptionOrNull()?.
+            message.orEmpty().contains("TEAM_TASK_REVIEW_INDEPENDENT_MEMBER_REQUIRED"))
+
+        f.log.append(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint("job-team-2", "sa-team-2", 1,
+                emptyList(), emptySet(), terminalOutput =
+                    """{"task_id":"task-1","reviewed_result_id":"other-result","verdict":"approve","reason":"已核查"}""",
+                resultId = "wrong-target"))
+        assertTrue(runCatching { review("wrong-target") }.exceptionOrNull()?.
+            message.orEmpty().contains("TEAM_TASK_REVIEW_TARGET_MISMATCH"))
+
+        f.log.append(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint("job-team-2", "sa-team-2", 2,
+                emptyList(), emptySet(), terminalOutput =
+                    """{"task_id":"task-1","reviewed_result_id":"worker-proof","verdict":"approve","reason":"单独复查结果记录"}""",
+                resultId = "review-proof"))
+        val created = review("review-proof").orEmpty()
+        assertTrue(created.contains("review_recorded=true"))
+        assertTrue(created.contains("independent_identity=true"))
+        assertTrue(created.contains("artifact_verified=false"))
+        assertTrue(runCatching { review("review-proof") }.exceptionOrNull()?.
+            message.orEmpty().contains("TEAM_TASK_REVIEW_DUPLICATE"))
+        val state = f.runtime.project(session)
+        assertNull(state.failure)
+        assertEquals(1, state.taskReviews.size)
+        assertEquals("member-2", state.taskReviews.single().reviewerId)
+        assertEquals("approve", state.taskReviews.single().verdict)
+        val evidence = f.runtime.execute(
+            LocalToolCall("inspect-review", "team_task_evidence",
+                buildJsonObject { put("task_id", "task-1") }, "{}"), binding,
+        ).orEmpty()
+        assertTrue(evidence.contains("independent_reviewer_reported=true"))
+        assertTrue(evidence.contains("reviewer_declared_verdict=approve"))
+        assertTrue(evidence.contains("content_verified=false"))
+        val cold = LocalAgentTeamRuntime(f.jobs,
+            { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
+            { _, _, _ -> JobMessageAdmission(false, false, false, "unused") },
+            { f.log }, SessionProjectionRegistry())
+        assertNull(cold.project(session).failure)
+        assertEquals(state.taskReviews, cold.project(session).taskReviews)
+    }
+
+    @Test
     fun completionRequiresFreshOwnedResultAndUnlocksDependencyOnlyAfterVerification() = runBlocking {
         val session = "team-verified-complete"
         val fixture = fixture(session)
