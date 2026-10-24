@@ -17,6 +17,7 @@ internal class LocalLegacySqliteMigration(
     private val events: SqliteSessionEventDatabase,
 ) {
     fun migrate(currentSessionId: String) {
+        if (events.legacyAdoptionFinished()) return
         // Move the single-file predecessor into the same historical folder first.
         migrateLegacySessionFiles(root, sessionsRoot, currentSessionId)
         val legacySnapshots = VersionedSessionStore(sessionsRoot, json)
@@ -44,5 +45,8 @@ internal class LocalLegacySqliteMigration(
                 snapshots.write(id, old.payload, old.updatedAt)
             }
         }
+        // Only after every historical snapshot and EventLog was committed.
+        // Future Session deletion must not re-import the retained legacy files.
+        events.finishLegacyAdoption()
     }
 }
