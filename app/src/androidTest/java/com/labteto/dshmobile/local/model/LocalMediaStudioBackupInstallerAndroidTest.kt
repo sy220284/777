@@ -158,6 +158,24 @@ class LocalMediaStudioBackupInstallerAndroidTest {
         } finally { root.deleteRecursively() }
     }
 
+    @Test fun restartAfterDatabaseCommitButBeforeStagingCleanupIsIdempotent() {
+        val root = File(base.cacheDir, "restore-db-committed-"+UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val (staging, destination) = fixture(root)
+            val db = destination.getDatabasePath("local_media_v1.db")
+            db.parentFile?.mkdirs()
+            File(staging, "media-studio.sqlite").copyTo(db)
+            File(staging, "INSTALLING").writeText("media-studio-v1")
+            assertEquals(2, LocalMediaStudioBackupInstaller(destination, json).install(staging))
+            assertFalse(staging.exists())
+            assertTrue(File(destination.filesDir, "media-studio/shared-paid.png").isFile)
+            LocalMediaDatabase(destination, json).use { stored ->
+                assertEquals("a", stored.get("a")?.result?.id)
+                assertEquals("b", stored.get("b")?.result?.id)
+            }
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun corruptedStagingMustNotCreateAnyUserDatabaseOrFile() {
         val root = File(base.cacheDir, "restore-corrupt-"+UUID.randomUUID()).apply { mkdirs() }
         try {
