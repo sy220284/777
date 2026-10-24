@@ -5,6 +5,7 @@ package com.labteto.dshmobile.local.work
 internal object LocalAgentTeamContract {
         const val TEAM_MEMBER_EVENT = "team/member"
         const val TEAM_TASK_EVENT = "team/task"
+        const val TEAM_TASK_REVIEW_EVENT = "team/task/review"
         const val TEAM_MESSAGE_QUEUED = "team/message/queued"
         const val TEAM_MESSAGE_DELIVERED = "team/message/delivered"
         const val TEAM_MESSAGE_DISCARDED = "team/message/discarded"
@@ -13,10 +14,11 @@ internal object LocalAgentTeamContract {
         const val TEAM_EVENT_VERSION = 2
         // Official V2 whole-value protocol remains at version 4; local activity projection adds display state.
         const val OFFICIAL_TEAM_PROJECTION_STATE_VERSION = 4
-        const val LOCAL_TEAM_PROJECTION_STATE_VERSION = 8
+        const val LOCAL_TEAM_PROJECTION_STATE_VERSION = 9
         val TEAM_EVENTS = setOf(
             TEAM_MEMBER_EVENT,
             TEAM_TASK_EVENT,
+            TEAM_TASK_REVIEW_EVENT,
             TEAM_MESSAGE_QUEUED,
             TEAM_MESSAGE_DELIVERED,
             TEAM_MESSAGE_DISCARDED,
@@ -40,6 +42,7 @@ internal object LocalAgentTeamContract {
             "team_task_create",
             "team_task_get",
             "team_task_evidence",
+            "team_task_review",
             "team_task_list",
             "team_task_update",
             "team_interrupt",
@@ -59,6 +62,7 @@ internal object LocalAgentTeamContract {
             "team_request_shutdown",
             "team_task_create",
             "team_task_update",
+            "team_task_review",
             "team_interrupt",
             "team_disable_member",
             "team_dismiss_member",
