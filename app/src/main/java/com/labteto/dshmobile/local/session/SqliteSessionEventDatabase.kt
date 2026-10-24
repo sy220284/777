@@ -127,6 +127,9 @@ class SqliteSessionEventDatabase(
                     put("schema_version", EVENT_SCHEMA_VERSION)
                     put("payload", payload.toString())
                 })
+                SqliteLocalAssetCatalog.indexCommittedMessageAssets(
+                    database, sessionId, sequence, type, payload,
+                )
                 SessionEvent(sequence, type, createdAt, payload)
             }
             database.setTransactionSuccessful()
