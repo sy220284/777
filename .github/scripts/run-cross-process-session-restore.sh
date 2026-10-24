@@ -13,7 +13,12 @@ mkdir -p "$root"
 for phase in stage resume; do
   log="$root/$phase.log"
   echo "CROSS_PROCESS_RESTORE begin=$phase"
-  adb shell am instrument -w -r -e class "$test_class" -e dsh_acceptance "$phase" \
+  if [[ "$phase" == stage ]]; then
+    method="stageRestoreForExternalProcessRestart"
+  else
+    method="resumeRestoreAfterExternalProcessDeath"
+  fi
+  adb shell am instrument -w -r -e class "${test_class}#${method}" -e dsh_acceptance "$phase" \
       "$component" 2>&1 | tr -d '\r' | tee "$log"
   if grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed' "$log" ||
      ! grep -Eq '^OK \(1 test\)' "$log"; then
