@@ -231,8 +231,12 @@ internal class LocalWorkComposition @Inject constructor(
                     maxSteps,
                     context,
                     parentCallId,
+                    role,
                     grantedExtensions,
                 ->
+                val roleBinding = com.labteto.dshmobile.local.agent.bindLocalAgentRole(
+                    role, instructions, parentMutationAllowed = true,
+                )
                 // 授权必须命中当前实际注册的扩展工具，不能静默丢弃或绕过设备/团队边界。
                 val unavailable = grantedExtensions.filter { name ->
                     name in SUBAGENT_EXCLUDED_TOOLS ||
@@ -255,7 +259,7 @@ internal class LocalWorkComposition @Inject constructor(
                 val activeOptional = defaultOptional + grantedExtensions
                 val exposed = tools.schemas.names(
                     tools.schemas.subagentSchemas(
-                        allowMutation = true,
+                        allowMutation = roleBinding.allowMutation,
                         allowVirtualScreen = false,
                         enabledOptional = activeOptional,
                     ),
@@ -272,7 +276,7 @@ internal class LocalWorkComposition @Inject constructor(
                     task = task,
                     model = model,
                     maxSteps = maxSteps,
-                    instructions = instructions,
+                    instructions = roleBinding.instructions,
                     virtualScreen = false,
                     forkParentCallId =
                         parentCallId.takeIf { context == LocalTeamMemberContext.FORK },
@@ -280,7 +284,7 @@ internal class LocalWorkComposition @Inject constructor(
                     boundState = binding.aggregateSnapshot(),
                     historySnapshot = binding.runHandle.modelHistory::snapshot,
                     requestedJobId = requestedJobId,
-                    allowMutation = true,
+                    allowMutation = roleBinding.allowMutation,
                     teamManaged = true,
                     // 基础网络、后台任务与技能可用；敏感扩展只能由 Lead 按名称授权。
                     initialOptionalTools = activeOptional,

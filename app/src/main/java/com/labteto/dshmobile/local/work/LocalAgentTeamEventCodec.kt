@@ -12,6 +12,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_EVENT_VERSION
+import com.labteto.dshmobile.local.agent.LocalAgentSpecialty
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_JOB_ID_PREFIX
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MEMBER_EVENT
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MEMBER_ID_PREFIX
@@ -26,6 +27,7 @@ internal object LocalAgentTeamEventCodec {
             put("id", id)
             put("name", name)
             put("description", description)
+            put("role", role)
             if (displayName.isNotBlank()) put("displayName", displayName)
             if (mutableToolsEnabled) put("mutableToolsEnabled", true)
             if (grantedExtensions.isNotEmpty()) put("grantedExtensions", JsonArray(grantedExtensions.sorted().map(::JsonPrimitive)))
@@ -86,6 +88,7 @@ internal object LocalAgentTeamEventCodec {
             jobId = teamJobId(id),
             name = member.requiredTeamString("name"),
             description = member.optionalTeamString("description").orEmpty(),
+            role = LocalAgentSpecialty.fromWire(member.optionalTeamString("role")).wireName,
             displayName = member.optionalTeamString("displayName").orEmpty(),
             mutableToolsEnabled = member["mutableToolsEnabled"]?.jsonPrimitive?.booleanOrNull ?: false,
             grantedExtensions = (member["grantedExtensions"] as? JsonArray)

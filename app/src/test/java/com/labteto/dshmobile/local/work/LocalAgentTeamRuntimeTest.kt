@@ -82,7 +82,7 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(listOf("job-team-2", "job-team-2"), peer.map { it.first })
         assertNull(f.runtime.project("lead-address").failure)
         assertEquals(3, f.runtime.project("lead-address").deliveredMessageIds.size)
-        val cold = LocalAgentTeamRuntime(f.jobs, { _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
+        val cold = LocalAgentTeamRuntime(f.jobs, { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
             { _, _, _ -> JobMessageAdmission(false, false, false, "unused") }, { f.log }, SessionProjectionRegistry())
         assertNull(cold.project("lead-address").failure)
         assertEquals(f.runtime.project("lead-address").deliveredMessageIds, cold.project("lead-address").deliveredMessageIds)
@@ -178,7 +178,7 @@ class LocalAgentTeamRuntimeTest {
         val persisted = encodeLocalSubagentInboxClaimEvent("sa-team-2", "job-team-2", received)
         assertEquals(received, decodeLocalSubagentInboxClaimedMessages(persisted))
         // Recreate the projection and activation: durable member/job identity remains unchanged.
-        val restored = LocalAgentTeamRuntime(f.jobs, { _, _, _, _, _, _, _, _, _ ->
+        val restored = LocalAgentTeamRuntime(f.jobs, { _, _, _, _, _, _, _, _, _, _ ->
             JobStartResult(false, null, "unused")
         }, { _, _, _ -> JobMessageAdmission(false, false, false, "unused") }, { f.log }, SessionProjectionRegistry())
         val peerIdentity = identity.copy(slotId = "child:sa-team-2", runId = "cold-run")
@@ -715,7 +715,7 @@ class LocalAgentTeamRuntimeTest {
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined).also(scopes::add),
                 onChanged = {},
             ),
-            startTeammate = { _, _, _, _, _, _, _, _, _ ->
+            startTeammate = { _, _, _, _, _, _, _, _, _, _ ->
                 JobStartResult(false, null, "重建测试不启动子代理")
             },
             sendToTeammate = { _, _, _ ->
@@ -1933,7 +1933,7 @@ class LocalAgentTeamRuntimeTest {
         ).also(logs::add)
         val runtime = LocalAgentTeamRuntime(
             jobs = jobs,
-            startTeammate = { _, _, _, _, _, _, _, _, _ ->
+            startTeammate = { _, _, _, _, _, _, _, _, _, _ ->
                 JobStartResult(false, null, "测试不启动子代理")
             },
             sendToTeammate = sender,

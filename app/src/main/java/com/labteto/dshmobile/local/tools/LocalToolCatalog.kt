@@ -298,6 +298,7 @@ object LocalToolCatalog {
         ), listOf("target")))
         add(tool("team_create_member", "只创建稳定 Team 成员身份，不立即启动模型执行；后续用 team_start_member 派活", properties(
             "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
+            "role" to string("可选；固定专业身份 general/explore/plan/execute/verify/review/integrate，恢复时保持不变，verify/review 为只读工具权限"),
             "description" to string("可选；职责说明"),
             "display_name" to string("可选；用户界面展示的中文成员名称"),
             "context" to buildJsonObject {
@@ -315,8 +316,9 @@ object LocalToolCatalog {
             "max_steps" to integer("单次执行预算，默认沿用当前 Work 子代理配置"),
             "allowed_extensions" to stringArray("可选；Lead 核实后授权给本次启动成员的扩展工具名称"),
         ), listOf("target", "task")))
-        add(tool("team_spawn", "创建具备持久身份、工作区读写权限和可选扩展授权的团队助手", properties(
+        add(tool("team_spawn", "创建具备持久身份、角色约束、授权工具和可选扩展的团队助手；只读角色禁止写入", properties(
             "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
+            "role" to string("可选；固定专业身份 general/explore/plan/execute/verify/review/integrate，verify/review 为只读；旧成员默认 general"),
             "description" to string("可选；职责说明"),
             "display_name" to string("可选；用户界面展示的中文成员名称"),
             "task" to string("首个任务"),
