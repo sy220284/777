@@ -263,6 +263,48 @@ class SqliteLocalAssetCatalogAndroidTest {
         }
     }
 
+    @Test fun v3WithVisibleHintUpgradesWithoutDroppingRecentMessageIndex() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "asset-v3-visible-${UUID.randomUUID()}.db"
+        try {
+            val file = context.getDatabasePath(name)
+            file.parentFile?.mkdirs()
+            SQLiteDatabase.openOrCreateDatabase(file, null).use { old ->
+                old.execSQL("CREATE TABLE session_event_cursors (" +
+                    "session_id TEXT PRIMARY KEY NOT NULL, " +
+                    "next_sequence INTEGER NOT NULL, instance TEXT NOT NULL)")
+                old.execSQL("CREATE TABLE session_events (" +
+                    "session_id TEXT NOT NULL REFERENCES session_event_cursors(session_id) ON DELETE CASCADE, " +
+                    "sequence INTEGER NOT NULL, event_type TEXT NOT NULL, created_at INTEGER NOT NULL, " +
+                    "schema_version INTEGER NOT NULL, payload TEXT NOT NULL, " +
+                    "visible_hint INTEGER NOT NULL DEFAULT 0, " +
+                    "PRIMARY KEY(session_id,sequence))")
+                old.execSQL("INSERT INTO session_event_cursors VALUES ('legacy',1,'old-instance')")
+                old.execSQL("INSERT INTO session_events VALUES (" +
+                    "'legacy',0,'user/message',1,1,'{}',1)")
+                old.version = 3
+            }
+            SqliteSessionEventDatabase(context, Json, name).use { upgraded ->
+                assertEquals(0L, upgraded.latestSequence("legacy"))
+                val catalog = SqliteLocalAssetCatalog(upgraded)
+                catalog.register(image)
+                assertEquals(image.bytes, catalog.asset(digest)?.bytes)
+                assertEquals(1L, upgraded.append(
+                    "legacy", "assistant/message", buildJsonObject {},
+                ).sequence)
+                upgraded.readableDatabase.rawQuery(
+                    "SELECT visible_hint FROM session_events WHERE session_id='legacy' AND sequence=0",
+                    null,
+                ).use { rows ->
+                    assertTrue(rows.moveToFirst())
+                    assertEquals(1, rows.getInt(0))
+                }
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
     @Test fun v2DatabaseUpgradesToV4WithoutDiscardingEvents() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "asset-upgrade-${UUID.randomUUID()}.db"
