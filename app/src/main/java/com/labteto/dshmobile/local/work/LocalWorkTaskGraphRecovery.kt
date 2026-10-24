@@ -329,11 +329,13 @@ internal class LocalWorkOpenGraphProjection(private val maxCachedFacts: Int = 4_
         val sequences = runs.flatMap { startsByRun[it].orEmpty().after(state.throughSequence) } +
             resultsByJob[jobId].orEmpty().after(state.throughSequence) +
             callsByAgent[agent].orEmpty().after(state.throughSequence)
-        val remaining = sequences.toMutableSet()
-        // Read the new tail once, rather than reopening/redecoding the segment per fact.
+        // Cold Job reconstruction reads only the authoritative indexed sequences.
+        // A dropped decoded hot cache must not trigger another complete EventLog
+        // fold. Sorting preserves execution/admission ordering exactly.
+        val indexedSequences = sequences.distinct().sorted()
         try {
-            if (remaining.isNotEmpty()) log.forEachAfter(state.throughSequence) { event ->
-                if (!remaining.remove(event.sequence)) return@forEachAfter
+            for (sequence in indexedSequences) {
+                val event = eventAt(log, sequence)
                 val type = when (event.type) {
                     "subagent/tool-call" -> "tool/call"
                     "subagent/tool-result" -> "tool/result"
@@ -341,10 +343,8 @@ internal class LocalWorkOpenGraphProjection(private val maxCachedFacts: Int = 4_
                 }
                 state.ledger.observe(type, event.data)
             }
-            // An indexed admission cannot disappear during reread and become a safe result.
-            check(remaining.isEmpty()) { "任务工具执行记录读取不完整，无法确认执行结果。" }
         } catch (error: Exception) {
-            // A partial fold must be rebuilt before retry, including declarations.
+            // Missing/corrupt indexed facts must fail closed, not become success.
             toolsByJob.remove(jobId)
             throw error
         }
