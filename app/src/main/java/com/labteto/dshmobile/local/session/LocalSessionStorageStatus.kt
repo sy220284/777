@@ -7,6 +7,7 @@ data class LocalSessionStorageStatus(
     val sessionCount: Int,
     val rawSegmentCount: Int,
     val compressedSegmentCount: Int,
+    val pendingRestore: Boolean = false,
 ) {
     val overBudget: Boolean get() = totalBytes >= budgetBytes
     val lowFreeSpace: Boolean get() = freeBytes < LOW_FREE_SPACE_BYTES
