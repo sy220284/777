@@ -195,7 +195,7 @@ internal class SqliteSessionStorageManager(
                 }
                 mediaBackup.export(zip, eventCopy)
             }
-            return converted.inputStream().buffered().use(::stageRestore)
+            return converted.inputStream().buffered().use { input -> stageRestore(input) }
         } finally {
             conversionRoot.deleteRecursively()
             context.deleteDatabase(legacySnapshotName)
