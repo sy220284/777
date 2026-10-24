@@ -45,6 +45,43 @@ class LocalToolPolicyTest {
         }
     }
 
+    @Test fun teamMessageReceiptHasReadOnlyOptionalPolicy() {
+        assertEquals(ToolAccess.READ_ONLY, LocalToolPolicy.access("team_message_receipt"))
+        assertEquals(ToolExposure.OPTIONAL, LocalToolPolicy.exposure("team_message_receipt"))
+        assertEquals(ToolApprovalPolicy.NEVER, LocalToolPolicy.approval("team_message_receipt"))
+        assertEquals(LocalAutoApprovalScope.READ_ONLY, LocalToolPolicy.autoApprovalScope("team_message_receipt"))
+    }
+
+    @Test fun shutdownResponseOnlyExposesAnAuthenticatedMemberControlCapability() {
+        assertEquals(ToolAccess.AGENT_CONTROL, LocalToolPolicy.access("team_respond_shutdown"))
+        assertEquals(ToolExposure.OPTIONAL, LocalToolPolicy.exposure("team_respond_shutdown"))
+        assertEquals(ToolApprovalPolicy.NEVER, LocalToolPolicy.approval("team_respond_shutdown"))
+        assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope("team_respond_shutdown"))
+    }
+
+    @Test fun agentLifecycleControlHasExplicitReadVsMutationAndApprovalBoundary() {
+        for (read in listOf("agent_inspect", "agent_watch")) {
+            assertEquals(ToolAccess.READ_ONLY, LocalToolPolicy.access(read))
+            assertEquals(LocalAutoApprovalScope.READ_ONLY, LocalToolPolicy.autoApprovalScope(read))
+            assertEquals(ToolApprovalPolicy.NEVER, LocalToolPolicy.approval(read))
+        }
+        for (control in listOf("interrupt_agent", "agent_resume", "agent_close")) {
+            assertEquals(ToolAccess.AGENT_CONTROL, LocalToolPolicy.access(control))
+            assertEquals(ToolApprovalPolicy.ALWAYS, LocalToolPolicy.approval(control))
+            assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope(control))
+        }
+    }
+
+    @Test fun memberMessageAcknowledgementHasExplicitNarrowAgentControlPolicy() {
+        assertEquals(ToolAccess.AGENT_CONTROL, LocalToolPolicy.access("team_ack_message"))
+        assertEquals(ToolExposure.OPTIONAL, LocalToolPolicy.exposure("team_ack_message"))
+        assertEquals(ToolApprovalPolicy.NEVER, LocalToolPolicy.approval("team_ack_message"))
+        assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope("team_ack_message"))
+        assertTrue("team_ack_message" in com.labteto.dshmobile.local.tools.LocalTeamMemberToolContract.NAMES)
+        assertTrue("team_ack_message" !in com.labteto.dshmobile.local.work.LocalAgentTeamContract.TOOL_NAMES)
+        assertTrue(com.labteto.dshmobile.local.work.LocalAgentTeamContract.isTeamChildControlCall("team_ack_message"))
+    }
+
     @Test fun mediaToolsHaveExplicitBillingAndReadOnlyBoundaries() {
         assertEquals(ToolAccess.PRIVILEGED, LocalToolPolicy.access("media_image_create"))
         assertEquals(ToolApprovalPolicy.ALWAYS, LocalToolPolicy.approval("media_image_create"))

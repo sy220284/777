@@ -8,10 +8,12 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_EVENT_VERSION
+import com.labteto.dshmobile.local.agent.LocalAgentSpecialty
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_JOB_ID_PREFIX
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MEMBER_EVENT
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MEMBER_ID_PREFIX
@@ -26,6 +28,7 @@ internal object LocalAgentTeamEventCodec {
             put("id", id)
             put("name", name)
             put("description", description)
+            put("role", role)
             if (displayName.isNotBlank()) put("displayName", displayName)
             if (mutableToolsEnabled) put("mutableToolsEnabled", true)
             if (grantedExtensions.isNotEmpty()) put("grantedExtensions", JsonArray(grantedExtensions.sorted().map(::JsonPrimitive)))
@@ -48,6 +51,10 @@ internal object LocalAgentTeamEventCodec {
             ownerId?.let { put("ownerId", it) }
             put("blockedBy", JsonArray(blockedBy.map(::JsonPrimitive)))
             put("writeScopes", JsonArray(writeScopes.map(::JsonPrimitive)))
+            autoDispatchMessageId?.let { put("autoDispatchMessageId", it) }
+            rootUserRevision?.let { put("rootUserRevision", it) }
+            completionResultId?.let { put("completionResultId", it) }
+            completionEvidenceSequence?.let { put("completionEvidenceSequence", it) }
         })
     }
 
@@ -59,6 +66,7 @@ internal object LocalAgentTeamEventCodec {
             put("senderId", senderId)
             put("senderName", senderName)
             put("targetId", targetId)
+            if (kind != LocalTeamMessageKind.MESSAGE) put("kind", kind.wireName)
             put("content", buildJsonArray {
                 add(buildJsonObject {
                     put("type", "text")
@@ -86,6 +94,7 @@ internal object LocalAgentTeamEventCodec {
             jobId = teamJobId(id),
             name = member.requiredTeamString("name"),
             description = member.optionalTeamString("description").orEmpty(),
+            role = LocalAgentSpecialty.fromWire(member.optionalTeamString("role")).wireName,
             displayName = member.optionalTeamString("displayName").orEmpty(),
             mutableToolsEnabled = member["mutableToolsEnabled"]?.jsonPrimitive?.booleanOrNull ?: false,
             grantedExtensions = (member["grantedExtensions"] as? JsonArray)
@@ -116,6 +125,18 @@ internal object LocalAgentTeamEventCodec {
             ownerId = task.optionalTeamString("ownerId"),
             blockedBy = task.teamStringArray("blockedBy"),
             writeScopes = task.teamStringArray("writeScopes"),
+            autoDispatchMessageId = task.optionalTeamString("autoDispatchMessageId")?.also {
+                require(it.matches(Regex("team-msg-[a-f0-9]{20}"))) { "TEAM_TASK_AUTO_DISPATCH_ID_INVALID" }
+            },
+            rootUserRevision = if ("rootUserRevision" in task) {
+                task["rootUserRevision"]?.jsonPrimitive?.longOrNull
+                    ?: error("TEAM_TASK_USER_REVISION_INVALID")
+            } else null,
+            completionResultId = task.optionalTeamString("completionResultId"),
+            completionEvidenceSequence = if ("completionEvidenceSequence" in task) {
+                task["completionEvidenceSequence"]?.jsonPrimitive?.longOrNull
+                    ?: error("TEAM_TASK_COMPLETION_EVIDENCE_INVALID")
+            } else null,
         )
     }
 
@@ -134,6 +155,14 @@ internal object LocalAgentTeamEventCodec {
             senderName = message.requiredTeamString("senderName"),
             targetId = message.requiredTeamString("targetId"),
             content = text,
+            kind = LocalTeamMessageKind.fromWire(message.optionalTeamString("kind"))
+                .also { kind ->
+                    if (kind == LocalTeamMessageKind.SHUTDOWN_REQUEST) {
+                        require(message.requiredTeamString("senderId") == data.requiredTeamString("teamId")) {
+                            "TEAM_SHUTDOWN_REQUEST_LEAD_ONLY"
+                        }
+                    }
+                },
         )
     }
 

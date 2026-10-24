@@ -215,6 +215,7 @@ object LocalToolCatalog {
         add(tool("subagent", "统一的只读子代理入口：可隔离执行或继承当前对话上下文，同一工具块中多个调用可并行；始终禁止写入。需带写入权限的子代理仍须使用独立授权的 subagent_fork", properties(
             "task" to string("交给子代理的完整任务"),
             "instructions" to string("可选；该子代理持续遵循的工作规则，不会扩大工具或权限"),
+            "role" to string("专业角色：general、explore、plan、verify、review；只读入口不能选择 execute 或 integrate"),
             "context_mode" to buildJsonObject {
                 put("type", "string")
                 put("description", "isolated 只传任务（默认）；inherit 前台只读继承父会话历史，不能与后台或虚拟屏共用")
@@ -224,6 +225,7 @@ object LocalToolCatalog {
             },
             "model" to string("可选；使用 list_subagent_models 返回的 profileId，或无歧义的模型名；留空继承父代理模型"),
             "max_steps" to integer("最大模型/工具循环步数，默认 20，可配置 1 到 512"),
+            "max_depth" to integer("最大只读代理树深度 1～3，默认 1；大于 1 时仅限前台只读，禁止虚拟屏及后台"),
             "virtual_screen" to boolean("是否为子代理分配独立虚拟屏；用于并行操作 Android 界面，默认 false"),
             "output_schema" to jsonSchemaObject("可选；要求子代理最终只返回符合该 JSON Schema 的对象"),
             "allowed_tools" to stringArray("可选；限制子代理本次可见且可执行的工具名；包含当前不可用工具时启动直接失败"),
@@ -232,6 +234,7 @@ object LocalToolCatalog {
         add(tool("subagent_fork", "需要继承父会话当前操作权限时使用的高级代理入口；可能具有写入权限。纯阅读分析请使用 subagent 的 context_mode=inherit", properties(
             "task" to string("需要结合当前上下文处理的任务"),
             "instructions" to string("可选；继承上下文之外，额外约束该子代理持续遵循的工作规则"),
+            "role" to string("专业角色：general、explore、plan、execute、verify、review、integrate；只读角色会收窄实际工具权限"),
             "output_schema" to jsonSchemaObject("可选；要求子代理最终只返回符合该 JSON Schema 的对象"),
             "allowed_tools" to stringArray("可选；限制 fork 子代理可见且可执行的工具名"),
         ), listOf("task")))
@@ -240,12 +243,30 @@ object LocalToolCatalog {
             "profile_id" to string("需要查询的已保存模型 profileId；联网查询时必填"),
         )))
         add(tool("list_agents", "列出当前会话启动的后台代理", properties()))
-        add(tool("send_message", "向后台代理追加消息；可继续的持久子代理即使已完成或因进程中断，也会先持久排队并安全恢复同一身份", properties(
+        add(tool("agent_tree", "从本会话持久 Run 检查点查看主子代理关系和最新记录状态；结果可能是部分历史，不代表当前活跃进程清单", properties(
+            "max_nodes" to integer("最大返回代理运行节点数，1–256，默认100；历史窗口不足会标记partial"),
+        )))
+        add(tool("send_message", "向后台代理的持久 Inbox 投递消息；接受回执不代表模型已读取。trigger_turn 在需要时唤醒继续执行；queue_only 仅入队等待下一次自然激活", properties(
             "agent_id" to string("后台代理编号"),
             "message" to string("需要追加的消息"),
+            "delivery_mode" to string("trigger_turn（默认，投递后按需唤醒）或 queue_only（只入持久队列，不启动新轮次）"),
         ), listOf("agent_id", "message")))
-        add(tool("interrupt_agent", "停止正在运行的后台代理", properties(
-            "agent_id" to string("后台代理编号"),
+        add(tool("interrupt_agent", "仅中断可恢复后台代理当前 Activation，保留身份、检查点与持久 Inbox；不会永久关闭。非可恢复 Agent 将被拒绝", properties(
+            "agent_id" to string("当前 Work 会话中的可恢复代理编号"),
+        ), listOf("agent_id")))
+        add(tool("agent_inspect", "检查当前 Work 会话后台 Agent 的身份、运行状态、消息数、持久恢复类型和摘要；状态输出并非最终成果验收", properties(
+            "agent_id" to string("当前 Work 会话中的后台代理编号"),
+        ), listOf("agent_id")))
+        add(tool("agent_watch", "有界观察指定 Agent 的 Job 状态变化；先用 agent_inspect 获取 observation_cursor，再传入游标等待；无变化不会冒充轮次完成或消息消费", properties(
+            "agent_id" to string("当前 Work 会话中的后台代理编号"),
+            "after_cursor" to string("之前 agent_inspect/agent_watch 返回的 observation_cursor"),
+            "wait_ms" to integer("最长等待毫秒，0–20000，默认0；可取消，超时返回 changed=false"),
+        ), listOf("agent_id", "after_cursor")))
+        add(tool("agent_resume", "仅请求已中断或 dormant 的持久只读代理通过既有恢复检查点重新激活；需要待处理 Inbox 消息或安全暂停执行片；返回的是请求回执，不代表轮次已被准入", properties(
+            "agent_id" to string("当前 Work 会话中的持久可恢复代理编号"),
+        ), listOf("agent_id")))
+        add(tool("agent_close", "永久取消当前 Work 会话的后台 Agent，清理待处理 Inbox；与只中断当前轮次的 interrupt_agent 区别明确", properties(
+            "agent_id" to string("当前 Work 会话中的后台代理编号"),
         ), listOf("agent_id")))
         add(tool("workflow", "以持久 Kotlin DAG 调度子任务，恢复已验收节点并继续剩余依赖。默认只读；可写需显式授权且未知副作用不重放。非空/字符串验收仅是窄文本检查，不证明通用交付", properties(
             "tasks" to buildJsonObject {
@@ -296,6 +317,7 @@ object LocalToolCatalog {
         ), listOf("target")))
         add(tool("team_create_member", "只创建稳定 Team 成员身份，不立即启动模型执行；后续用 team_start_member 派活", properties(
             "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
+            "role" to string("可选；固定专业身份 general/explore/plan/execute/verify/review/integrate，恢复时保持不变，verify/review 为只读工具权限"),
             "description" to string("可选；职责说明"),
             "display_name" to string("可选；用户界面展示的中文成员名称"),
             "context" to buildJsonObject {
@@ -313,8 +335,9 @@ object LocalToolCatalog {
             "max_steps" to integer("单次执行预算，默认沿用当前 Work 子代理配置"),
             "allowed_extensions" to stringArray("可选；Lead 核实后授权给本次启动成员的扩展工具名称"),
         ), listOf("target", "task")))
-        add(tool("team_spawn", "创建具备持久身份、工作区读写权限和可选扩展授权的团队助手", properties(
+        add(tool("team_spawn", "创建具备持久身份、角色约束、授权工具和可选扩展的团队助手；只读角色禁止写入", properties(
             "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
+            "role" to string("可选；固定专业身份 general/explore/plan/execute/verify/review/integrate，verify/review 为只读；旧成员默认 general"),
             "description" to string("可选；职责说明"),
             "display_name" to string("可选；用户界面展示的中文成员名称"),
             "task" to string("首个任务"),
@@ -334,6 +357,23 @@ object LocalToolCatalog {
             "target" to string("teammate 名称"),
             "message" to string("消息内容"),
         ), listOf("target", "message")))
+        add(tool("team_ack_message", "成员明确确认普通协作消息：必须已经投递给本人、进入模型持久历史且有后续模型回复；handled 仅为本人处理声明，不证明任务完成。无法处理时用 cannot_handle 并附原因。请在收到消息后的下一轮模型步骤调用，不能在首次阅读该消息的同轮工具调用中直接确认", properties(
+            "message_id" to string("本人收到的 team-msg-* 普通消息 ID；不能代确认或确认关闭请求"),
+            "outcome" to string("handled 或 cannot_handle"),
+            "reason" to string("不能处理时必填原因；已处理时可填简短说明"),
+        ), listOf("message_id", "outcome")))
+        add(tool("team_respond_shutdown", "团队成员批准或拒绝受信 Lead 的关闭请求；只有请求目标本人可回应，批准后撤销成员身份", properties(
+            "request_id" to string("已投递的 team-msg-* 关闭请求ID"),
+            "approve" to boolean("true 同意关闭；false 拒绝关闭"),
+            "reason" to string("拒绝关闭时必填的理由；批准时可选"),
+        ), listOf("request_id", "approve")))
+        add(tool("team_request_shutdown", "Lead 向指定成员发出经过来源验证的关闭请求；优先交给成员模型自行决定，不会直接禁用成员", properties(
+            "target" to string("active teammate 名称"),
+            "reason" to string("申请关闭的理由及应完成的交接"),
+        ), listOf("target", "reason")))
+        add(tool("team_message_receipt", "查询 Team 消息的持久排队、投递、模型回复以及成员显式处理声明；任何一项都不自动证明任务已核验完成", properties(
+            "message_id" to string("team-msg-* 持久消息ID"),
+        ), listOf("message_id")))
         add(tool("team_messages", "读取 Team 成员独立结果消息流；返回 durable EventLog sequence 作为结果游标", properties(
             "target" to string("可选；限定 teammate 名称"),
             "after_sequence" to integer("可选；仅返回该 EventLog sequence 之后的结果"),
@@ -361,6 +401,9 @@ object LocalToolCatalog {
             "task_id" to string("task-N"),
         ), listOf("task_id")))
         add(tool("team_task_list", "列出 Team 当前未删除任务及 readiness / owner / write-scope 警告", properties()))
+        add(tool("team_task_evidence", "从持久事件核查已完成 Team 任务的结果 ID、实际子代理 Job、检查点序号和任务归属；这只验证证据关联，不代表内容正确、独立审查通过或 Goal 完成", properties(
+            "task_id" to string("已经完成的 Team 任务编号 task-N"),
+        ), listOf("task_id")))
         add(tool("team_task_update", "用 compare-and-set revision 更新 Team 任务", properties(
             "task_id" to string("task-N"),
             "expected_revision" to integer("当前任务 revision；不匹配会拒绝写入"),

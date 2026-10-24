@@ -23,6 +23,7 @@ internal data class LocalSubagentCapabilities(
     val virtualScreen: Boolean = false,
     val historyMode: LocalSubagentHistoryMode = LocalSubagentHistoryMode.ISOLATED,
     val maxDepth: Int = 1,
+    val depth: Int = 1,
     val toolAllowlist: Set<String>? = null,
     val outputSchema: JsonObject? = null,
     val teamManaged: Boolean = false,
@@ -37,6 +38,7 @@ internal data class LocalSubagentLaunchSpec(
     val parentCallId: String? = null,
     val backgroundJobId: String? = null,
     val capabilities: LocalSubagentCapabilities = LocalSubagentCapabilities(),
+    val parentLink: LocalAgentParentLink? = null,
 )
 
 internal fun validateLocalSubagentLaunchSpec(
@@ -50,8 +52,14 @@ internal fun validateLocalSubagentLaunchSpec(
     require(spec.maxSteps in LocalAgentRuntimeLimits.SUBAGENT_MIN_STEPS..LocalAgentRuntimeLimits.MAX_CONFIGURED_STEPS) {
         "SUBAGENT_STEP_LIMIT_INVALID：子代理步数超出允许范围"
     }
-    require(spec.capabilities.maxDepth == 1) {
-        "SUBAGENT_DEPTH_NOT_SUPPORTED：当前子代理能力只允许 depth=1"
+    require(spec.capabilities.maxDepth in 1..3 &&
+        spec.capabilities.depth in 1..spec.capabilities.maxDepth) {
+        "SUBAGENT_DEPTH_INVALID：深度必须在 1..3 且不超过委派授权"
+    }
+    require(spec.capabilities.maxDepth == 1 ||
+        (!spec.capabilities.continuable && !spec.capabilities.allowMutation &&
+         !spec.capabilities.virtualScreen && !spec.capabilities.teamManaged)) {
+        "SUBAGENT_RECURSION_SCOPE_BLOCKED：多级委派只允许前台只读代理"
     }
     require(!spec.capabilities.continuable || !spec.capabilities.allowMutation || spec.capabilities.teamManaged) {
         "SUBAGENT_CONTINUATION_MUTATION_BLOCKED：可继续子代理必须保持只读，避免冷恢复重放未知副作用"
@@ -137,6 +145,7 @@ internal fun encodeLocalSubagentCapabilities(
     put("virtual_screen", capabilities.virtualScreen)
     put("history_mode", capabilities.historyMode.name.lowercase())
     put("max_depth", capabilities.maxDepth)
+    if (capabilities.depth != 1) put("depth", capabilities.depth)
     capabilities.toolAllowlist?.let { allowlist ->
         put("tool_allowlist", JsonArray(allowlist.sorted().map(::JsonPrimitive)))
     }
@@ -178,6 +187,7 @@ internal fun decodeLocalSubagentCapabilities(
         virtualScreen = data["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false,
         historyMode = historyMode,
         maxDepth = data["max_depth"]?.jsonPrimitive?.intOrNull ?: 1,
+        depth = data["depth"]?.jsonPrimitive?.intOrNull ?: 1,
         toolAllowlist = toolAllowlist,
         outputSchema = data["output_schema"] as? JsonObject,
         teamManaged = data["team_managed"]?.jsonPrimitive?.booleanOrNull ?: false,

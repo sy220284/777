@@ -40,7 +40,16 @@ data class LocalAgentTeamUiState(
             members = members.map { member ->
                 val jobStatus = byId[member.jobId]?.status
                 // Only an admitted active member derives activity from its Child Job.
-                val activity = if (member.phase == "active") jobStatus ?: member.activity else member.phase
+                val phase = LocalTeamMemberPhase.entries.firstOrNull {
+                    it.name.equals(member.phase, ignoreCase = true)
+                }
+                val activity = if (jobStatus != null && phase != null) {
+                    projectTeamMemberActivity(
+                        phase = phase,
+                        jobStatus = jobStatus,
+                        blockedTask = member.activity == "blocked",
+                    ).name.lowercase()
+                } else member.activity
                 member.copy(activity = activity)
             },
         )
@@ -72,7 +81,7 @@ data class LocalAgentTeamMemberUiState(
         get() = phase == "active"
 
     val awaitingReview: Boolean
-        get() = hasCurrentTaskResult && activity in setOf("dormant", "completed")
+        get() = hasCurrentTaskResult && activity in setOf("idle", "dormant", "completed")
 }
 
 data class LocalAgentTeamTaskUiState(
@@ -85,6 +94,9 @@ data class LocalAgentTeamTaskUiState(
     val ready: Boolean = false,
     val writeConflict: Boolean = false,
     val revision: Int = 0,
+    /** Durable verification pointer, not independent review approval. */
+    val completionResultId: String? = null,
+    val completionEvidenceSequence: Long? = null,
 )
 
 /** Work-owned runtime state. Session persistence remains a separate projection boundary. */

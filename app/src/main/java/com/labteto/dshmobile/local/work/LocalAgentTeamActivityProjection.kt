@@ -6,14 +6,45 @@ internal enum class LocalTeamMemberActivity {
     CREATED,
     PROVISIONING,
     RUNNING,
+    STOPPING,
     WAITING,
     BLOCKED,
+    /** A stable ACTIVE teammate is available for another turn even if its last Job completed. */
+    IDLE,
     DORMANT,
     DISABLED,
     DISMISSED,
     COMPLETED,
     INTERRUPTED,
     FAILED,
+}
+
+/**
+ * Single authority for Team activity semantics. Phase belongs to Team EventLog and Job
+ * status belongs to JobManager; this view does not own a new state machine.
+ * A completed/dormant Job is an idle *turn*, not a terminated Team identity.
+ */
+internal fun projectTeamMemberActivity(
+    phase: LocalTeamMemberPhase,
+    jobStatus: String?,
+    blockedTask: Boolean = false,
+): LocalTeamMemberActivity = when (phase) {
+    LocalTeamMemberPhase.CREATED -> LocalTeamMemberActivity.CREATED
+    LocalTeamMemberPhase.PROVISIONING -> LocalTeamMemberActivity.PROVISIONING
+    LocalTeamMemberPhase.DISABLED -> LocalTeamMemberActivity.DISABLED
+    LocalTeamMemberPhase.DISMISSED -> LocalTeamMemberActivity.DISMISSED
+    LocalTeamMemberPhase.FAILED -> LocalTeamMemberActivity.FAILED
+    LocalTeamMemberPhase.ACTIVE -> when {
+        jobStatus?.lowercase() in setOf("failed", "cancelled", "killed") ->
+            LocalTeamMemberActivity.FAILED
+        jobStatus.equals("interrupted", ignoreCase = true) -> LocalTeamMemberActivity.INTERRUPTED
+        jobStatus.equals("running", ignoreCase = true) -> LocalTeamMemberActivity.RUNNING
+        jobStatus.equals("stopping", ignoreCase = true) -> LocalTeamMemberActivity.STOPPING
+        blockedTask -> LocalTeamMemberActivity.BLOCKED
+        jobStatus.equals("dormant", ignoreCase = true) ||
+            jobStatus.equals("completed", ignoreCase = true) -> LocalTeamMemberActivity.IDLE
+        else -> LocalTeamMemberActivity.WAITING
+    }
 }
 
 internal data class LocalTeamMemberActivityView(
@@ -58,22 +89,11 @@ internal fun projectLocalAgentTeamActivity(
             it.ownerId == member.id && it.status == LocalTeamTaskStatus.PENDING
         }
         val jobStatus = jobsById[member.jobId]?.status?.lowercase()
-        val activity = when (member.phase) {
-            LocalTeamMemberPhase.CREATED -> LocalTeamMemberActivity.CREATED
-            LocalTeamMemberPhase.PROVISIONING -> LocalTeamMemberActivity.PROVISIONING
-            LocalTeamMemberPhase.ACTIVE -> when {
-                ownedTask != null && !blockersCompleted(ownedTask) -> LocalTeamMemberActivity.BLOCKED
-                jobStatus == "running" || jobStatus == "stopping" -> LocalTeamMemberActivity.RUNNING
-                jobStatus == "dormant" -> LocalTeamMemberActivity.DORMANT
-                jobStatus == "completed" -> LocalTeamMemberActivity.COMPLETED
-                jobStatus == "interrupted" -> LocalTeamMemberActivity.INTERRUPTED
-                jobStatus in setOf("failed", "cancelled", "killed") -> LocalTeamMemberActivity.FAILED
-                else -> LocalTeamMemberActivity.WAITING
-            }
-            LocalTeamMemberPhase.DISABLED -> LocalTeamMemberActivity.DISABLED
-            LocalTeamMemberPhase.DISMISSED -> LocalTeamMemberActivity.DISMISSED
-            LocalTeamMemberPhase.FAILED -> LocalTeamMemberActivity.FAILED
-        }
+        val activity = projectTeamMemberActivity(
+            phase = member.phase,
+            jobStatus = jobStatus,
+            blockedTask = ownedTask != null && !blockersCompleted(ownedTask),
+        )
         LocalTeamMemberActivityView(
             memberId = member.id,
             memberName = member.name,

@@ -34,6 +34,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -82,10 +84,235 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(listOf("job-team-2", "job-team-2"), peer.map { it.first })
         assertNull(f.runtime.project("lead-address").failure)
         assertEquals(3, f.runtime.project("lead-address").deliveredMessageIds.size)
-        val cold = LocalAgentTeamRuntime(f.jobs, { _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
+        val cold = LocalAgentTeamRuntime(f.jobs, { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
             { _, _, _ -> JobMessageAdmission(false, false, false, "unused") }, { f.log }, SessionProjectionRegistry())
         assertNull(cold.project("lead-address").failure)
         assertEquals(f.runtime.project("lead-address").deliveredMessageIds, cold.project("lead-address").deliveredMessageIds)
+    }
+
+    @Test fun memberOnlyShutdownResponseIsRoutedToAuthenticatedTeamRuntime() {
+        assertTrue("team_respond_shutdown" in LocalAgentTeamContract.MEMBER_TOOL_NAMES)
+        assertTrue(LocalAgentTeamContract.isTeamChildControlCall("team_respond_shutdown"))
+        assertTrue(LocalAgentTeamContract.isTeamChildControlCall("team_send_message"))
+        assertTrue(LocalAgentTeamContract.isTeamChildControlCall("team_request_shutdown"))
+        assertTrue(!LocalAgentTeamContract.isTeamChildControlCall("read"))
+        assertTrue("team_respond_shutdown" !in LocalAgentTeamContract.TOOL_NAMES)
+    }
+
+    @Test
+    fun shutdownRequestThroughRealLeadToolIsAuthenticatedAndNeverImplicitlyDismissesMember() = runBlocking {
+        val session = "typed-shutdown-admission"
+        val delivered = mutableListOf<QueuedAgentInput>()
+        val f = fixture(session, sender = { _, input, _ ->
+            delivered += input
+            JobMessageAdmission(true, false, false, "accepted")
+        })
+        appendActiveMember(f.log, session)
+        // Active Team member must have a real persistent Child Job at admission.
+        // A missing Job is correctly failed closed by synchronizeTeamRuntime.
+        startLiveChild(f, session)
+        val binding = LocalWorkRunBinding(
+            sessionId = session,
+            initialState = LocalHarnessState(
+                sessionId = session, usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = session, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = session, maxPendingInputs = 8),
+            eventLog = f.log,
+        )
+        val response = try {
+            f.runtime.execute(
+                memberTestToolCall("shutdown-req", "team_request_shutdown", buildJsonObject {
+                    put("target", "worker")
+                    put("reason", "finish your work and hand off remaining evidence")
+                }),
+                binding,
+            ).orEmpty()
+        } catch (error: Exception) {
+            throw AssertionError(
+                "Real Lead shutdown request failed: " + error.message + "\n" + error.stackTraceToString(),
+                error,
+            )
+        }
+        assertTrue(response.contains("Team 消息已投递"))
+        val durable = requireNotNull(f.log.latestMatching(
+            setOf(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED),
+        ) { true })
+        val restored = LocalAgentTeamEventCodec.decodeMessage(durable.data)
+        assertEquals(LocalTeamMessageKind.SHUTDOWN_REQUEST, restored.kind)
+        assertEquals(session, restored.senderId)
+        assertEquals("member-1", restored.targetId)
+        assertEquals(LocalTeamMemberPhase.ACTIVE, f.runtime.project(session).members.single().phase)
+        assertEquals(1, delivered.size)
+        assertTrue(delivered.single().agentSource.toString().contains("shutdown_request"))
+        assertTrue(delivered.single().modelMessage.toString().contains("team_respond_shutdown"))
+        assertNull(f.runtime.project(session).failure)
+    }
+
+    @Test
+    fun structuredShutdownApprovalDissolvesMemberAndNotifiesLeadExactlyOnce() = runBlocking {
+        val session = "structured-shutdown-approved"
+        val leadInputs = mutableListOf<QueuedAgentInput>()
+        val f = fixture(session,
+            sender = { _, _, _ -> JobMessageAdmission(true, false, false, "accepted") },
+            leadSender = { _, input -> leadInputs += input; true },
+        )
+        appendActiveMember(f.log, session)
+        startLiveChild(f, session)
+        val binding = LocalWorkRunBinding(
+            sessionId = session,
+            initialState = LocalHarnessState(sessionId = session, usageMode = LocalUsageMode.WORK).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = session, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = session, maxPendingInputs = 8),
+            eventLog = f.log,
+        )
+        f.runtime.execute(memberTestToolCall("shutdown-start", "team_request_shutdown", buildJsonObject {
+            put("target", "worker"); put("reason", "完成工作并交接")
+        }), binding)
+        val request = requireNotNull(f.log.latestMatching(
+            setOf(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED),
+        ) { event -> LocalAgentTeamEventCodec.decodeMessage(event).kind == LocalTeamMessageKind.SHUTDOWN_REQUEST })
+        val requestId = LocalAgentTeamEventCodec.decodeMessage(request.data).id
+        val owners = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
+        val identity = com.labteto.dshmobile.harness.agent.AgentRunIdentity(session, "child:sa-team-1", "shutdown-run")
+        owners.claim(identity) {}
+        val response = kotlinx.coroutines.withContext(owners.executionContext(identity)) {
+            f.runtime.executeMember(session, "job-team-1", memberTestToolCall(
+                "shutdown-confirm", "team_respond_shutdown", buildJsonObject {
+                    put("request_id", requestId); put("approve", true)
+                },
+            ))
+        }
+        assertTrue(response.contains("approved=true"))
+        val state = f.runtime.project(session)
+        assertNull(state.failure)
+        assertEquals(LocalTeamMemberPhase.DISMISSED, state.members.single().phase)
+        assertEquals(1, state.shutdownResponses.size)
+        assertEquals(requestId, state.shutdownResponses.single().requestId)
+        assertEquals(1, leadInputs.size)
+        assertTrue(leadInputs.single().modelMessage.toString().contains("team_shutdown_response"))
+        f.runtime.recoverMailbox(session)
+        assertEquals(1, leadInputs.size)
+        assertEquals(1, f.runtime.project(session).shutdownResponses.size)
+        assertEquals(LocalTeamMemberPhase.DISMISSED, f.runtime.project(session).members.single().phase)
+    }
+
+    @Test
+    fun shutdownRejectRequiresReasonAndOnlyOriginalTargetCanRespond() = runBlocking {
+        val session = "structured-shutdown-rejected"
+        val sent = mutableListOf<QueuedAgentInput>()
+        val f = fixture(session,
+            sender = { _, _, _ -> JobMessageAdmission(true, false, false, "accepted") },
+            leadSender = { _, input -> sent += input; true },
+        )
+        appendActiveMember(f.log, session)
+        startLiveChild(f, session)
+        val binding = LocalWorkRunBinding(
+            sessionId = session,
+            initialState = LocalHarnessState(sessionId = session, usageMode = LocalUsageMode.WORK).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = session, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = session, maxPendingInputs = 8),
+            eventLog = f.log,
+        )
+        f.runtime.execute(memberTestToolCall("shutdown-start", "team_request_shutdown", buildJsonObject {
+            put("target", "worker"); put("reason", "请求停止")
+        }), binding)
+        val request = requireNotNull(f.log.latestMatching(setOf(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED)) {
+            LocalAgentTeamEventCodec.decodeMessage(it).kind == LocalTeamMessageKind.SHUTDOWN_REQUEST
+        })
+        val requestId = LocalAgentTeamEventCodec.decodeMessage(request.data).id
+        val owners = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
+        val identity = com.labteto.dshmobile.harness.agent.AgentRunIdentity(session, "child:sa-team-1", "reject-run")
+        owners.claim(identity) {}
+        kotlinx.coroutines.withContext(owners.executionContext(identity)) {
+            val empty = runCatching {
+                f.runtime.executeMember(session, "job-team-1", memberTestToolCall(
+                    "reject-no-reason", "team_respond_shutdown", buildJsonObject {
+                        put("request_id", requestId); put("approve", false)
+                    },
+                ))
+            }.exceptionOrNull()
+            assertNotNull(empty)
+            assertEquals(0, f.runtime.project(session).shutdownResponses.size)
+            val wrong = runCatching {
+                f.runtime.executeMember(session, "job-team-1", memberTestToolCall(
+                    "reject-wrong", "team_respond_shutdown", buildJsonObject {
+                        put("request_id", "team-msg-another"); put("approve", false); put("reason", "处理中")
+                    },
+                ))
+            }.exceptionOrNull()
+            assertNotNull(wrong)
+            f.runtime.executeMember(session, "job-team-1", memberTestToolCall(
+                "reject-valid", "team_respond_shutdown", buildJsonObject {
+                    put("request_id", requestId); put("approve", false); put("reason", "仍需交接证据")
+                },
+            ))
+            val repeated = runCatching {
+                f.runtime.executeMember(session, "job-team-1", memberTestToolCall(
+                    "reject-duplicate", "team_respond_shutdown", buildJsonObject {
+                        put("request_id", requestId); put("approve", false); put("reason", "重复")
+                    },
+                ))
+            }.exceptionOrNull()
+            assertNotNull(repeated)
+        }
+        assertNull(f.runtime.project(session).failure)
+        assertEquals(LocalTeamMemberPhase.ACTIVE, f.runtime.project(session).members.single().phase)
+        assertEquals(1, f.runtime.project(session).shutdownResponses.size)
+        assertEquals(false, f.runtime.project(session).shutdownResponses.single().approved)
+        assertEquals(1, sent.size)
+        f.runtime.recoverMailbox(session)
+        assertEquals(1, sent.size)
+    }
+
+    @Test
+    fun coldRecoveryFinalizesApprovedShutdownAndRejectsForgedActor() {
+        val session = "shutdown-recovery"
+        val toLead = mutableListOf<QueuedAgentInput>()
+        val f = fixture(session,
+            sender = { _, _, _ -> JobMessageAdmission(true, false, false, "accepted") },
+            leadSender = { _, input -> toLead += input; true },
+        )
+        appendActiveMember(f.log, session)
+        startLiveChild(f, session)
+        val requestId = "team-msg-aabbccddeeff11223344"
+        val request = LocalTeamMessageSnapshot(
+            id = requestId, senderId = session, senderName = "lead",
+            targetId = "member-1", content = "请批准退出",
+            kind = LocalTeamMessageKind.SHUTDOWN_REQUEST,
+        )
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
+            with(LocalAgentTeamEventCodec) { request.toEvent(session) })
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED,
+            teamDelivered(session, requestId, "member-1"))
+        f.log.append(LocalAgentTeamContract.TEAM_SHUTDOWN_RESPONSE, buildJsonObject {
+            put("version", LocalAgentTeamContract.TEAM_EVENT_VERSION)
+            put("teamId", session); put("requestId", requestId)
+            put("memberId", "member-1"); put("approved", true); put("reason", "交接完毕")
+        })
+        f.runtime.recoverMailbox(session)
+        assertNull(f.runtime.project(session).failure)
+        assertEquals(LocalTeamMemberPhase.DISMISSED, f.runtime.project(session).members.single().phase)
+        assertEquals(1, toLead.size)
+        f.runtime.recoverMailbox(session)
+        assertEquals(1, toLead.size)
+        assertEquals(1, f.runtime.project(session).shutdownResponses.size)
+
+        val attackerSession = "shutdown-forged-actor"
+        val attacker = fixture(attackerSession)
+        appendActiveMember(attacker.log, attackerSession)
+        val attacked = request.copy(senderId = attackerSession)
+        attacker.log.append(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
+            with(LocalAgentTeamEventCodec) { attacked.toEvent(attackerSession) })
+        attacker.log.append(LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED,
+            teamDelivered(attackerSession, requestId, "member-1"))
+        attacker.log.append(LocalAgentTeamContract.TEAM_SHUTDOWN_RESPONSE, buildJsonObject {
+            put("version", LocalAgentTeamContract.TEAM_EVENT_VERSION)
+            put("teamId", attackerSession); put("requestId", requestId)
+            put("memberId", "member-forged"); put("approved", true)
+        })
+        assertTrue(attacker.runtime.project(attackerSession).failure
+            ?.contains("TEAM_SHUTDOWN_REQUEST_TARGET_MISMATCH") == true)
     }
 
     @Test
@@ -149,6 +376,295 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun leadReceiptToolReflectsRealTeamAndSubagentCheckpointEvents() = runBlocking {
+        val sessionId = "team-message-receipt-runtime"
+        val fixture = fixture(sessionId)
+        appendActiveMember(fixture.log, sessionId)
+        val messageId = "team-msg-receipt001"
+        fixture.log.append(
+            LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
+            teamMessage(sessionId, messageId, "member-1", "verify files"),
+        )
+        fixture.log.append(LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED, buildJsonObject {
+            put("version", LocalAgentTeamContract.TEAM_EVENT_VERSION)
+            put("teamId", sessionId)
+            put("messageId", messageId)
+            put("targetId", "member-1")
+        })
+        fixture.log.append(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT, encodeLocalSubagentHistoryCheckpoint(
+            backgroundJobId = "job-team-1",
+            agentId = localPersistentSubagentId("job-team-1"),
+            step = 1,
+            history = emptyList(),
+            claimedMessageIds = setOf(messageId),
+        ))
+        val binding = LocalWorkRunBinding(
+            sessionId = sessionId,
+            initialState = LocalHarnessState(
+                sessionId = sessionId, usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = sessionId, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = sessionId, maxPendingInputs = 8),
+            eventLog = fixture.log,
+        )
+        val result = fixture.runtime.execute(
+            memberTestToolCall("receipt", "team_message_receipt", buildJsonObject {
+                put("message_id", messageId)
+            }),
+            binding,
+        ).orEmpty()
+        assertTrue(result.contains("status=checkpointed_in_model_history"))
+        assertTrue(result.contains("target_id=member-1"))
+        assertTrue(result.contains("does not prove comprehension"))
+        assertNull(fixture.runtime.project(sessionId).failure)
+    }
+
+    @Test
+    fun completedTeammateTurnStaysIdleAndKeepsDurableInboxForNextTurn() = runBlocking {
+        val sessionId = "team-idle-multiple-prompts"
+        lateinit var jobManager: LocalJobManager
+        val f = fixture(
+            sessionId,
+            sender = { jobId, input, session ->
+                jobManager.sendInput(jobId, input, session)
+            },
+        )
+        jobManager = f.jobs
+        appendActiveMember(f.log, sessionId)
+        val first = f.jobs.startPersistentResult(
+            label = "子代理：teammate initial turn",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = sessionId,
+            continuable = true,
+            requestedId = "job-team-1",
+        ) { _, _ -> "initial result" }
+        assertTrue(first.accepted)
+        assertEquals("job-team-1", first.id)
+        kotlinx.coroutines.withTimeout(3_000L) {
+            while (f.jobs.snapshotInfos().first { it.id == "job-team-1" }.status !in
+                setOf("completed", "dormant")) {
+                kotlinx.coroutines.yield()
+            }
+        }
+        assertEquals("idle", f.runtime.uiState(sessionId).members.single().activity)
+        assertEquals(LocalTeamMemberPhase.ACTIVE, f.runtime.project(sessionId).members.single().phase)
+
+        val binding = LocalWorkRunBinding(
+            sessionId = sessionId,
+            initialState = LocalHarnessState(
+                sessionId = sessionId, usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = sessionId, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = sessionId, maxPendingInputs = 8),
+            eventLog = f.log,
+        )
+        val result = f.runtime.execute(
+            memberTestToolCall("next-prompt", "team_send_message", buildJsonObject {
+                put("target", "worker")
+                put("message", "Second task after idle")
+            }),
+            binding,
+        ).orEmpty()
+        assertTrue(result.contains("已投递"))
+        assertEquals(1, f.jobs.peekMessages("job-team-1").size)
+        val rendered = f.runtime.execute(
+            memberTestToolCall("members-after-idle", "team_members", buildJsonObject {}),
+            binding,
+        ).orEmpty()
+        assertTrue(rendered.contains("activity=idle"))
+        assertTrue(rendered.contains("job_status="))
+        assertEquals(LocalTeamMemberPhase.ACTIVE, f.runtime.project(sessionId).members.single().phase)
+        // Durable Inbox acceptance is the boundary; the coordinator must still admit a
+        // subsequent turn. Do not pretend the second message was processed already.
+        assertEquals(1, f.runtime.uiState(sessionId).members.single().pendingMessageCount)
+    }
+
+    @Test
+    fun idleTeammateAutoClaimsTaskOnceAndColdRecoveryRepairsUndeliveredReservation() = runBlocking {
+        val session = "team-idle-auto-dispatch"
+        lateinit var manager: LocalJobManager
+        val f = fixture(session, sender = { jobId, input, owner ->
+            manager.sendInput(jobId, input, owner)
+        })
+        manager = f.jobs
+        appendActiveMember(f.log, session)
+        val initial = f.jobs.startPersistentResult(
+            label = "子代理：worker 初始执行",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = session,
+            continuable = true,
+            requestedId = "job-team-1",
+        ) { _, _ -> "first task finished" }
+        assertTrue(initial.accepted)
+        kotlinx.coroutines.withTimeout(3_000L) {
+            while (f.jobs.snapshotInfos().first { it.id == "job-team-1" }.status !in
+                setOf("completed", "dormant")) kotlinx.coroutines.yield()
+        }
+
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT, task(
+            session, "task-1", 1, emptyList(), subject = "Review evidence",
+        ))
+        f.runtime.recoverMailbox(session)
+        val claimed = f.runtime.project(session).tasks.single()
+        assertEquals(LocalTeamTaskStatus.IN_PROGRESS, claimed.status)
+        assertEquals("member-1", claimed.ownerId)
+        assertNotNull(claimed.autoDispatchMessageId)
+        val queued = f.runtime.project(session).deliveredMessageIds.toSet()
+        assertEquals(setOf(claimed.autoDispatchMessageId), queued)
+        assertEquals(1, f.jobs.peekMessages("job-team-1").size)
+        f.runtime.recoverMailbox(session)
+        assertEquals(queued, f.runtime.project(session).deliveredMessageIds.toSet())
+        assertEquals(1, f.jobs.peekMessages("job-team-1").size)
+
+        // Rebuild an accepted claim whose process was killed before queue append.
+        val session2 = "team-idle-replay-gap"
+        lateinit var manager2: LocalJobManager
+        val f2 = fixture(session2, sender = { jobId, input, owner ->
+            manager2.sendInput(jobId, input, owner)
+        })
+        manager2 = f2.jobs
+        appendActiveMember(f2.log, session2)
+        val started = f2.jobs.startPersistentResult(
+            label = "子代理：worker 崩溃恢复执行",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = session2,
+            continuable = true,
+            requestedId = "job-team-1",
+        ) { _, _ -> "first task finished" }
+        assertTrue(started.accepted)
+        kotlinx.coroutines.withTimeout(3_000L) {
+            while (f2.jobs.snapshotInfos().first { it.id == "job-team-1" }.status !in
+                setOf("completed", "dormant")) kotlinx.coroutines.yield()
+        }
+        val reserved = LocalTeamTaskSnapshot(
+            id = "task-1", revision = 2, subject = "Review evidence", description = "",
+            status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = "member-1",
+            autoDispatchMessageId = "team-msg-1234567890abcdef1234",
+        )
+        f2.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session2, "task-1", 1, emptyList(), subject = "Review evidence"))
+        f2.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { reserved.toEvent(session2) })
+        f2.runtime.recoverMailbox(session2)
+        assertEquals(setOf("team-msg-1234567890abcdef1234"),
+            f2.runtime.project(session2).deliveredMessageIds.toSet())
+        assertEquals(1, f2.jobs.peekMessages("job-team-1").size)
+        f2.runtime.recoverMailbox(session2)
+        assertEquals(1, f2.jobs.peekMessages("job-team-1").size)
+    }
+
+    @Test
+    fun teamWaitReportsDurableChangeThroughRealLeadTool() = runBlocking {
+        val session = "team-wait-transition-contract"
+        val fixture = fixture(session)
+        // A ready projection establishes the baseline before the waiter suspends.
+        assertEquals(0, fixture.runtime.project(session).members.size)
+        val binding = LocalWorkRunBinding(
+            sessionId = session,
+            initialState = LocalHarnessState(
+                sessionId = session, usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = session, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = session, maxPendingInputs = 8),
+            eventLog = fixture.log,
+        )
+        val waiting = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            fixture.runtime.execute(memberTestToolCall(
+                "wait-for-team", "team_wait", buildJsonObject { put("timeout_ms", 2_000) },
+            ), binding).orEmpty()
+        }
+        fixture.log.append(
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", revision = 1, blockedBy = emptyList()),
+        )
+        val result = kotlinx.coroutines.withTimeout(3_000L) { waiting.await() }
+        assertTrue(result.contains("Team 状态已变化"))
+        assertTrue(result.contains("event_seq="))
+        assertTrue(result.contains("from_seq="))
+        assertTrue(result.contains("member_changes=none"))
+        assertTrue(result.contains("task_changes=task-1:new->pending@r1,owner=none"))
+        assertTrue(result.contains("task_completion=unverified"))
+    }
+
+    @Test
+    fun memberAcknowledgesOnlyPreviouslyObservedOwnMessageAndReplayIsIdempotent() = runBlocking {
+        val session = "team-member-handling-ack"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        val id = "team-msg-11223344556677889900"
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
+            teamMessage(session, id, "member-1", "处理已经交给你的核验工作"))
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED,
+            teamDelivered(session, id, "member-1"))
+        val owners = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
+        val identity = com.labteto.dshmobile.harness.agent.AgentRunIdentity(
+            session, "child:sa-team-1", "ack-run")
+        owners.claim(identity) {}
+        suspend fun ack(outcome: String, reason: String = "") =
+            f.runtime.executeMember(session, "job-team-1", memberTestToolCall(
+                "ack-$outcome", "team_ack_message", buildJsonObject {
+                    put("message_id", id); put("outcome", outcome); put("reason", reason)
+                },
+            ))
+        kotlinx.coroutines.withContext(owners.executionContext(identity)) {
+            val premature = runCatching { ack("handled") }.exceptionOrNull()
+            assertTrue(premature?.message.orEmpty().contains("TEAM_MESSAGE_ACK_MODEL_REPLY_REQUIRED"))
+            assertTrue(f.runtime.project(session).messageAcknowledgements.isEmpty())
+        }
+        f.log.append(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint("job-team-1", "sa-team-1", 2,
+                emptyList(), setOf(id)))
+        f.log.append(LOCAL_SUBAGENT_INBOX_MODEL_REPLY_EVENT, buildJsonObject {
+            put("background_job_id", "job-team-1")
+            put("message_ids", JsonArray(listOf(JsonPrimitive(id))))
+            put("step", 2)
+        })
+        kotlinx.coroutines.withContext(owners.executionContext(identity)) {
+            assertTrue(ack("handled").contains("不代表任务成果已验收"))
+            assertTrue(ack("handled").contains("无重复事件"))
+            val conflict = runCatching {
+                ack("cannot_handle", "改变已经提交的声明")
+            }.exceptionOrNull()
+            assertTrue(conflict?.message.orEmpty().contains("TEAM_MESSAGE_ACK_CONFLICT"))
+        }
+        assertEquals(1, f.runtime.project(session).messageAcknowledgements.size)
+        assertEquals("member-1", f.runtime.project(session).deliveredMessageTargets[id])
+        assertEquals("member_handled_reported",
+            readLocalTeamMessageReceipt(f.log, session, id).status)
+        val cold = LocalAgentTeamRuntime(f.jobs,
+            { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
+            { _, _, _ -> JobMessageAdmission(false, false, false, "unused") },
+            { f.log }, SessionProjectionRegistry())
+        assertNull(cold.project(session).failure)
+        assertEquals(f.runtime.project(session).messageAcknowledgements,
+            cold.project(session).messageAcknowledgements)
+    }
+
+    @Test
+    fun forgedRecipientAckFailsProjectionBeforeClaimingAnyHandling() {
+        val session = "team-forged-handling-ack"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        val id = "team-msg-99887766554433221100"
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
+            teamMessage(session, id, "member-1", "秘密消息"))
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED,
+            teamDelivered(session, id, "member-1"))
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_ACKNOWLEDGED, buildJsonObject {
+            put("version", LocalAgentTeamContract.TEAM_EVENT_VERSION)
+            put("teamId", session)
+            put("messageId", id)
+            put("memberId", "member-2")
+            put("outcome", "handled")
+        })
+        assertTrue(f.runtime.project(session).failure.orEmpty()
+            .contains("TEAM_MESSAGE_ACK_WRONG_RECIPIENT"))
+    }
+
+    @Test
     fun trustedMembersSendPeerLeadAndReadOwnDurableMailbox() = runBlocking {
         val received = mutableListOf<QueuedAgentInput>()
         val leadInbox = mutableListOf<QueuedAgentInput>()
@@ -178,7 +694,7 @@ class LocalAgentTeamRuntimeTest {
         val persisted = encodeLocalSubagentInboxClaimEvent("sa-team-2", "job-team-2", received)
         assertEquals(received, decodeLocalSubagentInboxClaimedMessages(persisted))
         // Recreate the projection and activation: durable member/job identity remains unchanged.
-        val restored = LocalAgentTeamRuntime(f.jobs, { _, _, _, _, _, _, _, _, _ ->
+        val restored = LocalAgentTeamRuntime(f.jobs, { _, _, _, _, _, _, _, _, _, _ ->
             JobStartResult(false, null, "unused")
         }, { _, _, _ -> JobMessageAdmission(false, false, false, "unused") }, { f.log }, SessionProjectionRegistry())
         val peerIdentity = identity.copy(slotId = "child:sa-team-2", runId = "cold-run")
@@ -715,7 +1231,7 @@ class LocalAgentTeamRuntimeTest {
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined).also(scopes::add),
                 onChanged = {},
             ),
-            startTeammate = { _, _, _, _, _, _, _, _, _ ->
+            startTeammate = { _, _, _, _, _, _, _, _, _, _ ->
                 JobStartResult(false, null, "重建测试不启动子代理")
             },
             sendToTeammate = { _, _, _ ->
@@ -1512,6 +2028,54 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun teamRoleIsAdmittedThroughRealToolAndPreservedAcrossFailedStart() = runBlocking {
+        val sessionId = "team-specialist-admission"
+        val f = fixture(sessionId)
+        val binding = LocalWorkRunBinding(
+            sessionId = sessionId,
+            initialState = LocalHarnessState(
+                sessionId = sessionId, usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = sessionId, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = sessionId, maxPendingInputs = 8),
+            eventLog = f.log,
+        )
+        f.runtime.execute(
+            memberTestToolCall("create-verifier", "team_create_member", buildJsonObject {
+                put("name", "verifier")
+                put("role", "verify")
+                put("description", "independently verify artifacts")
+            }), binding,
+        )
+        val created = f.runtime.project(sessionId).members.single()
+        assertEquals("verify", created.role)
+        assertEquals(LocalTeamMemberPhase.CREATED, created.phase)
+
+        val rejected = runCatching {
+            f.runtime.execute(memberTestToolCall("invalid-role", "team_create_member", buildJsonObject {
+                put("name", "malicious")
+                put("role", "superuser")
+            }), binding)
+        }
+        assertTrue(rejected.isFailure)
+        assertEquals(1, f.runtime.project(sessionId).members.size)
+
+        // The fixture intentionally rejects the actual Job start, but admission must already
+        // have derived a read-only tool scope and retained the role in durable Team events.
+        val response = f.runtime.execute(
+            memberTestToolCall("start-verifier", "team_start_member", buildJsonObject {
+                put("target", "verifier")
+                put("task", "audit")
+            }), binding,
+        )
+        assertTrue(response.orEmpty().contains("TEAM_MEMBER_START_REJECTED"))
+        val failed = f.runtime.project(sessionId).members.single()
+        assertEquals("verify", failed.role)
+        assertEquals(false, failed.mutableToolsEnabled)
+        assertEquals(LocalTeamMemberPhase.FAILED, failed.phase)
+    }
+
+    @Test
     fun dismissedMemberFreesCurrentRosterSlotForReplacement() = runBlocking {
         val sessionId = "team-roster-capacity"
         val fixture = fixture(sessionId)
@@ -1797,6 +2361,192 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun releasedOrReassignedTaskCannotKeepOldAgentRunAuthorized() {
+        val session = "team-old-run-after-release"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 1, emptyList()))
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 2, emptyList(), status = "in_progress", ownerId = "member-1"))
+        f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 3, emptyList(), status = "pending"))
+        assertTrue(runCatching {
+            f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+        }.exceptionOrNull() is LocalWorkflowSuperseded)
+
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 4, emptyList(), status = "in_progress", ownerId = "member-1"))
+        f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+
+        f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            member(session, "member-2", "peer", "provisioning"))
+        f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            member(session, "member-2", "peer", "active"))
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 5, emptyList(), status = "in_progress", ownerId = "member-2"))
+        assertTrue(runCatching {
+            f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+        }.exceptionOrNull() is LocalWorkflowSuperseded)
+        f.runtime.requireCurrentRootAuthorization(session, "job-team-2")
+        assertNull(f.runtime.project(session).failure)
+    }
+
+    @Test
+    fun teamRootFenceAllowsProvisioningButRejectsDismissedMembership() {
+        val session = "team-root-provisioning"
+        val f = fixture(session)
+        f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            member(session, "member-1", "worker", "provisioning"))
+        f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+        f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            member(session, "member-1", "worker", "active"))
+        f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+        f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            member(session, "member-1", "worker", "dismissed"))
+        assertTrue(runCatching {
+            f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+        }.exceptionOrNull() is LocalWorkflowSuperseded)
+        assertNull(f.runtime.project(session).failure)
+    }
+
+    @Test
+    fun teammateCannotSelfAuthorizeTaskFromSupersededUserInstruction() = runBlocking {
+        val session = "team-member-root-revoked"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        f.log.append("user/message", buildJsonObject { put("content", "原任务") })
+        val priorRevision = workflowUserRevision(f.log)
+        val pending = LocalTeamTaskSnapshot(
+            id = "task-1", revision = 1, subject = "原任务", description = "",
+            status = LocalTeamTaskStatus.PENDING, rootUserRevision = priorRevision,
+        )
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { pending.toEvent(session) })
+        f.log.append("user/message", buildJsonObject { put("content", "撤销旧任务") })
+        val owners = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
+        val identity = com.labteto.dshmobile.harness.agent.AgentRunIdentity(
+            session, "child:sa-team-1", "superseded-run")
+        owners.claim(identity) {}
+        val result = kotlinx.coroutines.withContext(owners.executionContext(identity)) {
+            runCatching {
+                f.runtime.executeMember(session, "job-team-1", memberTestToolCall(
+                    "stale-claim", "team_task_update", buildJsonObject {
+                        put("task_id", "task-1"); put("expected_revision", 1); put("action", "claim")
+                    },
+                ))
+            }
+        }
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message.orEmpty()
+            .contains("TEAM_TASK_ROOT_REAUTHORIZATION_REQUIRED"))
+        assertEquals(LocalTeamTaskStatus.PENDING, f.runtime.project(session).tasks.single().status)
+        assertEquals(priorRevision, f.runtime.project(session).tasks.single().rootUserRevision)
+        assertNull(f.runtime.project(session).failure)
+    }
+
+    @Test
+    fun newerUserInstructionRejectsPreviouslyAuthorizedTeamResult() = runBlocking {
+        val session = "team-root-authorization"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        startLiveChild(f, session)
+        f.log.append("user/message", buildJsonObject { put("content", "先执行旧任务") })
+        val originalRevision = workflowUserRevision(f.log)
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 1, emptyList()))
+        val reserved = LocalTeamTaskSnapshot(
+            id = "task-1", revision = 2, subject = "task-1", description = "",
+            status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = "member-1",
+            rootUserRevision = originalRevision,
+        )
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { reserved.toEvent(session) })
+        f.log.append("subagent/tool-result", buildJsonObject {
+            put("background_job_id", "job-team-1")
+            put("id", "old-work-result")
+            put("name", "read")
+            put("is_error", false)
+            put("content", "实际工具观测结果")
+        })
+        assertEquals(originalRevision, workflowUserRevision(f.log))
+        f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+        // Even a newer child result cannot override an intervening USER instruction.
+        f.log.append("user/message", buildJsonObject { put("content", "撤销旧任务，改做别的") })
+        assertTrue(workflowUserRevision(f.log) > originalRevision)
+        assertTrue(runCatching {
+            f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+        }.exceptionOrNull() is LocalWorkflowSuperseded)
+        f.log.append(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint("job-team-1", "sa-team-1", 3,
+                emptyList(), emptySet(), terminalOutput = "过期的结果", resultId = "stale-after-user"))
+        val binding = teamBinding(f, session)
+        val result = runCatching {
+            f.runtime.execute(LocalToolCall("complete-stale", "team_task_update", buildJsonObject {
+                put("task_id", "task-1")
+                put("expected_revision", 2)
+                put("action", "complete")
+                put("result_id", "stale-after-user")
+            }, "{}"), binding)
+        }
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message.orEmpty()
+            .contains("TEAM_TASK_ROOT_INSTRUCTION_SUPERSEDED"))
+        val unchanged = f.runtime.project(session).tasks.single()
+        assertEquals(LocalTeamTaskStatus.IN_PROGRESS, unchanged.status)
+        assertEquals(2, unchanged.revision)
+        assertEquals(originalRevision, unchanged.rootUserRevision)
+        assertNull(f.runtime.project(session).failure)
+    }
+
+    @Test
+    fun taskEvidenceNeverTreatsMissingOrForgedCheckpointAsVerified() = runBlocking {
+        val session = "team-machine-proof-audit"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        val pending = LocalTeamTaskSnapshot(
+            id = "task-1", revision = 1, subject = "核对成果", description = "",
+            status = LocalTeamTaskStatus.PENDING,
+        )
+        val running = pending.copy(
+            revision = 2, status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = "member-1",
+        )
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { pending.toEvent(session) })
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { running.toEvent(session) })
+        val legacy = running.copy(revision = 3, status = LocalTeamTaskStatus.COMPLETED)
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { legacy.toEvent(session) })
+        val binding = teamBinding(f, session)
+        val unknown = f.runtime.execute(LocalToolCall("legacy-proof", "team_task_evidence",
+            buildJsonObject { put("task_id", "task-1") }, "{}"), binding).orEmpty()
+        assertTrue(unknown.contains("evidence_state=legacy_unknown"))
+
+        val session2 = "team-machine-proof-forged"
+        val bad = fixture(session2)
+        appendActiveMember(bad.log, session2)
+        bad.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { pending.toEvent(session2) })
+        bad.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { running.toEvent(session2) })
+        val faked = running.copy(
+            revision = 3, status = LocalTeamTaskStatus.COMPLETED,
+            completionResultId = "unverified-model-claim",
+            completionEvidenceSequence = 902L,
+        )
+        bad.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            with(LocalAgentTeamEventCodec) { faked.toEvent(session2) })
+        val rejected = bad.runtime.execute(LocalToolCall("forged-proof", "team_task_evidence",
+            buildJsonObject { put("task_id", "task-1") }, "{}"), teamBinding(bad, session2)).orEmpty()
+        assertTrue(rejected.contains("checkpoint_binding_valid=false"))
+        assertTrue(rejected.contains("content_verified=false"))
+        assertNull(bad.runtime.project(session2).failure)
+    }
+
+    @Test
     fun completionRequiresFreshOwnedResultAndUnlocksDependencyOnlyAfterVerification() = runBlocking {
         val session = "team-verified-complete"
         val fixture = fixture(session)
@@ -1822,6 +2572,30 @@ class LocalAgentTeamRuntimeTest {
         assertNull(state.failure)
         assertEquals(LocalTeamTaskStatus.COMPLETED, state.tasks.first { it.id == "task-1" }.status)
         assertEquals(3, state.tasks.first { it.id == "task-1" }.revision)
+        val proof = state.tasks.first { it.id == "task-1" }
+        assertEquals("verified", proof.completionResultId)
+        val checkpoint = fixture.log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
+            data["result_id"]?.jsonPrimitive?.contentOrNull == "verified"
+        }
+        assertEquals(checkpoint?.sequence, proof.completionEvidenceSequence)
+        val cold = LocalAgentTeamRuntime(
+            fixture.jobs, { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
+            { _, _, _ -> JobMessageAdmission(false, false, false, "unused") },
+            { fixture.log }, SessionProjectionRegistry(),
+        )
+        val recovered = cold.project(session).tasks.first { it.id == "task-1" }
+        assertEquals(proof.completionResultId, recovered.completionResultId)
+        assertEquals(proof.completionEvidenceSequence, recovered.completionEvidenceSequence)
+        assertNull(recovered.completionResultId?.takeIf { it != "verified" })
+        val inspected = fixture.runtime.execute(
+            LocalToolCall("proof", "team_task_evidence", buildJsonObject {
+                put("task_id", "task-1")
+            }, "{}"), binding,
+        ).orEmpty()
+        assertTrue(inspected.contains("checkpoint_binding_valid=true"))
+        assertTrue(inspected.contains("result_id=verified"))
+        assertTrue(inspected.contains("content_verified=false"))
+        assertTrue(inspected.contains("goal_accepted=false"))
     }
 
     @Test
@@ -1933,7 +2707,7 @@ class LocalAgentTeamRuntimeTest {
         ).also(logs::add)
         val runtime = LocalAgentTeamRuntime(
             jobs = jobs,
-            startTeammate = { _, _, _, _, _, _, _, _, _ ->
+            startTeammate = { _, _, _, _, _, _, _, _, _, _ ->
                 JobStartResult(false, null, "测试不启动子代理")
             },
             sendToTeammate = sender,

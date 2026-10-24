@@ -1,0 +1,257 @@
+package com.labteto.dshmobile.local.work
+
+import com.labteto.dshmobile.local.agent.LocalAgentDelegationKind
+import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
+import com.labteto.dshmobile.local.agent.buildLocalDelegatedLaunchSpec
+import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
+import com.labteto.dshmobile.local.jobs.LocalJobManager
+import com.labteto.dshmobile.local.jobs.LocalJobInfo
+import com.labteto.dshmobile.local.model.LocalToolCall
+import kotlinx.serialization.json.JsonObject
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+
+/** Typed control command. Model schemas are parsed only by the model-facing adapter. */
+internal enum class LocalAgentDispatchKind { READONLY_FOREGROUND, READONLY_BACKGROUND, FORK }
+
+internal data class LocalAgentDispatchRequest(
+    val kind: LocalAgentDispatchKind,
+    val task: String,
+    val instructions: String,
+    val modelOverride: String?,
+    val maxSteps: Int,
+    val parentToolCallId: String,
+    val maxDepth: Int = 1,
+    val allowMutation: Boolean = false,
+    val historyMode: LocalSubagentHistoryMode = LocalSubagentHistoryMode.ISOLATED,
+    val virtualScreen: Boolean = false,
+    val toolAllowlist: Set<String>? = null,
+    val outputSchema: JsonObject? = null,
+) {
+    init {
+        require(task.isNotBlank() && parentToolCallId.isNotBlank()) { "AGENT_DELEGATION_REQUEST_INVALID" }
+        require(maxDepth in 1..3) { "AGENT_DELEGATION_DEPTH_INVALID" }
+        require(maxDepth == 1 || kind == LocalAgentDispatchKind.READONLY_FOREGROUND) {
+            "AGENT_RECURSION_ONLY_FOREGROUND_READONLY"
+        }
+        require(maxDepth == 1 || !virtualScreen) { "AGENT_RECURSION_VIRTUAL_SCREEN_BLOCKED" }
+        require(kind == LocalAgentDispatchKind.FORK || !allowMutation) { "READONLY_DELEGATION_CANNOT_MUTATE" }
+        require(kind != LocalAgentDispatchKind.FORK || historyMode == LocalSubagentHistoryMode.INHERIT_PARENT) {
+            "FORK_REQUIRES_PARENT_HISTORY"
+        }
+        require(kind != LocalAgentDispatchKind.READONLY_BACKGROUND ||
+            historyMode == LocalSubagentHistoryMode.ISOLATED) { "BACKGROUND_HISTORY_MUST_BE_ISOLATED" }
+    }
+}
+
+/**
+ * Codex-style lifecycle port for Work child Agents.
+ * Owner of execution facts remains the existing Job/Session/Run/Tool capabilities.
+ */
+internal interface LocalAgentControlPort {
+    /** Single Lead-side Team admission through the existing Team owner and EventLog. */
+    suspend fun executeTeam(binding: LocalWorkRunBinding, call: LocalToolCall): String?
+    suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String
+    fun list(sessionId: String): String
+    fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String
+    fun send(
+        sessionId: String,
+        agentId: String,
+        message: String,
+        mode: LocalAgentMessageDeliveryMode = LocalAgentMessageDeliveryMode.TRIGGER_TURN,
+    ): String
+    /**
+     * Inspect only an owned, actually registered persistent Agent. A Job label alone never
+     * authorizes control over another session or an unrelated background process.
+     */
+    fun inspect(sessionId: String, agentId: String): String
+    /** Bounded cancellation-aware long poll for changes to one owned Agent. */
+    suspend fun watch(sessionId: String, agentId: String, afterCursor: String, maxWaitMs: Int): String
+    /** Stop this Activation without deleting the resumable Agent identity/Inbox. */
+    fun interrupt(sessionId: String, agentId: String): String
+    /** Terminal cancellation; unlike interrupt, this clears the durable Inbox. */
+    fun close(sessionId: String, agentId: String): String
+    /** Request admission through the existing trusted recovery coordinator, not direct replay. */
+    fun resume(sessionId: String, agentId: String): String
+}
+
+/** Runtime implementation; no model-visible JSON parsing and no parallel persistence store. */
+/** Canonical owner-sensitive admission for every standalone child-control operation. */
+internal fun requireOwnedAgentInfo(
+    available: List<LocalJobInfo>,
+    sessionId: String,
+    agentId: String,
+): LocalJobInfo {
+    require(sessionId.isNotBlank() && agentId.isNotBlank()) { "AGENT_TARGET_REQUIRED" }
+    return available.singleOrNull {
+        it.id == agentId && it.ownerSessionId == sessionId && it.isAgent
+    } ?: error("AGENT_TARGET_NOT_FOUND：目标不属于当前 Work 会话或不是后台代理")
+}
+
+/** Cursor is a projection, never a new durable execution state or a receipt for model work. */
+internal fun localAgentObservationCursor(info: LocalJobInfo): String =
+    "${info.id}:${info.updatedAt}:${info.status}:${info.pendingMessageCount}"
+
+internal fun validateAgentResumeAdmission(
+    info: LocalJobInfo,
+    snapshot: com.labteto.dshmobile.harness.jobs.JobSnapshot,
+) {
+    require(info.continuable && snapshot.resumeKind == "subagent_readonly") {
+        "AGENT_RESUME_UNSUPPORTED：仅支持已有持久只读代理的安全恢复"
+    }
+    require(info.status in setOf("interrupted", "dormant", "waiting_slice")) {
+        "AGENT_RESUME_STATE_INVALID：当前状态不能重新激活"
+    }
+    require(info.pendingMessageCount > 0 || info.status == "waiting_slice") {
+        "AGENT_RESUME_INPUT_REQUIRED：需先有持久消息或等待中的安全执行片"
+    }
+}
+
+internal class LocalWorkAgentControlRuntime(
+    private val jobs: LocalJobManager,
+    private val subagents: LocalWorkSubagentRuntime,
+    private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
+    private val teams: LocalAgentTeamRuntime,
+) : LocalAgentControlPort {
+    override suspend fun executeTeam(binding: LocalWorkRunBinding, call: LocalToolCall): String? =
+        teams.execute(call, binding)
+
+    override suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String {
+        val parent = captureLocalAgentParentLink(request.parentToolCallId)
+        require(parent == null || parent.sessionId == binding.sessionId) { "AGENT_PARENT_SESSION_MISMATCH" }
+        return when (request.kind) {
+            LocalAgentDispatchKind.READONLY_BACKGROUND -> persistentJobs.startReadonlySubagent(
+                task = request.task,
+                model = request.modelOverride,
+                maxSteps = request.maxSteps,
+                instructions = request.instructions,
+                virtualScreen = request.virtualScreen,
+                outputSchema = request.outputSchema,
+                toolAllowlist = request.toolAllowlist,
+                parentToolCallId = request.parentToolCallId,
+                sessionId = binding.sessionId,
+                boundState = binding.aggregateSnapshot(),
+                historySnapshot = binding.runHandle.modelHistory::snapshot,
+            )
+            LocalAgentDispatchKind.READONLY_FOREGROUND -> subagents.runner(binding).run(
+                buildLocalDelegatedLaunchSpec(
+                    kind = LocalAgentDelegationKind.FOREGROUND_READONLY,
+                    task = request.task,
+                    instructions = request.instructions,
+                    modelOverride = request.modelOverride,
+                    maxSteps = request.maxSteps,
+                    parentCallId = request.parentToolCallId.takeIf {
+                        request.historyMode == LocalSubagentHistoryMode.INHERIT_PARENT
+                    },
+                    historyMode = request.historyMode,
+                    maxDepth = request.maxDepth,
+                    virtualScreen = request.virtualScreen,
+                    toolAllowlist = request.toolAllowlist,
+                    outputSchema = request.outputSchema,
+                    parentLink = parent,
+                ),
+            )
+            LocalAgentDispatchKind.FORK -> subagents.runner(binding).run(
+                buildLocalDelegatedLaunchSpec(
+                    kind = LocalAgentDelegationKind.FORK,
+                    task = request.task,
+                    instructions = request.instructions,
+                    modelOverride = request.modelOverride,
+                    maxSteps = request.maxSteps,
+                    parentCallId = request.parentToolCallId,
+                    allowMutation = request.allowMutation,
+                    toolAllowlist = request.toolAllowlist,
+                    outputSchema = request.outputSchema,
+                    parentLink = parent,
+                ),
+            )
+        }
+    }
+
+    override fun list(sessionId: String): String = jobs.listAgents(sessionId)
+    override fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String =
+        readLocalAgentTree(binding.eventLog, maxNodes).render()
+    override fun send(
+        sessionId: String,
+        agentId: String,
+        message: String,
+        mode: LocalAgentMessageDeliveryMode,
+    ): String = persistentJobs.sendMessage(agentId, message, sessionId, mode)
+    private fun requireOwnedAgent(sessionId: String, agentId: String): LocalJobInfo {
+        return requireOwnedAgentInfo(jobs.snapshotInfos(), sessionId, agentId)
+    }
+
+    private fun requireStandaloneAgent(info: LocalJobInfo) {
+        require(!LocalAgentTeamContract.isTeamJobId(info.id)) {
+            "AGENT_TEAM_LIFECYCLE_VIA_TEAM_PORT：Team 成员只能走 team_interrupt / team_dismiss_member"
+        }
+    }
+
+    override fun inspect(sessionId: String, agentId: String): String {
+        val info = requireOwnedAgent(sessionId, agentId)
+        val snapshot = jobs.snapshots().singleOrNull {
+            it.id == agentId && it.ownerId == sessionId
+        } ?: error("AGENT_SNAPSHOT_NOT_FOUND")
+        return buildString {
+            append("agent_id=").append(info.id)
+            append("\nstatus=").append(info.status)
+            append("\nowner_session=").append(sessionId)
+            append("\ncontinuable=").append(info.continuable)
+            append("\npending_messages=").append(info.pendingMessageCount)
+            append("\nupdated_at=").append(info.updatedAt)
+            append("\nobservation_cursor=").append(localAgentObservationCursor(info))
+            append("\nresume_kind=").append(snapshot.resumeKind ?: "none")
+            append("\nlatest_output=").append(snapshot.output.take(1_500))
+            append("\nexecution_result_verified=false")
+        }
+    }
+
+    override suspend fun watch(
+        sessionId: String,
+        agentId: String,
+        afterCursor: String,
+        maxWaitMs: Int,
+    ): String {
+        require(afterCursor.isNotBlank()) { "AGENT_WATCH_CURSOR_REQUIRED：先调用 agent_inspect" }
+        require(maxWaitMs in 0..20_000) { "AGENT_WATCH_TIMEOUT_INVALID" }
+        val started = System.nanoTime()
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val now = requireOwnedAgent(sessionId, agentId)
+            if (localAgentObservationCursor(now) != afterCursor) {
+                return "changed=true\n" + inspect(sessionId, agentId)
+            }
+            val elapsed = ((System.nanoTime() - started) / 1_000_000L).coerceAtLeast(0L)
+            if (elapsed >= maxWaitMs) {
+                return "changed=false\n" + inspect(sessionId, agentId)
+            }
+            delay(minOf(200L, maxWaitMs - elapsed))
+        }
+    }
+
+    override fun interrupt(sessionId: String, agentId: String): String {
+        val info = requireOwnedAgent(sessionId, agentId)
+        requireStandaloneAgent(info)
+        require(info.continuable) { "AGENT_NOT_CONTINUABLE：非持久代理不可安全暂停，可使用 agent_close 永久关闭" }
+        return jobs.interruptContinuableAgent(agentId, sessionId)
+    }
+
+    override fun close(sessionId: String, agentId: String): String {
+        requireStandaloneAgent(requireOwnedAgent(sessionId, agentId))
+        return jobs.kill(agentId, sessionId)
+    }
+
+    override fun resume(sessionId: String, agentId: String): String {
+        val info = requireOwnedAgent(sessionId, agentId)
+        requireStandaloneAgent(info)
+        val snapshot = jobs.snapshots().singleOrNull {
+            it.id == agentId && it.ownerId == sessionId
+        } ?: error("AGENT_SNAPSHOT_NOT_FOUND")
+        validateAgentResumeAdmission(info, snapshot)
+        persistentJobs.scheduleAgentResume(sessionId, agentId)
+        return "agent_id=$agentId\nresume_requested=true\nresume_admitted=unverified" +
+            "\nstatus_before=" + info.status +
+            "\n说明=恢复必须通过原 Job 检查点、模型路由与授权安全闸门"
+    }
+}

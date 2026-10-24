@@ -60,7 +60,9 @@ internal class LocalSubagentRunnerFactory(
     private val defaultSessionId: () -> String,
     private val compactionPolicy: LocalSubagentCompactionPolicy,
     private val teamSchemas: (() -> JsonArray)? = null,
+    private val nestedReadonlySchemas: (() -> JsonArray)? = null,
     private val executeTeamTool: (suspend (String, String, LocalToolCall) -> AgentToolResult)? = null,
+    private val requireTeamRootAuthorization: ((String, String) -> Unit)? = null,
     private val importToolImages: suspend (com.labteto.dshmobile.harness.tools.ToolRichContent?) -> List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = { emptyList() },
 ) {
     fun createBound(
@@ -133,7 +135,27 @@ internal class LocalSubagentRunnerFactory(
     ): LocalSubagentRunner = LocalSubagentRunner(
         modelGateway = modelGateway,
         teamSchemas = teamSchemas,
+        nestedReadonlySchemas = nestedReadonlySchemas,
+        // Every descendant owns fresh history policy and model step state; never reenter
+        // the parent's mutable runner instance while it is executing a tool call.
+        newNestedRunner = {
+            create(
+                eventLogProvider = eventLogProvider,
+                contextSnapshotProvider = contextSnapshotProvider,
+                schemasProvider = schemasProvider,
+                executeTool = executeTool,
+                runnerState = runnerState,
+                toolOutputSessionId = toolOutputSessionId,
+                runSessionId = runSessionId,
+                runKind = runKind,
+                historySnapshotProvider = historySnapshotProvider,
+                modelAdmission = modelAdmission,
+            )
+        },
         executeTeamTool = executeTeamTool?.let { executor -> { jobId, call -> executor(runSessionId(), jobId, call) } },
+        requireTeamRootAuthorization = requireTeamRootAuthorization?.let { check ->
+            { jobId -> check(runSessionId(), jobId) }
+        },
         importToolImages = importToolImages,
         state = runnerState,
         jobs = jobs,

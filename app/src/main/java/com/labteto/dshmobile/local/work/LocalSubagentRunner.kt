@@ -26,7 +26,14 @@ import com.labteto.dshmobile.local.buildTokenUsageContext
 import com.labteto.dshmobile.local.agent.LocalSubagentCompactionPolicy
 import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
+import com.labteto.dshmobile.local.agent.LocalAgentSubtreeBudget
+import com.labteto.dshmobile.local.agent.withLocalSubagentAgentSlot
+import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
+import com.labteto.dshmobile.local.agent.modelMessageForAgentInput
+import com.labteto.dshmobile.local.agent.submittedLocalTeamMessageIds
+import com.labteto.dshmobile.local.agent.orderLocalTeamInboxBatch
+import com.labteto.dshmobile.local.agent.toJson
 import com.labteto.dshmobile.local.agent.LocalSubagentModelStepExecutor
 import com.labteto.dshmobile.local.agent.validateLocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.validateLocalSubagentToolAllowlist
@@ -34,6 +41,7 @@ import com.labteto.dshmobile.local.agent.filterLocalSubagentSchemas
 import com.labteto.dshmobile.local.agent.LocalSubagentResult
 import com.labteto.dshmobile.local.agent.LocalSubagentStatus
 import com.labteto.dshmobile.local.agent.LocalSubagentToolCallPolicy
+import com.labteto.dshmobile.local.agent.LocalRecursiveReadOnlyToolScope
 import com.labteto.dshmobile.local.agent.LocalStructuredSubagentOutputException
 import com.labteto.dshmobile.local.agent.validateLocalStructuredSubagentOutput
 import com.labteto.dshmobile.local.agent.buildLocalSubagentInitialHistory
@@ -80,6 +88,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
@@ -111,7 +120,10 @@ internal class LocalSubagentRunner(
     private val schemas: (Boolean, Boolean, MutableSet<String>) -> JsonArray,
     private val execute: suspend (LocalToolCall, Boolean, MutableSet<String>) -> AgentToolResult,
     private val teamSchemas: (() -> JsonArray)? = null,
+    private val nestedReadonlySchemas: (() -> JsonArray)? = null,
+    private val newNestedRunner: (() -> LocalSubagentRunner)? = null,
     private val executeTeamTool: (suspend (String, LocalToolCall) -> AgentToolResult)? = null,
+    private val requireTeamRootAuthorization: ((String) -> Unit)? = null,
     private val spillToolOutput: (String, String) -> Boolean = { _, _ -> false },
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
     private val resolveImageMode: (LocalImageInputMode, String, String) -> LocalImageInputMode,
@@ -154,13 +166,14 @@ internal class LocalSubagentRunner(
         parentCallId: String,
         outputSchema: JsonObject? = null,
         instructions: String = "",
+        allowMutation: Boolean,
     ): List<JsonObject> =
         durableModelHistorySnapshot(
             buildLocalSubagentInitialHistory(
                 baseHistory = inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId),
                 task = task,
                 inheritParentHistory = true,
-                allowMutation = false,
+                allowMutation = allowMutation,
                 context = contextSnapshot(task),
                 outputSchema = outputSchema,
                 instructions = instructions,
@@ -177,14 +190,17 @@ internal class LocalSubagentRunner(
         resumeAfterCompletion: Boolean = false,
         onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)? = null,
         executionFence: () -> Unit = {},
+        subtreeBudget: LocalAgentSubtreeBudget = LocalAgentSubtreeBudget(),
+        agentSlotWaitMillis: Long? = null,
     ): LocalSubagentResult {
         val validated = validateLocalSubagentLaunchSpec(
             spec,
             structuredOutputSupported = true,
         )
-        return resourceScheduler.withResource(
-            HarnessResourceKind.AGENT,
+        return withLocalSubagentAgentSlot(
+            scheduler = resourceScheduler,
             owner = "subagent:" + validated.task.take(80),
+            waitMillis = agentSlotWaitMillis,
         ) {
             var virtualScreenId: String? = null
             try {
@@ -205,6 +221,7 @@ internal class LocalSubagentRunner(
                     resumeAfterCompletion = resumeAfterCompletion,
                     onCheckpointProgress = onCheckpointProgress,
                     executionFence = executionFence,
+                    subtreeBudget = subtreeBudget,
                 )
             } finally {
                 virtualScreenId?.let(releaseVirtualScreen)
@@ -223,6 +240,7 @@ internal class LocalSubagentRunner(
         resumeAfterCompletion: Boolean,
         onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)?,
         executionFence: () -> Unit,
+        subtreeBudget: LocalAgentSubtreeBudget,
     ): LocalSubagentResult {
         val task = spec.task
         val instructions = spec.instructions
@@ -230,6 +248,11 @@ internal class LocalSubagentRunner(
         val inheritHistory = capabilities.historyMode == LocalSubagentHistoryMode.INHERIT_PARENT
         val allowMutation = capabilities.allowMutation
         val backgroundJobId = spec.backgroundJobId
+        fun ensureTeamRootAuthorization() {
+            if (capabilities.teamManaged) {
+                backgroundJobId?.let { jobId -> requireTeamRootAuthorization?.invoke(jobId) }
+            }
+        }
         val parentCallId = spec.parentCallId
         val modelOverride = spec.modelOverride
         val maxSteps = spec.maxSteps
@@ -279,6 +302,8 @@ internal class LocalSubagentRunner(
             kind = runKind,
         )
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
+        // Step-local evidence only: never infer an unseen provider reply from recovered Inbox ACKs.
+        val submittedMessageIdsByStep = mutableMapOf<Int, Set<String>>()
         val recoveredBaseStep = recoveredStep.coerceAtLeast(0)
         var activationStep = 0
         var modelStep = recoveredBaseStep
@@ -302,10 +327,18 @@ internal class LocalSubagentRunner(
             addAll(capabilities.toolAllowlist.orEmpty())
             addAll(capabilities.initialOptionalTools)
         }
+        val canDelegateNested = !capabilities.allowMutation && !capabilities.continuable &&
+            capabilities.depth < capabilities.maxDepth && runCoordinator != null &&
+            snapshot.kernel.resources.maxAgents > capabilities.depth
         fun executionSchemas(mutation: Boolean, virtual: Boolean, enabled: MutableSet<String>): JsonArray {
             val normal = schemas(mutation, virtual, enabled)
-            return if (capabilities.teamManaged && backgroundJobId != null)
-                JsonArray(normal + (teamSchemas?.invoke().orEmpty())) else normal
+            val team = if (capabilities.teamManaged && backgroundJobId != null)
+                teamSchemas?.invoke().orEmpty() else emptyList()
+            val nested = if (canDelegateNested) nestedReadonlySchemas?.invoke().orEmpty() else emptyList()
+            return LocalRecursiveReadOnlyToolScope.visibleSchemas(
+                JsonArray(normal + team + nested),
+                capabilities,
+            )
         }
         val initialToolSchemas = executionSchemas(
             allowMutation,
@@ -313,10 +346,14 @@ internal class LocalSubagentRunner(
             enabledOptionalTools,
         )
         validateLocalSubagentToolAllowlist(initialToolSchemas, capabilities)
+        require(spec.parentLink == null || spec.parentLink.sessionId == runSessionId()) {
+            "AGENT_PARENT_SESSION_MISMATCH"
+        }
 
         eventLog().append("subagent/start", buildJsonObject {
             put("agent_id", subagentId)
             put("background_job_id", backgroundJobId ?: "")
+            spec.parentLink?.let { put("parent_link", it.toJson()) }
             put("model", routeModel)
             put("profile_id", runProfile.id)
             put("auth_kind", runProfile.authKind.name)
@@ -329,6 +366,7 @@ internal class LocalSubagentRunner(
             put("continuable", capabilities.continuable)
             put("history_mode", capabilities.historyMode.name.lowercase())
             put("max_depth", capabilities.maxDepth)
+            put("depth", capabilities.depth)
             capabilities.toolAllowlist?.let { allowlist ->
                 put("tool_allowlist", JsonArray(allowlist.sorted().map(::JsonPrimitive)))
             }
@@ -343,7 +381,7 @@ internal class LocalSubagentRunner(
             })
             return LocalSubagentResult(LocalSubagentStatus.FAILED, output, "NO_MODEL_CREDENTIAL")
         }
-        val parentRunId = parentCallId?.let { callId ->
+        val parentRunId = spec.parentLink?.parentRunId ?: parentCallId?.let { callId ->
             eventLog().latestMatching(setOf(LOCAL_AGENT_RUN_CHECKPOINT_EVENT)) { data ->
                 data["call_id"]?.jsonPrimitive?.contentOrNull == callId
             }?.data?.get("run_id")?.jsonPrimitive?.contentOrNull
@@ -481,10 +519,15 @@ internal class LocalSubagentRunner(
             val loop = AgentTurnEngine(
                 model = AgentModel {
                     executionFence()
+                    ensureTeamRootAuthorization()
                     currentCoroutineContext().ensureActive()
+                    val claimedForThisRequest = mutableListOf<com.labteto.dshmobile.harness.agent.QueuedAgentInput>()
                     backgroundJobId?.let { jobId ->
-                        val queuedMessages = jobs.peekMessages(jobId)
+                        val freshInputs = jobs.peekMessages(jobId)
                             .filterNot { message -> message.id in claimedMessageIds }
+                        val queuedMessages = if (capabilities.teamManaged) {
+                            orderLocalTeamInboxBatch(freshInputs, runSessionId())
+                        } else freshInputs
                         if (queuedMessages.isNotEmpty()) {
                             eventLog().append(
                                 LOCAL_SUBAGENT_INBOX_CLAIM_EVENT,
@@ -495,11 +538,9 @@ internal class LocalSubagentRunner(
                                 ),
                             )
                             queuedMessages.forEach { message ->
-                                history.append(buildJsonObject {
-                                    put("role", "user")
-                                    put("content", message.content)
-                                })
+                                history.append(modelMessageForAgentInput(message))
                                 claimedMessageIds += message.id
+                                claimedForThisRequest += message
                             }
                             persistContinuationCheckpoint(step = modelStep)
                             jobs.acknowledgeMessages(
@@ -531,8 +572,18 @@ internal class LocalSubagentRunner(
                         snapshot.modelState.baseUrl,
                         routeModel,
                     )
+                    // Only record a delivery as submitted when the exact normalized message survived
+                    // compaction and reached the model request. Dropped history remains unconfirmed.
+                    val actuallySubmitted = submittedLocalTeamMessageIds(
+                        claimedForThisRequest, preparedHistory,
+                    )
+                    if (actuallySubmitted.isNotEmpty()) {
+                        submittedMessageIdsByStep[activationStep] = actuallySubmitted
+                    }
                     val nativeImagesSent = hasMaterializedImageUrls(preparedHistory)
                     val reply = try {
+                        // A child tree shares one bounded model-step grant across every descendant.
+                        if (capabilities.depth > 1) subtreeBudget.claimModelStep()
                         modelStepExecutor.complete(
                             surface = runSurface,
                             history = preparedHistory,
@@ -552,6 +603,9 @@ internal class LocalSubagentRunner(
                             step = modelStep,
                             durableHistory = history,
                         ).also {
+                            // An ancestor may lose its Run while a remote model request is in flight.
+                            // Discard the late reply before usage/history/ToolStarted can commit.
+                            executionFence()
                             if (nativeImagesSent) {
                                 onNativeImageAccepted(snapshot.modelState.baseUrl, routeModel)
                             }
@@ -609,15 +663,52 @@ internal class LocalSubagentRunner(
                 },
                 tools = AgentToolExecutor { call ->
                     executionFence()
+                    ensureTeamRootAuthorization()
                     currentCoroutineContext().ensureActive()
-                    toolCallPolicy.rejection(call)
+                    LocalRecursiveReadOnlyToolScope.rejection(call, capabilities)
+                        ?: toolCallPolicy.rejection(call)
                         ?: if (capabilities.teamManaged && call.name == "capability_search") {
                             AgentToolResult(
                                 content = "额外的 MCP、LSP、GitHub 等扩展由主代理评估并显式授权；请向主代理申请所需工具。",
                             )
                         } else withContext(LocalModelRunContext(runProfile)) {
                         currentCoroutineContext().ensureActive()
-                        if (capabilities.teamManaged && call.name in LocalAgentTeamContract.TOOL_NAMES) {
+                        if (canDelegateNested && call.name == "subagent") {
+                            dispatchLocalNestedSubagent(
+                                call = call,
+                                parentCapabilities = capabilities,
+                                parentProfileId = runProfile.id,
+                                parentMaxSteps = maxSteps,
+                                subtreeBudget = subtreeBudget,
+                                availableAgentSlots = {
+                                    resourceScheduler.snapshot().availableAgentSlots
+                                },
+                                captureParent = { toolId -> captureLocalAgentParentLink(toolId) },
+                                ensureParentOwner = {
+                                    executionFence()
+                                    runContext?.let { parentContext ->
+                                        runCoordinator?.ensureCurrentOwner(parentContext)
+                                    }
+                                },
+                                runChild = { childSpec, sharedBudget ->
+                                    requireNotNull(newNestedRunner) {
+                                        "NESTED_DELEGATION_RUNNER_UNAVAILABLE"
+                                    }().runResult(
+                                        spec = childSpec,
+                                        executionFence = {
+                                            executionFence()
+                                            // Parent must still own its Run before a descendant acts.
+                                            runContext?.let { parentContext ->
+                                                runCoordinator?.ensureCurrentOwner(parentContext)
+                                            }
+                                        },
+                                        subtreeBudget = sharedBudget,
+                                        agentSlotWaitMillis = 5_000L,
+                                    )
+                                },
+                            )
+                        } else if (capabilities.teamManaged &&
+                            LocalAgentTeamContract.isTeamChildControlCall(call.name)) {
                             requireNotNull(executeTeamTool) { "TEAM_CALLER_UNAVAILABLE" }(
                                 requireNotNull(backgroundJobId), call.toLocalToolCall(),
                             )
@@ -734,6 +825,19 @@ internal class LocalSubagentRunner(
                                 persistContinuationCheckpoint(
                                     step = addSubagentSteps(recoveredBaseStep, event.step),
                                 )
+                            }
+                            // Persist the assistant/tool history before advancing receipt semantics.
+                            // Terminal output without a durable checkpoint (schema path) is not proof.
+                            val evidence = submittedMessageIdsByStep.remove(event.step).orEmpty()
+                            if (backgroundJobId != null && evidence.isNotEmpty() &&
+                                (pendingTerminalOutput == null || capabilities.outputSchema == null)
+                            ) {
+                                eventLog().append(LOCAL_SUBAGENT_INBOX_MODEL_REPLY_EVENT, buildJsonObject {
+                                    put("background_job_id", backgroundJobId)
+                                    put("agent_id", subagentId)
+                                    put("step", addSubagentSteps(recoveredBaseStep, event.step))
+                                    put("message_ids", kotlinx.serialization.json.JsonArray(evidence.sorted().map { JsonPrimitive(it) }))
+                                })
                             }
                         }
                         is AgentEvent.TurnCompleted -> {

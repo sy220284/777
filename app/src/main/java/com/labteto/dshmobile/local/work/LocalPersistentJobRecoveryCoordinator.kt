@@ -21,6 +21,12 @@ import com.labteto.dshmobile.local.runtime.PERSISTENT_RECOVERY_RETRY_MILLIS
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
+import com.labteto.dshmobile.local.agent.LocalAgentDelegationKind
+import com.labteto.dshmobile.local.agent.buildLocalDelegationCapabilities
+import com.labteto.dshmobile.local.agent.modelMessageForAgentInput
+import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
+import com.labteto.dshmobile.local.agent.decodeLocalAgentParentLink
+import com.labteto.dshmobile.local.agent.toJson
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.validateLocalSubagentLaunchSpec
@@ -64,6 +70,10 @@ internal fun isJobRecoveryOwnedBySession(snapshot: JobSnapshot, targetSession: S
 internal fun mustPreserveUnknownRecoveryOutcome(snapshot: JobSnapshot): Boolean =
     snapshot.status == "interrupted"
 
+/** Session-level recovery admits every eligible Job; explicit Agent resume admits only its ID. */
+internal fun matchesRequestedAgentRecovery(jobId: String, requestedAgentId: String?): Boolean =
+    requestedAgentId == null || jobId == requestedAgentId
+
 internal class LocalPersistentJobRecoveryCoordinator(
     private val scope: CoroutineScope,
     private val workspaceRoot: java.io.File,
@@ -86,6 +96,8 @@ internal class LocalPersistentJobRecoveryCoordinator(
     private val lock = Any()
     private val pendingRecoverySessions = linkedSetOf<String>()
     private val rootAdmittedSessions = linkedSetOf<String>()
+    /** Explicit per-Agent resumes stay distinct from session-wide crash recovery. */
+    private val pendingTargetedAgents = linkedSetOf<Pair<String, String>>()
     private var recoveryJob: Job? = null
 
     suspend fun startReadonlySubagent(
@@ -97,6 +109,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         outputSchema: JsonObject? = null,
         toolAllowlist: Set<String>? = null,
         forkParentCallId: String? = null,
+        parentToolCallId: String? = null,
         sessionId: String = currentSessionId(),
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
@@ -110,6 +123,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         outputSchema = outputSchema,
         toolAllowlist = toolAllowlist,
         forkParentCallId = forkParentCallId,
+        parentToolCallId = parentToolCallId,
         sessionId = sessionId,
         boundState = boundState,
         historySnapshot = historySnapshot,
@@ -125,6 +139,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         outputSchema: JsonObject? = null,
         toolAllowlist: Set<String>? = null,
         forkParentCallId: String? = null,
+        parentToolCallId: String? = null,
         sessionId: String = currentSessionId(),
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
@@ -138,16 +153,16 @@ internal class LocalPersistentJobRecoveryCoordinator(
             model ?: boundState.modelState.modelSelection.activeProfileId,
         )
         val protocol = effectiveProtocol(runProfile)
+        val parentLink = captureLocalAgentParentLink(parentToolCallId ?: forkParentCallId)
+        require(parentLink == null || parentLink.sessionId == sessionId) { "AGENT_PARENT_SESSION_MISMATCH" }
         val runner = subagentRunner(sessionId, boundState, historySnapshot)
-        val capabilities = LocalSubagentCapabilities(
+        val capabilities = buildLocalDelegationCapabilities(
+            kind = if (teamManaged) LocalAgentDelegationKind.TEAM_MEMBER
+                else LocalAgentDelegationKind.PERSISTENT,
             allowMutation = allowMutation,
-            continuable = true,
             virtualScreen = virtualScreen,
-            historyMode = LocalSubagentHistoryMode.ISOLATED,
-            maxDepth = 1,
             toolAllowlist = toolAllowlist,
             outputSchema = outputSchema,
-            teamManaged = teamManaged,
             initialOptionalTools = initialOptionalTools,
         )
         validateLocalSubagentLaunchSpec(
@@ -169,6 +184,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 parentCallId = parentCallId,
                 outputSchema = outputSchema,
                 instructions = instructions,
+                allowMutation = capabilities.allowMutation,
             )
             eventLogFor(sessionId).append(
                 LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
@@ -196,6 +212,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             put("route_fingerprint", runProfile.routeFingerprint())
             put("max_steps", maxSteps)
             forkParentCallId?.let { put("parent_call_id", it) }
+            parentLink?.let { put("parent_link", it.toJson()) }
             put("capabilities", encodeLocalSubagentCapabilities(capabilities))
             workflowFence?.let { put("workflow_fence", it) }
         }.toString()
@@ -207,7 +224,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             continuable = true,
             requestedId = requestedJobId,
         ) { jobId, report ->
-            suspendWorkflowJobForNewUser(eventLogFor(sessionId), jobId, workflowFence != null, allowMutation) {
+            suspendWorkflowJobForNewUser(eventLogFor(sessionId), jobId, workflowFence != null, allowMutation, teamManaged)  {
               withContext(LocalModelRunContext(runProfile) + LocalWorkflowExecutionFence {
                 if (workflowFence != null) requireWorkflowFenceCurrent(sessionId, workflowFence)
               }) {
@@ -218,6 +235,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                         modelOverride = runProfile.id,
                         maxSteps = maxSteps,
                         parentCallId = forkParentCallId,
+                        parentLink = parentLink,
                         backgroundJobId = jobId,
                         capabilities = capabilities,
                     ),
@@ -238,25 +256,50 @@ internal class LocalPersistentJobRecoveryCoordinator(
         agentId: String,
         message: String,
         sessionId: String,
+        mode: LocalAgentMessageDeliveryMode = LocalAgentMessageDeliveryMode.TRIGGER_TURN,
     ): String {
         val input = QueuedAgentInput(
             id = "msg-" + java.util.UUID.randomUUID().toString().replace("-", "").take(16),
             content = message,
             memoryInput = message,
         )
-        return sendInput(agentId, input, sessionId).message
+        val admission = sendInput(agentId, input, sessionId, mode)
+        return renderLocalAgentMessageSubmission(
+            messageId = input.id,
+            mode = mode,
+            accepted = admission.accepted,
+            duplicate = admission.duplicate,
+            requiresResume = admission.requiresResume,
+            rejection = admission.message.takeIf { !admission.accepted },
+        )
     }
 
     fun sendInput(
         agentId: String,
         input: QueuedAgentInput,
         sessionId: String,
+        mode: LocalAgentMessageDeliveryMode = LocalAgentMessageDeliveryMode.TRIGGER_TURN,
     ): JobMessageAdmission {
         val result = jobs.sendInput(agentId, input, sessionId)
-        if (result.accepted && result.requiresResume) {
+        if (shouldWakeAgentAfterAcceptedMessage(
+            mode, result.accepted, result.requiresResume, result.duplicate,
+        )) {
             schedule(sessionId)
         }
         return result
+    }
+
+    /**
+     * Request only the selected Agent's recovery. Never wake unrelated Jobs in the same Session.
+     * Validation of membership and resumability belongs to the AgentControl caller; this path
+     * still uses the original route, checkpoint, side-effect and ownership guards.
+     */
+    fun scheduleAgentResume(sessionId: String, agentId: String) {
+        require(sessionId.isNotBlank() && agentId.isNotBlank()) { "AGENT_RESUME_TARGET_REQUIRED" }
+        synchronized(lock) {
+            pendingTargetedAgents += sessionId to agentId
+            startRecoveryDrainLocked()
+        }
     }
 
     fun schedule(
@@ -268,34 +311,54 @@ internal class LocalPersistentJobRecoveryCoordinator(
         synchronized(lock) {
             pendingRecoverySessions += targetSession
             if (rootSliceAdmitted) rootAdmittedSessions += targetSession
-            if (recoveryJob?.isActive == true) return
-            recoveryJob = scope.launch {
+            startRecoveryDrainLocked()
+        }
+    }
+
+    private fun startRecoveryDrainLocked() {
+        if (recoveryJob?.isActive == true) return
+        recoveryJob = scope.launch {
                 try {
                     while (true) {
                         val next = synchronized(lock) {
-                            val session = pendingRecoverySessions.firstOrNull()
-                                ?.also { pendingRecoverySessions.remove(it) }
-                            session?.let { it to rootAdmittedSessions.remove(it) }
+                            val targeted = pendingTargetedAgents.firstOrNull()
+                                ?.also { pendingTargetedAgents.remove(it) }
+                            if (targeted != null) {
+                                Triple(targeted.first, true, targeted.second)
+                            } else {
+                                val session = pendingRecoverySessions.firstOrNull()
+                                    ?.also { pendingRecoverySessions.remove(it) }
+                                session?.let {
+                                    Triple(it, rootAdmittedSessions.remove(it), null)
+                                }
+                            }
                         } ?: break
-                        resumePass(next.first, resumeSlicePaused = next.second)
+                        resumePass(next.first, resumeSlicePaused = next.second, onlyAgentId = next.third)
                     }
                 } finally {
                     val completed = currentCoroutineContext()[Job]
                     val restart = synchronized(lock) {
                         if (recoveryJob === completed) recoveryJob = null
-                        recoveryJob == null && pendingRecoverySessions.isNotEmpty()
+                        recoveryJob == null &&
+                            (pendingRecoverySessions.isNotEmpty() || pendingTargetedAgents.isNotEmpty())
                     }
                     if (restart) {
-                        synchronized(lock) { pendingRecoverySessions.firstOrNull() }
-                            ?.let(::schedule)
+                        val session = synchronized(lock) { pendingRecoverySessions.firstOrNull() }
+                        if (session != null) schedule(session)
+                        else synchronized(lock) { pendingTargetedAgents.firstOrNull() }
+                            ?.let { scheduleAgentResume(it.first, it.second) }
                     }
                 }
             }
-        }
     }
 
-    private fun resumePass(targetSession: String, resumeSlicePaused: Boolean = false) {
+    private fun resumePass(
+        targetSession: String,
+        resumeSlicePaused: Boolean = false,
+        onlyAgentId: String? = null,
+    ) {
         jobs.resumableSnapshots().forEach { snapshot ->
+            if (!matchesRequestedAgentRecovery(snapshot.id, onlyAgentId)) return@forEach
             // Verify identity before decoding, failing, or reclassifying a recovery record.
             if (!isJobRecoveryOwnedBySession(snapshot, targetSession, json)) return@forEach
             // Startup/UI rehydration cannot grant new model request slots.
@@ -328,12 +391,15 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
 
         val waitingForActivationStop = jobs.pendingContinuableAgentMessageSnapshots().any { snapshot ->
-            snapshot.ownerId == targetSession && snapshot.status == "interrupted"
+            snapshot.ownerId == targetSession &&
+                matchesRequestedAgentRecovery(snapshot.id, onlyAgentId) &&
+                snapshot.status == "interrupted"
         }
         if (waitingForActivationStop) {
             scope.launch {
                 delay(PERSISTENT_RECOVERY_RETRY_MILLIS)
-                schedule(targetSession)
+                if (onlyAgentId == null) schedule(targetSession)
+                else scheduleAgentResume(targetSession, onlyAgentId)
             }
         }
     }
@@ -404,6 +470,10 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val credentialRef = payload["credential_ref"]?.jsonPrimitive?.contentOrNull
         val fingerprint = payload.requiredString("route_fingerprint")
         val capabilities = decodeLocalSubagentCapabilities(payload, version)
+        val parentLink = payload["parent_link"]?.let { raw ->
+            decodeLocalAgentParentLink(raw as? JsonObject
+                ?: error("AGENT_PARENT_LINK_INVALID"))
+        }
         val workflowFence = payload["workflow_fence"] as? JsonObject
         if (workflowFence != null) {
             try { requireWorkflowFenceCurrent(sessionId, workflowFence) }
@@ -492,10 +562,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 base
             } else {
                 base + recoveredTail.map { message ->
-                    message.modelMessage ?: buildJsonObject {
-                        put("role", "user")
-                        put("content", message.content)
-                    }
+                    modelMessageForAgentInput(message)
                 }
             }
         }
@@ -505,7 +572,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
 
         jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { jobId, report ->
-          suspendWorkflowJobForNewUser(eventLogFor(sessionId), jobId, workflowFence != null, capabilities.allowMutation) {
+          suspendWorkflowJobForNewUser(eventLogFor(sessionId), jobId, workflowFence != null, capabilities.allowMutation, capabilities.teamManaged) {
             val profile = modelGateway.profileForRoute(profileId, model, baseUrl)
             require(
                 profile.authKind.name == authKind &&
@@ -524,6 +591,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                             modelOverride = profile.id,
                             maxSteps = maxSteps,
                             parentCallId = payload["parent_call_id"]?.jsonPrimitive?.contentOrNull,
+                            parentLink = parentLink,
                             backgroundJobId = jobId,
                             capabilities = capabilities,
                         ),
@@ -763,9 +831,11 @@ internal class LocalPersistentJobRecoveryCoordinator(
 /** Actual persisted Jobs block, retaining only a slice without uncheckpointed write effects. */
 internal suspend fun <T> suspendWorkflowJobForNewUser(
     log: LocalSessionEventLog, jobId: String, workflowNode: Boolean, allowMutation: Boolean,
+    teamManaged: Boolean = false,
     block: suspend () -> T,
 ): T = try { block() } catch (superseded: LocalWorkflowSuperseded) {
-    if (!workflowNode) throw superseded
+    if (!workflowNode && !teamManaged) throw superseded
+    // Team task changes pause the existing Job only at a safely replayable slice.
     // A USER fence can fire between a tool's settlement and its history checkpoint.
     // Without a matching terminal result, even a settled write must not be reissued.
     if (allowMutation && !workflowToolContinuationSafe(log, jobId)) throw superseded

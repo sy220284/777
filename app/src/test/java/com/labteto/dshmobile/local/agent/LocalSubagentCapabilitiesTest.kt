@@ -101,7 +101,7 @@ class LocalSubagentCapabilitiesTest {
             task = "深层代理",
             modelOverride = null,
             maxSteps = 20,
-            capabilities = LocalSubagentCapabilities(maxDepth = 2),
+            capabilities = LocalSubagentCapabilities(maxDepth = 4),
         )
         val structured = LocalSubagentLaunchSpec(
             task = "结构化结果",
@@ -116,7 +116,7 @@ class LocalSubagentCapabilitiesTest {
 
         assertTrue(
             requireFailure { validateLocalSubagentLaunchSpec(deep) }
-                .contains("SUBAGENT_DEPTH_NOT_SUPPORTED"),
+                .contains("SUBAGENT_DEPTH_INVALID"),
         )
         assertTrue(
             requireFailure { validateLocalSubagentLaunchSpec(structured) }
