@@ -17,6 +17,42 @@ import org.junit.runner.RunWith
 /** Full SQLite archive/restore, without overwriting app or JVM-test data. */
 @RunWith(AndroidJUnit4::class)
 class SqliteStorageArchiveAndroidTest {
+    @Test fun exportRejectsSnapshotProjectionAheadOfDurableEventAuthority() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val uid = UUID.randomUUID().toString()
+        val snapName = "cursor-safety-$uid-snap.db"
+        val eventName = "cursor-safety-$uid-event.db"
+        try {
+            SqliteSessionSnapshotStore(context, Json, snapName).use { snapshots ->
+                SqliteSessionEventDatabase(context, Json, eventName).use { events ->
+                    val invalid = LocalHarnessSession(
+                        id = "mismatch", transcriptProjectedThroughSequence = 50L,
+                    )
+                    snapshots.write(
+                        "mismatch",
+                        Json.encodeToJsonElement(LocalHarnessSession.serializer(), invalid).jsonObject,
+                        1L,
+                    )
+                    events.append("mismatch", "assistant/message", buildJsonObject {})
+                    val manager = SqliteSessionStorageManager(
+                        context, snapshots, events, snapName, eventName, "cursor-$uid",
+                    )
+                    var blocked = false
+                    try {
+                        manager.exportAll(ByteArrayOutputStream())
+                    } catch (_: IllegalStateException) {
+                        blocked = true
+                    }
+                    assertTrue("Cursor-ahead snapshot must not be exported", blocked)
+                    assertEquals(0L, events.latestSequence("mismatch"))
+                }
+            }
+        } finally {
+            context.deleteDatabase(snapName)
+            context.deleteDatabase(eventName)
+        }
+    }
+
     @Test fun exportedSqliteDatabaseRetainsSessionAndAllEventsAcrossRestartRestore() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val uid = UUID.randomUUID().toString()

@@ -113,7 +113,11 @@ internal class SqliteSessionSnapshotStore(
         val snapshot = json.decodeFromJsonElement(LocalHarnessSession.serializer(), payload)
         val summary = projectLocalSessionSummary(snapshot, domainCodecs)
         val preview = snapshot.transcriptWindow.ifEmpty { snapshot.messages }
+            .filter { it.role == "user" || it.role == "assistant" }
             .takeLast(MAX_PREVIEW_MESSAGES)
+        val encodedPreview = preview.map {
+            json.encodeToString(LocalHarnessMessage.serializer(), it)
+        }
         val mutation = SqliteSessionConsistencyGate.acquireMutation()
         try {
         val db = writableDatabase
@@ -157,13 +161,30 @@ internal class SqliteSessionSnapshotStore(
             check(db.insertWithOnConflict(
                 "session_summaries", null, summaryValues, SQLiteDatabase.CONFLICT_REPLACE,
             ) >= 0L) { "SQLite 会话摘要保存失败：$id" }
-            db.delete("session_message_tail", "session_id=?", arrayOf(id))
-            preview.forEachIndexed { ordinal, message ->
-                check(db.insertOrThrow("session_message_tail", null, ContentValues().apply {
-                    put("session_id", id)
-                    put("ordinal", ordinal)
-                    put("payload", json.encodeToString(LocalHarnessMessage.serializer(), message))
-                }) >= 0L) { "SQLite 最近消息索引写入失败：$id" }
+            // Token streaming changes only the last visible row most of the time.
+            // Preserve unchanged rows rather than DELETE + 12 INSERTs per snapshot.
+            val priorPreview = db.rawQuery(
+                "SELECT payload FROM session_message_tail WHERE session_id=? ORDER BY ordinal ASC",
+                arrayOf(id),
+            ).use { rows ->
+                buildList { while (rows.moveToNext()) add(rows.getString(0)) }
+            }
+            encodedPreview.forEachIndexed { ordinal, encoded ->
+                if (priorPreview.getOrNull(ordinal) != encoded) {
+                    db.insertWithOnConflict(
+                        "session_message_tail", null, ContentValues().apply {
+                            put("session_id", id)
+                            put("ordinal", ordinal)
+                            put("payload", encoded)
+                        }, SQLiteDatabase.CONFLICT_REPLACE,
+                    )
+                }
+            }
+            if (priorPreview.size > encodedPreview.size) {
+                db.delete(
+                    "session_message_tail", "session_id=? AND ordinal>=?",
+                    arrayOf(id, encodedPreview.size.toString()),
+                )
             }
             db.setTransactionSuccessful()
             return SessionDocument(version, id, updatedAt, payload)
