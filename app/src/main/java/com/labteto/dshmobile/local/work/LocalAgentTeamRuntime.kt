@@ -1315,6 +1315,7 @@ internal class LocalAgentTeamRuntime(
                 status = LocalTeamTaskStatus.IN_PROGRESS,
                 ownerId = member.id,
                 autoDispatchMessageId = messageId,
+                rootUserRevision = workflowUserRevision(eventLogFor(sessionId)),
             )
             validateTaskTransition(state.tasks, previous = task, next = reserved)
             appendTask(sessionId, reserved)
