@@ -179,6 +179,36 @@ class SqliteSessionEventDatabase(
         } finally { mutation.unlock() }
     }
 
+    /**
+     * Completion is stored in the Event database, not a detached preference file.
+     * Deleted sessions must never be resurrected from retained legacy source files,
+     * and a lost/recreated SQLite database must not inherit a stale migration marker.
+     */
+    internal fun legacyAdoptionFinished(): Boolean {
+        val db = readableDatabase
+        val table = db.rawQuery(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_legacy_adoption'",
+            null,
+        ).use { it.moveToFirst() }
+        if (!table) return false
+        return db.rawQuery("SELECT 1 FROM session_legacy_adoption WHERE id=1", null)
+            .use { it.moveToFirst() }
+    }
+
+    internal fun finishLegacyAdoption() {
+        val mutation = SqliteSessionConsistencyGate.acquireMutation()
+        try {
+            val db = writableDatabase
+            db.beginTransactionNonExclusive()
+            try {
+                db.execSQL("CREATE TABLE IF NOT EXISTS session_legacy_adoption (" +
+                    "id INTEGER PRIMARY KEY NOT NULL CHECK(id=1))")
+                db.execSQL("INSERT OR IGNORE INTO session_legacy_adoption(id) VALUES (1)")
+                db.setTransactionSuccessful()
+            } finally { db.endTransaction() }
+        } finally { mutation.unlock() }
+    }
+
     internal fun legacyImportCommitted(sessionId: String): Boolean {
         validateSessionId(sessionId)
         val db = readableDatabase
