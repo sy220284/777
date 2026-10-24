@@ -7,6 +7,9 @@ import com.labteto.dshmobile.local.session.SqliteSessionEventDatabase
 import java.util.UUID
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.put
+import com.labteto.dshmobile.local.model.LOCAL_IMAGE_REF
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -75,6 +78,43 @@ class SqliteLocalAssetCatalogAndroidTest {
                     catalog.recordReference("present", "m-1", "b".repeat(64), "user_image")
                 }.isFailure)
                 assertEquals(0L, catalog.referenceCount(digest))
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
+    @Test fun committedMessageReferencesIndexAtomicallyAndMissingAssetsRemainRecoverable() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "asset-events-${UUID.randomUUID()}.db"
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { events ->
+                val catalog = SqliteLocalAssetCatalog(events)
+                catalog.register(image)
+                val payload = buildJsonObject {
+                    put("model_message", buildJsonObject {
+                        put("content", buildJsonArray {
+                            add(buildJsonObject {
+                                put("type", LOCAL_IMAGE_REF)
+                                put("attachmentId", digest)
+                                put("path", image.relativePath)
+                            })
+                            add(buildJsonObject {
+                                put("type", LOCAL_IMAGE_REF)
+                                put("attachmentId", "b".repeat(64))
+                            })
+                        })
+                    })
+                }
+                events.append("first", "user/message", payload)
+                assertEquals(1L, catalog.referenceCount(digest))
+                // A second session references the same asset; cross-session
+                // deduplication must not erase the first one.
+                events.append("second", "assistant/message", payload)
+                assertEquals(2L, catalog.referenceCount(digest))
+                events.clearSession("first")
+                assertEquals(1L, catalog.referenceCount(digest))
+                assertNull(catalog.asset("b".repeat(64)))
             }
         } finally {
             context.deleteDatabase(name)
