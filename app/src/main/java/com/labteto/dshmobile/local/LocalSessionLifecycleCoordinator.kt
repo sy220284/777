@@ -333,10 +333,10 @@ internal class LocalSessionLifecycleCoordinator(
     private fun isKnownSession(sessionId: String): Boolean =
         pendingSessions.modeFor(sessionId) != null ||
             state.value.sessions.any { it.id == sessionId } ||
-            sessionCoordinator.summaries().any { it.id == sessionId }
+            sessionCoordinator.containsForNavigation(sessionId)
 
     fun switchSession(sessionId: String): Boolean {
-        if (sessionId.isBlank()) return false
+        if (!sessionId.matches(Regex("[A-Za-z0-9._-]{1,128}"))) return false
         // This synchronous UI/SessionUiPort entrypoint only queues the desired identity.
         // Validating a cold deep link may scan session JSON and must run on the Session IO
         // owner with the rest of navigation, never while the UI command lock is held.
@@ -358,13 +358,20 @@ internal class LocalSessionLifecycleCoordinator(
             try {
                 transitionMutex.withLock {
                     try {
-                        if (sessionCoordinator.summaries().none { it.id == sessionId } &&
-                            pendingSessions.modeFor(sessionId) == null) {
+                        if (pendingSessions.modeFor(sessionId) == null &&
+                            !sessionCoordinator.containsForNavigation(sessionId)) {
                             state.update { it.copy(error = "目标会话已不存在，请从历史记录重新选择") }
                             return@withLock
                         }
+                        // A superseding tap may arrive while waiting for the
+                        // transition mutex or catalog check. Do not start an
+                        // expensive restore the user will never see.
+                        if (navigationInbox.hasPending()) return@withLock
                         if (cancelVisibleChatRun) cancelActiveRunAndJoin()
                         persist()
+                        // Persisting the outgoing session may perform IO. Prefer the
+                        // last requested destination before changing runtime identity.
+                        if (navigationInbox.hasPending()) return@withLock
                         activateSession(sessionId, null)
                         loadSession(sessionId)
                         restartInterruptedSafeJobs()
@@ -373,7 +380,9 @@ internal class LocalSessionLifecycleCoordinator(
                         state.update { it.copy(loading = false) }
                     }
                 }
-                startNextQueuedTurnIfIdle()?.start()
+                // Do not admit work for a now-unwanted foreground session when
+                // a newer navigation is already queued.
+                if (!navigationInbox.hasPending()) startNextQueuedTurnIfIdle()?.start()
             } finally {
                 // Even a failed restore must not strand a newer navigation tap.
                 continueQueuedNavigation()
@@ -471,6 +480,7 @@ internal class LocalSessionLifecycleCoordinator(
                         sessionsRoot = sessionsRoot,
                         clearEvents = beforeEventLogsDeleted,
                         clearToolOutputs = toolOutputStore::deleteSession,
+                        persistedSnapshotExists = sessionCoordinator::hasDurableSnapshot,
                     )
                     val durableDeletedIds = linkedSetOf<String>()
                     try {

@@ -3,6 +3,11 @@ package com.labteto.dshmobile.local.chat
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 
+/** Event types used by this reducer; keep in sync with its when dispatch. */
+internal val LOCAL_CHAT_CONTROL_EVENT_TYPES = setOf(
+    "chat/active-transcript", LOCAL_CHAT_DOMAIN_STATE_EVENT_TYPE, "chat/branch-state",
+)
+
 /** Chat alone interprets durable Chat control events. The app supplies an ordered event tail. */
 internal fun projectChatSessionControls(
     snapshot: LocalHarnessSession,

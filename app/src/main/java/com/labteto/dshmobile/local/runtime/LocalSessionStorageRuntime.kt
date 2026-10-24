@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.runtime
 import android.content.Context
 import com.labteto.dshmobile.harness.session.SessionProjectionRegistry
 import com.labteto.dshmobile.local.session.LocalSessionCoordinator
+import com.labteto.dshmobile.local.session.SqliteSessionSnapshotStore
+import com.labteto.dshmobile.local.session.LocalLegacySqliteMigration
 import com.labteto.dshmobile.local.session.LocalSessionRepository
 import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
@@ -11,7 +13,7 @@ import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.session.localSessionSnapshotBoundary
 import com.labteto.dshmobile.local.session.LocalSessionFilesRuntime
-import com.labteto.dshmobile.local.session.LocalSessionStorageManager
+import com.labteto.dshmobile.local.session.SqliteSessionStorageManager
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -56,16 +58,40 @@ class LocalSessionStorageRuntime @Inject internal constructor(
 
     private val orderedCodecs = domainCodecs.sortedBy(LocalSessionDomainCodec::id)
     private val repository: LocalSessionRepository
-    private val storageManager = LocalSessionStorageManager(sessionsRoot, json)
+    private val sqliteSnapshots = SqliteSessionSnapshotStore(context, json, domainCodecs = orderedCodecs)
+    private val storageManager = SqliteSessionStorageManager(
+        context, sqliteSnapshots, requireNotNull(eventLogs.sqliteDatabase),
+    )
     internal val coordinator: LocalSessionCoordinator
     internal val projectionRegistry = SessionProjectionRegistry()
     internal val agentRunCoordinator = LocalAgentRunCoordinator(eventLogFor = eventLogs::get)
 
     init {
         // Apply staged imports before any repository or event reader opens the session directory.
-        runCatching { storageManager.applyPendingRestore() }.onFailure { failure ->
+        try {
+            storageManager.applyPendingRestore()
+        } catch (failure: Exception) {
             runtimeStateStore.projection.publishError(
                 "会话备份恢复未全部完成：${failure.message ?: "请检查本地存储"}")
+            // Never expose a possibly half-installed pair of SQLite databases.
+            throw IllegalStateException("SQLite 恢复未完成，禁止启动不一致会话", failure)
+        }
+        // Before any user Session is enumerated or opened, adopt released main's
+        // JSON snapshots and rotated/compressed JSONL EventLogs. Never present an
+        // empty SQLite editor while private historical files are still unimported.
+        try {
+            LocalLegacySqliteMigration(
+                root = File(context.filesDir, "local-harness"),
+                sessionsRoot = sessionsRoot,
+                json = json,
+                snapshots = sqliteSnapshots,
+                events = requireNotNull(eventLogs.sqliteDatabase),
+            ).migrate()
+        } catch (failure: Exception) {
+            runtimeStateStore.projection.publishError(
+                "旧会话迁移未完成，原历史仍保留：${failure.message ?: "请检查存储"}",
+            )
+            throw IllegalStateException("旧会话迁移未完成，禁止开启与历史分叉的新会话", failure)
         }
         repository = LocalSessionRepository(
             root = sessionsRoot,
@@ -76,6 +102,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
                 runtimeStateStore.projection.publishError(error.message ?: "会话写入失败")
             },
             domainCodecs = orderedCodecs,
+            snapshotStore = sqliteSnapshots,
         )
         coordinator = LocalSessionCoordinator(
             repository = repository,
@@ -84,6 +111,9 @@ class LocalSessionStorageRuntime @Inject internal constructor(
             domainCodecs = orderedCodecs,
         )
     }
+
+    internal fun previewMessages(sessionId: String, limit: Int = 12): List<com.labteto.dshmobile.local.session.LocalHarnessMessage> =
+        repository.preview(sessionId, limit)
 
     internal fun enqueueSnapshot(snapshot: LocalHarnessSession) {
         coordinator.enqueue(snapshot)
@@ -110,6 +140,8 @@ class LocalSessionStorageRuntime @Inject internal constructor(
         coordinator.enqueue(snapshot)
         return true
     }
+
+    internal fun storageDiagnosticSummary(): String = storageManager.diagnosticSummary()
 
     internal suspend fun storageStatus(): LocalSessionStorageStatus =
         withContext(Dispatchers.IO) { storageManager.status() }

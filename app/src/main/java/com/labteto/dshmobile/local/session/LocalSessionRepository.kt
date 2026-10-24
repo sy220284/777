@@ -1,10 +1,8 @@
 package com.labteto.dshmobile.local.session
 
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
-import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,10 +32,9 @@ internal class LocalSessionRepository(
     private val onWritten: () -> Unit,
     private val onError: (Throwable) -> Unit,
     private val domainCodecs: List<LocalSessionDomainCodec> = emptyList(),
+    private val snapshotStore: LocalSessionSnapshotStore = FileSessionSnapshotStore(root, json),
 ) {
     private val sessionsRoot = root
-    private val catalogStore = VersionedSessionStore(root, json)
-    private val sessionStores = ConcurrentHashMap<String, VersionedSessionStore>()
     private val sessionLocks = Array(SESSION_LOCK_STRIPES) { Any() }
     private val summaryIndex = LocalSessionSummaryIndex(root, json)
     private val lock = Any()
@@ -76,7 +73,7 @@ internal class LocalSessionRepository(
                                     json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject,
                                     updatedAt = snapshot.updatedAt,
                                 )
-                                store.lastModified(snapshot.id)
+                                if (snapshotStore.nativeSummaries) 1L else store.lastModified(snapshot.id)
                             }
                         }
                         if (sourceModifiedAt != null) {
@@ -145,7 +142,9 @@ internal class LocalSessionRepository(
                     json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject,
                     updatedAt = snapshot.updatedAt,
                 )
-                requireNotNull(store.lastModified(snapshot.id)) { "会话写入后无法读取文件代际：${snapshot.id}" }
+                if (snapshotStore.nativeSummaries) 1L else requireNotNull(store.lastModified(snapshot.id)) {
+                    "会话写入后无法读取文件代际：${snapshot.id}"
+                }
             }
             persistSummaryIndex(snapshot, sourceModifiedAt)
             synchronized(lock) {
@@ -246,20 +245,60 @@ internal class LocalSessionRepository(
             ids.forEach { id ->
                 if (id !in pending && id !in latestSnapshots) {
                     deletedIds.remove(id)
-                    sessionStores.remove(id)
+                    snapshotStore.evict(id)
                 }
             }
         }
     }
 
+    /**
+     * Navigation admission is a primary-key probe, not a full summaries scan.
+     * The per-session lock fences concurrent destructive transitions.
+     */
+    fun containsForNavigation(id: String): Boolean = synchronized(sessionLock(id)) {
+        val (deleted, accepted) = synchronized(lock) {
+            (id in deletedIds) to (id in latestSnapshots || id in pending)
+        }
+        !deleted && (accepted || snapshotStore.containsSnapshotId(id))
+    }
+
+    // Query durable authority, never pending UI state or a legacy filename.
+    // A corrupt persisted row throws and blocks deletion rather than clearing its events.
+    fun hasDurableSnapshot(id: String): Boolean = synchronized(sessionLock(id)) {
+        snapshotStore.hasRecoverableSnapshot(id)
+    }
+
     fun read(id: String): LocalHarnessSession? = readWithLegacyApproval(id)?.session
+
+    fun preview(id: String, limit: Int = 12): List<LocalHarnessMessage> {
+        require(limit in 1..12)
+        // Lock-order matches read/delete; a removed session must never leak a stale preview.
+        return synchronized(sessionLock(id)) {
+            if (synchronized(lock) { id in deletedIds }) emptyList()
+            else {
+                val latest = synchronized(lock) { latestSnapshots[id] }
+                if (latest != null) latest.transcriptWindow.ifEmpty { latest.messages }
+                    .asReversed().asSequence()
+                    .filter { it.role == "user" || it.role == "assistant" }
+                    .take(limit).toList().asReversed()
+                else snapshotStore.recentMessages(id, limit)
+            }
+        }
+    }
 
     fun readWithLegacyApproval(id: String): LocalSessionRead? = synchronized(sessionLock(id)) {
         val (deleted, latest) = synchronized(lock) {
             (id in deletedIds) to latestSnapshots[id]
         }
         if (deleted) return@synchronized null
-        val persistedPayload = storeFor(id).read(id)?.document?.payload
+        // A new SQLite snapshot has no legacy auto-approval bit. When a newer
+        // accepted snapshot is already in memory, re-reading disk here can block
+        // navigation on a queued write with no semantic benefit.
+        val persistedPayload = if (latest != null && snapshotStore.nativeSummaries) {
+            null
+        } else {
+            storeFor(id).read(id)?.document?.payload
+        }
         if (latest != null) {
             LocalSessionRead(
                 session = latest,
@@ -297,7 +336,8 @@ internal class LocalSessionRepository(
     }
 
     private fun loadSummaries(): List<LocalSessionSummary> {
-        val ids = catalogStore.ids()
+        if (snapshotStore.nativeSummaries) return snapshotStore.readSummaries()
+        val ids = snapshotStore.ids()
         val validIds = ids.toSet()
         summaryIndex.prune(validIds)
         return ids.mapNotNull { id ->
@@ -363,6 +403,7 @@ internal class LocalSessionRepository(
     }
 
     private fun persistSummaryIndex(snapshot: LocalHarnessSession, sourceModifiedAt: Long) {
+        if (snapshotStore.nativeSummaries) return
         runCatching { summaryIndex.write(projectSummary(snapshot), sourceModifiedAt) }
             .onFailure { error ->
                 // The sidecar is derivative. A failed index write must not roll back a durable Session.
@@ -386,8 +427,7 @@ internal class LocalSessionRepository(
         return sessionLocks[index]
     }
 
-    private fun storeFor(id: String): VersionedSessionStore =
-        sessionStores.computeIfAbsent(id) { VersionedSessionStore(sessionsRoot, json) }
+    private fun storeFor(id: String): LocalSessionSnapshotStore = snapshotStore
 
     private fun projectSummary(snapshot: LocalHarnessSession): LocalSessionSummary =
         com.labteto.dshmobile.local.session.projectLocalSessionSummary(snapshot, domainCodecs)

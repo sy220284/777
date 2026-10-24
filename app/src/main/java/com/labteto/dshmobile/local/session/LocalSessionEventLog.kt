@@ -26,6 +26,7 @@ class LocalSessionEventLog(
     private val json: Json,
     maxBytes: Long = DEFAULT_MAX_BYTES,
     private val sessionId: String? = null,
+    private val sqlite: SqliteSessionEventDatabase? = null,
 ) {
     @Serializable
     data class Event(
@@ -35,7 +36,7 @@ class LocalSessionEventLog(
         val data: JsonObject,
     )
 
-    private val delegate = SessionEventLog(
+    private val delegate = if (sqlite == null) SessionEventLog(
         file = file,
         json = json,
         maxBytes = maxBytes,
@@ -47,7 +48,13 @@ class LocalSessionEventLog(
             )
         },
         onSegmentRotated = { LocalSessionArchiveMaintenance.request(file, json) },
-    )
+    ) else null
+
+    private val sqliteId: String get() = requireNotNull(sessionId) {
+        "SQLite event log requires a session identity"
+    }
+
+    private fun fileLog(): SessionEventLog = requireNotNull(delegate)
 
     // The durable log is the only publisher of committed event revisions.
     // Consumers receive the current revision immediately, then each successful append/reset.
@@ -60,14 +67,16 @@ class LocalSessionEventLog(
     private var checkpointIdentity: String? = null
 
     private fun projectionIdentity(): String = checkpointIdentity ?: run {
-        val first = delegate.pageAfter(-1L, 1).firstOrNull()
+        if (sqlite != null) return@run sqlite.instance(sqliteId).orEmpty()
+        val first = fileLog().pageAfter(-1L, 1).firstOrNull()
         val encoded = first?.let { json.encodeToString(com.labteto.dshmobile.harness.session.SessionEvent.serializer(), it) }.orEmpty()
         MessageDigest.getInstance("SHA-256").digest(encoded.toByteArray())
             .joinToString("") { "%02x".format(it) }.also { checkpointIdentity = it }
     }
 
     internal fun readProjectionCheckpoint(name: String, version: Int): LocalSessionProjectionCheckpoint? = if (isClosed) null else withWriterLease {
-        if (isClosed) null else checkpoints.read(name)?.takeIf {
+        if (isClosed) null else if (sqlite != null) sqlite.readProjectionCheckpoint(sqliteId, name, version)
+        else checkpoints.read(name)?.takeIf {
             it.version == version && it.identity == projectionIdentity() &&
                 it.throughSequence in -1L..latestSequence()
         }
@@ -76,8 +85,9 @@ class LocalSessionEventLog(
     internal fun writeProjectionCheckpoint(name: String, version: Int, throughSequence: Long,
         payload: String, generation: Long) = if (isClosed) Unit else withWriterLease {
         if (isClosed || generation != resetGeneration || throughSequence > latestSequence()) return@withWriterLease
-        checkpoints.write(name,
-            LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload))
+        val checkpoint = LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload)
+        if (sqlite != null) sqlite.writeProjectionCheckpoint(sqliteId, name, checkpoint)
+        else checkpoints.write(name, checkpoint)
     }
 
     internal fun writeProjectionCheckpointIfFits(name: String, version: Int, throughSequence: Long,
@@ -94,21 +104,25 @@ class LocalSessionEventLog(
 
     /** Native writer first, then adapter state; callers already holding the writer may reenter. */
     internal fun <T> withWriterLease(block: () -> T): T =
-        delegate.withWriterLease { synchronized(this) { block() } }
+        if (sqlite != null) sqlite.withWriterLease { synchronized(this) { block() } }
+        else fileLog().withWriterLease { synchronized(this) { block() } }
 
     fun append(type: String, data: JsonObject): Event {
-        val committed = delegate.append(type, data).toLocalEvent()
+        val committed = (sqlite?.append(sqliteId, type, data)
+            ?: fileLog().append(type, data)).toLocalEvent()
         mutableChanges.update { it + 1L }
         return committed
     }
 
-    fun snapshot(): List<Event> = delegate.snapshot().map { event ->
-        event.toLocalEvent()
-    }
+    fun snapshot(): List<Event> = if (sqlite != null) buildList {
+        sqlite.forEachAfter(sqliteId, -1L) { add(it.toLocalEvent()) }
+    } else fileLog().snapshot().map { it.toLocalEvent() }
 
-    fun latestSequence(): Long = delegate.latestSequence()
+    fun latestSequence(): Long = sqlite?.latestSequence(sqliteId) ?: fileLog().latestSequence()
 
-    fun diagnostics() = delegate.diagnostics()
+    fun diagnostics() = if (sqlite != null)
+        com.labteto.dshmobile.harness.session.SessionEventLogDiagnostics(0L, 0L, 0L)
+    else fileLog().diagnostics()
 
     @Volatile internal var isClosed: Boolean = false
         private set
@@ -126,38 +140,68 @@ class LocalSessionEventLog(
         if (release) {
             // Core close releases path registration; never hold its writer while taking
             // the core registry lock, whose own close path acquires the writer internally.
-            delegate.close()
+            if (sqlite == null) fileLog().close()
             mutableChanges.update { it + 1L }
         }
     }
 
-    fun snapshotAfter(sequenceExclusive: Long): List<Event> = delegate.snapshotAfter(sequenceExclusive).map { event ->
-        event.toLocalEvent()
+    fun eventsOfTypesAfter(
+        sequenceExclusive: Long, types: Set<String>,
+    ): List<Event> {
+        require(types.isNotEmpty())
+        return (if (sqlite != null) sqlite.selectTypesAfter(sqliteId, sequenceExclusive, types)
+        else fileLog().snapshotAfter(sequenceExclusive).filter { it.type in types })
+            .map { it.toLocalEvent() }
     }
+
+    /**
+     * Native SQL skips events without a visible transcript or rewrite semantics.
+     * File-based tests retain the conservative full replay contract.
+     */
+    internal fun visibleTranscriptEventsAfter(sequenceExclusive: Long): List<Event> =
+        (if (sqlite != null) sqlite.visibleEventsAfter(sqliteId, sequenceExclusive)
+        else fileLog().snapshotAfter(sequenceExclusive)).map { it.toLocalEvent() }
+
+    fun snapshotAfter(sequenceExclusive: Long): List<Event> = if (sqlite != null) buildList {
+        sqlite.forEachAfter(sqliteId, sequenceExclusive) { add(it.toLocalEvent()) }
+    } else fileLog().snapshotAfter(sequenceExclusive).map { it.toLocalEvent() }
 
     /** Streaming projection over committed Session facts. Never copy a whole historical tail. */
     fun forEachAfter(sequenceExclusive: Long, visitor: (Event) -> Unit) {
-        delegate.forEachAfter(sequenceExclusive) { visitor(it.toLocalEvent()) }
+        if (sqlite != null) sqlite.forEachAfter(sqliteId, sequenceExclusive) { visitor(it.toLocalEvent()) }
+        else fileLog().forEachAfter(sequenceExclusive) { visitor(it.toLocalEvent()) }
     }
 
     /** 按 sequence 递增返回旧事件页，适合 Projection / fold 等从旧到新的消费路径。 */
     fun pageBeforeChronological(
         sequenceExclusive: Long = Long.MAX_VALUE,
         limit: Int = 80,
-    ): List<Event> = delegate.pageBeforeChronological(sequenceExclusive, limit).map { event ->
-        event.toLocalEvent()
-    }
+    ): List<Event> = (if (sqlite != null)
+        sqlite.pageBeforeChronological(sqliteId, sequenceExclusive, limit)
+        else fileLog().pageBeforeChronological(sequenceExclusive, limit)).map { it.toLocalEvent() }
+
+    /**
+     * Transcript-only reverse feed. Native SQLite uses the visible-hint index;
+     * file-backed JVM contracts retain the original full event scan.
+     */
+    internal fun pageVisibleTranscriptBefore(
+        sequenceExclusive: Long = Long.MAX_VALUE,
+        limit: Int = 80,
+    ): List<Event> = (if (sqlite != null)
+        sqlite.pageVisibleBeforeNewestFirst(sqliteId, sequenceExclusive, limit)
+        else fileLog().pageBeforeNewestFirst(sequenceExclusive, limit)).map { it.toLocalEvent() }
 
     /** 按 sequence 递减返回旧事件页，适合从最新事件向历史倒查。 */
     fun pageBeforeNewestFirst(
         sequenceExclusive: Long = Long.MAX_VALUE,
         limit: Int = 80,
-    ): List<Event> = delegate.pageBeforeNewestFirst(sequenceExclusive, limit).map { event ->
-        event.toLocalEvent()
-    }
+    ): List<Event> = (if (sqlite != null)
+        sqlite.pageBeforeNewestFirst(sqliteId, sequenceExclusive, limit)
+        else fileLog().pageBeforeNewestFirst(sequenceExclusive, limit)).map { it.toLocalEvent() }
 
     fun pageAfter(sequenceExclusive: Long, limit: Int = 80): List<Event> =
-        delegate.pageAfter(sequenceExclusive, limit).map { it.toLocalEvent() }
+        (if (sqlite != null) sqlite.pageAfter(sqliteId, sequenceExclusive, limit)
+         else fileLog().pageAfter(sequenceExclusive, limit)).map { it.toLocalEvent() }
 
     /**
      * Consume a frozen durable stream within [block], without materializing the whole session.
@@ -165,7 +209,10 @@ class LocalSessionEventLog(
      * every snapshot and decompressor; suspended sequence builders cannot own these resources.
      */
     fun <T> withEvents(block: (Sequence<Event>) -> T): T {
-        val snapshots = delegate.openDurableFileSnapshot()
+        if (sqlite != null) return sqlite.withEvents(sqliteId) { events ->
+            block(events.map { it.toLocalEvent() })
+        }
+        val snapshots = fileLog().openDurableFileSnapshot()
         var activeReader: java.io.BufferedReader? = null
         var malformedRows = 0
         try {
@@ -215,51 +262,69 @@ class LocalSessionEventLog(
         if (!force && sessionId?.let(LocalSessionRuntimeRegistry::hasLiveOwner) == true) {
             SessionRepairResult()
         } else {
-            SessionRecovery.repairInterruptedTail(delegate)
+            if (sqlite == null) SessionRecovery.repairInterruptedTail(fileLog())
+            else SessionRecovery.repairInterruptedTail(
+                withWriterLease = { task -> sqlite.withWriterLease { task() } },
+                latest = { type -> sqlite.latest(sqliteId, type) },
+                forEachAfter = { sequence, visit -> sqlite.forEachAfter(sqliteId, sequence, visit) },
+                append = { type, data ->
+                    val event = sqlite.append(sqliteId, type, data)
+                    mutableChanges.update { it + 1L }
+                    event
+                },
+            )
         }
 
     fun search(
         query: String,
         limit: Int = 50,
         afterSequence: Long = -1L,
-    ): String = delegate.search(query, limit, afterSequence)
+    ): String = if (sqlite != null) sqlite.search(sqliteId, query, limit, afterSequence)
+        else fileLog().search(query, limit, afterSequence)
 
-    fun tail(limit: Int = 40): String = delegate.tail(limit)
+    fun tail(limit: Int = 40): String = if (sqlite != null) sqlite.tail(sqliteId, limit)
+        else fileLog().tail(limit)
 
     fun read(sequence: Long, before: Int = 0, after: Int = 0, offsetChars: Int = 0): String =
-        delegate.read(sequence, before, after, offsetChars)
+        if (sqlite != null) sqlite.read(sqliteId, sequence, before, after, offsetChars)
+        else fileLog().read(sequence, before, after, offsetChars)
 
     fun latestMatching(
         types: Set<String>,
         beforeSequenceExclusive: Long = Long.MAX_VALUE,
         predicate: (JsonObject) -> Boolean,
-    ): Event? = delegate.latestMatching(types, beforeSequenceExclusive, predicate)?.toLocalEvent()
+    ): Event? = (if (sqlite != null)
+        sqlite.latestMatching(sqliteId, types, beforeSequenceExclusive, predicate)
+        else fileLog().latestMatching(types, beforeSequenceExclusive, predicate))?.toLocalEvent()
 
     /** Android-facing batched latest-by-identity projection over the single durable core log. */
     fun <K> latestMatchingByKey(
         types: Set<String>,
         requiredKeys: Set<K>,
         keyOf: (Event) -> K?,
-    ): Map<K, Event> = delegate.latestMatchingByKey(types, requiredKeys) { event ->
-        keyOf(event.toLocalEvent())
-    }.mapValues { (_, event) -> event.toLocalEvent() }
+    ): Map<K, Event> = (if (sqlite != null)
+        sqlite.latestMatchingByKey(sqliteId, types, requiredKeys) { keyOf(it.toLocalEvent()) }
+        else fileLog().latestMatchingByKey(types, requiredKeys) { keyOf(it.toLocalEvent()) }
+    ).mapValues { (_, event) -> event.toLocalEvent() }
 
     fun latest(
         type: String,
         beforeSequenceExclusive: Long = Long.MAX_VALUE,
-    ): Event? = delegate.latest(type, beforeSequenceExclusive)?.toLocalEvent()
+    ): Event? = (if (sqlite != null) sqlite.latest(sqliteId, type, beforeSequenceExclusive)
+        else fileLog().latest(type, beforeSequenceExclusive))?.toLocalEvent()
 
     fun latestOf(types: Set<String>): Event? =
-        delegate.latestOf(types)?.toLocalEvent()
+        (if (sqlite != null) sqlite.latestMatching(sqliteId, types) { true }
+        else fileLog().latestOf(types))?.toLocalEvent()
 
     @Volatile internal var resetGeneration: Long = 0L
         private set
 
     fun clear() = withWriterLease {
-        delegate.clear()
+        if (sqlite != null) sqlite.clearSession(sqliteId) else fileLog().clear()
         resetGeneration += 1L
         checkpointIdentity = null
-        checkpoints.clear()
+        if (sqlite == null) checkpoints.clear()
         mutableChanges.update { it + 1L }
     }
 

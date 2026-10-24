@@ -2368,4 +2368,5 @@
     <string name="persona_v4_discard_confirm">放弃修改</string>
     <string name="persona_v4_discard_cancel">继续编辑</string>
     <string name="usage_action_work_summary">工作背景摘要</string>
+    <string name="local_transcript_load_older">加载更早对话</string>
 </resources>

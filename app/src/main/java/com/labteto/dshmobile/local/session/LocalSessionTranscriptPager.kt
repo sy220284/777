@@ -95,9 +95,9 @@ internal class LocalSessionTranscriptPager(
 
         while (collectedNewestFirst.size < messageLimit) {
             val scanBefore = beforeSequenceExclusive
-            val events = eventLog.pageBeforeNewestFirst(
+            val events = eventLog.pageVisibleTranscriptBefore(
                 sequenceExclusive = scanBefore,
-                limit = scanPageSize,
+                limit = minOf(scanPageSize, 200),
             )
             if (events.isEmpty()) break
 

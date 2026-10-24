@@ -12,6 +12,12 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.longOrNull
 
+/** Event types used by this reducer; keep in sync with its when dispatch. */
+internal val LOCAL_WORK_CONTROL_EVENT_TYPES = setOf(
+    "work/active-transcript", "plan/approved", "plan/state",
+    "todo/state", "goal/state", "plan/mode",
+)
+
 /** Work alone interprets plan, todo and goal events, including atomic plan approval. */
 internal fun projectWorkSessionControls(
     snapshot: LocalHarnessSession,

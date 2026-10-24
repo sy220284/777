@@ -27,16 +27,20 @@ class LocalSessionEventLogRegistry internal constructor(
     private val sessionsRoot: File,
     private val json: Json,
     private val maxEntries: Int = 64,
+    private val sqlite: SqliteSessionEventDatabase? = null,
 ) {
     @Inject
     internal constructor(@ApplicationContext context: Context, json: Json) : this(
         sessionsRoot = File(context.filesDir, "local-harness/sessions").apply { mkdirs() },
         json = json,
+        sqlite = SqliteSessionEventDatabase(context, json),
     )
 
     init {
         require(maxEntries in 8..512) { "EventLog 注册表容量必须在 8..512 之间" }
     }
+
+    internal val sqliteDatabase: SqliteSessionEventDatabase? get() = sqlite
 
     private val logs = object : LinkedHashMap<String, LocalSessionEventLog>(16, 0.75f, true) {
         override fun removeEldestEntry(
@@ -55,12 +59,16 @@ class LocalSessionEventLogRegistry internal constructor(
                 File(sessionsRoot, "$sessionId.events.jsonl"),
                 json,
                 sessionId = sessionId,
+                sqlite = sqlite,
             )
         }
 
-    /** Report the authority's durable historical sessions without touching the active adapter LRU. */
+    /**
+     * Authoritative historical listing: SQLite instances for app sessions, legacy files
+     * only for portable tests still running the file-backed EventLog.
+     */
     internal fun historicalSources(): List<LocalHistoricalSessionSource> =
-        sessionsRoot.listFiles().orEmpty().asSequence()
+        sqlite?.historicalSources() ?: sessionsRoot.listFiles().orEmpty().asSequence()
             .filter { it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) &&
                 it.name.endsWith(".events.jsonl") }
             .map { file ->
@@ -72,13 +80,14 @@ class LocalSessionEventLogRegistry internal constructor(
                     identity, file.length(), file.lastModified())
             }.sortedBy { it.id }.toList()
 
-    /** Scoped native adapter; historical scans must not evict a live foreground event log. */
+    /** Scoped adapter shares only the durable fact authority, never the foreground LRU. */
     internal fun <T> readHistorical(sessionId: String, block: (LocalSessionEventLog) -> T): T {
         require(sessionId.isNotBlank() && '/' !in sessionId && '\\' !in sessionId && ".." !in sessionId) {
             "Invalid historical session identity"
         }
         val reader = LocalSessionEventLog(
-            File(sessionsRoot, "${sessionId}.events.jsonl"), json, sessionId = sessionId,
+            File(sessionsRoot, "${sessionId}.events.jsonl"), json,
+            sessionId = sessionId, sqlite = sqlite,
         )
         return try { block(reader) } finally { reader.close() }
     }
@@ -90,9 +99,14 @@ class LocalSessionEventLogRegistry internal constructor(
     @Synchronized
     internal fun clearAndEvict(sessionIds: Set<String>) {
         sessionIds.forEach { id ->
-            logs.remove(id)?.let { log ->
-                log.clear()
-                log.close()
+            val cached = logs.remove(id)
+            if (cached != null) {
+                cached.clear()
+                cached.close()
+            } else {
+                // An evicted session still has durable SQL rows; do not let deletion
+                // resurrect it when a later session reuses the same identity.
+                sqlite?.clearSession(id)
             }
         }
     }

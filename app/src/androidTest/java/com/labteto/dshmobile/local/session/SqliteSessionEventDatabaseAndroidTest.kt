@@ -1,0 +1,254 @@
+package com.labteto.dshmobile.local.session
+
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import java.util.UUID
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class SqliteSessionEventDatabaseAndroidTest {
+    @Test fun atomicBatchAppendAndConcurrentWritersNeverLeaveSequenceGaps() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "sqlite-batch-test-${UUID.randomUUID()}.db"
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { db ->
+                val firstBatch = db.appendBatch("chat", (0 until 100).map { index ->
+                    "assistant/message" to buildJsonObject { put("index", index) }
+                })
+                assertEquals((0L..99L).toList(), firstBatch.map { it.sequence })
+                // Invalid batch is rejected without advancing the durable cursor.
+                var invalidRejected = false
+                try {
+                    db.appendBatch("chat", listOf(
+                        "turn/start" to buildJsonObject {},
+                        "" to buildJsonObject {},
+                    ))
+                } catch (_: IllegalArgumentException) {
+                    invalidRejected = true
+                }
+                assertTrue(invalidRejected)
+                assertEquals(99L, db.latestSequence("chat"))
+
+                val executor = Executors.newFixedThreadPool(4)
+                try {
+                    val tasks = (0 until 4).map { writer ->
+                        Callable {
+                            repeat(8) { batch ->
+                                db.appendBatch("chat", (0 until 25).map { index ->
+                                    "tool/result" to buildJsonObject {
+                                        put("writer", writer)
+                                        put("batch", batch)
+                                        put("index", index)
+                                    }
+                                })
+                            }
+                        }
+                    }
+                    val futures = executor.invokeAll(tasks)
+                    futures.forEach { it.get(90, TimeUnit.SECONDS) }
+                } finally {
+                    executor.shutdownNow()
+                }
+
+                assertEquals(899L, db.latestSequence("chat"))
+                val encountered = mutableListOf<Long>()
+                db.forEachAfter("chat", -1L) { encountered += it.sequence }
+                assertEquals((0L..899L).toList(), encountered)
+                assertEquals((899L downTo 880L).toList(),
+                    db.pageBeforeNewestFirst("chat", limit = 20).map { it.sequence })
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
+    @Test fun hundredThousandEventsStillReturnOnlyTheRequestedRecentPage() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "sqlite-long-session-${UUID.randomUUID()}.db"
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { store ->
+                // Fifty hundred? Exactly 100,000 durable events, always in small
+                // WAL batches; nothing needs to be decoded before the latest page.
+                repeat(400) { batch ->
+                    store.appendBatch("long", (0 until 250).map { i ->
+                        "assistant/message" to buildJsonObject { put("ordinal", batch * 250 + i) }
+                    })
+                }
+                assertEquals(99_999L, store.latestSequence("long"))
+                val newest = store.pageBeforeNewestFirst("long", limit = 12)
+                assertEquals((99_999L downTo 99_988L).toList(), newest.map { it.sequence })
+                val earlier = store.pageBeforeNewestFirst(
+                    "long", beforeSequenceExclusive = 99_988L, limit = 24,
+                )
+                assertEquals((99_987L downTo 99_964L).toList(), earlier.map { it.sequence })
+                assertEquals(99_999L, store.latest("long", "assistant/message")?.sequence)
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
+    @Test fun indexedVisiblePagingSkipsIrrelevantWorkEventsAndHonorsRewriteBoundary() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "sqlite-visible-test-${UUID.randomUUID()}.db"
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { db ->
+                db.append("history", "user/message", buildJsonObject {
+                    put("transcript", kotlinx.serialization.json.buildJsonArray {
+                        add(buildJsonObject {
+                            put("id", "before")
+                            put("role", "user")
+                            put("content", "before")
+                            put("created_at", 1)
+                        })
+                    })
+                })
+                repeat(160) { i ->
+                    db.append("history", "tool/result", buildJsonObject { put("index", i) })
+                }
+                db.append("history", "assistant/message", buildJsonObject { put("replaces", "before") })
+                db.append("history", "chat/active-transcript", buildJsonObject {})
+                db.append("history", "transcript/batch", buildJsonObject {
+                    put("transcript", kotlinx.serialization.json.buildJsonArray {
+                        add(buildJsonObject {
+                            put("id", "after")
+                            put("role", "assistant")
+                            put("content", "after")
+                            put("created_at", 2)
+                        })
+                    })
+                })
+                val visible = db.pageVisibleBeforeNewestFirst("history", limit = 3)
+                assertEquals(listOf("transcript/batch", "chat/active-transcript", "assistant/message"),
+                    visible.map { it.type })
+                assertEquals(0L, db.pageVisibleBeforeNewestFirst(
+                    "history", beforeSequenceExclusive = visible.last().sequence, limit = 1,
+                ).single().sequence)
+                assertEquals(163L, db.latestSequence("history"))
+                assertEquals(listOf(0L, 161L, 162L, 163L),
+                    db.visibleEventsAfter("history", -1L).map { it.sequence })
+                assertEquals(listOf(161L, 162L, 163L),
+                    db.visibleEventsAfter("history", 0L).map { it.sequence })
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
+    @Test fun upgradingV2DatabaseRebuildsVisibleHintsWithoutDroppingEvents() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "sqlite-visible-upgrade-${UUID.randomUUID()}.db"
+        try {
+            val location = context.getDatabasePath(name)
+            location.parentFile?.mkdirs()
+            android.database.sqlite.SQLiteDatabase.openOrCreateDatabase(location, null).use { db ->
+                db.execSQL("CREATE TABLE session_event_cursors (" +
+                    "session_id TEXT PRIMARY KEY NOT NULL, next_sequence INTEGER NOT NULL, " +
+                    "instance TEXT NOT NULL)")
+                db.execSQL("CREATE TABLE session_events (" +
+                    "session_id TEXT NOT NULL REFERENCES session_event_cursors(session_id) ON DELETE CASCADE," +
+                    "sequence INTEGER NOT NULL, event_type TEXT NOT NULL, created_at INTEGER NOT NULL," +
+                    "schema_version INTEGER NOT NULL, payload TEXT NOT NULL," +
+                    "PRIMARY KEY(session_id,sequence))")
+                db.execSQL("INSERT INTO session_event_cursors VALUES ('legacy',3,'v2-generation')")
+                db.execSQL("INSERT INTO session_events VALUES " +
+                    "('legacy',0,'user/message',1,1,'{\"transcript\":[]}')," +
+                    "('legacy',1,'tool/result',2,1,'{\"note\":1}')," +
+                    "('legacy',2,'assistant/message',3,1,'{\"replaces\":\"old\"}')")
+                db.version = 2
+            }
+            SqliteSessionEventDatabase(context, Json, name).use { db ->
+                assertEquals(2L, db.latestSequence("legacy"))
+                assertEquals(listOf(2L, 0L),
+                    db.pageVisibleBeforeNewestFirst("legacy", limit = 10).map { it.sequence })
+                assertEquals(3L, db.append("legacy", "chat/active-transcript",
+                    buildJsonObject {}).sequence)
+                assertEquals(listOf(3L, 2L, 0L),
+                    db.pageVisibleBeforeNewestFirst("legacy", limit = 10).map { it.sequence })
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
+    @Test fun eventSequencesAndIndexedPagesSurviveReopen() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "sqlite-events-test-${UUID.randomUUID()}.db"
+        try {
+            var identity = ""
+            SqliteSessionEventDatabase(context, Json, name, { 1234L }).use { db ->
+                repeat(120) { index ->
+                    val event = db.append("chat", if (index % 2 == 0) "assistant/message" else "tool/result",
+                        buildJsonObject { put("index", index) })
+                    assertEquals(index.toLong(), event.sequence)
+                }
+                identity = requireNotNull(db.instance("chat"))
+                assertEquals(119L, db.latestSequence("chat"))
+                assertEquals(118L, db.latest("chat", "assistant/message")?.sequence)
+                assertEquals((119L downTo 100L).toList(),
+                    db.pageBeforeNewestFirst("chat", limit = 20).map { it.sequence })
+                assertEquals((99L downTo 80L).toList(),
+                    db.pageBeforeNewestFirst("chat", beforeSequenceExclusive = 100L, limit = 20)
+                        .map { it.sequence })
+                assertEquals((115L..119L).toList(),
+                    db.pageAfter("chat", 114L, 20).map { it.sequence })
+                assertEquals(-1L, db.latestSequence("other"))
+                val selected = db.selectTypesAfter(
+                    "chat", 10L, setOf("tool/result"),
+                )
+                assertEquals((11L..119L step 2).toList(), selected.map { it.sequence })
+                assertTrue(selected.all { it.type == "tool/result" })
+                val generation = requireNotNull(db.instance("chat"))
+                assertTrue(db.writeProjectionCheckpoint(
+                    "chat", "ui-transcript", LocalSessionProjectionCheckpoint(
+                        version = 2,
+                        identity = generation,
+                        throughSequence = 100L,
+                        payload = "indexed through 100",
+                    ),
+                ))
+                assertEquals("indexed through 100",
+                    db.readProjectionCheckpoint("chat", "ui-transcript", 2)?.payload)
+                assertTrue(!db.writeProjectionCheckpoint(
+                    "chat", "ui-transcript", LocalSessionProjectionCheckpoint(
+                        2, generation, 99L, "stale",
+                    ),
+                ))
+                assertEquals("indexed through 100",
+                    db.readProjectionCheckpoint("chat", "ui-transcript", 2)?.payload)
+                assertTrue(!db.writeProjectionCheckpoint(
+                    "chat", "ui-transcript", LocalSessionProjectionCheckpoint(
+                        2, "wrong-generation", 110L, "invalid",
+                    ),
+                ))
+            }
+            SqliteSessionEventDatabase(context, Json, name).use { db ->
+                assertEquals(identity, db.instance("chat"))
+                assertEquals(120L, db.append("chat", "turn/end", buildJsonObject { }).sequence)
+                val sequences = mutableListOf<Long>()
+                db.forEachAfter("chat", 118L) { sequences += it.sequence }
+                assertEquals(listOf(119L, 120L), sequences)
+                db.clearSession("chat")
+                assertNull(db.instance("chat"))
+                assertNull(db.readProjectionCheckpoint("chat", "ui-transcript", 2))
+                assertTrue(db.pageBeforeNewestFirst("chat").isEmpty())
+                assertEquals(0L, db.append("chat", "turn/start", buildJsonObject {}).sequence)
+                assertNotEquals(identity, db.instance("chat"))
+                assertNull(db.readProjectionCheckpoint("chat", "ui-transcript", 2))
+            }
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+}

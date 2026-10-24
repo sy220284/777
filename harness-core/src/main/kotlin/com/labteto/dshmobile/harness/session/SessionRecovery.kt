@@ -84,28 +84,46 @@ object SessionRecovery {
         return RecoveredToolResult(callId, name, step, code, content, modelContent, executionId)
     }
 
-    fun repairInterruptedTail(log: SessionEventLog): SessionRepairResult = log.withWriterLease {
-        // The unfinished-turn check and every recovery receipt must share the durable
-        // per-session writer lease. Otherwise two processes can both see an open turn,
-        // append conflicting synthetic tool results, and close it twice.
-        repairInterruptedTailUnderLease(log)
+    fun repairInterruptedTail(log: SessionEventLog): SessionRepairResult = repairInterruptedTail(
+        withWriterLease = { task -> log.withWriterLease { task() } },
+        latest = { type -> log.latest(type) },
+        forEachAfter = log::forEachAfter,
+        append = log::append,
+    )
+
+    /**
+     * The recovery algorithm is independent of the durable backend. SQLite and
+     * native JSONL use the same reducer and interrupted-tool policy; each backend
+     * supplies a cross-process writer lease covering check, fold and receipts.
+     */
+    fun repairInterruptedTail(
+        withWriterLease: ((() -> SessionRepairResult) -> SessionRepairResult),
+        latest: (String) -> SessionEvent?,
+        forEachAfter: (Long, (SessionEvent) -> Unit) -> Unit,
+        append: (String, JsonObject) -> SessionEvent,
+    ): SessionRepairResult = withWriterLease {
+        repairInterruptedTailUnderLease(latest, forEachAfter, append)
     }
 
-    private fun repairInterruptedTailUnderLease(log: SessionEventLog): SessionRepairResult {
+    private fun repairInterruptedTailUnderLease(
+        latest: (String) -> SessionEvent?,
+        forEachAfter: (Long, (SessionEvent) -> Unit) -> Unit,
+        append: (String, JsonObject) -> SessionEvent,
+    ): SessionRepairResult {
         // A restart only needs to inspect the newest unfinished turn. Replaying the complete
         // append-only archive here used to duplicate years of session history in the Android heap
         // and could OOM before the Harness reached its incremental projection checkpoints.
-        val turnStart = log.latest("turn/start") ?: return SessionRepairResult()
-        val turnEnd = log.latest("turn/end")
+        val turnStart = latest("turn/start") ?: return SessionRepairResult()
+        val turnEnd = latest("turn/end")
         if (turnEnd != null && turnEnd.sequence > turnStart.sequence) {
             return SessionRepairResult()
         }
 
-        val latestStepStart = log.latest("step/start")?.takeIf {
+        val latestStepStart = latest("step/start")?.takeIf {
             it.sequence > turnStart.sequence
         }
         val latestStepNumber = latestStepStart?.data?.get("step")?.jsonPrimitive?.intOrNull
-        val latestStepEnd = log.latest("step/end")
+        val latestStepEnd = latest("step/end")
         val endedCurrentStep = latestStepStart != null && latestStepEnd != null &&
             latestStepEnd.sequence > latestStepStart.sequence &&
             // Legacy step/end omitted the step number. A numbered end, however,
@@ -118,7 +136,7 @@ object SessionRecovery {
             // A durable step/end cannot prove an earlier tool result was flushed.
             // Always fold the newest step's tool facts, even when it has an end,
             // so a crash between the two writes cannot silently lose a mutation.
-            log.forEachAfter(latestStepStart.sequence) { event ->
+            forEachAfter(latestStepStart.sequence) { event ->
                 pending.observe(event, latestStepNumber)
             }
         }
@@ -135,7 +153,7 @@ object SessionRecovery {
                 executionId = call.executionId,
             )
             recovered += result
-            appended += log.append("tool/result", buildJsonObject {
+            appended += append("tool/result", buildJsonObject {
                 result.step?.let { put("step", it) }
                 put("id", result.callId)
                 result.executionId?.let { put("execution_id", it) }
@@ -150,12 +168,12 @@ object SessionRecovery {
             })
         }
         openStep?.let { step ->
-            appended += log.append("step/end", buildJsonObject {
+            appended += append("step/end", buildJsonObject {
                 put("step", step)
                 put("recovered", true)
             })
         }
-        appended += log.append("turn/end", buildJsonObject {
+        appended += append("turn/end", buildJsonObject {
             put("reason", "interrupted")
             put("recovered", true)
         })

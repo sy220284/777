@@ -66,7 +66,9 @@ internal class LocalSessionComposition @Inject constructor(
         jobs = runtimeStateStore.jobManager,
         sessionCoordinator = sessionStorage.coordinator,
         pendingSessions = pendingSessions,
-        chatSessionLifecycle = LocalChatSessionLifecyclePlanner(chatPersistence.personaStore),
+        chatSessionLifecycle = LocalChatSessionLifecyclePlanner(
+            chatPersistence.personaStore, sessionStorage.eventLogs::get,
+        ),
         approvalPreferences = approvalPreferences,
         resourceScheduler = runtimeStateStore.resourceScheduler,
         handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS),

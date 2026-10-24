@@ -124,9 +124,12 @@ internal fun ChatContextState.continuePendingInSession(
     targetId: String,
     scope: String,
     activeBranchMessageIds: Set<String>? = null,
+    eventLogFor: ((String) -> LocalSessionEventLog)? = null,
 ): ChatContextState {
     require(sourceId != targetId) { "继续会话需要新的日志身份" }
     fun log(id: String): LocalSessionEventLog {
+        eventLogFor?.let { return it(id) }
+        // File-based adapter retained for standalone JVM contract tests only.
         val file = java.io.File(sessionsRoot, "$id.events.jsonl").canonicalFile
         require(file.parentFile == sessionsRoot.canonicalFile) { "会话日志路径无效" }
         return LocalSessionEventLog(file, pendingTurnJson)

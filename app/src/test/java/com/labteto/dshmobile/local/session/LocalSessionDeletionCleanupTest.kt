@@ -64,6 +64,33 @@ class LocalSessionDeletionCleanupTest {
     }
 
     @Test
+    fun sqliteAuthorityBlocksPrematureCleanupEvenWithoutLegacyJsonFiles() {
+        val sessions = temporary.newFolder("sqlite")
+        var sqlSnapshotStillPresent = true
+        var eventsCleared = 0
+        val cleanup = LocalSessionDeletionCleanup(
+            sessionsRoot = sessions,
+            clearEvents = { eventsCleared++ },
+            clearToolOutputs = {},
+            persistedSnapshotExists = { sqlSnapshotStillPresent },
+        )
+        cleanup.markIntent("current")
+        // Simulated process death after intent but before SQL snapshot deletion.
+        assertTrue(cleanup.recoverPending().isEmpty())
+        assertEquals(0, eventsCleared)
+        assertTrue(File(sessions, ".pending-deletions/current.pending").exists())
+        try {
+            cleanup.cleanupCommitted("current")
+            org.junit.Assert.fail("SQLite snapshot must fence event deletion")
+        } catch (_: IllegalStateException) { }
+        assertEquals(0, eventsCleared)
+        sqlSnapshotStillPresent = false
+        assertTrue(cleanup.recoverPending().isEmpty())
+        assertEquals(1, eventsCleared)
+        assertFalse(File(sessions, ".pending-deletions/current.pending").exists())
+    }
+
+    @Test
     fun successfulCleanupClearsMarkerSoStartupDoesNotRepeatDeletion() {
         val sessions = temporary.newFolder("complete")
         var calls = 0
