@@ -246,6 +246,8 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                     count = args.int("count", 10).coerceIn(1, 50),
                     needContent = args.boolean("need_content", false),
                     provider = args.optionalString("provider") ?: "auto",
+                    oriQuestion = args.optionalString("ori_question"),
+                    localization = args.optionalString("localization"),
                 )
             }
             "web_fetch" -> {
