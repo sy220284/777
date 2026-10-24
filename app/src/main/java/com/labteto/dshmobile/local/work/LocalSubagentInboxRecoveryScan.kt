@@ -42,7 +42,11 @@ internal fun recoverSubagentInboxClaims(
             if (event.type != LOCAL_SUBAGENT_INBOX_CLAIM_EVENT ||
                 event.data["background_job_id"]?.jsonPrimitive?.contentOrNull != backgroundJobId
             ) continue
-            val messages = decodeLocalSubagentInboxClaimedMessages(event.data) ?: continue
+            // A matching claim has already been durably admitted. Skipping a malformed
+            // payload would advance the recovery cursor and permanently lose that input.
+            val messages = checkNotNull(decodeLocalSubagentInboxClaimedMessages(event.data)) {
+                "SUBAGENT_RECOVERY_INVALID_CLAIM：job=$backgroundJobId，事件序号=${event.sequence}，已领取消息损坏；停止续跑以防丢失输入"
+            }
             for (message in messages) {
                 if (message.id in pendingIds || !seen.add(message.id)) continue
                 recovered += message

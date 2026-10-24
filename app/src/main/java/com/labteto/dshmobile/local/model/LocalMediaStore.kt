@@ -233,9 +233,19 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
     fun cleanupDeleted() = operation {
         initialize()
         database.deletions().forEach { row ->
-            val file = managedFile(row.fileName)
-            if (file != null && file.exists() && !file.delete()) throw java.io.IOException("媒体已移出列表，本地文件尚未清理，请重试")
-            database.remove(row.id)
+            // Keep the reference check and physical cleanup behind SQLite's write lock.
+            // Otherwise a concurrent record can begin referencing the same filename
+            // after the check but before the delete, losing a surviving paid result.
+            database.transaction {
+                val deleted = database.get(row.id)?.takeIf { it.deleted } ?: return@transaction
+                val file = managedFile(deleted.fileName)
+                if (file != null && !database.hasActiveFileReference(file.name) &&
+                    file.exists() && !file.delete()
+                ) {
+                    throw java.io.IOException("媒体已移出列表，本地文件尚未清理，请重试")
+                }
+                database.remove(deleted.id)
+            }
         }
     }
     @Synchronized

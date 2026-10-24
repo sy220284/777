@@ -2,7 +2,11 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -82,6 +86,50 @@ class LocalSubagentInboxRecoveryScanTest {
         }.exceptionOrNull()
         assertTrue(failure is IllegalStateException)
         assertTrue(failure?.message.orEmpty().contains("HISTORY_GAP"))
+    }
+
+    @Test
+    fun malformedMatchingClaimFailsClosedInsteadOfLosingAdmittedUserInput() {
+        val valid = encodeLocalSubagentInboxClaimEvent(
+            agentId = "agent", backgroundJobId = "job",
+            messages = listOf(QueuedAgentInput(id = "accepted", content = "保留这条输入")),
+        )
+        val invalidVersion = JsonObject(valid + ("version" to JsonPrimitive(99)))
+        val incompleteMessages = JsonObject(valid + ("messages" to JsonArray(listOf(
+            buildJsonObject { put("id", "accepted"); put("content", "") },
+        ))))
+        for (payload in listOf(invalidVersion, incompleteMessages)) {
+            val failure = runCatching {
+                recoverSubagentInboxClaims(
+                    backgroundJobId = "job", checkpointSequence = 0L, scanThrough = 1L,
+                    alreadyClaimed = emptySet(), pendingIds = emptySet(),
+                    pageAfter = { listOf(LocalSessionEventLog.Event(
+                        sequence = 1L, type = LOCAL_SUBAGENT_INBOX_CLAIM_EVENT,
+                        createdAt = 0L, data = payload,
+                    )) },
+                )
+            }.exceptionOrNull()
+            assertTrue(failure is IllegalStateException)
+            assertTrue(failure?.message.orEmpty().contains("INVALID_CLAIM"))
+        }
+    }
+
+    @Test
+    fun malformedClaimForOtherJobAndLegitimateEmptyClaimDoNotBlockRecovery() {
+        val unrelated = LocalSessionEventLog.Event(
+            sequence = 1L, type = LOCAL_SUBAGENT_INBOX_CLAIM_EVENT,
+            createdAt = 0L, data = buildJsonObject { put("background_job_id", "another-job") },
+        )
+        val empty = LocalSessionEventLog.Event(
+            sequence = 2L, type = LOCAL_SUBAGENT_INBOX_CLAIM_EVENT,
+            createdAt = 0L, data = encodeLocalSubagentInboxClaimEvent("agent", "job", emptyList()),
+        )
+        val result = recoverSubagentInboxClaims(
+            backgroundJobId = "job", checkpointSequence = 0L, scanThrough = 2L,
+            alreadyClaimed = emptySet(), pendingIds = emptySet(),
+            pageAfter = { listOf(unrelated, empty) },
+        )
+        assertTrue(result.isEmpty())
     }
 
     @Test

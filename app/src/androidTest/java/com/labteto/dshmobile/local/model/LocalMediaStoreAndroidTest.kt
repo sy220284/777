@@ -174,6 +174,36 @@ class LocalMediaStoreAndroidTest {
         assertEquals(listOf("unrelated"), store().page().results.map { it.id })
     }
 
+    @Test fun sharedOriginalAcrossSessionsIsNotDeletedUntilItsLastReferenceIsRemoved() {
+        val shared = File(directory, "shared-original.png").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        legacy(listOf(
+            result("first", 1L, session = "session-a", file = shared.name),
+            result("second", 2L, session = "session-b", file = shared.name),
+        ))
+        val first = store()
+        first.remove("first")
+        assertTrue(shared.isFile)
+        assertEquals("second", first.page().results.single().id)
+        assertEquals("second", store().result("second")?.id)
+        first.remove("second")
+        assertFalse(shared.exists())
+        assertTrue(store().page().results.isEmpty())
+    }
+
+    @Test fun removingRevisionFamilyKeepsUnrelatedResultReferencingSameFile() {
+        val shared = File(directory, "shared-family.png").apply { writeBytes(byteArrayOf(4, 5)) }
+        val original = result("original", 1L, file = shared.name)
+        val revision = result("revision", 2L, file = shared.name).copy(revisionOf = original.id)
+        val other = result("other", 3L, session = "second-session", file = shared.name)
+        legacy(listOf(original, revision, other))
+        val first = store()
+        first.removeRevisionFamily("revision")
+        assertTrue(shared.isFile)
+        assertEquals("other", first.page().results.single().id)
+        first.remove("other")
+        assertFalse(shared.exists())
+    }
+
     @Test fun indexedPagesKeepAllHistoryAndSeparateSessions() {
         legacy((1..130).map { result("r$it", it.toLong(), if (it % 2 == 0) "even" else "odd") })
         val first = store()

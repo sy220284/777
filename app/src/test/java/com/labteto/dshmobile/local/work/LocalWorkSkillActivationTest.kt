@@ -85,6 +85,46 @@ class LocalWorkSkillActivationTest {
     }
 
     @Test
+    fun longExplicitSkillIsBoundedAndItsUnreadTailIsNotPretendedLoaded() {
+        val root = Files.createTempDirectory("explicit-skill-budget").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            val longBody = "START_REQUIRED\n" + "A".repeat(45_000) + "\nTAIL_NOT_READ"
+            workspace.write(".dsh/skills/long-skill/SKILL.md", longBody)
+            val guidance = resolveLocalWorkSkillGuidance(workspace, "@skill:long-skill\n执行")
+            assertTrue(guidance.contains("START_REQUIRED"))
+            assertFalse(guidance.contains("TAIL_NOT_READ"))
+            assertTrue(guidance.contains("已限制本轮自动注入"))
+            assertTrue(guidance.contains("skill(name=long-skill)"))
+            assertTrue(guidance.length < 20_000)
+            // The persisted original must remain untouched and retrievable through the tool.
+            assertTrue(workspace.readSkill("long-skill").endsWith("TAIL_NOT_READ"))
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
+    fun explicitSkillGetsBudgetBeforeOtherPinsAndIsNotLoadedTwice() {
+        val root = Files.createTempDirectory("skill-explicit-priority").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            workspace.write(".dsh/skills/explicit/SKILL.md",
+                "EXPLICIT_START\n" + "X".repeat(18_500) + "\nEXPLICIT_TAIL")
+            workspace.write(".dsh/skills/second/SKILL.md", "SECOND_PIN_GUIDANCE")
+            val pins = listOf(
+                LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "explicit"),
+                LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "second"),
+            )
+            val result = resolveLocalWorkSkillGuidance(workspace, "@skill:explicit\n执行", pins)
+            assertTrue(result.contains("EXPLICIT_START"))
+            assertFalse(result.contains("EXPLICIT_TAIL"))
+            assertFalse(result.contains("SECOND_PIN_GUIDANCE"))
+            assertTrue(result.contains("skill(name=second)"))
+            assertEquals(1, Regex("EXPLICIT_START").findAll(result).count())
+            assertFalse(result.contains("[已固定技能：explicit]"))
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
     fun userOnlyRequiresExplicitSelectionButRemovedSkillFails() {
         val root = Files.createTempDirectory("skill-disabled").toFile()
         try {
@@ -127,6 +167,29 @@ class LocalWorkSkillActivationTest {
         assertTrue("imagegen" in named)
         assertTrue("minimax-media" in named)
         assertTrue("minimax-media" in relevantSkillIdsForTask("生成视频"))
+    }
+
+    @Test
+    fun installedWhenToUseOutranksLegacyKeywordAliasAndFallbackStillWorks() {
+        val root = Files.createTempDirectory("skill-metadata-authority").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            // A legacy hardcoded alias for writing-polish matches 润色, but this
+            // user's installed metadata deliberately limits when that skill applies.
+            workspace.write(".dsh/skills/writing-polish/SKILL.md",
+                "---\ndescription: legal proofreading\nwhen-to-use: 合同核对\n---\nOnly legal proofing.")
+            workspace.write(".dsh/skills/custom-polish/SKILL.md",
+                "---\ndescription: prose styling\nwhen-to-use: 润色\n---\nImprove the prose.")
+            val metadataGuidance = resolveLocalWorkSkillGuidance(workspace, "帮我润色稿件")
+            assertTrue(metadataGuidance.indexOf("custom-polish：") < metadataGuidance.indexOf("writing-polish："))
+            // Older installed skills without front matter remain discoverable
+            // by the compatibility alias until they define their own trigger.
+            workspace.write(".dsh/skills/code-review/SKILL.md",
+                "---\ndescription: code inspection\n---\nRead every changed file.")
+            val legacyGuidance = resolveLocalWorkSkillGuidance(workspace, "请审计代码")
+            assertTrue(legacyGuidance.contains("code-review：code inspection"))
+            assertFalse(legacyGuidance.contains("Read every changed file."))
+        } finally { root.deleteRecursively() }
     }
 
     @Test
