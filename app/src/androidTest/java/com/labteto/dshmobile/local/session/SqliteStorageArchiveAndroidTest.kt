@@ -53,6 +53,63 @@ class SqliteStorageArchiveAndroidTest {
         }
     }
 
+    @Test fun stagedArchiveCannotOverwriteNewBusinessEventsCommittedInWalDatabase() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val uid = UUID.randomUUID().toString()
+        val srcSnap = "wal-source-$uid-snap.db"
+        val srcEvents = "wal-source-$uid-events.db"
+        val dstSnap = "wal-destination-$uid-snap.db"
+        val dstEvents = "wal-destination-$uid-events.db"
+        val key = "wal-refuse-$uid"
+        val pending = java.io.File(context.filesDir, "local-harness/.sqlite-restore-pending-$key")
+        try {
+            val archive = ByteArrayOutputStream()
+            SqliteSessionSnapshotStore(context, Json, srcSnap).use { snapshots ->
+                SqliteSessionEventDatabase(context, Json, srcEvents).use { events ->
+                    snapshots.write(
+                        "incoming",
+                        Json.encodeToJsonElement(LocalHarnessSession.serializer(),
+                            LocalHarnessSession(id = "incoming", title = "需要恢复的备份")).jsonObject,
+                        10L,
+                    )
+                    events.append("incoming", "user/message", buildJsonObject { put("text", "old") })
+                    SqliteSessionStorageManager(context, snapshots, events, srcSnap, srcEvents,
+                        "wal-export-$uid").exportAll(archive)
+                }
+            }
+            SqliteSessionSnapshotStore(context, Json, dstSnap).use { snapshots ->
+                SqliteSessionEventDatabase(context, Json, dstEvents).use { events ->
+                    val manager = SqliteSessionStorageManager(context, snapshots, events,
+                        dstSnap, dstEvents, key)
+                    assertEquals(1, manager.stageRestore(archive.toByteArray()))
+                    assertTrue(java.io.File(pending, "READY").isFile)
+                    // An active user can create a new business fact between staging and restart.
+                    // It is never legal to overwrite that event database with the staged ZIP.
+                    events.append("already-has-user-data", "work/tool-result",
+                        buildJsonObject { put("receipt", "must-preserve") })
+                    assertEquals(0L, events.latestSequence("already-has-user-data"))
+                }
+            }
+            val resumed = SqliteSessionStorageManager(context,
+                SqliteSessionSnapshotStore(context, Json, dstSnap),
+                SqliteSessionEventDatabase(context, Json, dstEvents),
+                dstSnap, dstEvents, key)
+            val rejected = runCatching { resumed.applyPendingRestore() }.exceptionOrNull()
+            assertTrue("A staged archive cannot replace a committed business WAL fact",
+                rejected is IllegalArgumentException)
+            assertTrue("Staged data must be retained for explicit recovery", pending.isDirectory)
+            SqliteSessionEventDatabase(context, Json, dstEvents).use { events ->
+                assertEquals(0L, events.latestSequence("already-has-user-data"))
+                assertTrue(events.pageAfter("already-has-user-data", -1L)
+                    .single().data.toString().contains("must-preserve"))
+                assertEquals(-1L, events.latestSequence("incoming"))
+            }
+        } finally {
+            listOf(srcSnap, srcEvents, dstSnap, dstEvents).forEach(context::deleteDatabase)
+            pending.deleteRecursively()
+        }
+    }
+
     @Test fun exportedSqliteDatabaseRetainsSessionAndAllEventsAcrossRestartRestore() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val uid = UUID.randomUUID().toString()
