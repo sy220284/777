@@ -23,7 +23,7 @@ class SqliteSessionEventDatabase(
     private val json: Json,
     name: String = "local_session_events_v1.db",
     private val clock: () -> Long = System::currentTimeMillis,
-) : SQLiteOpenHelper(context, name, null, 3) {
+) : SQLiteOpenHelper(context, name, null, 4) {
     init { setWriteAheadLoggingEnabled(true) }
 
     override fun onConfigure(db: SQLiteDatabase) {
@@ -54,7 +54,7 @@ class SqliteSessionEventDatabase(
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        require(oldVersion in 1..2 && newVersion == 3) {
+        require(oldVersion in 1..3 && newVersion == 4) {
             "不支持的会话事件数据库版本：$oldVersion -> $newVersion"
         }
         if (oldVersion < 2) createCheckpointTable(db)
