@@ -76,7 +76,7 @@ object LocalToolCatalog {
         add(tool("media_image_status", "按任务 ID 查询当前会话已提交的真实图片生成回执与成果；不触发新的付费调用", properties(
             "job_id" to string("media_image_create 返回的任务 ID"),
         ), listOf("job_id")))
-        add(tool("web_search", "联网搜索：配置了 DeepSeek 官方密钥时默认使用原生 Search API（按成功请求计费），否则使用免费的 Bing RSS；可用 provider 指定搜索服务", properties(
+        add(tool("web_search", "联网搜索：默认使用免费 Bing RSS；在能力中心明确开启 DeepSeek 付费搜索并配置官方密钥后优先使用原生 Search API（按成功请求计费）；可用 provider 指定搜索服务", properties(
             "queries" to buildJsonObject {
                 put("type", "array")
                 put("description", "1 到 4 个搜索词，DeepSeek 单词条最多 128 个 Unicode 字符")
