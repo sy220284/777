@@ -75,6 +75,46 @@ class InlineSpeechPlayerOwnerAndroidTest {
         }
     }
 
+    @Test fun asyncOldACompletionCannotMutateNewBPlaybackOwner() {
+        val first = wav("async-old-a.wav")
+        val second = wav("async-new-b.wav")
+        val ownerA = InlineSpeechPlayerOwner()
+        val ownerB = InlineSpeechPlayerOwner()
+        val old = MediaPlayer()
+        val fresh = MediaPlayer()
+        val oldCallbackAccepted = java.util.concurrent.atomic.AtomicBoolean(false)
+        val prepared = java.util.concurrent.CountDownLatch(1)
+        try {
+            old.setDataSource(first.absolutePath)
+            ownerA.attach(old)
+            old.setOnPreparedListener { ready ->
+                if (ownerA.owns(ready)) oldCallbackAccepted.set(true)
+            }
+            old.prepareAsync()
+            // This races an outstanding MediaPlayer decoder callback. A's
+            // release must not be able to claim B or a later A incarnation.
+            ownerA.dispose()
+            fresh.setDataSource(second.absolutePath)
+            ownerB.attach(fresh)
+            fresh.setOnPreparedListener { ready ->
+                if (ownerB.owns(ready)) prepared.countDown()
+            }
+            fresh.prepareAsync()
+            assertTrue("new B file must prepare in real Android decoder",
+                prepared.await(10, java.util.concurrent.TimeUnit.SECONDS))
+            assertFalse("stale A callback was accepted after file switch",
+                oldCallbackAccepted.get())
+            assertTrue(ownerB.owns(fresh))
+        } finally {
+            ownerA.dispose()
+            ownerB.dispose()
+            runCatching { old.release() }
+            runCatching { fresh.release() }
+            first.delete()
+            second.delete()
+        }
+    }
+
     @Test fun stalePlayerCannotReleaseReplacementAfterAsyncHandoff() {
         val owner = InlineSpeechPlayerOwner()
         val a = MediaPlayer()
