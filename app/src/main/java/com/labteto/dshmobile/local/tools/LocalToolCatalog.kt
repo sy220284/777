@@ -401,6 +401,9 @@ object LocalToolCatalog {
             "task_id" to string("task-N"),
         ), listOf("task_id")))
         add(tool("team_task_list", "列出 Team 当前未删除任务及 readiness / owner / write-scope 警告", properties()))
+        add(tool("team_task_evidence", "从持久事件核查已完成 Team 任务的结果 ID、实际子代理 Job、检查点序号和任务归属；这只验证证据关联，不代表内容正确、独立审查通过或 Goal 完成", properties(
+            "task_id" to string("已经完成的 Team 任务编号 task-N"),
+        ), listOf("task_id")))
         add(tool("team_task_update", "用 compare-and-set revision 更新 Team 任务", properties(
             "task_id" to string("task-N"),
             "expected_revision" to integer("当前任务 revision；不匹配会拒绝写入"),
