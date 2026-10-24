@@ -68,6 +68,16 @@ internal class LocalMediaDatabase(context: Context, private val json: Json, name
     fun activeForSession(sessionId: String): List<LocalMediaRecord> =
         readableDatabase.rawQuery("SELECT payload FROM media WHERE deleted=0 AND session_id=?", arrayOf(sessionId))
             .use { cursor -> buildList { while (cursor.moveToNext()) add(decode(cursor.getString(0))) } }
+    /** Call inside the deletion transaction: all sessions and media types share this namespace.
+     * Fail closed if an active payload cannot be decoded; a best-effort guess can destroy media.
+     */
+    fun hasActiveFileReference(fileName: String): Boolean =
+        readableDatabase.rawQuery("SELECT payload FROM media WHERE deleted=0", null).use { cursor ->
+            while (cursor.moveToNext()) {
+                if (decode(cursor.getString(0)).fileName == fileName) return@use true
+            }
+            false
+        }
     fun pending(): List<LocalMediaRecord> = select("deleted=0 AND pending=1")
     fun deletions(): List<LocalMediaRecord> = select("deleted=1")
     private fun select(where: String): List<LocalMediaRecord> = readableDatabase.rawQuery("SELECT payload FROM media WHERE $where", null)
