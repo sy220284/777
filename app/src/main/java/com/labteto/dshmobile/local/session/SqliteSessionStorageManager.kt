@@ -49,6 +49,19 @@ internal class SqliteSessionStorageManager(
         )
     }
 
+    /** Shared Session owner supplies environment diagnostics as well as settings. */
+    fun diagnosticSummary(): String {
+        val core = status()
+        val mediaRoot = File(context.filesDir, "local-harness/workspace/.dsh/attachments")
+        val mediaBytes = mediaRoot.listFiles().orEmpty()
+            .sumOf { if (it.isFile) it.length() else 0L }
+        val total = core.totalBytes + mediaBytes
+        val warning = if (total >= core.budgetBytes || core.lowFreeSpace) "（空间偏紧）" else ""
+        val mib = 1024L * 1024L
+        return "会话存储：${total / mib} MiB（SQLite及WAL ${core.totalBytes / mib} MiB，附件 ${mediaBytes / mib} MiB），" +
+            "设备可用 ${core.freeBytes / mib} MiB${warning}"
+    }
+
     suspend fun compactAll(): LocalSessionStorageStatus {
         val maintenance = SqliteSessionConsistencyGate.acquireExclusive()
         try {
@@ -107,7 +120,7 @@ internal class SqliteSessionStorageManager(
     fun stageRestore(archive: ByteArray): Int {
         require(archive.isNotEmpty() && archive.size <= MAX_ZIP_BYTES) { "SQLite 备份压缩包为空或超限" }
         require(!pendingRoot.exists()) { "已有待恢复数据，请重启应用处理" }
-        check(snapshots.readSummaries().isEmpty() && events.sessionCount() == 0) {
+        check(snapshots.readSummaries().isEmpty() && restorableEmptyEditor(events.readableDatabase)) {
             "为防止覆盖现有会话，SQLite 备份目前只允许恢复到空会话库"
         }
         val staging = File(context.filesDir, "local-harness/.sqlite-restore-${UUID.randomUUID()}")
@@ -169,14 +182,13 @@ internal class SqliteSessionStorageManager(
             validateDatabase(src)
             // Never replace a live/user-owned database. Already installed bytes
             // are safe only when identical to the staged, verified source.
-            if (dst.exists() && !sameBytes(src, dst)) {
-                // WAL sidecars may contain the only committed copy of an event.
-                // Do not overwrite a database whose sidecars are still present.
-                check(!File(dst.path + "-wal").exists() &&
-                    !File(dst.path + "-shm").exists()) {
-                    "SQLite WAL 尚未安全关闭，恢复拒绝覆盖"
+            if (dst.exists()) {
+                // A killed process can leave a valid EMPTY WAL database with sidecars.
+                // Let SQLite recover/checkpoint it; never discard a WAL before reading it.
+                settleStoppedWal(dst)
+                if (!sameBytes(src, dst)) {
+                    require(isEmptyDatabase(dst)) { "已有 SQLite 会话数据，恢复拒绝覆盖" }
                 }
-                require(isEmptyDatabase(dst)) { "已有 SQLite 会话数据，恢复拒绝覆盖" }
             }
         }
         sources.forEach { (src, dst) ->
@@ -258,6 +270,45 @@ internal class SqliteSessionStorageManager(
             }
         }
 
+    private fun settleStoppedWal(file: File) {
+        if (!File(file.path + "-wal").exists() && !File(file.path + "-shm").exists()) return
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            db.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", null).use { result ->
+                check(result.moveToFirst() && result.getInt(0) == 0) {
+                    "恢复前 SQLite 仍被写入者占用"
+                }
+            }
+            db.rawQuery("PRAGMA journal_mode=DELETE", null).use { result ->
+                check(result.moveToFirst() && result.getString(0).equals("delete", true)) {
+                    "恢复前 SQLite WAL 未完成安全关闭"
+                }
+            }
+        }
+        check(!File(file.path + "-wal").exists()) {
+            "SQLite WAL 已结算但仍存在，拒绝覆盖数据库"
+        }
+    }
+
+    /**
+     * A deleted final Session can leave an unstarted editor's model-selection
+     * event and orphan asset catalog rows. Those are not conversation facts.
+     * Keep every original media file: physical GC remains disabled.
+     */
+    private fun restorableEmptyEditor(db: SQLiteDatabase): Boolean {
+        val onlySelection = db.rawQuery(
+            "SELECT 1 FROM session_events WHERE event_type != ? LIMIT 1",
+            arrayOf(com.labteto.dshmobile.local.model.LOCAL_SESSION_MODEL_SELECTION_EVENT),
+        ).use { !it.moveToFirst() }
+        if (!onlySelection) return false
+        val referencesPresent = db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='local_asset_references'",
+            null,
+        ).use { it.moveToFirst() }
+        return !referencesPresent || db.rawQuery(
+            "SELECT 1 FROM local_asset_references LIMIT 1", null,
+        ).use { !it.moveToFirst() }
+    }
+
     private fun isEmptyDatabase(file: File): Boolean {
         if (!file.exists()) return true
         // Only a recognized, genuinely empty session database may be replaced.
@@ -275,7 +326,8 @@ internal class SqliteSessionStorageManager(
                 ).use { exists ->
                     if (!exists.moveToFirst()) false else {
                         db.rawQuery("SELECT 1 FROM $requiredTable LIMIT 1", null).use { rows ->
-                            !rows.moveToFirst()
+                            !rows.moveToFirst() ||
+                                (requiredTable == "session_events" && restorableEmptyEditor(db))
                         }
                     }
                 }

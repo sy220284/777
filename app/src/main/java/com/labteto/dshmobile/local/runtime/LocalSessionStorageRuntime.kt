@@ -4,6 +4,7 @@ import android.content.Context
 import com.labteto.dshmobile.harness.session.SessionProjectionRegistry
 import com.labteto.dshmobile.local.session.LocalSessionCoordinator
 import com.labteto.dshmobile.local.session.SqliteSessionSnapshotStore
+import com.labteto.dshmobile.local.session.LocalLegacySqliteMigration
 import com.labteto.dshmobile.local.session.LocalSessionRepository
 import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
@@ -75,6 +76,23 @@ class LocalSessionStorageRuntime @Inject internal constructor(
             // Never expose a possibly half-installed pair of SQLite databases.
             throw IllegalStateException("SQLite 恢复未完成，禁止启动不一致会话", failure)
         }
+        // Before any user Session is enumerated or opened, adopt released main's
+        // JSON snapshots and rotated/compressed JSONL EventLogs. Never present an
+        // empty SQLite editor while private historical files are still unimported.
+        try {
+            LocalLegacySqliteMigration(
+                root = File(context.filesDir, "local-harness"),
+                sessionsRoot = sessionsRoot,
+                json = json,
+                snapshots = sqliteSnapshots,
+                events = requireNotNull(eventLogs.sqliteDatabase),
+            ).migrate(runtimeStateStore.currentSessionId)
+        } catch (failure: Exception) {
+            runtimeStateStore.projection.publishError(
+                "旧会话迁移未完成，原历史仍保留：${failure.message ?: "请检查存储"}",
+            )
+            throw IllegalStateException("旧会话迁移未完成，禁止开启与历史分叉的新会话", failure)
+        }
         repository = LocalSessionRepository(
             root = sessionsRoot,
             json = json,
@@ -122,6 +140,8 @@ class LocalSessionStorageRuntime @Inject internal constructor(
         coordinator.enqueue(snapshot)
         return true
     }
+
+    internal fun storageDiagnosticSummary(): String = storageManager.diagnosticSummary()
 
     internal suspend fun storageStatus(): LocalSessionStorageStatus =
         withContext(Dispatchers.IO) { storageManager.status() }
