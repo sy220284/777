@@ -50,6 +50,7 @@ internal object LocalAgentTeamEventCodec {
             ownerId?.let { put("ownerId", it) }
             put("blockedBy", JsonArray(blockedBy.map(::JsonPrimitive)))
             put("writeScopes", JsonArray(writeScopes.map(::JsonPrimitive)))
+            autoDispatchMessageId?.let { put("autoDispatchMessageId", it) }
         })
     }
 
@@ -120,6 +121,9 @@ internal object LocalAgentTeamEventCodec {
             ownerId = task.optionalTeamString("ownerId"),
             blockedBy = task.teamStringArray("blockedBy"),
             writeScopes = task.teamStringArray("writeScopes"),
+            autoDispatchMessageId = task.optionalTeamString("autoDispatchMessageId")?.also {
+                require(it.matches(Regex("team-msg-[a-f0-9]{20}"))) { "TEAM_TASK_AUTO_DISPATCH_ID_INVALID" }
+            },
         )
     }
 
