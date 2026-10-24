@@ -142,7 +142,7 @@ internal fun formatDeepSeekSearch(query: String, root: JsonObject, needContent: 
         val authority = result["authority"]?.jsonPrimitive?.contentOrNull
         val score = result["rerank_score"]?.jsonPrimitive?.contentOrNull
         val summary = result["summary"]?.jsonPrimitive?.contentOrNull
-            ?.ifBlank { null } ?: result["snippet"]?.jsonPrimitive?.contentOrNull.orEmpty()
+            ?.takeIf(String::isNotBlank) ?: result["snippet"]?.jsonPrimitive?.contentOrNull.orEmpty()
         val metadata = listOfNotNull(site, date, authority?.let { "权威度 " + it }, score?.let { "相关分 " + it })
         val safeTitle = title.take(180).replace("[", "［").replace("]", "］")
         sources += buildString {
