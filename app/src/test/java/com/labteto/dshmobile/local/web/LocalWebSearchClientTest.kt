@@ -39,13 +39,13 @@ class LocalWebSearchClientTest {
             """.trimIndent())
         }, Json)
         val actual = client.search("official-key", listOf("最新技术"), count = 30, needContent = true)
-        assertTrue(actual.contains("来源：DeepSeek Search API"))
-        assertTrue(actual.contains("[官网公告](https://example.org/news)"))
-        assertTrue(actual.contains("权威度 4"))
-        assertTrue(actual.contains("相关分 2.9"))
-        assertTrue(actual.contains("正文摘录：# 新版本完整正文"))
-        assertFalse(actual.contains("javascript:"))
-        assertFalse(actual.contains("official-key"))
+        assertTrue("实际搜索内容：$actual", actual.contains("来源：DeepSeek Search API"))
+        assertTrue("实际搜索内容：$actual", actual.contains("[官网公告](https://example.org/news)"))
+        assertTrue("实际搜索内容：$actual", actual.contains("权威度 4"))
+        assertTrue("实际搜索内容：$actual", actual.contains("相关分 2.9"))
+        assertTrue("实际搜索内容：$actual", actual.contains("正文摘录：# 新版本完整正文"))
+        assertFalse("实际搜索内容：$actual", actual.contains("javascript:"))
+        assertFalse("实际搜索内容：$actual", actual.contains("official-key"))
     }
 
     @Test
