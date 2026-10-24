@@ -468,10 +468,11 @@ internal fun loadModelHistoryReplayEvents(
             beforeSequenceExclusive = beforeSequence,
         ) ?: break
         val decoded = codec.decodeCheckpoint(checkpoint.data)
+        val asOfSequence = decoded?.asOfSequence
         // A checkpoint cannot cover a future event; retain the next older valid
         // one instead of potentially replaying tool effects from bad metadata.
         if (decoded != null &&
-            (decoded.asOfSequence == null || decoded.asOfSequence < checkpoint.sequence)
+            (asOfSequence == null || asOfSequence < checkpoint.sequence)
         ) {
             // Some checkpoints deliberately snapshot history at a watermark older
             // than their own durable sequence. Include every subsequent semantic
