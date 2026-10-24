@@ -176,8 +176,7 @@ internal fun UsageCalculationPage(
     )
 
     if (modeIndex == 2) {
-        UsageSearchSection(searchUsage, range.days)
-        UsageRangeSelector(selectedIndex = rangeIndex, onSelect = { rangeIndex = it })
+        UsageSearchSection(searchUsage, range.days, rangeIndex) { rangeIndex = it }
         return
     }
 
