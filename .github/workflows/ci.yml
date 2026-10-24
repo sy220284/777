@@ -385,6 +385,7 @@ jobs:
             adb install -r .ci/device-apks/app-debug.apk
             adb install -r .ci/device-apks/app-debug-androidTest.apk
             bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
+            bash .github/scripts/run-cross-process-session-restore.sh
             # Same ten scenarios as Android 17, same x86_64 test APK, no production-code fork.
             bash .github/scripts/run-android17-ten-rounds.sh 36
             # The emulator runner executes script lines in individual shells; an EXIT
@@ -469,6 +470,7 @@ jobs:
           adb install -r .ci/device-apks/app-debug.apk
           adb install -r .ci/device-apks/app-debug-androidTest.apk
           bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
+          bash .github/scripts/run-cross-process-session-restore.sh
           # Ten repeatable performance rounds on the SAME Android 17 emulator/CI host.
           bash .github/scripts/run-android17-ten-rounds.sh 37
           adb shell am force-stop com.sy220284.dshmobile.debug || true
