@@ -4,10 +4,7 @@ import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
-import com.labteto.dshmobile.local.agent.LocalAgentDelegationKind
 import com.labteto.dshmobile.local.agent.bindLocalAgentRole
-import com.labteto.dshmobile.local.agent.buildLocalDelegatedLaunchSpec
-import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
@@ -34,6 +31,8 @@ internal class LocalAgentControlPlane(
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
     private val teams: LocalAgentTeamRuntime,
 ) {
+    private val control: LocalAgentControlPort = LocalWorkAgentControlRuntime(jobs, subagents, persistentJobs)
+
     internal suspend fun execute(
         call: LocalToolCall,
         allowMutation: Boolean,
@@ -44,8 +43,6 @@ internal class LocalAgentControlPlane(
             ?: return "Work 代理工具缺少活动运行上下文，已拒绝旧的无绑定执行路径"
         val args = call.arguments
         val snapshot = run.aggregateSnapshot()
-        val runner = subagents.runner(run)
-
         teams.execute(call, run)?.let { return it }
 
         return when (call.name) {
@@ -68,37 +65,19 @@ internal class LocalAgentControlPlane(
                 )
                 val outputSchema = args.outputSchema()
                 val toolAllowlist = args.toolAllowlist()
-                if (background) {
-                    persistentJobs.startReadonlySubagent(
-                        task = task,
-                        model = model,
-                        maxSteps = maxSteps,
-                        instructions = instructions,
-                        virtualScreen = virtualScreen,
-                        outputSchema = outputSchema,
-                        toolAllowlist = toolAllowlist,
-                        parentToolCallId = call.id,
-                        sessionId = run.sessionId,
-                        boundState = snapshot,
-                        historySnapshot = run.runHandle.modelHistory::snapshot,
-                    )
-                } else {
-                    runner.run(
-                        buildLocalDelegatedLaunchSpec(
-                            kind = LocalAgentDelegationKind.FOREGROUND_READONLY,
-                            task = task,
-                            instructions = instructions,
-                            modelOverride = model,
-                            maxSteps = maxSteps,
-                            parentCallId = if (historyMode == LocalSubagentHistoryMode.INHERIT_PARENT) call.id else null,
-                            virtualScreen = virtualScreen,
-                            historyMode = historyMode,
-                            toolAllowlist = toolAllowlist,
-                            outputSchema = outputSchema,
-                            parentLink = captureLocalAgentParentLink(call.id),
-                        ),
-                    )
-                }
+                control.delegate(run, LocalAgentDispatchRequest(
+                    kind = if (background) LocalAgentDispatchKind.READONLY_BACKGROUND
+                        else LocalAgentDispatchKind.READONLY_FOREGROUND,
+                    task = task,
+                    instructions = instructions,
+                    modelOverride = model,
+                    maxSteps = maxSteps,
+                    parentToolCallId = call.id,
+                    virtualScreen = virtualScreen,
+                    historyMode = historyMode,
+                    toolAllowlist = toolAllowlist,
+                    outputSchema = outputSchema,
+                ))
             }
             "subagent_fork", "fork_subagent" -> {
                 val roleBinding = bindLocalAgentRole(
@@ -106,20 +85,18 @@ internal class LocalAgentControlPlane(
                     userInstructions = args.optionalString("instructions").orEmpty(),
                     parentMutationAllowed = allowMutation,
                 )
-                runner.run(
-                    buildLocalDelegatedLaunchSpec(
-                        kind = LocalAgentDelegationKind.FORK,
-                        task = args.string("task"),
-                        instructions = roleBinding.instructions,
-                        modelOverride = LocalWorkerModelRouter.resolve(null, snapshot),
-                        maxSteps = snapshot.subagentMaxSteps,
-                        parentCallId = call.id,
-                        allowMutation = roleBinding.allowMutation,
-                        toolAllowlist = args.toolAllowlist(),
-                        outputSchema = args.outputSchema(),
-                        parentLink = captureLocalAgentParentLink(call.id),
-                    ),
-                )
+                control.delegate(run, LocalAgentDispatchRequest(
+                    kind = LocalAgentDispatchKind.FORK,
+                    task = args.string("task"),
+                    instructions = roleBinding.instructions,
+                    modelOverride = LocalWorkerModelRouter.resolve(null, snapshot),
+                    maxSteps = snapshot.subagentMaxSteps,
+                    parentToolCallId = call.id,
+                    allowMutation = roleBinding.allowMutation,
+                    historyMode = LocalSubagentHistoryMode.INHERIT_PARENT,
+                    toolAllowlist = args.toolAllowlist(),
+                    outputSchema = args.outputSchema(),
+                ))
             }
             "list_subagent_models" -> {
                 val saved = modelGateway.configuredProfiles()
@@ -154,13 +131,9 @@ internal class LocalAgentControlPlane(
                     "$catalog\n\n【指定配置的官方模型目录】\n$providerModels"
                 }
             }
-            "list_agents" -> jobs.listAgents(run.sessionId)
-            "send_message" -> persistentJobs.sendMessage(
-                agentId = args.string("agent_id"),
-                message = args.string("message"),
-                sessionId = run.sessionId,
-            )
-            "interrupt_agent" -> jobs.kill(args.string("agent_id"), run.sessionId)
+            "list_agents" -> control.list(run.sessionId)
+            "send_message" -> control.send(run.sessionId, args.string("agent_id"), args.string("message"))
+            "interrupt_agent" -> control.interrupt(run.sessionId, args.string("agent_id"))
             "workflow" -> subagents.runWorkflow(
                 resumeGraphId = args.optionalString("resume_graph_id"),
                 allowMutation = args.boolean("allow_mutation", false).also { requested ->

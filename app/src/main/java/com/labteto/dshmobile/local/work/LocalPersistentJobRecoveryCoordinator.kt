@@ -416,6 +416,10 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val credentialRef = payload["credential_ref"]?.jsonPrimitive?.contentOrNull
         val fingerprint = payload.requiredString("route_fingerprint")
         val capabilities = decodeLocalSubagentCapabilities(payload, version)
+        val parentLink = payload["parent_link"]?.let { raw ->
+            decodeLocalAgentParentLink(raw as? JsonObject
+                ?: error("AGENT_PARENT_LINK_INVALID"))
+        }
         val workflowFence = payload["workflow_fence"] as? JsonObject
         if (workflowFence != null) {
             try { requireWorkflowFenceCurrent(sessionId, workflowFence) }
@@ -533,7 +537,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                             modelOverride = profile.id,
                             maxSteps = maxSteps,
                             parentCallId = payload["parent_call_id"]?.jsonPrimitive?.contentOrNull,
-                            parentLink = decodeLocalAgentParentLink(payload["parent_link"] as? JsonObject),
+                            parentLink = parentLink,
                             backgroundJobId = jobId,
                             capabilities = capabilities,
                         ),
