@@ -89,6 +89,46 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun shutdownRequestThroughRealLeadToolIsAuthenticatedAndNeverImplicitlyDismissesMember() = runBlocking {
+        val session = "typed-shutdown-admission"
+        val delivered = mutableListOf<QueuedAgentInput>()
+        val f = fixture(session, sender = { _, input, _ ->
+            delivered += input
+            JobMessageAdmission(true, false, false, "accepted")
+        })
+        appendActiveMember(f.log, session)
+        val binding = LocalWorkRunBinding(
+            sessionId = session,
+            initialState = LocalHarnessState(
+                sessionId = session, usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = session, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = session, maxPendingInputs = 8),
+            eventLog = f.log,
+        )
+        val response = f.runtime.execute(
+            memberTestToolCall("shutdown-req", "team_request_shutdown", buildJsonObject {
+                put("target", "worker")
+                put("reason", "finish your work and hand off remaining evidence")
+            }),
+            binding,
+        ).orEmpty()
+        assertTrue(response.contains("Team 消息已投递"))
+        val durable = requireNotNull(f.log.latestMatching(
+            setOf(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED),
+        ) { true })
+        val restored = LocalAgentTeamEventCodec.decodeMessage(durable.data)
+        assertEquals(LocalTeamMessageKind.SHUTDOWN_REQUEST, restored.kind)
+        assertEquals(session, restored.senderId)
+        assertEquals("member-1", restored.targetId)
+        assertEquals(LocalTeamMemberPhase.ACTIVE, f.runtime.project(session).members.single().phase)
+        assertEquals(1, delivered.size)
+        assertTrue(delivered.single().agentSource.toString().contains("shutdown_request"))
+        assertTrue(delivered.single().modelMessage.toString().contains("不会自动终止"))
+        assertNull(f.runtime.project(session).failure)
+    }
+
+    @Test
     fun leadInboxAdmissionDoesNotHoldTeamCommandLockAgainstUi() {
         val foreground = Any()
         val uiHoldingForeground = CountDownLatch(1)
