@@ -32,10 +32,17 @@ internal fun collectLocalImageAttachmentReferences(
     fun visit(element: JsonElement?) {
         when (element) {
             is JsonObject -> {
-                if ((element["type"] as? JsonPrimitive)?.contentOrNull == LOCAL_IMAGE_REF) {
-                    (element["attachmentId"] as? JsonPrimitive)?.contentOrNull
-                        ?.takeIf(String::isNotBlank)
-                        ?.let(ids::add)
+                val type = (element["type"] as? JsonPrimitive)?.contentOrNull
+                val kind = (element["kind"] as? JsonPrimitive)?.contentOrNull
+                // Model history uses local_image_ref/attachmentId. The durable
+                // transcript and snapshot use blocks.kind=image/attachment_id.
+                // Both are authoritative representations of a retained image.
+                if (type == LOCAL_IMAGE_REF || kind == "image") {
+                    sequenceOf("attachmentId", "attachment_id").forEach { key ->
+                        (element[key] as? JsonPrimitive)?.contentOrNull
+                            ?.takeIf(String::isNotBlank)
+                            ?.let(ids::add)
+                    }
                     (element["path"] as? JsonPrimitive)?.contentOrNull
                         ?.takeIf(String::isNotBlank)
                         ?.let(paths::add)
