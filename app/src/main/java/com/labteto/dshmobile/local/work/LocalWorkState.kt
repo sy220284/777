@@ -94,6 +94,9 @@ data class LocalAgentTeamTaskUiState(
     val ready: Boolean = false,
     val writeConflict: Boolean = false,
     val revision: Int = 0,
+    /** Durable verification pointer, not independent review approval. */
+    val completionResultId: String? = null,
+    val completionEvidenceSequence: Long? = null,
 )
 
 /** Work-owned runtime state. Session persistence remains a separate projection boundary. */
