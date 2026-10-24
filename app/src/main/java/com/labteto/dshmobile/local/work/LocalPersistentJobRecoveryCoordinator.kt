@@ -21,6 +21,9 @@ import com.labteto.dshmobile.local.runtime.PERSISTENT_RECOVERY_RETRY_MILLIS
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
+import com.labteto.dshmobile.local.agent.LocalAgentDelegationKind
+import com.labteto.dshmobile.local.agent.buildLocalDelegationCapabilities
+import com.labteto.dshmobile.local.agent.modelMessageForAgentInput
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.validateLocalSubagentLaunchSpec
@@ -139,15 +142,13 @@ internal class LocalPersistentJobRecoveryCoordinator(
         )
         val protocol = effectiveProtocol(runProfile)
         val runner = subagentRunner(sessionId, boundState, historySnapshot)
-        val capabilities = LocalSubagentCapabilities(
+        val capabilities = buildLocalDelegationCapabilities(
+            kind = if (teamManaged) LocalAgentDelegationKind.TEAM_MEMBER
+                else LocalAgentDelegationKind.PERSISTENT,
             allowMutation = allowMutation,
-            continuable = true,
             virtualScreen = virtualScreen,
-            historyMode = LocalSubagentHistoryMode.ISOLATED,
-            maxDepth = 1,
             toolAllowlist = toolAllowlist,
             outputSchema = outputSchema,
-            teamManaged = teamManaged,
             initialOptionalTools = initialOptionalTools,
         )
         validateLocalSubagentLaunchSpec(
@@ -169,6 +170,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 parentCallId = parentCallId,
                 outputSchema = outputSchema,
                 instructions = instructions,
+                allowMutation = capabilities.allowMutation,
             )
             eventLogFor(sessionId).append(
                 LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
@@ -492,10 +494,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 base
             } else {
                 base + recoveredTail.map { message ->
-                    message.modelMessage ?: buildJsonObject {
-                        put("role", "user")
-                        put("content", message.content)
-                    }
+                    modelMessageForAgentInput(message)
                 }
             }
         }

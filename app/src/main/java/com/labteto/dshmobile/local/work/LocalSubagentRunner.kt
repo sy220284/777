@@ -27,6 +27,7 @@ import com.labteto.dshmobile.local.agent.LocalSubagentCompactionPolicy
 import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
+import com.labteto.dshmobile.local.agent.modelMessageForAgentInput
 import com.labteto.dshmobile.local.agent.LocalSubagentModelStepExecutor
 import com.labteto.dshmobile.local.agent.validateLocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.validateLocalSubagentToolAllowlist
@@ -154,13 +155,14 @@ internal class LocalSubagentRunner(
         parentCallId: String,
         outputSchema: JsonObject? = null,
         instructions: String = "",
+        allowMutation: Boolean,
     ): List<JsonObject> =
         durableModelHistorySnapshot(
             buildLocalSubagentInitialHistory(
                 baseHistory = inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId),
                 task = task,
                 inheritParentHistory = true,
-                allowMutation = false,
+                allowMutation = allowMutation,
                 context = contextSnapshot(task),
                 outputSchema = outputSchema,
                 instructions = instructions,
@@ -495,10 +497,7 @@ internal class LocalSubagentRunner(
                                 ),
                             )
                             queuedMessages.forEach { message ->
-                                history.append(buildJsonObject {
-                                    put("role", "user")
-                                    put("content", message.content)
-                                })
+                                history.append(modelMessageForAgentInput(message))
                                 claimedMessageIds += message.id
                             }
                             persistContinuationCheckpoint(step = modelStep)

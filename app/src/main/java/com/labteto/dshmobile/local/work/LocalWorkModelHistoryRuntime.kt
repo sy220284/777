@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.agent.modelMessageForAgentInput
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
@@ -100,10 +101,7 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
                     action = "claimed",
                     pending = emptyList(),
                     affected = inputs,
-                    modelMessages = inputs.map { input -> input.modelMessage ?: buildJsonObject {
-                        put("role", "user")
-                        put("content", input.content)
-                    } },
+                    modelMessages = inputs.map { input -> modelMessageForAgentInput(input) },
                 ),
             )
         }
@@ -111,10 +109,7 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
 
         val history = binding.runHandle.modelHistory
         queued.forEach { input ->
-            history.append(input.modelMessage ?: buildJsonObject {
-                put("role", "user")
-                put("content", input.content)
-            })
+            history.append(modelMessageForAgentInput(input))
             if (input.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.USER) workMemory.captureAutoMemoryDirective(
                 text = input.memoryInput,
                 sourceMessageId = input.id,

@@ -299,7 +299,7 @@ internal class LocalWorkComposition @Inject constructor(
         )
     }
     private val agentControlBuiltins by lazy {
-        LocalWorkAgentControlBuiltinRuntime(
+        LocalAgentControlPlane(
             jobs = runtimeStateStore.jobManager,
             modelGateway = modelGateway,
             subagents = subagents,
