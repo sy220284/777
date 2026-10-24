@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalModelConfigurationCoordinator
 import com.labteto.dshmobile.local.LocalWebProvider
+import com.labteto.dshmobile.local.LocalWebException
+import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import java.net.URI
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -12,6 +14,7 @@ import kotlinx.coroutines.CancellationException
 internal class LocalChatWebContextProvider @Inject constructor(
     private val web: LocalWebProvider,
     private val configuration: LocalModelConfigurationCoordinator,
+    private val networkSettings: LocalNetworkSearchSettings,
 ) {
     private data class CachedSearch(val storedAtNanos: Long, val content: String)
     private val cacheLock = Any()
@@ -19,10 +22,19 @@ internal class LocalChatWebContextProvider @Inject constructor(
 
     suspend fun forInput(input: String, persona: PersonaProfile? = null): String {
         val lookup = chatWebLookup(input, persona) ?: return ""
+        if (!networkSettings.isEnabled()) return ""
         val result = try {
             when (lookup) {
                 is ChatWebLookup.Page -> {
-                    val fetched = web.fetch(lookup.url, maxBytes = 16 * 1024)
+                    val fetched = try {
+                        web.fetch(lookup.url, maxBytes = 16 * 1024)
+                    } catch (failure: LocalWebException) {
+                        if (failure.code !in setOf("HTTP_4XX", "HTTP_5XX", "DNS_FAILED", "TIMEOUT", "NETWORK_ERROR")) {
+                            throw failure
+                        }
+                        val key = configuration.resolveDeepSeekSearchCredential() ?: throw failure
+                        web.fetchViaDeepSeek(key, lookup.url)
+                    }
                     "网页：" + fetched.url + "\n" + fetched.content.take(6_000)
                 }
                 is ChatWebLookup.Search -> if (lookup.cacheable) searchCached(lookup.query)

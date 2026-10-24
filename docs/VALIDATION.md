@@ -332,7 +332,8 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - Responses SSE 的顶层 `error`、`response.failed`、`response.incomplete`、refusal 与 completed 均需保留真实语义；标准 Responses 错误不得映射成 ChatGPT 套餐错误。
 - DeepSeek 官方网页搜索只允许读取 DeepSeek 官方 API Key，不得把 OpenAI、Gemini、Qwen、ChatGPT OAuth 等当前模型凭据误发给 DeepSeek 搜索接口。
 - Work 默认暴露 web_search、web_fetch，切换模型不得清除默认联网工具；网络工具不会扩大文件/进程权限。
-- web_search 默认走无密钥 Bing RSS 公共搜索，失败后只可使用明确配置的 DeepSeek 官方 API Key 备用；任何模型账户凭据不得转发给公共搜索服务。
+- web_search 使用 DeepSeek 2026-10-17 发布的原生 `POST /v1/tools/search`；**默认免费 Bing**，只有用户明确在能力中心开启「DeepSeek 高质量搜索」且配置官方 API Key 时才优先 DeepSeek；不开启时 `provider=deepseek` 不允许调用。Search 支持 `query/count/need_content/ori_question/localization`，DeepSeek 请求失败降级到 Bing；不会向任何搜索服务转发其他模型账户凭据。官方成功且有结果的 Search/Fetch 请求按 ¥0.005/次独立记账，不得混入模型 Token。
+- web_fetch 默认本机抓取，特定网络错误且用户开启付费搜索后才尝试官方 `POST /v1/tools/fetch`；`provider=deepseek` 可直接抓取 Markdown，`raw` 保持本机抓取；官方 Fetch 必须按调用方要求执行 max_bytes 和 timeout_seconds 限制。后台抓取保持 provider 并在恢复时沿用；网络抓取 URL 经过公网校验，严禁把私网目标发给远端服务。
 - Chat 与群聊无需模型支持工具调用；只有在明确联网或实时信息意图时才发起应用层检索，群聊一轮最多一次，并且结果仅进入当轮临时上下文，不进入长期会话历史。
 - system message 不进入 Responses input，转换为 `instructions`。
 - 文本、图片、function tool、function_call_output 和 continuation item 转换。
@@ -434,3 +435,5 @@ current main + current PR head
 设备实际安装前调用 `wait-android-device-artifacts.sh`：通过 GitHub Actions 只读授权按 **当前 `GITHUB_REPOSITORY` + `GITHUB_RUN_ID`** 定位构建产物，仅从此 Run 的 `android-x86_64-test-apks` 下载三个非空 APK。源 Job 失败、取消或等待超时时直接失败。无跨 Run APK 复用，完整 Android 16/17 仪器化、Debug/Optimized 启动冒烟及最终合并门禁均保留。
 
 该优化主要缩短墙钟等待时间，但模拟器 Runner 可能在 APK 编译时占用更长时间；应同时衡量总 Runner 分钟成本。Gradle 已启用并行构建、Configuration Cache 和 Build Cache，不重复分拆同一构建任务。
+
+- 消耗计算页显示「聊天模式 / 工作模式 / 搜索消耗」三个等宽选项卡。搜索统计独立展示累计及当日请求数、DeepSeek Search/Fetch 和 Bing 数量、按成功收费次数估算的费用及近 7/30/90 天趋势；不得凭空展示搜索 Token，或将搜索费用加到模型 Token 估算。
