@@ -901,20 +901,21 @@ internal fun InlineSpeechPlayer(file: File) {
     var playing by remember(file.absolutePath) { mutableStateOf(false) }
     var preparing by remember(file.absolutePath) { mutableStateOf(false) }
     var error by remember(file.absolutePath) { mutableStateOf<String?>(null) }
-    var player by remember(file.absolutePath) { mutableStateOf<MediaPlayer?>(null) }
-    val currentPlayer by rememberUpdatedState(player)
+    // The resource holder and its DisposableEffect must have the same file identity.
+    val playerHolder = remember(file.absolutePath) { mutableStateOf<MediaPlayer?>(null) }
+    var player by playerHolder
     val lifecycleOwner = LocalLifecycleOwner.current
     var durationMs by remember(file.absolutePath) { mutableStateOf(0) }
     var positionMs by remember(file.absolutePath) { mutableStateOf(0) }
     // The effect must release the latest player, not the null initial composition snapshot.
     DisposableEffect(file.absolutePath) {
-        onDispose { currentPlayer?.release(); player = null }
+        onDispose { playerHolder.value?.release(); playerHolder.value = null }
     }
     DisposableEffect(lifecycleOwner, file.absolutePath) {
         val listener = LifecycleEventObserver { _, event ->
             if (shouldSuspendInlineSpeechOnBackground(Build.VERSION.SDK_INT) &&
                 event == Lifecycle.Event.ON_STOP) {
-                runCatching { currentPlayer?.pause() }
+                runCatching { playerHolder.value?.pause() }
                 playing = false
             }
         }
