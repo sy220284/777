@@ -23,7 +23,15 @@ internal enum class LocalAgentSpecialty(val wireName: String, val permitsMutatio
     QA("qa", false,
         "根据真实代码与验收标准设计反例和回归测试；区分已经执行、仅静态检查及未验证的结果。"),
     DOCUMENTATION("doc", false,
-        "核对实现与文档的一致性、版本、示例及引用；只有经过真实授权的执行者才能修改文件。");
+        "核对实现与文档的一致性、版本、示例及引用；只有经过真实授权的执行者才能修改文件。"),
+    DATA_RESEARCH("data_research", false,
+        "按来源、时间和可重复性组织研究；标出证据断链、相关性和未知项，不把同伴摘要当作事实。"),
+    PERFORMANCE("performance", false,
+        "定位任务等待、资源预算、成本与延迟瓶颈；仅引用真实量测 P50/P95、设备和环境，不预测提升比例。"),
+    INCIDENT_RECOVERY("incident_recovery", false,
+        "分析崩溃水位、重放幂等和未知外部副作用；无法证明安全继续时明确要求人工核验。"),
+    COORDINATOR("coordinator", false,
+        "组织依赖、角色、预算和可验收交接，不执行未经父任务或用户授权的工具与设备操作。");
 
     companion object {
         fun fromWire(raw: String?): LocalAgentSpecialty = when (raw?.trim()?.lowercase().orEmpty()) {
@@ -37,6 +45,10 @@ internal enum class LocalAgentSpecialty(val wireName: String, val permitsMutatio
             "security", "sec" -> SECURITY
             "qa", "test", "tester" -> QA
             "doc", "docs", "documentation" -> DOCUMENTATION
+            "data_research", "data_researcher" -> DATA_RESEARCH
+            "performance", "performance_analyst" -> PERFORMANCE
+            "incident_recovery", "incident" -> INCIDENT_RECOVERY
+            "coordinator", "coordinate" -> COORDINATOR
             else -> throw IllegalArgumentException("AGENT_ROLE_UNKNOWN：不支持的代理角色：$raw")
         }
     }
@@ -63,6 +75,10 @@ internal fun LocalAgentSpecialty.profile(): LocalAgentRoleProfile =
             LocalAgentSpecialty.REVIEWER, LocalAgentSpecialty.SECURITY -> "findings+reproduction+severity"
             LocalAgentSpecialty.INTEGRATOR -> "inputs+conflicts+verification"
             LocalAgentSpecialty.DOCUMENTATION -> "sources+version+unverified"
+            LocalAgentSpecialty.DATA_RESEARCH -> "sources+provenance+uncertainty"
+            LocalAgentSpecialty.PERFORMANCE -> "measurements+environment+latency_p95"
+            LocalAgentSpecialty.INCIDENT_RECOVERY -> "checkpoints+unknown_effects+safe_recovery"
+            LocalAgentSpecialty.COORDINATOR -> "task_dependencies+budgets+handoff"
             LocalAgentSpecialty.GENERAL -> "task_result+evidence"
         },
     )
