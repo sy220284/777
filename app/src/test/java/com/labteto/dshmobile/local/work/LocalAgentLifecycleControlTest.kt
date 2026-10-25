@@ -182,8 +182,10 @@ class LocalAgentLifecycleControlTest {
                 requestedId = "job-agent-one",
             ) { _, _ -> awaitCancellation() }
             assertTrue(started.accepted)
+            val registry = LocalAgentRegistry(jobs)
+            assertEquals("running", registry.resolveStandalone("session-a", "job-agent-one").info.status)
             assertTrue(jobs.interruptContinuableAgent("job-agent-one", "session-a").contains("已中断"))
-            assertEquals("interrupted", jobs.snapshotInfos().single().status)
+            assertEquals("interrupted", registry.resolveStandalone("session-a", "job-agent-one").info.status)
             val input = QueuedAgentInput(
                 id = "msg-lifecycle-1",
                 content = "继续核对",
@@ -191,10 +193,12 @@ class LocalAgentLifecycleControlTest {
             )
             val accepted = jobs.sendInput("job-agent-one", input, "session-a")
             assertTrue(accepted.accepted)
-            assertEquals(1, jobs.peekMessages("job-agent-one").size)
+            assertEquals(1, registry.resolveStandalone("session-a", "job-agent-one").info.pendingMessageCount)
             assertFalse(jobs.sendInput("job-agent-one", input, "session-b").accepted)
             jobs.kill("job-agent-one", "session-a")
-            assertEquals("cancelled", jobs.snapshotInfos().single().status)
+            val closed = registry.resolveStandalone("session-a", "job-agent-one")
+            assertEquals("cancelled", closed.info.status)
+            assertEquals(0, closed.info.pendingMessageCount)
             assertTrue(jobs.peekMessages("job-agent-one").isEmpty())
         } finally {
             scope.cancel()
