@@ -97,6 +97,11 @@ data class LocalAgentTeamTaskUiState(
     /** Durable verification pointer, not independent review approval. */
     val completionResultId: String? = null,
     val completionEvidenceSequence: Long? = null,
+    /**
+     * Event-replayed, proof-checked reviewer judgement. reviewer_approved is a model
+     * reviewer report, not objective test or Goal acceptance.
+     */
+    val independentReviewStatus: String = "legacy_unknown",
 )
 
 /** Work-owned runtime state. Session persistence remains a separate projection boundary. */
