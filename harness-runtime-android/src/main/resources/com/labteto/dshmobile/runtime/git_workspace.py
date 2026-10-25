@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -50,6 +51,24 @@ def save(path, value):
         os.close(descriptor)
 
 
+def validate_worktree(source, directory):
+    if text(directory, "rev-parse", "--show-toplevel") != str(directory):
+        raise ValueError("workspace directory identity changed")
+    if text(directory, "rev-parse", "--path-format=absolute", "--git-common-dir") != text(
+            source, "rev-parse", "--path-format=absolute", "--git-common-dir"):
+        raise ValueError("workspace Git identity changed")
+
+
+def remove_unadmitted(source, directory):
+    registered = git(source, "worktree", "list", "--porcelain", "-z").stdout.split(b"\0")
+    if b"worktree " + os.fsencode(directory) in registered:
+        git(source, "worktree", "remove", "--force", str(directory))
+    elif directory.is_symlink():
+        directory.unlink()
+    elif directory.exists():
+        shutil.rmtree(directory)
+
+
 def operate(root, store, owner, action, arguments):
     root, store = Path(root).resolve(), Path(store).resolve()
     if store == root or root in store.parents:
@@ -63,6 +82,13 @@ def operate(root, store, owner, action, arguments):
 
 
 def locked(root, store, owner, action, arguments):
+    if action == "list":
+        workspaces = []
+        for path in sorted(store.glob("*/admission.json")):
+            admission = json.loads(path.read_text())
+            if admission["owner"] == owner:
+                workspaces.append(admission)
+        return dict(workspaces=workspaces)
     workspace_id = arguments["workspace_id"]
     if not re.fullmatch(r"[0-9a-f]{32}", workspace_id):
         raise ValueError("invalid workspace identity")
@@ -98,23 +124,26 @@ def locked(root, store, owner, action, arguments):
         if admission["state"] == "discarded":
             raise ValueError("workspace was discarded; use a new invocation")
         if admission["state"] == "creating":
-            if directory.exists():
-                # No child is exposed until READY is durable. Repair only this
-                # unadmitted allocation after an interrupted worktree creation.
-                git(source, "worktree", "remove", "--force", str(directory))
+            # No child is exposed until READY is durable. Repair only this
+            # unadmitted allocation after an interrupted worktree creation.
+            remove_unadmitted(source, directory)
             git(source, "worktree", "add", "--detach", str(directory), admission["base_commit"])
             admission["state"] = "ready"
             save(manifest, admission)
+        validate_worktree(source, directory)
         return admission
     if action == "discard" and admission["state"] == "discarded":
         return dict(workspace_id=workspace_id, state="discarded")
+    if admission["state"] == "creating" and action == "discard":
+        if arguments.get("expected_tree") != admission["base_tree"]:
+            raise ValueError("unadmitted workspace baseline changed")
+        remove_unadmitted(source, directory)
+        admission["state"] = "discarded"
+        save(manifest, admission)
+        return dict(workspace_id=workspace_id, state="discarded")
     if admission["state"] != "ready":
         raise ValueError("workspace is not ready: " + admission["state"])
-    if text(directory, "rev-parse", "--show-toplevel") != str(directory):
-        raise ValueError("workspace directory identity changed")
-    if text(directory, "rev-parse", "--path-format=absolute", "--git-common-dir") != text(
-            source, "rev-parse", "--path-format=absolute", "--git-common-dir"):
-        raise ValueError("workspace Git identity changed")
+    validate_worktree(source, directory)
     if action == "locate":
         return admission
     child_tree = snapshot(directory)

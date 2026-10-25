@@ -28,7 +28,7 @@ class GitWorkspaceRuntime(
     private val workspaceRoot: File,
     private val processRuntime: AndroidProcessRuntime,
 ) {
-    private val store = File(workspaceRoot.parentFile, workspaceRoot.name + "-agent-worktrees")
+    private val store = workspaceRoot.canonicalFile.let { File(it.parentFile, it.name + "-agent-worktrees") }
 
     suspend fun fork(sessionId: String, invocationId: String, repository: String = "."): JsonObject {
         val id = MessageDigest.getInstance("SHA-256").digest("$sessionId\u0000$invocationId".toByteArray())
@@ -61,13 +61,13 @@ class GitWorkspaceRuntime(
     }
 
     internal fun install(context: HarnessContext) {
-        for (action in listOf("fork", "status", "merge", "discard")) {
+        for (action in listOf("fork", "list", "status", "merge", "discard")) {
             val name = "workspace_$action"
-            val mutates = action != "status"
+            val mutates = action !in setOf("status", "list")
             val properties = buildJsonObject {
                 if (action == "fork") put("repository", buildJsonObject {
                     put("type", "string"); put("description", "工作区内 Git 仓库根目录，默认 .；包含当前未提交及未跟踪文件作为起点")
-                }) else put("workspace_id", buildJsonObject { put("type", "string") })
+                }) else if (action != "list") put("workspace_id", buildJsonObject { put("type", "string") })
                 if (action in setOf("merge", "discard")) put("expected_tree", buildJsonObject {
                     put("type", "string"); put("description", "最近 workspace_status 返回的 tree；变化后必须重新审阅")
                 })
@@ -75,13 +75,14 @@ class GitWorkspaceRuntime(
             val description = when (action) {
                 "fork" -> "创建真实独立 Git worktree；保留父目录、HEAD 和暂存区，返回工作目录及基线。目录隔离不构成独立操作系统权限边界"
                 "status" -> "检查本会话工作区相对基线的全部变更及 tree 指纹，含未提交、未跟踪和二进制文件"
+                "list" -> "列出本会话工作区及创建/删除状态；找回取消或中断时未返回的 workspace_id 与基线"
                 "merge" -> "三方合并已审阅工作区与父目录后续变更；冲突时不改父目录，成功时保留父目录 HEAD 和暂存区"
                 else -> "确认 tree 未变化后删除本会话独立 worktree；保留父目录和删除回执"
             }
             context.tools.register(HarnessTool(
                 name = name,
                 schema = functionToolSchema(name, description, properties, required = when (action) {
-                    "fork" -> emptySet()
+                    "fork", "list" -> emptySet()
                     "status" -> setOf("workspace_id")
                     else -> setOf("workspace_id", "expected_tree")
                 }),
@@ -108,6 +109,6 @@ class GitWorkspaceRuntime(
     }
 
     internal fun uninstall(context: HarnessContext) {
-        listOf("fork", "status", "merge", "discard").forEach { context.tools.unregister("workspace_$it") }
+        listOf("fork", "list", "status", "merge", "discard").forEach { context.tools.unregister("workspace_$it") }
     }
 }

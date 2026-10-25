@@ -126,6 +126,28 @@ class GitWorkspaceTest(unittest.TestCase):
         self.assertFalse(self.call("status")["changed"])
         self.assertEqual("first\nsecond\nthird\n", (self.root / "code.txt").read_text())
 
+    def test_lost_creation_receipt_is_listed_only_for_owner_and_can_be_discarded(self):
+        original_save = workspace.save
+        def stop_before_checkout(path, value):
+            original_save(path, value)
+            raise OSError("stopped before checkout")
+        with patch.object(workspace, "save", stop_before_checkout):
+            with self.assertRaisesRegex(OSError, "stopped before checkout"):
+                self.fork()
+        listed = self.call("list")["workspaces"]
+        self.assertEqual(["creating"], [item["state"] for item in listed])
+        foreign = workspace.operate(self.root, self.store, "foreign", "list", {})
+        self.assertEqual([], foreign["workspaces"])
+        self.assertEqual("discarded", self.call("discard", expected_tree=listed[0]["base_tree"])["state"])
+
+    def test_ready_workspace_is_not_silently_recreated_if_tree_was_removed(self):
+        child = self.fork()
+        import shutil
+        shutil.rmtree(child)
+        with self.assertRaises(RuntimeError):
+            self.fork()
+        self.assertFalse(child.exists())
+
     def test_source_edit_during_merge_preflight_is_preserved_and_merge_stops(self):
         child = self.fork()
         (child / "code.txt").write_text("CHILD\nsecond\nthird\n")

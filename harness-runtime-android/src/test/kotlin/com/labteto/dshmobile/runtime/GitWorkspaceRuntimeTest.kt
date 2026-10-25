@@ -4,6 +4,8 @@ import com.labteto.dshmobile.harness.capability.ProcessRequest
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.tools.ToolContext
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import com.labteto.dshmobile.harness.capability.WorkspaceExecutionContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -38,10 +40,23 @@ class GitWorkspaceRuntimeTest {
             assertFalse(opened.content, opened.isError)
             val admission = Json.parseToJsonElement(opened.content).jsonObject
             val id = admission.getValue("workspace_id").jsonPrimitive.content
+            val listed = registry.context.tools.execute("workspace_list", buildJsonObject {}, context = ToolContext(sessionId = "session"))
+            assertTrue(listed.content.contains(id))
+            val foreign = registry.context.tools.execute("workspace_list", buildJsonObject {}, context = ToolContext(sessionId = "foreign"))
+            assertFalse(foreign.content.contains(id))
             java.io.File(admission.getValue("root").jsonPrimitive.content, "code.txt").writeText("child\n")
             val status = registry.context.tools.execute("workspace_status", buildJsonObject { put("workspace_id", id) }, context = context)
             val tree = Json.parseToJsonElement(status.content).jsonObject.getValue("tree").jsonPrimitive.content
             assertEquals("parent\n", root.resolve("code.txt").readText())
+            withContext(WorkspaceExecutionContext(root, java.io.File(admission.getValue("root").jsonPrimitive.content), id)) {
+                val refused = runCatching {
+                    registry.context.tools.execute("workspace_merge", buildJsonObject {
+                        put("workspace_id", id); put("expected_tree", tree)
+                    }, context = context)
+                }
+                assertTrue(refused.isFailure)
+                assertTrue(refused.exceptionOrNull()?.message.orEmpty().contains("父任务"))
+            }
             val merged = registry.context.tools.execute("workspace_merge", buildJsonObject {
                 put("workspace_id", id); put("expected_tree", tree)
             }, context = context)
