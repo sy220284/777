@@ -51,6 +51,26 @@ internal class LocalTeamMemberLifecycle(
 ) {
     private val startingMembers = mutableSetOf<Pair<String, String>>()
 
+    /**
+     * A newly admitted Job remains provisional until its Team ACTIVE event is durable.
+     * Codex PendingSpawn closes an uncommitted child even when its initial turn started.
+     * Reuse the original Job cancellation/persistence semantics; no second Agent registry.
+     */
+    private fun abortUncommittedChild(sessionId: String, jobId: String) {
+        val child = jobs.snapshotInfos().singleOrNull {
+            it.id == jobId && it.ownerSessionId == sessionId && it.isAgent
+        } ?: return
+        if (child.status !in setOf("failed", "cancelled", "killed")) {
+            jobs.kill(jobId, sessionId)
+        }
+        val after = jobs.snapshotInfos().singleOrNull {
+            it.id == jobId && it.ownerSessionId == sessionId
+        }
+        require(after?.status in setOf("failed", "cancelled", "killed")) {
+            "TEAM_PROVISIONAL_CHILD_ROLLBACK_UNCONFIRMED:$jobId"
+        }
+    }
+
     fun requireMemberCapacity(state: LocalTeamProjection) {
         val liveJobs = jobs.snapshotInfos().asSequence()
             .filterNot { it.status in setOf("completed", "failed", "cancelled", "killed") }
@@ -132,12 +152,14 @@ internal class LocalTeamMemberLifecycle(
                 mutableToolsEnabled = if (resumingExisting) member.mutableToolsEnabled
                     else bindLocalAgentRole(member.role, "", parentMutationAllowed = true).allowMutation,
                 grantedExtensions = if (resumingExisting) member.grantedExtensions else grantedExtensions,
+                provisionalNewJob = !resumingExisting,
             )
             appendMember(binding.sessionId, provisioning)
             startingMembers.add(binding.sessionId to member.id)
             Triple(member, cleanTask, provisioning)
         }
         var launchAdmitted = false
+        var committed = false
         return try {
             val existingJob = jobs.snapshotInfos().firstOrNull { it.id == member.jobId }
             if (member.phase == LocalTeamMemberPhase.DISABLED && existingJob != null) {
@@ -181,11 +203,13 @@ internal class LocalTeamMemberLifecycle(
                     grantedExtensions,
                 )
                 if (!started.accepted || started.id != member.jobId) {
+                    abortUncommittedChild(binding.sessionId, member.jobId)
                     appendMember(
                         binding.sessionId,
                         provisioning.copy(
                             phase = LocalTeamMemberPhase.FAILED,
                             error = started.message.take(MAX_ERROR_CHARS),
+                            provisionalNewJob = null,
                         ),
                     )
                     "[TEAM_MEMBER_START_REJECTED] " + started.message
@@ -193,14 +217,26 @@ internal class LocalTeamMemberLifecycle(
                     launchAdmitted = true
                     appendMember(
                         binding.sessionId,
-                        provisioning.copy(phase = LocalTeamMemberPhase.ACTIVE),
+                        provisioning.copy(phase = LocalTeamMemberPhase.ACTIVE, provisionalNewJob = null),
                     )
+                    committed = true
                     "teammate 已启动：" + member.name + " | agent=" + member.jobId
                 }
             }
         } catch (error: Exception) {
+            if (provisioning.provisionalNewJob == true && !committed) {
+                try {
+                    abortUncommittedChild(binding.sessionId, member.jobId)
+                } catch (rollbackFailure: Exception) {
+                    error.addSuppressed(rollbackFailure)
+                    // Leave PROVISIONING intact for the next recovery pass.
+                    throw error
+                }
+            }
             val job = jobs.snapshotInfos().firstOrNull { it.id == member.jobId }
-            val recoveredPhase = recoverTeamStartPhase(
+            val recoveredPhase = if (provisioning.provisionalNewJob == true) {
+                LocalTeamMemberPhase.FAILED
+            } else recoverTeamStartPhase(
                 previous = member.phase,
                 job = job,
                 admitted = launchAdmitted,
@@ -217,6 +253,7 @@ internal class LocalTeamMemberLifecycle(
                                 error = if (recoveredPhase == LocalTeamMemberPhase.FAILED) {
                                     error.message.orEmpty().take(MAX_ERROR_CHARS)
                                 } else null,
+                                provisionalNewJob = null,
                             ),
                         )
                     }
@@ -336,6 +373,7 @@ internal class LocalTeamMemberLifecycle(
                 provider = LOCAL_SUBAGENT_PROVIDER,
                 context = context,
                 phase = LocalTeamMemberPhase.PROVISIONING,
+                provisionalNewJob = true,
             )
             appendMember(binding.sessionId, provisioning)
             startingMembers.add(binding.sessionId to provisioning.id)
@@ -345,7 +383,7 @@ internal class LocalTeamMemberLifecycle(
         val cleanName = provisioning.name
         val memberId = provisioning.id
         val jobId = provisioning.jobId
-        var launchAdmitted = false
+        var committed = false
 
         return try {
             val started = startTeammate(
@@ -361,45 +399,43 @@ internal class LocalTeamMemberLifecycle(
                 grantedExtensions,
             )
             if (!started.accepted || started.id != jobId) {
+                abortUncommittedChild(binding.sessionId, jobId)
                 appendMember(
                     binding.sessionId,
                     provisioning.copy(
                         phase = LocalTeamMemberPhase.FAILED,
                         error = started.message.take(MAX_ERROR_CHARS),
+                        provisionalNewJob = null,
                     ),
                 )
                 "[TEAM_MEMBER_START_REJECTED] " + started.message
             } else {
-                launchAdmitted = true
                 appendMember(
                     binding.sessionId,
-                    provisioning.copy(phase = LocalTeamMemberPhase.ACTIVE),
+                    provisioning.copy(phase = LocalTeamMemberPhase.ACTIVE, provisionalNewJob = null),
                 )
+                committed = true
                 "teammate 已创建：" + cleanName + " | id=" + memberId + " | agent=" + jobId
             }
         } catch (error: Exception) {
-            // A durable Job may have accepted its initial task before a cancelled caller
-            // observes its receipt. Never kill that accepted child as "failed spawn" cleanup:
-            // the existing Job/Team recovery ledger must adopt it on the next projection.
-            val durableChild = jobs.snapshotInfos().singleOrNull {
-                it.id == jobId && it.ownerSessionId == binding.sessionId && it.isAgent
+            if (!committed) {
+                try {
+                    abortUncommittedChild(binding.sessionId, jobId)
+                } catch (rollbackFailure: Exception) {
+                    error.addSuppressed(rollbackFailure)
+                    // A later cold-recovery pass must retry rollback.
+                    throw error
+                }
             }
-            val recoveredPhase = recoverTeamStartPhase(
-                previous = LocalTeamMemberPhase.CREATED,
-                job = durableChild,
-                admitted = launchAdmitted,
-                cancelled = error is CancellationException,
-            )
             synchronized(commandLock) {
                 val current = project(binding.sessionId).members.singleOrNull { it.id == memberId }
                 if (current?.phase == LocalTeamMemberPhase.PROVISIONING) {
                     appendMember(
                         binding.sessionId,
                         provisioning.copy(
-                            phase = recoveredPhase,
-                            error = if (recoveredPhase == LocalTeamMemberPhase.FAILED) {
-                                error.message.orEmpty().take(MAX_ERROR_CHARS)
-                            } else null,
+                            phase = LocalTeamMemberPhase.FAILED,
+                            error = error.message.orEmpty().take(MAX_ERROR_CHARS),
+                            provisionalNewJob = null,
                         ),
                     )
                 }
@@ -414,22 +450,30 @@ internal class LocalTeamMemberLifecycle(
     fun reconcileProvisioningMembers(sessionId: String) {
         val state = project(sessionId)
         if (state.failure != null) return
-        val jobStates = jobs.snapshotInfos().associateBy { it.id }
         state.members
             .filter { it.phase == LocalTeamMemberPhase.PROVISIONING && (sessionId to it.id) !in startingMembers }
             .forEach { member ->
-                val job = jobStates[member.jobId]
+                if (member.provisionalNewJob == true) {
+                    // Crash before ACTIVE commit: a Job may exist but must not become an
+                    // authorized Team member just because its initial input was accepted.
+                    abortUncommittedChild(sessionId, member.jobId)
+                    appendMember(sessionId, member.copy(
+                        phase = LocalTeamMemberPhase.FAILED,
+                        provisionalNewJob = null,
+                        error = "TEAM_MEMBER_SPAWN_UNCOMMITTED",
+                    ))
+                    return@forEach
+                }
+                val job = jobs.snapshotInfos().firstOrNull { it.id == member.jobId }
                 val recoverable = job?.status in setOf("running", "interrupted", "dormant", "completed")
                 val terminal = if (recoverable) {
-                    member.copy(phase = LocalTeamMemberPhase.ACTIVE)
+                    member.copy(phase = LocalTeamMemberPhase.ACTIVE, provisionalNewJob = null)
                 } else {
                     member.copy(
                         phase = LocalTeamMemberPhase.FAILED,
-                        error = if (job == null) {
-                            "TEAM_MEMBER_CHILD_MISSING"
-                        } else {
-                            "TEAM_MEMBER_CHILD_" + job.status.uppercase()
-                        },
+                        provisionalNewJob = null,
+                        error = if (job == null) "TEAM_MEMBER_CHILD_MISSING"
+                            else "TEAM_MEMBER_CHILD_" + job.status.uppercase(),
                     )
                 }
                 appendMember(sessionId, terminal)
