@@ -98,8 +98,12 @@ internal class LocalWorkAgentControlRuntime(
         agentId: String,
         message: String,
         mode: LocalAgentMessageDeliveryMode,
-    ): String = persistentJobs.sendMessage(agentId, message, sessionId, mode)
-    private val lifecycle = LocalAgentLifecycleController(jobs, persistentJobs)
+    ): String {
+        registry.resolveStandaloneChild(sessionId, agentId)
+        return persistentJobs.sendMessage(agentId, message, sessionId, mode)
+    }
+    private val registry = LocalAgentRegistry(jobs)
+    private val lifecycle = LocalAgentLifecycleController(jobs, persistentJobs, registry)
 
     override fun inspect(sessionId: String, agentId: String): String =
         lifecycle.inspect(sessionId, agentId)
