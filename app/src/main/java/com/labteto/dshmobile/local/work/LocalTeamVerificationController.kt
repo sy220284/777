@@ -137,6 +137,43 @@ internal class LocalTeamVerificationController(
      * Recheck the persisted proof pointer from the original Session EventLog.
      * This validates event provenance and freshness, not artifact content or Goal correctness.
      */
+    /**
+     * This is a replay-checked review verdict, NOT an objective artifact/test acceptance.
+     * A live Work projection can use it as a Goal blocker without inventing a new ledger.
+     */
+    fun reviewStatus(sessionId: String, task: LocalTeamTaskSnapshot, state: LocalTeamProjection): String {
+        if (task.status != LocalTeamTaskStatus.COMPLETED) return "not_applicable"
+        val resultId = task.completionResultId ?: return "legacy_unknown"
+        val seq = task.completionEvidenceSequence ?: return "evidence_invalid"
+        val log = eventLogFor(sessionId)
+        val owner = state.members.singleOrNull { it.id == task.ownerId } ?: return "evidence_invalid"
+        val event = log.pageBeforeNewestFirst(
+            sequenceExclusive = if (seq == Long.MAX_VALUE) Long.MAX_VALUE else seq + 1L,
+            limit = 1,
+        ).singleOrNull() ?: return "evidence_invalid"
+        if (event.sequence != seq || event.type != LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT ||
+            event.data["background_job_id"]?.jsonPrimitive?.contentOrNull != owner.jobId ||
+            resultIdentity(event.data) != resultId || !isFirstResultCheckpoint(log, event)) {
+            return "evidence_invalid"
+        }
+        val prior = log.latestMatching(setOf(TEAM_TASK_EVENT), seq) { data ->
+            val raw = data["task"] as? JsonObject ?: return@latestMatching false
+            raw["id"]?.jsonPrimitive?.contentOrNull == task.id &&
+                raw["status"]?.jsonPrimitive?.contentOrNull == "in_progress" &&
+                raw["ownerId"]?.jsonPrimitive?.contentOrNull == task.ownerId &&
+                (raw["revision"]?.jsonPrimitive?.intOrNull ?: -1) < task.revision
+        } ?: return "evidence_invalid"
+        if (prior.sequence >= seq) return "evidence_invalid"
+        val admitted = task.rootUserRevision
+        if (admitted != null && admitted != workflowUserRevision(log)) return "root_superseded"
+        val review = state.taskReviews.singleOrNull {
+            it.taskId == task.id && it.taskRevision == task.revision &&
+                it.taskResultId == resultId
+        } ?: return "pending"
+        if (!hasValidReviewerCheckpoint(log, task, review, state)) return "review_invalid"
+        return if (review.verdict == "approve") "reviewer_approved" else "reviewer_rejected"
+    }
+
     fun renderTaskCompletionEvidence(sessionId: String, taskId: String): String {
         val state = project(sessionId)
         require(state.failure == null) { "TEAM_PROJECTION_INVALID" }
