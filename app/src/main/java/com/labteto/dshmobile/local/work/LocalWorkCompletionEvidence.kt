@@ -119,6 +119,8 @@ internal fun localWorkCompletionEvidence(
  */
 internal fun LocalWorkCompletionEvidence.toDiagnosticJson(): JsonObject = buildJsonObject {
     put("ready_for_goal_completion", readyForGoalCompletion)
+    put("integration_disposition", decideLocalWorkIntegration(this@toDiagnosticJson)
+        .disposition.name.lowercase())
     put("open_todos", openTodos)
     put("open_team_tasks", openTeamTasks)
     put("active_team_members", activeTeamMembers)
