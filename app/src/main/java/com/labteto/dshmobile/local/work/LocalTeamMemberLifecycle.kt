@@ -178,6 +178,7 @@ internal class LocalTeamMemberLifecycle(
                         provisioning.copy(
                             phase = LocalTeamMemberPhase.FAILED,
                             error = admission.message.take(MAX_ERROR_CHARS),
+                            provisionalNewJob = null,
                         ),
                     )
                     "[TEAM_MEMBER_RESUME_REJECTED] " + admission.message
@@ -185,8 +186,9 @@ internal class LocalTeamMemberLifecycle(
                     launchAdmitted = true
                     appendMember(
                         binding.sessionId,
-                        provisioning.copy(phase = LocalTeamMemberPhase.ACTIVE),
+                        provisioning.copy(phase = LocalTeamMemberPhase.ACTIVE, provisionalNewJob = null),
                     )
+                    committed = true
                     "teammate 已重新启用：" + member.name
                 }
             } else {
