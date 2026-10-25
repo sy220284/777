@@ -53,8 +53,10 @@ class AndroidRuntimePlugin(
 ) : HarnessPlugin {
     override val id: String = "android-runtime"
     private val terminalLeases = ConcurrentHashMap<String, HarnessResourceLease>()
+    private val gitWorkspaces = GitWorkspaceRuntime(workspaceRoot, processRuntime)
 
     override suspend fun install(context: HarnessContext) {
+        gitWorkspaces.install(context)
         context.tools.register(
             HarnessTool(
                 name = "runtime_command_status",
@@ -197,6 +199,7 @@ class AndroidRuntimePlugin(
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val sessionId = input.requiredString("session_id")
+                    requireTerminalWorkspace(sessionId)
                     try {
                         terminalProvider.write(sessionId, input.requiredString("input"))
                         ToolResult("已写入终端会话")
@@ -222,6 +225,7 @@ class AndroidRuntimePlugin(
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val sessionId = input.requiredString("session_id")
+                    requireTerminalWorkspace(sessionId)
                     try {
                         val read = terminalProvider.readResult(sessionId)
                         ToolResult(
@@ -251,6 +255,7 @@ class AndroidRuntimePlugin(
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val sessionId = input.requiredString("session_id")
+                    requireTerminalWorkspace(sessionId)
                     val fromPreviousRuntime = terminalProvider.isFromPreviousRuntime(sessionId)
                     val kind = terminalProvider.terminalType(sessionId)
                     val exitCode = terminalProvider.exitCode(sessionId)
@@ -290,6 +295,7 @@ class AndroidRuntimePlugin(
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val sessionId = input.requiredString("session_id")
+                    requireTerminalWorkspace(sessionId)
                     try {
                         terminalProvider.close(sessionId)
                     } finally {
@@ -312,7 +318,9 @@ class AndroidRuntimePlugin(
             exposure = ToolExposure.OPTIONAL, timeoutMillis = 10_000L,
             metadata = ToolMetadata("运行时", discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS),
             executor = HarnessToolExecutor { _, input, _ ->
-                terminalProvider.resize(input.requiredString("session_id"),
+                val sessionId = input.requiredString("session_id")
+                requireTerminalWorkspace(sessionId)
+                terminalProvider.resize(sessionId,
                     requireNotNull(input["rows"]?.jsonPrimitive?.intOrNull),
                     requireNotNull(input["columns"]?.jsonPrimitive?.intOrNull))
                 ToolResult("终端尺寸已更新")
@@ -336,6 +344,7 @@ class AndroidRuntimePlugin(
     }
 
     override suspend fun uninstall(context: HarnessContext) {
+        gitWorkspaces.uninstall(context)
         terminalProvider.closeAll()
         terminalLeases.keys.toList().forEach { sessionId ->
             runCatching { terminalProvider.close(sessionId) }
@@ -352,8 +361,15 @@ class AndroidRuntimePlugin(
         }
     }
 
-    private fun resolveWorkingDirectory(requested: String?): String {
-        val root = workspaceRoot.canonicalFile
+    private suspend fun requireTerminalWorkspace(sessionId: String) {
+        val scope = currentCoroutineContext()[com.labteto.dshmobile.harness.capability.WorkspaceExecutionContext] ?: return
+        val directory = terminalProvider.workingDirectory(sessionId)?.canonicalFile ?: return
+        val root = scope.rootFor(workspaceRoot).canonicalFile
+        require(directory == root || directory.toPath().startsWith(root.toPath())) { "终端不属于当前子代理工作区" }
+    }
+
+    private suspend fun resolveWorkingDirectory(requested: String?): String {
+        val root = com.labteto.dshmobile.harness.capability.executionWorkspaceRoot(workspaceRoot).canonicalFile
         val target = if (requested.isNullOrBlank()) {
             root
         } else {

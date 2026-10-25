@@ -195,6 +195,11 @@ class LocalVisionPlugin(
                         )
                     }
                     val prompt = input.requiredString("prompt")
+                    val analysisCache = workspaceRoot?.let {
+                        val bound = com.labteto.dshmobile.harness.capability.executionWorkspaceRoot(it)
+                        if (bound.canonicalFile == it.canonicalFile) this.analysisCache
+                        else LocalVisionAnalysisCache(File(bound, ".dsh/vision-cache"))
+                    }
                     val file = runCatching { imageFile(input.requiredString("path")) }
                         .getOrElse { error ->
                             return@HarnessToolExecutor ToolResult(
@@ -316,8 +321,9 @@ class LocalVisionPlugin(
         )
     }
 
-    private fun imageFile(relativePath: String): File {
-        val root = workspaceRoot?.canonicalFile ?: error("本机工作区未配置")
+    private suspend fun imageFile(relativePath: String): File {
+        val root = workspaceRoot?.let { com.labteto.dshmobile.harness.capability.executionWorkspaceRoot(it) }
+            ?.canonicalFile ?: error("本机工作区未配置")
         require(!File(relativePath).isAbsolute) { "视觉文件路径必须使用工作区相对路径" }
         val file = File(root, relativePath).canonicalFile
         require(file.toPath().startsWith(root.toPath())) { "拒绝读取工作区之外的图片" }

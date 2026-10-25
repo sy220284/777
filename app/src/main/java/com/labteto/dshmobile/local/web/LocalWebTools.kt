@@ -17,6 +17,11 @@ internal class LocalWebTools(
     private val workspace: LocalWorkspace,
     private val json: Json,
 ) {
+    fun atWorkspace(target: LocalWorkspace): LocalWebTools =
+        if (target === workspace) this else LocalWebTools(web, searchKeyProvider, target, json)
+
+    fun atRoot(directory: java.io.File): LocalWebTools = atWorkspace(workspace.atRoot(directory))
+
     suspend fun diagnose(target: String): String = web.diagnose(target)
 
     suspend fun search(

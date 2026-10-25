@@ -35,6 +35,7 @@ class PersistentPipeTerminalProvider(
         val bufferedOutput: TerminalOutputBuffer = TerminalOutputBuffer(output),
         val inputLock: Any = Any(),
         val outputLock: Any = Any(),
+        val workingDirectory: File? = null,
     )
 
     private val sessions = ConcurrentHashMap<String, Session>()
@@ -81,7 +82,7 @@ class PersistentPipeTerminalProvider(
                 // The child is blocked behind its private gate until ownership is registered.
                 writePtyFrame(process.process.outputStream, 'S')
                 val id = "term-$runtimeEpoch-" + UUID.randomUUID().toString().replace("-", "").take(12)
-                sessions[id] = Session(process, process.process.outputStream, process.process.inputStream, pty = true)
+                sessions[id] = Session(process, process.process.outputStream, process.process.inputStream, pty = true, workingDirectory = directory)
                 publishedId = id
                 ptyObserved = true
                 id
@@ -112,6 +113,8 @@ class PersistentPipeTerminalProvider(
 
     fun terminalType(sessionId: String): String? = sessions[sessionId]?.let { if (it.pty) "pty" else "pipe" }
 
+    fun workingDirectory(sessionId: String): File? = sessions[sessionId]?.workingDirectory
+
     fun exitCode(sessionId: String): Int? = sessions[sessionId]?.managed?.process?.let {
         if (it.isAlive) null else it.exitValue()
     }
@@ -138,7 +141,7 @@ class PersistentPipeTerminalProvider(
                 owned = managed
                 val id = "term-" + runtimeEpoch + "-" +
                     UUID.randomUUID().toString().replace("-", "").take(12)
-                sessions[id] = Session(managed, process.outputStream, process.inputStream)
+                sessions[id] = Session(managed, process.outputStream, process.inputStream, workingDirectory = directory)
                 published = id
                 id
             }

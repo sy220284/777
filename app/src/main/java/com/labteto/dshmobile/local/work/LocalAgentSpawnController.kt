@@ -52,8 +52,8 @@ internal class LocalAgentSpawnController(
                     parentLink = parent,
                 ),
             )
-            LocalAgentDispatchKind.FORK -> subagents.runner(binding).run(
-                buildLocalDelegatedLaunchSpec(
+            LocalAgentDispatchKind.FORK -> {
+                val spec = buildLocalDelegatedLaunchSpec(
                     kind = LocalAgentDelegationKind.FORK,
                     task = request.task,
                     instructions = request.instructions,
@@ -64,8 +64,11 @@ internal class LocalAgentSpawnController(
                     toolAllowlist = request.toolAllowlist,
                     outputSchema = request.outputSchema,
                     parentLink = parent,
-                ),
-            )
+                )
+                request.workspaceRepository?.let { repository ->
+                    subagents.runInWorktree(binding, spec, repository)
+                } ?: subagents.runner(binding).run(spec)
+            }
         }
     }
 

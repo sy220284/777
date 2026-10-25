@@ -92,6 +92,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         history: () -> List<JsonObject>,
     ) -> LocalSubagentRunner,
     private val eventLogFor: (String) -> LocalSessionEventLog,
+    private val webToolsForWorkspace: suspend (String, String) -> LocalWebTools,
 ) {
     private val lock = Any()
     private val pendingRecoverySessions = linkedSetOf<String>()
@@ -440,7 +441,10 @@ internal class LocalPersistentJobRecoveryCoordinator(
             ?.toLongOrNull() ?: BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS
         jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { _, report ->
             report("正在恢复网页抓取：$url")
-            webTools.fetch(
+            val selected = payload["workspace_id"]?.jsonPrimitive?.contentOrNull?.let {
+                webToolsForWorkspace(sessionId, it)
+            } ?: webTools
+            selected.fetch(
                 url,
                 maxBytes.coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES),
                 format,

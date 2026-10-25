@@ -30,8 +30,10 @@ internal data class LocalAgentDispatchRequest(
     val toolAllowlist: Set<String>? = null,
     val outputSchema: JsonObject? = null,
     val executionBackend: LocalAgentExecutionBackend = LocalAgentExecutionBackend.IN_PROCESS,
+    val workspaceRepository: String? = null,
 ) {
     init {
+        require(workspaceRepository == null || kind == LocalAgentDispatchKind.FORK) { "WORKTREE_REQUIRES_FORK" }
         require(task.isNotBlank() && parentToolCallId.isNotBlank()) { "AGENT_DELEGATION_REQUEST_INVALID" }
         require(maxDepth in 1..3) { "AGENT_DELEGATION_DEPTH_INVALID" }
         require(maxDepth == 1 || kind == LocalAgentDispatchKind.READONLY_FOREGROUND) {

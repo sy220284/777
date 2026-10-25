@@ -95,6 +95,8 @@ internal class LocalAgentControlPlane(
                 ))
             }
             "subagent_fork", "fork_subagent" -> {
+                val workspaceRepository = args.optionalString("workspace_repository")
+                require(workspaceRepository == null || allowMutation) { "创建独立工作区需要父任务写入权限" }
                 val roleBinding = bindLocalAgentRole(
                     requested = args.optionalString("role"),
                     userInstructions = delegatedAgentInstructions(args),
@@ -112,6 +114,7 @@ internal class LocalAgentControlPlane(
                     toolAllowlist = args.toolAllowlist(),
                     outputSchema = args.outputSchema(),
                     executionBackend = LocalAgentExecutionBackend.fromWire(args.optionalString("execution_backend")),
+                    workspaceRepository = workspaceRepository,
                 ))
             }
             "list_subagent_models" -> {

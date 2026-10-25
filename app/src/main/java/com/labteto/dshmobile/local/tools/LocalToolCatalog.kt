@@ -234,6 +234,7 @@ object LocalToolCatalog {
             "run_in_background" to boolean("是否转为后台任务，默认 false"),
         ), listOf("task")))
         add(tool("subagent_fork", "需要继承父会话当前操作权限时使用的高级代理入口；可能具有写入权限。纯阅读分析请使用 subagent 的 context_mode=inherit", properties(
+            "workspace_repository" to string("可选；工作区内 Git 仓库根目录，如 project。提供后创建真实独立 worktree，文件/命令在其中执行；返回 workspace_id 与 result，审阅 workspace_status 后显式 workspace_merge。目录隔离不提供独立系统权限"),
             "task" to string("需要结合当前上下文处理的任务"),
             "instructions" to string("可选；继承上下文之外，额外约束该子代理持续遵循的工作规则"),
             "role" to string("专业角色：general、explore、plan、execute、verify、review、integrate、security、qa、doc、data_research、performance、incident_recovery、coordinator；只读角色收窄权限"),

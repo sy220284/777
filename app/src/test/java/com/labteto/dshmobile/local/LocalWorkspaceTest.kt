@@ -39,6 +39,23 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun separateExecutionRootKeepsNativeWritesAndObservationsOutOfParent() {
+        external = Files.createTempDirectory("agent-worktree").toFile()
+        val childRoot = requireNotNull(external)
+        workspace.write("code.txt", "parent")
+        val child = workspace.atRoot(childRoot)
+        child.write("code.txt", "child")
+        assertTrue(child.read("code.txt").contains("child"))
+        child.requireFreshObservation("code.txt")
+        assertThrows(IllegalStateException::class.java) { workspace.requireFreshObservation("code.txt") }
+        child.edit("code.txt", "child", "changed")
+        assertEquals("parent", root.resolve("code.txt").readText())
+        assertEquals("changed", childRoot.resolve("code.txt").readText())
+        assertThrows(IllegalArgumentException::class.java) { child.read(root.resolve("code.txt").absolutePath) }
+        assertThrows(IllegalArgumentException::class.java) { child.write("../outside.txt", "escape") }
+    }
+
+    @Test
     fun replacingAnExecutableFileKeepsItsExecutePermission() {
         workspace.write("scripts/run.sh", "#!/bin/sh\necho before\n")
         val script = root.resolve("scripts/run.sh")

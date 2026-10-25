@@ -23,7 +23,7 @@ class LocalWorkDeliveryEvidenceTest {
         try { body(log, goal, root) } finally { log.close() }
     }
     private fun result(log: LocalSessionEventLog, goal: LocalGoal, root: File, id: String, command: String = "go test ./...",
-        exit: Int? = 0, error: Boolean = false, text: String = "", invoke: Boolean = true) {
+        exit: Int? = 0, error: Boolean = false, text: String = "", invoke: Boolean = true, workspaceId: String? = null) {
         val executionId = java.util.UUID.randomUUID().toString()
         if (invoke) log.append("tool/call", buildJsonObject {
             put("id", id); put("goal_id", goal.id); put("name", "bash")
@@ -31,7 +31,7 @@ class LocalWorkDeliveryEvidenceTest {
         })
         if (invoke) log.append("tool/execution-started", buildJsonObject {
             put("id", id); put("name", "bash"); put("execution_id", executionId)
-            put("attributes", buildJsonObject { put("goal_id", goal.id) })
+            put("attributes", buildJsonObject { put("goal_id", goal.id); workspaceId?.let { put("workspace_id", it) } })
         })
         log.append("tool/result", buildJsonObject {
             put("execution_id", executionId)
@@ -41,6 +41,15 @@ class LocalWorkDeliveryEvidenceTest {
                 localWorkFileSha256(root, path)?.let { path to JsonPrimitive(it) }
             }.toMap()))
         })
+    }
+
+    @Test fun childWorktreeVerificationCannotCompleteOrInvalidateSharedGoal() = scenario(artifacts = emptyList()) { log, goal, root ->
+        result(log, goal, root, "child-success", workspaceId = "child-worktree")
+        assertNull(localWorkDeliveryEvidence(log, goal, root).testCallId)
+        result(log, goal, root, "parent-success")
+        assertEquals("parent-success", localWorkDeliveryEvidence(log, goal, root).testCallId)
+        result(log, goal, root, "child-failure", exit = 1, error = true, workspaceId = "child-worktree")
+        assertEquals("parent-success", localWorkDeliveryEvidence(log, goal, root).testCallId)
     }
     private fun artifact(root: File, text: String = "actual source") = File(root, "src/main.kt").apply { parentFile.mkdirs(); writeText(text) }
 

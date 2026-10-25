@@ -148,6 +148,7 @@ class LspPlugin(
         input: JsonObject,
         context: ToolContext,
     ): ToolResult {
+        val root = com.labteto.dshmobile.harness.capability.executionWorkspaceRoot(this.root)
         if (name == "lsp_uninstall_component") {
             val component = input["component"]?.jsonPrimitive?.contentOrNull.orEmpty()
             require(component in setOf("typescript", "pyright")) { "未知组件：仅支持 typescript、pyright" }
@@ -247,6 +248,7 @@ class LspPlugin(
         relativePath: String?,
         context: ToolContext,
     ): ClientHandle {
+        val root = com.labteto.dshmobile.harness.capability.executionWorkspaceRoot(this.root)
         val detected = runCatching { command(relativePath) }.getOrElse { error ->
             throw IllegalStateException("语言服务器自动检测失败：${error.message ?: error::class.java.simpleName}", error)
         }
@@ -272,7 +274,7 @@ class LspPlugin(
 
         val resolved = commandResolver(configured)
         require(resolved.isNotEmpty()) { "语言服务器解析后的命令不能为空" }
-        val key = resolved.joinToString("\\u0000")
+        val key = root.canonicalPath + "\u0000" + resolved.joinToString("\\u0000")
         clients[key]?.let { cached ->
             if (cached.client.isLive()) return cached
             cached.client.close()

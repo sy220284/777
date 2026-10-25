@@ -63,6 +63,19 @@ internal class LocalToolCompositionRoot @Inject constructor(
         dynamicSearchPaths = bundledRuntimeManager::searchPaths,
         baseEnvironment = bundledRuntimeManager::environment,
     )
+    internal val agentWorkspaces = com.labteto.dshmobile.runtime.GitWorkspaceRuntime(File(workspace.path), process)
+
+    internal suspend fun forkAgentWorkspace(sessionId: String, invocationId: String, repository: String): kotlinx.serialization.json.JsonObject {
+        val tool = requireNotNull(registry.get("workspace_fork")) { "工作区运行时未启用" }
+        val lease = workspaceGate.acquire(tool)
+        try {
+            check(registry.get("workspace_fork") === tool) { "工作区运行时已更新，请重试" }
+            kotlinx.coroutines.currentCoroutineContext()[com.labteto.dshmobile.harness.agent.AgentRunExecutionContext]?.requireCurrent(sessionId)
+            return agentWorkspaces.fork(sessionId, invocationId, repository)
+        } finally {
+            lease?.close()
+        }
+    }
     private val preferences = LocalHarnessPreferences.from(context)
     private val languageServerComponents = OnDemandLanguageServerManager(
         home = File(context.noBackupFilesDir, "local-harness/lsp-components"),

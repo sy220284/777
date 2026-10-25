@@ -27,6 +27,8 @@ import kotlinx.coroutines.sync.withLock
 internal class LocalWorkSubagentRuntime(
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
     private val workspaceRoot: java.io.File,
+    private val sourceWorkspace: com.labteto.dshmobile.local.files.LocalWorkspace,
+    private val createWorkspace: suspend (String, String, String) -> JsonObject,
     private val factory: LocalSubagentRunnerFactory,
     private val schemasProvider: (Boolean, Boolean, Set<String>) -> JsonArray,
     private val executeTool: suspend (
@@ -38,7 +40,35 @@ internal class LocalWorkSubagentRuntime(
     ) -> AgentToolResult,
     private val pruneOutput: (LocalWorkRunBinding, String) -> String,
 ) {
-    internal fun runner(binding: LocalWorkRunBinding): LocalSubagentRunner =
+    internal suspend fun runInWorktree(
+        binding: LocalWorkRunBinding,
+        spec: com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec,
+        repository: String,
+    ): String {
+        com.labteto.dshmobile.local.agent.validateLocalSubagentLaunchSpec(spec, structuredOutputSupported = true)
+        val admission = createWorkspace(binding.sessionId, requireNotNull(spec.parentCallId), repository)
+        kotlinx.coroutines.currentCoroutineContext()[com.labteto.dshmobile.harness.agent.AgentRunExecutionContext]?.requireCurrent(binding.sessionId)
+        val directory = java.io.File(admission.getValue("root").jsonPrimitive.content)
+        val identity = admission.getValue("workspace_id").jsonPrimitive.content
+        binding.eventLog.append("agent/workspace-admitted", buildJsonObject {
+            put("workspace", admission)
+            put("parent_call_id", spec.parentCallId)
+        })
+        val scoped = sourceWorkspace.atRoot(directory)
+        val result = withContext(
+            com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext(workspaceRoot, scoped, identity),
+        ) {
+            runner(binding, directory).run(spec)
+        }
+        return buildJsonObject {
+            put("workspace_id", identity)
+            put("working_directory", directory.path)
+            put("result", if (spec.capabilities.outputSchema != null)
+                kotlinx.serialization.json.Json.parseToJsonElement(result) else JsonPrimitive(result))
+        }.toString()
+    }
+
+    internal fun runner(binding: LocalWorkRunBinding, executionWorkspace: java.io.File? = null): LocalSubagentRunner =
         factory.createBound(
             sessionId = binding.sessionId,
             boundState = binding.aggregateSnapshot(),
@@ -51,6 +81,7 @@ internal class LocalWorkSubagentRuntime(
             },
             historySnapshot = binding.runHandle.modelHistory::snapshot,
             modelAdmission = binding.executionControl.asModelAdmissionPort(),
+            executionWorkspacePath = executionWorkspace?.path,
         )
 
     private val taskGraphs = LocalAgentTaskGraphController(persistentJobs, workspaceRoot, pruneOutput)

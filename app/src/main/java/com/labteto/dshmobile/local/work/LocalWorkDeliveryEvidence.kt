@@ -110,6 +110,9 @@ internal fun localWorkDeliveryEvidence(
                     (it["attributes"] as? JsonObject)?.value("goal_id") == goal.id
             }?.takeIf { it.sequence > start }
         }
+        // A child worktree is a different file version. Its verifier cannot settle
+        // the shared Goal, even when that Goal declares no artifact paths.
+        if (!(admission?.data?.get("attributes") as? JsonObject)?.value("workspace_id").isNullOrBlank()) return null
         // Successful evidence must come from the real coordinator admission, not a model id.
         // Unstarted failures may invalidate a previous verifier, but can never prove success.
         if (admission == null && result.value("is_error") != "true") return null

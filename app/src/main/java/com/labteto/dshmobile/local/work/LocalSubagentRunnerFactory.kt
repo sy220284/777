@@ -80,6 +80,7 @@ internal class LocalSubagentRunnerFactory(
         ) -> AgentToolResult,
         historySnapshot: () -> List<kotlinx.serialization.json.JsonObject> = modelHistory::snapshot,
         modelAdmission: LocalModelAdmissionPort? = null,
+        executionWorkspacePath: String? = null,
     ): LocalSubagentRunner {
         val boundEventLog = eventLogFor(sessionId)
         val boundMemoryTools = LocalMemoryTools(
@@ -106,7 +107,10 @@ internal class LocalSubagentRunnerFactory(
                         lineageId = boundState.lineageId,
                         handoffSummary = boundState.handoffSummary,
                     ),
-                )
+                ) + executionWorkspacePath?.let {
+                    "\n\n当前工作目录为独立 Git worktree：$it。文件工具及本机命令均以此目录执行。" +
+                        "成果保留在此目录，由父代理审阅 workspace_status 后显式 workspace_merge；不要自行修改父目录或删除工作区。"
+                }.orEmpty()
             },
             schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
                 schemasProvider(allowMutation, allowVirtualScreen, enabledOptional.toSet())
@@ -174,6 +178,8 @@ internal class LocalSubagentRunnerFactory(
         prepareMessages = { messages, mode, baseUrl, model ->
             prepareLocalMultimodalMessages(
                 messages = messages,
+                // Attachment references belong to the shared attachment importer, including
+                // inherited parent inputs. Native file/image tools use the execution root.
                 workspaceRoot = File(workspacePath),
                 mode = mode,
                 budget = imageRequestBudget(),

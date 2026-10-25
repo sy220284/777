@@ -24,6 +24,7 @@ import com.labteto.dshmobile.local.tools.LocalExtensionWorkshop
 import com.labteto.dshmobile.local.tools.LocalShellTool
 import com.labteto.dshmobile.local.tools.toolCapabilityTarget
 import kotlinx.coroutines.currentCoroutineContext
+import com.labteto.dshmobile.local.files.executionLocalWorkspace
 import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.long
@@ -69,7 +70,6 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
 ) {
     private val jobs get() = runtimeStateStore.jobManager
     private val workspace get() = sessionStorage.files.workspace
-    private val fileInspector by lazy { LocalFileInspector(File(workspace.path)) }
     private val extensionWorkshop by lazy { LocalExtensionWorkshop(workspace) }
     private val usageBridge by lazy {
         LocalTokenUsageContextBridge(
@@ -115,6 +115,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         else workspace.readModelSkill(name)
 
     internal suspend fun executeResult(call: LocalToolCall, allowMutation: Boolean, executionSessionId: String?): com.labteto.dshmobile.harness.tools.ToolResult {
+        val workspace = executionLocalWorkspace(this.workspace)
         val captured = executionSessionId?.let(workRuns::get)?.aggregateSnapshot() ?: runtimeStateStore.state.value
         if (captured.work.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) return com.labteto.dshmobile.harness.tools.ToolResult(
             "当前处于规划模式，只能检查和制定方案", isError = true, errorCode = "PLAN_MODE_BLOCKED")
@@ -140,6 +141,9 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         executionSessionId: String?,
     ): String {
         val root = tools.get()
+        val workspace = executionLocalWorkspace(this.workspace)
+        val webTools = root.webTools.atWorkspace(workspace)
+        val extensionWorkshop = if (workspace === this.workspace) this.extensionWorkshop else LocalExtensionWorkshop(workspace)
         val args = call.arguments
         val binding = executionSessionId?.let(workRuns::get)
         val state = binding?.aggregateSnapshot() ?: runtimeStateStore.state.value
@@ -168,7 +172,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 startByte = args.int("start_byte", 0),
                 maxBytes = args.int("max_bytes", LocalToolOutputStore.DEFAULT_READ_BYTES),
             )
-            "file_inspect" -> fileInspector.inspect(args.string("path"))
+            "file_inspect" -> LocalFileInspector(File(workspace.path)).inspect(args.string("path"))
             "write", "write_file" -> {
                 if (!allowMutation) return "子代理无写入权限"
                 workspace.write(args.string("path"), args.string("content"))
@@ -235,7 +239,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
             "job_kill" -> jobs.kill(args.string("job_id"), boundSessionId)
             "web_search" -> {
                 val queries = args["queries"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
-                root.webTools.search(
+                webTools.search(
                     queries,
                     usageBridge.resolve(
                         boundSessionId,
@@ -263,7 +267,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 if (background) {
                     startPersistentWebFetch(input, maxBytes, format, timeout, boundSessionId)
                 } else {
-                    root.webTools.fetch(
+                    webTools.fetch(
                         input,
                         maxBytes,
                         format,
@@ -282,7 +286,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 val headers = args["headers"]?.jsonObject?.mapValues { (_, value) ->
                     value.jsonPrimitive.content
                 }.orEmpty()
-                root.webTools.httpRequest(
+                webTools.httpRequest(
                     method = args.string("method"),
                     url = args.string("url"),
                     headers = headers,
@@ -294,7 +298,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
             }
             "download_file" -> {
                 if (!allowMutation) return "只读子任务不能下载写入文件"
-                root.webTools.download(
+                webTools.download(
                     url = args.string("url"),
                     path = args.string("path"),
                     maxBytes = args.int("max_bytes", DEFAULT_DOWNLOAD_BYTES)
@@ -303,12 +307,12 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                     timeoutSeconds = BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS,
                 )
             }
-            "json_query" -> root.webTools.jsonQuery(
+            "json_query" -> webTools.jsonQuery(
                 path = args.string("path"),
                 query = args.optionalString("query").orEmpty(),
                 allowArtifactWrite = allowMutation && !state.work.planMode,
             )
-            "network_diagnose" -> root.webTools.diagnose(args.string("url"))
+            "network_diagnose" -> webTools.diagnose(args.string("url"))
             "environment_info" -> diagnostics.get().environmentInfo(
                 binding?.toEnvironmentRunSnapshot(
                     runtimeStateStore.historyBudgetFor(binding.aggregateSnapshot()).maxHistoryChars,
@@ -423,25 +427,31 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
             sessionId = { binding?.sessionId ?: runtimeStateStore.currentSessionId },
         )
 
-    private fun startPersistentWebFetch(
+    private suspend fun startPersistentWebFetch(
         url: String,
         maxBytes: Int,
         format: String,
         timeoutSeconds: Long,
         sessionId: String,
-    ): String = jobs.startPersistent(
-        label = "网页抓取：${url.take(120)}",
-        resumeKind = "web_fetch",
-        resumePayload = buildJsonObject {
-            put("session_id", sessionId)
-            put("url", url)
-            put("max_bytes", maxBytes)
-            put("format", format)
-            put("timeout_seconds", timeoutSeconds)
-        }.toString(),
-        ownerSessionId = sessionId,
-    ) { _, report ->
-        report("正在抓取：$url")
-        tools.get().webTools.fetch(url, maxBytes, format, timeoutSeconds)
+    ): String {
+        val boundWorkspace = executionLocalWorkspace(workspace)
+        val workspaceId = currentCoroutineContext()[com.labteto.dshmobile.harness.capability.WorkspaceExecutionContext]?.workspaceId
+        val selected = tools.get().webTools.atWorkspace(boundWorkspace)
+        return jobs.startPersistent(
+            label = "网页抓取：${url.take(120)}",
+            resumeKind = "web_fetch",
+            resumePayload = buildJsonObject {
+                put("session_id", sessionId)
+                put("url", url)
+                put("max_bytes", maxBytes)
+                put("format", format)
+                put("timeout_seconds", timeoutSeconds)
+                workspaceId?.let { put("workspace_id", it) }
+            }.toString(),
+            ownerSessionId = sessionId,
+        ) { _, report ->
+            report("正在抓取：$url")
+            selected.fetch(url, maxBytes, format, timeoutSeconds)
+        }
     }
 }

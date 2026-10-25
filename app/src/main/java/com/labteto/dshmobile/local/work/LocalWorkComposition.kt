@@ -47,6 +47,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /** WorkFeature composition owner for foreground turns, subagents and Work-owned built-ins. */
@@ -164,6 +165,8 @@ internal class LocalWorkComposition @Inject constructor(
         LocalWorkSubagentRuntime(
             persistentJobs = persistentJobs,
             workspaceRoot = File(sessionStorage.files.workspace.path),
+            sourceWorkspace = sessionStorage.files.workspace,
+            createWorkspace = tools::forkAgentWorkspace,
             factory = subagentFactory,
             schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
                 tools.schemas.subagentSchemas(
@@ -186,6 +189,12 @@ internal class LocalWorkComposition @Inject constructor(
             json = json,
             modelGateway = modelGateway,
             webTools = tools.webTools,
+            webToolsForWorkspace = { sessionId, identity ->
+                val admission = tools.agentWorkspaces.operate(sessionId, "locate", buildJsonObject {
+                    put("workspace_id", identity)
+                })
+                tools.webTools.atRoot(File(admission.getValue("root").jsonPrimitive.content))
+            },
             currentSessionId = runtimeStateStore::currentSessionId,
             currentState = { runtimeStateStore.state.value },
             defaultHistory = runtimeStateStore.foregroundRunHandle.modelHistory::snapshot,

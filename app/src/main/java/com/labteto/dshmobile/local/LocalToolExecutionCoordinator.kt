@@ -406,6 +406,10 @@ internal class LocalToolExecutionCoordinator(
             rootCallId = call.id,
             attributes = buildMap {
                 putAll(executionAttributes)
+                currentCoroutineContext()[com.labteto.dshmobile.harness.capability.WorkspaceExecutionContext]?.let {
+                    put("workspace_id", it.workspaceId)
+                    put("workspace_root", it.root.path)
+                }
                 runOwner?.let {
                     put("run_id", it.identity.runId)
                     it.parentRunId?.let { parent -> put("parent_run_id", parent) }
