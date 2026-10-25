@@ -120,6 +120,8 @@ internal data class LocalTeamMemberSnapshot(
     val grantedExtensions: Set<String> = emptySet(),
     /** Versioned role name; absent V2 events imply the historical general-purpose member. */
     val role: String = "general",
+    /** null=legacy; true=uncommitted new Job; false=activation of existing durable Job. */
+    val provisionalNewJob: Boolean? = null,
 )
 
 @Serializable
