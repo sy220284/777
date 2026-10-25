@@ -264,7 +264,7 @@ internal class LocalTeamTaskBoard(
             append(" | workspace=shared")
             append(" | write_execution=serialized")
             if (task.writeScopes.isNotEmpty()) {
-                append(" | scope_enforcement=advisory_only | claim_conflict=enforced | file_isolation=none")
+                append(" | scope_enforcement=tool_time_native_path_guard | opaque_mutation=denied | claim_conflict=enforced | file_isolation=none")
             }
             if (task.status == LocalTeamTaskStatus.IN_PROGRESS &&
                 state.tasks.any { other ->
