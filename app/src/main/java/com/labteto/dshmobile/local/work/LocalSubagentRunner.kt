@@ -79,7 +79,6 @@ import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
@@ -255,19 +254,7 @@ internal class LocalSubagentRunner(
             val check = requireNotNull(requireTeamRootAuthorization) {
                 "TEAM_MEMBER_AUTHORIZATION_GATE_REQUIRED"
             }
-            // The provisionally persisted Job may begin before the Team ACTIVE event
-            // commits. Wait without making a model request or invoking a tool.
-            val deadline = System.nanoTime() + 30_000_000_000L
-            while (true) {
-                currentCoroutineContext().ensureActive()
-                try {
-                    check(jobId)
-                    return
-                } catch (_: LocalTeamSpawnCommitPending) {
-                    if (System.nanoTime() >= deadline) throw LocalWorkflowSuperseded()
-                    delay(50)
-                }
-            }
+            awaitCommittedTeamAgentAdmission { check(jobId) }
         }
         val parentCallId = spec.parentCallId
         val modelOverride = spec.modelOverride
