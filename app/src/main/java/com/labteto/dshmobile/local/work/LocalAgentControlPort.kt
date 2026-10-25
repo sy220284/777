@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.agent.LocalAgentDelegationKind
+import com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.buildLocalDelegatedLaunchSpec
 import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
@@ -28,6 +29,7 @@ internal data class LocalAgentDispatchRequest(
     val virtualScreen: Boolean = false,
     val toolAllowlist: Set<String>? = null,
     val outputSchema: JsonObject? = null,
+    val executionBackend: LocalAgentExecutionBackend = LocalAgentExecutionBackend.IN_PROCESS,
 ) {
     init {
         require(task.isNotBlank() && parentToolCallId.isNotBlank()) { "AGENT_DELEGATION_REQUEST_INVALID" }
