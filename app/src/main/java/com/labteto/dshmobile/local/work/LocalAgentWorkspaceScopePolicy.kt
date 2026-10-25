@@ -15,7 +15,7 @@ internal fun normalizeLocalAgentWriteScopes(
         val clean = raw.trim().replace('\\', '/')
         require(clean.isNotBlank() && !clean.startsWith("/") &&
             !clean.startsWith("~") && ':' !in clean && '\u0000' !in clean &&
-            clean.none { it.isISOControl() }) {
+            clean.none { Character.isISOControl(it) }) {
             "TEAM_WRITE_SCOPE_INVALID"
         }
         require(clean.split('/').none { it.isBlank() || it == "." || it == ".." }) {
