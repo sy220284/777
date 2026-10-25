@@ -359,7 +359,7 @@ internal class LocalTeamTaskBoard(
     private fun nextTaskId(tasks: List<LocalTeamTaskSnapshot>): String =
         "task-" + ((tasks.maxOfOrNull(::taskNumber) ?: 0) + 1)
 
-    private fun taskNumber(task: LocalTeamTaskSnapshot): Int =
+    fun taskNumber(task: LocalTeamTaskSnapshot): Int =
         task.id.removePrefix("task-").toIntOrNull() ?: Int.MAX_VALUE
 
 }
