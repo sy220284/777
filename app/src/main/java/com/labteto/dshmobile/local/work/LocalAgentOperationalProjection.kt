@@ -34,3 +34,50 @@ internal fun renderLocalAgentLiveRoster(
         }
     }
 }
+
+/**
+ * U01: Join the real durable Job registrations to their recorded parent links.
+ * Historical Run checkpoints can be windowed away, but cold persistent identity
+ * must still be visible without creating or resuming a Job. The payload is never
+ * surfaced to an unrelated session; damaged records remain explicitly unknown.
+ */
+internal fun renderLocalAgentDurableLineage(
+    sessionId: String,
+    registrations: List<com.labteto.dshmobile.local.jobs.LocalJobRegistration>,
+    maxVisible: Int,
+): String {
+    require(sessionId.isNotBlank()) { "AGENT_LINEAGE_SESSION_REQUIRED" }
+    require(maxVisible in 1..256) { "AGENT_LINEAGE_LIMIT_INVALID" }
+    val owned = registrations.filter {
+        it.info.ownerSessionId == sessionId && it.snapshot.ownerId == sessionId &&
+            it.info.id == it.snapshot.id && it.info.isAgent
+    }.sortedWith(
+        compareByDescending<com.labteto.dshmobile.local.jobs.LocalJobRegistration> {
+            it.info.updatedAt
+        }.thenBy { it.info.id },
+    )
+    return buildString {
+        append("durable_agent_lineage source=JobManager owned=").append(owned.size)
+        append(" displayed=").append(minOf(owned.size, maxVisible))
+        append(" partial=").append(owned.size > maxVisible)
+        owned.take(maxVisible).forEach { record ->
+            append("\njob=").append(record.info.id)
+            val view = runCatching { projectLocalAgentResidency(record) }.getOrNull()
+            if (view == null) {
+                append(" lineage=unverifiable persisted_registration_invalid=true")
+                return@forEach
+            }
+            append(" residency=").append(view.residency.name.lowercase())
+            val parent = view.recordedParent
+            if (parent == null) {
+                append(" parent=legacy_or_root_unknown")
+            } else {
+                append(" parent_run=").append(parent.parentRunId)
+                append(" parent_slot=").append(parent.parentSlotId)
+                // Stable slot relation is a durable address; it never proves the
+                // original parent process is still live or that loading is allowed.
+                append(" parent_live=unverified")
+            }
+        }
+    }
+}
