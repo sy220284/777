@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -23,7 +24,7 @@ class LocalTaskGraphReplanPolicyTest {
             })
             add(buildJsonObject {
                 put("node_id", "b"); put("task", "verify")
-                put("depends_on", buildJsonArray { if (dependent) add("a") })
+                put("depends_on", buildJsonArray { if (dependent) add(JsonPrimitive("a")) })
             })
         })
     })
