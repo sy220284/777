@@ -29,9 +29,9 @@ class LocalAgentSkillBindingTest {
             "---\nname: agent-review\ndescription: check claims\n---\nChanged document")
         val changed = resolveLocalAgentSkillBindings(ws, listOf("agent-review")).single()
         assertTrue(first.contentSha256 != changed.contentSha256)
-        assertEquals(first.guidance, resolveLocalAgentSkillBindings(
-            ws, listOf("agent-review")
-        ).single().guidance.let { _ -> first.guidance })
+        assertTrue(first.guidance.contains("Review the evidence"))
+        assertFalse(first.guidance.contains("Changed document"))
+        assertTrue(changed.guidance.contains("Changed document"))
     }
 
     @Test fun disabledMissingOrInvalidSkillsCannotEnterDelegatedModelPrompt() = withWorkspace { ws ->
