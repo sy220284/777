@@ -2,8 +2,6 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import com.labteto.dshmobile.harness.jobs.JobStartResult
-import com.labteto.dshmobile.harness.session.SessionProjectionRegistry
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
@@ -58,7 +56,9 @@ class LocalTeamSpawnAdmissionTest {
             assertFalse(entered.get())
             assertEquals("running", jobs.snapshots().single().status)
             put(log, session, LocalTeamMemberPhase.ACTIVE)
-            withTimeout(2_000L) { while (!entered.get()) delay(10L) }
+            withTimeout(2_000L) {
+                while (jobs.snapshots().single().status != "dormant") delay(10L)
+            }
             assertTrue(entered.get())
             assertEquals("dormant", jobs.snapshots().single().status)
         } finally {
