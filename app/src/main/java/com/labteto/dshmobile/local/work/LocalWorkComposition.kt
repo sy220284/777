@@ -252,6 +252,7 @@ internal class LocalWorkComposition @Inject constructor(
     )
     private val agentTeams: LocalAgentTeamRuntime by lazy {
         LocalAgentTeamRuntime(
+            roleWorkspace = sessionStorage.files.workspace,
             pinBackend = backendRuntime::pin,
             jobs = runtimeStateStore.jobManager,
             startTeammate = {
@@ -266,9 +267,11 @@ internal class LocalWorkComposition @Inject constructor(
                     role,
                     grantedExtensions,
                 ->
-                val roleBinding = com.labteto.dshmobile.local.agent.bindLocalAgentRole(
-                    role, instructions, parentMutationAllowed = true,
-                )
+                val roleBinding = agentTeams.memberFrozenRole(binding.sessionId, requestedJobId)?.let {
+                    com.labteto.dshmobile.local.agent.decodeFrozenAgentRole(it).let { frozen ->
+                        frozen.copy(instructions = listOf(frozen.instructions, instructions).filter(String::isNotBlank).joinToString("\n\n"))
+                    }
+                } ?: com.labteto.dshmobile.local.agent.bindLocalAgentRole(role, instructions, parentMutationAllowed = true)
                 // 授权必须命中当前实际注册的扩展工具，不能静默丢弃或绕过设备/团队边界。
                 val unavailable = grantedExtensions.filter { name ->
                     name in SUBAGENT_EXCLUDED_TOOLS ||
@@ -296,19 +299,22 @@ internal class LocalWorkComposition @Inject constructor(
                         enabledOptional = activeOptional,
                     ),
                 ).toSet()
-                val missing = grantedExtensions - exposed
+                val roleExposed = roleBinding.toolAllowlist?.let { exposed.intersect(it) } ?: exposed
+                val missing = grantedExtensions - roleExposed
                 require(missing.isEmpty()) {
                     "TEAM_EXTENSION_NOT_EXPOSED：已授权工具未进入成员实际工具表（数量或上下文预算限制）：" +
                         missing.sorted().joinToString("、")
                 }
-                require("skill" !in tools.registry.names() || "skill" in exposed) {
+                require(roleBinding.toolAllowlist?.contains("skill") == false ||
+                    "skill" !in tools.registry.names() || "skill" in roleExposed) {
                     "TEAM_SKILL_NOT_EXPOSED：技能工具未进入成员实际工具表"
                 }
                 persistentJobs.startReadonlySubagentResult(
                     task = task,
-                    model = model,
+                    model = model ?: roleBinding.modelOverride,
                     maxSteps = maxSteps,
                     instructions = roleBinding.instructions,
+                    toolAllowlist = roleBinding.toolAllowlist,
                     virtualScreen = false,
                     forkParentCallId =
                         parentCallId.takeIf { context == LocalTeamMemberContext.FORK },

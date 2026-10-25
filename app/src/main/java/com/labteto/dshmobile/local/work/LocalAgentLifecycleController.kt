@@ -61,13 +61,14 @@ internal class LocalAgentLifecycleController(
     private val registry: LocalAgentRegistry,
 ) {
     fun inspect(sessionId: String, agentId: String): String {
-        val view = registry.observeStandalone(sessionId, agentId)
+        val view = registry.observeOwned(sessionId, agentId)
         val registration = view.registration
         val info = registration.info
         val snapshot = registration.snapshot
         return buildString {
             append("agent_id=").append(info.id)
             append("\nstatus=").append(info.status)
+            append("\ncontrol_namespace=").append(if (LocalAgentTeamContract.isTeamJobId(agentId)) "team" else "standalone")
             append("\nruntime_residency=").append(view.residency.name.lowercase())
             append("\nexecution_active=").append(registration.executionActive)
             append("\nruntime_activation=").append(registration.runtimeActivation)
@@ -95,7 +96,7 @@ internal class LocalAgentLifecycleController(
         require(afterCursor.isNotBlank()) { "AGENT_WATCH_CURSOR_REQUIRED：先调用 agent_inspect" }
         require(maxWaitMs in 0..20_000) { "AGENT_WATCH_TIMEOUT_INVALID" }
         fun changed(): Boolean = localAgentObservationCursor(
-            registry.resolveStandalone(sessionId, agentId).info,
+            registry.resolveOwned(sessionId, agentId).info,
         ) != afterCursor
         if (!changed() && maxWaitMs > 0) {
             withTimeoutOrNull(maxWaitMs.toLong()) {

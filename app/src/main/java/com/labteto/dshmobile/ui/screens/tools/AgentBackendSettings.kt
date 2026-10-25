@@ -23,6 +23,7 @@ internal fun AgentBackendSettings(viewModel: ToolsViewModel) {
     LaunchedEffect(Unit) { viewModel.refreshAgentBackend() }
     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
         Text("代理执行器")
+        Text("远端负责控制循环；模型请求、审批和工具执行保留在本机。")
         Text(status)
         SyButton(text = if (expanded) "收起远端设置" else "配置远端执行器", onClick = { expanded = !expanded; token = "" })
         if (expanded) {

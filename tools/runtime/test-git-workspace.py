@@ -196,6 +196,154 @@ class GitWorkspaceTest(unittest.TestCase):
         self.assertEqual("user edit", (self.root / "new-user-file.txt").read_text())
         self.assertEqual("first\nsecond\nthird\n", (self.root / "code.txt").read_text())
 
+    def test_partial_apply_failure_restores_only_the_merge_changes(self):
+        child = self.fork()
+        (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
+        (child / "zz-added.bin").write_bytes(b"\x00\xffnew")
+        reviewed = self.call("status")["tree"]
+        original_replace = workspace.os.replace
+        def failing_publish(source, target):
+            if Path(target) == self.root / "zz-added.bin":
+                (self.root / "external.txt").write_text("concurrent user")
+                raise OSError("simulated partial filesystem failure")
+            return original_replace(source, target)
+        with patch.object(workspace.os, "replace", failing_publish):
+            with self.assertRaisesRegex(OSError, "partial filesystem failure"):
+                self.call("merge", expected_tree=reviewed)
+        self.assertEqual("first\nsecond\nthird\n", (self.root / "code.txt").read_text())
+        self.assertEqual("concurrent user", (self.root / "external.txt").read_text())
+        self.assertFalse((self.root / "zz-added.bin").exists())
+        self.assertEqual("rolled_back", self.call("status")["integration"]["state"])
+
+    def test_partial_apply_never_rolls_back_a_later_external_edit(self):
+        child = self.fork()
+        (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
+        reviewed = self.call("status")["tree"]
+        original_replace = workspace.os.replace
+        def failing_publish(source, target):
+            result = original_replace(source, target)
+            if Path(target) == self.root / "code.txt":
+                (self.root / "code.txt").write_text("new user revision")
+                raise OSError("partial apply with external edit")
+            return result
+        with patch.object(workspace.os, "replace", failing_publish):
+            with self.assertRaisesRegex(OSError, "partial apply"):
+                self.call("merge", expected_tree=reviewed)
+        self.assertEqual("new user revision", (self.root / "code.txt").read_text())
+        status = self.call("status")["integration"]
+        self.assertEqual("needs_inspection", status["state"])
+        self.assertEqual(["code.txt"], status["unresolved_paths"])
+
+    def test_sigkill_during_apply_is_recovered_without_replaying_merge(self):
+        import json
+        import select
+        child = self.fork()
+        (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
+        (child / "zz-added.bin").write_bytes(b"new")
+        reviewed = self.call("status")["tree"]
+        code = f"""
+import importlib.util,sys,signal
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('workspace', {str(SOURCE)!r})
+module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+original=module.os.replace
+def interrupted(source,target):
+    result=original(source,target)
+    if Path(target) == Path({str(self.root)!r})/'code.txt':
+        print('partial-write',flush=True)
+        signal.pause()
+    return result
+module.os.replace=interrupted
+module.operate({str(self.root)!r},{str(self.store)!r},'session','merge',
+    {{'workspace_id':{self.identity!r},'expected_tree':{reviewed!r}}})
+"""
+        process = subprocess.Popen([sys.executable, '-B', '-c', code], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            self.assertTrue(select.select([process.stdout], [], [], 10)[0], "worker did not reach apply")
+            self.assertEqual(b"partial-write\n", process.stdout.readline())
+            process.kill(); process.wait(timeout=5)
+        finally:
+            if process.poll() is None:
+                process.kill(); process.wait(timeout=5)
+            process.stdout.close(); process.stderr.close()
+        self.assertEqual("applying", self.call("status")["integration"]["state"])
+        recovered = self.call("merge", expected_tree=reviewed)
+        self.assertEqual("rolled_back", recovered["state"])
+        self.assertEqual("first\nsecond\nthird\n", (self.root / "code.txt").read_text())
+        self.assertEqual("merged", self.call("merge", expected_tree=reviewed)["state"])
+
+    def test_binary_rename_symlink_publish_failure_restores_original_files(self):
+        child = self.fork()
+        (child / "code.txt").unlink()
+        (child / "renamed.bin").write_bytes(b"\x00\xffbinary")
+        (child / "link").symlink_to("renamed.bin")
+        reviewed = self.call("status")["tree"]
+        original_replace = workspace.os.replace
+        def no_space(source, target):
+            if Path(target) == self.root / "renamed.bin":
+                raise OSError("simulated ENOSPC during publication")
+            return original_replace(source, target)
+        with patch.object(workspace.os, "replace", no_space):
+            with self.assertRaisesRegex(OSError, "ENOSPC"):
+                self.call("merge", expected_tree=reviewed)
+        self.assertEqual("first\nsecond\nthird\n", (self.root / "code.txt").read_text())
+        self.assertFalse((self.root / "renamed.bin").exists())
+        self.assertFalse((self.root / "link").is_symlink())
+        self.assertEqual("rolled_back", self.call("status")["integration"]["state"])
+
+    def test_file_directory_replacement_rolls_back_without_removing_external_children(self):
+        child = self.fork()
+        (child / "code.txt").unlink()
+        (child / "code.txt").mkdir()
+        (child / "code.txt" / "nested").write_text("new")
+        (child / "zz-new").write_text("new")
+        original_replace = workspace.os.replace
+        def no_space(source, target):
+            if Path(target) == self.root / "zz-new":
+                raise OSError("publish failed")
+            return original_replace(source, target)
+        with patch.object(workspace.os, "replace", no_space):
+            with self.assertRaisesRegex(OSError, "publish failed"):
+                self.call("merge", expected_tree=self.call("status")["tree"])
+        self.assertTrue((self.root / "code.txt").is_file())
+        self.assertEqual("first\nsecond\nthird\n", (self.root / "code.txt").read_text())
+
+    def test_staging_failure_does_not_touch_parent_or_revert_external_changes(self):
+        child = self.fork()
+        (child / "code.txt").write_text("child")
+        reviewed = self.call("status")["tree"]
+        original_git = workspace.git
+        def fail_private_stage(root, *args, **kwargs):
+            if args[:2] == ("apply", "--binary"):
+                self.assertNotEqual(self.root, Path(root))
+                (self.root / "code.txt").write_text("external")
+                raise OSError("private stage failed")
+            return original_git(root, *args, **kwargs)
+        with patch.object(workspace, "git", fail_private_stage):
+            with self.assertRaisesRegex(OSError, "private stage failed"):
+                self.call("merge", expected_tree=reviewed)
+        self.assertEqual("external", (self.root / "code.txt").read_text())
+        self.assertEqual("not_started", self.call("status")["integration"]["state"])
+
+    def test_pending_integration_must_be_resolved_before_discard(self):
+        child = self.fork()
+        (child / "code.txt").write_text("child")
+        reviewed = self.call("status")["tree"]
+        original_replace = workspace.os.replace
+        def external_edit(source, target):
+            result = original_replace(source, target)
+            if Path(target) == self.root / "code.txt":
+                (self.root / "code.txt").write_text("external")
+                raise OSError("uncertain publication")
+            return result
+        with patch.object(workspace.os, "replace", external_edit):
+            with self.assertRaises(OSError):
+                self.call("merge", expected_tree=reviewed)
+        with self.assertRaisesRegex(ValueError, "pending integration"):
+            self.call("discard", expected_tree=reviewed)
+        self.assertTrue(child.is_dir())
+        self.assertEqual("external", (self.root / "code.txt").read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

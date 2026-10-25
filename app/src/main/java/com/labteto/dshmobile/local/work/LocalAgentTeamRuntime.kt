@@ -126,6 +126,7 @@ internal data class LocalTeamMemberSnapshot(
     val provisionalNewJob: Boolean? = null,
     val workspaceRepository: String? = null,
     val backendBinding: JsonObject? = null,
+    val frozenRole: JsonObject? = null,
 )
 
 @Serializable
@@ -258,6 +259,7 @@ internal class LocalAgentTeamRuntime(
     projectionScope: CoroutineScope? = null,
     onProjectionReady: (String) -> Unit = {},
     private val sendToLead: (String, QueuedAgentInput) -> Boolean = { _, _ -> false },
+    private val roleWorkspace: com.labteto.dshmobile.local.files.LocalWorkspace? = null,
     private val pinBackend: suspend (com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend) -> com.labteto.dshmobile.local.agent.LocalSubagentCapabilities = { backend ->
         require(backend == com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend.IN_PROCESS) { "AGENT_BACKEND_OWNER_REQUIRED" }
         com.labteto.dshmobile.local.agent.LocalSubagentCapabilities()
@@ -469,6 +471,8 @@ internal class LocalAgentTeamRuntime(
                 displayName = args.optionalTeamString("display_name").orEmpty(),
                 context = args.optionalTeamContext(),
                 role = args.optionalTeamString("role"),
+                frozenRole = com.labteto.dshmobile.local.agent.encodeFrozenAgentRole(
+                    com.labteto.dshmobile.local.agent.resolveLocalAgentRole(roleWorkspace, args.optionalTeamString("role"), "", true)),
                 workspaceRepository = decodeAgentWorkspaceRepository(args),
                 backendBinding = pinBackend(com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend.fromWire(args.optionalTeamString("execution_backend"))).let {
                     it.backendBinding()
@@ -490,6 +494,8 @@ internal class LocalAgentTeamRuntime(
                 description = args.optionalTeamString("description").orEmpty(),
                 displayName = args.optionalTeamString("display_name").orEmpty(),
                 role = args.optionalTeamString("role"),
+                frozenRole = com.labteto.dshmobile.local.agent.encodeFrozenAgentRole(
+                    com.labteto.dshmobile.local.agent.resolveLocalAgentRole(roleWorkspace, args.optionalTeamString("role"), "", true)),
                 workspaceRepository = decodeAgentWorkspaceRepository(args),
                 backendBinding = pinBackend(com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend.fromWire(args.optionalTeamString("execution_backend"))).let {
                     it.backendBinding()
@@ -1087,6 +1093,9 @@ internal class LocalAgentTeamRuntime(
             wholeWorkspaceAllowed = wholeRepository,
         )
     }
+
+    internal fun memberFrozenRole(sessionId: String, jobId: String): JsonObject? =
+        (project(sessionId).members.singleOrNull { it.jobId == jobId } ?: error("TEAM_MEMBER_NOT_FOUND")).frozenRole
 
     internal fun memberBackendCapabilities(sessionId: String, jobId: String) =
         com.labteto.dshmobile.local.agent.decodeAgentBackendBinding((project(sessionId).members.singleOrNull { it.jobId == jobId }

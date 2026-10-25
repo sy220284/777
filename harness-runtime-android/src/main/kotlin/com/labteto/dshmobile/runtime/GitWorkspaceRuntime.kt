@@ -45,8 +45,8 @@ class GitWorkspaceRuntime(
         val script = requireNotNull(GitWorkspaceRuntime::class.java.getResourceAsStream("/com/labteto/dshmobile/runtime/git_workspace.py")) {
             "安装包缺少 Git 工作区执行代码"
         }.bufferedReader().use { it.readText() }
-        val result = processRuntime.execute(ProcessRequest(
-            command = listOf("python3", "-u", "-c", script, workspaceRoot.canonicalPath,
+        val result = processRuntime.executeWorkspaceOperation(ProcessRequest(
+            command = listOf("python3", "-P", "-s", "-u", "-c", script, workspaceRoot.canonicalPath,
                 store.canonicalPath, sessionId, action),
             workingDirectory = workspaceRoot.canonicalPath,
             stdin = arguments.toString(), timeoutMillis = 120_000L,
@@ -103,7 +103,11 @@ class GitWorkspaceRuntime(
                         toolContext.attributes["call_id"] as? String ?: UUID.randomUUID().toString(),
                         input["repository"]?.jsonPrimitive?.contentOrNull ?: ".",
                     ) else operate(session, action, input)
-                    ToolResult(response.toString(), isError = response["state"]?.jsonPrimitive?.contentOrNull == "conflict")
+                    val outcome = response["state"]?.jsonPrimitive?.contentOrNull
+                    val incomplete = outcome in setOf("conflict", "rolled_back", "needs_inspection", "not_started")
+                    ToolResult(response.toString(), isError = incomplete,
+                        errorCode = if (incomplete) "WORKSPACE_INTEGRATION_INCOMPLETE" else null,
+                        recoveryHint = if (incomplete) "检查 workspace_status 的 integration；已回滚不等于已合并，外部新修改会保留。" else null)
                 },
             ))
         }

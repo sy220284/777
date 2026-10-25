@@ -92,8 +92,10 @@ internal class LocalTeamMemberLifecycle(
         role: String?,
         workspaceRepository: String? = null,
         backendBinding: JsonObject? = null,
+        frozenRole: JsonObject? = null,
     ): String {
-        val roleBinding = bindLocalAgentRole(role, "", parentMutationAllowed = true)
+        val roleBinding = frozenRole?.let { com.labteto.dshmobile.local.agent.decodeFrozenAgentRole(it) }
+            ?: bindLocalAgentRole(role, "", parentMutationAllowed = true)
         return synchronized(commandLock) {
             val cleanName = normalizeName(name)
             val before = project(sessionId)
@@ -110,6 +112,7 @@ internal class LocalTeamMemberLifecycle(
                 role = roleBinding.role.wireName,
                 workspaceRepository = workspaceRepository,
                 backendBinding = backendBinding,
+                frozenRole = frozenRole,
                 description = boundedTeamText(
                     value = description,
                     field = "description",
@@ -357,8 +360,10 @@ internal class LocalTeamMemberLifecycle(
         grantedExtensions: Set<String>,
         workspaceRepository: String? = null,
         backendBinding: JsonObject? = null,
+        frozenRole: JsonObject? = null,
     ): String {
-        val roleBinding = bindLocalAgentRole(role, "", parentMutationAllowed = true)
+        val roleBinding = frozenRole?.let { com.labteto.dshmobile.local.agent.decodeFrozenAgentRole(it) }
+            ?: bindLocalAgentRole(role, "", parentMutationAllowed = true)
         val provisioning = synchronized(commandLock) {
             val cleanName = normalizeName(name)
             val before = project(binding.sessionId)
@@ -378,6 +383,7 @@ internal class LocalTeamMemberLifecycle(
                 grantedExtensions = grantedExtensions,
                 workspaceRepository = workspaceRepository,
                 backendBinding = backendBinding,
+                frozenRole = frozenRole,
                 description = boundedTeamText(
                     value = description,
                     field = "description",

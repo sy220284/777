@@ -51,6 +51,9 @@ internal class LocalAgentRegistry(private val jobs: LocalJobManager) {
         resolve(sessionId, agentId, LocalAgentAddressSpace.STANDALONE)
 
     /** Resolve a recorded but unloaded child without activating or re-registering it. */
+    fun observeOwned(sessionId: String, agentId: String): LocalAgentResidencyView =
+        projectLocalAgentResidency(resolveOwned(sessionId, agentId))
+
     fun observeStandalone(sessionId: String, agentId: String): LocalAgentResidencyView =
         projectLocalAgentResidency(resolveStandalone(sessionId, agentId))
 

@@ -2992,6 +2992,27 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(0, fixture.runtime.project("team-oversize").deliveredMessageIds.size)
     }
 
+    @Test fun projectRoleIsFrozenInTeamEventsBeforeAnyJobStarts() = runBlocking {
+        val directory = temporary.newFolder("role-project")
+        val file = File(directory, ".agents/roles/project-reviewer.json")
+        file.parentFile.mkdirs()
+        file.writeText("""{"version":4,"base_role":"review","instructions":"inspect original evidence","allowed_tools":["read"]}""")
+        val f = fixture("custom-role-team", roleWorkspace = com.labteto.dshmobile.local.files.LocalWorkspace(directory))
+        val binding = teamBinding(f, "custom-role-team")
+        f.runtime.execute(memberTestToolCall("create", "team_create_member", buildJsonObject {
+            put("name", "reviewer"); put("role", "project-reviewer")
+        }), binding)
+        val admitted = f.runtime.project("custom-role-team").members.single()
+        assertEquals("review", admitted.role)
+        val frozen = com.labteto.dshmobile.local.agent.decodeFrozenAgentRole(requireNotNull(admitted.frozenRole))
+        assertEquals(4, frozen.profile.version)
+        file.writeText("""{"version":5,"base_role":"execute","instructions":"changed"}""")
+        val restored = f.runtime.project("custom-role-team").members.single()
+        assertEquals(admitted.frozenRole, restored.frozenRole)
+        assertTrue(frozen.instructions.contains("inspect original evidence"))
+        assertFalse(frozen.allowMutation)
+    }
+
     private data class Fixture(
         val runtime: LocalAgentTeamRuntime,
         val log: LocalSessionEventLog,
@@ -3001,6 +3022,7 @@ class LocalAgentTeamRuntimeTest {
     private fun fixture(
         sessionId: String,
         projectionScope: CoroutineScope? = null,
+        roleWorkspace: com.labteto.dshmobile.local.files.LocalWorkspace? = null,
         onProjectionReady: (String) -> Unit = {},
         leadSender: (String, QueuedAgentInput) -> Boolean = { _, _ -> false },
         sender: (String, QueuedAgentInput, String) -> JobMessageAdmission = { _, _, _ ->
@@ -3022,6 +3044,7 @@ class LocalAgentTeamRuntimeTest {
             eventLogFor = { log },
             projectionRegistry = SessionProjectionRegistry(),
             projectionScope = projectionScope,
+            roleWorkspace = roleWorkspace,
             onProjectionReady = onProjectionReady,
             sendToLead = leadSender,
         )

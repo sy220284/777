@@ -319,6 +319,11 @@ internal object LocalAgentTeamReducer {
             "TEAM_MEMBER_PROVISIONAL_INTENT_OUTSIDE_ADMISSION"
         }
         require(next.name.isNotBlank()) { "TEAM_MEMBER_NAME_INVALID" }
+        next.frozenRole?.let { frozen ->
+            require(com.labteto.dshmobile.local.agent.decodeFrozenAgentRole(frozen).role.wireName == next.role) {
+                "TEAM_MEMBER_ROLE_BINDING_CHANGED"
+            }
+        }
         require(next.workspaceRepository == null || next.workspaceRepository.isNotBlank()) { "TEAM_MEMBER_WORKSPACE_INVALID" }
         val byName = members.firstOrNull { it.name == next.name && it.id != next.id }
         require(byName == null) { "TEAM_MEMBER_NAME_CONFLICT：" + next.name }
@@ -332,7 +337,7 @@ internal object LocalAgentTeamReducer {
         require(
             previous.name == next.name &&
                 previous.provider == next.provider &&
-                previous.context == next.context && previous.workspaceRepository == next.workspaceRepository && previous.backendBinding == next.backendBinding
+                previous.context == next.context && previous.workspaceRepository == next.workspaceRepository && previous.backendBinding == next.backendBinding && previous.frozenRole == next.frozenRole
         ) {
             "TEAM_MEMBER_IMMUTABLE_FIELDS_CHANGED：" + next.id
         }

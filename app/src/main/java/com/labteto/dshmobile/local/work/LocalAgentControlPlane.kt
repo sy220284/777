@@ -5,7 +5,9 @@ import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend
-import com.labteto.dshmobile.local.agent.bindLocalAgentRole
+import com.labteto.dshmobile.local.agent.resolveLocalAgentRole
+import com.labteto.dshmobile.local.agent.intersectAgentRoleTools
+import com.labteto.dshmobile.local.agent.renderProjectAgentRoleCatalog
 import com.labteto.dshmobile.local.agent.renderLocalAgentRoleCatalog
 import com.labteto.dshmobile.local.agent.resolveLocalAgentSkillBindings
 import com.labteto.dshmobile.local.agent.renderDelegatedAgentSkillGuidance
@@ -59,16 +61,17 @@ internal class LocalAgentControlPlane(
         control.executeTeam(run, call)?.let { return it }
 
         return when (call.name) {
-            "list_agent_roles" -> renderLocalAgentRoleCatalog()
+            "list_agent_roles" -> renderProjectAgentRoleCatalog(skillWorkspace)
             "subagent", "spawn_subagent" -> {
                 val task = args.string("task")
-                val roleBinding = bindLocalAgentRole(
+                val roleBinding = resolveLocalAgentRole(
+                    workspace = skillWorkspace,
                     requested = args.optionalString("role"),
                     userInstructions = delegatedAgentInstructions(args),
                     parentMutationAllowed = false,
                 )
                 val instructions = roleBinding.instructions
-                val model = LocalWorkerModelRouter.resolve(args.optionalString("model"), snapshot)
+                val model = LocalWorkerModelRouter.resolve(args.optionalString("model") ?: roleBinding.modelOverride, snapshot)
                 val maxSteps = LocalAgentRuntimeLimits.normalizeSubagentSteps(
                     args.int("max_steps", snapshot.subagentMaxSteps),
                 )
@@ -78,7 +81,7 @@ internal class LocalAgentControlPlane(
                     args.optionalString("context_mode"), background, virtualScreen,
                 )
                 val outputSchema = args.outputSchema()
-                val toolAllowlist = args.toolAllowlist()
+                val toolAllowlist = intersectAgentRoleTools(args.toolAllowlist(), roleBinding.toolAllowlist)
                 control.delegate(run, LocalAgentDispatchRequest(
                     kind = if (background) LocalAgentDispatchKind.READONLY_BACKGROUND
                         else LocalAgentDispatchKind.READONLY_FOREGROUND,
@@ -98,7 +101,8 @@ internal class LocalAgentControlPlane(
             "subagent_fork", "fork_subagent" -> {
                 val workspaceRepository = decodeAgentWorkspaceRepository(args)
                 require(workspaceRepository == null || allowMutation) { "创建独立工作区需要父任务写入权限" }
-                val roleBinding = bindLocalAgentRole(
+                val roleBinding = resolveLocalAgentRole(
+                    workspace = skillWorkspace,
                     requested = args.optionalString("role"),
                     userInstructions = delegatedAgentInstructions(args),
                     parentMutationAllowed = allowMutation,
@@ -107,12 +111,12 @@ internal class LocalAgentControlPlane(
                     kind = LocalAgentDispatchKind.FORK,
                     task = args.string("task"),
                     instructions = roleBinding.instructions,
-                    modelOverride = LocalWorkerModelRouter.resolve(null, snapshot),
+                    modelOverride = LocalWorkerModelRouter.resolve(roleBinding.modelOverride, snapshot),
                     maxSteps = snapshot.subagentMaxSteps,
                     parentToolCallId = call.id,
                     allowMutation = roleBinding.allowMutation,
                     historyMode = LocalSubagentHistoryMode.INHERIT_PARENT,
-                    toolAllowlist = args.toolAllowlist(),
+                    toolAllowlist = intersectAgentRoleTools(args.toolAllowlist(), roleBinding.toolAllowlist),
                     outputSchema = args.outputSchema(),
                     executionBackend = LocalAgentExecutionBackend.fromWire(args.optionalString("execution_backend")),
                     workspaceRepository = workspaceRepository,

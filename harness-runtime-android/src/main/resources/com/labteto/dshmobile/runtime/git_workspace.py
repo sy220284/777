@@ -69,6 +69,238 @@ def remove_unadmitted(source, directory):
         shutil.rmtree(directory)
 
 
+def tree_entries(source, tree, paths):
+    wanted = set(paths)
+    entries = {}
+    for record in git(source, "ls-tree", "-r", "-z", tree).stdout.split(b"\0"):
+        if not record:
+            continue
+        header, path = record.split(b"\t", 1)
+        name = os.fsdecode(path)
+        if name in wanted:
+            mode, kind, oid = header.decode().split()
+            if kind != "blob":
+                raise ValueError("integration requires file-level changes: " + name)
+            entries[name] = dict(mode=mode, oid=oid)
+    return entries
+
+
+def local_entry(source, path):
+    # Never traverse a changed parent symlink while inspecting/recovering a merge.
+    target = source / path
+    for parent in target.parents:
+        if parent == source:
+            break
+        if parent.is_symlink():
+            return dict(mode="parent_symlink")
+    if target.is_symlink():
+        data = os.fsencode(os.readlink(target))
+        mode = "120000"
+    elif target.is_file():
+        data = target.read_bytes()
+        mode = "100755" if target.stat().st_mode & 0o111 else "100644"
+    elif target.is_dir():
+        return dict(mode="directory")
+    elif not target.exists():
+        return None
+    else:
+        return dict(mode="special")
+    oid = git(source, "hash-object", "--stdin", data=data).stdout.decode().strip()
+    return dict(mode=mode, oid=oid)
+
+
+def prepare_integration(source, manifest, admission, parent_tree, merged_tree, child_tree):
+    paths = [os.fsdecode(p) for p in git(source, "diff", "--name-only", "--no-renames", "-z",
+                                       parent_tree, merged_tree).stdout.split(b"\0") if p]
+    after = tree_entries(source, merged_tree, paths)
+    backup = manifest.parent / "integration-backup"
+    backup.mkdir(exist_ok=True)
+    records = {}
+    for index, path in enumerate(paths):
+        before = local_entry(source, path)
+        if before is not None and before["mode"] not in ("100644", "100755", "120000", "directory"):
+            raise ValueError("cannot snapshot integration path: " + path)
+        if before is not None and before["mode"] != "directory":
+            target = source / path
+            data = os.fsencode(os.readlink(target)) if target.is_symlink() else target.read_bytes()
+            if git(source, "hash-object", "--stdin", data=data).stdout.decode().strip() != before["oid"]:
+                raise ValueError("source changed while preparing integration: " + path)
+            with (backup / str(index)).open("wb") as output:
+                output.write(data); output.flush(); os.fsync(output.fileno())
+            before = dict(before, backup=str(index))
+        records[path] = dict(before=before, after=after.get(path))
+    descriptor = os.open(str(backup), os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    stage = manifest.parent / "integration-stage"
+    if stage.exists():
+        shutil.rmtree(stage)
+    stage.mkdir()
+    for path in sorted(records, key=lambda p: (len(Path(p).parts), p)):
+        before = records[path]["before"]
+        if before is None:
+            continue
+        target = stage / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if before["mode"] == "directory":
+            target.mkdir(exist_ok=True)
+        else:
+            data = (backup / before["backup"]).read_bytes()
+            if before["mode"] == "120000":
+                target.symlink_to(os.fsdecode(data))
+            else:
+                target.write_bytes(data)
+                target.chmod(0o755 if before["mode"] == "100755" else 0o644)
+    integration = dict(state="staging", source_tree=parent_tree, target_tree=merged_tree,
+                       child_tree=child_tree, paths=records, unresolved_paths=[])
+    admission["integration"] = integration
+    save(manifest, admission)
+    # The backup belongs to the exact preflight version, not a transient concurrent edit.
+    if snapshot(source) != parent_tree or any(local_entry(source, path) !=
+            ({k: v for k, v in item["before"].items() if k != "backup"} if item["before"] else None)
+            for path, item in records.items()):
+        integration["state"] = "not_started"
+        save(manifest, admission)
+        raise ValueError("source changed during merge preparation; inspect and retry")
+    return integration
+
+
+def publish_integration(source, stage, manifest, admission):
+    integration = admission["integration"]
+    records = integration["paths"]
+    for path, item in records.items():
+        item["after"] = local_entry(stage, path)
+    # Exact post-images are known before any source file is touched.
+    integration["state"] = "applying"
+    save(manifest, admission)
+    deleted = sorted((p for p in records if records[p]["after"] is None),
+                     key=lambda p: (len(Path(p).parts), p), reverse=True)
+    written = sorted((p for p in records if records[p]["after"] is not None),
+                     key=lambda p: (len(Path(p).parts), p))
+    for path in deleted + written:
+        item = records[path]
+        before = item["before"]
+        expected = {k: v for k, v in before.items() if k != "backup"} if before else None
+        if local_entry(source, path) != expected:
+            raise ValueError("source changed before publishing integration: " + path)
+        target = source / path
+        after = item["after"]
+        if after is None:
+            if target.is_dir() and not target.is_symlink():
+                target.rmdir()
+            elif target.exists() or target.is_symlink():
+                target.unlink()
+        elif after["mode"] == "directory":
+            if target.is_file() or target.is_symlink():
+                target.unlink()
+            target.mkdir(parents=True, exist_ok=True)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.is_dir() and not target.is_symlink():
+                target.rmdir()  # Never remove an unexpected descendant recursively.
+            descriptor, temporary = tempfile.mkstemp(prefix="publish-", dir=manifest.parent / "integration-backup")
+            try:
+                data = os.fsencode(os.readlink(stage / path)) if after["mode"] == "120000" else (stage / path).read_bytes()
+                with os.fdopen(descriptor, "wb") as output:
+                    output.write(data); output.flush(); os.fsync(output.fileno())
+                if after["mode"] == "120000":
+                    os.unlink(temporary); os.symlink(os.fsdecode(data), temporary)
+                else:
+                    os.chmod(temporary, 0o755 if after["mode"] == "100755" else 0o644)
+                os.replace(temporary, target)
+            finally:
+                if os.path.lexists(temporary):
+                    os.unlink(temporary)
+        descriptor = os.open(str(target.parent), os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+
+def recover_integration(source, manifest, admission):
+    integration = admission["integration"]
+    if integration["state"] == "staging":
+        integration["state"] = "not_started"
+        save(manifest, admission)
+        return dict(workspace_id=admission["workspace_id"], state="not_started", integration=integration)
+    if snapshot(source) == integration["target_tree"]:
+        integration["state"] = "merged"
+        integration["unresolved_paths"] = []
+        save(manifest, admission)
+        return dict(workspace_id=admission["workspace_id"], state="merged", integration=integration,
+                    source_tree=integration["target_tree"], tree=integration["child_tree"])
+    unresolved = []
+    records = integration["paths"]
+    # Remove only exact newly-created outputs, deepest first, then restore prior files.
+    ordered = sorted(records, key=lambda path: (len(Path(path).parts), path), reverse=True)
+    for path in ordered:
+        item = records[path]
+        before = item["before"]
+        expected_before = {k: v for k, v in before.items() if k != "backup"} if before else None
+        current = local_entry(source, path)
+        if current == expected_before:
+            continue
+        target = source / path
+        if current == dict(mode="directory") and item["after"] is None:
+            try:
+                target.rmdir()
+                current = None
+            except OSError:
+                unresolved.append(path)
+                continue
+        if current != item["after"]:
+            unresolved.append(path)
+            continue
+        if before is None:
+            if target.exists() or target.is_symlink():
+                target.unlink()
+        elif before["mode"] == "directory":
+            if target.exists() or target.is_symlink():
+                target.unlink()
+            target.mkdir(parents=True, exist_ok=True)
+        else:
+            data = (manifest.parent / "integration-backup" / before["backup"]).read_bytes()
+            if git(source, "hash-object", "--stdin", data=data).stdout.decode().strip() != before["oid"]:
+                raise RuntimeError("integration backup is not intact: " + path)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            # A private sibling and rename avoid truncating the destination during rollback.
+            if current == dict(mode="directory"):
+                try:
+                    target.rmdir()
+                except OSError:
+                    unresolved.append(path)
+                    continue
+                current = None
+            descriptor, temporary = tempfile.mkstemp(prefix="restore-", dir=manifest.parent / "integration-backup")
+            try:
+                with os.fdopen(descriptor, "wb") as output:
+                    output.write(data); output.flush(); os.fsync(output.fileno())
+                if before["mode"] == "120000":
+                    os.unlink(temporary)
+                    os.symlink(os.fsdecode(data), temporary)
+                else:
+                    os.chmod(temporary, 0o755 if before["mode"] == "100755" else 0o644)
+                if local_entry(source, path) != current:
+                    unresolved.append(path)
+                    continue
+                os.replace(temporary, target)
+            finally:
+                if os.path.lexists(temporary):
+                    os.unlink(temporary)
+        descriptor = os.open(str(target.parent), os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    integration["state"] = "needs_inspection" if unresolved else "rolled_back"
+    integration["unresolved_paths"] = sorted(set(unresolved))
+    save(manifest, admission)
+    return dict(workspace_id=admission["workspace_id"], state=integration["state"], integration=integration)
+
+
 def operate(root, store, owner, action, arguments):
     root, store = Path(root).resolve(), Path(store).resolve()
     if store == root or root in store.parents:
@@ -155,12 +387,17 @@ def locked(root, store, owner, action, arguments):
     if arguments.get("expected_tree") != child_tree:
         raise ValueError("workspace changed since review; inspect again")
     if action == "discard":
+        if admission.get("integration", {}).get("state") in ("staging", "applying", "needs_inspection"):
+            raise ValueError("recover the pending integration before discarding its workspace")
         git(source, "worktree", "remove", "--force", str(directory))
         admission["state"] = "discarded"
         save(manifest, admission)
         return dict(workspace_id=workspace_id, state="discarded")
     if action != "merge":
         raise ValueError("unknown workspace operation")
+    pending = admission.get("integration")
+    if pending and pending["state"] in ("staging", "applying", "needs_inspection"):
+        return recover_integration(source, manifest, admission)
     if "allowed_paths" in arguments:
         allowed = arguments["allowed_paths"]
         if not isinstance(allowed, list) or not allowed or any(
@@ -185,10 +422,24 @@ def locked(root, store, owner, action, arguments):
         git(source, "apply", "--check", "--binary", "--whitespace=nowarn", "-", data=patch)
         if snapshot(source) != parent_tree:
             raise ValueError("source changed during merge; inspect and retry")
-        git(source, "apply", "--binary", "--whitespace=nowarn", "-", data=patch)
-    actual = snapshot(source)
-    if actual != merged_tree:
-        raise RuntimeError("merge requires inspection: source changed while applying; do not blindly replay")
+        integration = prepare_integration(source, manifest, admission, parent_tree, merged_tree, child_tree)
+        try:
+            stage = manifest.parent / "integration-stage"
+            git(stage, "apply", "--binary", "--whitespace=nowarn", "-", data=patch)
+            publish_integration(source, stage, manifest, admission)
+            actual = snapshot(source)
+            if actual != merged_tree:
+                raise RuntimeError("merge source changed while applying; inspect integration outcome")
+            integration["state"] = "merged"
+            save(manifest, admission)
+        except Exception as failure:
+            try:
+                recover_integration(source, manifest, admission)
+            except Exception as recovery_error:
+                raise RuntimeError("merge and recovery incomplete; inspect original integration record") from recovery_error
+            raise
+    else:
+        actual = snapshot(source)
     return dict(workspace_id=workspace_id, state="merged" if patch else "already_present",
                 tree=child_tree, source_tree=actual, base_tree=base_tree)
 

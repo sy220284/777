@@ -60,6 +60,7 @@ internal data class LocalAgentRoleProfile(
     val version: Int,
     val toolIntent: String,
     val resultContract: String,
+    val sourceSha256: String? = null,
 )
 
 internal fun LocalAgentSpecialty.profile(): LocalAgentRoleProfile =
@@ -98,6 +99,8 @@ internal data class LocalAgentRoleBinding(
     val instructions: String,
     val allowMutation: Boolean,
     val profile: LocalAgentRoleProfile = role.profile(),
+    val toolAllowlist: Set<String>? = null,
+    val modelOverride: String? = null,
 )
 
 internal fun bindLocalAgentRole(

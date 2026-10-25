@@ -231,7 +231,7 @@ object LocalToolCatalog {
             "instructions" to string("可选；该子代理持续遵循的工作规则，不会扩大工具或权限"),
             "role" to string("专业角色：general、explore、plan、verify、review、security、qa、doc、data_research、performance、incident_recovery、coordinator；只读入口不能选择 execute 或 integrate"),
             "skill_ids" to stringArray("可选；从本地已安装技能中选最多 3 个并冻结内容指纹；技能只提供方法，不授予工具权限"),
-            "execution_backend" to string("执行后端：in_process（默认）、isolated_process（独立系统 UID）、trusted_remote（须用户先配置并授权固定证书的远端执行器）"),
+            "execution_backend" to string("执行后端：in_process（默认）、isolated_process（独立系统 UID）、trusted_remote（须用户授权固定证书；仅控制循环远端，模型和工具仍由本机执行）"),
             "context_mode" to buildJsonObject {
                 put("type", "string")
                 put("description", "isolated 只传任务（默认）；inherit 前台只读继承父会话历史，不能与后台或虚拟屏共用")
@@ -253,11 +253,11 @@ object LocalToolCatalog {
             "instructions" to string("可选；继承上下文之外，额外约束该子代理持续遵循的工作规则"),
             "role" to string("专业角色：general、explore、plan、execute、verify、review、integrate、security、qa、doc、data_research、performance、incident_recovery、coordinator；只读角色收窄权限"),
             "skill_ids" to stringArray("可选；子代理调用前从本地技能仓库冻结最多 3 个 SKILL.md 版本，不能扩大实际工具授权"),
-            "execution_backend" to string("执行后端：in_process（默认）、isolated_process（独立系统 UID）、trusted_remote（须用户先配置并授权固定证书的远端执行器）"),
+            "execution_backend" to string("执行后端：in_process（默认）、isolated_process（独立系统 UID）、trusted_remote（须用户授权固定证书；仅控制循环远端，模型和工具仍由本机执行）"),
             "output_schema" to jsonSchemaObject("可选；要求子代理最终只返回符合该 JSON Schema 的对象"),
             "allowed_tools" to stringArray("可选；限制 fork 子代理可见且可执行的工具名"),
         ), listOf("task")))
-        add(tool("list_agent_roles", "返回本地版本化 AgentRoleProfile、交付约束和工具意图；角色不能提高用户授权，读取目录不执行工具", properties()))
+        add(tool("list_agent_roles", "返回内置角色和项目 .agents/roles/*.json 配置目录；项目角色支持 version/base_role/instructions/allowed_tools/model/skill_ids，启动冻结版本与技能，工具范围只收窄不增权", properties()))
         add(tool("list_subagent_models", "查看本机所有模型配置、凭据就绪状态、协议、模型能力及可用的子代理 profileId；可选向官方服务商查询该账户的模型目录，密钥始终由应用代管且不会输出", properties(
             "include_provider_models" to boolean("是否使用已保存凭据查询指定服务商官方 /models 接口；默认 false，不会在普通清单请求时联网"),
             "profile_id" to string("需要查询的已保存模型 profileId；联网查询时必填"),

@@ -31,6 +31,7 @@ internal object LocalAgentTeamEventCodec {
             put("role", role)
             workspaceRepository?.let { put("workspaceRepository", it) }
             backendBinding?.let { put("backendBinding", it) }
+            frozenRole?.let { put("frozenRole", it) }
             if (displayName.isNotBlank()) put("displayName", displayName)
             if (mutableToolsEnabled) put("mutableToolsEnabled", true)
             if (grantedExtensions.isNotEmpty()) put("grantedExtensions", JsonArray(grantedExtensions.sorted().map(::JsonPrimitive)))
@@ -101,6 +102,8 @@ internal object LocalAgentTeamEventCodec {
             workspaceRepository = decodeAgentWorkspaceRepository(member, "workspaceRepository"),
             backendBinding = if ("backendBinding" in member) (member["backendBinding"] as? JsonObject
                 ?: error("TEAM_MEMBER_BACKEND_INVALID")).also { com.labteto.dshmobile.local.agent.decodeAgentBackendBinding(it) } else null,
+            frozenRole = if ("frozenRole" in member) (member["frozenRole"] as? JsonObject
+                ?: error("TEAM_MEMBER_ROLE_INVALID")).also { com.labteto.dshmobile.local.agent.decodeFrozenAgentRole(it) } else null,
             displayName = member.optionalTeamString("displayName").orEmpty(),
             mutableToolsEnabled = member["mutableToolsEnabled"]?.jsonPrimitive?.booleanOrNull ?: false,
             grantedExtensions = (member["grantedExtensions"] as? JsonArray)
