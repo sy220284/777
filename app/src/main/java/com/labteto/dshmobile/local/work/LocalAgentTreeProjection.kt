@@ -36,6 +36,21 @@ internal data class LocalAgentTreeView(
             }
             return depth
         }
+        fun runLineage(node: LocalAgentTreeNode): Pair<String, Boolean> {
+            val chain = mutableListOf<String>()
+            val visited = hashSetOf<String>()
+            var current: LocalAgentTreeNode? = node
+            var cyclic = false
+            while (current != null) {
+                if (!visited.add(current.runId)) {
+                    cyclic = true
+                    break
+                }
+                chain.add(current.runId)
+                current = current.parentRunId?.let(byId::get)
+            }
+            return chain.asReversed().joinToString("/") to cyclic
+        }
         val header = "agent_tree runs=${nodes.size} partial=$partial " +
             "(checkpoint view, not an active-process census)"
         if (nodes.isEmpty()) return "$header\n暂无本窗口内的 Agent Run 检查点"
@@ -48,6 +63,9 @@ internal data class LocalAgentTreeView(
                 append("run=").append(node.runId)
                 append(" kind=").append(node.kind)
                 append(" status=").append(node.status)
+                val (lineage, cycle) = runLineage(node)
+                append(" run_path=").append(lineage)
+                if (cycle) append(" [lineage_cycle_invalid]")
                 node.agentId?.let { append(" agent=").append(it) }
                 node.parentRunId?.let {
                     append(" parent=").append(it)
