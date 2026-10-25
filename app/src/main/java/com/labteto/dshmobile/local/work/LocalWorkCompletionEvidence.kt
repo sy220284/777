@@ -27,6 +27,8 @@ internal data class LocalWorkCompletionEvidence(
     val pendingQuestion: Boolean,
     val deliveryEvidence: LocalWorkDeliveryEvidence? = null,
     val blockedWorkflow: Boolean = false,
+    val unreviewedTeamResults: Int = 0,
+    val rejectedTeamResults: Int = 0,
 ) {
     val findings: List<String> get() = buildList {
         if (openTodos > 0) add("完成声明与未完成任务清单冲突")
@@ -35,6 +37,8 @@ internal data class LocalWorkCompletionEvidence(
         if (pendingTeamMessages > 0) add("完成声明与待投递 Agent Team 消息冲突")
         if (failedTeamMembers > 0) add("完成声明与失败的 Agent Team 成员冲突")
         if (awaitingReviewMembers > 0) add("完成声明与仍待核验的 Agent Team 成果冲突")
+        if (unreviewedTeamResults > 0) add("完成声明与未通过来源重验的 Team 独立审查冲突")
+        if (rejectedTeamResults > 0) add("完成声明与独立 reviewer 已拒绝的 Team 成果冲突")
         if (teamFailure) add("完成声明与 Agent Team 异常状态冲突")
         if (teamRebuilding) add("完成声明与正在恢复的 Agent Team 状态冲突")
         if (blockedGoal) add("完成声明与阻塞目标状态冲突")
@@ -51,6 +55,8 @@ internal data class LocalWorkCompletionEvidence(
         if (pendingTeamMessages > 0) add("仍有 $pendingTeamMessages 条 Team 消息待投递")
         if (failedTeamMembers > 0) add("仍有 $failedTeamMembers 个 Agent Team 成员失败")
         if (awaitingReviewMembers > 0) add("仍有 $awaitingReviewMembers 个 Agent Team 成果待核验")
+        if (unreviewedTeamResults > 0) add("仍有 $unreviewedTeamResults 项新 Team 成果尚无可信独立 reviewer 通过记录")
+        if (rejectedTeamResults > 0) add("有 $rejectedTeamResults 项 Team 成果被独立 reviewer 拒绝，需修复并重新核验")
         if (teamFailure) add("Agent Team 当前存在异常状态")
         if (teamRebuilding) add("Agent Team 正在恢复状态")
         if (blockedGoal) add("目标仍处于阻塞状态")
@@ -91,6 +97,17 @@ internal fun localWorkCompletionEvidence(
         pendingQuestion = work.pendingQuestion != null,
         deliveryEvidence = deliveryEvidence,
         blockedWorkflow = work.workflowProgress?.needsUserAction == true,
+        // Only newly evidence-backed completions require a reviewer; historical tasks without
+        // durable proof retain their legacy semantics. Reviewer approval alone does not bypass
+        // the actual artifact SHA/test exit-code acceptance in LocalWorkDeliveryEvidence.
+        unreviewedTeamResults = team.tasks.count {
+            it.status == "completed" && it.completionResultId != null &&
+                it.independentReviewStatus !in setOf("reviewer_approved", "reviewer_rejected")
+        },
+        rejectedTeamResults = team.tasks.count {
+            it.status == "completed" && it.completionResultId != null &&
+                it.independentReviewStatus == "reviewer_rejected"
+        },
     )
 }
 
@@ -108,6 +125,8 @@ internal fun LocalWorkCompletionEvidence.toDiagnosticJson(): JsonObject = buildJ
     put("pending_team_messages", pendingTeamMessages)
     put("failed_team_members", failedTeamMembers)
     put("awaiting_review_members", awaitingReviewMembers)
+    put("unreviewed_team_results", unreviewedTeamResults)
+    put("rejected_team_results", rejectedTeamResults)
     put("team_has_failure", teamFailure)
     put("team_rebuilding", teamRebuilding)
     put("blocked_goal", blockedGoal)
