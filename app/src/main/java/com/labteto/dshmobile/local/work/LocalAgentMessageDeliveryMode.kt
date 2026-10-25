@@ -30,6 +30,22 @@ internal fun shouldWakeAgentAfterAcceptedMessage(
     mode == LocalAgentMessageDeliveryMode.TRIGGER_TURN
 
 /**
+ * Codex delivery.rs preserves QueueOnly/TriggerTurn through routing. The wake target
+ * is always the addressed child, never an entire session or the sender's Agent tree.
+ */
+internal fun addressedAgentWakeTarget(
+    agentId: String,
+    mode: LocalAgentMessageDeliveryMode,
+    accepted: Boolean,
+    requiresResume: Boolean,
+    duplicate: Boolean = false,
+): String? {
+    if (!shouldWakeAgentAfterAcceptedMessage(mode, accepted, requiresResume, duplicate)) return null
+    require(agentId.isNotBlank()) { "AGENT_MESSAGE_TARGET_REQUIRED" }
+    return agentId
+}
+
+/**
  * A durable acceptance receipt. It explicitly does not promise execution, consumption or
  * a completed turn. Wake *requested* also does not mean that a new turn was admitted.
  */
