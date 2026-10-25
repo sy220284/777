@@ -93,7 +93,7 @@ internal fun enforceTeamMemberWorkspaceMutation(
             val headers = patch.lineSequence().filter { it.startsWith("diff --git ") }.toList()
             require(headers.isNotEmpty()) { "TEAM_WRITE_PATCH_HEADER_REQUIRED" }
             headers.forEach { header ->
-                val m = Regex("""diff --git a/([^\\s]+) b/([^\\s]+)""").matchEntire(header)
+                val m = Regex("""diff --git a/([^\s]+) b/([^\s]+)""").matchEntire(header)
                     ?: error("TEAM_WRITE_PATCH_HEADER_INVALID")
                 requirePath(m.groupValues[1])
                 requirePath(m.groupValues[2])
