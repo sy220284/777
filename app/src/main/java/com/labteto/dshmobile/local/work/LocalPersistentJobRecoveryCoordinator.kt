@@ -224,6 +224,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             continuable = true,
             requestedId = requestedJobId,
         ) { jobId, report ->
+            if (teamManaged) awaitTeamMemberSpawnCommit(eventLogFor(sessionId), sessionId, jobId)
             suspendWorkflowJobForNewUser(eventLogFor(sessionId), jobId, workflowFence != null, allowMutation, teamManaged)  {
               withContext(LocalModelRunContext(runProfile) + LocalWorkflowExecutionFence {
                 if (workflowFence != null) requireWorkflowFenceCurrent(sessionId, workflowFence)
@@ -574,6 +575,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
 
         jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { jobId, report ->
+          if (capabilities.teamManaged) awaitTeamMemberSpawnCommit(eventLogFor(sessionId), sessionId, jobId)
           suspendWorkflowJobForNewUser(eventLogFor(sessionId), jobId, workflowFence != null, capabilities.allowMutation, capabilities.teamManaged) {
             val profile = modelGateway.profileForRoute(profileId, model, baseUrl)
             require(
