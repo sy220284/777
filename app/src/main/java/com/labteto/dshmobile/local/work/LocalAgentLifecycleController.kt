@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.LocalJobManager
+import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -93,6 +94,31 @@ internal class LocalAgentLifecycleController(
     fun close(sessionId: String, agentId: String): String {
         registry.resolveStandalone(sessionId, agentId)
         return jobs.kill(agentId, sessionId)
+    }
+
+    /**
+     * Codex ensure_child_loaded: preserve the original durable Job ID and mailbox.
+     * The invoking coroutine must own the recorded direct-parent slot. Scheduling
+     * remains a request to the existing coordinator and is not proof of execution.
+     */
+    suspend fun ensureChildLoaded(sessionId: String, agentId: String): String {
+        val caller = captureLocalAgentParentLink()
+        val view = registry.observeStandalone(sessionId, agentId)
+        validateImmediateAgentParentForLoad(view.recordedParent, caller, sessionId)
+        when (view.residency) {
+            LocalAgentRuntimeResidency.ACTIVE_JOB -> return
+                "agent_id=$agentId\\nchild_loaded=true\\nload_action=already_active"
+            LocalAgentRuntimeResidency.TERMINAL -> error(
+                "AGENT_CHILD_TERMINAL：终态代理不能重新加载"
+            )
+            LocalAgentRuntimeResidency.UNLOADED -> Unit
+        }
+        validateAgentResumeAdmission(view.registration.info, view.registration.snapshot)
+        persistentJobs.scheduleAgentResume(sessionId, agentId)
+        return "agent_id=$agentId\\nload_requested=true\\nload_admitted=unverified" +
+            "\\nstatus_before=" + view.registration.info.status +
+            "\\nparent_slot=" + (view.recordedParent?.parentSlotId ?: "legacy_unknown") +
+            "\\n说明=加载由原持久 Job 恢复入口处理，身份、邮箱与模型路由不替换"
     }
 
     fun resume(sessionId: String, agentId: String): String {
