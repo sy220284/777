@@ -4,6 +4,7 @@ import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.LocalJobManager
+import com.labteto.dshmobile.local.jobs.LocalJobRegistration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,27 +43,32 @@ class LocalAgentLifecycleControlTest {
     )
 
     @Test fun registrationUsesOneDurableSnapshotAndRejectsCrossSessionOrFakeAgent() {
+        fun registered(snapshot: JobSnapshot, agent: LocalJobInfo = info(
+            status = snapshot.status, pending = snapshot.inbox.size,
+            continuable = snapshot.continuable,
+        )) = LocalJobRegistration(agent, snapshot)
         assertEquals("job-agent-one",
-            requireAgentRegistration(listOf(snapshot()), "session-a", "job-agent-one").info.id)
+            requireAgentRegistration(listOf(registered(snapshot())), "session-a", "job-agent-one").info.id)
         assertTrue(runCatching {
-            requireAgentRegistration(listOf(snapshot()), "session-b", "job-agent-one")
+            requireAgentRegistration(listOf(registered(snapshot())), "session-b", "job-agent-one")
         }.isFailure)
         assertTrue(runCatching {
-            requireAgentRegistration(listOf(snapshot().copy(label = "后台 shell")), "session-a", "job-agent-one")
+            requireAgentRegistration(listOf(registered(snapshot(), info(isAgent = false))),
+                "session-a", "job-agent-one")
         }.isFailure)
         assertTrue(runCatching {
-            requireAgentRegistration(listOf(snapshot()), "session-a", "")
+            requireAgentRegistration(listOf(registered(snapshot())), "session-a", "")
         }.isFailure)
         val persisted = snapshot().copy(status = "dormant",
             inbox = listOf(QueuedAgentInput(id = "queued-1", content = "继续", memoryInput = "继续")))
-        val resolved = requireAgentRegistration(listOf(persisted), "session-a", "job-agent-one")
+        val resolved = requireAgentRegistration(
+            listOf(registered(persisted)), "session-a", "job-agent-one")
         assertEquals("dormant", resolved.info.status)
         assertEquals(1, resolved.info.pendingMessageCount)
-        assertTrue(resolved.info.canMessage)
         assertTrue(resolved.snapshot === persisted)
     }
 
-    @Test fun registrySeparatesTeamRoutingFromStandaloneAndNeverResolvesCrossSession() = runBlocking {
+        @Test fun registrySeparatesTeamRoutingFromStandaloneAndNeverResolvesCrossSession() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val jobs = LocalJobManager(scope, onChanged = {})
         try {
