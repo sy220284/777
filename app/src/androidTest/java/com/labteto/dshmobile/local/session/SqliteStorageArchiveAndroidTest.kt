@@ -17,6 +17,81 @@ import org.junit.runner.RunWith
 /** Full SQLite archive/restore, without overwriting app or JVM-test data. */
 @RunWith(AndroidJUnit4::class)
 class SqliteStorageArchiveAndroidTest {
+    @Test fun scopeMarkerExplainsMediaStudioExclusionAndTamperingBlocksRestore() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val uid = UUID.randomUUID().toString()
+        val srcSnap = "scope-source-$uid-snap.db"
+        val srcEvent = "scope-source-$uid-events.db"
+        val dstSnap = "scope-target-$uid-snap.db"
+        val dstEvent = "scope-target-$uid-events.db"
+        val key = "scope-import-$uid"
+        val pending = java.io.File(context.filesDir, "local-harness/.sqlite-restore-pending-$key")
+        fun modifyArchive(bytes: ByteArray, removeScope: Boolean, corruptScope: Boolean): ByteArray {
+            val result = ByteArrayOutputStream()
+            java.util.zip.ZipInputStream(java.io.ByteArrayInputStream(bytes)).use { input ->
+                java.util.zip.ZipOutputStream(result).use { output ->
+                    while (true) {
+                        val item = input.nextEntry ?: break
+                        if (removeScope && item.name == "backup.scope.json") {
+                            input.closeEntry()
+                            continue
+                        }
+                        output.putNextEntry(java.util.zip.ZipEntry(item.name))
+                        if (item.name == "backup.scope.json" && corruptScope) {
+                            output.write("""{"version":1,"scope":"all-media","mediaStudio":true}""".toByteArray())
+                        } else input.copyTo(output)
+                        output.closeEntry()
+                        input.closeEntry()
+                    }
+                }
+            }
+            return result.toByteArray()
+        }
+        try {
+            val original = ByteArrayOutputStream()
+            SqliteSessionSnapshotStore(context, Json, srcSnap).use { snap ->
+                SqliteSessionEventDatabase(context, Json, srcEvent).use { events ->
+                    snap.write("session", Json.encodeToJsonElement(
+                        LocalHarnessSession.serializer(),
+                        LocalHarnessSession(id = "session", title = "会话范围校验"),
+                    ).jsonObject, 42L)
+                    events.append("session", "user/message", buildJsonObject { put("content", "kept") })
+                    SqliteSessionStorageManager(context, snap, events, srcSnap, srcEvent,
+                        "scope-export-$uid").exportAll(original)
+                }
+            }
+            var scopeText: String? = null
+            java.util.zip.ZipInputStream(java.io.ByteArrayInputStream(original.toByteArray())).use { zip ->
+                while (true) {
+                    val item = zip.nextEntry ?: break
+                    if (item.name == "backup.scope.json") scopeText = zip.readBytes().toString(Charsets.UTF_8)
+                    zip.closeEntry()
+                }
+            }
+            assertTrue("Media Studio exclusion must be machine-readable",
+                scopeText.orEmpty().contains("\"mediaStudio\":false"))
+            SqliteSessionSnapshotStore(context, Json, dstSnap).use { snapshots ->
+                SqliteSessionEventDatabase(context, Json, dstEvent).use { events ->
+                    val restore = SqliteSessionStorageManager(context, snapshots, events,
+                        dstSnap, dstEvent, key)
+                    val corrupt = modifyArchive(original.toByteArray(),
+                        removeScope = false, corruptScope = true)
+                    val error = runCatching { restore.stageRestore(corrupt) }.exceptionOrNull()
+                    assertTrue("Tampered backup scope must fail closed", error is IllegalArgumentException)
+                    assertTrue("Invalid scope must not create a READY restore", !pending.exists())
+                    // Pre-marker SQLite archives remain compatible.
+                    val old = modifyArchive(original.toByteArray(),
+                        removeScope = true, corruptScope = false)
+                    assertEquals(1, restore.stageRestore(old))
+                    assertTrue(java.io.File(pending, "READY").isFile)
+                }
+            }
+        } finally {
+            pending.deleteRecursively()
+            listOf(srcSnap, srcEvent, dstSnap, dstEvent).forEach(context::deleteDatabase)
+        }
+    }
+
     @Test fun exportRejectsSnapshotProjectionAheadOfDurableEventAuthority() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val uid = UUID.randomUUID().toString()

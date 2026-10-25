@@ -10,6 +10,7 @@ import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
+import com.labteto.dshmobile.local.web.LocalSearchUsageSnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageGroupKind
 import com.labteto.dshmobile.local.TokenUsageRecord
@@ -70,6 +71,7 @@ class SettingsViewModel @Inject constructor(
     val chatStyleGuardBuiltInPhrases: List<String> get() = localHarness.chatStyleGuardBuiltInPhrases
     val approvalMode: StateFlow<LocalApprovalMode> = localHarness.approvalMode
     val deepSeekPricing: StateFlow<DeepSeekPricingState> = settingsData.deepSeekPricing
+    val searchUsage: StateFlow<LocalSearchUsageSnapshot> = settingsData.searchUsage
     val usageAnalytics: StateFlow<TokenUsageAnalyticsSnapshot> = settingsData.usageRevision
         .mapLatest {
             withContext(Dispatchers.IO) { settingsData.usageSnapshot() }

@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import android.os.Build
+import android.os.Debug
 import android.os.Bundle
 import android.os.SystemClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -37,10 +38,14 @@ class DevicePerformanceBaselineTest {
         val sorted = samples.sorted()
         fun percentile(value: Double): Double = sorted[(kotlin.math.ceil(value * sorted.size).toInt() - 1)
             .coerceIn(0, sorted.lastIndex)]
+        val memory = Debug.MemoryInfo().also { Debug.getMemoryInfo(it) }
+        val heap = Runtime.getRuntime()
+        val javaUsedKiB = (heap.totalMemory() - heap.freeMemory()) / 1024
         val output = "ANDROID_PERF api=${Build.VERSION.SDK_INT} scenario=$name samples=${sorted.size} " +
             "p50_ms=${"%.3f".format(Locale.US, percentile(0.50))} " +
             "p95_ms=${"%.3f".format(Locale.US, percentile(0.95))} " +
-            "max_ms=${"%.3f".format(Locale.US, sorted.last())}"
+            "max_ms=${"%.3f".format(Locale.US, sorted.last())} " +
+            "sample_pss_kib=${memory.totalPss} sample_java_used_kib=$javaUsedKiB"
         InstrumentationRegistry.getInstrumentation().sendStatus(2, Bundle().apply {
             putString("stream", output)
         })

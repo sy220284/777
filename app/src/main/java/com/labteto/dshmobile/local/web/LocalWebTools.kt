@@ -27,9 +27,14 @@ internal class LocalWebTools(
     suspend fun search(
         queries: List<String>,
         usageContext: TokenUsageContext? = null,
-    ): String {
-        return web.searchWithFallback(queries, usageContext, searchKeyProvider)
-    }
+        count: Int = 10,
+        needContent: Boolean = false,
+        provider: String = "auto",
+        oriQuestion: String? = null,
+        localization: String? = null,
+    ): String = web.searchWithFallback(
+        queries, usageContext, searchKeyProvider, count, needContent, provider, oriQuestion, localization,
+    )
 
     suspend fun fetch(
         input: String,
@@ -37,7 +42,15 @@ internal class LocalWebTools(
         format: String,
         timeoutSeconds: Long,
         allowArtifactWrite: Boolean = true,
+        provider: String = "auto",
     ): String {
+        require(provider in setOf("auto", "local", "deepseek")) { "未知网页抓取服务：" + provider }
+        if (provider == "deepseek") {
+            require(format == "text") { "DeepSeek Fetch 仅返回 Markdown，不能使用 raw 格式" }
+            val key = searchKeyProvider()
+                ?: throw LocalWebException("FETCH_UNAVAILABLE", "DeepSeek Fetch 需要单独配置官方 DeepSeek API Key")
+            return formatFetchedWeb(web.fetchViaDeepSeek(key, input, maxBytes, timeoutSeconds), format, allowArtifactWrite)
+        }
         return try {
             formatFetchedWeb(
                 web.fetch(
@@ -50,13 +63,31 @@ internal class LocalWebTools(
                 allowArtifactWrite,
             )
         } catch (error: LocalWebException) {
-            if (error.code !in FALLBACK_WEB_ERRORS) throw error
+            if (provider == "local" || error.code !in FALLBACK_WEB_ERRORS) throw error
+            // The official Fetch endpoint returns readable Markdown when a site blocks
+            // direct HTTP extraction. Do not change raw-format semantics silently.
+            if (format == "text") {
+                val key = searchKeyProvider()
+                if (!key.isNullOrBlank()) {
+                    try {
+                        return "[web_fetch][" + error.code + "] 直接抓取失败，已使用 DeepSeek Fetch。\n" +
+                            formatFetchedWeb(web.fetchViaDeepSeek(key, input, maxBytes, timeoutSeconds), format, allowArtifactWrite)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // Retain the established search fallback if official Fetch is unavailable.
+                    }
+                }
+            }
             runCatching {
-                val fallback = search(listOf(web.fallbackQuery(input)))
-                "[web_fetch][${error.code}] 直接抓取失败，已自动降级为网页搜索。\n原因：${error.message}\n\n$fallback"
+                val fallback = search(listOf(web.fallbackQuery(input)), provider = "bing")
+                "[web_fetch][" + error.code + "] 直接抓取失败，已降级为公开网页搜索。\n原因：" +
+                    error.message + "\n\n" + fallback
             }.getOrElse { fallbackError ->
                 if (fallbackError is CancellationException) throw fallbackError
-                "[web_fetch][${error.code}] ${error.message}\n搜索降级也失败：${fallbackError.message}\n建议：先运行 network_diagnose，或把目标文件通过附件放入本机工作区。"
+                "[web_fetch][" + error.code + "] " + error.message +
+                    "\n搜索降级也失败：" + fallbackError.message +
+                    "\n建议：先运行 network_diagnose，或通过附件提供目标文件。"
             }
         }
     }

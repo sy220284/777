@@ -459,6 +459,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val url = payload["url"]?.jsonPrimitive?.contentOrNull ?: error("恢复任务缺少 url")
         val maxBytes = payload["max_bytes"]?.jsonPrimitive?.intOrNull ?: DEFAULT_WEB_FETCH_BYTES
         val format = payload["format"]?.jsonPrimitive?.contentOrNull ?: "text"
+        val provider = payload["provider"]?.jsonPrimitive?.contentOrNull ?: "auto"
         val timeout = payload["timeout_seconds"]?.jsonPrimitive?.contentOrNull
             ?.toLongOrNull() ?: BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS
         jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { _, report ->
@@ -471,6 +472,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 maxBytes.coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES),
                 format,
                 timeout.coerceIn(30L, BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS),
+                provider = provider,
             )
         }
     }

@@ -183,6 +183,7 @@ fun SettingsScreen(
     val approvalMode by viewModel.approvalMode.collectAsStateWithLifecycle()
     val deepSeekPricing by viewModel.deepSeekPricing.collectAsStateWithLifecycle()
     val usageAnalytics by viewModel.usageAnalytics.collectAsStateWithLifecycle()
+    val searchUsage by viewModel.searchUsage.collectAsStateWithLifecycle()
     val deviceCapabilities by viewModel.deviceCapabilities.collectAsStateWithLifecycle()
     // Re-probe after returning from Android settings; a stale permission badge is misleading.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshDeviceCapabilities() }
@@ -787,6 +788,7 @@ fun SettingsScreen(
                             usage = localHarness.usage,
                             onOpenPricing = { openPage(SettingsDestination.PRICING) },
                             analytics = usageAnalytics,
+                            searchUsage = searchUsage,
                             configuredModels = localHarness.modelProfiles.map { it.model },
                             selectedModel = selectedUsageModel,
                             onSelectModel = { selectedUsageModel = it },

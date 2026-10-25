@@ -2,8 +2,6 @@ package com.labteto.dshmobile.local
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.labteto.dshmobile.local.model.DeepSeekPricingRepository
-import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
@@ -79,8 +77,11 @@ class LocalWebCancellationAndroidTest {
 
     private fun provider(http: OkHttpClient): LocalWebProvider {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val usage = DeepSeekUsageTracker(context, DeepSeekPricingRepository(context, http), TokenUsageAnalyticsStore(context, Json))
-        return LocalWebProvider(context, http, Json, usage)
+        return LocalWebProvider(
+            context, http, Json,
+            com.labteto.dshmobile.local.web.LocalSearchUsageStore(context, Json),
+            com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings(context),
+        )
     }
 
     private fun blockedClient(entered: CountDownLatch, closed: AtomicBoolean): OkHttpClient =

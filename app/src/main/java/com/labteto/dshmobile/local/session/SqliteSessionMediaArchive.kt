@@ -132,8 +132,11 @@ internal class SqliteSessionMediaArchive(
             }
             indexed[filename] = size to parts[2]
         }
+        // New session-only archives carry an explicit exclusion contract for Media Studio.
+        // Old SQLite v2 archives without the marker stay readable.
+        val scope = if ("backup.scope.json" in archiveNames) setOf("backup.scope.json") else emptySet()
         require(archiveNames == expected.mapTo(mutableSetOf()) { "$MEDIA_PREFIX$it" } +
-            setOf(MANIFEST_ENTRY, "snapshot.sqlite", "events.sqlite")) {
+            setOf(MANIFEST_ENTRY, "snapshot.sqlite", "events.sqlite") + scope) {
             "SQLite 备份缺少媒体文件或包含多余成员"
         }
         verifyCatalogLocations(File(staging, "events.sqlite"), indexed)

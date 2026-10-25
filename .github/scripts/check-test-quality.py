@@ -19,6 +19,11 @@ TEST_ROOTS = tuple(sorted(path for path in ROOT.glob("*/src/test") if path.is_di
 )
 
 ASSUMPTION_ALLOW = {
+    # This test only runs when the two-step adb force-stop harness selects a
+    # specific stage. Full-suite discovery MUST skip it: executing stage and
+    # resume in one instrumentation process would be a false acceptance.
+    # run-cross-process-session-restore.sh enforces 1 executed test per phase.
+    "app/src/androidTest/java/com/labteto/dshmobile/local/session/SqliteCrossProcessRestoreAcceptanceAndroidTest.kt",
     "app/src/test/java/com/labteto/dshmobile/local/LocalSessionEventLogTest.kt",
     "harness-interop/src/test/kotlin/com/labteto/dshmobile/interop/lsp/LspPluginTest.kt",
 }

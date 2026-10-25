@@ -4,6 +4,8 @@ import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageGroupKind
 import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.web.LocalSearchUsageSnapshot
+import com.labteto.dshmobile.local.web.LocalSearchUsageStore
 import com.labteto.dshmobile.local.chat.LocalChatMemoryProjectionPort
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryRecord
@@ -33,9 +35,11 @@ class LocalSettingsDataFacade @Inject internal constructor(
     private val chatMemoryProjection: LocalChatMemoryProjectionPort,
     private val pricing: DeepSeekPricingRepository,
     private val usage: TokenUsageAnalyticsStore,
+    private val searchUsageStore: LocalSearchUsageStore,
 ) : com.labteto.dshmobile.uicontract.MemoryUiPort, PricingUiPort {
     internal val deepSeekPricing: StateFlow<DeepSeekPricingState> = pricing.state
     internal val usageRevision: StateFlow<Long> = usage.revision
+    internal val searchUsage: StateFlow<LocalSearchUsageSnapshot> = searchUsageStore.usage
     internal fun usageSnapshot(): TokenUsageAnalyticsSnapshot = usage.snapshot()
     internal fun usageGroupDetail(kind: TokenUsageGroupKind, key: String, modelFilter: String?): TokenUsageGroupDetail? = usage.groupDetail(kind, key, modelFilter = modelFilter)
     internal fun usageRecord(requestId: String): TokenUsageRecord? = usage.recordById(requestId)

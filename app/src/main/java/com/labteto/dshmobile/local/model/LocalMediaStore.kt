@@ -181,6 +181,16 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
         attached
     }
 
+    /**
+     * Prepare a verified, immutable Studio snapshot for the backup coordinator.
+     * Never advertise it as a restorable Session archive until import is implemented.
+     */
+    @Synchronized
+    internal fun stageMediaStudioBackup(target: File): LocalMediaStudioBackupSnapshot.Prepared = operation {
+        initialize()
+        LocalMediaStudioBackupSnapshot(context, json).prepare(database, target)
+    }
+
     fun file(name: String?): File? = managedFile(name)?.takeIf(File::isFile)
     private fun managedFile(name: String?): File? = name?.takeIf { it.matches(Regex("[A-Za-z0-9._-]{1,180}")) && it !in setOf(".", "..") }
         ?.let { File(directory, it).takeIf { f -> f.canonicalFile.parentFile == directory.canonicalFile } }

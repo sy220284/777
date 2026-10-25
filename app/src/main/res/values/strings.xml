@@ -1469,6 +1469,17 @@
     <string name="local_character_tuning_done">完成</string>
 <string name="usage_mode_chat">聊天模式</string>
 <string name="usage_mode_work">工作模式</string>
+    <string name="usage_mode_search">搜索消耗</string>
+    <string name="usage_search_request_count">搜索及抓取次数</string>
+    <string name="usage_search_today_count">今日请求</string>
+    <string name="usage_search_fee">预计搜索费用</string>
+    <string name="usage_search_deepseek_search">DeepSeek 搜索</string>
+    <string name="usage_search_deepseek_fetch">DeepSeek 网页抓取</string>
+    <string name="usage_search_bing">Bing 免费搜索</string>
+    <string name="usage_search_independent">搜索按成功请求计费，单独统计，不计入模型 Token。历史从启用此记录版本开始。</string>
+    <string name="usage_search_daily">每日搜索请求</string>
+    <string name="usage_search_count_unit">次</string>
+    <string name="usage_search_no_data">尚无搜索请求记录</string>
 <string name="usage_log_title">Token 消耗日志</string>
 <string name="usage_log_open">打开 Token 消耗日志</string>
 <string name="usage_device_total">本机累计</string>
@@ -1859,6 +1870,8 @@
     <string name="local_tool_activity_full_result">持久化执行结果</string>
     <string name="local_tool_activity_evidence_error">完整记录读取失败，当前显示结果预览</string>
     <string name="tools_network_search">网络搜索</string>
+    <string name="tools_deepseek_search">DeepSeek 高质量搜索</string>
+    <string name="tools_deepseek_search_hint">开启后优先使用已配置的 DeepSeek 官方 Search，并可调用 Fetch；仅成功且有结果的请求按每次 ¥0.005 计费，关闭后仍使用免费 Bing。</string>
     <string name="tools_network_search_hint">关闭后智能体无法搜索和抓取网页；GitHub 等其他联网能力不受影响</string>
     <string name="tools_agent_settings_hint">主循环、子循环步数、重试次数与子智能体模型</string>
     <!-- Markdown reply semantic emphasis -->

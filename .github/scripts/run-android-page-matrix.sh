@@ -71,7 +71,7 @@ if [[ "${1:-}" == "--cell" ]]; then
     exit 1
   fi
   "$emu" -avd "$avd" -no-window -gpu swiftshader_indirect \
-    -no-snapshot -noaudio -no-boot-anim -memory 3072 -cores 4 \
+    -no-snapshot -noaudio -no-boot-anim -memory 4096 -cores 4 \
     > "$root/emulator-$release-$page_kb-k.log" 2>&1 &
   emulator_pid=$!
   cleanup() {
@@ -110,7 +110,19 @@ if [[ "${1:-}" == "--cell" ]]; then
     echo "CELL_ERROR expected_api=$api actual_api=$actual_api expected_page=$((page_kb*1024)) actual_page=$actual_page" >&2
     exit 1
   fi
-  echo "CELL_VERIFIED api=$actual_api page_bytes=$actual_page image=$package"
+  echo "CELL_VERIFIED api=$actual_api page_bytes=$actual_page image=$package ram_mb=4096"
+  # A freshly booted Play-services image can launch heavy system work after
+  # sys.boot_completed. On 3 GiB Android16/16KB it exhausted the guest
+  # watermark: LMKD killed the foreground app (396MB RSS) and GMS services.
+  # Use equal 4 GiB guest RAM across all four cells and wait for idle boot
+  # broadcasts before instrumented performance admission.
+  if [[ "$page_kb" == "16" ]]; then
+    timeout 30 adb shell cmd activity wait-for-broadcast-idle || true
+    sleep 25
+  fi
+  echo "GUEST_MEMORY_BEFORE api=$api page_kb=$page_kb"
+  adb shell cat /proc/meminfo | grep -E '^(MemTotal|MemAvailable|SwapFree):' || true
+  adb shell dumpsys meminfo "$app" > "$root/meminfo-before-$release-$page_kb-k.txt" 2>&1 || true
   for setting in window_animation_scale transition_animation_scale animator_duration_scale; do
     adb shell settings put global "$setting" 0
   done
@@ -128,6 +140,8 @@ if [[ "${1:-}" == "--cell" ]]; then
     echo "CELL_ERROR Android $release $page_kb KB performance instrumentation failed" >&2
     adb logcat -d -v threadtime -b main -b system -b crash \
       > "$root/logcat-$release-$page_kb-k.txt" 2>&1 || true
+    adb shell dumpsys meminfo "$app" > "$root/meminfo-after-$release-$page_kb-k.txt" 2>&1 || true
+    adb shell cat /proc/meminfo > "$root/guest-meminfo-failure-$release-$page_kb-k.txt" 2>&1 || true
     adb shell dumpsys activity exit-info "$app" \
       > "$root/exit-info-$release-$page_kb-k.txt" 2>&1 || true
     adb shell dumpsys dropbox --print \

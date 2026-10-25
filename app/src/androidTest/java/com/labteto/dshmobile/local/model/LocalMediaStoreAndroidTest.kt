@@ -204,6 +204,90 @@ class LocalMediaStoreAndroidTest {
         assertFalse(shared.exists())
     }
 
+    @Test fun backupRejectsStructurallyIncompatibleDatabaseDespiteValidHash() {
+        legacy(emptyList())
+        val media = store()
+        for (invalidVersion in listOf(false, true)) {
+            val target = File(root, "incompatible-backup-$invalidVersion")
+            val backup = media.stageMediaStudioBackup(target)
+            SQLiteDatabase.openDatabase(backup.database.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+                if (invalidVersion) db.version = 2
+                else {
+                    db.execSQL("DROP INDEX media_pending")
+                    db.execSQL("ALTER TABLE media DROP COLUMN pending")
+                }
+            }
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(backup.database.readBytes()).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            File(target, "media-studio.manifest").writeText(
+                "media-studio-v1\ndatabase\t${backup.database.length()}\t$digest\n",
+            )
+            assertThrows(IllegalArgumentException::class.java) {
+                LocalMediaStudioBackupSnapshot(context, json).validate(target)
+            }
+            assertTrue(media.page().results.isEmpty())
+        }
+    }
+
+    @Test fun snapshotPreservesCrossSessionSharedOriginalAfterLiveRowsAreDeleted() {
+        val original = File(directory, "paid-shared.png").apply { writeBytes(byteArrayOf(2, 4, 6, 8)) }
+        legacy(listOf(
+            result("first", time = 1L, session = "alpha", file = original.name),
+            result("second", time = 2L, session = "beta", file = original.name),
+        ))
+        val first = store()
+        val staging = File(root, "studio-backup")
+        val prepared = first.stageMediaStudioBackup(staging)
+        assertTrue(prepared.database.isFile)
+        assertEquals(listOf("paid-shared.png"), prepared.mediaFiles.map(File::getName))
+        assertEquals(4L, prepared.mediaFiles.single().length())
+        assertEquals(1, LocalMediaStudioBackupSnapshot(context, json)
+            .validate(staging).mediaFiles.size)
+
+        first.remove("first")
+        assertTrue(original.isFile)
+        first.remove("second")
+        assertFalse(original.exists())
+        // Prepared backup contains independent file bytes and a durable SQLite snapshot.
+        val fromArchive = LocalMediaStudioBackupSnapshot(context, json).validate(staging)
+        assertTrue(fromArchive.database.isFile)
+        assertEquals(byteArrayOf(2, 4, 6, 8).toList(),
+            fromArchive.mediaFiles.single().readBytes().toList())
+        SQLiteDatabase.openDatabase(fromArchive.database.path, null,
+            SQLiteDatabase.OPEN_READONLY).use { db ->
+            db.rawQuery("SELECT COUNT(*) FROM media WHERE deleted=0", null).use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(2, cursor.getInt(0))
+            }
+        }
+    }
+
+    @Test fun missingOriginalStopsBackupWithoutReplacingLiveMediaHistory() {
+        legacy(listOf(result("paid", file = "missing-paid.png")))
+        val media = store()
+        assertEquals("paid", media.page().results.single().id)
+        val target = File(root, "failed-studio-backup")
+        assertThrows(IllegalStateException::class.java) {
+            media.stageMediaStudioBackup(target)
+        }
+        assertFalse(target.exists())
+        assertEquals("paid", store().page().results.single().id)
+    }
+
+    @Test fun corruptionOfStagedMediaFailsValidationButNeverModifiesOriginal() {
+        val original = File(directory, "receipt.png").apply { writeBytes(byteArrayOf(9, 1, 2)) }
+        legacy(listOf(result("paid", file = original.name)))
+        val media = store()
+        val target = File(root, "corrupt-studio-backup")
+        val staged = media.stageMediaStudioBackup(target).mediaFiles.single()
+        staged.writeBytes(byteArrayOf(0, 0, 0))
+        assertThrows(IllegalArgumentException::class.java) {
+            LocalMediaStudioBackupSnapshot(context, json).validate(target)
+        }
+        assertEquals(byteArrayOf(9, 1, 2).toList(), original.readBytes().toList())
+        assertEquals("paid", media.result("paid")?.id)
+    }
+
     @Test fun indexedPagesKeepAllHistoryAndSeparateSessions() {
         legacy((1..130).map { result("r$it", it.toLong(), if (it % 2 == 0) "even" else "odd") })
         val first = store()
