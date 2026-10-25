@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
+import com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend
 import com.labteto.dshmobile.local.agent.bindLocalAgentRole
 import com.labteto.dshmobile.local.agent.renderLocalAgentRoleCatalog
 import com.labteto.dshmobile.local.agent.resolveLocalAgentSkillBindings
@@ -90,6 +91,7 @@ internal class LocalAgentControlPlane(
                     historyMode = historyMode,
                     toolAllowlist = toolAllowlist,
                     outputSchema = outputSchema,
+                    executionBackend = LocalAgentExecutionBackend.fromWire(args.optionalString("execution_backend")),
                 ))
             }
             "subagent_fork", "fork_subagent" -> {
@@ -109,6 +111,7 @@ internal class LocalAgentControlPlane(
                     historyMode = LocalSubagentHistoryMode.INHERIT_PARENT,
                     toolAllowlist = args.toolAllowlist(),
                     outputSchema = args.outputSchema(),
+                    executionBackend = LocalAgentExecutionBackend.fromWire(args.optionalString("execution_backend")),
                 ))
             }
             "list_subagent_models" -> {
