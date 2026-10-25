@@ -41,18 +41,25 @@ class LocalAgentLifecycleControlTest {
         continuable = true,
     )
 
-    @Test fun cannotInspectOrControlOtherSessionsOrNonAgents() {
+    @Test fun registrationUsesOneDurableSnapshotAndRejectsCrossSessionOrFakeAgent() {
         assertEquals("job-agent-one",
-            requireOwnedAgentInfo(listOf(info()), "session-a", "job-agent-one").id)
+            requireAgentRegistration(listOf(snapshot()), "session-a", "job-agent-one").info.id)
         assertTrue(runCatching {
-            requireOwnedAgentInfo(listOf(info()), "session-b", "job-agent-one")
+            requireAgentRegistration(listOf(snapshot()), "session-b", "job-agent-one")
         }.isFailure)
         assertTrue(runCatching {
-            requireOwnedAgentInfo(listOf(info(isAgent = false)), "session-a", "job-agent-one")
+            requireAgentRegistration(listOf(snapshot().copy(label = "后台 shell")), "session-a", "job-agent-one")
         }.isFailure)
         assertTrue(runCatching {
-            requireOwnedAgentInfo(listOf(info()), "session-a", "")
+            requireAgentRegistration(listOf(snapshot()), "session-a", "")
         }.isFailure)
+        val persisted = snapshot().copy(status = "dormant",
+            inbox = listOf(QueuedAgentInput(id = "queued-1", content = "继续", memoryInput = "继续")))
+        val resolved = requireAgentRegistration(listOf(persisted), "session-a", "job-agent-one")
+        assertEquals("dormant", resolved.info.status)
+        assertEquals(1, resolved.info.pendingMessageCount)
+        assertTrue(resolved.info.canMessage)
+        assertTrue(resolved.snapshot === persisted)
     }
 
     @Test fun registrySeparatesTeamRoutingFromStandaloneAndNeverResolvesCrossSession() = runBlocking {
@@ -70,6 +77,14 @@ class LocalAgentLifecycleControlTest {
                 registry.resolveStandaloneChild("session-a", "job-ordinary-1").id)
             assertEquals("job-team-1",
                 registry.resolveOwnedChild("session-a", "job-team-1").id)
+            assertEquals("job-ordinary-1",
+                registry.resolveStandalone("session-a", "job-ordinary-1").snapshot.id)
+            val listed = registry.list("session-a")
+            assertTrue(listed.contains("job-ordinary-1"))
+            assertTrue(listed.contains("job-team-1"))
+            assertEquals("没有后台代理", registry.list("session-b"))
+            assertEquals(2, jobs.snapshots().size)
+
             assertTrue(runCatching {
                 registry.resolveStandaloneChild("session-a", "job-team-1")
             }.exceptionOrNull()?.message.orEmpty().contains("AGENT_TEAM_LIFECYCLE_VIA_TEAM_PORT"))
