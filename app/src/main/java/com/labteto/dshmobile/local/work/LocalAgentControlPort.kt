@@ -132,8 +132,15 @@ internal class LocalWorkAgentControlRuntime(
     }
 
     override fun list(sessionId: String): String = registry.list(sessionId)
-    override fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String =
-        readLocalAgentTree(binding.eventLog, maxNodes).render()
+    override fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String {
+        val historical = readLocalAgentTree(binding.eventLog, maxNodes).render()
+        val live = renderLocalAgentLiveRoster(
+            sessionId = binding.sessionId,
+            infos = jobs.snapshotInfos(),
+            maxVisible = maxNodes,
+        )
+        return "$historical\n\n$live"
+    }
     override fun send(
         sessionId: String,
         agentId: String,
