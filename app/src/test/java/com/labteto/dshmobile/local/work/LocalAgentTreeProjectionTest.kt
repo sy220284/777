@@ -35,6 +35,7 @@ class LocalAgentTreeProjectionTest {
         assertEquals(2, view.nodes.size)
         assertEquals("completed", view.nodes.single { it.runId == "child" }.status)
         assertTrue(view.render().contains("parent=root"))
+        assertTrue(view.render().contains("run_path=root/child"))
     }
 
     @Test fun truncatedHistoryExposesMissingParentAndPartialFlag() {
@@ -60,6 +61,21 @@ class LocalAgentTreeProjectionTest {
         ))
         assertEquals(2, view.nodes.size)
         assertTrue(view.render().length < 2_000)
+        assertTrue(view.render().contains("[lineage_cycle_invalid]"))
         assertTrue(runCatching { projectLocalAgentTree(emptyList(), maxNodes = 257) }.isFailure)
     }
+    @Test fun nestedRunPathCanBeReadWithoutPretendingToHaveUnknownAncestors() {
+        val view = projectLocalAgentTree(listOf(
+            checkpoint(1, "root", kind = "foreground"),
+            checkpoint(2, "child", "root"),
+            checkpoint(3, "grandchild", "child"),
+            checkpoint(4, "disconnected", "outside-window"),
+        ), historyIncomplete = true)
+        val rendered = view.render()
+        assertTrue(rendered.contains("run_path=root/child/grandchild"))
+        assertTrue(rendered.contains("run_path=disconnected"))
+        assertTrue(rendered.contains("parent_outside_window"))
+        assertTrue(rendered.contains("partial=true"))
+    }
+
 }
