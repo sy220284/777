@@ -37,6 +37,7 @@ import com.labteto.dshmobile.local.agent.toJson
 import com.labteto.dshmobile.local.agent.LocalSubagentModelStepExecutor
 import com.labteto.dshmobile.local.agent.validateLocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.validateLocalSubagentToolAllowlist
+import com.labteto.dshmobile.local.agent.admitLocalAgentScopedToolGrants
 import com.labteto.dshmobile.local.agent.filterLocalSubagentSchemas
 import com.labteto.dshmobile.local.agent.LocalSubagentResult
 import com.labteto.dshmobile.local.agent.LocalSubagentStatus
@@ -322,14 +323,9 @@ internal class LocalSubagentRunner(
         val toolCallPolicy = LocalSubagentToolCallPolicy(allowMutation, virtualScreenId, modelToolStepSurface)
         // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
         // runtime capability must never make that capability appear in its parent or sibling run.
-        val enabledOptionalTools = linkedSetOf<String>().apply {
-            addAll(recoveredEnabledOptionalTools)
-            // Explicit allowed_tools may name optional tools that are not yet active.
-            // Offer only these requested candidates; the effective schemas still enforce
-            // subagent access, network switch, prompt budget and the strict allowlist.
-            addAll(capabilities.toolAllowlist.orEmpty())
-            addAll(capabilities.initialOptionalTools)
-        }
+        val enabledOptionalTools = admitLocalAgentScopedToolGrants(
+            capabilities, recoveredEnabledOptionalTools,
+        ).toCollection(linkedSetOf())
         val canDelegateNested = !capabilities.allowMutation && !capabilities.continuable &&
             capabilities.depth < capabilities.maxDepth && runCoordinator != null &&
             snapshot.kernel.resources.maxAgents > capabilities.depth
