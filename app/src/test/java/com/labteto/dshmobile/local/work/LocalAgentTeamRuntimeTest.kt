@@ -2029,6 +2029,53 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun cancelledSpawnCallerCannotKillAlreadyAdmittedTeamChildAcrossColdRecovery() = runBlocking {
+        val session = "team-spawn-accepted-caller-cancelled"
+        val fixture = fixture(session)
+        val runtime = LocalAgentTeamRuntime(
+            fixture.jobs,
+            { _, jobId, _, _, _, _, _, _, _, _ ->
+                val admitted = fixture.jobs.startPersistentResult(
+                    label = "子代理：durable",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = "{}",
+                    ownerSessionId = session,
+                    continuable = true,
+                    requestedId = jobId,
+                ) { _, _ -> awaitCancellation() }
+                assertTrue(admitted.accepted)
+                throw kotlinx.coroutines.CancellationException("调用方在接纳后失去返回通道")
+            },
+            { _, _, _ -> JobMessageAdmission(false, false, false, "unused") },
+            { fixture.log },
+            SessionProjectionRegistry(),
+        )
+        val invocation = runCatching {
+            runtime.execute(memberTestToolCall("spawn-admitted", "team_spawn", buildJsonObject {
+                put("name", "durable")
+                put("task", "持续核查")
+            }), teamBinding(fixture, session))
+        }
+        assertTrue(invocation.isFailure)
+        val member = runtime.project(session).members.single()
+        assertEquals(LocalTeamMemberPhase.ACTIVE, member.phase)
+        val child = fixture.jobs.snapshots().single { it.id == member.jobId }
+        assertEquals(session, child.ownerId)
+        assertEquals("running", child.status)
+        val restored = LocalAgentTeamRuntime(
+            fixture.jobs,
+            { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
+            { _, _, _ -> JobMessageAdmission(false, false, false, "unused") },
+            { fixture.log },
+            SessionProjectionRegistry(),
+        )
+        restored.recoverMailbox(session)
+        assertNull(restored.project(session).failure)
+        assertEquals(LocalTeamMemberPhase.ACTIVE, restored.project(session).members.single().phase)
+        assertEquals("running", fixture.jobs.snapshots().single { it.id == member.jobId }.status)
+    }
+
+    @Test
     fun teamRoleIsAdmittedThroughRealToolAndPreservedAcrossFailedStart() = runBlocking {
         val sessionId = "team-specialist-admission"
         val f = fixture(sessionId)
