@@ -2029,7 +2029,7 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
-    fun cancelledSpawnCallerCannotKillAlreadyAdmittedTeamChildAcrossColdRecovery() = runBlocking {
+    fun cancelledBeforeSpawnCommitRollsBackDurableChildAndCannotColdRecoverAsActive() = runBlocking {
         val session = "team-spawn-accepted-caller-cancelled"
         val fixture = fixture(session)
         val runtime = LocalAgentTeamRuntime(
@@ -2058,10 +2058,11 @@ class LocalAgentTeamRuntimeTest {
         }
         assertTrue(invocation.isFailure)
         val member = runtime.project(session).members.single()
-        assertEquals(LocalTeamMemberPhase.ACTIVE, member.phase)
+        assertEquals(LocalTeamMemberPhase.FAILED, member.phase)
         val child = fixture.jobs.snapshots().single { it.id == member.jobId }
         assertEquals(session, child.ownerId)
-        assertEquals("running", child.status)
+        assertEquals("cancelled", child.status)
+        assertEquals(null, member.provisionalNewJob)
         val restored = LocalAgentTeamRuntime(
             fixture.jobs,
             { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
@@ -2071,8 +2072,50 @@ class LocalAgentTeamRuntimeTest {
         )
         restored.recoverMailbox(session)
         assertNull(restored.project(session).failure)
-        assertEquals(LocalTeamMemberPhase.ACTIVE, restored.project(session).members.single().phase)
-        assertEquals("running", fixture.jobs.snapshots().single { it.id == member.jobId }.status)
+        assertEquals(LocalTeamMemberPhase.FAILED, restored.project(session).members.single().phase)
+        assertEquals("cancelled", fixture.jobs.snapshots().single { it.id == member.jobId }.status)
+    }
+
+    @Test
+    fun coldRecoveryClosesOrphanedProvisionalChildAndKeepsLegacyEventsReadable() {
+        val session = "team-cold-uncommitted"
+        val f = fixture(session)
+        val provisional = LocalTeamMemberSnapshot(
+            id = "member-1", jobId = "job-team-1", name = "provisional",
+            description = "", provider = "local-subagent",
+            context = LocalTeamMemberContext.FRESH,
+            phase = LocalTeamMemberPhase.PROVISIONING,
+            provisionalNewJob = true,
+        )
+        f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            with(LocalAgentTeamEventCodec) { provisional.toEvent(session) })
+        f.jobs.startPersistent(
+            label = "子代理：provisional", resumeKind = "subagent_readonly", resumePayload = "{}",
+            ownerSessionId = session, continuable = true, requestedId = "job-team-1",
+        ) { _, _ -> awaitCancellation() }
+        assertEquals("running", f.jobs.snapshots().single().status)
+        f.runtime.recoverMailbox(session)
+        val member = f.runtime.project(session).members.single()
+        assertEquals(LocalTeamMemberPhase.FAILED, member.phase)
+        assertEquals("TEAM_MEMBER_SPAWN_UNCOMMITTED", member.error)
+        assertEquals(null, member.provisionalNewJob)
+        assertEquals("cancelled", f.jobs.snapshots().single().status)
+        val cold = LocalAgentTeamRuntime(f.jobs,
+            { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
+            { _, _, _ -> JobMessageAdmission(false, false, false, "unused") },
+            { f.log }, SessionProjectionRegistry())
+        cold.recoverMailbox(session)
+        assertEquals(LocalTeamMemberPhase.FAILED, cold.project(session).members.single().phase)
+        assertEquals("cancelled", f.jobs.snapshots().single().status)
+        assertNull(cold.project(session).failure)
+
+        val legacy = fixture("team-legacy-provisional")
+        legacy.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            with(LocalAgentTeamEventCodec) {
+                provisional.copy(provisionalNewJob = null).toEvent("team-legacy-provisional")
+            })
+        assertEquals(null, legacy.runtime.project("team-legacy-provisional")
+            .members.single().provisionalNewJob)
     }
 
     @Test
