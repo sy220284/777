@@ -132,11 +132,17 @@ class ProcessRuntimeTest {
             workingDirectory = null,
         )
 
-        while (terminal.isAlive(sessionId)) {
-            kotlinx.coroutines.delay(10)
-        }
-
-        assertEquals("terminal-tail", terminal.read(sessionId))
+        // Child exit and pipe EOF are separate events. Poll the terminal's drain
+        // receipt rather than racing its output reader immediately after isAlive.
+        val output = StringBuilder()
+        var receipt: TerminalReadResult
+        do {
+            receipt = terminal.readResult(sessionId)
+            output.append(receipt.output)
+            if (!receipt.exited) kotlinx.coroutines.delay(10)
+        } while (!receipt.exited)
+        assertEquals("terminal-tail", output.toString())
+        assertEquals(0, receipt.exitCode)
     }
 
     @Test(timeout = 5000)
