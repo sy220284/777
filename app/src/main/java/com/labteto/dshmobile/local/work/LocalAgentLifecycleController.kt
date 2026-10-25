@@ -2,12 +2,32 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.LocalJobManager
+import com.labteto.dshmobile.local.jobs.LocalJobRegistration
 import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import com.labteto.dshmobile.harness.agent.AgentRunExecutionContext
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.StateFlow
+
+/** Observe the sole Job owner; queued scheduling and old persisted status are not load evidence. */
+internal suspend fun awaitLocalAgentActivation(
+    changes: StateFlow<Long>,
+    baseline: Long,
+    observe: () -> LocalJobRegistration,
+    timeoutMillis: Long = 5_000L,
+): LocalJobRegistration? = withTimeoutOrNull(timeoutMillis) {
+    var observed: LocalJobRegistration
+    while (true) {
+        val version = changes.value
+        observed = observe()
+        if (observed.executionActive || observed.runtimeActivation > baseline) break
+        if (observed.info.status in setOf("failed", "cancelled", "completed")) return@withTimeoutOrNull null
+        changes.first { it != version }
+    }
+    observed
+}
 
 /**
  * Codex agent/control/api.rs: resolving/observing a child and interrupting its current
@@ -49,6 +69,8 @@ internal class LocalAgentLifecycleController(
             append("agent_id=").append(info.id)
             append("\nstatus=").append(info.status)
             append("\nruntime_residency=").append(view.residency.name.lowercase())
+            append("\nexecution_active=").append(registration.executionActive)
+            append("\nruntime_activation=").append(registration.runtimeActivation)
             view.recordedParent?.let { parent ->
                 append("\nrecorded_parent_run=").append(parent.parentRunId)
                 append("\nrecorded_parent_slot=").append(parent.parentSlotId)
@@ -117,20 +139,32 @@ internal class LocalAgentLifecycleController(
                 "AGENT_CHILD_TERMINAL：终态代理不能重新加载"
             )
             LocalAgentRuntimeResidency.UNLOADED -> Unit
+            LocalAgentRuntimeResidency.LOADING -> Unit
         }
-        validateAgentResumeAdmission(view.registration.info, view.registration.snapshot)
+        if (view.residency == LocalAgentRuntimeResidency.UNLOADED) {
+            validateAgentResumeAdmission(view.registration.info, view.registration.snapshot)
+        }
         // Handoff is committed under the same live run-slot lock that revokes
         // previous activations. A displaced caller cannot race a new parent turn.
         val liveOwner = currentCoroutineContext()[AgentRunExecutionContext]
-        if (liveOwner != null) {
+        if (view.residency == LocalAgentRuntimeResidency.UNLOADED && liveOwner != null) {
             liveOwner.commitCurrent(sessionId) {
                 persistentJobs.scheduleAgentResume(sessionId, agentId)
             }
-        } else {
+        } else if (view.residency == LocalAgentRuntimeResidency.UNLOADED) {
             persistentJobs.scheduleAgentResume(sessionId, agentId)
         }
-        return "agent_id=$agentId\nload_requested=true\nload_admitted=unverified" +
-            "\nstatus_before=" + view.registration.info.status +
+        val activated = awaitLocalAgentActivation(jobs.changes, view.registration.runtimeActivation,
+            observe = { registry.resolveStandalone(sessionId, agentId) })
+        currentCoroutineContext().ensureActive()
+        liveOwner?.requireCurrent(sessionId)
+        val current = activated ?: registry.resolveStandalone(sessionId, agentId)
+        return "agent_id=$agentId\nload_requested=true\nchild_loaded=${activated != null}" +
+            "\nload_admitted=" + (if (activated != null) "true" else "unverified") +
+            "\nexecution_active=" + current.executionActive +
+            "\nruntime_activation=" + current.runtimeActivation +
+            "\nstatus=" + current.info.status +
+            "\nexecution_result_verified=false" +
             "\nparent_slot=" + (view.recordedParent?.parentSlotId ?: "legacy_unknown") +
             "\n说明=加载由原持久 Job 恢复入口处理，身份、邮箱与模型路由不替换"
     }

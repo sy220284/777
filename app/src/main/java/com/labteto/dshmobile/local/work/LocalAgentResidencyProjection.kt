@@ -8,7 +8,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
 /** Codex-style identity inspection never starts a child or changes its durable state. */
-internal enum class LocalAgentRuntimeResidency { ACTIVE_JOB, UNLOADED, TERMINAL }
+internal enum class LocalAgentRuntimeResidency { ACTIVE_JOB, LOADING, UNLOADED, TERMINAL }
 
 /**
  * Loading a persisted child is an action of its immediate live parent slot, not of
@@ -54,7 +54,8 @@ internal fun projectLocalAgentResidency(registration: LocalJobRegistration): Loc
         registration.info.ownerSessionId == snapshot.ownerId &&
         registration.info.isAgent) { "AGENT_RESIDENCY_IDENTITY_MISMATCH" }
     val residency = when (snapshot.status) {
-        "running" -> LocalAgentRuntimeResidency.ACTIVE_JOB
+        "running" -> if (registration.executionActive) LocalAgentRuntimeResidency.ACTIVE_JOB
+            else LocalAgentRuntimeResidency.LOADING
         "interrupted", "dormant", "waiting_slice" -> LocalAgentRuntimeResidency.UNLOADED
         else -> LocalAgentRuntimeResidency.TERMINAL
     }

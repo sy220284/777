@@ -21,4 +21,6 @@ data class LocalJobInfo(
 data class LocalJobRegistration(
     val info: LocalJobInfo,
     val snapshot: JobSnapshot,
+    val executionActive: Boolean = false,
+    val runtimeActivation: Long = 0L,
 )

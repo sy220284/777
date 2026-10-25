@@ -120,7 +120,8 @@ internal class LocalJobManager(
     /** Coherent Agent identity/state view from one underlying Job-lock acquisition. */
     fun agentRegistrations(ownerSessionId: String): List<LocalJobRegistration> =
         delegate.agentRegistrations(ownerSessionId).map { registration ->
-            LocalJobRegistration(registration.info.toLocalJobInfo(), registration.snapshot)
+            LocalJobRegistration(registration.info.toLocalJobInfo(), registration.snapshot,
+                registration.executionActive, registration.runtimeActivation)
         }
 
 

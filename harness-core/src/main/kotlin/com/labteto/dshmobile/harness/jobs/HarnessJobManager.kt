@@ -58,6 +58,9 @@ data class JobMessageAdmission(
 data class JobRegistration(
     val info: JobInfo,
     val snapshot: JobSnapshot,
+    /** Runtime evidence only: never restored from a persisted running status. */
+    val executionActive: Boolean = false,
+    val runtimeActivation: Long = 0L,
 )
 
 data class JobSnapshot(
@@ -100,6 +103,8 @@ class HarnessJobManager(
         var status: String = "running",
         var output: String = "",
         var job: Job? = null,
+        var enteredJob: Job? = null,
+        var runtimeActivation: Long = 0L,
         val inbox: MutableList<QueuedAgentInput> = mutableListOf(),
         val resumeKind: String? = null,
         val resumePayload: String? = null,
@@ -604,6 +609,15 @@ class HarnessJobManager(
             }
             try {
                 val executionOwner = currentCoroutineContext()[Job]
+                synchronized(lock) {
+                    if (record.status != "running" || record.job !== executionOwner) {
+                        throw CancellationException("后台任务执行权已撤销")
+                    }
+                    record.enteredJob = executionOwner
+                    record.runtimeActivation++
+                    record.updatedAt = nextActivityTimestamp(record.updatedAt)
+                }
+                notifyChanged()
                 val report: (String) -> Unit = { output ->
                     val accepted = synchronized(lock) {
                         // A cancelled/completed activation (or an older activation after
@@ -692,7 +706,11 @@ class HarnessJobManager(
     fun agentRegistrations(ownerId: String): List<JobRegistration> = synchronized(lock) {
         records.values
             .filter { it.ownerId == ownerId && it.label.startsWith(AGENT_PREFIX) }
-            .map { JobRegistration(it.toJobInfo(), snapshot(it)) }
+            .map { JobRegistration(it.toJobInfo(), snapshot(it),
+                executionActive = it.status == "running" && it.job != null &&
+                    it.enteredJob === it.job && it.job?.isActive == true,
+                runtimeActivation = it.runtimeActivation,
+            ) }
     }
 
     fun listAgents(ownerId: String? = null): String = synchronized(lock) {

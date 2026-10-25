@@ -35,6 +35,7 @@ class LocalAgentResidencyProjectionTest {
             put("parent_link", parent.toJson())
         }.toString(),
         agent: Boolean = true,
+        executionActive: Boolean = false,
     ): LocalJobRegistration {
         val snapshot = JobSnapshot(
             id = "job-agent-1", label = "子代理：worker",
@@ -46,6 +47,7 @@ class LocalAgentResidencyProjectionTest {
                 ownerSessionId = snapshot.ownerId, isAgent = agent, continuable = true,
                 updatedAt = snapshot.updatedAt),
             snapshot,
+            executionActive = executionActive,
         )
     }
 
@@ -58,6 +60,8 @@ class LocalAgentResidencyProjectionTest {
         assertEquals("slot-parent", view.recordedParent?.parentSlotId)
         assertEquals("call-1", view.recordedParent?.parentToolCallId)
         assertEquals(LocalAgentRuntimeResidency.ACTIVE_JOB,
+            projectLocalAgentResidency(registration(status = "running", executionActive = true)).residency)
+        assertEquals(LocalAgentRuntimeResidency.LOADING,
             projectLocalAgentResidency(registration(status = "running")).residency)
         assertEquals(LocalAgentRuntimeResidency.UNLOADED,
             projectLocalAgentResidency(registration(status = "dormant")).residency)
