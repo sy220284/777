@@ -47,11 +47,14 @@ internal suspend fun dispatchLocalNestedSubagent(
             parentLink = parent,
             capabilities = childCapabilities,
         )
-        // Admit only after all validations and current parent identity have been established.
-        subtreeBudget.claim()
         val deadline = executionDeadlineOverrideMillis
             ?: (parsed.maxSteps.toLong() * 60_000L).coerceIn(120_000L, 900_000L)
         require(deadline in 1L..900_000L) { "NESTED_DELEGATION_DEADLINE_INVALID" }
+        // Admit after all validation. A replayed tool id in one parent Run cannot
+        // consume another descendant slot or launch a second model invocation.
+        subtreeBudget.claim(
+            "${parent.sessionId}:${parent.parentSlotId}:${parent.parentRunId}:${call.id}"
+        )
         val result = withTimeoutOrNull(deadline) {
             runChild(child, subtreeBudget)
         }
