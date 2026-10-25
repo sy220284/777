@@ -42,7 +42,11 @@ internal class LocalAgentTaskGraphController(
         allowMutation: Boolean = false, requiredFiles: List<String> = emptyList(), inputFiles: List<String> = emptyList(),
         nodeInputFiles: List<List<String>> = emptyList(), nodeOutputFiles: List<List<String>> = emptyList(),
         resumeGraphId: String? = null,
+        replanGraphId: String? = null,
     ): String = binding.workflowAdmission.withLock {
+        require(resumeGraphId.isNullOrBlank() || replanGraphId.isNullOrBlank()) {
+            "TASKGRAPH_RESUME_REPLAN_CONFLICT"
+        }
         if (!resumeGraphId.isNullOrBlank()) {
             val open = openGraphs(binding).singleOrNull { it.graphId == resumeGraphId }
                 ?: error("未找到唯一未结算图：$resumeGraphId")
@@ -57,6 +61,11 @@ internal class LocalAgentTaskGraphController(
                 put("allow_mutation", allowMutation)
             })
             return@withLock executePlan(binding, open.graphId, execution, open.goalId, plan)
+        }
+        val replacing = replanGraphId?.takeIf(String::isNotBlank)?.let { originalId ->
+            require(tasks.isNotEmpty()) { "TASKGRAPH_REPLAN_TASKS_REQUIRED" }
+            openGraphs(binding).singleOrNull { it.graphId == originalId }
+                ?: error("TASKGRAPH_REPLAN_SOURCE_NOT_OPEN:$originalId")
         }
         val route = persistentJobs.workflowRoute(LocalWorkerModelRouter.resolve(modelOverride, binding.aggregateSnapshot()))
         val model = route.first
@@ -95,16 +104,55 @@ internal class LocalAgentTaskGraphController(
         plan.nodes.indices.forEach { index -> plan.inputPaths(index).forEach { path ->
             require(localWorkFileSha256(workspaceRoot, path) != null) { "输入文件不存在或不属于安全工作区：$path" }
         } }
-        val existing = openGraphs(binding).singleOrNull { it.plan == plan.value }
+        val replan = replacing?.let { original ->
+            val previous = LocalWorkTaskGraphPlan(requireNotNull(original.plan) {
+                "TASKGRAPH_REPLAN_SOURCE_PLAN_MISSING"
+            })
+            admitLocalTaskGraphReplan(previous, plan)
+        }
+        val existing = if (replacing == null) {
+            openGraphs(binding).singleOrNull { it.plan == plan.value }
+        } else null
         val graphId = existing?.graphId ?: java.util.UUID.randomUUID().toString()
         val execution = existing?.graphExecutionId ?: java.util.UUID.randomUUID().toString()
+        // The old graph has no writable effects; stop its Jobs before admitting a new
+        // independent execution. Failure leaves the original event ledger recoverable.
+        if (replacing != null) {
+            persistentJobs.cancelWorkflowJobs(
+                binding.sessionId, requireNotNull(replacing.graphExecutionId),
+                preserveSafeSlice = false,
+            )
+        }
         if (existing == null) binding.eventLog.append("taskgraph/start", buildJsonObject {
             put("graph_id", graphId); put("graph_execution_id", execution)
+            if (replacing != null) put("replaces_graph_id", replacing.graphId)
             put("session_id", binding.sessionId); put("goal_id", goal?.id.orEmpty())
             put("goal_fingerprint", goal?.let(::localWorkGoalFingerprint).orEmpty())
             put("plan", plan.value); put("plan_version", plan.version)
             put("nodes", plan.value.getValue("nodes"))
         })
+        if (replacing != null && replan != null) {
+            // New graph is durable before the predecessor is retired. A crash
+            // between events leaves both inspectable rather than losing work.
+            binding.eventLog.append("taskgraph/replanned", buildJsonObject {
+                put("old_graph_id", replacing.graphId)
+                put("old_execution_id", requireNotNull(replacing.graphExecutionId))
+                put("new_graph_id", graphId)
+                put("new_execution_id", execution)
+                put("old_plan_version", replan.oldPlanVersion)
+                put("new_plan_version", replan.newPlanVersion)
+                put("invalidated_nodes", buildJsonArray {
+                    replan.invalidatedNodeIds.forEach { add(JsonPrimitive(it)) }
+                })
+                put("user_revision", workflowUserRevision(binding.eventLog))
+            })
+            binding.eventLog.append("taskgraph/end", buildJsonObject {
+                put("graph_id", replacing.graphId)
+                put("graph_execution_id", requireNotNull(replacing.graphExecutionId))
+                put("outcome", "replanned")
+                put("detail", "superseded_by:$graphId")
+            })
+        }
         executePlan(binding, graphId, execution, goal?.id.orEmpty(), plan)
     }
 
