@@ -1032,6 +1032,39 @@ internal class LocalAgentTeamRuntime(
         return rows.joinToString("\n") + state.failure?.let { "\nfailure=$it" }.orEmpty()
     }
 
+    /**
+     * Team workspace write admission reads current EventLog projection at tool time.
+     * Work Task scopes are genuine execution permissions, not only UI warnings.
+     * Lead or user must explicitly assign the task and write_scopes. This does not
+     * bypass the sandbox or ToolApproval checks in the real executor.
+     */
+    internal fun requireMemberWorkspaceMutation(
+        sessionId: String,
+        jobId: String,
+        call: LocalToolCall,
+        workspaceRoot: java.io.File,
+    ) {
+        val snapshot = project(sessionId)
+        require(snapshot.failure == null) { "TEAM_PROJECTION_INVALID" }
+        val member = snapshot.members.singleOrNull { it.jobId == jobId }
+            ?: error("TEAM_WORKSPACE_MEMBER_NOT_FOUND")
+        require(member.phase == LocalTeamMemberPhase.ACTIVE) { "TEAM_WORKSPACE_MEMBER_NOT_ACTIVE" }
+        val tasks = snapshot.tasks.filter {
+            it.ownerId == member.id && it.status == LocalTeamTaskStatus.IN_PROGRESS
+        }
+        require(tasks.size <= 1) { "TEAM_WRITE_MULTIPLE_ACTIVE_TASKS" }
+        val current = tasks.singleOrNull()
+        current?.rootUserRevision?.let { rev ->
+            LocalAgentRootDirectiveSnapshot(sessionId, rev).requireCurrent(
+                sessionId, eventLogFor(sessionId),
+            )
+        }
+        enforceTeamMemberWorkspaceMutation(
+            call = call, writeScopes = current?.writeScopes.orEmpty(),
+            workspaceRoot = workspaceRoot,
+        )
+    }
+
     /** One canonical USER epoch for an owned task; stale children must not call tools. */
     internal fun requireCurrentRootAuthorization(sessionId: String, jobId: String) {
         val state = project(sessionId)
