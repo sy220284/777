@@ -43,17 +43,44 @@ internal fun enforceTeamMemberWorkspaceMutation(
     call: com.labteto.dshmobile.local.model.LocalToolCall,
     writeScopes: List<String>,
     workspaceRoot: java.io.File,
+    registeredTool: com.labteto.dshmobile.harness.tools.HarnessTool? = null,
 ) {
     val canonical = com.labteto.dshmobile.local.tools.LocalToolPolicy.canonical(call.name)
-    val unscopable = setOf(
-        "bash", "download_file", "present", "skill_create", "skill_update",
-        "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local",
-        "mcp_rollback_local", "mcp_start_local",
-    )
-    require(canonical !in unscopable) {
-        "TEAM_WRITE_TOOL_UNSCOPABLE:$canonical"
+    // The actual registered tool, not its model-provided name, owns the effect
+    // classification. Legacy pure-call tests may use the native policy fallback.
+    val access = registeredTool?.access
+        ?: runCatching { com.labteto.dshmobile.local.tools.LocalToolPolicy.access(canonical) }
+            .getOrNull()
+        ?: error("TEAM_WRITE_TOOL_UNREGISTERED:$canonical")
+    val workspaceAccess = registeredTool?.metadata?.workspaceAccess
+        ?: runCatching { com.labteto.dshmobile.local.tools.LocalToolPolicy.metadata(canonical).workspaceAccess }
+            .getOrNull()
+        ?: error("TEAM_WRITE_TOOL_UNREGISTERED:$canonical")
+    val nativeWrites = setOf("write", "edit", "apply_patch")
+    if (canonical !in nativeWrites) {
+        // Remote/MCP tools, processes, downloads, and plugins which can modify
+        // workspace state have no auditable path list here. No parent task grant
+        // can turn an opaque mutation into a scoped native file operation.
+        require(workspaceAccess != com.labteto.dshmobile.harness.tools.ToolWorkspaceAccess.WRITE &&
+            (access in setOf(
+                com.labteto.dshmobile.harness.tools.ToolAccess.READ_ONLY,
+                com.labteto.dshmobile.harness.tools.ToolAccess.NETWORK,
+            ) || (access == com.labteto.dshmobile.harness.tools.ToolAccess.AGENT_CONTROL &&
+                LocalAgentTeamContract.isTeamChildControlCall(call.name)))) {
+            "TEAM_WRITE_TOOL_UNSCOPABLE:$canonical"
+        }
+        if (canonical == "web_fetch") {
+            require((call.arguments["run_in_background"] as? kotlinx.serialization.json.JsonPrimitive)
+                ?.booleanOrNull != true) {
+                "TEAM_WRITE_TOOL_UNSCOPABLE:web_fetch_background"
+            }
+        }
+        return
     }
-    if (canonical !in setOf("write", "edit", "apply_patch")) return
+    require(access == com.labteto.dshmobile.harness.tools.ToolAccess.WORKSPACE_WRITE &&
+        workspaceAccess == com.labteto.dshmobile.harness.tools.ToolWorkspaceAccess.WRITE) {
+        "TEAM_WRITE_TOOL_CONTRACT_MISMATCH:$canonical"
+    }
     require(writeScopes.isNotEmpty()) {
         "TEAM_WRITE_SCOPE_REQUIRED: Lead must assign a task with explicit write_scopes"
     }
