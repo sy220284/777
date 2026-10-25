@@ -149,7 +149,7 @@ internal class LocalAgentControlPlane(
             )
             "agent_resume" -> control.resume(run.sessionId, args.string("agent_id"))
             "agent_close" -> control.close(run.sessionId, args.string("agent_id"))
-            "workflow" -> subagents.runWorkflow(
+            "workflow" -> control.workflow(run, LocalAgentWorkflowRequest(
                 resumeGraphId = args.optionalString("resume_graph_id"),
                 allowMutation = args.boolean("allow_mutation", false).also { requested ->
                     require(!requested || allowMutation) { "当前执行范围不允许可写任务图" }
@@ -184,8 +184,7 @@ internal class LocalAgentControlPlane(
                 modelOverride = args.optionalString("model"),
                 outputSchema = args.outputSchema(),
                 toolAllowlist = args.toolAllowlist(),
-                binding = run,
-            )
+            ))
             else -> error("未覆盖的 Work 代理工具：${call.name}")
         }
     }
