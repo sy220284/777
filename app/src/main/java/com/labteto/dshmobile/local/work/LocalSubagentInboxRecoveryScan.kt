@@ -30,11 +30,19 @@ internal fun recoverSubagentInboxClaims(
         check(page.last().sequence > cursor) {
             "SUBAGENT_RECOVERY_NO_PROGRESS：持久事件日志未推进读取位置，停止续跑避免无限扫描"
         }
+        check(page.first().sequence == cursor + 1L) {
+            "SUBAGENT_RECOVERY_SEQUENCE_GAP：读取页跳过高水位之前的事件，禁止冒充恢复完成"
+        }
         // Append-only logs have contiguous event sequences. A page can silently skip
         // damaged rows or unreadable segments: never mark that recovery as complete.
         var expected = cursor + 1L
         for (event in page) {
-            if (event.sequence > scanThrough) break
+            if (event.sequence > scanThrough) {
+                check(expected > scanThrough) {
+                    "SUBAGENT_RECOVERY_SEQUENCE_GAP：当前页越过固定高水位，仍有未审计事件"
+                }
+                break
+            }
             check(event.sequence == expected) {
                 "SUBAGENT_RECOVERY_SEQUENCE_GAP：期望事件序号 $expected，实际 ${event.sequence}；不能丢弃未确认的用户消息"
             }
