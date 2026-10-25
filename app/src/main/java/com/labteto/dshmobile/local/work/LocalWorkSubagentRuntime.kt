@@ -62,9 +62,11 @@ internal class LocalWorkSubagentRuntime(
         allowMutation: Boolean = false, requiredFiles: List<String> = emptyList(), inputFiles: List<String> = emptyList(),
         nodeInputFiles: List<List<String>> = emptyList(), nodeOutputFiles: List<List<String>> = emptyList(),
         resumeGraphId: String? = null,
+        replanGraphId: String? = null,
     ): String = taskGraphs.runWorkflow(
         tasks, mode, requiredEvidence, modelOverride, outputSchema, toolAllowlist, binding,
-        dependencies, allowMutation, requiredFiles, inputFiles, nodeInputFiles, nodeOutputFiles, resumeGraphId,
+        dependencies, allowMutation, requiredFiles, inputFiles, nodeInputFiles, nodeOutputFiles,
+        resumeGraphId, replanGraphId,
     )
 
     internal suspend fun resumePendingWorkflows(binding: LocalWorkRunBinding) =
