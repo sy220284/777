@@ -85,57 +85,10 @@ internal class LocalWorkAgentControlRuntime(
     override suspend fun executeTeam(binding: LocalWorkRunBinding, call: LocalToolCall): String? =
         teams.execute(call, binding)
 
-    override suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String {
-        val parent = captureLocalAgentParentLink(request.parentToolCallId)
-        require(parent == null || parent.sessionId == binding.sessionId) { "AGENT_PARENT_SESSION_MISMATCH" }
-        return when (request.kind) {
-            LocalAgentDispatchKind.READONLY_BACKGROUND -> persistentJobs.startReadonlySubagent(
-                task = request.task,
-                model = request.modelOverride,
-                maxSteps = request.maxSteps,
-                instructions = request.instructions,
-                virtualScreen = request.virtualScreen,
-                outputSchema = request.outputSchema,
-                toolAllowlist = request.toolAllowlist,
-                parentToolCallId = request.parentToolCallId,
-                sessionId = binding.sessionId,
-                boundState = binding.aggregateSnapshot(),
-                historySnapshot = binding.runHandle.modelHistory::snapshot,
-            )
-            LocalAgentDispatchKind.READONLY_FOREGROUND -> subagents.runner(binding).run(
-                buildLocalDelegatedLaunchSpec(
-                    kind = LocalAgentDelegationKind.FOREGROUND_READONLY,
-                    task = request.task,
-                    instructions = request.instructions,
-                    modelOverride = request.modelOverride,
-                    maxSteps = request.maxSteps,
-                    parentCallId = request.parentToolCallId.takeIf {
-                        request.historyMode == LocalSubagentHistoryMode.INHERIT_PARENT
-                    },
-                    historyMode = request.historyMode,
-                    maxDepth = request.maxDepth,
-                    virtualScreen = request.virtualScreen,
-                    toolAllowlist = request.toolAllowlist,
-                    outputSchema = request.outputSchema,
-                    parentLink = parent,
-                ),
-            )
-            LocalAgentDispatchKind.FORK -> subagents.runner(binding).run(
-                buildLocalDelegatedLaunchSpec(
-                    kind = LocalAgentDelegationKind.FORK,
-                    task = request.task,
-                    instructions = request.instructions,
-                    modelOverride = request.modelOverride,
-                    maxSteps = request.maxSteps,
-                    parentCallId = request.parentToolCallId,
-                    allowMutation = request.allowMutation,
-                    toolAllowlist = request.toolAllowlist,
-                    outputSchema = request.outputSchema,
-                    parentLink = parent,
-                ),
-            )
-        }
-    }
+    private val spawns = LocalAgentSpawnController(subagents, persistentJobs)
+
+    override suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String =
+        spawns.delegate(binding, request)
 
     override fun list(sessionId: String): String = jobs.listAgents(sessionId)
     override fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String =
