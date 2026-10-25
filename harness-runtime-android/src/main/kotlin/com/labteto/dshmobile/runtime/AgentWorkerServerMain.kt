@@ -3,6 +3,7 @@ package com.labteto.dshmobile.runtime
 import java.io.FileInputStream
 import java.net.InetAddress
 import java.security.KeyStore
+import java.security.MessageDigest
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLServerSocket
@@ -21,6 +22,11 @@ suspend fun main(args: Array<String>) {
     val address = InetAddress.getByName(environment["DSH_AGENT_BIND"] ?: "127.0.0.1")
     val socket = context.serverSocketFactory.createServerSocket(port, 50, address) as SSLServerSocket
     val server = AgentTlsWorkerServer(socket, credential, environment["DSH_AGENT_MAX_ACTIVATIONS"]?.toInt() ?: 8)
+    val identity = keys.aliases().toList().filter { keys.isKeyEntry(it) }.single()
+    val pin = MessageDigest.getInstance("SHA-256").digest(keys.getCertificateChain(identity).first().encoded)
+        .joinToString("") { "%02x".format(it) }
+    println("DSH_AGENT_CERT_SHA256=$pin")
+    println("DSH_AGENT_LISTEN=${socket.inetAddress.hostAddress}:${socket.localPort}")
     Runtime.getRuntime().addShutdownHook(Thread { server.close() })
     try { server.serve() } finally { server.close(); password.fill('\u0000') }
 }

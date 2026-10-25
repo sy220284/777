@@ -40,6 +40,8 @@ internal data class LocalWorkTaskGraphPlan(val value: JsonObject) {
     val route: String get() = value.getValue("route").jsonPrimitive.content
     val writable: Boolean get() = value.getValue("allow_mutation").jsonPrimitive.boolean
     val workspaceRepository: String? get() = decodeAgentWorkspaceRepository(value)
+    val backendBinding: JsonObject? get() = if ("backend_binding" in value)
+        value["backend_binding"] as? JsonObject ?: error("TASKGRAPH_BACKEND_BINDING_INVALID") else null
     val schema: JsonObject? get() = value["output_schema"] as? JsonObject
     val tools: Set<String>? get() = (value["allowed_tools"] as? JsonArray)?.map { it.jsonPrimitive.content }?.toSet()
     fun inputPaths(index: Int): List<String> = value.getValue("input_files").jsonArray.map { it.jsonPrimitive.content } +

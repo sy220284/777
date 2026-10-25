@@ -99,7 +99,8 @@ internal object LocalAgentTeamEventCodec {
             description = member.optionalTeamString("description").orEmpty(),
             role = LocalAgentSpecialty.fromWire(member.optionalTeamString("role")).wireName,
             workspaceRepository = decodeAgentWorkspaceRepository(member, "workspaceRepository"),
-            backendBinding = (member["backendBinding"] as? JsonObject)?.also { com.labteto.dshmobile.local.agent.decodeAgentBackendBinding(it) },
+            backendBinding = if ("backendBinding" in member) (member["backendBinding"] as? JsonObject
+                ?: error("TEAM_MEMBER_BACKEND_INVALID")).also { com.labteto.dshmobile.local.agent.decodeAgentBackendBinding(it) } else null,
             displayName = member.optionalTeamString("displayName").orEmpty(),
             mutableToolsEnabled = member["mutableToolsEnabled"]?.jsonPrimitive?.booleanOrNull ?: false,
             grantedExtensions = (member["grantedExtensions"] as? JsonArray)

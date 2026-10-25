@@ -84,4 +84,50 @@ class AgentBackendProtocolTest {
         assertEquals(1, events.filterIsInstance<AgentEvent.ToolStarted>().size)
         assertEquals("done", result.messages.last().content)
     }
+    @Test fun alteredReceiptIsRejectedAfterOneRealEffect() = runTest {
+        val (host, wire) = pair()
+        val call = AgentToolCall("c1", "write", buildJsonObject { })
+        val published = mutableListOf<AgentEvent>()
+        var effects = 0
+        val worker = object : AgentBackendChannel by wire {
+            override suspend fun send(frame: JsonObject) {
+                val body = frame["body"] as? JsonObject
+                val altered = if (body?.containsKey("output") == true) JsonObject(frame +
+                    ("body" to JsonObject(body + ("output" to kotlinx.serialization.json.JsonPrimitive("forged"))))) else frame
+                wire.send(altered)
+            }
+        }
+        val remote = async { runCatching { AgentBackendProtocol.worker(worker) } }
+        val result = runCatching {
+            AgentBackendProtocol.host(host, AgentBackendRequest("t", "task", emptyList(), 1),
+                AgentBackendServices(AgentModel { AgentModelReply(toolCalls = listOf(call)) },
+                    AgentToolExecutor { effects++; AgentToolResult("actual") },
+                    AgentToolBatchExecutor { error("no batch") }, { false }, AgentEventSink { published += it }, null))
+        }
+        remote.await()
+        assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("FORGED_RECEIPT"))
+        assertEquals(1, effects)
+        assertTrue(published.none { it is AgentEvent.ToolFinished || it is AgentEvent.TurnCompleted })
+    }
+
+    @Test fun finalResultMustMatchBeforeAnyCompletionIsPublished() = runTest {
+        val (host, wire) = pair()
+        val published = mutableListOf<AgentEvent>()
+        val worker = object : AgentBackendChannel by wire {
+            override suspend fun send(frame: JsonObject) {
+                val body = frame["body"] as? JsonObject
+                wire.send(if (body?.containsKey("answer") == true && body.containsKey("messages"))
+                    JsonObject(frame + ("body" to JsonObject(body +
+                        ("answer" to kotlinx.serialization.json.JsonPrimitive("forged"))))) else frame)
+            }
+        }
+        val remote = async { runCatching { AgentBackendProtocol.worker(worker) } }
+        val result = runCatching { AgentBackendProtocol.host(host, AgentBackendRequest("t", "task", emptyList(), 1),
+            AgentBackendServices(AgentModel { AgentModelReply("actual") }, AgentToolExecutor { error("no tools") },
+                AgentToolBatchExecutor { error("no batch") }, { false }, AgentEventSink { published += it }, null)) }
+        remote.await()
+        assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("RESULT_CHANGED"))
+        assertTrue(published.none { it is AgentEvent.TurnCompleted })
+    }
+
 }

@@ -71,6 +71,7 @@ def filesystem(policy):
 
 
 def syscalls():
+    checked(libc.prctl(38, 1, 0, 0, 0), "no_new_privs")
     machine = platform.machine().lower()
     if machine in ("x86_64", "amd64"):
         arch = 0xC000003E

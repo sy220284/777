@@ -36,6 +36,7 @@ class PersistentPipeTerminalProvider(
         val inputLock: Any = Any(),
         val outputLock: Any = Any(),
         val workingDirectory: File? = null,
+        val isolated: Boolean = false,
     )
 
     private val sessions = ConcurrentHashMap<String, Session>()
@@ -72,7 +73,7 @@ class PersistentPipeTerminalProvider(
                     environment().putAll(baseEnvironment())
                 }, extraSearchPaths(), baseEnvironment())
                 val process = ManagedProcess.start(ProcessBuilder(
-                    python.path, "-u", "-c", script,
+                    python.path, "-P", "-s", "-u", "-c", script,
                     JsonArray(childBuilder.command().map(::JsonPrimitive)).toString(),
                     rows.toString(), columns.toString(),
                 ).directory(directory).redirectErrorStream(true).apply {
@@ -86,7 +87,7 @@ class PersistentPipeTerminalProvider(
                 // The child is blocked behind its private gate until ownership is registered.
                 writePtyFrame(process.process.outputStream, 'S')
                 val id = "term-$runtimeEpoch-" + UUID.randomUUID().toString().replace("-", "").take(12)
-                sessions[id] = Session(process, process.process.outputStream, process.process.inputStream, pty = true, workingDirectory = directory)
+                sessions[id] = Session(process, process.process.outputStream, process.process.inputStream, pty = true, workingDirectory = directory, isolated = currentCoroutineContext()[ProcessIsolationContext] != null)
                 publishedId = id
                 ptyObserved = true
                 id
@@ -145,7 +146,7 @@ class PersistentPipeTerminalProvider(
                 owned = managed
                 val id = "term-" + runtimeEpoch + "-" +
                     UUID.randomUUID().toString().replace("-", "").take(12)
-                sessions[id] = Session(managed, process.outputStream, process.inputStream, workingDirectory = directory)
+                sessions[id] = Session(managed, process.outputStream, process.inputStream, workingDirectory = directory, isolated = currentCoroutineContext()[ProcessIsolationContext] != null)
                 published = id
                 id
             }
@@ -177,6 +178,9 @@ class PersistentPipeTerminalProvider(
 
     private suspend fun send(sessionId: String, action: (Session) -> Unit): Unit = supervisorScope {
         val session = requireLiveSession(sessionId)
+        require(currentCoroutineContext()[ProcessIsolationContext] == null || session.isolated) {
+            "TERMINAL_ISOLATION_MISMATCH：隔离任务不能控制此前的普通终端"
+        }
         val writer = async(Dispatchers.IO) { action(session) }
         try {
             writer.await()

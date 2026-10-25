@@ -42,6 +42,7 @@ class LspProcessClient(
     private val workingDirectory: File? = null,
     private val commandResolver: (List<String>) -> List<String> = { it },
     private val environmentProvider: () -> Map<String, String> = { emptyMap() },
+    private val replaceEnvironment: Boolean = false,
 ) : Closeable {
     private val ids = AtomicLong(1L)
     private val mutex = Mutex()
@@ -315,7 +316,7 @@ class LspProcessClient(
         val next = ProcessBuilder(resolvedCommand)
             .directory(workingDirectory)
             .redirectError(ProcessBuilder.Redirect.INHERIT)
-            .apply { environment().putAll(environmentProvider()) }
+            .apply { if (replaceEnvironment) environment().clear(); environment().putAll(environmentProvider()) }
             .start()
         process = next
         val reader = BufferedInputStream(next.inputStream)

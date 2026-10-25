@@ -190,9 +190,12 @@ internal fun decodeLocalSubagentCapabilities(
     val toolAllowlist = (data["tool_allowlist"] as? JsonArray)
         ?.mapNotNull { it.jsonPrimitive.contentOrNull }
         ?.toSet()
+    val backend = decodeAgentBackendBinding(JsonObject(data.filterKeys {
+        it == "execution_backend" || it == "remote_backend_revision"
+    }))
     return LocalSubagentCapabilities(
-        executionBackend = LocalAgentExecutionBackend.fromWire(data["execution_backend"]?.jsonPrimitive?.contentOrNull),
-        remoteBackendRevision = data["remote_backend_revision"]?.jsonPrimitive?.contentOrNull,
+        executionBackend = backend.executionBackend,
+        remoteBackendRevision = backend.remoteBackendRevision,
         allowMutation = data["allow_mutation"]?.jsonPrimitive?.booleanOrNull ?: false,
         continuable = data["continuable"]?.jsonPrimitive?.booleanOrNull ?: false,
         virtualScreen = data["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false,

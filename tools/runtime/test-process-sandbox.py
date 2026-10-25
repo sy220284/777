@@ -94,5 +94,24 @@ else: raise AssertionError('inherited private fd')
         self.assertFalse((self.workspace / 'should-not-run').exists())
 
 
+class SeccompTest(unittest.TestCase):
+    def test_network_process_signals_and_alternate_abi_are_denied(self):
+        code = """
+import runpy,socket,os,ctypes
+helper=runpy.run_path(%r)
+helper['syscalls']()
+for operation in [lambda:socket.socket(),lambda:socket.socket(socket.AF_UNIX),lambda:os.kill(os.getppid(),0)]:
+    try: operation()
+    except PermissionError: continue
+    raise AssertionError('unexpected kernel permission')
+# Every architecture rejects x32/foreign syscall number space before syscall dispatch.
+libc=ctypes.CDLL(None,use_errno=True)
+assert libc.syscall(0x40000000) == -1
+assert ctypes.get_errno() == 1
+""" % str(HELPER)
+        result = subprocess.run([sys.executable, '-I', '-c', code], capture_output=True, text=True, timeout=10)
+        self.assertEqual(0, result.returncode, result.stderr)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -100,6 +100,9 @@ class OpenAiResponsesClient @Inject constructor(
             .build()
         var admittedRequestId: String? = null
         val eager = currentCoroutineContext()[AgentEagerToolContext]
+        val advertisedToolNames = tools.mapNotNull { schema ->
+            ((schema as? JsonObject)?.get("function") as? JsonObject)?.get("name")?.jsonPrimitive?.contentOrNull
+        }.toSet()
         val eagerItems = sortedMapOf<Int, JsonObject>()
         val eagerCalls = linkedMapOf<String, LocalToolCall>()
         fun interruptedEagerReply(): LocalModelReply {
@@ -121,6 +124,7 @@ class OpenAiResponsesClient @Inject constructor(
             val call = parseCompleted(buildJsonObject {
                 put("status", "completed"); put("output", JsonArray(listOf(item)))
             }, promptBreakdown).toolCalls.single()
+            if (call.name !in advertisedToolNames) throw responseProtocolError("完成工具项不属于本次请求的工具表")
             eagerItems[index]?.let { previous ->
                 if (previous != item) throw responseProtocolError("完成工具项内容变化"); return
             }

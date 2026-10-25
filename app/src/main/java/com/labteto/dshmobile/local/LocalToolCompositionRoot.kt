@@ -144,6 +144,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
             runtimeProcess = process,
             runtimeTerminal = terminal,
             languageServerCommand = languageServerResolver::resolve,
+            languageServerReadRoots = languageServerComponents::processReadRoots,
             canInstallLanguageServer = { path ->
                 languageServerResolver.managedHint(path)
                     ?.let { languageServerComponents.componentFor(it) } != null

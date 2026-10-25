@@ -104,6 +104,7 @@ object AgentBackendProtocol {
         var finished = 0
         var limit = request.maxSteps
         var terminal: AgentStopReason? = null
+        var terminalEvent: AgentEvent? = null
         var heartbeat: Job? = null
         val receipts = linkedMapOf<String, AgentToolResult>()
         suspend fun publish(event: AgentEvent) {
@@ -152,14 +153,16 @@ object AgentBackendProtocol {
                 }
                 is AgentEvent.TurnFailed -> {
                     val reason = event.completionReason
-                    if (reason != null) {
-                        check(stepClosed && observed && reason != AgentCompletionReason.COMPLETED && requireNotNull(modelReply).completionReason == reason)
-                        terminal = AgentStopReason.valueOf(reason.name)
-                    }
+                    check(reason != null) { "AGENT_BACKEND_WORKER_FAILED" }
+                    val reply = requireNotNull(modelReply)
+                    check(stepClosed && observed && reason != AgentCompletionReason.COMPLETED && reply.completionReason == reason &&
+                        event.reason == (reply.rawStopReason ?: reason.name))
+                    terminal = AgentStopReason.valueOf(reason.name)
                 }
-                is AgentEvent.TurnCancelled -> Unit
+                is AgentEvent.TurnCancelled -> error("AGENT_BACKEND_WORKER_CANCELLED")
             }
-            if (event !is AgentEvent.ToolStarted || eager?.contains(event.call) != true) services.events.append(event)
+            if (terminal != null) terminalEvent = event
+            else if (event !is AgentEvent.ToolStarted || eager?.contains(event.call) != true) services.events.append(event)
             when (event) {
                 is AgentEvent.ToolFinished -> state.appendToolResult(event.call, requireNotNull(receipts[event.call.id]))
                 is AgentEvent.StepFinished -> { state.closeStep(); stepClosed = true }
@@ -177,8 +180,10 @@ object AgentBackendProtocol {
                 val incoming = channel.receive()
                 checkFrame(incoming, request.turnId)
                 check(incoming["sequence"]?.jsonPrimitive?.longOrNull == ++sequence) { "AGENT_BACKEND_REPLAY_OR_GAP" }
+                val operation = incoming["operation"]?.jsonPrimitive?.content
+                check(terminal == null || operation == "result") { "AGENT_BACKEND_ALREADY_TERMINAL" }
                 val body = incoming.getValue("body")
-                val result: JsonElement = when (incoming["operation"]?.jsonPrimitive?.content) {
+                val result: JsonElement = when (operation) {
                     "model" -> {
                         check(started && !stepClosed && modelReply == null && decode<List<AgentMessage>>(body) == state.snapshot()) { "AGENT_BACKEND_MODEL_HISTORY_CHANGED" }
                         val activeEager = requireNotNull(eager)
@@ -219,6 +224,7 @@ object AgentBackendProtocol {
                         val actual = decode<AgentRunResult>(body)
                         val expected = state.result(requireNotNull(terminal) { "AGENT_BACKEND_TERMINAL_MISSING" })
                         check(actual == expected) { "AGENT_BACKEND_RESULT_CHANGED" }
+                        services.events.append(requireNotNull(terminalEvent))
                         return actual
                     }
                     else -> error("AGENT_BACKEND_OPERATION_UNKNOWN")

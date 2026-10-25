@@ -52,10 +52,14 @@ class LocalAgentSubtreeAdmissionTest {
     @Test fun leafCannotRetainDelegationAndInheritsNoMutationGrant() {
         val parent = LocalSubagentCapabilities(
             depth = 2, maxDepth = 3, allowMutation = false,
+            executionBackend = LocalAgentExecutionBackend.TRUSTED_REMOTE,
+            remoteBackendRevision = "pinned-peer",
             toolAllowlist = setOf("read", "subagent"),
         )
         val leaf = compileNestedReadonlyCapabilities(parent)
         assertEquals(3, leaf.depth)
+        assertEquals(parent.executionBackend, leaf.executionBackend)
+        assertEquals("pinned-peer", leaf.remoteBackendRevision)
         assertEquals(setOf("read"), leaf.toolAllowlist)
         assertFalse(leaf.allowMutation)
         assertFalse(leaf.continuable)

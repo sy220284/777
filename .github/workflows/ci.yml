@@ -181,6 +181,7 @@ jobs:
           python3 tools/runtime/test-verification.py
           python3 tools/runtime/test-pty-bridge.py
           python3 tools/runtime/test-git-workspace.py
+          python3 tools/runtime/test-process-sandbox.py
           while IFS= read -r -d '' file; do
             bash -n "$file"
           done < <(find .github/scripts tools/runtime tools/dev tools/reference-validation -type f -name '*.sh' -print0)

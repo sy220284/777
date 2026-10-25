@@ -109,7 +109,12 @@ internal fun LocalSubagentCapabilities.backendBinding(): kotlinx.serialization.j
 internal fun decodeAgentBackendBinding(value: kotlinx.serialization.json.JsonObject?): LocalSubagentCapabilities {
     if (value == null) return LocalSubagentCapabilities()
     require(value.keys.all { it in setOf("execution_backend", "remote_backend_revision") }) { "AGENT_BACKEND_BINDING_INVALID" }
-    fun text(key: String): String? = (value[key] as? kotlinx.serialization.json.JsonPrimitive)?.content
+    fun text(key: String): String? {
+        if (key !in value) return null
+        val field = value[key] as? kotlinx.serialization.json.JsonPrimitive
+        require(field != null && field.isString && field.content.isNotBlank()) { "AGENT_BACKEND_BINDING_INVALID" }
+        return field.content
+    }
     val kind = LocalAgentExecutionBackend.fromWire(text("execution_backend"))
     val revision = text("remote_backend_revision")
     require((kind == LocalAgentExecutionBackend.TRUSTED_REMOTE) == !revision.isNullOrBlank()) { "AGENT_BACKEND_REVISION_INVALID" }

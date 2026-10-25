@@ -49,6 +49,7 @@ class FramedAgentChannel(
             require(size in 1..maxFrameBytes) { "AGENT_BACKEND_FRAME_SIZE_INVALID" }
             val data = ByteArray(size)
             reader.readFully(data)
+            requireBoundedJsonDepth(data)
             AgentBackendProtocol.json.parseToJsonElement(data.toString(Charsets.UTF_8)).jsonObject
         }
     }
@@ -58,6 +59,25 @@ class FramedAgentChannel(
         // Socket close/unbind first: releases writers before closing their buffered streams.
         try { onClose() } finally {
             runCatching { reader.close() }; runCatching { writer.close() }; ioScope.cancel()
+        }
+    }
+}
+
+/** Reject peer-controlled nesting before recursive JSON deserialization can exhaust the host stack. */
+private fun requireBoundedJsonDepth(bytes: ByteArray) {
+    var depth = 0
+    var quoted = false
+    var escaped = false
+    for (byte in bytes) {
+        val value = byte.toInt()
+        if (quoted) {
+            if (escaped) escaped = false
+            else if (value == 92) escaped = true
+            else if (value == 34) quoted = false
+        } else when (value) {
+            34 -> quoted = true
+            123, 91 -> { depth++; require(depth <= 256) { "AGENT_BACKEND_JSON_DEPTH_INVALID" } }
+            125, 93 -> { depth--; require(depth >= 0) { "AGENT_BACKEND_JSON_DEPTH_INVALID" } }
         }
     }
 }

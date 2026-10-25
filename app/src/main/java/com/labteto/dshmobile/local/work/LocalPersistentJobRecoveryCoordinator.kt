@@ -716,7 +716,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         check(index >= 0 && fence["node_version"]?.jsonPrimitive?.contentOrNull == plan.nodeVersion(plan.nodes[index])) {
             "节点定义版本已改变"
         }
-        check(fence["backend_binding"] == plan.value["backend_binding"]) { "节点执行后端身份已变化" }
+        check(fence["backend_binding"] == plan.backendBinding) { "节点执行后端身份已变化" }
         val originalFiles = fence["files"] as? JsonObject ?: error("节点文件版本缺失")
         val currentFiles = plan.fileVersions(workspaceRoot, index)
         val identityPaths = if (plan.writable) plan.inputPaths(index) else
@@ -805,7 +805,9 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 historySnapshot = binding.runHandle.modelHistory::snapshot,
                 requestedJobId = jobId, allowMutation = allowMutation,
                 workflowFence = fence,
-                backendCapabilities = com.labteto.dshmobile.local.agent.decodeAgentBackendBinding(fence["backend_binding"] as? JsonObject),
+                backendCapabilities = com.labteto.dshmobile.local.agent.decodeAgentBackendBinding(
+                    if ("backend_binding" in fence) fence["backend_binding"] as? JsonObject
+                        ?: error("TASKGRAPH_BACKEND_BINDING_INVALID") else null),
                 workspaceRepository = workspaceRepository,
             )
             if (!admitted.accepted) {

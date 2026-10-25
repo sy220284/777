@@ -55,6 +55,7 @@ class AgentTlsBackend(
                     } catch (error: Exception) { continuation.resumeWithException(error) }
                 }
             }
+            requireGrantCurrent()
             val connection = FramedAgentChannel(socket.inputStream, socket.outputStream, onClose = socket::close)
             channel = connection
             val checked = AgentBackendServices(

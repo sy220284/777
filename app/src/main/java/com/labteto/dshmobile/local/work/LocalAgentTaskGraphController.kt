@@ -290,7 +290,7 @@ internal class LocalAgentTaskGraphController(
                 val proposedJobId = workflowNodeJobId(execution, nodeVersion, identityFiles, inputs,
                     dependencyVersions(ctx.node.dependsOn))
                 val fence = buildJsonObject {
-                    plan.value["backend_binding"]?.let { put("backend_binding", it) }
+                    plan.backendBinding?.let { put("backend_binding", it) }
                     put("graph_id", graphId); put("graph_execution_id", execution); put("goal_id", goalId)
                     put("goal_fingerprint", goalFingerprint); put("node_id", ctx.node.id)
                     put("source_message_id", source ?: JsonNull)

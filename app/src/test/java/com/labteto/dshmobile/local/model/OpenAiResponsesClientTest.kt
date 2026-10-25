@@ -1851,7 +1851,7 @@ class OpenAiResponsesClientTest {
             model = com.labteto.dshmobile.harness.agent.AgentModel {
                 val reply = streaming.completeStreaming("token", "https://example.test/v1", "gpt-test",
                     listOf(buildJsonObject { put("role", "user"); put("content", "write") }),
-                    JsonArray(emptyList()), planSharing = false)
+                    Json.parseToJsonElement("""[{"type":"function","function":{"name":"write","parameters":{"type":"object","properties":{}}}}]""").jsonArray, planSharing = false)
                 com.labteto.dshmobile.harness.agent.AgentModelReply(toolCalls = reply.toolCalls.map {
                     com.labteto.dshmobile.harness.agent.AgentToolCall(it.id, it.name, it.arguments, it.rawArguments)
                 }, completionReason = reply.completionReason)
