@@ -71,6 +71,7 @@ internal interface LocalAgentControlPort {
     suspend fun executeTeam(binding: LocalWorkRunBinding, call: LocalToolCall): String?
     suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String
     suspend fun workflow(binding: LocalWorkRunBinding, request: LocalAgentWorkflowRequest): String
+    suspend fun resumePendingWorkflows(binding: LocalWorkRunBinding)
     fun list(sessionId: String): String
     fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String
     fun send(
@@ -119,6 +120,10 @@ internal class LocalWorkAgentControlRuntime(
         inputFiles = request.inputFiles, nodeInputFiles = request.nodeInputFiles,
         nodeOutputFiles = request.nodeOutputFiles, resumeGraphId = request.resumeGraphId,
     )
+
+    override suspend fun resumePendingWorkflows(binding: LocalWorkRunBinding) {
+        subagents.resumePendingWorkflows(binding)
+    }
 
     override fun list(sessionId: String): String = jobs.listAgents(sessionId)
     override fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String =
