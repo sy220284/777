@@ -55,6 +55,32 @@ class LocalAgentLifecycleControlTest {
         }.isFailure)
     }
 
+    @Test fun registrySeparatesTeamRoutingFromStandaloneAndNeverResolvesCrossSession() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val jobs = LocalJobManager(scope, onChanged = {})
+        try {
+            assertTrue(jobs.startPersistentResult("子代理：ordinary", "subagent_readonly", "{}",
+                ownerSessionId = "session-a", continuable = true,
+                requestedId = "job-ordinary-1") { _, _ -> awaitCancellation() }.accepted)
+            assertTrue(jobs.startPersistentResult("子代理：team member", "subagent_readonly", "{}",
+                ownerSessionId = "session-a", continuable = true,
+                requestedId = "job-team-1") { _, _ -> awaitCancellation() }.accepted)
+            val registry = LocalAgentRegistry(jobs)
+            assertEquals("job-ordinary-1",
+                registry.resolveStandaloneChild("session-a", "job-ordinary-1").id)
+            assertEquals("job-team-1",
+                registry.resolveOwnedChild("session-a", "job-team-1").id)
+            assertTrue(runCatching {
+                registry.resolveStandaloneChild("session-a", "job-team-1")
+            }.exceptionOrNull()?.message.orEmpty().contains("AGENT_TEAM_LIFECYCLE_VIA_TEAM_PORT"))
+            assertTrue(runCatching {
+                registry.resolveStandaloneChild("session-b", "job-ordinary-1")
+            }.isFailure)
+        } finally {
+            scope.cancel()
+        }
+    }
+
     @Test fun explicitResumeNeverSelectsAnotherAgentInSameSession() {
         assertTrue(matchesRequestedAgentRecovery("job-first", null))
         assertTrue(matchesRequestedAgentRecovery("job-second", null))
