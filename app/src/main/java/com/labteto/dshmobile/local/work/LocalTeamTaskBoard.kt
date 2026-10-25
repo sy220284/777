@@ -378,4 +378,3 @@ internal fun boundedTeamText(
     }
     return clean
 }
-
