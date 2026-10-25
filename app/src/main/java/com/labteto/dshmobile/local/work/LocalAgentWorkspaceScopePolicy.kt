@@ -48,6 +48,9 @@ internal fun enforceTeamMemberWorkspaceMutation(
     registeredTool: com.labteto.dshmobile.harness.tools.HarnessTool? = null,
 ) {
     val canonical = com.labteto.dshmobile.local.tools.LocalToolPolicy.canonical(call.name)
+    require(registeredTool == null || registeredTool.name == canonical) {
+        "TEAM_WRITE_TOOL_IDENTITY_MISMATCH:$canonical"
+    }
     // The actual registered tool, not its model-provided name, owns the effect
     // classification. Legacy pure-call tests may use the native policy fallback.
     val access = registeredTool?.access
