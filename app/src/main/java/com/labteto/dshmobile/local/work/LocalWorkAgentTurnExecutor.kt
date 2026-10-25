@@ -446,8 +446,9 @@ internal class LocalWorkAgentTurnExecutor(
                         // Replace this request's layer, never append catalog updates to history.
                         workPromptContext = workPromptContext.copy(skill = skillGuidance)
                     }
+                    val advertisedTools = runToolSurface.next(workTurnToolRuntime.schemas(runPolicy, binding))
                     val tools = modelToolStepSurface.capture(
-                        runToolSurface.next(workTurnToolRuntime.schemas(runPolicy, binding)),
+                        advertisedTools, workTurnToolRuntime.captureBindings(advertisedTools),
                     )
                     val productContextTokens =
                         estimateModelTokens(workPromptContext.stable) +
@@ -645,31 +646,35 @@ internal class LocalWorkAgentTurnExecutor(
                     error("Unreachable: Work sampling must return or be cancelled")
                 },
                 tools = AgentToolExecutor { call ->
-                    agentRunCoordinator.ensureCurrentOwner(runContext)
-                    if (binding.steeringRevision.value != latestAcceptedSamplingRevision) {
-                        workSteeredToolResult(call.toLocalToolCall())
-                    } else if (!modelToolStepSurface.allows(call.name)) {
-                        modelToolStepSurface.hiddenCallResult(call.name)
-                    } else {
-                        workTurnToolRuntime.execute(
-                            binding = binding,
-                            call = call.toLocalToolCall(),
-                            allowMutation = true,
-                            stillCurrent = {
-                                binding.steeringRevision.value == latestAcceptedSamplingRevision
-                            },
-                        )
+                    modelToolStepSurface.executeBound {
+                        agentRunCoordinator.ensureCurrentOwner(runContext)
+                        if (binding.steeringRevision.value != latestAcceptedSamplingRevision) {
+                            workSteeredToolResult(call.toLocalToolCall())
+                        } else if (!modelToolStepSurface.allows(call.name)) {
+                            modelToolStepSurface.hiddenCallResult(call.name)
+                        } else {
+                            workTurnToolRuntime.execute(
+                                binding = binding,
+                                call = call.toLocalToolCall(),
+                                allowMutation = true,
+                                stillCurrent = {
+                                    binding.steeringRevision.value == latestAcceptedSamplingRevision
+                                },
+                            )
+                        }
                     }
                 },
                 toolBatch = AgentToolBatchExecutor { calls ->
-                    agentRunCoordinator.ensureCurrentOwner(runContext)
-                    modelToolStepSurface.executeVisibleBatch(calls) { visibleCalls ->
-                        workTurnToolRuntime.executeBatch(
-                            binding = binding,
-                            calls = visibleCalls.map { it.toLocalToolCall() },
-                            allowMutation = true,
-                            superseded = { binding.steeringRevision.value != latestAcceptedSamplingRevision },
-                        ).map { (_, result) -> result }
+                    modelToolStepSurface.executeBound {
+                        agentRunCoordinator.ensureCurrentOwner(runContext)
+                        modelToolStepSurface.executeVisibleBatch(calls) { visibleCalls ->
+                            workTurnToolRuntime.executeBatch(
+                                binding = binding,
+                                calls = visibleCalls.map { it.toLocalToolCall() },
+                                allowMutation = true,
+                                superseded = { binding.steeringRevision.value != latestAcceptedSamplingRevision },
+                            ).map { (_, result) -> result }
+                        }
                     }
                 },
                 isParallelTool = { call ->

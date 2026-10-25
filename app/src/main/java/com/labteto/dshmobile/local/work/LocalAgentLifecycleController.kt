@@ -5,8 +5,9 @@ import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
 import com.labteto.dshmobile.harness.agent.AgentRunExecutionContext
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Codex agent/control/api.rs: resolving/observing a child and interrupting its current
@@ -71,19 +72,22 @@ internal class LocalAgentLifecycleController(
     ): String {
         require(afterCursor.isNotBlank()) { "AGENT_WATCH_CURSOR_REQUIRED：先调用 agent_inspect" }
         require(maxWaitMs in 0..20_000) { "AGENT_WATCH_TIMEOUT_INVALID" }
-        val started = System.nanoTime()
-        while (true) {
-            currentCoroutineContext().ensureActive()
-            val now = registry.resolveStandalone(sessionId, agentId).info
-            if (localAgentObservationCursor(now) != afterCursor) {
-                return "changed=true\n" + inspect(sessionId, agentId)
+        fun changed(): Boolean = localAgentObservationCursor(
+            registry.resolveStandalone(sessionId, agentId).info,
+        ) != afterCursor
+        if (!changed() && maxWaitMs > 0) {
+            withTimeoutOrNull(maxWaitMs.toLong()) {
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    // Capture notification version BEFORE observing: a change in between the
+                    // read and subscription is retained by StateFlow and cannot be missed.
+                    val version = jobs.changes.value
+                    if (changed()) break
+                    jobs.changes.first { it != version }
+                }
             }
-            val elapsed = ((System.nanoTime() - started) / 1_000_000L).coerceAtLeast(0L)
-            if (elapsed >= maxWaitMs) {
-                return "changed=false\n" + inspect(sessionId, agentId)
-            }
-            delay(minOf(200L, maxWaitMs - elapsed))
         }
+        return "changed=${changed()}\n" + inspect(sessionId, agentId)
     }
 
     fun interrupt(sessionId: String, agentId: String): String {

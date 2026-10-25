@@ -21,7 +21,11 @@ internal fun placeTurnContext(
     val stable = truncateWithoutSplittingSurrogatePair(stableContext, (maxChars - reserve).coerceAtLeast(0))
     val dynamic = truncateWithoutSplittingSurrogatePair(dynamicContext, (maxChars - stable.length).coerceAtLeast(0))
     val result = history.toMutableList()
-    fun message(content: String) = buildJsonObject { put("role", "system"); put("content", content) }
+    fun message(content: String) = buildJsonObject {
+        put("role", "system")
+        put("content", content)
+        put(LOCAL_INSTRUCTION_SCOPE, LocalInstructionScope.TURN.name)
+    }
     if (stable.isNotBlank()) {
         val index = if (result.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") 1 else 0
         result.add(index, message(stable))

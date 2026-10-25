@@ -119,6 +119,7 @@ internal class LocalSubagentRunner(
     private val contextSnapshot: (String) -> String,
     private val eventLog: () -> LocalSessionEventLog,
     private val schemas: (Boolean, Boolean, MutableSet<String>) -> JsonArray,
+    private val captureToolBindings: ((JsonArray) -> com.labteto.dshmobile.harness.tools.ToolBindingSnapshot)? = null,
     private val execute: suspend (LocalToolCall, Boolean, MutableSet<String>) -> AgentToolResult,
     private val teamSchemas: (() -> JsonArray)? = null,
     private val nestedReadonlySchemas: (() -> JsonArray)? = null,
@@ -587,18 +588,14 @@ internal class LocalSubagentRunner(
                         modelStepExecutor.complete(
                             surface = runSurface,
                             history = preparedHistory,
-                            tools = modelToolStepSurface.capture(
-                                runToolSurface.next(
-                                    filterLocalSubagentSchemas(
-                                        executionSchemas(
-                                            allowMutation,
-                                            virtualScreenId != null,
-                                            enabledOptionalTools,
-                                        ),
-                                        capabilities,
-                                    ),
+                            tools = runToolSurface.next(
+                                filterLocalSubagentSchemas(
+                                    executionSchemas(allowMutation, virtualScreenId != null, enabledOptionalTools),
+                                    capabilities,
                                 ),
-                            ),
+                            ).let { advertised ->
+                                modelToolStepSurface.capture(advertised, captureToolBindings?.invoke(advertised))
+                            },
                             subagentId = subagentId,
                             step = modelStep,
                             durableHistory = history,
@@ -662,79 +659,81 @@ internal class LocalSubagentRunner(
                     )
                 },
                 tools = AgentToolExecutor { call ->
-                    executionFence()
-                    ensureTeamRootAuthorization()
-                    currentCoroutineContext().ensureActive()
-                    LocalRecursiveReadOnlyToolScope.rejection(call, capabilities)
-                        ?: toolCallPolicy.rejection(call)
-                        ?: if (capabilities.teamManaged && call.name == "capability_search") {
-                            AgentToolResult(
-                                content = "额外的 MCP、LSP、GitHub 等扩展由主代理评估并显式授权；请向主代理申请所需工具。",
-                            )
-                        } else withContext(LocalModelRunContext(runProfile)) {
+                    modelToolStepSurface.executeBound {
+                        executionFence()
+                        ensureTeamRootAuthorization()
                         currentCoroutineContext().ensureActive()
-                        if (capabilities.teamManaged) {
-                            requireNotNull(requireTeamWorkspaceMutation) {
-                                "TEAM_WORKSPACE_WRITE_GATE_REQUIRED"
-                            }(requireNotNull(backgroundJobId), call.toLocalToolCall())
-                        }
-                        if (canDelegateNested && call.name == "subagent") {
-                            dispatchLocalNestedSubagent(
-                                call = call,
-                                parentCapabilities = capabilities,
-                                parentProfileId = runProfile.id,
-                                parentMaxSteps = maxSteps,
-                                subtreeBudget = subtreeBudget,
-                                availableAgentSlots = {
-                                    resourceScheduler.snapshot().availableAgentSlots
-                                },
-                                captureParent = { toolId -> captureLocalAgentParentLink(toolId) },
-                                ensureParentOwner = {
-                                    executionFence()
-                                    runContext?.let { parentContext ->
-                                        runCoordinator?.ensureCurrentOwner(parentContext)
-                                    }
-                                },
-                                runChild = { childSpec, sharedBudget ->
-                                    requireNotNull(newNestedRunner) {
-                                        "NESTED_DELEGATION_RUNNER_UNAVAILABLE"
-                                    }().runResult(
-                                        spec = childSpec,
-                                        executionFence = {
-                                            executionFence()
-                                            // Parent must still own its Run before a descendant acts.
-                                            runContext?.let { parentContext ->
-                                                runCoordinator?.ensureCurrentOwner(parentContext)
-                                            }
-                                        },
-                                        subtreeBudget = sharedBudget,
-                                        agentSlotWaitMillis = 5_000L,
-                                    )
-                                },
-                            )
-                        } else if (capabilities.teamManaged &&
-                            LocalAgentTeamContract.isTeamChildControlCall(call.name)) {
-                            requireNotNull(executeTeamTool) { "TEAM_CALLER_UNAVAILABLE" }(
-                                requireNotNull(backgroundJobId), call.toLocalToolCall(),
-                            )
-                        } else {
-                            val admittedCall = call.toLocalToolCall()
-                            val invoke: suspend () -> AgentToolResult = {
-                                execute(admittedCall, allowMutation, enabledOptionalTools)
-                                    .also { currentCoroutineContext().ensureActive() }
-                            }
+                        LocalRecursiveReadOnlyToolScope.rejection(call, capabilities)
+                            ?: toolCallPolicy.rejection(call)
+                            ?: if (capabilities.teamManaged && call.name == "capability_search") {
+                                AgentToolResult(
+                                    content = "额外的 MCP、LSP、GitHub 等扩展由主代理评估并显式授权；请向主代理申请所需工具。",
+                                )
+                            } else withContext(LocalModelRunContext(runProfile)) {
+                            currentCoroutineContext().ensureActive()
                             if (capabilities.teamManaged) {
-                                val jobId = requireNotNull(backgroundJobId)
-                                val check = requireNotNull(requireTeamWorkspaceMutation) {
+                                requireNotNull(requireTeamWorkspaceMutation) {
                                     "TEAM_WORKSPACE_WRITE_GATE_REQUIRED"
+                                }(requireNotNull(backgroundJobId), call.toLocalToolCall())
+                            }
+                            if (canDelegateNested && call.name == "subagent") {
+                                dispatchLocalNestedSubagent(
+                                    call = call,
+                                    parentCapabilities = capabilities,
+                                    parentProfileId = runProfile.id,
+                                    parentMaxSteps = maxSteps,
+                                    subtreeBudget = subtreeBudget,
+                                    availableAgentSlots = {
+                                        resourceScheduler.snapshot().availableAgentSlots
+                                    },
+                                    captureParent = { toolId -> captureLocalAgentParentLink(toolId) },
+                                    ensureParentOwner = {
+                                        executionFence()
+                                        runContext?.let { parentContext ->
+                                            runCoordinator?.ensureCurrentOwner(parentContext)
+                                        }
+                                    },
+                                    runChild = { childSpec, sharedBudget ->
+                                        requireNotNull(newNestedRunner) {
+                                            "NESTED_DELEGATION_RUNNER_UNAVAILABLE"
+                                        }().runResult(
+                                            spec = childSpec,
+                                            executionFence = {
+                                                executionFence()
+                                                // Parent must still own its Run before a descendant acts.
+                                                runContext?.let { parentContext ->
+                                                    runCoordinator?.ensureCurrentOwner(parentContext)
+                                                }
+                                            },
+                                            subtreeBudget = sharedBudget,
+                                            agentSlotWaitMillis = 5_000L,
+                                        )
+                                    },
+                                )
+                            } else if (capabilities.teamManaged &&
+                                LocalAgentTeamContract.isTeamChildControlCall(call.name)) {
+                                requireNotNull(executeTeamTool) { "TEAM_CALLER_UNAVAILABLE" }(
+                                    requireNotNull(backgroundJobId), call.toLocalToolCall(),
+                                )
+                            } else {
+                                val admittedCall = call.toLocalToolCall()
+                                val invoke: suspend () -> AgentToolResult = {
+                                    execute(admittedCall, allowMutation, enabledOptionalTools)
+                                        .also { currentCoroutineContext().ensureActive() }
                                 }
-                                withContext(LocalTeamToolExecutionAdmission {
-                                    executionFence()
-                                    ensureTeamRootAuthorization()
-                                    runContext?.let { runCoordinator?.ensureCurrentOwner(it) }
-                                    check(jobId, admittedCall)
-                                }) { invoke() }
-                            } else invoke()
+                                if (capabilities.teamManaged) {
+                                    val jobId = requireNotNull(backgroundJobId)
+                                    val check = requireNotNull(requireTeamWorkspaceMutation) {
+                                        "TEAM_WORKSPACE_WRITE_GATE_REQUIRED"
+                                    }
+                                    withContext(LocalTeamToolExecutionAdmission {
+                                        executionFence()
+                                        ensureTeamRootAuthorization()
+                                        runContext?.let { runCoordinator?.ensureCurrentOwner(it) }
+                                        check(jobId, admittedCall)
+                                    }) { invoke() }
+                                } else invoke()
+                            }
                         }
                     }
                 },

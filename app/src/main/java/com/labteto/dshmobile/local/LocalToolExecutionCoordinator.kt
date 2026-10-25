@@ -20,8 +20,10 @@ import com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate
 import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -58,6 +60,11 @@ internal class LocalToolExecutionCoordinator(
     private val pinnedConnectorIds: () -> List<String> = { emptyList() },
     private val pinnedSkillIds: () -> List<String> = { emptyList() },
     private val workspaceReadWriteGate: LocalWorkspaceReadWriteGate = LocalWorkspaceReadWriteGate(),
+    /** Real handler receipts survive cancellation; they never authorize a continuation. */
+    private val recordCancelledExecutionFinished: suspend (
+        String, LocalToolCall, LocalToolExecutionIdentity,
+        com.labteto.dshmobile.harness.tools.ToolResult,
+    ) -> Unit = { _, _, _, _ -> },
 ) {
     // 前台 Lead 与所有后台成员共用此闸门，文件写入工具不得并行交错执行。
 
@@ -390,6 +397,7 @@ internal class LocalToolExecutionCoordinator(
 
         val executionOwner = currentCoroutineContext()[SessionExecutionContext]?.lease
         val runOwner = currentCoroutineContext()[AgentRunExecutionContext]
+        val callerJob = currentCoroutineContext()[Job]
         var authorizationRecorded = false
         var approvalDenied = false
         var executionStarted = false
@@ -431,6 +439,11 @@ internal class LocalToolExecutionCoordinator(
                             currentCoroutineContext()[LocalModelRunContext]?.profile?.let { put("model_profile", it) }
                         },
                         expectedRegistration = registered,
+                        onExecutionFinished = { _, result ->
+                            if (callerJob?.isCancelled == true) {
+                                recordCancelledExecutionFinished(sessionId, call, executionIdentity, result)
+                            }
+                        },
                         approval = { tool ->
                             val granted = approval(call, tool, approvalSummary(call, tool))
                             // No tool may start if the exact user's decision failed to
@@ -536,6 +549,7 @@ internal class LocalToolExecutionCoordinator(
             finally { if (executionStarted) onExecutionActive(false) }
         }
         executionStarted = executionStarted || invocation.executionStarted
+        currentCoroutineContext().ensureActive()
         val result = invocation.result
 
         if (!result.isError) {

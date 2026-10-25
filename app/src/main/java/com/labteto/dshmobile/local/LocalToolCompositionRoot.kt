@@ -196,6 +196,23 @@ internal class LocalToolCompositionRoot @Inject constructor(
                     },
                 )
             },
+            recordCancelledExecutionFinished = { sessionId, call, identity, result ->
+                // The original executor has actually returned. Record under its exact execution
+                // ID before cancellation unwinds; this cannot mark the Turn/Goal completed.
+                sessionStorage.eventLogs.get(sessionId).append("tool/result", buildJsonObject {
+                    put("id", call.id)
+                    put("name", call.name)
+                    put("execution_id", identity.executionId)
+                    put("is_error", result.isError)
+                    put("content", result.content)
+                    put("retryable", false)
+                    put("side_effect", if (identity.verifiedReadOnly) "none" else "possible")
+                    result.errorCode?.let { put("error_code", it) }
+                    result.processExitCode?.let { put("process_exit_code", it) }
+                    put("settlement_origin", "executor_after_cancellation")
+                    identity.attributes["run_id"]?.let { put("run_id", it) }
+                })
+            },
         )
     }
 

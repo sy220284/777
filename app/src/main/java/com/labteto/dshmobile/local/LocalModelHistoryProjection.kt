@@ -177,6 +177,9 @@ private fun applyModelHistoryEvent(
             val message = buildJsonObject {
                 put("role", "system")
                 put("content", modelContent)
+                event.data[com.labteto.dshmobile.local.model.LOCAL_INSTRUCTION_SCOPE]?.let {
+                    put(com.labteto.dshmobile.local.model.LOCAL_INSTRUCTION_SCOPE, it)
+                }
             }
             val hasSystem = history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
             if (hasSystem && updateMode == LocalModelPromptUpdateMode.APPEND_ONLY.name.lowercase()) {

@@ -40,6 +40,7 @@ import kotlinx.serialization.json.JsonArray
  */
 internal class LocalSubagentRunnerFactory(
     private val modelGateway: LocalModelGateway,
+    private val captureToolBindings: (JsonArray) -> com.labteto.dshmobile.harness.tools.ToolBindingSnapshot,
     private val jobs: LocalJobManager,
     private val modelHistory: LocalModelHistoryBuffer,
     private val toolOutputStore: LocalToolOutputStore,
@@ -135,6 +136,7 @@ internal class LocalSubagentRunnerFactory(
         modelAdmission: LocalModelAdmissionPort? = null,
     ): LocalSubagentRunner = LocalSubagentRunner(
         modelGateway = modelGateway,
+        captureToolBindings = captureToolBindings,
         teamSchemas = teamSchemas,
         nestedReadonlySchemas = nestedReadonlySchemas,
         // Every descendant owns fresh history policy and model step state; never reenter

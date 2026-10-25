@@ -40,6 +40,7 @@ internal class LocalWorkTurnToolRuntime(
     private val githubConfigured: suspend () -> Boolean,
     private val workspaceRoot: java.io.File? = null,
 ) {
+    internal fun captureBindings(schemas: JsonArray) = registry.captureBindings(schemas)
     internal fun clear(binding: LocalWorkRunBinding) {
         execution.clearTurnCapabilities(binding.enabledOptionalTools)
         binding.toolPriority.reset()

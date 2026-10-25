@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.harness.agent
 
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+
 /**
  * Owns tool batching and the model-visible settlement order for one step.
  * Actual admission, permission, resource leases and side-effect identity belong
@@ -18,6 +21,7 @@ internal class AgentToolDispatch(
     ) {
         var index = 0
         while (index < calls.size) {
+            currentCoroutineContext().ensureActive()
             val first = calls[index]
             val parallel = mayRunParallel(first)
             val group = if (parallel) calls.drop(index).takeWhile(mayRunParallel)

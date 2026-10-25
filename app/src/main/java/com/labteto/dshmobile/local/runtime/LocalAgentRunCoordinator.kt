@@ -571,6 +571,14 @@ internal class LocalAgentRunCoordinator(
                 event.data["side_effect"]?.jsonPrimitive?.contentOrNull != "none") {
                 mutationReceipt = true
             }
+            if (event.type == "tool/result" &&
+                event.data["settlement_origin"]?.jsonPrimitive?.contentOrNull == "executor_after_cancellation" &&
+                event.data["run_id"]?.jsonPrimitive?.contentOrNull == runId &&
+                event.data["side_effect"]?.jsonPrimitive?.contentOrNull == "possible") {
+                // A cancelled commit can finish before AgentEvent.ToolFinished is delivered.
+                // Its exact executor receipt prevents legacy recovery from restarting writes.
+                mutationReceipt = true
+            }
         }
         val unresolved = ledger.snapshot().any {
             it.unresolvedExternalEffect && (kind != LocalAgentRunKind.SUBAGENT ||

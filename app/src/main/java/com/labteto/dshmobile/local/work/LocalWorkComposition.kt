@@ -117,6 +117,7 @@ internal class LocalWorkComposition @Inject constructor(
     private val subagentFactory by lazy {
         LocalSubagentRunnerFactory(
             modelGateway = modelGateway,
+            captureToolBindings = tools.registry::captureBindings,
             teamSchemas = { tools.schemas.teamMemberSchemas() },
             requireTeamRootAuthorization = { sessionId, jobId ->
                 agentTeams.requireCurrentRootAuthorization(sessionId, jobId)

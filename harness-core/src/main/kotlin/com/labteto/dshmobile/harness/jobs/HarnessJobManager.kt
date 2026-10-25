@@ -15,6 +15,9 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class JobContinuationPersistenceException(
     message: String,
@@ -118,6 +121,9 @@ class HarnessJobManager(
     // Capture and commit in one order. Otherwise an older callback/write can arrive after a
     // terminal snapshot and restore a running UI or durable record.
     private val publicationLock = Any()
+    // Notification only. Consumers always re-read the existing Job owner after a wake-up.
+    private val mutableChanges = MutableStateFlow(0L)
+    val changes: StateFlow<Long> = mutableChanges.asStateFlow()
     private val records = linkedMapOf<String, Record>()
     private val removingOwners = mutableSetOf<String>()
 
@@ -1268,6 +1274,7 @@ class HarnessJobManager(
             infos = records.values.map { it.toJobInfo() }
             snapshots = records.values.map(::snapshot)
         }
+        mutableChanges.value += 1L
         onChanged(infos)
         // A transient persistence failure must not rewrite the task's execution result. The next
         // state publication retries the full snapshot. Persistent start/resume use the strict
@@ -1276,6 +1283,7 @@ class HarnessJobManager(
     }
 
     private fun notifyChanged() = synchronized(publicationLock) {
+        mutableChanges.value += 1L
         onChanged(snapshotRecords())
     }
 

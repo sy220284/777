@@ -23,6 +23,7 @@ internal fun recordRuntimeSystemPromptUpdate(
     val hadSystem = history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
     return applyRuntimeSystemPromptUpdate(history, prompt, modelState).also { mode ->
         log.append("system/prompt", buildJsonObject {
+            put(LOCAL_INSTRUCTION_SCOPE, LocalInstructionScope.TURN.name)
             put("content", prompt)
             put("model_content", runtimeSystemPromptContent(prompt, mode, hadSystem))
             put("update_mode", mode.name.lowercase())
@@ -50,6 +51,7 @@ internal fun applyRuntimeSystemPromptUpdate(
     val hasSystem = history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
     val message = buildJsonObject {
         put("role", "system")
+        put(LOCAL_INSTRUCTION_SCOPE, LocalInstructionScope.TURN.name)
         put("content", runtimeSystemPromptContent(prompt, mode, hasSystem))
     }
     when {
