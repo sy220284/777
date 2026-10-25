@@ -47,15 +47,10 @@ internal fun validateAgentResumeAdmission(
 internal class LocalAgentLifecycleController(
     private val jobs: LocalJobManager,
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
+    private val registry: LocalAgentRegistry,
 ) {
     private fun requireOwnedAgent(sessionId: String, agentId: String): LocalJobInfo {
-        return requireOwnedAgentInfo(jobs.snapshotInfos(), sessionId, agentId)
-    }
-
-    private fun requireStandaloneAgent(info: LocalJobInfo) {
-        require(!LocalAgentTeamContract.isTeamJobId(info.id)) {
-            "AGENT_TEAM_LIFECYCLE_VIA_TEAM_PORT：Team 成员只能走 team_interrupt / team_dismiss_member"
-        }
+        return registry.resolveOwnedChild(sessionId, agentId)
     }
 
     fun inspect(sessionId: String, agentId: String): String {
@@ -101,20 +96,18 @@ internal class LocalAgentLifecycleController(
     }
 
     fun interrupt(sessionId: String, agentId: String): String {
-        val info = requireOwnedAgent(sessionId, agentId)
-        requireStandaloneAgent(info)
+        val info = registry.resolveStandaloneChild(sessionId, agentId)
         require(info.continuable) { "AGENT_NOT_CONTINUABLE：非持久代理不可安全暂停，可使用 agent_close 永久关闭" }
         return jobs.interruptContinuableAgent(agentId, sessionId)
     }
 
     fun close(sessionId: String, agentId: String): String {
-        requireStandaloneAgent(requireOwnedAgent(sessionId, agentId))
+        registry.resolveStandaloneChild(sessionId, agentId)
         return jobs.kill(agentId, sessionId)
     }
 
     fun resume(sessionId: String, agentId: String): String {
-        val info = requireOwnedAgent(sessionId, agentId)
-        requireStandaloneAgent(info)
+        val info = registry.resolveStandaloneChild(sessionId, agentId)
         val snapshot = jobs.snapshots().singleOrNull {
             it.id == agentId && it.ownerId == sessionId
         } ?: error("AGENT_SNAPSHOT_NOT_FOUND")
