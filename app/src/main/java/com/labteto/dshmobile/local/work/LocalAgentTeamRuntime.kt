@@ -1043,6 +1043,7 @@ internal class LocalAgentTeamRuntime(
         jobId: String,
         call: LocalToolCall,
         workspaceRoot: java.io.File,
+        registeredTool: com.labteto.dshmobile.harness.tools.HarnessTool? = null,
     ) {
         val snapshot = project(sessionId)
         require(snapshot.failure == null) { "TEAM_PROJECTION_INVALID" }
@@ -1061,7 +1062,7 @@ internal class LocalAgentTeamRuntime(
         }
         enforceTeamMemberWorkspaceMutation(
             call = call, writeScopes = current?.writeScopes.orEmpty(),
-            workspaceRoot = workspaceRoot,
+            workspaceRoot = workspaceRoot, registeredTool = registeredTool,
         )
     }
 
