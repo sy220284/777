@@ -45,6 +45,7 @@ enum class ToolResultRetention {
     EPHEMERAL,
 }
 
+@kotlinx.serialization.Serializable
 data class ToolResult(
     val content: String,
     val isError: Boolean = false,
