@@ -66,7 +66,7 @@ internal fun projectLocalTeamMessageReceipt(
 ): LocalTeamMessageReceipt {
     require(id.matches(Regex("team-msg-[a-zA-Z0-9_-]{1,64}"))) { "TEAM_MESSAGE_RECEIPT_ID_INVALID" }
     var queued: Long? = null
-    var delivered: Long? = null
+    val deliveredCandidates = mutableListOf<Pair<Long, String?>>()
     var discarded: Long? = null
     var target: String? = null
     val checkpointJobs = mutableListOf<Pair<String, Long>>()
@@ -86,9 +86,10 @@ internal fun projectLocalTeamMessageReceipt(
             }
             LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED -> {
                 if (data["teamId"]?.jsonPrimitive?.contentOrNull == sessionId &&
-                    data["messageId"]?.jsonPrimitive?.contentOrNull == id &&
-                    (delivered == null || event.sequence > delivered)
-                ) delivered = event.sequence
+                    data["messageId"]?.jsonPrimitive?.contentOrNull == id
+                ) {
+                    deliveredCandidates += event.sequence to data["targetId"]?.jsonPrimitive?.contentOrNull
+                }
             }
             LocalAgentTeamContract.TEAM_MESSAGE_DISCARDED -> {
                 if (data["teamId"]?.jsonPrimitive?.contentOrNull == sessionId &&
@@ -127,13 +128,23 @@ internal fun projectLocalTeamMessageReceipt(
     val expectedJob = target?.takeIf { it.startsWith(LocalAgentTeamContract.TEAM_MEMBER_ID_PREFIX) }
         ?.let(LocalAgentTeamEventCodec::teamJobId)
     val queuedAt = queued
+    // A delivery from another recipient or one preceding the queue is not proof.
+    val delivered = deliveredCandidates.asSequence()
+        .filter { (sequence, deliveredTo) ->
+            queuedAt != null && sequence > queuedAt && deliveredTo == target
+        }.maxOfOrNull { it.first }
     val checkpoint = checkpointJobs.asSequence()
         .filter { it.first == expectedJob && (queuedAt == null || it.second >= queuedAt) }
         .maxOfOrNull { it.second }
     // A matching model reply is stronger than an Inbox checkpoint, but never proof of task success.
     val reply = replyJobs.asSequence()
-        .filter { it.first == expectedJob && queuedAt != null && it.second >= queuedAt }
-        .maxOfOrNull { it.second }
+        .filter { (job, sequence) ->
+            job == expectedJob && queuedAt != null && delivered != null &&
+                sequence > delivered &&
+                checkpointJobs.any { (checkedJob, checkedAt) ->
+                    checkedJob == job && checkedAt >= queuedAt && checkedAt < sequence
+                }
+        }.maxOfOrNull { it.second }
     val acknowledgment = ackReports.asSequence()
         .filter { (member, sequence, _) ->
             member == target && reply != null && sequence > reply && delivered != null &&
