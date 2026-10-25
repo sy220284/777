@@ -186,4 +186,33 @@ class LocalAgentWorkspaceScopePolicyTest {
         )
     }
 
+    @Test fun legacyWriteAliasUsesTheExactCanonicalRegisteredToolContract() {
+        val root = temporary.newFolder("canonical-alias")
+        val admitted = registeredTool(
+            "write", ToolAccess.WORKSPACE_WRITE, ToolWorkspaceAccess.WRITE,
+        )
+        enforceTeamMemberWorkspaceMutation(
+            tool("write_file", "path", "src/Allowed.kt"), listOf("src"),
+            root, registeredTool = admitted,
+        )
+        val mismatched = registeredTool(
+            "write_file", ToolAccess.WORKSPACE_WRITE, ToolWorkspaceAccess.WRITE,
+        )
+        assertTrue(runCatching {
+            enforceTeamMemberWorkspaceMutation(
+                tool("write_file", "path", "src/Allowed.kt"),
+                listOf("src"), root, registeredTool = mismatched,
+            )
+        }.exceptionOrNull()?.message.orEmpty().contains("TEAM_WRITE_TOOL_IDENTITY_MISMATCH"))
+        val replaced = registeredTool(
+            "write", ToolAccess.PRIVILEGED, ToolWorkspaceAccess.NONE,
+        )
+        assertTrue(runCatching {
+            enforceTeamMemberWorkspaceMutation(
+                tool("write_file", "path", "src/Allowed.kt"),
+                listOf("src"), root, registeredTool = replaced,
+            )
+        }.exceptionOrNull()?.message.orEmpty().contains("TEAM_WRITE_TOOL_CONTRACT_MISMATCH"))
+    }
+
 }
