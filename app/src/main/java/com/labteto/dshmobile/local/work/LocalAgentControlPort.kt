@@ -45,6 +45,23 @@ internal data class LocalAgentDispatchRequest(
     }
 }
 
+/** Workflow is a first-class AgentControl operation, with its own durable admission. */
+internal data class LocalAgentWorkflowRequest(
+    val tasks: List<String>,
+    val mode: String,
+    val requiredEvidence: List<String>,
+    val modelOverride: String?,
+    val outputSchema: JsonObject?,
+    val toolAllowlist: Set<String>?,
+    val dependencies: List<List<Int>> = emptyList(),
+    val allowMutation: Boolean = false,
+    val requiredFiles: List<String> = emptyList(),
+    val inputFiles: List<String> = emptyList(),
+    val nodeInputFiles: List<List<String>> = emptyList(),
+    val nodeOutputFiles: List<List<String>> = emptyList(),
+    val resumeGraphId: String? = null,
+)
+
 /**
  * Codex-style lifecycle port for Work child Agents.
  * Owner of execution facts remains the existing Job/Session/Run/Tool capabilities.
@@ -53,6 +70,7 @@ internal interface LocalAgentControlPort {
     /** Single Lead-side Team admission through the existing Team owner and EventLog. */
     suspend fun executeTeam(binding: LocalWorkRunBinding, call: LocalToolCall): String?
     suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String
+    suspend fun workflow(binding: LocalWorkRunBinding, request: LocalAgentWorkflowRequest): String
     fun list(sessionId: String): String
     fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String
     fun send(
@@ -89,6 +107,18 @@ internal class LocalWorkAgentControlRuntime(
 
     override suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String =
         spawns.delegate(binding, request)
+
+    override suspend fun workflow(
+        binding: LocalWorkRunBinding, request: LocalAgentWorkflowRequest,
+    ): String = subagents.runWorkflow(
+        tasks = request.tasks, mode = request.mode,
+        requiredEvidence = request.requiredEvidence, modelOverride = request.modelOverride,
+        outputSchema = request.outputSchema, toolAllowlist = request.toolAllowlist,
+        binding = binding, dependencies = request.dependencies,
+        allowMutation = request.allowMutation, requiredFiles = request.requiredFiles,
+        inputFiles = request.inputFiles, nodeInputFiles = request.nodeInputFiles,
+        nodeOutputFiles = request.nodeOutputFiles, resumeGraphId = request.resumeGraphId,
+    )
 
     override fun list(sessionId: String): String = jobs.listAgents(sessionId)
     override fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String =
