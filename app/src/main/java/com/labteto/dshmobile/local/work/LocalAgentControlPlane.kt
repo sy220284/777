@@ -34,6 +34,11 @@ internal class LocalAgentControlPlane(
     private val control: LocalAgentControlPort =
         LocalWorkAgentControlRuntime(jobs, subagents, persistentJobs, teams)
 
+    /** Root-slice admission restores DAGs through the same control boundary as workflow. */
+    internal suspend fun resumePendingWorkflows(binding: LocalWorkRunBinding) {
+        control.resumePendingWorkflows(binding)
+    }
+
     internal suspend fun execute(
         call: LocalToolCall,
         allowMutation: Boolean,
