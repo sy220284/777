@@ -35,6 +35,7 @@ internal object LocalAgentTeamEventCodec {
             put("provider", provider)
             put("context", context.name.lowercase())
             put("phase", phase.name.lowercase())
+            provisionalNewJob?.let { put("provisionalNewJob", it) }
             error?.let { put("error", it) }
         })
     }
