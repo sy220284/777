@@ -124,6 +124,7 @@ internal class LocalWorkComposition @Inject constructor(
             requireTeamWorkspaceMutation = { sessionId, jobId, call ->
                 agentTeams.requireMemberWorkspaceMutation(
                     sessionId, jobId, call, java.io.File(sessionStorage.files.workspace.path),
+                    tools.registry.get(call.name),
                 )
             },
             nestedReadonlySchemas = { tools.schemas.nestedReadOnlySubagentSchemas() },
