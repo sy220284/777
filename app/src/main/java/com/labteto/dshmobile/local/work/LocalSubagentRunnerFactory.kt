@@ -63,6 +63,7 @@ internal class LocalSubagentRunnerFactory(
     private val nestedReadonlySchemas: (() -> JsonArray)? = null,
     private val executeTeamTool: (suspend (String, String, LocalToolCall) -> AgentToolResult)? = null,
     private val requireTeamRootAuthorization: ((String, String) -> Unit)? = null,
+    private val requireTeamWorkspaceMutation: ((String, String, LocalToolCall) -> Unit)? = null,
     private val importToolImages: suspend (com.labteto.dshmobile.harness.tools.ToolRichContent?) -> List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = { emptyList() },
 ) {
     fun createBound(
@@ -155,6 +156,9 @@ internal class LocalSubagentRunnerFactory(
         executeTeamTool = executeTeamTool?.let { executor -> { jobId, call -> executor(runSessionId(), jobId, call) } },
         requireTeamRootAuthorization = requireTeamRootAuthorization?.let { check ->
             { jobId -> check(runSessionId(), jobId) }
+        },
+        requireTeamWorkspaceMutation = requireTeamWorkspaceMutation?.let { check ->
+            { jobId, call -> check(runSessionId(), jobId, call) }
         },
         importToolImages = importToolImages,
         state = runnerState,
