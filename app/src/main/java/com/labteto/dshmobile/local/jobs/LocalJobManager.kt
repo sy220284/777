@@ -115,6 +115,13 @@ internal class LocalJobManager(
 
     fun snapshotInfos(): List<LocalJobInfo> = delegate.infos().map { it.toLocalJobInfo() }
 
+    /** Coherent Agent identity/state view from one underlying Job-lock acquisition. */
+    fun agentRegistrations(ownerSessionId: String): List<LocalJobRegistration> =
+        delegate.agentRegistrations(ownerSessionId).map { registration ->
+            LocalJobRegistration(registration.info.toLocalJobInfo(), registration.snapshot)
+        }
+
+
     fun list(ownerSessionId: String? = null): String = delegate.list(ownerSessionId)
 
     fun listAgents(ownerSessionId: String? = null): String = delegate.listAgents(ownerSessionId)
