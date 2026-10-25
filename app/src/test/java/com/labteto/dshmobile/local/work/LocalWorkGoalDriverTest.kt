@@ -35,6 +35,44 @@ class LocalWorkGoalDriverTest {
     }
 
     @Test
+    fun sameIntegrationGateProtectsManualAndAutomaticGoalCompletion() {
+        withVerifiedGoal { binding, goal, root ->
+            fun updateReviewer(status: String) {
+                binding.workState.update { work ->
+                    work.copy(team = LocalAgentTeamUiState(tasks = listOf(
+                        LocalAgentTeamTaskUiState(
+                            id = "task-1", subject = "独立复核", description = "",
+                            status = "completed", revision = 3,
+                            completionResultId = "worker-proof",
+                            completionEvidenceSequence = 25L,
+                            independentReviewStatus = status,
+                        ),
+                    )))
+                }
+            }
+            val commands = LocalWorkProgressCoordinator(
+                binding.workState, binding.eventLog, root,
+            ) { }
+            updateReviewer("review_invalid")
+            assertThrows(IllegalStateException::class.java) { commands.updateGoal("completed", null) }
+            assertEquals("active", binding.workState.snapshot().goal?.status)
+            assertEquals(LocalWorkGoalDriveResult.PARTIAL, drive(binding, goal, root) {
+                error("Reviewer is unverified; cannot settle")
+            })
+            updateReviewer("reviewer_rejected")
+            assertThrows(IllegalStateException::class.java) { commands.updateGoal("completed", null) }
+            assertEquals("active", binding.workState.snapshot().goal?.status)
+            updateReviewer("reviewer_approved")
+            assertEquals(LocalWorkGoalDriveResult.COMPLETED,
+                drive(binding, goal, root, commands::completeVerifiedGoal))
+            assertEquals("completed", binding.workState.snapshot().goal?.status)
+            val diagnostic = binding.eventLog.latest("goal/driver")?.data
+            assertEquals("\"ready_for_goal_admission\"",
+                diagnostic?.get("integration_disposition").toString())
+        }
+    }
+
+    @Test
     fun inFlightGoalUpdateExcludesOnlyItsOwnExactInvocation() {
         withVerifiedGoal { binding, goal, root ->
             fun start(id: String, name: String) {
