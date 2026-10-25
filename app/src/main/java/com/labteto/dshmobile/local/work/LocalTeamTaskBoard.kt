@@ -326,22 +326,10 @@ internal class LocalTeamTaskBoard(
     }
 
     private fun scopesOverlap(left: String, right: String): Boolean =
-        left == right || left.startsWith("$right/") || right.startsWith("$left/")
+        localAgentWriteScopeOverlaps(left, right)
 
-    private fun normalizeWriteScopes(values: List<String>): List<String> {
-        val normalized = values
-            .map { it.trim().replace('\\', '/').trim('/') }
-            .filter(String::isNotBlank)
-            .distinct()
-        require(normalized.size <= MAX_WRITE_SCOPES) {
-            "TEAM_TASK_WRITE_SCOPE_LIMIT：最多允许 $MAX_WRITE_SCOPES 个 write scope"
-        }
-        require(normalized.none { scope ->
-            scope.split('/').any { it == "." || it == ".." } || scope.startsWith("~") ||
-                scope.contains(':') || scope.startsWith("//")
-        }) { "TEAM_WRITE_SCOPE_INVALID：写入范围只能是工作区内的相对目录或文件路径" }
-        return normalized
-    }
+    private fun normalizeWriteScopes(values: List<String>): List<String> =
+        normalizeLocalAgentWriteScopes(values, MAX_WRITE_SCOPES)
 
     private fun normalizeTaskIds(values: List<String>): List<String> {
         val normalized = values
