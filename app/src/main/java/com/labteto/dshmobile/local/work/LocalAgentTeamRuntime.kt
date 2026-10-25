@@ -1064,7 +1064,7 @@ internal class LocalAgentTeamRuntime(
             return
         }
         val admitted = assigned.rootUserRevision ?: return // Legacy tasks retain their previous semantics.
-        if (admitted != workflowUserRevision(log)) throw LocalWorkflowSuperseded()
+        LocalAgentRootDirectiveSnapshot(sessionId, admitted).requireCurrent(sessionId, log)
     }
 
     internal fun activityProjection(sessionId: String): LocalAgentTeamActivityProjection =
