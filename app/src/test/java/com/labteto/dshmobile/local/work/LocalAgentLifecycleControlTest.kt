@@ -68,7 +68,7 @@ class LocalAgentLifecycleControlTest {
         assertTrue(resolved.snapshot === persisted)
     }
 
-        @Test fun registrySeparatesTeamRoutingFromStandaloneAndNeverResolvesCrossSession() = runBlocking {
+    @Test fun registrySeparatesTeamRoutingFromStandaloneAndNeverResolvesCrossSession() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val jobs = LocalJobManager(scope, onChanged = {})
         try {
