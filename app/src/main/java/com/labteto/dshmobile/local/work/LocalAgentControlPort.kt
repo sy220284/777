@@ -93,6 +93,8 @@ internal interface LocalAgentControlPort {
     fun close(sessionId: String, agentId: String): String
     /** Request admission through the existing trusted recovery coordinator, not direct replay. */
     fun resume(sessionId: String, agentId: String): String
+    /** Resolve the cold child through the exact live parent before targeted resume. */
+    suspend fun ensureChildLoaded(sessionId: String, agentId: String): String
 }
 
 internal class LocalWorkAgentControlRuntime(
@@ -158,5 +160,8 @@ internal class LocalWorkAgentControlRuntime(
 
     override fun resume(sessionId: String, agentId: String): String =
         lifecycle.resume(sessionId, agentId)
+
+    override suspend fun ensureChildLoaded(sessionId: String, agentId: String): String =
+        lifecycle.ensureChildLoaded(sessionId, agentId)
 
 }
