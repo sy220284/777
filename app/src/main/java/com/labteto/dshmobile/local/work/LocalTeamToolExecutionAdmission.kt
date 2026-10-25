@@ -10,7 +10,7 @@ import kotlin.coroutines.CoroutineContext
  * any registered tool. No second task authority or persistent state is created.
  */
 internal class LocalTeamToolExecutionAdmission(
-    val requireCurrent: () -> Unit,
+    val requireCurrent: suspend () -> Unit,
 ) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<LocalTeamToolExecutionAdmission>
 }
