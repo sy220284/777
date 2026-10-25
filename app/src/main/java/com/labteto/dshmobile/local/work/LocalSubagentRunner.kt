@@ -79,6 +79,7 @@ import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
@@ -248,9 +249,24 @@ internal class LocalSubagentRunner(
         val inheritHistory = capabilities.historyMode == LocalSubagentHistoryMode.INHERIT_PARENT
         val allowMutation = capabilities.allowMutation
         val backgroundJobId = spec.backgroundJobId
-        fun ensureTeamRootAuthorization() {
-            if (capabilities.teamManaged) {
-                backgroundJobId?.let { jobId -> requireTeamRootAuthorization?.invoke(jobId) }
+        suspend fun ensureTeamRootAuthorization() {
+            if (!capabilities.teamManaged) return
+            val jobId = requireNotNull(backgroundJobId) { "TEAM_MEMBER_JOB_ID_REQUIRED" }
+            val check = requireNotNull(requireTeamRootAuthorization) {
+                "TEAM_MEMBER_AUTHORIZATION_GATE_REQUIRED"
+            }
+            // The provisionally persisted Job may begin before the Team ACTIVE event
+            // commits. Wait without making a model request or invoking a tool.
+            val deadline = System.nanoTime() + 30_000_000_000L
+            while (true) {
+                currentCoroutineContext().ensureActive()
+                try {
+                    check(jobId)
+                    return
+                } catch (_: LocalTeamSpawnCommitPending) {
+                    if (System.nanoTime() >= deadline) throw LocalWorkflowSuperseded()
+                    delay(50)
+                }
             }
         }
         val parentCallId = spec.parentCallId
