@@ -566,7 +566,7 @@ internal class LocalAgentTeamRuntime(
             .members.associateBy(LocalTeamMemberActivityView::memberId)
         val visibleTasks = state.tasks
             .filter { it.status != LocalTeamTaskStatus.DELETED }
-            .sortedBy(::taskNumber)
+            .sortedBy(taskBoard::taskNumber)
         val taskById = visibleTasks.associateBy { it.id }
         val memberById = state.members.associateBy { it.id }
         val memberExecutions = memberExecutionEvidenceByJobId(sessionId, state.members)
