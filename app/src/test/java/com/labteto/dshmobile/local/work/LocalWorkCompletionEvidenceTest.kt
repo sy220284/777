@@ -33,6 +33,41 @@ class LocalWorkCompletionEvidenceTest {
     }
 
     @Test
+    fun reviewerVerdictFromDurableTeamTaskMustBeAcceptedBeforeGoalCanSettle() {
+        fun task(status: String) = LocalAgentTeamTaskUiState(
+            id = "task-verify", subject = "独立验收", description = "",
+            status = "completed", revision = 3,
+            completionResultId = "worker-proof",
+            completionEvidenceSequence = 18,
+            independentReviewStatus = status,
+        )
+        val goal = LocalGoal("交付独立验证结果", id = "goal-reviewed")
+        for (status in listOf("pending", "review_invalid", "evidence_invalid", "root_superseded")) {
+            val work = LocalWorkState(goal = goal,
+                team = LocalAgentTeamUiState(tasks = listOf(task(status))))
+            val evidence = localWorkCompletionEvidence(work)
+            assertFalse(evidence.readyForGoalCompletion)
+            assertTrue(evidence.unreviewedTeamResults == 1)
+            assertFalse(resolveWorkGoalTransition(goal, goal.copy(status = "completed"), work).accepted)
+        }
+        val rejected = LocalWorkState(goal = goal,
+            team = LocalAgentTeamUiState(tasks = listOf(task("reviewer_rejected"))))
+        assertTrue(localWorkCompletionEvidence(rejected).rejectedTeamResults == 1)
+        assertFalse(resolveWorkGoalTransition(goal, goal.copy(status = "completed"), rejected).accepted)
+
+        val reviewed = LocalWorkState(goal = goal,
+            team = LocalAgentTeamUiState(tasks = listOf(task("reviewer_approved"))))
+        assertTrue(localWorkCompletionEvidence(reviewed).readyForGoalCompletion)
+        assertTrue(resolveWorkGoalTransition(goal, goal.copy(status = "completed"), reviewed).accepted)
+        // Legacy Task records without a durable result pointer remain readable.
+        val legacy = reviewed.copy(team = LocalAgentTeamUiState(tasks = listOf(
+            task("legacy_unknown").copy(completionResultId = null,
+                completionEvidenceSequence = null),
+        )))
+        assertTrue(localWorkCompletionEvidence(legacy).readyForGoalCompletion)
+    }
+
+    @Test
     fun goalTransitionAndDeliveryUseOneDiagnosticFactProjection() {
         val work = LocalWorkState(
             goal = LocalGoal("核查交付", status = "blocked"),
