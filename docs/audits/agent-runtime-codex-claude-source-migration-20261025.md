@@ -40,6 +40,18 @@
 - *仍需真实实现替换*：Codex PendingSpawn 接纳回滚与 ensure_child_loaded 的全树语义；TaskGraph/Team/非 Team 统一 delegation registry 和根授权 generation；客观验证→成果合并→Goal admission；Workspace ACL/worktree；后端/设备与完整三方差分。
 - 最新 HEAD 的自动化测试还需完整完成，尤其是 Kotlin 编译、EventLog 冷重放、软中断/关闭、消息去重、Team 生命周期竞态与 Android 16/17。前一 HEAD 因 `Json` import 缺失导致 CI 编译失败，修复已纳入这次迁移分支，但不能推定迁移版 CI 通过。
 
+## 2026-10-25 后续实装：统一 TaskGraph 和 Team → Goal 机器结算入口
+
+| Codex/Claude 源码语义 | 777 真实改动 | 边界及尚未覆盖 |
+|---|---|---|
+| Codex `agent/control/execution.rs` 中执行轮次与 AgentControl 管理分离，历史结果仍归运行时所有 | 新建 `LocalAgentTaskGraphController.kt`，将 `LocalWorkSubagentRuntime.kt` 的 DAG 执行、依赖证据、工具输入版本、Job 管理、节点接受和冷恢复全部迁出；旧 SubagentRuntime 保留受控 Agent Run 构建 | 新的 `LocalAgentControlPort.workflow` 接管模型 `workflow` 工具；根执行轮次恢复入口亦经 `LocalAgentControlPlane.resumePendingWorkflows`，复用原 Work Graph/EventLog/Job 所有权 |
+| Claude `verificationAgent.ts` 独立复测要求、Codex `tasks/review.rs` 独立审查与现有 777 Goal/文件 SHA/工具验证证据 | `LocalTeamVerificationController.reviewStatus` 从事件日志重新确认源检查点、成员身份、任务版本、根授权版本和 reviewer 自己的结构化输出；结果进入 `LocalAgentTeamTaskUiState.independentReviewStatus` → `LocalWorkCompletionEvidence` → 原 Goal 状态转换 | 未独立审查或拒绝的新式 Team 结果会阻止 Goal 结算；**reviewer_approved 仅证明来源可信的审查声明**，实际文件 SHA 与测试进程退出码仍由原 `LocalWorkDeliveryEvidence` 核对 |
+| 现有 777 的事件来源与回归规则 | 已补 Team 事件冷恢复→Reviewer 记录→Goal 接纳的联合回归；历史未带 proof 字段的 Task 保留旧兼容路径 | 该测试不代表已覆盖 Git worktree 冲突、真实 Android 运行或 84 场景矩阵 |
+
+**明确尚未完成、不能冒充源码复刻：** Codex `PendingSpawn` 全树接纳/回滚、`ensure_child_loaded`、unloaded identity 与 parent tree path 全覆盖；统一 Agent Team / DAG / Fork 的路径权限和代际 revoke；工作区强 sandbox/worktree、真实并行分支合并、可信远程 Backend、84 场景与三方真实模型性能质量对比。这些都需要独立实现与设备/故障注入验收。
+
+**CI 真实记录：** 此批重构曾遇到 `LocalTeamTaskBoard.kt` 末尾空行触发 scope 失败，以及 `LocalAgentTeamRuntime.kt` 分域移植出现成员生命周期回调循环类型推断及残留同步调用，已按对应失败日志修复。修复不等于最新版 CI 全部成功，以当前 HEAD 的 Actions 结果为准。
+
 ## 迁移验证门槛
 
 - 每一批必须满足：新模块成为真实调用 owner；原方法删除；EventLog/Job 的状态事实来源不变；旧 EventLog 和冷恢复能重放；新旧输入在差分测试中观察到相同的业务结果或有明确且安全的有意变更。
