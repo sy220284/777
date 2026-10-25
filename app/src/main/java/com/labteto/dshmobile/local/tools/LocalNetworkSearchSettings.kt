@@ -17,8 +17,17 @@ class LocalNetworkSearchSettings @Inject constructor(
     private val preferences = LocalHarnessPreferences.from(context)
     private val enabledState = MutableStateFlow(isEnabled())
     val enabled: StateFlow<Boolean> = enabledState.asStateFlow()
+    private val premiumState = MutableStateFlow(isDeepSeekPreferred())
+    val deepSeekPreferred: StateFlow<Boolean> = premiumState.asStateFlow()
 
     fun isEnabled(): Boolean = preferences.getBoolean(KEY_ENABLED, true)
+
+    fun isDeepSeekPreferred(): Boolean = preferences.getBoolean(KEY_DEEPSEEK_PREFERRED, false)
+
+    fun setDeepSeekPreferred(value: Boolean) {
+        preferences.edit().putBoolean(KEY_DEEPSEEK_PREFERRED, value).apply()
+        premiumState.value = value
+    }
 
     fun setEnabled(value: Boolean) {
         preferences.edit().putBoolean(KEY_ENABLED, value).apply()
@@ -27,5 +36,6 @@ class LocalNetworkSearchSettings @Inject constructor(
 
     private companion object {
         const val KEY_ENABLED = "network_search_enabled"
+        const val KEY_DEEPSEEK_PREFERRED = "deepseek_native_search_preferred"
     }
 }
