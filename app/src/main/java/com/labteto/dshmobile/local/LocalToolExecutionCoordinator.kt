@@ -349,7 +349,7 @@ internal class LocalToolExecutionCoordinator(
         allowMutation: Boolean,
         planModeEnabled: Boolean,
         approval: suspend (LocalToolCall, HarnessTool, String) -> Boolean,
-        beforeExecution: () -> Boolean = { true },
+        beforeExecution: suspend () -> Boolean = { true },
         observeFileVersions: (() -> Map<String, String>)? = null,
         executionAttributes: Map<String, String> = emptyMap(),
         onExecutionActive: (Boolean) -> Unit = {},
