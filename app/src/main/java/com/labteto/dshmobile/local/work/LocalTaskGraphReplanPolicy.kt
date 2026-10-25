@@ -44,13 +44,19 @@ internal fun durableTaskGraphReplacement(
     oldPlan: LocalWorkTaskGraphPlan,
 ): String? {
     if (oldPlan.writable) return null
+    val expectedGoal = oldPlan.value["goal_fingerprint"] ?: return null
     val candidate = log.latestMatching(setOf("taskgraph/start")) { data ->
         data["replaces_graph_id"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } == oldGraphId &&
             data["session_id"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } == sessionId &&
-            data["graph_execution_id"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } != oldExecutionId &&
-            data["goal_fingerprint"] == oldPlan.value["goal_fingerprint"] &&
+            (data["graph_execution_id"] as? kotlinx.serialization.json.JsonPrimitive)
+                ?.content?.takeIf(String::isNotBlank)?.let { it != oldExecutionId } == true &&
+            (data["graph_id"] as? kotlinx.serialization.json.JsonPrimitive)
+                ?.content?.isNotBlank() == true &&
+            data["goal_fingerprint"] == expectedGoal &&
             (data["plan"] as? kotlinx.serialization.json.JsonObject)?.let { plan ->
-                plan["allow_mutation"]?.toString() == "false"
+                plan["allow_mutation"]?.toString() == "false" &&
+                    plan["goal_fingerprint"] == expectedGoal &&
+                    LocalWorkTaskGraphPlan(plan).version != oldPlan.version
             } == true
     } ?: return null
     return (candidate.data["graph_id"] as? kotlinx.serialization.json.JsonPrimitive)
