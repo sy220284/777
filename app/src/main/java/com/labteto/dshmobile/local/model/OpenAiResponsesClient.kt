@@ -11,6 +11,9 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.labteto.dshmobile.harness.agent.AgentEagerToolContext
+import com.labteto.dshmobile.harness.agent.AgentToolCall
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -27,6 +30,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -95,6 +99,38 @@ class OpenAiResponsesClient @Inject constructor(
             .post(payload.toString().toRequestBody(JSON_MEDIA).withModelAdmissionTracking(admissionTracker))
             .build()
         var admittedRequestId: String? = null
+        val eager = currentCoroutineContext()[AgentEagerToolContext]
+        val eagerItems = sortedMapOf<Int, JsonObject>()
+        val eagerCalls = linkedMapOf<String, LocalToolCall>()
+        fun interruptedEagerReply(): LocalModelReply {
+            val replay = parseCompleted(buildJsonObject {
+                put("status", "completed"); put("id", admittedRequestId.orEmpty())
+                put("output", JsonArray(eagerItems.values.toList()))
+            }, promptBreakdown)
+            return replay.copy(completionReason = LocalModelCompletionReason.INTERRUPTED,
+                rawStopReason = "stream_interrupted_after_tool_item_completion",
+                message = JsonObject(replay.message - RESPONSES_OUTPUT_KEY))
+        }
+        suspend fun acceptCompletedItem(event: JsonObject) {
+            if (eager == null || event["type"]?.jsonPrimitive?.contentOrNull != "response.output_item.done") return
+            val item = event["item"] as? JsonObject ?: return
+            if (item["type"]?.jsonPrimitive?.contentOrNull != "function_call" ||
+                item["status"]?.jsonPrimitive?.contentOrNull != "completed") return
+            val index = event["output_index"]?.jsonPrimitive?.intOrNull
+                ?.takeIf { it >= 0 } ?: throw responseProtocolError("完成工具项缺少输出序号")
+            val call = parseCompleted(buildJsonObject {
+                put("status", "completed"); put("output", JsonArray(listOf(item)))
+            }, promptBreakdown).toolCalls.single()
+            eagerItems[index]?.let { previous ->
+                if (previous != item) throw responseProtocolError("完成工具项内容变化"); return
+            }
+            if (call.id in eagerCalls || (eagerItems.isNotEmpty() && index <= eagerItems.lastKey()))
+                throw responseProtocolError("完成工具项编号重复或顺序变化")
+            // Store the exact admitted item before offer: interruption must retain its identity.
+            eagerItems[index] = item; eagerCalls[call.id] = call
+            eager.offer(AgentToolCall(call.id, call.name, call.arguments, call.rawArguments))
+        }
+
         try {
             withCancellableModelResponse(modelHttp.newCall(request), admissionTracker) { response ->
                 val requestId = response.header("x-request-id")
@@ -138,7 +174,7 @@ class OpenAiResponsesClient @Inject constructor(
                                 retryable = false,
                             )
                         } catch (failure: java.io.IOException) {
-                            if (!(streamed.content.isNotBlank())) throw failure
+                            if (streamed.content.isBlank() && eagerCalls.isEmpty()) throw failure
                             null
                         } ?: break
                         if (!line.startsWith("data:")) continue
@@ -155,6 +191,7 @@ class OpenAiResponsesClient @Inject constructor(
                             }
                         ((event["response"] as? JsonObject)?.get("usage") as? JsonObject)?.let { reportedUsage = it }
                         streamed.record(event)?.let { onDelta(it) }
+                        acceptCompletedItem(event)
                         when (event["type"]?.jsonPrimitive?.contentOrNull) {
                             "error" -> throw streamError(event, planSharing, requestId, retryAfterMs)
                             "response.failed" -> throw responseFailure(
@@ -179,7 +216,7 @@ class OpenAiResponsesClient @Inject constructor(
                     }
                 }
                 currentCoroutineContext().ensureActive()
-                val completed = completedResponse ?: if (streamed.content.isNotBlank()) buildJsonObject {
+                val completed = completedResponse ?: if (streamed.content.isNotBlank() || eagerCalls.isNotEmpty()) buildJsonObject {
                     put("status", "interrupted")
                     reportedUsage?.let { put("usage", it) }
                     put("id", requestId.orEmpty())
@@ -187,14 +224,20 @@ class OpenAiResponsesClient @Inject constructor(
                     planSharing = planSharing, requestId = requestId,
                     detail = "Responses API 流在终态前结束",
                 )
-                parseCompleted(
+                val settledReply = parseCompleted(
                     response = streamed.settledResponse(completed),
                     promptBreakdown = promptBreakdown,
                     streamedContent = streamed.content,
                     streamedReasoning = streamed.reasoningText,
                 )
+                if (eagerCalls.isNotEmpty() && (settledReply.completionReason != LocalModelCompletionReason.COMPLETED ||
+                        settledReply.toolCalls.take(eagerCalls.size) != eagerCalls.values.toList())) {
+                    interruptedEagerReply()
+                } else settledReply
             }
+        } catch (cancelled: CancellationException) { throw cancelled
         } catch (error: LocalModelException) {
+            if (eagerCalls.isNotEmpty()) return@withContext interruptedEagerReply()
             // In-stream failures can arrive after real inference has started on any Responses route.
             // Preserve diagnostics but never blindly replay the whole accepted request.
             if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED && error.retryable) {
@@ -202,6 +245,7 @@ class OpenAiResponsesClient @Inject constructor(
             }
             throw error
         } catch (error: SocketTimeoutException) {
+            if (eagerCalls.isNotEmpty()) return@withContext interruptedEagerReply()
             if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED) {
                 throw streamInterruptedAfterAdmission(
                     planSharing = planSharing,
@@ -218,6 +262,7 @@ class OpenAiResponsesClient @Inject constructor(
                 cause = error,
             )
         } catch (error: IOException) {
+            if (eagerCalls.isNotEmpty()) return@withContext interruptedEagerReply()
             if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED) {
                 throw streamInterruptedAfterAdmission(
                     planSharing = planSharing,

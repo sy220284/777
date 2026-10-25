@@ -18,18 +18,22 @@ internal class AgentToolDispatch(
         turn: AgentTurnState,
         step: Int,
         calls: List<AgentToolCall>,
+        eager: AgentEagerToolStep? = null,
     ) {
         var index = 0
         while (index < calls.size) {
             currentCoroutineContext().ensureActive()
             val first = calls[index]
-            val parallel = mayRunParallel(first)
-            val group = if (parallel) calls.drop(index).takeWhile(mayRunParallel)
+            val alreadyStarted = eager?.contains(first) == true
+            val parallel = !alreadyStarted && mayRunParallel(first)
+            val group = if (parallel) calls.drop(index).takeWhile { mayRunParallel(it) && eager?.contains(it) != true }
                 else listOf(first)
 
             // All call declarations are durably appended before dispatch begins.
-            for (call in group) emit.append(AgentEvent.ToolStarted(turn.turnId, step, call))
-            val results = if (parallel) {
+            for (call in group) if (eager?.contains(call) != true) emit.append(AgentEvent.ToolStarted(turn.turnId, step, call))
+            val results = if (alreadyStarted) {
+                listOf(requireNotNull(eager?.result(first)))
+            } else if (parallel) {
                 batch.execute(group)
             } else {
                 listOf(tools.execute(first))

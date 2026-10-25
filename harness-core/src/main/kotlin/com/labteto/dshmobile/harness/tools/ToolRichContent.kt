@@ -1,8 +1,10 @@
 package com.labteto.dshmobile.harness.tools
 
 import kotlinx.serialization.json.*
+import kotlinx.serialization.Serializable
 
 /** Lossless MCP envelope; known block types are projected without deleting unknown fields. */
+@Serializable
 data class ToolRichContent(val raw: JsonObject) {
     /** Budget previews omit only image payloads; raw remains the recoverable authority. */
     fun modelPreview(): String {

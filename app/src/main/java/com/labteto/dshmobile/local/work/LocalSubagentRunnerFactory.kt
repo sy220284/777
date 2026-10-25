@@ -40,6 +40,7 @@ import kotlinx.serialization.json.JsonArray
  */
 internal class LocalSubagentRunnerFactory(
     private val modelGateway: LocalModelGateway,
+    private val backendRuntime: com.labteto.dshmobile.local.agent.LocalAgentBackendRuntime,
     private val captureToolBindings: (JsonArray) -> com.labteto.dshmobile.harness.tools.ToolBindingSnapshot,
     private val jobs: LocalJobManager,
     private val modelHistory: LocalModelHistoryBuffer,
@@ -67,6 +68,8 @@ internal class LocalSubagentRunnerFactory(
     private val requireTeamWorkspaceMutation: (suspend (String, String, LocalToolCall) -> Unit)? = null,
     private val importToolImages: suspend (com.labteto.dshmobile.harness.tools.ToolRichContent?) -> List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = { emptyList() },
 ) {
+    suspend fun pinBackend(backend: com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend) = backendRuntime.pin(backend)
+
     fun createBound(
         sessionId: String,
         boundState: LocalHarnessState,
@@ -137,6 +140,7 @@ internal class LocalSubagentRunnerFactory(
         modelAdmission: LocalModelAdmissionPort? = null,
     ): LocalSubagentRunner = LocalSubagentRunner(
         modelGateway = modelGateway,
+        resolveBackend = backendRuntime::resolve,
         captureToolBindings = captureToolBindings,
         teamSchemas = teamSchemas,
         nestedReadonlySchemas = nestedReadonlySchemas,

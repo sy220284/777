@@ -1,10 +1,12 @@
 package com.labteto.dshmobile.harness.agent
 
 import com.labteto.dshmobile.harness.tools.ToolResultRetention
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+@Serializable
 data class AgentToolCall(
     val id: String,
     val name: String,
@@ -12,6 +14,7 @@ data class AgentToolCall(
     val rawArguments: String = arguments.toString(),
 )
 
+@Serializable
 data class AgentMessage(
     val role: String,
     val content: String = "",
@@ -22,15 +25,18 @@ data class AgentMessage(
     val rawStopReason: String? = null,
 )
 
+@Serializable
 enum class AgentCompletionReason { COMPLETED, OUTPUT_LIMIT, REFUSED, INTERRUPTED }
 
 /** Provider-reported facts only; the runtime usage owner remains responsible for billing once. */
+@Serializable
 data class AgentModelUsage(
     val promptTokens: Long, val completionTokens: Long,
     val cacheHitTokens: Long = 0L, val cacheMissTokens: Long = 0L,
     val cacheWriteTokens: Long = 0L, val reasoningTokens: Long = 0L,
 )
 
+@Serializable
 data class AgentModelReply(
     val content: String = "",
     val toolCalls: List<AgentToolCall> = emptyList(),
@@ -39,11 +45,13 @@ data class AgentModelReply(
     val reportedUsage: AgentModelUsage? = null,
 )
 
+@Serializable
 enum class AgentToolSideEffect {
     NONE,
     POSSIBLE,
 }
 
+@Serializable
 data class AgentToolResult(
     val content: String,
     val isError: Boolean = false,
@@ -70,6 +78,7 @@ fun AgentToolResult.modelVisibleContent(): String {
     }.toString()
 }
 
+@Serializable
 enum class AgentStopReason {
     COMPLETED,
     OUTPUT_LIMIT,
@@ -78,6 +87,7 @@ enum class AgentStopReason {
     STEP_LIMIT,
 }
 
+@Serializable
 data class AgentRunResult(
     val turnId: String,
     val answer: String,
@@ -86,19 +96,23 @@ data class AgentRunResult(
     val stopReason: AgentStopReason,
 )
 
+@Serializable
 sealed interface AgentEvent {
     val turnId: String
 
+    @Serializable
     data class TurnStarted(
         override val turnId: String,
         val input: String,
     ) : AgentEvent
 
+    @Serializable
     data class StepStarted(
         override val turnId: String,
         val step: Int,
     ) : AgentEvent
 
+    @Serializable
     data class AssistantObserved(
         override val turnId: String,
         val step: Int,
@@ -109,12 +123,14 @@ sealed interface AgentEvent {
         val reportedUsage: AgentModelUsage? = null,
     ) : AgentEvent
 
+    @Serializable
     data class ToolStarted(
         override val turnId: String,
         val step: Int,
         val call: AgentToolCall,
     ) : AgentEvent
 
+    @Serializable
     data class ToolFinished(
         override val turnId: String,
         val step: Int,
@@ -132,28 +148,33 @@ sealed interface AgentEvent {
         val richContent: com.labteto.dshmobile.harness.tools.ToolRichContent? = null,
     ) : AgentEvent
 
+    @Serializable
     data class StepFinished(
         override val turnId: String,
         val step: Int,
     ) : AgentEvent
 
+    @Serializable
     data class TurnCompleted(
         override val turnId: String,
         val steps: Int,
         val answer: String,
     ) : AgentEvent
 
+    @Serializable
     data class TurnStepLimit(
         override val turnId: String,
         val steps: Int,
     ) : AgentEvent
 
+    @Serializable
     data class TurnFailed(
         override val turnId: String,
         val reason: String,
         val completionReason: AgentCompletionReason? = null,
     ) : AgentEvent
 
+    @Serializable
     data class TurnCancelled(
         override val turnId: String,
     ) : AgentEvent

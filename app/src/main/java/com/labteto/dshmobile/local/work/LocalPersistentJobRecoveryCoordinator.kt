@@ -120,6 +120,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
         requestedJobId: String? = null,
+        backendCapabilities: com.labteto.dshmobile.local.agent.LocalSubagentCapabilities? = null,
     ): String = startReadonlySubagentResult(
         task = task,
         model = model,
@@ -134,6 +135,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         boundState = boundState,
         historySnapshot = historySnapshot,
         requestedJobId = requestedJobId,
+        backendCapabilities = backendCapabilities,
     ).message
 
     suspend fun startReadonlySubagentResult(
@@ -150,6 +152,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
         requestedJobId: String? = null,
+        backendCapabilities: com.labteto.dshmobile.local.agent.LocalSubagentCapabilities? = null,
         allowMutation: Boolean = false,
         teamManaged: Boolean = false,
         initialOptionalTools: Set<String> = emptySet(),
@@ -162,6 +165,8 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val protocol = effectiveProtocol(runProfile)
         val parentLink = captureLocalAgentParentLink(parentToolCallId ?: forkParentCallId)
         require(parentLink == null || parentLink.sessionId == sessionId) { "AGENT_PARENT_SESSION_MISMATCH" }
+        val selectedBackend = backendCapabilities
+            ?: currentCoroutineContext()[com.labteto.dshmobile.local.agent.LocalAgentBackendSelectionContext]?.capabilities
         val capabilities = buildLocalDelegationCapabilities(
             kind = if (teamManaged) LocalAgentDelegationKind.TEAM_MEMBER
                 else if (workflowFence != null) LocalAgentDelegationKind.WORKFLOW_NODE
@@ -171,6 +176,9 @@ internal class LocalPersistentJobRecoveryCoordinator(
             toolAllowlist = toolAllowlist,
             outputSchema = outputSchema,
             initialOptionalTools = initialOptionalTools,
+        ).copy(
+            executionBackend = selectedBackend?.executionBackend ?: com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend.IN_PROCESS,
+            remoteBackendRevision = selectedBackend?.remoteBackendRevision,
         )
         validateLocalSubagentLaunchSpec(
             LocalSubagentLaunchSpec(
@@ -708,6 +716,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         check(index >= 0 && fence["node_version"]?.jsonPrimitive?.contentOrNull == plan.nodeVersion(plan.nodes[index])) {
             "节点定义版本已改变"
         }
+        check(fence["backend_binding"] == plan.value["backend_binding"]) { "节点执行后端身份已变化" }
         val originalFiles = fence["files"] as? JsonObject ?: error("节点文件版本缺失")
         val currentFiles = plan.fileVersions(workspaceRoot, index)
         val identityPaths = if (plan.writable) plan.inputPaths(index) else
@@ -796,6 +805,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 historySnapshot = binding.runHandle.modelHistory::snapshot,
                 requestedJobId = jobId, allowMutation = allowMutation,
                 workflowFence = fence,
+                backendCapabilities = com.labteto.dshmobile.local.agent.decodeAgentBackendBinding(fence["backend_binding"] as? JsonObject),
                 workspaceRepository = workspaceRepository,
             )
             if (!admitted.accepted) {

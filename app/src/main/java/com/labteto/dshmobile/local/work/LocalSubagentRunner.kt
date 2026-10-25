@@ -113,6 +113,9 @@ internal fun subagentModelSelection(modelOverride: String?, inheritedModel: Stri
 
 internal class LocalSubagentRunner(
     private val modelGateway: LocalModelGateway,
+    private val resolveBackend: suspend (LocalSubagentCapabilities) -> com.labteto.dshmobile.harness.agent.AgentTurnBackend? = { capabilities ->
+        require(capabilities.executionBackend == com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend.IN_PROCESS) { "AGENT_BACKEND_OWNER_REQUIRED" }; null
+    },
     private val state: StateFlow<LocalHarnessState>,
     private val jobs: LocalJobManager,
     private val historySnapshot: () -> List<JsonObject>,
@@ -521,6 +524,7 @@ internal class LocalSubagentRunner(
             }
             val remainingSteps = totalBudgetLimit - recoveredBaseStep
             val loop = AgentTurnEngine(
+                backend = resolveBackend(capabilities),
                 model = AgentModel {
                     executionFence()
                     ensureTeamRootAuthorization()

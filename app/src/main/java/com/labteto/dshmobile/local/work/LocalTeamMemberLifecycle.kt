@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.work
 
+import kotlinx.serialization.json.JsonObject
+
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.jobs.JobInboxContract
 import com.labteto.dshmobile.harness.jobs.JobMessageAdmission
@@ -89,6 +91,7 @@ internal class LocalTeamMemberLifecycle(
         context: LocalTeamMemberContext,
         role: String?,
         workspaceRepository: String? = null,
+        backendBinding: JsonObject? = null,
     ): String {
         val roleBinding = bindLocalAgentRole(role, "", parentMutationAllowed = true)
         return synchronized(commandLock) {
@@ -106,6 +109,7 @@ internal class LocalTeamMemberLifecycle(
                 displayName = displayName.trim().take(32),
                 role = roleBinding.role.wireName,
                 workspaceRepository = workspaceRepository,
+                backendBinding = backendBinding,
                 description = boundedTeamText(
                     value = description,
                     field = "description",
@@ -352,6 +356,7 @@ internal class LocalTeamMemberLifecycle(
         parentCallId: String,
         grantedExtensions: Set<String>,
         workspaceRepository: String? = null,
+        backendBinding: JsonObject? = null,
     ): String {
         val roleBinding = bindLocalAgentRole(role, "", parentMutationAllowed = true)
         val provisioning = synchronized(commandLock) {
@@ -372,6 +377,7 @@ internal class LocalTeamMemberLifecycle(
                 mutableToolsEnabled = roleBinding.allowMutation,
                 grantedExtensions = grantedExtensions,
                 workspaceRepository = workspaceRepository,
+                backendBinding = backendBinding,
                 description = boundedTeamText(
                     value = description,
                     field = "description",

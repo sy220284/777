@@ -66,6 +66,7 @@ internal data class LocalAgentWorkflowRequest(
     val resumeGraphId: String? = null,
     val replanGraphId: String? = null,
     val workspaceRepository: String? = null,
+    val executionBackend: LocalAgentExecutionBackend = LocalAgentExecutionBackend.IN_PROCESS,
 )
 
 /**
@@ -129,6 +130,7 @@ internal class LocalWorkAgentControlRuntime(
         nodeOutputFiles = request.nodeOutputFiles, resumeGraphId = request.resumeGraphId,
         replanGraphId = request.replanGraphId,
         workspaceRepository = request.workspaceRepository,
+        executionBackend = request.executionBackend,
     )
 
     override suspend fun resumePendingWorkflows(binding: LocalWorkRunBinding) {

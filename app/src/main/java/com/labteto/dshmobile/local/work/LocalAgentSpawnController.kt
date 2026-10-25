@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.agent.LocalAgentDelegationKind
-import com.labteto.dshmobile.local.agent.requireExecutableAgentBackend
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.buildLocalDelegatedLaunchSpec
 import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
@@ -17,7 +16,7 @@ internal class LocalAgentSpawnController(
 ) {
     suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String {
         // Fail before Job creation, event recording, credential access or model admission.
-        requireExecutableAgentBackend(request.executionBackend)
+        val backendCapabilities = subagents.pinBackend(request.executionBackend)
         val parent = captureLocalAgentParentLink(request.parentToolCallId)
         require(parent == null || parent.sessionId == binding.sessionId) { "AGENT_PARENT_SESSION_MISMATCH" }
         return when (request.kind) {
@@ -33,6 +32,7 @@ internal class LocalAgentSpawnController(
                 sessionId = binding.sessionId,
                 boundState = binding.aggregateSnapshot(),
                 historySnapshot = binding.runHandle.modelHistory::snapshot,
+                backendCapabilities = backendCapabilities,
             )
             LocalAgentDispatchKind.READONLY_FOREGROUND -> subagents.runner(binding).run(
                 buildLocalDelegatedLaunchSpec(
@@ -50,6 +50,7 @@ internal class LocalAgentSpawnController(
                     toolAllowlist = request.toolAllowlist,
                     outputSchema = request.outputSchema,
                     parentLink = parent,
+                    backendCapabilities = backendCapabilities,
                 ),
             )
             LocalAgentDispatchKind.FORK -> {
@@ -64,6 +65,7 @@ internal class LocalAgentSpawnController(
                     toolAllowlist = request.toolAllowlist,
                     outputSchema = request.outputSchema,
                     parentLink = parent,
+                    backendCapabilities = backendCapabilities,
                 )
                 request.workspaceRepository?.let { repository ->
                     subagents.runInWorktree(binding, spec, repository)

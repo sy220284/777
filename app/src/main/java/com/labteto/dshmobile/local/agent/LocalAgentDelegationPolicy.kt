@@ -68,6 +68,7 @@ internal fun buildLocalDelegatedLaunchSpec(
     outputSchema: JsonObject? = null,
     parentLink: LocalAgentParentLink? = null,
     maxDepth: Int = 1,
+    backendCapabilities: LocalSubagentCapabilities? = null,
 ): LocalSubagentLaunchSpec {
     require(kind == LocalAgentDelegationKind.FOREGROUND_READONLY ||
         kind == LocalAgentDelegationKind.FORK) {
@@ -88,6 +89,9 @@ internal fun buildLocalDelegatedLaunchSpec(
             maxDepth = maxDepth,
             toolAllowlist = toolAllowlist,
             outputSchema = outputSchema,
+        ).copy(
+            executionBackend = backendCapabilities?.executionBackend ?: LocalAgentExecutionBackend.IN_PROCESS,
+            remoteBackendRevision = backendCapabilities?.remoteBackendRevision,
         ),
     )
 }

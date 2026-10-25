@@ -57,6 +57,7 @@ internal class LocalWorkComposition @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val modelGateway: LocalModelGateway,
+    backendRuntime: com.labteto.dshmobile.local.agent.LocalAgentBackendRuntime,
     private val auxiliaryModel: com.labteto.dshmobile.local.model.LocalAuxiliaryModelRequestRuntime,
     private val usageAnalytics: com.labteto.dshmobile.local.TokenUsageAnalyticsStore,
     mediaRuntime: Provider<LocalMediaCreationRuntime>,
@@ -118,6 +119,7 @@ internal class LocalWorkComposition @Inject constructor(
     private val subagentFactory by lazy {
         LocalSubagentRunnerFactory(
             modelGateway = modelGateway,
+            backendRuntime = backendRuntime,
             captureToolBindings = tools.registry::captureBindings,
             teamSchemas = { tools.schemas.teamMemberSchemas() },
             requireTeamRootAuthorization = { sessionId, jobId ->
@@ -250,6 +252,7 @@ internal class LocalWorkComposition @Inject constructor(
     )
     private val agentTeams: LocalAgentTeamRuntime by lazy {
         LocalAgentTeamRuntime(
+            pinBackend = backendRuntime::pin,
             jobs = runtimeStateStore.jobManager,
             startTeammate = {
                     binding,
@@ -317,6 +320,7 @@ internal class LocalWorkComposition @Inject constructor(
                     allowMutation = roleBinding.allowMutation,
                     teamManaged = true,
                     workspaceRepository = agentTeams.memberWorkspaceRepository(binding.sessionId, requestedJobId),
+                    backendCapabilities = agentTeams.memberBackendCapabilities(binding.sessionId, requestedJobId),
                     // 基础网络、后台任务与技能可用；敏感扩展只能由 Lead 按名称授权。
                     initialOptionalTools = activeOptional,
                 )

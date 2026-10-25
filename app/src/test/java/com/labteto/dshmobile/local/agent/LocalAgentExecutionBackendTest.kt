@@ -34,15 +34,15 @@ class LocalAgentExecutionBackendTest {
         grant, receipt, committed, auth, approved, now,
     )
 
-    @Test fun remoteAndIsolatedExecutionFailClosedBeforeAnyExecutableBackendExists() {
-        assertEquals(LocalAgentExecutionBackend.IN_PROCESS,
-            LocalAgentExecutionBackend.fromWire(null))
-        for (name in listOf("trusted_remote", "isolated_process")) {
-            val backend = LocalAgentExecutionBackend.fromWire(name)
-            assertTrue(runCatching { requireExecutableAgentBackend(backend) }
-                .exceptionOrNull()?.message.orEmpty().contains("AGENT_BACKEND_NOT_CONFIGURED"))
+    @Test fun backendSelectionSurvivesPersistentCapabilityCodec() {
+        for (backend in LocalAgentExecutionBackend.entries) {
+            val original = LocalSubagentCapabilities(executionBackend = backend,
+                remoteBackendRevision = if (backend == LocalAgentExecutionBackend.TRUSTED_REMOTE) "pinned-peer-v1" else null)
+            val payload = kotlinx.serialization.json.buildJsonObject {
+                put("capabilities", encodeLocalSubagentCapabilities(original))
+            }
+            assertEquals(original, decodeLocalSubagentCapabilities(payload, 2))
         }
-        requireExecutableAgentBackend(LocalAgentExecutionBackend.IN_PROCESS)
         assertTrue(runCatching { LocalAgentExecutionBackend.fromWire("fake-cloud") }.isFailure)
     }
 

@@ -447,6 +447,7 @@ internal class LocalWorkAgentTurnExecutor(
                         workPromptContext = workPromptContext.copy(skill = skillGuidance)
                     }
                     val advertisedTools = runToolSurface.next(workTurnToolRuntime.schemas(runPolicy, binding))
+                    latestAcceptedSamplingRevision = observedSteer
                     val tools = modelToolStepSurface.capture(
                         advertisedTools, workTurnToolRuntime.captureBindings(advertisedTools),
                     )
@@ -581,6 +582,9 @@ internal class LocalWorkAgentTurnExecutor(
                     }
                     val rawReply = when (sampling) {
                         LocalWorkSamplingOutcome.Steered -> {
+                            check(kotlinx.coroutines.currentCoroutineContext()[com.labteto.dshmobile.harness.agent.AgentEagerToolContext]?.hasOffered?.invoke() != true) {
+                                "采样期间已有工具提前执行；已按原回执停止本轮，禁止重新采样重放"
+                            }
                             runEventLog.append("work/model-sampling-steered", buildJsonObject {
                                 put("step", modelStep + 1)
                                 put("run_id", runContext.runId)

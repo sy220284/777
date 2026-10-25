@@ -461,6 +461,7 @@ internal class LocalToolExecutionCoordinator(
                             // A new correction can arrive while awaiting approval or resource admission.
                             // Reject the stale call before entering its executor, with no side effect.
                             executionOwner?.requireCurrent(sessionId)
+                            kotlinx.coroutines.currentCoroutineContext()[com.labteto.dshmobile.harness.agent.AgentBackendExecutionContext]?.requireCurrent()
                             runOwner?.requireCurrent(sessionId)
                             if (!beforeExecution()) throw LocalToolSampleSuperseded()
                             // The registry calls this only after schema checks and user approval.
@@ -469,6 +470,7 @@ internal class LocalToolExecutionCoordinator(
                             // Admission can suspend behind another read/write operation. A correction
                             // committed during that wait must invalidate this still-unstarted call.
                             executionOwner?.requireCurrent(sessionId)
+                            kotlinx.coroutines.currentCoroutineContext()[com.labteto.dshmobile.harness.agent.AgentBackendExecutionContext]?.requireCurrent()
                             runOwner?.requireCurrent(sessionId)
                             if (!beforeExecution()) throw LocalToolSampleSuperseded()
                             // Approval may outlive the exact plugin registration. Re-check after waiting

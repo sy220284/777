@@ -217,7 +217,7 @@ object LocalToolCatalog {
             "instructions" to string("可选；该子代理持续遵循的工作规则，不会扩大工具或权限"),
             "role" to string("专业角色：general、explore、plan、verify、review、security、qa、doc、data_research、performance、incident_recovery、coordinator；只读入口不能选择 execute 或 integrate"),
             "skill_ids" to stringArray("可选；从本地已安装技能中选最多 3 个并冻结内容指纹；技能只提供方法，不授予工具权限"),
-            "execution_backend" to string("执行后端：in_process（可执行，默认）；isolated_process/trusted_remote 仅有安全协议，未配置可信执行端时启动前拒绝"),
+            "execution_backend" to string("执行后端：in_process（默认）、isolated_process（独立系统 UID）、trusted_remote（须用户先配置并授权固定证书的远端执行器）"),
             "context_mode" to buildJsonObject {
                 put("type", "string")
                 put("description", "isolated 只传任务（默认）；inherit 前台只读继承父会话历史，不能与后台或虚拟屏共用")
@@ -239,7 +239,7 @@ object LocalToolCatalog {
             "instructions" to string("可选；继承上下文之外，额外约束该子代理持续遵循的工作规则"),
             "role" to string("专业角色：general、explore、plan、execute、verify、review、integrate、security、qa、doc、data_research、performance、incident_recovery、coordinator；只读角色收窄权限"),
             "skill_ids" to stringArray("可选；子代理调用前从本地技能仓库冻结最多 3 个 SKILL.md 版本，不能扩大实际工具授权"),
-            "execution_backend" to string("执行后端：in_process（可执行，默认）；isolated_process/trusted_remote 仅有安全协议，未配置可信执行端时启动前拒绝"),
+            "execution_backend" to string("执行后端：in_process（默认）、isolated_process（独立系统 UID）、trusted_remote（须用户先配置并授权固定证书的远端执行器）"),
             "output_schema" to jsonSchemaObject("可选；要求子代理最终只返回符合该 JSON Schema 的对象"),
             "allowed_tools" to stringArray("可选；限制 fork 子代理可见且可执行的工具名"),
         ), listOf("task")))
@@ -275,6 +275,7 @@ object LocalToolCatalog {
             "agent_id" to string("当前 Work 会话中的后台代理编号"),
         ), listOf("agent_id")))
         add(tool("workflow", "以持久 Kotlin DAG 调度子任务，恢复已验收节点并继续剩余依赖。默认只读；可写需显式授权且未知副作用不重放。非空/字符串验收仅是窄文本检查，不证明通用交付", properties(
+            "execution_backend" to string("执行后端：in_process、isolated_process 或用户已授权的 trusted_remote；成员/节点固定原后端与远端授权版本，后代继承隔离"),
             "workspace_repository" to string("可选；工作区内 Git 仓库根目录。须 allow_mutation=true，并为每个节点声明交付文件；节点在独立目录执行，仅声明范围可三方合并，冲突或越界变更会停止整合"),
             "tasks" to buildJsonObject {
                 put("type", "array")
@@ -324,6 +325,7 @@ object LocalToolCatalog {
             "target" to string("teammate 名称"),
         ), listOf("target")))
         add(tool("team_create_member", "只创建稳定 Team 成员身份，不立即启动模型执行；后续用 team_start_member 派活", properties(
+            "execution_backend" to string("执行后端：in_process、isolated_process 或用户已授权的 trusted_remote；成员/节点固定原后端与远端授权版本，后代继承隔离"),
             "workspace_repository" to string("可选；工作区内 Git 仓库根目录。成员使用固定独立目录，唤醒/恢复不替换。write_scopes 仍按原工作区路径声明；成果须由 Lead 显式整合"),
             "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
             "role" to string("可选；固定专业身份 general/explore/plan/execute/verify/review/integrate/security/qa/doc/data_research/performance/incident_recovery/coordinator，恢复时保持不变，verify/review 为只读工具权限"),
@@ -345,6 +347,7 @@ object LocalToolCatalog {
             "allowed_extensions" to stringArray("可选；Lead 核实后授权给本次启动成员的扩展工具名称"),
         ), listOf("target", "task")))
         add(tool("team_spawn", "创建具备持久身份、角色约束、授权工具和可选扩展的团队助手；只读角色禁止写入", properties(
+            "execution_backend" to string("执行后端：in_process、isolated_process 或用户已授权的 trusted_remote；成员/节点固定原后端与远端授权版本，后代继承隔离"),
             "workspace_repository" to string("可选；工作区内 Git 仓库根目录，成员在固定独立 worktree 中工作，停用/恢复保持原目录"),
             "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
             "role" to string("可选；固定专业身份 general/explore/plan/execute/verify/review/integrate/security/qa/doc/data_research/performance/incident_recovery/coordinator，verify/review 为只读；旧成员默认 general"),

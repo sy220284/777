@@ -332,7 +332,7 @@ internal object LocalAgentTeamReducer {
         require(
             previous.name == next.name &&
                 previous.provider == next.provider &&
-                previous.context == next.context && previous.workspaceRepository == next.workspaceRepository
+                previous.context == next.context && previous.workspaceRepository == next.workspaceRepository && previous.backendBinding == next.backendBinding
         ) {
             "TEAM_MEMBER_IMMUTABLE_FIELDS_CHANGED：" + next.id
         }

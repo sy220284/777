@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.agent.backendBinding
+
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.AGENT_MESSAGE_SCAN_PAGE
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.DEFAULT_AGENT_MESSAGE_LIMIT
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.LOCAL_SUBAGENT_PROVIDER
@@ -123,6 +125,7 @@ internal data class LocalTeamMemberSnapshot(
     /** null=legacy; true=uncommitted new Job; false=activation of existing durable Job. */
     val provisionalNewJob: Boolean? = null,
     val workspaceRepository: String? = null,
+    val backendBinding: JsonObject? = null,
 )
 
 @Serializable
@@ -255,6 +258,10 @@ internal class LocalAgentTeamRuntime(
     projectionScope: CoroutineScope? = null,
     onProjectionReady: (String) -> Unit = {},
     private val sendToLead: (String, QueuedAgentInput) -> Boolean = { _, _ -> false },
+    private val pinBackend: suspend (com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend) -> com.labteto.dshmobile.local.agent.LocalSubagentCapabilities = { backend ->
+        require(backend == com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend.IN_PROCESS) { "AGENT_BACKEND_OWNER_REQUIRED" }
+        com.labteto.dshmobile.local.agent.LocalSubagentCapabilities()
+    },
 ) {
     // All synchronous Team commands share one commit boundary; suspend starts reserve first.
     private val commandLock = Any()
@@ -463,6 +470,9 @@ internal class LocalAgentTeamRuntime(
                 context = args.optionalTeamContext(),
                 role = args.optionalTeamString("role"),
                 workspaceRepository = decodeAgentWorkspaceRepository(args),
+                backendBinding = pinBackend(com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend.fromWire(args.optionalTeamString("execution_backend"))).let {
+                    it.backendBinding()
+                },
             )
             "team_start_member" -> memberLifecycle.startMember(
                 binding = binding,
@@ -481,6 +491,9 @@ internal class LocalAgentTeamRuntime(
                 displayName = args.optionalTeamString("display_name").orEmpty(),
                 role = args.optionalTeamString("role"),
                 workspaceRepository = decodeAgentWorkspaceRepository(args),
+                backendBinding = pinBackend(com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend.fromWire(args.optionalTeamString("execution_backend"))).let {
+                    it.backendBinding()
+                },
                 task = args.requiredTeamString("task"),
                 model = args.optionalTeamString("model"),
                 maxSteps = args["max_steps"]?.jsonPrimitive?.intOrNull
@@ -1074,6 +1087,10 @@ internal class LocalAgentTeamRuntime(
             wholeWorkspaceAllowed = wholeRepository,
         )
     }
+
+    internal fun memberBackendCapabilities(sessionId: String, jobId: String) =
+        com.labteto.dshmobile.local.agent.decodeAgentBackendBinding((project(sessionId).members.singleOrNull { it.jobId == jobId }
+            ?: error("TEAM_MEMBER_NOT_FOUND")).backendBinding)
 
     internal fun memberWorkspaceRepository(sessionId: String, jobId: String): String? =
         (project(sessionId).members.singleOrNull { it.jobId == jobId }

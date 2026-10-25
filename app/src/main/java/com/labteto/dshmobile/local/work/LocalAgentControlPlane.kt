@@ -168,6 +168,7 @@ internal class LocalAgentControlPlane(
             "agent_resume" -> control.ensureChildLoaded(run.sessionId, args.string("agent_id"))
             "agent_close" -> control.close(run.sessionId, args.string("agent_id"))
             "workflow" -> control.workflow(run, LocalAgentWorkflowRequest(
+                executionBackend = LocalAgentExecutionBackend.fromWire(args.optionalString("execution_backend")),
                 resumeGraphId = args.optionalString("resume_graph_id"),
                 replanGraphId = args.optionalString("replan_graph_id"),
                 workspaceRepository = decodeAgentWorkspaceRepository(args),

@@ -538,7 +538,7 @@ class LocalWorkspace(
             }
         }
         val result = com.labteto.dshmobile.runtime.executeManagedProcess(
-            builder = builder,
+            builder = com.labteto.dshmobile.runtime.secureIsolatedProcessBuilder(builder, extraSearchPaths(), environmentProvider()),
             timeoutMillis = timeoutSeconds.coerceIn(1, MAX_SHELL_TIMEOUT_SECONDS) * 1000L,
             maxChars = MAX_SHELL_CHARS,
             onProgress = onProgress,

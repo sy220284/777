@@ -18,6 +18,8 @@ internal enum class LocalSubagentHistoryMode {
 }
 
 internal data class LocalSubagentCapabilities(
+    val executionBackend: LocalAgentExecutionBackend = LocalAgentExecutionBackend.IN_PROCESS,
+    val remoteBackendRevision: String? = null,
     val allowMutation: Boolean = false,
     val continuable: Boolean = false,
     val virtualScreen: Boolean = false,
@@ -144,6 +146,8 @@ internal fun filterLocalSubagentSchemas(
 internal fun encodeLocalSubagentCapabilities(
     capabilities: LocalSubagentCapabilities,
 ): JsonObject = buildJsonObject {
+    put("execution_backend", capabilities.executionBackend.wireName)
+    capabilities.remoteBackendRevision?.let { put("remote_backend_revision", it) }
     put("allow_mutation", capabilities.allowMutation)
     put("continuable", capabilities.continuable)
     put("virtual_screen", capabilities.virtualScreen)
@@ -187,6 +191,8 @@ internal fun decodeLocalSubagentCapabilities(
         ?.mapNotNull { it.jsonPrimitive.contentOrNull }
         ?.toSet()
     return LocalSubagentCapabilities(
+        executionBackend = LocalAgentExecutionBackend.fromWire(data["execution_backend"]?.jsonPrimitive?.contentOrNull),
+        remoteBackendRevision = data["remote_backend_revision"]?.jsonPrimitive?.contentOrNull,
         allowMutation = data["allow_mutation"]?.jsonPrimitive?.booleanOrNull ?: false,
         continuable = data["continuable"]?.jsonPrimitive?.booleanOrNull ?: false,
         virtualScreen = data["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false,

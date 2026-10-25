@@ -5,6 +5,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.coroutineScope
 
 /**
  * Kotlin native Turn executor shared by foreground Work, child Agents and
@@ -24,6 +25,8 @@ class AgentTurnEngine(
     private val maxSteps: Int = DEFAULT_MAX_STEPS,
     private val stepLimitExtender: AgentStepLimitExtender? = null,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
+    private val backend: AgentTurnBackend? = null,
+    private val suspendStepLimitExtender: (suspend (Int, Int) -> Int?)? = null,
 ) {
     private val toolDispatch = AgentToolDispatch(tools, toolBatch, isParallelTool, eventSink)
     init { require(maxSteps > 0) { "代理步数必须大于 0" } }
@@ -34,8 +37,19 @@ class AgentTurnEngine(
     ): AgentRunResult {
         val command = input.trim()
         require(command.isNotEmpty()) { "用户输入不能为空" }
+        backend?.let { delegate ->
+            currentCoroutineContext()[AgentRunExecutionContext]?.requireCurrent()
+            val extend: (suspend (Int, Int) -> Int?)? =
+                if (suspendStepLimitExtender == null && stepLimitExtender == null) null else { limit, used ->
+                    if (suspendStepLimitExtender != null) suspendStepLimitExtender.invoke(limit, used)
+                    else stepLimitExtender?.extend(limit, used)
+                }
+            return delegate.run(AgentBackendRequest(idFactory(), command, history, maxSteps),
+                AgentBackendServices(model, tools, toolBatch, isParallelTool, eventSink, extend))
+                .also { currentCoroutineContext()[AgentRunExecutionContext]?.requireCurrent() }
+        }
         val turn = AgentTurnState(idFactory(), command, history)
-        val budget = AgentTurnStepBudget(maxSteps, stepLimitExtender)
+        val budget = AgentTurnStepBudget(maxSteps, stepLimitExtender, suspendStepLimitExtender)
 
         val execution = currentCoroutineContext()[AgentRunExecutionContext]
         execution?.requireCurrent()
@@ -45,10 +59,11 @@ class AgentTurnEngine(
                 execution?.requireCurrent()
                 val step = turn.startStep()
                 eventSink.append(AgentEvent.StepStarted(turn.turnId, step))
-                val observed = model.complete(turn.snapshot())
-                // Non-complete replies cannot authorize any tool side effects.
-                val reply = if (observed.completionReason == AgentCompletionReason.COMPLETED) observed
-                    else observed.copy(toolCalls = emptyList())
+                coroutineScope {
+                val eager = AgentEagerToolStep(turn.turnId, step, tools, eventSink, isParallelTool)
+                val observed = withContext(eager.context) { model.complete(turn.snapshot()) }
+                // An interrupted response may settle already-admitted items, never start new ones.
+                val reply = eager.validate(observed)
                 execution?.requireCurrent()
                 turn.acceptModelReply(reply)
                 eventSink.append(AgentEvent.AssistantObserved(
@@ -60,7 +75,7 @@ class AgentTurnEngine(
                     reportedUsage = reply.reportedUsage,
                 ))
                 if (reply.toolCalls.isNotEmpty()) {
-                    toolDispatch.executeStep(turn, step, reply.toolCalls)
+                    toolDispatch.executeStep(turn, step, reply.toolCalls, eager)
                 }
                 eventSink.append(AgentEvent.StepFinished(turn.turnId, step))
                 turn.closeStep()
@@ -68,12 +83,14 @@ class AgentTurnEngine(
                 if (reply.completionReason != AgentCompletionReason.COMPLETED) {
                     eventSink.append(AgentEvent.TurnFailed(turn.turnId,
                         reply.rawStopReason ?: reply.completionReason.name, reply.completionReason))
-                    return turn.result(AgentStopReason.valueOf(reply.completionReason.name))
+                    return@coroutineScope turn.result(AgentStopReason.valueOf(reply.completionReason.name))
                 }
                 if (reply.toolCalls.isEmpty()) {
                     eventSink.append(AgentEvent.TurnCompleted(turn.turnId, step, reply.content))
-                    return turn.result(AgentStopReason.COMPLETED)
+                    return@coroutineScope turn.result(AgentStopReason.COMPLETED)
                 }
+                null
+                }?.let { return it }
             }
             eventSink.append(AgentEvent.TurnStepLimit(turn.turnId, turn.steps))
             return turn.result(AgentStopReason.STEP_LIMIT)

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.agent.backendBinding
+
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.local.memory.LocalMemoryTools
 import com.labteto.dshmobile.local.model.LocalToolCall
@@ -44,6 +46,7 @@ internal class LocalAgentTaskGraphController(
         resumeGraphId: String? = null,
         replanGraphId: String? = null,
         workspaceRepository: String? = null,
+        backendCapabilities: com.labteto.dshmobile.local.agent.LocalSubagentCapabilities = com.labteto.dshmobile.local.agent.LocalSubagentCapabilities(),
     ): String = binding.workflowAdmission.withLock {
         require(resumeGraphId.isNullOrBlank() || replanGraphId.isNullOrBlank()) {
             "TASKGRAPH_RESUME_REPLAN_CONFLICT"
@@ -79,6 +82,7 @@ internal class LocalAgentTaskGraphController(
         requireCurrentWorkflowGoal(goal, goal)
         val plan = LocalWorkTaskGraphPlan(buildJsonObject {
             put("version", 1)
+            put("backend_binding", backendCapabilities.backendBinding())
             put("user_revision", workflowUserRevision(binding.eventLog))
             put("source_message_id", binding.eventLog.latestMatching(setOf("turn/start")) { true }
                 ?.data?.get("source_message_id") ?: JsonNull)
@@ -286,6 +290,7 @@ internal class LocalAgentTaskGraphController(
                 val proposedJobId = workflowNodeJobId(execution, nodeVersion, identityFiles, inputs,
                     dependencyVersions(ctx.node.dependsOn))
                 val fence = buildJsonObject {
+                    plan.value["backend_binding"]?.let { put("backend_binding", it) }
                     put("graph_id", graphId); put("graph_execution_id", execution); put("goal_id", goalId)
                     put("goal_fingerprint", goalFingerprint); put("node_id", ctx.node.id)
                     put("source_message_id", source ?: JsonNull)

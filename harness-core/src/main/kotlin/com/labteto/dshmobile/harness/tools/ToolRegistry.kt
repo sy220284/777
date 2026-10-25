@@ -39,6 +39,7 @@ data class ToolContext(
     val onExecutionFinished: (suspend (HarnessTool, ToolResult) -> Unit)? = null,
 )
 
+@kotlinx.serialization.Serializable
 enum class ToolResultRetention {
     DURABLE,
     EPHEMERAL,

@@ -33,9 +33,10 @@ class AndroidProcessRuntime(
 
         val resolvedCommand = resolveCommand(request.command)
         executeManagedProcess(
-            builder = ProcessBuilder(resolvedCommand)
+            builder = secureIsolatedProcessBuilder(ProcessBuilder(resolvedCommand)
                 .directory(workingDirectory)
                 .apply { environment().putAll(processEnvironment(request.environment)) },
+                extraSearchPaths + dynamicSearchPaths(), baseEnvironment()),
             stdin = request.stdin,
             timeoutMillis = request.timeoutMillis,
         )

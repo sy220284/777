@@ -67,13 +67,17 @@ class PersistentPipeTerminalProvider(
                 }.bufferedReader().use { it.readText() }
                 val directory = workingDirectory?.let(::File) ?: defaultWorkingDirectory
                 if (directory != null) require(directory.isDirectory) { "工作目录不存在：${directory.path}" }
+                val childBuilder = secureIsolatedProcessBuilder(ProcessBuilder(resolveCommand(command)).directory(directory).apply {
+                    environment()["PATH"] = searchPaths().joinToString(File.pathSeparator) { it.path }
+                    environment().putAll(baseEnvironment())
+                }, extraSearchPaths(), baseEnvironment())
                 val process = ManagedProcess.start(ProcessBuilder(
                     python.path, "-u", "-c", script,
-                    JsonArray(resolveCommand(command).map(::JsonPrimitive)).toString(),
+                    JsonArray(childBuilder.command().map(::JsonPrimitive)).toString(),
                     rows.toString(), columns.toString(),
                 ).directory(directory).redirectErrorStream(true).apply {
                     environment()["PATH"] = searchPaths().joinToString(File.pathSeparator) { it.path }
-                    environment().putAll(baseEnvironment())
+                    environment().clear(); environment().putAll(childBuilder.environment())
                 })
                 managed = process
                 val child = awaitPtyChild(process)
@@ -129,13 +133,13 @@ class PersistentPipeTerminalProvider(
                 if (directory != null) require(directory.isDirectory) { "工作目录不存在：${directory.path}" }
                 val resolved = resolveCommand(command)
                 val managed = ManagedProcess.start(
-                    ProcessBuilder(resolved)
+                    secureIsolatedProcessBuilder(ProcessBuilder(resolved)
                         .directory(directory)
                         .redirectErrorStream(true)
                         .apply {
                             environment()["PATH"] = searchPaths().joinToString(File.pathSeparator) { it.path }
                             environment().putAll(baseEnvironment())
-                        },
+                        }, extraSearchPaths(), baseEnvironment()),
                 )
                 val process = managed.process
                 owned = managed

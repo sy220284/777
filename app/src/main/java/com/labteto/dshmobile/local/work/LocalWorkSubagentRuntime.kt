@@ -40,6 +40,8 @@ internal class LocalWorkSubagentRuntime(
     ) -> AgentToolResult,
     private val pruneOutput: (LocalWorkRunBinding, String) -> String,
 ) {
+    internal suspend fun pinBackend(backend: com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend) = factory.pinBackend(backend)
+
     internal suspend fun runInWorktree(
         binding: LocalWorkRunBinding,
         spec: com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec,
@@ -96,10 +98,11 @@ internal class LocalWorkSubagentRuntime(
         resumeGraphId: String? = null,
         replanGraphId: String? = null,
         workspaceRepository: String? = null,
+        executionBackend: com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend = com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend.IN_PROCESS,
     ): String = taskGraphs.runWorkflow(
         tasks, mode, requiredEvidence, modelOverride, outputSchema, toolAllowlist, binding,
         dependencies, allowMutation, requiredFiles, inputFiles, nodeInputFiles, nodeOutputFiles,
-        resumeGraphId, replanGraphId, workspaceRepository,
+        resumeGraphId, replanGraphId, workspaceRepository, factory.pinBackend(executionBackend),
     )
 
     internal suspend fun resumePendingWorkflows(binding: LocalWorkRunBinding) =

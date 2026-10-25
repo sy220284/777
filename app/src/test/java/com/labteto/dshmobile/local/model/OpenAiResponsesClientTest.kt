@@ -1819,4 +1819,53 @@ class OpenAiResponsesClientTest {
         }
     }
 
+    @Test
+    fun completedToolItemExecutesBeforeTerminalReadAndDisconnectDoesNotReplayIt() = runBlocking {
+        val toolStarted = java.util.concurrent.CountDownLatch(1)
+        val item = """{"type":"function_call","id":"fc-1","call_id":"c1","name":"write","arguments":"{}","status":"completed"}"""
+        val first = Buffer().writeUtf8("data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":$item}\n\n")
+        var reads = 0
+        val source = object : Source {
+            override fun timeout() = Timeout.NONE
+            override fun close() = Unit
+            override fun read(sink: Buffer, byteCount: Long): Long {
+                if (++reads == 1) return first.read(sink, byteCount)
+                assertTrue("tool must run before waiting for response terminal", toolStarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                throw SocketException("disconnected after completed item")
+            }
+        }
+        val body = object : ResponseBody() {
+            override fun contentType() = "text/event-stream".toMediaType()
+            override fun contentLength() = -1L
+            private val buffered = source.buffer()
+            override fun source(): BufferedSource = buffered
+        }
+        var requests = 0
+        val streaming = OpenAiResponsesClient(OkHttpClient.Builder().addInterceptor { chain ->
+            requests++
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK").body(body).build()
+        }.build(), Json)
+        var effects = 0
+        val engine = com.labteto.dshmobile.harness.agent.AgentTurnEngine(
+            model = com.labteto.dshmobile.harness.agent.AgentModel {
+                val reply = streaming.completeStreaming("token", "https://example.test/v1", "gpt-test",
+                    listOf(buildJsonObject { put("role", "user"); put("content", "write") }),
+                    JsonArray(emptyList()), planSharing = false)
+                com.labteto.dshmobile.harness.agent.AgentModelReply(toolCalls = reply.toolCalls.map {
+                    com.labteto.dshmobile.harness.agent.AgentToolCall(it.id, it.name, it.arguments, it.rawArguments)
+                }, completionReason = reply.completionReason)
+            },
+            tools = com.labteto.dshmobile.harness.agent.AgentToolExecutor {
+                effects++; toolStarted.countDown()
+                com.labteto.dshmobile.harness.agent.AgentToolResult("durable-receipt", executionId = "exec-1")
+            },
+        )
+        val result = engine.run("task")
+        assertEquals(com.labteto.dshmobile.harness.agent.AgentStopReason.INTERRUPTED, result.stopReason)
+        assertEquals(1, requests)
+        assertEquals(1, effects)
+        assertEquals("durable-receipt", result.messages.last().content)
+    }
+
 }

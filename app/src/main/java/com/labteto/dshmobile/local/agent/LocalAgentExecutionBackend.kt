@@ -1,10 +1,6 @@
 package com.labteto.dshmobile.local.agent
 
-/**
- * E13 multi-backend admission protocol. The only executable backend today is
- * IN_PROCESS. A remote peer is NEVER inferred from a model name, URL or prompt:
- * selecting an unsupported backend fails before creating a Job or contacting a peer.
- */
+/** Explicit backend identity; admission pins the user-configured remote revision. */
 internal enum class LocalAgentExecutionBackend(val wireName: String) {
     IN_PROCESS("in_process"),
     ISOLATED_PROCESS("isolated_process"),
@@ -17,12 +13,6 @@ internal enum class LocalAgentExecutionBackend(val wireName: String) {
             "trusted_remote" -> TRUSTED_REMOTE
             else -> throw IllegalArgumentException("AGENT_BACKEND_UNKNOWN")
         }
-    }
-}
-
-internal fun requireExecutableAgentBackend(backend: LocalAgentExecutionBackend) {
-    require(backend == LocalAgentExecutionBackend.IN_PROCESS) {
-        "AGENT_BACKEND_NOT_CONFIGURED: ${backend.wireName}; no authenticated transport or isolated-process owner registered"
     }
 }
 
@@ -107,4 +97,26 @@ internal fun reconcileRemoteAgentReceipt(
         return LocalRemoteReceiptDisposition.WAIT_FOR_RECOVERY
     }
     return LocalRemoteReceiptDisposition.ACCEPT_FRESH_EVIDENCE
+}
+
+/** Backend admission only; no authority/tool policy is copied from a peer or model payload. */
+internal fun LocalSubagentCapabilities.backendBinding(): kotlinx.serialization.json.JsonObject =
+    kotlinx.serialization.json.buildJsonObject {
+        put("execution_backend", kotlinx.serialization.json.JsonPrimitive(executionBackend.wireName))
+        remoteBackendRevision?.let { put("remote_backend_revision", kotlinx.serialization.json.JsonPrimitive(it)) }
+    }
+
+internal fun decodeAgentBackendBinding(value: kotlinx.serialization.json.JsonObject?): LocalSubagentCapabilities {
+    if (value == null) return LocalSubagentCapabilities()
+    require(value.keys.all { it in setOf("execution_backend", "remote_backend_revision") }) { "AGENT_BACKEND_BINDING_INVALID" }
+    fun text(key: String): String? = (value[key] as? kotlinx.serialization.json.JsonPrimitive)?.content
+    val kind = LocalAgentExecutionBackend.fromWire(text("execution_backend"))
+    val revision = text("remote_backend_revision")
+    require((kind == LocalAgentExecutionBackend.TRUSTED_REMOTE) == !revision.isNullOrBlank()) { "AGENT_BACKEND_REVISION_INVALID" }
+    return LocalSubagentCapabilities(executionBackend = kind, remoteBackendRevision = revision)
+}
+
+internal class LocalAgentBackendSelectionContext(val capabilities: LocalSubagentCapabilities) :
+    kotlin.coroutines.AbstractCoroutineContextElement(Key) {
+    companion object Key : kotlin.coroutines.CoroutineContext.Key<LocalAgentBackendSelectionContext>
 }

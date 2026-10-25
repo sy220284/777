@@ -30,6 +30,7 @@ internal object LocalAgentTeamEventCodec {
             put("description", description)
             put("role", role)
             workspaceRepository?.let { put("workspaceRepository", it) }
+            backendBinding?.let { put("backendBinding", it) }
             if (displayName.isNotBlank()) put("displayName", displayName)
             if (mutableToolsEnabled) put("mutableToolsEnabled", true)
             if (grantedExtensions.isNotEmpty()) put("grantedExtensions", JsonArray(grantedExtensions.sorted().map(::JsonPrimitive)))
@@ -98,6 +99,7 @@ internal object LocalAgentTeamEventCodec {
             description = member.optionalTeamString("description").orEmpty(),
             role = LocalAgentSpecialty.fromWire(member.optionalTeamString("role")).wireName,
             workspaceRepository = decodeAgentWorkspaceRepository(member, "workspaceRepository"),
+            backendBinding = (member["backendBinding"] as? JsonObject)?.also { com.labteto.dshmobile.local.agent.decodeAgentBackendBinding(it) },
             displayName = member.optionalTeamString("displayName").orEmpty(),
             mutableToolsEnabled = member["mutableToolsEnabled"]?.jsonPrimitive?.booleanOrNull ?: false,
             grantedExtensions = (member["grantedExtensions"] as? JsonArray)
