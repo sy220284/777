@@ -59,4 +59,25 @@ class LocalAgentRolePolicyTest {
             bindLocalAgentRole("superuser", "", parentMutationAllowed = true)
         }.isFailure)
     }
+    @Test fun specializedResearchPerformanceRecoveryAndCoordinationStayReadOnly() {
+        val expected = mapOf(
+            "data_research" to "sources+provenance+uncertainty",
+            "performance" to "measurements+environment+latency_p95",
+            "incident_recovery" to "checkpoints+unknown_effects+safe_recovery",
+            "coordinator" to "task_dependencies+budgets+handoff",
+        )
+        expected.forEach { (role, contract) ->
+            val binding = bindLocalAgentRole(role, "review facts", parentMutationAllowed = true)
+            assertFalse(binding.allowMutation)
+            assertEquals("readonly", binding.profile.toolIntent)
+            assertEquals(contract, binding.profile.resultContract)
+            assertTrue(renderLocalAgentRoleCatalog().contains(role))
+            assertFalse(bindLocalAgentRole(role, "", parentMutationAllowed = false).allowMutation)
+        }
+        // The legacy alias never changes identity semantics in persisted v1 Teams.
+        assertEquals(LocalAgentSpecialty.EXPLORER, LocalAgentSpecialty.fromWire("research"))
+        assertEquals(LocalAgentSpecialty.DATA_RESEARCH,
+            LocalAgentSpecialty.fromWire("data_researcher"))
+    }
+
 }
