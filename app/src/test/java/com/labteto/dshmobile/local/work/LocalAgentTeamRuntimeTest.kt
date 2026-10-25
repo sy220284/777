@@ -2119,6 +2119,96 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun admittedTeamSpawnCommitsDurableMembershipAndSurvivesColdReplay() = runBlocking {
+        val session = "team-spawn-commit"
+        val fixture = fixture(session)
+        val runtime = LocalAgentTeamRuntime(
+            fixture.jobs,
+            { _, jobId, _, _, _, _, _, _, _, _ ->
+                fixture.jobs.startPersistentResult(
+                    label = "子代理：committed", resumeKind = "subagent_readonly",
+                    resumePayload = "{}", ownerSessionId = session,
+                    continuable = true, requestedId = jobId,
+                ) { _, _ -> awaitCancellation() }
+            },
+            { _, _, _ -> JobMessageAdmission(false, false, false, "unused") },
+            { fixture.log }, SessionProjectionRegistry(),
+        )
+        val output = runtime.execute(
+            memberTestToolCall("spawn-committed", "team_spawn", buildJsonObject {
+                put("name", "committed")
+                put("task", "执行")
+            }), teamBinding(fixture, session),
+        ).orEmpty()
+        assertTrue(output.contains("teammate 已创建"))
+        val state = runtime.project(session)
+        assertNull(state.failure)
+        assertEquals(LocalTeamMemberPhase.ACTIVE, state.members.single().phase)
+        assertEquals(null, state.members.single().provisionalNewJob)
+        val cold = LocalAgentTeamRuntime(
+            fixture.jobs,
+            { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
+            { _, _, _ -> JobMessageAdmission(false, false, false, "unused") },
+            { fixture.log }, SessionProjectionRegistry(),
+        )
+        cold.recoverMailbox(session)
+        assertEquals(LocalTeamMemberPhase.ACTIVE, cold.project(session).members.single().phase)
+        assertEquals("running", fixture.jobs.snapshots().single().status)
+    }
+
+    @Test
+    fun existingTeamChildResumeIsNotMistakenForUncommittedNewJob() {
+        val session = "team-existing-resume"
+        val f = fixture(session)
+        val provisional = LocalTeamMemberSnapshot(
+            id = "member-1", jobId = "job-team-1", name = "existing",
+            description = "", provider = "local-subagent",
+            context = LocalTeamMemberContext.FRESH,
+            phase = LocalTeamMemberPhase.PROVISIONING,
+            provisionalNewJob = false,
+        )
+        f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            with(LocalAgentTeamEventCodec) { provisional.toEvent(session) })
+        f.jobs.startPersistent(
+            label = "子代理：existing", resumeKind = "subagent_readonly", resumePayload = "{}",
+            ownerSessionId = session, continuable = true, requestedId = "job-team-1",
+        ) { _, _ -> awaitCancellation() }
+        f.runtime.recoverMailbox(session)
+        val member = f.runtime.project(session).members.single()
+        assertNull(f.runtime.project(session).failure)
+        assertEquals(LocalTeamMemberPhase.ACTIVE, member.phase)
+        assertEquals(null, member.provisionalNewJob)
+        assertEquals("running", f.jobs.snapshots().single().status)
+    }
+
+    @Test
+    fun invalidProvisionalIntentCannotBeReplayedAsAuthorizedMember() {
+        val session = "team-forged-provisional"
+        val f = fixture(session)
+        val member = LocalTeamMemberSnapshot(
+            id = "member-1", jobId = "job-team-1", name = "bad",
+            description = "", provider = "local-subagent",
+            context = LocalTeamMemberContext.FRESH, phase = LocalTeamMemberPhase.PROVISIONING,
+        )
+        val valid = with(LocalAgentTeamEventCodec) { member.toEvent(session) }
+        val invalid = buildJsonObject {
+            valid.forEach { (key, value) ->
+                if (key == "member") {
+                    put("member", buildJsonObject {
+                        value.jsonObject.forEach { (memberKey, memberValue) ->
+                            put(memberKey, memberValue)
+                        }
+                        put("provisionalNewJob", "invalid")
+                    })
+                } else put(key, value)
+            }
+        }
+        f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT, invalid)
+        assertTrue(f.runtime.project(session).failure.orEmpty()
+            .contains("TEAM_MEMBER_PROVISIONAL_INTENT_INVALID"))
+    }
+
+    @Test
     fun teamRoleIsAdmittedThroughRealToolAndPreservedAcrossFailedStart() = runBlocking {
         val sessionId = "team-specialist-admission"
         val f = fixture(sessionId)
