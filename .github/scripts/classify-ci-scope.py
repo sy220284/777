@@ -186,6 +186,15 @@ HIGH_RISK_PREFIXES = (
     "app/src/main/java/com/labteto/dshmobile/local/session/",
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgent",
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeState",
+    # Agent ownership, delegation and recovery execute on Android even when
+    # their files live under Work rather than the historical runtime directory.
+    "app/src/main/java/com/labteto/dshmobile/local/agent/",
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgent",
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagent",
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalNested",
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalPersistentJobRecoveryCoordinator",
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkComposition",
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentControlBuiltinRuntime",
 )
 UI_PACK_SCENE_PREFIX = "ui-pack-v6/src/main/kotlin/com/labteto/dshmobile/uipack/v6/"
 UI_PACK_VISUAL_PREFIX = "ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/"
@@ -399,6 +408,21 @@ def self_test() -> None:
         for item in excluded:
             assert values["run_" + item] == "false", (paths, item, result)
 
+    for runtime_file in (
+        "local/agent/LocalAgentDelegationPolicy.kt",
+        "local/work/LocalSubagentRunner.kt",
+        "local/work/LocalSubagentRunnerFactory.kt",
+        "local/work/LocalAgentControlPlane.kt",
+        "local/work/LocalAgentTeamRuntime.kt",
+        "local/work/LocalNestedAgentDispatcher.kt",
+        "local/work/LocalPersistentJobRecoveryCoordinator.kt",
+        "local/work/LocalWorkComposition.kt",
+        "local/work/LocalWorkAgentControlBuiltinRuntime.kt",
+    ):
+        verify(["app/src/main/java/com/labteto/dshmobile/" + runtime_file],
+               full=True, required=("unit", "build", "device", "android16", "android17"), release=True)
+    verify(["app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkImprovementGuidance.kt"],
+           required=("unit", "build"), excluded=("device", "android16", "android17"), release=True)
     verify(["README.md"], excluded=("static", "architecture", "unit", "build",
                                    "device", "android16", "android17"))
     verify(["docs/ARCHITECTURE.md"], required=("static", "architecture"),

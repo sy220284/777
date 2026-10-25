@@ -3,6 +3,7 @@ package com.labteto.dshmobile.runtime
 import com.labteto.dshmobile.harness.capability.ProcessResult
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -16,13 +17,44 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /** Each managed command owns a process group; Android 36 has no public Process.pid API. */
 class ManagedProcess private constructor(val process: Process, private val groupId: Long, private val shell: String) {
+    private val ownedGroups = linkedSetOf(groupId)
+    private val ownedSessions = linkedSetOf<Long>()
+
+    /** A PTY child owns a separate session. Register it before allowing that child to exec. */
+    @Synchronized fun registerProcessSession(id: Long) {
+        check(!closed) { "受管进程已关闭" }
+        require(id > 1L) { "进程组编号无效" }
+        ownedGroups += id
+        ownedSessions += id
+    }
     @Synchronized fun terminate() {
         if (closed) return
         closed = true
+        val namespace = runCatching { Files.readSymbolicLink(File("/proc/self/ns/pid").toPath()).toString() }.getOrNull()
+        // PTY job control assigns each job its own group. The session identity is stable
+        // even after its shell exits; /proc/stat lets us include those sibling groups.
+        if (ownedSessions.isNotEmpty()) File("/proc").listFiles()?.forEach { entry ->
+            if (entry.name.toLongOrNull() == null) return@forEach
+            runCatching {
+                if (namespace != null && Files.readSymbolicLink(File(entry, "ns/pid").toPath()).toString() != namespace) {
+                    return@runCatching
+                }
+                val fields = File(entry, "stat").readText().substringAfterLast(')').trim().split(Regex("\\s+"))
+                val status = File(entry, "status").readLines().filter { ':' in it }
+                    .associate { it.substringBefore(':') to it.substringAfter(':').trim().substringAfterLast('\t') }
+                val session = (if (namespace != null) status["NSsid"] ?: fields.getOrNull(3) else fields.getOrNull(3))?.toLongOrNull()
+                val group = (if (namespace != null) status["NSpgid"] ?: fields.getOrNull(2) else fields.getOrNull(2))?.toLongOrNull()
+                if (session in ownedSessions) {
+                    group?.takeIf { it > 1 }?.let(ownedGroups::add)
+                }
+            }
+        }
         // Positional arguments only; never interpolate a caller-supplied command into this script.
-        runCatching {
-            val killer = ProcessBuilder(shell, "-c", "kill -KILL -\"\$1\"", "group-cleanup", groupId.toString()).start()
-            if (!killer.waitFor(1, TimeUnit.SECONDS)) killer.destroyForcibly()
+        ownedGroups.toList().asReversed().forEach { group ->
+            runCatching {
+                val killer = ProcessBuilder(shell, "-c", "kill -KILL -\"\$1\"", "group-cleanup", group.toString()).start()
+                if (!killer.waitFor(1, TimeUnit.SECONDS)) killer.destroyForcibly()
+            }
         }
         if (process.isAlive) process.destroyForcibly()
         runCatching { process.waitFor(1, TimeUnit.SECONDS) }

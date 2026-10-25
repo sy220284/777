@@ -3,9 +3,12 @@ package com.labteto.dshmobile.local
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.local.runtime.BundledPythonRuntime
+import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,6 +16,43 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class BundledPythonRuntimeTest {
+    @Test
+    fun bundledPythonOwnsRealPtyWithResizeAndControlC() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val runtime = BundledPythonRuntime(context)
+        runtime.prepare()
+        val provider = PersistentPipeTerminalProvider(
+            defaultWorkingDirectory = context.cacheDir,
+            extraSearchPaths = runtime::searchPaths,
+            baseEnvironment = runtime::environment,
+        )
+        try {
+            val script = """
+                import os, signal, struct, fcntl, termios, time
+                assert all(os.isatty(fd) for fd in (0, 1, 2))
+                def size(*_):
+                    h,w,_,_ = struct.unpack('HHHH', fcntl.ioctl(0, termios.TIOCGWINSZ, bytes(8)))
+                    print('SIZE:%d:%d' % (h,w), flush=True)
+                signal.signal(signal.SIGWINCH, size)
+                signal.signal(signal.SIGINT, lambda *_: (print('INTERRUPTED', flush=True), exit(0)))
+                size()
+                while True: time.sleep(1)
+            """.trimIndent()
+            val id = provider.openPty(listOf("python3", "-u", "-c", script))
+            var output = ""
+            suspend fun expect(text: String) = withTimeout(10_000) {
+                while (!output.contains(text)) { output += provider.read(id); delay(10) }
+            }
+            expect("SIZE:24:80")
+            provider.resize(id, 43, 132)
+            expect("SIZE:43:132")
+            provider.write(id, "\u0003")
+            expect("INTERRUPTED")
+        } finally {
+            provider.closeAll()
+        }
+    }
+
     @Test
     fun bundledPythonRunsStdlibAndAndroidShellOnAndroid16() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

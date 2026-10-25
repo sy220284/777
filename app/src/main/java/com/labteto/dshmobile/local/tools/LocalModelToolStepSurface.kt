@@ -6,17 +6,26 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import com.labteto.dshmobile.harness.tools.ToolBindingSnapshot
+import kotlinx.coroutines.withContext
 
 /** Freezes the exact tool names exposed to one model step and rejects provider/model drift. */
 internal class LocalModelToolStepSurface {
     private var allowedNames: Set<String> = emptySet()
+    private var bindings: ToolBindingSnapshot? = null
 
-    fun capture(schemas: JsonArray): JsonArray {
+    fun capture(schemas: JsonArray, capturedBindings: ToolBindingSnapshot? = null): JsonArray {
+        bindings = capturedBindings
         allowedNames = schemas.mapNotNull { element ->
             val function = (element as? JsonObject)?.get("function") as? JsonObject
             (function?.get("name") as? JsonPrimitive)?.contentOrNull
         }.toSet()
         return schemas
+    }
+
+    suspend fun <T> executeBound(block: suspend () -> T): T {
+        val captured = bindings ?: return block()
+        return withContext(captured) { block() }
     }
 
     fun allows(name: String): Boolean = LocalToolPolicy.isVisibleCall(name, allowedNames)

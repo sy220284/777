@@ -24,7 +24,12 @@ class AndroidProcessRuntime(
         return searchPaths().any { directory -> File(directory, command).isExecutableCommand() }
     }
 
-    override suspend fun execute(request: ProcessRequest): ProcessResult = withContext(Dispatchers.IO) {
+    override suspend fun execute(request: ProcessRequest): ProcessResult = executeBound(request, sandbox = true)
+
+    /** Fixed runtime-owned Git operations need their private metadata directory, never caller shell authority. */
+    internal suspend fun executeWorkspaceOperation(request: ProcessRequest): ProcessResult = executeBound(request, sandbox = false)
+
+    private suspend fun executeBound(request: ProcessRequest, sandbox: Boolean): ProcessResult = withContext(Dispatchers.IO) {
         require(request.command.isNotEmpty()) { "进程命令不能为空" }
         val workingDirectory = request.workingDirectory?.let(::File) ?: defaultWorkingDirectory
         if (workingDirectory != null) require(workingDirectory.isDirectory) {
@@ -33,9 +38,10 @@ class AndroidProcessRuntime(
 
         val resolvedCommand = resolveCommand(request.command)
         executeManagedProcess(
-            builder = ProcessBuilder(resolvedCommand)
-                .directory(workingDirectory)
-                .apply { environment().putAll(processEnvironment(request.environment)) },
+            builder = ProcessBuilder(resolvedCommand).directory(workingDirectory)
+                .apply { environment().putAll(processEnvironment(request.environment)) }
+                .let { builder -> if (sandbox) secureIsolatedProcessBuilder(builder,
+                    extraSearchPaths + dynamicSearchPaths(), baseEnvironment()) else builder },
             stdin = request.stdin,
             timeoutMillis = request.timeoutMillis,
         )

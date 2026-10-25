@@ -65,11 +65,11 @@ private val WORK_RUN_REQUIRED = setOf(
     "get_goal", "update_goal", "ask_user_question",
 )
 private val WORK_AGENT_REQUIRED = setOf(
-    "subagent", "subagent_fork", "list_subagent_models", "list_agents",
-    "send_message", "interrupt_agent", "workflow",
+    "subagent", "subagent_fork", "list_subagent_models", "list_agent_roles", "list_agents", "agent_tree",
+    "send_message", "interrupt_agent", "agent_inspect", "agent_watch", "agent_resume", "agent_close", "workflow",
     "team_members", "team_member_status", "team_create_member", "team_start_member",
-    "team_spawn", "team_send_message", "team_messages", "team_wait_for_message",
-    "team_task_create", "team_task_get", "team_task_list", "team_task_update",
+    "team_spawn", "team_send_message", "team_request_shutdown", "team_messages", "team_message_receipt", "team_wait_for_message",
+    "team_task_create", "team_task_get", "team_task_list", "team_task_evidence", "team_task_review", "team_task_update",
     "team_interrupt", "team_disable_member", "team_dismiss_member", "team_stop_all", "team_wait",
 )
 private val IMAGE_TOOLS = setOf("media_image_options", "media_image_create", "media_image_status")

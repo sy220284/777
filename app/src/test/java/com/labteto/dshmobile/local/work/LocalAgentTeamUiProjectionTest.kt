@@ -30,6 +30,7 @@ class LocalAgentTeamUiProjectionTest {
         assertEquals(0, stopping.runningMemberCount)
         assertFalse(stopping.members.single().awaitingReview)
         val completed = stopping.withJobs(listOf(LocalJobInfo("job", "助手", "completed", isAgent = true)))
+        assertEquals("idle", completed.members.single().activity)
         assertTrue(completed.members.single().awaitingReview)
         assertTrue(completed.members.single().canReceiveMessage)
         assertEquals(0, completed.completedMemberCount)

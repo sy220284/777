@@ -15,6 +15,8 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 
 /**
@@ -28,6 +30,9 @@ internal class KeystorePreferenceSecretStore(
     private val alias: String,
 ) {
     private val key = stringPreferencesKey(preferenceName)
+
+    fun changes(): kotlinx.coroutines.flow.Flow<String?> = dataStore.data
+        .map { it[key] }.distinctUntilChanged()
 
     suspend fun get(): String? {
         val blob = dataStore.data.first()[key] ?: return null

@@ -1,6 +1,9 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    application
 }
+
+application { mainClass.set("com.labteto.dshmobile.runtime.AgentWorkerServerMainKt") }
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21

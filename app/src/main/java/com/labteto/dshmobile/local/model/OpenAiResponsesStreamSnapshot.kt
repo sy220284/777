@@ -59,7 +59,11 @@ internal class OpenAiResponsesStreamSnapshot {
     }
 
     fun settledResponse(response: JsonObject): JsonObject {
+        if ("output" in response && response["output"] !is JsonArray) throw invalidField("output")
         val terminal = (response["output"] as? JsonArray).orEmpty()
+        // A successful full snapshot owns both text and tool identities. Stream fallback is
+        // for missing output or interrupted snapshots; it must not resurrect omitted calls.
+        if (response.string("status") == "completed" && terminal.isNotEmpty()) return response
         val indexes = (terminal.indices + items.keys + text.keys.map { it.first }).distinct().sorted()
         val output = indexes.map { index ->
             val native = terminal.getOrNull(index) as? JsonObject ?: items[index]

@@ -18,14 +18,18 @@ internal enum class LocalSubagentHistoryMode {
 }
 
 internal data class LocalSubagentCapabilities(
+    val executionBackend: LocalAgentExecutionBackend = LocalAgentExecutionBackend.IN_PROCESS,
+    val remoteBackendRevision: String? = null,
     val allowMutation: Boolean = false,
     val continuable: Boolean = false,
     val virtualScreen: Boolean = false,
     val historyMode: LocalSubagentHistoryMode = LocalSubagentHistoryMode.ISOLATED,
     val maxDepth: Int = 1,
+    val depth: Int = 1,
     val toolAllowlist: Set<String>? = null,
     val outputSchema: JsonObject? = null,
     val teamManaged: Boolean = false,
+    val workflowManaged: Boolean = false,
     val initialOptionalTools: Set<String> = emptySet(),
 )
 
@@ -37,6 +41,7 @@ internal data class LocalSubagentLaunchSpec(
     val parentCallId: String? = null,
     val backgroundJobId: String? = null,
     val capabilities: LocalSubagentCapabilities = LocalSubagentCapabilities(),
+    val parentLink: LocalAgentParentLink? = null,
 )
 
 internal fun validateLocalSubagentLaunchSpec(
@@ -50,10 +55,17 @@ internal fun validateLocalSubagentLaunchSpec(
     require(spec.maxSteps in LocalAgentRuntimeLimits.SUBAGENT_MIN_STEPS..LocalAgentRuntimeLimits.MAX_CONFIGURED_STEPS) {
         "SUBAGENT_STEP_LIMIT_INVALID：子代理步数超出允许范围"
     }
-    require(spec.capabilities.maxDepth == 1) {
-        "SUBAGENT_DEPTH_NOT_SUPPORTED：当前子代理能力只允许 depth=1"
+    require(spec.capabilities.maxDepth in 1..3 &&
+        spec.capabilities.depth in 1..spec.capabilities.maxDepth) {
+        "SUBAGENT_DEPTH_INVALID：深度必须在 1..3 且不超过委派授权"
     }
-    require(!spec.capabilities.continuable || !spec.capabilities.allowMutation || spec.capabilities.teamManaged) {
+    require(spec.capabilities.maxDepth == 1 ||
+        (!spec.capabilities.continuable && !spec.capabilities.allowMutation &&
+         !spec.capabilities.virtualScreen && !spec.capabilities.teamManaged)) {
+        "SUBAGENT_RECURSION_SCOPE_BLOCKED：多级委派只允许前台只读代理"
+    }
+    require(!spec.capabilities.continuable || !spec.capabilities.allowMutation ||
+        spec.capabilities.teamManaged || spec.capabilities.workflowManaged) {
         "SUBAGENT_CONTINUATION_MUTATION_BLOCKED：可继续子代理必须保持只读，避免冷恢复重放未知副作用"
     }
     require(
@@ -82,6 +94,8 @@ internal fun validateLocalSubagentLaunchSpec(
     require(!spec.capabilities.teamManaged || spec.backgroundJobId != null) {
         "SUBAGENT_TEAM_REQUIRES_PERSISTENT_JOB：可写团队助手必须绑定持久任务身份"
     }
+    require(!spec.capabilities.workflowManaged || (spec.backgroundJobId != null &&
+        spec.capabilities.continuable && !spec.capabilities.teamManaged)) { "SUBAGENT_WORKFLOW_REQUIRES_PERSISTENT_JOB" }
     require(spec.capabilities.initialOptionalTools.size <= 24 &&
         spec.capabilities.initialOptionalTools.none(String::isBlank)) {
         "SUBAGENT_TEAM_GRANTS_INVALID：扩展授权列表无效"
@@ -132,16 +146,20 @@ internal fun filterLocalSubagentSchemas(
 internal fun encodeLocalSubagentCapabilities(
     capabilities: LocalSubagentCapabilities,
 ): JsonObject = buildJsonObject {
+    put("execution_backend", capabilities.executionBackend.wireName)
+    capabilities.remoteBackendRevision?.let { put("remote_backend_revision", it) }
     put("allow_mutation", capabilities.allowMutation)
     put("continuable", capabilities.continuable)
     put("virtual_screen", capabilities.virtualScreen)
     put("history_mode", capabilities.historyMode.name.lowercase())
     put("max_depth", capabilities.maxDepth)
+    if (capabilities.depth != 1) put("depth", capabilities.depth)
     capabilities.toolAllowlist?.let { allowlist ->
         put("tool_allowlist", JsonArray(allowlist.sorted().map(::JsonPrimitive)))
     }
     capabilities.outputSchema?.let { put("output_schema", it) }
     if (capabilities.teamManaged) put("team_managed", true)
+    if (capabilities.workflowManaged) put("workflow_managed", true)
     if (capabilities.initialOptionalTools.isNotEmpty()) {
         put("initial_optional_tools", JsonArray(capabilities.initialOptionalTools.sorted().map(::JsonPrimitive)))
     }
@@ -172,15 +190,23 @@ internal fun decodeLocalSubagentCapabilities(
     val toolAllowlist = (data["tool_allowlist"] as? JsonArray)
         ?.mapNotNull { it.jsonPrimitive.contentOrNull }
         ?.toSet()
+    val backend = decodeAgentBackendBinding(JsonObject(data.filterKeys {
+        it == "execution_backend" || it == "remote_backend_revision"
+    }))
     return LocalSubagentCapabilities(
+        executionBackend = backend.executionBackend,
+        remoteBackendRevision = backend.remoteBackendRevision,
         allowMutation = data["allow_mutation"]?.jsonPrimitive?.booleanOrNull ?: false,
         continuable = data["continuable"]?.jsonPrimitive?.booleanOrNull ?: false,
         virtualScreen = data["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false,
         historyMode = historyMode,
         maxDepth = data["max_depth"]?.jsonPrimitive?.intOrNull ?: 1,
+        depth = data["depth"]?.jsonPrimitive?.intOrNull ?: 1,
         toolAllowlist = toolAllowlist,
         outputSchema = data["output_schema"] as? JsonObject,
         teamManaged = data["team_managed"]?.jsonPrimitive?.booleanOrNull ?: false,
+        workflowManaged = if ("workflow_managed" in data) data["workflow_managed"]?.jsonPrimitive?.booleanOrNull
+            ?: error("SUBAGENT_WORKFLOW_CAPABILITY_INVALID") else false,
         initialOptionalTools = (data["initial_optional_tools"] as? JsonArray)
             ?.mapNotNull { it.jsonPrimitive.contentOrNull }?.toSet().orEmpty(),
     )

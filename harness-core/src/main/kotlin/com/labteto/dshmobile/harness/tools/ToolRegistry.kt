@@ -2,6 +2,10 @@ package com.labteto.dshmobile.harness.tools
 
 import com.labteto.dshmobile.harness.registry.RegistryEntries
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -31,8 +35,11 @@ data class ToolContext(
     val onExecutionStarted: (suspend (HarnessTool) -> Unit)? = null,
     /** Optional exact tool identity captured with the model-visible permission/tool surface. */
     val expectedRegistration: HarnessTool? = null,
+    /** Execution receipt, persisted before returning to a possibly cancelled caller. */
+    val onExecutionFinished: (suspend (HarnessTool, ToolResult) -> Unit)? = null,
 )
 
+@kotlinx.serialization.Serializable
 enum class ToolResultRetention {
     DURABLE,
     EPHEMERAL,
@@ -85,6 +92,15 @@ class ToolRegistry private constructor(
     fun unregister(name: String): HarnessTool? = tools.remove(name)
     fun get(name: String): HarnessTool? = tools.get(name)
     fun names(): List<String> = tools.snapshot().keys.toList()
+    /** Capture once before sending schemas, using one coherent registry view. */
+    fun captureBindings(schemas: JsonArray): ToolBindingSnapshot {
+        val registered = tools.snapshot()
+        val names = schemas.mapNotNull { schema ->
+            val function = (schema as? JsonObject)?.get("function") as? JsonObject
+            (function?.get("name") as? JsonPrimitive)?.content
+        }.toSet()
+        return ToolBindingSnapshot(registered.filterKeys { it in names })
+    }
     internal fun schemas(): JsonArray = JsonArray(
         tools.snapshot().values
             .filter { it.exposure == ToolExposure.CORE }
@@ -150,6 +166,8 @@ class ToolRegistry private constructor(
         if (context.expectedRegistration != null && context.expectedRegistration !== tool) {
             return registrationChanged(name)
         }
+        val sampled = currentCoroutineContext()[ToolBindingSnapshot]
+        if (sampled != null && sampled.registration(name) !== tool) return registrationChanged(name)
         validateToolInput(tool, input)?.let { problem ->
             return ToolInvocationResult(
                 result = ToolResult(
@@ -202,21 +220,38 @@ class ToolRegistry private constructor(
         // A plugin may be replaced or uninstalled while the user is reading its approval prompt.
         // Never execute a handler other than the one whose contract was admitted.
         if (tools.get(name) !== tool) return registrationChanged(name)
+        currentCoroutineContext().ensureActive()
         context.onExecutionStarted?.invoke(tool)
+        currentCoroutineContext().ensureActive()
+        // Approval/resource admission stays cancellable. Only an explicitly audited handler
+        // owns a finish-on-cancellation region, including its terminal receipt. Other tools
+        // retain cooperative cancellation and unknown-effect recovery.
+        return if (tool.metadata.finishesOnCancellation) {
+            withContext(NonCancellable) { executeHandler(tool, input, rawArguments, context) }
+        } else executeHandler(tool, input, rawArguments, context)
+    }
+
+    private suspend fun executeHandler(
+        tool: HarnessTool,
+        input: JsonObject,
+        rawArguments: String,
+        context: ToolContext,
+    ): ToolInvocationResult {
         val timeoutMillis = tool.timeoutMillis
         if (timeoutMillis == null) {
+            val result = tool.executor.execute(context, input, rawArguments)
+            context.onExecutionFinished?.invoke(tool, result)
             return ToolInvocationResult(
-                result = tool.executor.execute(context, input, rawArguments),
+                result = result,
                 executionStarted = true,
             )
         }
-        require(timeoutMillis > 0L) { "工具超时必须大于 0：$name" }
+        require(timeoutMillis > 0L) { "工具超时必须大于 0：${tool.name}" }
         val result = withTimeoutOrNull(timeoutMillis) {
             tool.executor.execute(context, input, rawArguments)
         }
-        return ToolInvocationResult(
-            result = result ?: ToolResult(
-                content = "工具执行超时：$name（${timeoutMillis} ms）",
+        val settled = result ?: ToolResult(
+                content = "工具执行超时：${tool.name}（${timeoutMillis} ms）",
                 isError = true,
                 errorCode = "TOOL_TIMEOUT",
                 retryable = tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK),
@@ -225,7 +260,10 @@ class ToolRegistry private constructor(
                 } else {
                     "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
                 },
-            ),
+            )
+        context.onExecutionFinished?.invoke(tool, settled)
+        return ToolInvocationResult(
+            result = settled,
             executionStarted = true,
         )
     }

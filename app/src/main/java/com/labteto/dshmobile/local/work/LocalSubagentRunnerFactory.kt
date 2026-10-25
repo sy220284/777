@@ -40,6 +40,8 @@ import kotlinx.serialization.json.JsonArray
  */
 internal class LocalSubagentRunnerFactory(
     private val modelGateway: LocalModelGateway,
+    private val backendRuntime: com.labteto.dshmobile.local.agent.LocalAgentBackendRuntime,
+    private val captureToolBindings: (JsonArray) -> com.labteto.dshmobile.harness.tools.ToolBindingSnapshot,
     private val jobs: LocalJobManager,
     private val modelHistory: LocalModelHistoryBuffer,
     private val toolOutputStore: LocalToolOutputStore,
@@ -60,9 +62,14 @@ internal class LocalSubagentRunnerFactory(
     private val defaultSessionId: () -> String,
     private val compactionPolicy: LocalSubagentCompactionPolicy,
     private val teamSchemas: (() -> JsonArray)? = null,
+    private val nestedReadonlySchemas: (() -> JsonArray)? = null,
     private val executeTeamTool: (suspend (String, String, LocalToolCall) -> AgentToolResult)? = null,
+    private val requireTeamRootAuthorization: ((String, String) -> Unit)? = null,
+    private val requireTeamWorkspaceMutation: (suspend (String, String, LocalToolCall) -> Unit)? = null,
     private val importToolImages: suspend (com.labteto.dshmobile.harness.tools.ToolRichContent?) -> List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = { emptyList() },
 ) {
+    suspend fun pinBackend(backend: com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend) = backendRuntime.pin(backend)
+
     fun createBound(
         sessionId: String,
         boundState: LocalHarnessState,
@@ -76,6 +83,7 @@ internal class LocalSubagentRunnerFactory(
         ) -> AgentToolResult,
         historySnapshot: () -> List<kotlinx.serialization.json.JsonObject> = modelHistory::snapshot,
         modelAdmission: LocalModelAdmissionPort? = null,
+        executionWorkspaceGuidance: String? = null,
     ): LocalSubagentRunner {
         val boundEventLog = eventLogFor(sessionId)
         val boundMemoryTools = LocalMemoryTools(
@@ -102,7 +110,7 @@ internal class LocalSubagentRunnerFactory(
                         lineageId = boundState.lineageId,
                         handoffSummary = boundState.handoffSummary,
                     ),
-                )
+                ) + executionWorkspaceGuidance.orEmpty()
             },
             schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
                 schemasProvider(allowMutation, allowVirtualScreen, enabledOptional.toSet())
@@ -132,8 +140,33 @@ internal class LocalSubagentRunnerFactory(
         modelAdmission: LocalModelAdmissionPort? = null,
     ): LocalSubagentRunner = LocalSubagentRunner(
         modelGateway = modelGateway,
+        resolveBackend = backendRuntime::resolve,
+        captureToolBindings = captureToolBindings,
         teamSchemas = teamSchemas,
+        nestedReadonlySchemas = nestedReadonlySchemas,
+        // Every descendant owns fresh history policy and model step state; never reenter
+        // the parent's mutable runner instance while it is executing a tool call.
+        newNestedRunner = {
+            create(
+                eventLogProvider = eventLogProvider,
+                contextSnapshotProvider = contextSnapshotProvider,
+                schemasProvider = schemasProvider,
+                executeTool = executeTool,
+                runnerState = runnerState,
+                toolOutputSessionId = toolOutputSessionId,
+                runSessionId = runSessionId,
+                runKind = runKind,
+                historySnapshotProvider = historySnapshotProvider,
+                modelAdmission = modelAdmission,
+            )
+        },
         executeTeamTool = executeTeamTool?.let { executor -> { jobId, call -> executor(runSessionId(), jobId, call) } },
+        requireTeamRootAuthorization = requireTeamRootAuthorization?.let { check ->
+            { jobId -> check(runSessionId(), jobId) }
+        },
+        requireTeamWorkspaceMutation = if (requireTeamWorkspaceMutation == null) null else {
+            jobId, call -> requireTeamWorkspaceMutation.invoke(runSessionId(), jobId, call)
+        },
         importToolImages = importToolImages,
         state = runnerState,
         jobs = jobs,
@@ -146,6 +179,8 @@ internal class LocalSubagentRunnerFactory(
         prepareMessages = { messages, mode, baseUrl, model ->
             prepareLocalMultimodalMessages(
                 messages = messages,
+                // Attachment references belong to the shared attachment importer, including
+                // inherited parent inputs. Native file/image tools use the execution root.
                 workspaceRoot = File(workspacePath),
                 mode = mode,
                 budget = imageRequestBudget(),

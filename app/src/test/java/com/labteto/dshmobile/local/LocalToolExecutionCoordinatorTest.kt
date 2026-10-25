@@ -7,6 +7,7 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolMetadata
+import com.labteto.dshmobile.harness.tools.ToolWorkspaceAccess
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.functionToolSchema
@@ -33,6 +34,85 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
+
+    @Test fun teamRevocationWhileWaitingForSharedWorkspaceLeaseCannotWrite() = runBlocking {
+        val gate = com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate()
+        val leaseHeld = CompletableDeferred<Unit>()
+        val releaseLease = CompletableDeferred<Unit>()
+        val firstAdmission = CompletableDeferred<Unit>()
+        val holder = async {
+            gate.withWrite {
+                leaseHeld.complete(Unit)
+                releaseLease.await()
+            }
+        }
+        leaseHeld.await()
+        var taskStillAuthorized = true
+        var admissionChecks = 0
+        var executed = 0
+        val tool = tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) {
+            executed++
+            ToolResult("should not write")
+        }.copy(metadata = ToolMetadata("文件", workspaceAccess = ToolWorkspaceAccess.WRITE))
+        val registry = ToolRegistry().apply { register(tool) }
+        val running = async {
+            coordinator(registry, workspaceGate = gate).executeScoped(
+                LocalToolCall("lease-race", "write", JsonObject(emptyMap()), "{}"),
+                "team-session", true, false, approval = { _, _, _ -> true },
+                beforeExecution = {
+                    admissionChecks++
+                    if (admissionChecks == 1) firstAdmission.complete(Unit)
+                    taskStillAuthorized
+                },
+            )
+        }
+        try {
+            firstAdmission.await() // First check is true, then the call waits for the writer.
+            taskStillAuthorized = false // Lead revokes the Task while workspace lease is held.
+            releaseLease.complete(Unit)
+            val result = running.await()
+            assertTrue(result.isError)
+            assertEquals(0, executed)
+            assertTrue(admissionChecks >= 2)
+        } finally {
+            releaseLease.complete(Unit)
+            holder.join()
+            running.cancel()
+        }
+    }
+
+
+    @Test fun teamRevocationDuringApprovalCannotReachARegisteredWriteExecutor() = runBlocking {
+        var liveTask = true
+        var checkedAfterApproval = 0
+        var executed = 0
+        val registry = ToolRegistry().apply {
+            register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) {
+                executed++
+                ToolResult("unacceptable-write")
+            })
+        }
+        val result = coordinator(registry).executeScoped(
+            original = LocalToolCall(
+                "late-team-write", "write", JsonObject(emptyMap()), "{}",
+            ),
+            sessionId = "team-session",
+            allowMutation = true,
+            planModeEnabled = false,
+            approval = { _, _, _ ->
+                liveTask = false // Simulates Lead reassigning the task while approval is open.
+                true
+            },
+            beforeExecution = {
+                checkedAfterApproval++
+                liveTask
+            },
+        )
+        assertTrue(result.isError)
+        assertEquals(0, executed)
+        assertTrue(checkedAfterApproval > 0)
+    }
+
 
     @Test
     fun explicitlyDiscoveredCapabilitySurvivesLaterWorkStepHeuristicRefresh() {

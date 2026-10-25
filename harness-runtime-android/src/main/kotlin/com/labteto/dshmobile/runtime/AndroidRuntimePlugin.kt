@@ -24,6 +24,11 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -48,8 +53,10 @@ class AndroidRuntimePlugin(
 ) : HarnessPlugin {
     override val id: String = "android-runtime"
     private val terminalLeases = ConcurrentHashMap<String, HarnessResourceLease>()
+    private val gitWorkspaces = GitWorkspaceRuntime(workspaceRoot, processRuntime)
 
     override suspend fun install(context: HarnessContext) {
+        gitWorkspaces.install(context)
         context.tools.register(
             HarnessTool(
                 name = "runtime_command_status",
@@ -156,11 +163,20 @@ class AndroidRuntimePlugin(
                         HarnessResourceKind.TERMINAL,
                         owner = "terminal:" + command.firstOrNull().orEmpty(),
                     )
+                    var opened: String? = null
                     try {
-                        val sessionId = terminalProvider.open(command, workingDirectory)
+                        val usePty = input["tty"]?.jsonPrimitive?.booleanOrNull ?: true
+                        val sessionId = if (usePty) terminalProvider.openPty(
+                            command, workingDirectory,
+                            input["rows"]?.jsonPrimitive?.intOrNull ?: 24,
+                            input["columns"]?.jsonPrimitive?.intOrNull ?: 80,
+                        ) else terminalProvider.open(command, workingDirectory)
+                        opened = sessionId
+                        currentCoroutineContext().ensureActive()
                         if (lease != null) terminalLeases[sessionId] = lease
                         ToolResult(sessionId)
                     } catch (error: Throwable) {
+                        withContext(NonCancellable) { opened?.let { terminalProvider.close(it) } }
                         lease?.close()
                         throw error
                     }
@@ -183,6 +199,7 @@ class AndroidRuntimePlugin(
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val sessionId = input.requiredString("session_id")
+                    requireTerminalWorkspace(sessionId)
                     try {
                         terminalProvider.write(sessionId, input.requiredString("input"))
                         ToolResult("已写入终端会话")
@@ -208,8 +225,14 @@ class AndroidRuntimePlugin(
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val sessionId = input.requiredString("session_id")
+                    requireTerminalWorkspace(sessionId)
                     try {
-                        ToolResult(terminalProvider.read(sessionId))
+                        val read = terminalProvider.readResult(sessionId)
+                        ToolResult(
+                            content = read.output + if (read.exited) "\n[终端已退出，退出码：${read.exitCode}]" else "",
+                            isError = read.exited && read.exitCode != 0,
+                            processExitCode = read.exitCode,
+                        )
                     } finally {
                         releaseTerminalLeaseIfFinished(sessionId)
                     }
@@ -232,7 +255,10 @@ class AndroidRuntimePlugin(
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val sessionId = input.requiredString("session_id")
+                    requireTerminalWorkspace(sessionId)
                     val fromPreviousRuntime = terminalProvider.isFromPreviousRuntime(sessionId)
+                    val kind = terminalProvider.terminalType(sessionId)
+                    val exitCode = terminalProvider.exitCode(sessionId)
                     val alive = !fromPreviousRuntime && terminalProvider.isAlive(sessionId)
                     if (!alive) terminalLeases.remove(sessionId)?.close()
                     ToolResult(
@@ -241,7 +267,9 @@ class AndroidRuntimePlugin(
                             put("alive", alive)
                             put("stale_runtime", fromPreviousRuntime)
                             put("runtime_generation", terminalProvider.runtimeGeneration())
-                            put("native_pty", terminalProvider.nativePtyAvailable())
+                            put("native_pty", kind == "pty")
+                            put("terminal_kind", kind ?: "unknown")
+                            exitCode?.let { put("exit_code", it) }
                             if (fromPreviousRuntime) {
                                 put("recovery_hint",
                                     "执行环境已重建，旧终端状态不可用。先核对文件和外部操作结果，再重新打开终端，避免重复写入。")
@@ -267,6 +295,7 @@ class AndroidRuntimePlugin(
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val sessionId = input.requiredString("session_id")
+                    requireTerminalWorkspace(sessionId)
                     try {
                         terminalProvider.close(sessionId)
                     } finally {
@@ -276,6 +305,27 @@ class AndroidRuntimePlugin(
                 },
             ),
         )
+
+        context.tools.register(HarnessTool(
+            name = "terminal_resize",
+            schema = functionToolSchema("terminal_resize", "调整真实 PTY 尺寸，系统向前台进程发送 SIGWINCH", buildJsonObject {
+                put("session_id", buildJsonObject { put("type", "string") })
+                for (key in listOf("rows", "columns")) put(key, buildJsonObject {
+                    put("type", "integer"); put("minimum", 1); put("maximum", 65535)
+                })
+            }, required = setOf("session_id", "rows", "columns")),
+            access = ToolAccess.PROCESS, approvalPolicy = ToolApprovalPolicy.ALWAYS,
+            exposure = ToolExposure.OPTIONAL, timeoutMillis = 10_000L,
+            metadata = ToolMetadata("运行时", discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS),
+            executor = HarnessToolExecutor { _, input, _ ->
+                val sessionId = input.requiredString("session_id")
+                requireTerminalWorkspace(sessionId)
+                terminalProvider.resize(sessionId,
+                    requireNotNull(input["rows"]?.jsonPrimitive?.intOrNull),
+                    requireNotNull(input["columns"]?.jsonPrimitive?.intOrNull))
+                ToolResult("终端尺寸已更新")
+            },
+        ))
 
         context.capabilities.register(
             CapabilityDescriptor(
@@ -287,13 +337,15 @@ class AndroidRuntimePlugin(
         context.capabilities.register(
             CapabilityDescriptor(
                 id = "android-terminal-provider",
-                attributes = mapOf("nativePty" to terminalProvider.nativePtyAvailable().toString()),
+                attributes = mapOf("ptyTransport" to "bundled-python-posix", "ptyVerification" to "per-session"),
             ),
             terminalProvider,
         )
     }
 
     override suspend fun uninstall(context: HarnessContext) {
+        gitWorkspaces.uninstall(context)
+        terminalProvider.closeAll()
         terminalLeases.keys.toList().forEach { sessionId ->
             runCatching { terminalProvider.close(sessionId) }
             terminalLeases.remove(sessionId)?.close()
@@ -309,8 +361,15 @@ class AndroidRuntimePlugin(
         }
     }
 
-    private fun resolveWorkingDirectory(requested: String?): String {
-        val root = workspaceRoot.canonicalFile
+    private suspend fun requireTerminalWorkspace(sessionId: String) {
+        val scope = currentCoroutineContext()[com.labteto.dshmobile.harness.capability.WorkspaceExecutionContext] ?: return
+        val directory = terminalProvider.workingDirectory(sessionId)?.canonicalFile ?: return
+        val root = scope.rootFor(workspaceRoot).canonicalFile
+        require(directory == root || directory.toPath().startsWith(root.toPath())) { "终端不属于当前子代理工作区" }
+    }
+
+    private suspend fun resolveWorkingDirectory(requested: String?): String {
+        val root = com.labteto.dshmobile.harness.capability.executionWorkspaceRoot(workspaceRoot).canonicalFile
         val target = if (requested.isNullOrBlank()) {
             root
         } else {
@@ -403,7 +462,7 @@ class AndroidRuntimePlugin(
 
     private fun terminalOpenSchema(): JsonObject = functionToolSchema(
         "terminal_open",
-        "打开一个跨多次工具调用保持存活的交互进程；当前为管道终端，不伪装完整 PTY",
+        "打开真实 PTY，支持交互、控制字符和窗口尺寸；tty=false 显式选择普通管道。PTY 依赖安装包内置 Python，启动失败会明确报错",
         buildJsonObject {
             put(
                 "command",
@@ -414,6 +473,10 @@ class AndroidRuntimePlugin(
                 },
             )
             put("working_directory", buildJsonObject { put("type", "string") })
+            put("tty", buildJsonObject { put("type", "boolean"); put("description", "默认 true；false 为普通管道") })
+            for (key in listOf("rows", "columns")) put(key, buildJsonObject {
+                put("type", "integer"); put("minimum", 1); put("maximum", 65535)
+            })
         },
     )
 
@@ -453,6 +516,7 @@ class AndroidRuntimePlugin(
             "terminal_read",
             "terminal_status",
             "terminal_close",
+            "terminal_resize",
         )
     }
 }

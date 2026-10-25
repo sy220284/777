@@ -10,11 +10,17 @@ import javax.inject.Singleton
 @Singleton
 class LocalToolsUiFacade @Inject internal constructor(
     private val tools: LocalToolsRuntime,
+    private val agentBackends: com.labteto.dshmobile.local.agent.LocalAgentBackendRuntime,
     private val gitHubSkillImporter: com.labteto.dshmobile.local.tools.LocalGitHubSkillImporter,
     private val gitHubBrowser: com.labteto.dshmobile.local.tools.LocalGitHubCredentialManager,
     private val mcpCredentials: com.labteto.dshmobile.local.tools.LocalMcpCredentialStore,
     private val mcpOAuth: com.labteto.dshmobile.local.tools.LocalMcpOAuthCoordinator,
 ) : com.labteto.dshmobile.uicontract.ToolsUiPort {
+    suspend fun agentBackendStatus(): String = agentBackends.status()
+    suspend fun configureAgentBackend(host: String, port: Int, pin: String, token: String, consent: Boolean) =
+        agentBackends.configure(host, port, pin, token, consent)
+    suspend fun revokeAgentBackend() = agentBackends.revoke()
+
     override fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit> = tools.serverChanges()
 
     override suspend fun lifecycleHistory(

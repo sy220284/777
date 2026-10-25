@@ -144,4 +144,30 @@ class LocalSubagentInboxRecoveryScanTest {
         assertTrue(failure is IllegalStateException)
         assertTrue(failure?.message.orEmpty().contains("NO_PROGRESS"))
     }
+    @Test fun futureEventsCannotBridgeMissingEventsBeforePinnedHighWaterMark() {
+        for (page in listOf(
+            listOf(event(13L), event(14L)),
+            listOf(event(11L), event(13L), event(14L)),
+        )) {
+            val broken = runCatching {
+                recoverSubagentInboxClaims(
+                    backgroundJobId = "job", checkpointSequence = 10L,
+                    scanThrough = 12L, alreadyClaimed = emptySet(),
+                    pendingIds = emptySet(), pageAfter = { page },
+                )
+            }.exceptionOrNull()
+            assertTrue(broken is IllegalStateException)
+            assertTrue(broken?.message.orEmpty().contains("SEQUENCE_GAP"))
+        }
+    }
+
+    @Test fun legitimateFuturePageSuffixDoesNotConfusePinnedRecoverySnapshot() {
+        val recovered = recoverSubagentInboxClaims(
+            backgroundJobId = "job", checkpointSequence = 10L, scanThrough = 12L,
+            alreadyClaimed = emptySet(), pendingIds = emptySet(),
+            pageAfter = { listOf(event(11L), event(12L), event(13L)) },
+        )
+        assertTrue(recovered.isEmpty())
+    }
+
 }

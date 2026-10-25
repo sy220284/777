@@ -85,13 +85,15 @@ internal class AgentTurnState(
 internal class AgentTurnStepBudget(
     initialLimit: Int,
     private val extender: AgentStepLimitExtender?,
+    private val suspendExtender: (suspend (Int, Int) -> Int?)? = null,
 ) {
     private var limit = initialLimit
     init { require(initialLimit > 0) { "代理步数必须大于 0" } }
 
-    fun admits(nextStep: Int): Boolean {
+    suspend fun admits(nextStep: Int): Boolean {
         if (nextStep <= limit) return true
-        val expanded = extender?.extend(limit, nextStep - 1) ?: return false
+        val expanded = (if (suspendExtender != null) suspendExtender.invoke(limit, nextStep - 1)
+            else extender?.extend(limit, nextStep - 1)) ?: return false
         if (expanded <= limit) return false
         limit = expanded
         return nextStep <= limit

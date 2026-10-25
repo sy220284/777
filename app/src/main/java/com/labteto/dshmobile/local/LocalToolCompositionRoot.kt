@@ -27,6 +27,7 @@ import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
@@ -63,6 +64,42 @@ internal class LocalToolCompositionRoot @Inject constructor(
         dynamicSearchPaths = bundledRuntimeManager::searchPaths,
         baseEnvironment = bundledRuntimeManager::environment,
     )
+    internal val agentWorkspaces = com.labteto.dshmobile.runtime.GitWorkspaceRuntime(File(workspace.path), process)
+
+    internal suspend fun resolveAgentWorkspace(sessionId: String, identity: String): com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext {
+        val admission = agentWorkspaces.operate(sessionId, "locate", buildJsonObject { put("workspace_id", identity) })
+        return com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext(
+            File(workspace.path), workspace.atRoot(File(admission.getValue("root").jsonPrimitive.content)), identity,
+            File(admission.getValue("source").jsonPrimitive.content),
+        )
+    }
+
+    internal suspend fun forkAgentWorkspace(sessionId: String, invocationId: String, repository: String): kotlinx.serialization.json.JsonObject {
+        val tool = requireNotNull(registry.get("workspace_fork")) { "工作区运行时未启用" }
+        val lease = workspaceGate.acquire(tool)
+        try {
+            check(registry.get("workspace_fork") === tool) { "工作区运行时已更新，请重试" }
+            kotlinx.coroutines.currentCoroutineContext()[com.labteto.dshmobile.harness.agent.AgentRunExecutionContext]?.requireCurrent(sessionId)
+            return agentWorkspaces.fork(sessionId, invocationId, repository)
+        } finally {
+            lease?.close()
+        }
+    }
+
+    internal suspend fun integrateAgentWorkspace(
+        sessionId: String, identity: String, tree: String, allowedPaths: List<String>, beforeCommit: suspend () -> Unit,
+    ): kotlinx.serialization.json.JsonObject {
+        val tool = requireNotNull(registry.get("workspace_merge")) { "工作区运行时未启用" }
+        val lease = workspaceGate.acquire(tool)
+        try {
+            check(registry.get("workspace_merge") === tool) { "工作区运行时已更新" }
+            beforeCommit()
+            return agentWorkspaces.operate(sessionId, "merge", buildJsonObject {
+                put("workspace_id", identity); put("expected_tree", tree)
+                put("allowed_paths", kotlinx.serialization.json.JsonArray(allowedPaths.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+            })
+        } finally { lease?.close() }
+    }
     private val preferences = LocalHarnessPreferences.from(context)
     private val languageServerComponents = OnDemandLanguageServerManager(
         home = File(context.noBackupFilesDir, "local-harness/lsp-components"),
@@ -107,6 +144,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
             runtimeProcess = process,
             runtimeTerminal = terminal,
             languageServerCommand = languageServerResolver::resolve,
+            languageServerReadRoots = languageServerComponents::processReadRoots,
             canInstallLanguageServer = { path ->
                 languageServerResolver.managedHint(path)
                     ?.let { languageServerComponents.componentFor(it) } != null
@@ -195,6 +233,23 @@ internal class LocalToolCompositionRoot @Inject constructor(
                         identity.parentExecutionId?.let { put("parent_execution_id", it) }
                     },
                 )
+            },
+            recordCancelledExecutionFinished = { sessionId, call, identity, result ->
+                // The original executor has actually returned. Record under its exact execution
+                // ID before cancellation unwinds; this cannot mark the Turn/Goal completed.
+                sessionStorage.eventLogs.get(sessionId).append("tool/result", buildJsonObject {
+                    put("id", call.id)
+                    put("name", call.name)
+                    put("execution_id", identity.executionId)
+                    put("is_error", result.isError)
+                    put("content", result.content)
+                    put("retryable", false)
+                    put("side_effect", if (identity.verifiedReadOnly) "none" else "possible")
+                    result.errorCode?.let { put("error_code", it) }
+                    result.processExitCode?.let { put("process_exit_code", it) }
+                    put("settlement_origin", "executor_after_cancellation")
+                    identity.attributes["run_id"]?.let { put("run_id", it) }
+                })
             },
         )
     }

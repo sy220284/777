@@ -115,6 +115,16 @@ internal class LocalJobManager(
 
     fun snapshotInfos(): List<LocalJobInfo> = delegate.infos().map { it.toLocalJobInfo() }
 
+    val changes: kotlinx.coroutines.flow.StateFlow<Long> get() = delegate.changes
+
+    /** Coherent Agent identity/state view from one underlying Job-lock acquisition. */
+    fun agentRegistrations(ownerSessionId: String): List<LocalJobRegistration> =
+        delegate.agentRegistrations(ownerSessionId).map { registration ->
+            LocalJobRegistration(registration.info.toLocalJobInfo(), registration.snapshot,
+                registration.executionActive, registration.runtimeActivation)
+        }
+
+
     fun list(ownerSessionId: String? = null): String = delegate.list(ownerSessionId)
 
     fun listAgents(ownerSessionId: String? = null): String = delegate.listAgents(ownerSessionId)

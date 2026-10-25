@@ -5,21 +5,29 @@ package com.labteto.dshmobile.local.work
 internal object LocalAgentTeamContract {
         const val TEAM_MEMBER_EVENT = "team/member"
         const val TEAM_TASK_EVENT = "team/task"
+        const val TEAM_TASK_REVIEW_EVENT = "team/task/review"
         const val TEAM_MESSAGE_QUEUED = "team/message/queued"
         const val TEAM_MESSAGE_DELIVERED = "team/message/delivered"
         const val TEAM_MESSAGE_DISCARDED = "team/message/discarded"
+        const val TEAM_SHUTDOWN_RESPONSE = "team/shutdown/response"
+        const val TEAM_MESSAGE_ACKNOWLEDGED = "team/message/acknowledged"
         const val TEAM_EVENT_VERSION = 2
         // Official V2 whole-value protocol remains at version 4; local activity projection adds display state.
         const val OFFICIAL_TEAM_PROJECTION_STATE_VERSION = 4
-        const val LOCAL_TEAM_PROJECTION_STATE_VERSION = 6
+        const val LOCAL_TEAM_PROJECTION_STATE_VERSION = 11
         val TEAM_EVENTS = setOf(
             TEAM_MEMBER_EVENT,
             TEAM_TASK_EVENT,
+            TEAM_TASK_REVIEW_EVENT,
             TEAM_MESSAGE_QUEUED,
             TEAM_MESSAGE_DELIVERED,
             TEAM_MESSAGE_DISCARDED,
+            TEAM_SHUTDOWN_RESPONSE,
+            TEAM_MESSAGE_ACKNOWLEDGED,
         )
         val MEMBER_TOOL_NAMES = com.labteto.dshmobile.local.tools.LocalTeamMemberToolContract.NAMES
+        /** All Team-managed child calls must enter the authenticated member dispatcher. */
+        fun isTeamChildControlCall(name: String): Boolean = name in TOOL_NAMES || name in MEMBER_TOOL_NAMES
         val TOOL_NAMES = setOf(
             "team_members",
             "team_member_status",
@@ -27,10 +35,14 @@ internal object LocalAgentTeamContract {
             "team_start_member",
             "team_spawn",
             "team_send_message",
+            "team_request_shutdown",
+            "team_message_receipt",
             "team_messages",
             "team_wait_for_message",
             "team_task_create",
             "team_task_get",
+            "team_task_evidence",
+            "team_task_review",
             "team_task_list",
             "team_task_update",
             "team_interrupt",
@@ -47,8 +59,10 @@ internal object LocalAgentTeamContract {
             "team_start_member",
             "team_spawn",
             "team_send_message",
+            "team_request_shutdown",
             "team_task_create",
             "team_task_update",
+            "team_task_review",
             "team_interrupt",
             "team_disable_member",
             "team_dismiss_member",

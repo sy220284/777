@@ -43,6 +43,7 @@ class DshApplication : Application() {
         // The MCP Binder worker has its own OS process. It must never bootstrap
         // a second Agent/runtime kernel, WorkManager scheduler or app maintenance
         // from the ordinary Application onCreate().
+        if (android.os.Process.isIsolated()) return
         if (isMcpWorkerProcess(Application.getProcessName(), packageName)) return
         AppLog.configurePersistence(File(filesDir, "diagnostics/app-log.tsv"))
         AppLog.installUnhandledExceptionLogger()

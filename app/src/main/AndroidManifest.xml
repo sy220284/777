@@ -72,6 +72,13 @@
             android:stopWithTask="true" />
 
         <service
+            android:name=".local.agent.ipc.IsolatedAgentService"
+            android:process=":agent_isolated"
+            android:isolatedProcess="true"
+            android:exported="false"
+            android:stopWithTask="true" />
+
+        <service
             android:name=".local.runtime.LocalExecutionService"
             android:exported="false"
             android:foregroundServiceType="specialUse">

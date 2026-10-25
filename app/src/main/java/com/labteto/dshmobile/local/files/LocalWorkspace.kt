@@ -127,6 +127,12 @@ class LocalWorkspace(
     /** Stable app-private workspace root. */
     val path: String get() = canonicalRoot.absolutePath
 
+    /** A separate instance keeps observations and traversal cursors bound to this physical root. */
+    internal fun atRoot(directory: File): LocalWorkspace = LocalWorkspace(
+        root = directory, extraSearchPaths = extraSearchPaths, environmentProvider = environmentProvider,
+        shellExecutable = shellExecutable, boundary = LocalSandboxBoundary.workspaceOnly(directory),
+    )
+
     /** Read a UTF-8 text range, bounded to keep one result out of the model's entire context. */
     fun read(relativePath: String, startLine: Int = 1, endLine: Int = startLine + 399): String {
         val file = resolve(relativePath)
@@ -532,7 +538,7 @@ class LocalWorkspace(
             }
         }
         val result = com.labteto.dshmobile.runtime.executeManagedProcess(
-            builder = builder,
+            builder = com.labteto.dshmobile.runtime.secureIsolatedProcessBuilder(builder, extraSearchPaths(), environmentProvider()),
             timeoutMillis = timeoutSeconds.coerceIn(1, MAX_SHELL_TIMEOUT_SECONDS) * 1000L,
             maxChars = MAX_SHELL_CHARS,
             onProgress = onProgress,

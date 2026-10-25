@@ -15,6 +15,9 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class JobContinuationPersistenceException(
     message: String,
@@ -49,6 +52,15 @@ data class JobMessageAdmission(
     val duplicate: Boolean,
     val requiresResume: Boolean,
     val message: String,
+)
+
+/** A single coherent read of an Agent's UI identity and durable execution state. */
+data class JobRegistration(
+    val info: JobInfo,
+    val snapshot: JobSnapshot,
+    /** Runtime evidence only: never restored from a persisted running status. */
+    val executionActive: Boolean = false,
+    val runtimeActivation: Long = 0L,
 )
 
 data class JobSnapshot(
@@ -91,6 +103,8 @@ class HarnessJobManager(
         var status: String = "running",
         var output: String = "",
         var job: Job? = null,
+        var enteredJob: Job? = null,
+        var runtimeActivation: Long = 0L,
         val inbox: MutableList<QueuedAgentInput> = mutableListOf(),
         val resumeKind: String? = null,
         val resumePayload: String? = null,
@@ -112,6 +126,9 @@ class HarnessJobManager(
     // Capture and commit in one order. Otherwise an older callback/write can arrive after a
     // terminal snapshot and restore a running UI or durable record.
     private val publicationLock = Any()
+    // Notification only. Consumers always re-read the existing Job owner after a wake-up.
+    private val mutableChanges = MutableStateFlow(0L)
+    val changes: StateFlow<Long> = mutableChanges.asStateFlow()
     private val records = linkedMapOf<String, Record>()
     private val removingOwners = mutableSetOf<String>()
 
@@ -592,6 +609,15 @@ class HarnessJobManager(
             }
             try {
                 val executionOwner = currentCoroutineContext()[Job]
+                synchronized(lock) {
+                    if (record.status != "running" || record.job !== executionOwner) {
+                        throw CancellationException("后台任务执行权已撤销")
+                    }
+                    record.enteredJob = executionOwner
+                    record.runtimeActivation++
+                    record.updatedAt = nextActivityTimestamp(record.updatedAt)
+                }
+                notifyChanged()
                 val report: (String) -> Unit = { output ->
                     val accepted = synchronized(lock) {
                         // A cancelled/completed activation (or an older activation after
@@ -671,6 +697,20 @@ class HarnessJobManager(
     fun list(ownerId: String? = null): String = snapshotRecords(ownerId).let { snapshot ->
         if (snapshot.isEmpty()) "没有后台任务"
         else snapshot.joinToString("\n") { "${it.id} [${it.status}] ${publicLabel(it.label)}" }
+    }
+
+    /**
+     * Inspect live and unloaded Agent identities without activating them. Both projections
+     * are captured under the same existing Job lock, so status and Inbox cannot diverge.
+     */
+    fun agentRegistrations(ownerId: String): List<JobRegistration> = synchronized(lock) {
+        records.values
+            .filter { it.ownerId == ownerId && it.label.startsWith(AGENT_PREFIX) }
+            .map { JobRegistration(it.toJobInfo(), snapshot(it),
+                executionActive = it.status == "running" && it.job != null &&
+                    it.enteredJob === it.job && it.job?.isActive == true,
+                runtimeActivation = it.runtimeActivation,
+            ) }
     }
 
     fun listAgents(ownerId: String? = null): String = synchronized(lock) {
@@ -1252,6 +1292,7 @@ class HarnessJobManager(
             infos = records.values.map { it.toJobInfo() }
             snapshots = records.values.map(::snapshot)
         }
+        mutableChanges.value += 1L
         onChanged(infos)
         // A transient persistence failure must not rewrite the task's execution result. The next
         // state publication retries the full snapshot. Persistent start/resume use the strict
@@ -1260,6 +1301,7 @@ class HarnessJobManager(
     }
 
     private fun notifyChanged() = synchronized(publicationLock) {
+        mutableChanges.value += 1L
         onChanged(snapshotRecords())
     }
 

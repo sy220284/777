@@ -58,6 +58,7 @@ data class LocalCanonicalMessage(
     val replay: LocalModelReplayEnvelope? = null,
     val completionReason: LocalModelCompletionReason = LocalModelCompletionReason.COMPLETED,
     val rawStopReason: String? = null,
+    val instructionScope: String? = null,
 )
 
 internal data class LocalCanonicalToolDefinition(
@@ -132,7 +133,8 @@ internal object LocalCanonicalModelCodec {
             source["_dsh_completion"]?.jsonPrimitive?.contentOrNull?.let { value ->
                 LocalModelCompletionReason.entries.firstOrNull { it.name == value } ?: LocalModelCompletionReason.INTERRUPTED
             } ?: LocalModelCompletionReason.COMPLETED,
-            source["_dsh_stop_reason"]?.jsonPrimitive?.contentOrNull)
+            source["_dsh_stop_reason"]?.jsonPrimitive?.contentOrNull,
+            source[LOCAL_INSTRUCTION_SCOPE]?.jsonPrimitive?.contentOrNull)
     }
 
     fun tools(source: JsonArray): List<LocalCanonicalToolDefinition> = source.mapIndexed { index, raw ->
@@ -288,6 +290,7 @@ internal object LocalCanonicalModelCodec {
         adapterId: String,
         routeFingerprint: String,
     ): JsonObject = buildJsonObject {
+        if (adapterId.isEmpty()) message.instructionScope?.let { put(LOCAL_INSTRUCTION_SCOPE, it) }
         if (adapterId.isEmpty() && (message.completionReason != LocalModelCompletionReason.COMPLETED || message.rawStopReason != null)) {
             put("_dsh_completion", message.completionReason.name)
             message.rawStopReason?.let { put("_dsh_stop_reason", it) }

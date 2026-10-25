@@ -153,6 +153,25 @@ class ToolsViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(ToolsUiState())
     val state: StateFlow<ToolsUiState> = _state.asStateFlow()
+    private val _agentBackendStatus = MutableStateFlow("正在读取执行器设置")
+    val agentBackendStatus: StateFlow<String> = _agentBackendStatus.asStateFlow()
+    fun refreshAgentBackend() { viewModelScope.launch {
+        try { _agentBackendStatus.value = localTools.agentBackendStatus() }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { _agentBackendStatus.value = "执行器设置读取失败，原授权已保留" }
+    } }
+    fun configureAgentBackend(host: String, port: Int, pin: String, token: String, consent: Boolean) { viewModelScope.launch {
+        try {
+            operationGate.run { localTools.configureAgentBackend(host, port, pin, token, consent) }
+            refreshAgentBackend()
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { _agentBackendStatus.value = "保存失败，请检查主机、端口、证书和连接口令" }
+    } }
+    fun revokeAgentBackend() { viewModelScope.launch {
+        try { operationGate.run { localTools.revokeAgentBackend() }; refreshAgentBackend() }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { _agentBackendStatus.value = "撤销失败，请重试；原授权状态未确认" }
+    } }
     val networkSearchEnabled: StateFlow<Boolean> = networkSearchSettings.enabled
     val deepSeekSearchPreferred: StateFlow<Boolean> = networkSearchSettings.deepSeekPreferred
 
@@ -793,6 +812,7 @@ fun ToolsScreen(
                                         .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
                                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                                 ) {
+                                    AgentBackendSettings(viewModel)
                                     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                                         Text(
                                             stringResource(R.string.cap_center_settings_group),

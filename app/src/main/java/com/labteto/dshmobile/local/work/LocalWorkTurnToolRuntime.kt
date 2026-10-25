@@ -40,6 +40,7 @@ internal class LocalWorkTurnToolRuntime(
     private val githubConfigured: suspend () -> Boolean,
     private val workspaceRoot: java.io.File? = null,
 ) {
+    internal fun captureBindings(schemas: JsonArray) = registry.captureBindings(schemas)
     internal fun clear(binding: LocalWorkRunBinding) {
         execution.clearTurnCapabilities(binding.enabledOptionalTools)
         binding.toolPriority.reset()
@@ -147,6 +148,7 @@ internal class LocalWorkTurnToolRuntime(
         allowMutation: Boolean = true,
         stillCurrent: () -> Boolean = { true },
     ): AgentToolResult {
+        val isolatedWorkspace = kotlinx.coroutines.currentCoroutineContext()[com.labteto.dshmobile.harness.capability.WorkspaceExecutionContext]
         val goal = binding.workState.snapshot().goal
         val paths = goal?.artifactPaths.orEmpty()
         return execution.executeScoped(
@@ -155,12 +157,15 @@ internal class LocalWorkTurnToolRuntime(
             allowMutation = allowMutation,
             planModeEnabled = binding.state.value.work.planMode,
             beforeExecution = stillCurrent,
-            executionAttributes = mapOf("goal_id" to goal?.id.orEmpty()),
+            executionAttributes = buildMap {
+                put("goal_id", goal?.id.orEmpty())
+                isolatedWorkspace?.let { put("workspace_id", it.workspaceId); put("workspace_root", it.root.path) }
+            },
             onExecutionActive = { active ->
                 binding.executingToolCallIds.update { ids -> if (active) ids + call.id else ids - call.id }
             },
             observeFileVersions = { paths.mapNotNull { path ->
-                workspaceRoot?.let { localWorkFileSha256(it, path) }?.let { path to it }
+                workspaceRoot?.takeIf { isolatedWorkspace == null }?.let { localWorkFileSha256(it, path) }?.let { path to it }
             }.toMap() },
             approval = { normalized, tool, summary ->
                 approve(binding, normalized, summary, tool)

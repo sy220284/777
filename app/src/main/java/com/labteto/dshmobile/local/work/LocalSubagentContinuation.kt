@@ -12,6 +12,8 @@ import kotlinx.serialization.json.put
 
 internal const val LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT = "subagent/history-checkpoint"
 internal const val LOCAL_SUBAGENT_INBOX_CLAIM_EVENT = "subagent/inbox-claimed"
+/** Durable evidence: a model reply was returned after an exact Inbox message reached the submitted model input. */
+internal const val LOCAL_SUBAGENT_INBOX_MODEL_REPLY_EVENT = "subagent/inbox-model-reply"
 private const val LOCAL_SUBAGENT_HISTORY_CHECKPOINT_VERSION = 2
 private const val LOCAL_SUBAGENT_INBOX_CLAIM_VERSION = 1
 private const val MAX_CLAIMED_MESSAGE_IDS = 256

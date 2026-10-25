@@ -9,6 +9,45 @@ import com.labteto.dshmobile.local.LocalModelException
 import org.junit.Test
 
 class OpenAiResponsesStreamSnapshotTest {
+    @Test fun nonCompletedProviderStatesCannotAuthorizeAnOtherwiseValidToolCall() {
+        val client = OpenAiResponsesClient(okhttp3.OkHttpClient(), Json)
+        for (status in listOf("failed", "cancelled", "canceled", "queued", "in_progress")) {
+            val response = event("""{"status":"$status","output":[{"type":"function_call","call_id":"call-a","name":"write","arguments":"{}"}]}""")
+            val reply = client.parseCompleted(response, com.labteto.dshmobile.local.TokenPromptBreakdown())
+            assertEquals(LocalModelCompletionReason.INTERRUPTED, reply.completionReason)
+            assertEquals(emptyList<LocalToolCall>(), reply.toolCalls)
+        }
+        assertThrows(LocalModelException::class.java) {
+            client.parseCompleted(event("""{"status":"unknown-new-state","output":[]}"""),
+                com.labteto.dshmobile.local.TokenPromptBreakdown())
+        }
+    }
+
+    @Test fun completedSnapshotCannotResurrectOmittedToolsOrLongerPreviewText() {
+        val stream = OpenAiResponsesStreamSnapshot()
+        stream.record(event("""{"type":"response.output_text.delta","output_index":0,"content_index":0,"delta":"preview tail"}"""))
+        stream.record(event("""{"type":"response.output_item.done","output_index":1,"item":{"type":"function_call","id":"fc-old","call_id":"call-old","name":"write","arguments":"{}"}}"""))
+        val terminal = event("""{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"preview"}]}]}""")
+        assertEquals(terminal, stream.settledResponse(terminal))
+    }
+
+    @Test fun malformedTerminalOutputCannotTurnAStoredToolItemIntoAValidResponse() {
+        val stream = OpenAiResponsesStreamSnapshot()
+        stream.record(event("""{"type":"response.output_item.done","output_index":0,"item":{"type":"function_call","call_id":"call-old","name":"write","arguments":"{}"}}"""))
+        assertThrows(LocalModelException::class.java) {
+            stream.settledResponse(event("""{"status":"completed","output":"corrupt"}"""))
+        }
+    }
+
+    @Test fun explicitlyEmptyFinalTextDoesNotFallBackToPreviewContent() {
+        val terminal = event("""{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":""}]}]}""")
+        val failure = assertThrows(LocalModelException::class.java) {
+            OpenAiResponsesClient(okhttp3.OkHttpClient(), Json).parseCompleted(terminal,
+                com.labteto.dshmobile.local.TokenPromptBreakdown(), streamedContent = "preview", streamedReasoning = "preview thought")
+        }
+        assertEquals("MODEL_EMPTY_RESPONSE", failure.code)
+    }
+
     @Test
     fun missingDeltaIsRecoveredFromDoneWithoutRepeatingAlreadyReceivedText() {
         val stream = OpenAiResponsesStreamSnapshot()

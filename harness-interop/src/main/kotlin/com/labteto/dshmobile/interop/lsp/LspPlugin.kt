@@ -18,6 +18,9 @@ import com.labteto.dshmobile.harness.tools.functionToolSchema
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import com.labteto.dshmobile.runtime.ProcessIsolationContext
+import com.labteto.dshmobile.runtime.secureIsolatedProcessBuilder
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -84,6 +87,7 @@ class LspPlugin(
     private val installOnDemand: suspend (String?) -> List<String> = { emptyList() },
     private val managedStatus: () -> String = { "" },
     private val uninstallOnDemand: (String) -> Boolean = { false },
+    private val processReadRoots: () -> List<File> = { emptyList() },
 ) : HarnessPlugin {
     override val id = "local-language-server"
 
@@ -148,6 +152,7 @@ class LspPlugin(
         input: JsonObject,
         context: ToolContext,
     ): ToolResult {
+        val root = com.labteto.dshmobile.harness.capability.executionWorkspaceRoot(this.root)
         if (name == "lsp_uninstall_component") {
             val component = input["component"]?.jsonPrimitive?.contentOrNull.orEmpty()
             require(component in setOf("typescript", "pyright")) { "未知组件：仅支持 typescript、pyright" }
@@ -247,6 +252,7 @@ class LspPlugin(
         relativePath: String?,
         context: ToolContext,
     ): ClientHandle {
+        val root = com.labteto.dshmobile.harness.capability.executionWorkspaceRoot(this.root)
         val detected = runCatching { command(relativePath) }.getOrElse { error ->
             throw IllegalStateException("语言服务器自动检测失败：${error.message ?: error::class.java.simpleName}", error)
         }
@@ -272,7 +278,8 @@ class LspPlugin(
 
         val resolved = commandResolver(configured)
         require(resolved.isNotEmpty()) { "语言服务器解析后的命令不能为空" }
-        val key = resolved.joinToString("\\u0000")
+        val isolation = currentCoroutineContext()[ProcessIsolationContext] != null
+        val key = root.canonicalPath + "\u0000" + resolved.joinToString("\\u0000") + if (isolation) "\u0000isolated" else ""
         clients[key]?.let { cached ->
             if (cached.client.isLive()) return cached
             cached.client.close()
@@ -291,12 +298,22 @@ class LspPlugin(
             HarnessResourceKind.LANGUAGE_SERVER,
             owner = "lsp:" + resolved.firstOrNull().orEmpty(),
         )
+        val prepared = try {
+            currentCoroutineContext()[com.labteto.dshmobile.harness.agent.AgentBackendExecutionContext]?.requireCurrent()
+            currentCoroutineContext()[com.labteto.dshmobile.harness.agent.AgentRunExecutionContext]?.requireCurrent()
+            val trustedEnvironment = environment()
+            secureIsolatedProcessBuilder(ProcessBuilder(resolved).directory(root).apply {
+                environment().putAll(trustedEnvironment)
+            }, trustedEnvironment["PATH"].orEmpty().split(File.pathSeparatorChar).filter(String::isNotBlank).map(::File),
+                trustedEnvironment, processReadRoots())
+        } catch (failure: Exception) { lease?.close(); throw failure }
         val next = LspProcessClient(
-            command = configured,
+            command = prepared.command().toList(),
             json = json,
             workingDirectory = root,
-            commandResolver = commandResolver,
-            environmentProvider = environment,
+            commandResolver = { it },
+            environmentProvider = { prepared.environment().toMap() },
+            replaceEnvironment = isolation,
         )
         try {
             next.initialize(root.canonicalFile.toURI().toString())

@@ -21,7 +21,10 @@ internal fun resolveWorkGoalTransition(
         // The disposition itself is not a second Goal owner or a completion permission.
         val evidence = assessLocalWorkGoal(work.copy(goal = proposed),
             localWorkCompletionEvidence(work.copy(goal = proposed), deliveryEvidence)).evidence
-        if (proposed.status == "completed" && !evidence.readyForGoalCompletion) {
+        // Explicit Goal commands and autonomous GoalDriver share the same integration gate.
+        // This projection joins Team reviewer status with real tool/file/test evidence.
+        val integration = decideLocalWorkIntegration(evidence)
+        if (proposed.status == "completed" && !integration.readyForGoalAdmission) {
             rejectRuntimeStateTransition(
                 runtimeOwned,
                 "目标尚不能标记完成：" + evidence.userReasons.joinToString("；"),

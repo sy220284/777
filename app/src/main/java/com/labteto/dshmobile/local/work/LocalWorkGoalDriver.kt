@@ -114,6 +114,9 @@ internal fun driveLocalWorkGoalAfterTurn(
     }
     val evidence = localWorkCompletionEvidence(work,
         localWorkDeliveryEvidence(binding.eventLog, goal, workspaceRoot))
+    // Reuse the same evidence that the Goal command and final-reply guard consume.
+    // Reviewer approval cannot replace a missing file hash or failed real test result.
+    val integration = decideLocalWorkIntegration(evidence)
     val conditions = LocalWorkGoalFollowUpConditions(
         originalGoal = baseline,
         currentGoal = goal,
@@ -128,7 +131,8 @@ internal fun driveLocalWorkGoalAfterTurn(
         completedContinuations = binding.automaticContinuationCount,
     )
     val candidate = decideLocalWorkGoalDrive(conditions,
-        goal.artifactPaths.isNotEmpty() || goal.verificationCommands.isNotEmpty())
+        integration.readyForGoalAdmission &&
+            (goal.artifactPaths.isNotEmpty() || goal.verificationCommands.isNotEmpty()))
     val result = when (candidate) {
         LocalWorkGoalDriveResult.COMPLETED ->
             if (completeGoal(goal)) LocalWorkGoalDriveResult.COMPLETED else LocalWorkGoalDriveResult.STALE
@@ -145,6 +149,10 @@ internal fun driveLocalWorkGoalAfterTurn(
             put("goal_revision", goal.revision)
             put("source_run_id", sourceRunId)
             put("result", result.name.lowercase())
+            put("integration_disposition", integration.disposition.name.lowercase())
+            put("integration_review_pending", integration.reviewPendingCount)
+            put("integration_review_rejected", integration.reviewRejectedCount)
+            put("integration_machine_evidence_missing", integration.missingMachineEvidence.size)
             put("verification_level", when {
                 goal.artifactPaths.isNotEmpty() && goal.verificationCommands.isNotEmpty() -> "artifact_and_execution"
                 goal.artifactPaths.isNotEmpty() -> "artifact"

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.harness.agent.AgentRunExecutionContext
+import kotlinx.coroutines.currentCoroutineContext
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.local.LocalModelException
@@ -25,6 +27,17 @@ internal fun interface LocalModelAdmissionPort {
         request: LocalModelAdmissionRequest,
         block: suspend () -> LocalModelReply,
     ): LocalModelReply
+}
+
+/**
+ * E11 resource attribution: one actual model lease follows its original run slot
+ * without a new scheduler, database or duplicated activity counter. The active
+ * scheduler continues to own allocation and release.
+ */
+internal fun localAgentModelResourceOwner(runId: String?, slotId: String?): String {
+    val run = runId?.takeIf(String::isNotBlank) ?: return "model-request:unbound"
+    val slot = slotId?.takeIf(String::isNotBlank) ?: "unknown"
+    return "agent-model:${slot.take(64)}:${run.take(64)}"
 }
 
 /** Model-owned safety preflight that applies to every provider request, with or without Work. */
@@ -111,7 +124,13 @@ internal class LocalAgentModelRequestRuntime(
         val invokeProvider: suspend () -> LocalModelReply = {
             val scheduler = resourceScheduler
             if (scheduler != null) {
-                scheduler.withResource(HarnessResourceKind.MODEL_REQUEST) { completeProvider() }
+                val run = currentCoroutineContext()[AgentRunExecutionContext]
+                val owner = localAgentModelResourceOwner(
+                    run?.identity?.runId, run?.identity?.slotId,
+                )
+                scheduler.withResource(HarnessResourceKind.MODEL_REQUEST, owner = owner) {
+                    completeProvider()
+                }
             } else {
                 completeProvider()
             }

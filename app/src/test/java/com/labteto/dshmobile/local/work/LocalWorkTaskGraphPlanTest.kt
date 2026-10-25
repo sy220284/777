@@ -245,6 +245,32 @@ class LocalWorkTaskGraphPlanTest {
         assertEquals(jobId, jobs.snapshots().single { it.id == jobId }.id)
     }
 
+    @Test fun teamUserAuthorizationSupersessionPausesOnlySafelyRecoverableMembers() = runTest {
+        val log = LocalSessionEventLog(File(temporary.root, "team-root-epoch.jsonl"), Json)
+        val jobs = LocalJobManager(backgroundScope, onChanged = {})
+        val teamId = "job-team-root-safe"
+        assertTrue(jobs.startPersistentResult("团队只读成员", "subagent_readonly", "{}",
+            ownerSessionId = "session-a", continuable = true, requestedId = teamId) { _, _ ->
+            suspendWorkflowJobForNewUser(log, teamId, workflowNode = false,
+                allowMutation = false, teamManaged = true) {
+                throw LocalWorkflowSuperseded()
+            }
+        }.accepted)
+        runCurrent()
+        assertEquals("waiting_slice", jobs.snapshots().single { it.id == teamId }.status)
+
+        val ordinaryId = "job-ordinary-root-safe"
+        assertTrue(jobs.startPersistentResult("普通后台子代理", "subagent_readonly", "{}",
+            ownerSessionId = "session-a", continuable = true, requestedId = ordinaryId) { _, _ ->
+            suspendWorkflowJobForNewUser(log, ordinaryId, workflowNode = false,
+                allowMutation = false, teamManaged = false) {
+                throw LocalWorkflowSuperseded()
+            }
+        }.accepted)
+        runCurrent()
+        assertEquals("failed", jobs.snapshots().single { it.id == ordinaryId }.status)
+    }
+
     @Test fun newUserFenceInsidePersistedJobBecomesSafeSliceOnlyWithSafeContinuationEvidence() = runTest {
         val log = LocalSessionEventLog(File(temporary.root, "preempted-job.jsonl"), Json)
         val jobs = LocalJobManager(backgroundScope, onChanged = {})

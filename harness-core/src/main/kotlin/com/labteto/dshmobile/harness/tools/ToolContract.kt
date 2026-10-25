@@ -24,6 +24,8 @@ data class ToolMetadata(
     /** Explicit opt-in for concurrent pure reads. Never inferred from access alone. */
     val parallelReadSafe: Boolean = false,
     val workspaceAccess: ToolWorkspaceAccess = ToolWorkspaceAccess.NONE,
+    /** Audited short commit handlers must return their real receipt after caller cancellation. */
+    val finishesOnCancellation: Boolean = false,
 ) {
     init {
         require(family.isNotBlank()) { "工具能力族不能为空" }

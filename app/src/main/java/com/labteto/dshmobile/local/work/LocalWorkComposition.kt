@@ -47,6 +47,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /** WorkFeature composition owner for foreground turns, subagents and Work-owned built-ins. */
@@ -56,6 +57,7 @@ internal class LocalWorkComposition @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val modelGateway: LocalModelGateway,
+    backendRuntime: com.labteto.dshmobile.local.agent.LocalAgentBackendRuntime,
     private val auxiliaryModel: com.labteto.dshmobile.local.model.LocalAuxiliaryModelRequestRuntime,
     private val usageAnalytics: com.labteto.dshmobile.local.TokenUsageAnalyticsStore,
     mediaRuntime: Provider<LocalMediaCreationRuntime>,
@@ -117,7 +119,21 @@ internal class LocalWorkComposition @Inject constructor(
     private val subagentFactory by lazy {
         LocalSubagentRunnerFactory(
             modelGateway = modelGateway,
+            backendRuntime = backendRuntime,
+            captureToolBindings = tools.registry::captureBindings,
             teamSchemas = { tools.schemas.teamMemberSchemas() },
+            requireTeamRootAuthorization = { sessionId, jobId ->
+                agentTeams.requireCurrentRootAuthorization(sessionId, jobId)
+            },
+            requireTeamWorkspaceMutation = { sessionId, jobId, call ->
+                agentTeams.requireMemberWorkspaceMutation(
+                    sessionId, jobId, call, java.io.File(sessionStorage.files.workspace.path),
+                    tools.registry.get(
+                        com.labteto.dshmobile.local.tools.LocalToolPolicy.canonical(call.name),
+                    ),
+                )
+            },
+            nestedReadonlySchemas = { tools.schemas.nestedReadOnlySubagentSchemas() },
             executeTeamTool = { sessionId, jobId, call ->
                 AgentToolResult(agentTeams.executeMember(sessionId, jobId, call))
             },
@@ -151,6 +167,8 @@ internal class LocalWorkComposition @Inject constructor(
         LocalWorkSubagentRuntime(
             persistentJobs = persistentJobs,
             workspaceRoot = File(sessionStorage.files.workspace.path),
+            sourceWorkspace = sessionStorage.files.workspace,
+            createWorkspace = tools::forkAgentWorkspace,
             factory = subagentFactory,
             schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
                 tools.schemas.subagentSchemas(
@@ -173,6 +191,12 @@ internal class LocalWorkComposition @Inject constructor(
             json = json,
             modelGateway = modelGateway,
             webTools = tools.webTools,
+            webToolsForWorkspace = { sessionId, identity ->
+                val admission = tools.agentWorkspaces.operate(sessionId, "locate", buildJsonObject {
+                    put("workspace_id", identity)
+                })
+                tools.webTools.atRoot(File(admission.getValue("root").jsonPrimitive.content))
+            },
             currentSessionId = runtimeStateStore::currentSessionId,
             currentState = { runtimeStateStore.state.value },
             defaultHistory = runtimeStateStore.foregroundRunHandle.modelHistory::snapshot,
@@ -185,10 +209,17 @@ internal class LocalWorkComposition @Inject constructor(
                     ?: runtimeStateStore.foregroundRunHandle.modelHistory.snapshot()
                         .takeIf { runtimeStateStore.state.value.sessionId == sessionId }
             },
-            subagentRunner = { sessionId, boundState, history ->
+            createWorkspace = tools::forkAgentWorkspace,
+            resolveWorkspace = tools::resolveAgentWorkspace,
+            inspectWorkspace = { sessionId, identity ->
+                tools.agentWorkspaces.operate(sessionId, "status", buildJsonObject { put("workspace_id", identity) })
+            },
+            mergeWorkspace = tools::integrateAgentWorkspace,
+            subagentRunner = { sessionId, boundState, history, workspaceBinding ->
                 subagentFactory.createBound(
                     sessionId = sessionId,
                     boundState = boundState,
+                    executionWorkspaceGuidance = workspaceBinding?.guidance,
                     runKind = LocalAgentRunKind.SUBAGENT,
                     schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
                         tools.schemas.subagentSchemas(
@@ -221,6 +252,8 @@ internal class LocalWorkComposition @Inject constructor(
     )
     private val agentTeams: LocalAgentTeamRuntime by lazy {
         LocalAgentTeamRuntime(
+            roleWorkspace = sessionStorage.files.workspace,
+            pinBackend = backendRuntime::pin,
             jobs = runtimeStateStore.jobManager,
             startTeammate = {
                     binding,
@@ -231,8 +264,14 @@ internal class LocalWorkComposition @Inject constructor(
                     maxSteps,
                     context,
                     parentCallId,
+                    role,
                     grantedExtensions,
                 ->
+                val roleBinding = agentTeams.memberFrozenRole(binding.sessionId, requestedJobId)?.let {
+                    com.labteto.dshmobile.local.agent.decodeFrozenAgentRole(it).let { frozen ->
+                        frozen.copy(instructions = listOf(frozen.instructions, instructions).filter(String::isNotBlank).joinToString("\n\n"))
+                    }
+                } ?: com.labteto.dshmobile.local.agent.bindLocalAgentRole(role, instructions, parentMutationAllowed = true)
                 // 授权必须命中当前实际注册的扩展工具，不能静默丢弃或绕过设备/团队边界。
                 val unavailable = grantedExtensions.filter { name ->
                     name in SUBAGENT_EXCLUDED_TOOLS ||
@@ -255,33 +294,39 @@ internal class LocalWorkComposition @Inject constructor(
                 val activeOptional = defaultOptional + grantedExtensions
                 val exposed = tools.schemas.names(
                     tools.schemas.subagentSchemas(
-                        allowMutation = true,
+                        allowMutation = roleBinding.allowMutation,
                         allowVirtualScreen = false,
                         enabledOptional = activeOptional,
                     ),
                 ).toSet()
-                val missing = grantedExtensions - exposed
+                val roleExposed = roleBinding.toolAllowlist?.let { exposed.intersect(it) } ?: exposed
+                val missing = grantedExtensions - roleExposed
                 require(missing.isEmpty()) {
                     "TEAM_EXTENSION_NOT_EXPOSED：已授权工具未进入成员实际工具表（数量或上下文预算限制）：" +
                         missing.sorted().joinToString("、")
                 }
-                require("skill" !in tools.registry.names() || "skill" in exposed) {
+                require(roleBinding.toolAllowlist?.contains("skill") == false ||
+                    "skill" !in tools.registry.names() || "skill" in roleExposed) {
                     "TEAM_SKILL_NOT_EXPOSED：技能工具未进入成员实际工具表"
                 }
                 persistentJobs.startReadonlySubagentResult(
                     task = task,
-                    model = model,
+                    model = model ?: roleBinding.modelOverride,
                     maxSteps = maxSteps,
-                    instructions = instructions,
+                    instructions = roleBinding.instructions,
+                    toolAllowlist = roleBinding.toolAllowlist,
                     virtualScreen = false,
                     forkParentCallId =
                         parentCallId.takeIf { context == LocalTeamMemberContext.FORK },
+                    parentToolCallId = parentCallId,
                     sessionId = binding.sessionId,
                     boundState = binding.aggregateSnapshot(),
                     historySnapshot = binding.runHandle.modelHistory::snapshot,
                     requestedJobId = requestedJobId,
-                    allowMutation = true,
+                    allowMutation = roleBinding.allowMutation,
                     teamManaged = true,
+                    workspaceRepository = agentTeams.memberWorkspaceRepository(binding.sessionId, requestedJobId),
+                    backendCapabilities = agentTeams.memberBackendCapabilities(binding.sessionId, requestedJobId),
                     // 基础网络、后台任务与技能可用；敏感扩展只能由 Lead 按名称授权。
                     initialOptionalTools = activeOptional,
                 )
@@ -299,12 +344,13 @@ internal class LocalWorkComposition @Inject constructor(
         )
     }
     private val agentControlBuiltins by lazy {
-        LocalWorkAgentControlBuiltinRuntime(
+        LocalAgentControlPlane(
             jobs = runtimeStateStore.jobManager,
             modelGateway = modelGateway,
             subagents = subagents,
             persistentJobs = persistentJobs,
             teams = agentTeams,
+            skillWorkspace = sessionStorage.files.workspace,
         )
     }
     private val turnExecutor = LocalWorkAgentTurnExecutor(
@@ -345,7 +391,7 @@ internal class LocalWorkComposition @Inject constructor(
         },
         onRootExecutionSliceStarted = { binding ->
             persistentJobs.schedule(binding.sessionId, rootSliceAdmitted = true)
-            subagents.resumePendingWorkflows(binding)
+            agentControlBuiltins.resumePendingWorkflows(binding)
         },
     )
 

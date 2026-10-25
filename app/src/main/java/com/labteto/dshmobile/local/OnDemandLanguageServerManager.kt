@@ -36,6 +36,9 @@ internal class OnDemandLanguageServerManager(
 
     private val installationMutex = Mutex()
 
+    internal fun processReadRoots(): List<File> = Component.entries.map(::installedDirectory)
+        .filter(File::isDirectory)
+
     internal fun componentFor(path: String?): Component? {
         val extension = path?.substringAfterLast('/')?.substringAfterLast('.', "")?.lowercase()
         return when (extension) {

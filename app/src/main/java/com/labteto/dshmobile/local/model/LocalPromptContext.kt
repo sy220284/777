@@ -55,6 +55,7 @@ internal fun withTailEphemeralContext(
     if (context.isBlank()) return history
     val insertion = buildJsonObject {
         put("role", "system")
+        put(LOCAL_INSTRUCTION_SCOPE, LocalInstructionScope.TURN.name)
         put("content", truncateWithoutSplittingSurrogatePair(context, MAX_EPHEMERAL_CONTEXT_CHARS))
     }
     val result = history.toMutableList()
@@ -73,6 +74,7 @@ internal fun withEphemeralContext(
     if (context.isBlank()) return history
     val insertion = buildJsonObject {
         put("role", "system")
+        put(LOCAL_INSTRUCTION_SCOPE, LocalInstructionScope.TURN.name)
         put("content", truncateWithoutSplittingSurrogatePair(context, MAX_EPHEMERAL_CONTEXT_CHARS))
     }
     val index = if (

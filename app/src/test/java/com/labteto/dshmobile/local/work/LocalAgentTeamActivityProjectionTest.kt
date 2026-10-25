@@ -74,14 +74,37 @@ class LocalAgentTeamActivityProjectionTest {
             team,
             jobs = listOf(
                 LocalJobInfo("job-1", "researcher", "dormant", isAgent = true),
-                LocalJobInfo("job-2", "writer", "running", isAgent = true),
+                LocalJobInfo("job-2", "writer", "waiting_slice", isAgent = true),
             ),
         )
 
-        assertEquals(LocalTeamMemberActivity.DORMANT, projection.members[0].activity)
+        assertEquals(LocalTeamMemberActivity.IDLE, projection.members[0].activity)
         assertEquals(LocalTeamMemberActivity.BLOCKED, projection.members[1].activity)
     }
 
+
+    @Test
+    fun completedTurnIsIdleWhileMemberIdentityRemainsActive() {
+        val active = LocalTeamMemberPhase.ACTIVE
+        assertEquals(LocalTeamMemberActivity.IDLE, projectTeamMemberActivity(active, "completed"))
+        assertEquals(LocalTeamMemberActivity.IDLE, projectTeamMemberActivity(active, "dormant"))
+        assertEquals(LocalTeamMemberActivity.RUNNING, projectTeamMemberActivity(active, "running"))
+        assertEquals(LocalTeamMemberActivity.STOPPING, projectTeamMemberActivity(active, "stopping"))
+        assertEquals(LocalTeamMemberActivity.WAITING, projectTeamMemberActivity(active, "waiting_slice"))
+        assertEquals(LocalTeamMemberActivity.RUNNING,
+            projectTeamMemberActivity(active, "running", blockedTask = true))
+        assertEquals(LocalTeamMemberPhase.ACTIVE, active)
+    }
+
+    @Test
+    fun explicitShutdownAndFailuresOverrideStaleChildJobState() {
+        assertEquals(LocalTeamMemberActivity.DISABLED,
+            projectTeamMemberActivity(LocalTeamMemberPhase.DISABLED, "running"))
+        assertEquals(LocalTeamMemberActivity.DISMISSED,
+            projectTeamMemberActivity(LocalTeamMemberPhase.DISMISSED, "completed"))
+        assertEquals(LocalTeamMemberActivity.FAILED,
+            projectTeamMemberActivity(LocalTeamMemberPhase.ACTIVE, "killed"))
+    }
     private fun member(id: String, jobId: String, name: String) = LocalTeamMemberSnapshot(
         id = id,
         jobId = jobId,

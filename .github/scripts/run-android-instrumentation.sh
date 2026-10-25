@@ -32,6 +32,16 @@ fi
 component="${1:-com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner}"
 result_file="${2:-.ci/android-instrumentation-result.txt}"
 mkdir -p "$(dirname "$result_file")"
+capture_failure() {
+  local status=$?
+  if (( status != 0 )); then
+    # AndroidJUnitRunner cannot report an exception after its own process dies.
+    # Keep the platform crash stack and exit reason in this job's failure log.
+    adb logcat -d -v threadtime -b crash >&2 || true
+    adb shell dumpsys activity exit-info com.sy220284.dshmobile.debug >&2 || true
+  fi
+}
+trap capture_failure EXIT
 adb shell am instrument -w -r "$component" | tr -d '\r' | tee "$result_file"
 # Native timeline captures are written by instrumentation after its assertions.
 # Collect before the emulator exits; the original test result remains authoritative.

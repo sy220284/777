@@ -31,13 +31,16 @@ internal object LocalShellTool {
             if (background) MAX_BACKGROUND_TIMEOUT_SECONDS else MAX_FOREGROUND_TIMEOUT_SECONDS,
         )
 
+        val isolation = kotlinx.coroutines.currentCoroutineContext()[com.labteto.dshmobile.runtime.ProcessIsolationContext]
         return if (background) {
             ToolResult(jobs.start(
                 label = "后台命令",
                 expectedDurationMillis = timeout * 1_000L,
                 ownerSessionId = ownerSessionId,
             ) { _, report ->
-                workspace.shell(command, timeout, report, throwOnFailure = true)
+                kotlinx.coroutines.withContext(isolation ?: kotlin.coroutines.EmptyCoroutineContext) {
+                    workspace.shell(command, timeout, report, throwOnFailure = true)
+                }
             })
         } else {
             workspace.shellResult(command, timeout)

@@ -3,8 +3,11 @@ package com.labteto.dshmobile.local.work
 import com.labteto.dshmobile.harness.session.SessionEvent
 import com.labteto.dshmobile.harness.workflow.TaskGraphTopology
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.MAX_BLOCKERS
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.MAX_DESCRIPTION_CHARS
@@ -16,7 +19,10 @@ import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MEMBER_EVENT
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_DISCARDED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_QUEUED
+import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_ACKNOWLEDGED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_TASK_EVENT
+import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_TASK_REVIEW_EVENT
+import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_SHUTDOWN_RESPONSE
 import com.labteto.dshmobile.local.work.LocalAgentTeamEventCodec.decodeMember
 import com.labteto.dshmobile.local.work.LocalAgentTeamEventCodec.decodeMessage
 import com.labteto.dshmobile.local.work.LocalAgentTeamEventCodec.decodeTask
@@ -55,6 +61,53 @@ internal object LocalAgentTeamReducer {
                         tasks = state.tasks.filterNot { it.id == task.id } + task,
                     )
                 }
+                TEAM_TASK_REVIEW_EVENT -> {
+                    validateTeamEnvelope(event.data)
+                    val data = event.data["review"] as? kotlinx.serialization.json.JsonObject
+                        ?: error("TEAM_TASK_REVIEW_EVENT_INVALID")
+                    val taskId = data["taskId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_TASK_REVIEW_TASK_REQUIRED")
+                    val revision = data["taskRevision"]?.jsonPrimitive?.intOrNull
+                        ?: error("TEAM_TASK_REVIEW_REVISION_REQUIRED")
+                    val taskResultId = data["taskResultId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_TASK_REVIEW_RESULT_REQUIRED")
+                    val reviewerId = data["reviewerId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_TASK_REVIEW_MEMBER_REQUIRED")
+                    val reviewResultId = data["reviewResultId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_TASK_REVIEW_EVIDENCE_REQUIRED")
+                    val reviewSeq = data["reviewEvidenceSequence"]?.jsonPrimitive?.longOrNull
+                        ?: error("TEAM_TASK_REVIEW_SEQUENCE_REQUIRED")
+                    val verdict = data["verdict"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_TASK_REVIEW_VERDICT_REQUIRED")
+                    val reason = data["reason"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                    val task = state.tasks.singleOrNull { it.id == taskId }
+                        ?: error("TEAM_TASK_REVIEW_TASK_NOT_FOUND")
+                    require(task.revision == revision && task.status == LocalTeamTaskStatus.COMPLETED &&
+                        task.completionResultId == taskResultId && task.completionEvidenceSequence != null) {
+                        "TEAM_TASK_REVIEW_STALE"
+                    }
+                    val reviewer = state.members.singleOrNull { it.id == reviewerId }
+                        ?: error("TEAM_TASK_REVIEW_MEMBER_NOT_FOUND")
+                    require(reviewer.id != task.ownerId && reviewer.phase == LocalTeamMemberPhase.ACTIVE &&
+                        isQualifiedIndependentReviewRole(reviewer.role)) {
+                        "TEAM_TASK_REVIEW_INDEPENDENT_MEMBER_REQUIRED"
+                    }
+                    require(reviewSeq > task.completionEvidenceSequence!! &&
+                        reviewSeq < event.sequence && reviewResultId.isNotBlank()) {
+                        "TEAM_TASK_REVIEW_EVIDENCE_ORDER_INVALID"
+                    }
+                    require(verdict in setOf("approve", "reject") &&
+                        reason.isNotBlank() &&
+                        reason.toByteArray(Charsets.UTF_8).size <= LocalAgentTeamContract.MAX_ERROR_CHARS) {
+                        "TEAM_TASK_REVIEW_VERDICT_INVALID"
+                    }
+                    require(state.taskReviews.none { it.taskId == taskId && it.taskRevision == revision }) {
+                        "TEAM_TASK_REVIEW_DUPLICATE"
+                    }
+                    advanced.copy(taskReviews = state.taskReviews +
+                        LocalTeamTaskReviewSnapshot(taskId, revision, taskResultId, reviewerId,
+                            reviewResultId, reviewSeq, verdict, reason))
+                }
                 TEAM_MESSAGE_QUEUED -> {
                     val message = decodeMessage(event.data)
                     require(state.pendingMessages.none { it.id == message.id }) {
@@ -84,7 +137,72 @@ internal object LocalAgentTeamReducer {
                     ) {
                         "TEAM_MAILBOX_LIMIT：" + message.targetId
                     }
-                    advanced.copy(pendingMessages = state.pendingMessages + message)
+                    advanced.copy(
+                        pendingMessages = state.pendingMessages + message,
+                        shutdownRequests = if (message.kind == LocalTeamMessageKind.SHUTDOWN_REQUEST) {
+                            state.shutdownRequests + LocalTeamShutdownRequestSnapshot(message.id, message.targetId)
+                        } else state.shutdownRequests,
+                    )
+                }
+                TEAM_SHUTDOWN_RESPONSE -> {
+                    validateTeamEnvelope(event.data)
+                    val requestId = event.data["requestId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_SHUTDOWN_REQUEST_ID_REQUIRED")
+                    val memberId = event.data["memberId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_SHUTDOWN_MEMBER_ID_REQUIRED")
+                    val approved = event.data["approved"]?.jsonPrimitive?.booleanOrNull
+                        ?: error("TEAM_SHUTDOWN_APPROVE_REQUIRED")
+                    val reason = event.data["reason"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                    require(reason.length <= MAX_MESSAGE_BYTES) { "TEAM_SHUTDOWN_REASON_TOO_LARGE" }
+                    require(approved || reason.isNotBlank()) { "TEAM_SHUTDOWN_REJECT_REASON_REQUIRED" }
+                    require(state.shutdownRequests.any {
+                        it.requestId == requestId && it.targetId == memberId
+                    }) { "TEAM_SHUTDOWN_REQUEST_TARGET_MISMATCH" }
+                    require(requestId in state.deliveredMessageIds) {
+                        "TEAM_SHUTDOWN_REQUEST_NOT_DELIVERED"
+                    }
+                    require(state.members.any {
+                        it.id == memberId && it.phase == LocalTeamMemberPhase.ACTIVE
+                    }) { "TEAM_SHUTDOWN_MEMBER_NOT_ACTIVE" }
+                    require(state.shutdownResponses.none { it.requestId == requestId }) {
+                        "TEAM_SHUTDOWN_RESPONSE_DUPLICATE"
+                    }
+                    advanced.copy(shutdownResponses = state.shutdownResponses +
+                        LocalTeamShutdownResponseSnapshot(requestId, memberId, approved, reason))
+                }
+                TEAM_MESSAGE_ACKNOWLEDGED -> {
+                    validateTeamEnvelope(event.data)
+                    val id = event.data["messageId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_MESSAGE_ACK_ID_REQUIRED")
+                    require(id.matches(Regex("team-msg-[a-zA-Z0-9_-]{1,64}"))) {
+                        "TEAM_MESSAGE_ACK_ID_INVALID"
+                    }
+                    val memberId = event.data["memberId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_MESSAGE_ACK_MEMBER_REQUIRED")
+                    val outcome = event.data["outcome"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_MESSAGE_ACK_OUTCOME_REQUIRED")
+                    require(outcome in setOf("handled", "cannot_handle")) {
+                        "TEAM_MESSAGE_ACK_OUTCOME_INVALID"
+                    }
+                    val reason = event.data["reason"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                    require(reason.toByteArray(Charsets.UTF_8).size <= LocalAgentTeamContract.MAX_ERROR_CHARS) {
+                        "TEAM_MESSAGE_ACK_REASON_TOO_LONG"
+                    }
+                    require(outcome != "cannot_handle" || reason.isNotBlank()) {
+                        "TEAM_MESSAGE_ACK_REASON_REQUIRED"
+                    }
+                    require(id in state.deliveredMessageIds &&
+                        state.deliveredMessageTargets[id] == memberId) {
+                        "TEAM_MESSAGE_ACK_WRONG_RECIPIENT"
+                    }
+                    require(state.members.any {
+                        it.id == memberId && it.phase == LocalTeamMemberPhase.ACTIVE
+                    }) { "TEAM_MESSAGE_ACK_MEMBER_NOT_ACTIVE" }
+                    require(state.messageAcknowledgements.none { it.messageId == id }) {
+                        "TEAM_MESSAGE_ACK_DUPLICATE"
+                    }
+                    advanced.copy(messageAcknowledgements = state.messageAcknowledgements +
+                        LocalTeamMessageAckSnapshot(id, memberId, outcome, reason))
                 }
                 TEAM_MESSAGE_DELIVERED -> {
                     validateTeamEnvelope(event.data)
@@ -106,6 +224,7 @@ internal object LocalAgentTeamReducer {
                     advanced.copy(
                         pendingMessages = state.pendingMessages.filterNot { it.id == id },
                         deliveredMessageIds = state.deliveredMessageIds + id,
+                        deliveredMessageTargets = state.deliveredMessageTargets + (id to targetId),
                     )
                 }
                 TEAM_MESSAGE_DISCARDED -> {
@@ -154,6 +273,21 @@ internal object LocalAgentTeamReducer {
                         next.members.firstOrNull { it.id == message.targetId }?.name,
                     )
                 }
+                TEAM_SHUTDOWN_RESPONSE -> LocalAgentTeamActivityUiState(
+                    event.sequence, "message", "成员关闭请求已有结构化回复",
+                    if (event.data["approved"]?.jsonPrimitive?.booleanOrNull == true) "approved" else "rejected",
+                    next.members.firstOrNull {
+                        it.id == event.data["memberId"]?.jsonPrimitive?.contentOrNull
+                    }?.name,
+                )
+                TEAM_MESSAGE_ACKNOWLEDGED -> LocalAgentTeamActivityUiState(
+                    event.sequence, "message",
+                    "成员显式声明消息处理结果（非任务完成证明）",
+                    event.data["outcome"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                    next.members.firstOrNull {
+                        it.id == event.data["memberId"]?.jsonPrimitive?.contentOrNull
+                    }?.name,
+                )
                 TEAM_MESSAGE_DELIVERED -> LocalAgentTeamActivityUiState(
                     event.sequence, "message", "", "delivered",
                     next.members.firstOrNull {
@@ -181,7 +315,16 @@ internal object LocalAgentTeamReducer {
         next: LocalTeamMemberSnapshot,
     ) {
         require(next.id.isNotBlank() && next.jobId == teamJobId(next.id)) { "TEAM_MEMBER_ID_INVALID" }
+        require(next.phase == LocalTeamMemberPhase.PROVISIONING || next.provisionalNewJob == null) {
+            "TEAM_MEMBER_PROVISIONAL_INTENT_OUTSIDE_ADMISSION"
+        }
         require(next.name.isNotBlank()) { "TEAM_MEMBER_NAME_INVALID" }
+        next.frozenRole?.let { frozen ->
+            require(com.labteto.dshmobile.local.agent.decodeFrozenAgentRole(frozen).role.wireName == next.role) {
+                "TEAM_MEMBER_ROLE_BINDING_CHANGED"
+            }
+        }
+        require(next.workspaceRepository == null || next.workspaceRepository.isNotBlank()) { "TEAM_MEMBER_WORKSPACE_INVALID" }
         val byName = members.firstOrNull { it.name == next.name && it.id != next.id }
         require(byName == null) { "TEAM_MEMBER_NAME_CONFLICT：" + next.name }
         val previous = members.firstOrNull { it.id == next.id }
@@ -194,7 +337,7 @@ internal object LocalAgentTeamReducer {
         require(
             previous.name == next.name &&
                 previous.provider == next.provider &&
-                previous.context == next.context
+                previous.context == next.context && previous.workspaceRepository == next.workspaceRepository && previous.backendBinding == next.backendBinding && previous.frozenRole == next.frozenRole
         ) {
             "TEAM_MEMBER_IMMUTABLE_FIELDS_CHANGED：" + next.id
         }
@@ -239,6 +382,45 @@ internal object LocalAgentTeamReducer {
             "TEAM_TASK_BLOCKER_DUPLICATE"
         }
         require(next.writeScopes.size <= MAX_WRITE_SCOPES) { "TEAM_TASK_WRITE_SCOPE_LIMIT" }
+        require((next.completionResultId == null) == (next.completionEvidenceSequence == null)) {
+            "TEAM_TASK_COMPLETION_EVIDENCE_PAIR_REQUIRED"
+        }
+        require(next.completionEvidenceSequence == null ||
+            (next.status == LocalTeamTaskStatus.COMPLETED && next.completionEvidenceSequence >= 0L &&
+                !next.completionResultId.isNullOrBlank())) {
+            "TEAM_TASK_COMPLETION_EVIDENCE_INVALID"
+        }
+        if (previous?.status == LocalTeamTaskStatus.COMPLETED &&
+            next.status == LocalTeamTaskStatus.COMPLETED) {
+            require(previous.completionResultId == next.completionResultId &&
+                previous.completionEvidenceSequence == next.completionEvidenceSequence) {
+                "TEAM_TASK_COMPLETION_EVIDENCE_IMMUTABLE"
+            }
+        }
+        require(next.rootUserRevision == null || next.rootUserRevision >= -1L) {
+            "TEAM_TASK_USER_REVISION_INVALID"
+        }
+        require(next.autoDispatchMessageId == null ||
+            (next.status == LocalTeamTaskStatus.IN_PROGRESS && next.ownerId != null)) {
+            "TEAM_TASK_AUTO_DISPATCH_STATE_INVALID"
+        }
+        // Same owner cannot silently renew root authority by editing the task or its description.
+        if (previous?.status == LocalTeamTaskStatus.IN_PROGRESS &&
+            next.status == LocalTeamTaskStatus.IN_PROGRESS && next.ownerId == previous.ownerId) {
+            require(next.rootUserRevision == previous.rootUserRevision) {
+                "TEAM_TASK_ROOT_AUTHORITY_IMMUTABLE"
+            }
+        }
+        if (next.autoDispatchMessageId != null && previous != null) {
+            require(
+                next.autoDispatchMessageId == previous.autoDispatchMessageId ||
+                    (previous.status == LocalTeamTaskStatus.PENDING &&
+                        previous.autoDispatchMessageId == null)
+            ) { "TEAM_TASK_AUTO_DISPATCH_REPLACED" }
+            if (next.autoDispatchMessageId == previous.autoDispatchMessageId) {
+                require(next.ownerId == previous.ownerId) { "TEAM_TASK_AUTO_OWNER_CHANGED" }
+            }
+        }
         if (previous == null) {
             require(next.status == LocalTeamTaskStatus.PENDING && next.ownerId == null) {
                 "TEAM_TASK_MUST_START_PENDING：" + next.id
