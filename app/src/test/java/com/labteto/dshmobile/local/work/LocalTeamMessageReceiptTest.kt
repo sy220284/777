@@ -117,6 +117,40 @@ class LocalTeamMessageReceiptTest {
         assertFalse(receipt.render().contains("completion_status=completed"))
     }
 
+    @Test fun outOfOrderReplyCannotClaimModelProcessingBeforeClaimCheckpoint() {
+        val preCheckpointReply = projectLocalTeamMessageReceipt(
+            id, listOf(queued(1), delivered(2), modelReply(3, jobId),
+                checkpoint(4, jobId)), true, sessionId,
+        )
+        assertEquals("checkpointed_in_model_history", preCheckpointReply.status)
+        assertEquals(null, preCheckpointReply.modelReplySequence)
+        val unrecordedDelivery = projectLocalTeamMessageReceipt(
+            id, listOf(queued(1), checkpoint(2, jobId), modelReply(3, jobId)),
+            true, sessionId,
+        )
+        assertEquals("checkpointed_in_model_history", unrecordedDelivery.status)
+        assertEquals(null, unrecordedDelivery.modelReplySequence)
+    }
+
+    @Test fun wrongRecipientAndPrematureDeliveryNeverBecomeInboxAcceptance() {
+        val foreignTargetDelivery = event(2, LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED,
+            buildJsonObject {
+                put("version", 2); put("teamId", sessionId)
+                put("messageId", id); put("targetId", "member-foreign")
+            })
+        val wrong = projectLocalTeamMessageReceipt(
+            id, listOf(queued(1), foreignTargetDelivery), true, sessionId,
+        )
+        assertEquals("queued", wrong.status)
+        assertEquals(null, wrong.deliveredSequence)
+        val earlier = projectLocalTeamMessageReceipt(
+            id, listOf(delivered(1), queued(2), checkpoint(3, jobId),
+                modelReply(4, jobId)), true, sessionId,
+        )
+        assertEquals("checkpointed_in_model_history", earlier.status)
+        assertEquals(null, earlier.modelReplySequence)
+    }
+
     @Test fun unaffiliatedReplyOrMissingHistoryCannotUpgradeDelivery() {
         val wrongJob = projectLocalTeamMessageReceipt(
             id,
