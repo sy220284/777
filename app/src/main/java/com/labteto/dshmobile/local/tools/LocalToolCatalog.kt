@@ -215,7 +215,8 @@ object LocalToolCatalog {
         add(tool("subagent", "统一的只读子代理入口：可隔离执行或继承当前对话上下文，同一工具块中多个调用可并行；始终禁止写入。需带写入权限的子代理仍须使用独立授权的 subagent_fork", properties(
             "task" to string("交给子代理的完整任务"),
             "instructions" to string("可选；该子代理持续遵循的工作规则，不会扩大工具或权限"),
-            "role" to string("专业角色：general、explore、plan、verify、review；只读入口不能选择 execute 或 integrate"),
+            "role" to string("专业角色：general、explore、plan、verify、review、security、qa、doc；只读入口不能选择 execute 或 integrate"),
+            "skill_ids" to stringArray("可选；从本地已安装技能中选最多 3 个并冻结内容指纹；技能只提供方法，不授予工具权限"),
             "context_mode" to buildJsonObject {
                 put("type", "string")
                 put("description", "isolated 只传任务（默认）；inherit 前台只读继承父会话历史，不能与后台或虚拟屏共用")
@@ -234,10 +235,12 @@ object LocalToolCatalog {
         add(tool("subagent_fork", "需要继承父会话当前操作权限时使用的高级代理入口；可能具有写入权限。纯阅读分析请使用 subagent 的 context_mode=inherit", properties(
             "task" to string("需要结合当前上下文处理的任务"),
             "instructions" to string("可选；继承上下文之外，额外约束该子代理持续遵循的工作规则"),
-            "role" to string("专业角色：general、explore、plan、execute、verify、review、integrate；只读角色会收窄实际工具权限"),
+            "role" to string("专业角色：general、explore、plan、execute、verify、review、integrate、security、qa、doc；只读角色收窄权限"),
+            "skill_ids" to stringArray("可选；子代理调用前从本地技能仓库冻结最多 3 个 SKILL.md 版本，不能扩大实际工具授权"),
             "output_schema" to jsonSchemaObject("可选；要求子代理最终只返回符合该 JSON Schema 的对象"),
             "allowed_tools" to stringArray("可选；限制 fork 子代理可见且可执行的工具名"),
         ), listOf("task")))
+        add(tool("list_agent_roles", "返回本地版本化 AgentRoleProfile、交付约束和工具意图；角色不能提高用户授权，读取目录不执行工具", properties()))
         add(tool("list_subagent_models", "查看本机所有模型配置、凭据就绪状态、协议、模型能力及可用的子代理 profileId；可选向官方服务商查询该账户的模型目录，密钥始终由应用代管且不会输出", properties(
             "include_provider_models" to boolean("是否使用已保存凭据查询指定服务商官方 /models 接口；默认 false，不会在普通清单请求时联网"),
             "profile_id" to string("需要查询的已保存模型 profileId；联网查询时必填"),
@@ -317,7 +320,7 @@ object LocalToolCatalog {
         ), listOf("target")))
         add(tool("team_create_member", "只创建稳定 Team 成员身份，不立即启动模型执行；后续用 team_start_member 派活", properties(
             "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
-            "role" to string("可选；固定专业身份 general/explore/plan/execute/verify/review/integrate，恢复时保持不变，verify/review 为只读工具权限"),
+            "role" to string("可选；固定专业身份 general/explore/plan/execute/verify/review/integrate/security/qa/doc，恢复时保持不变，verify/review 为只读工具权限"),
             "description" to string("可选；职责说明"),
             "display_name" to string("可选；用户界面展示的中文成员名称"),
             "context" to buildJsonObject {
@@ -337,7 +340,7 @@ object LocalToolCatalog {
         ), listOf("target", "task")))
         add(tool("team_spawn", "创建具备持久身份、角色约束、授权工具和可选扩展的团队助手；只读角色禁止写入", properties(
             "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
-            "role" to string("可选；固定专业身份 general/explore/plan/execute/verify/review/integrate，verify/review 为只读；旧成员默认 general"),
+            "role" to string("可选；固定专业身份 general/explore/plan/execute/verify/review/integrate/security/qa/doc，verify/review 为只读；旧成员默认 general"),
             "description" to string("可选；职责说明"),
             "display_name" to string("可选；用户界面展示的中文成员名称"),
             "task" to string("首个任务"),
