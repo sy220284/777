@@ -38,12 +38,18 @@ internal class LocalAgentLifecycleController(
     private val registry: LocalAgentRegistry,
 ) {
     fun inspect(sessionId: String, agentId: String): String {
-        val registration = registry.resolveStandalone(sessionId, agentId)
+        val view = registry.observeStandalone(sessionId, agentId)
+        val registration = view.registration
         val info = registration.info
         val snapshot = registration.snapshot
         return buildString {
             append("agent_id=").append(info.id)
             append("\nstatus=").append(info.status)
+            append("\nruntime_residency=").append(view.residency.name.lowercase())
+            view.recordedParent?.let { parent ->
+                append("\nrecorded_parent_run=").append(parent.parentRunId)
+                append("\nrecorded_parent_slot=").append(parent.parentSlotId)
+            }
             append("\nowner_session=").append(sessionId)
             append("\ncontinuable=").append(info.continuable)
             append("\npending_messages=").append(info.pendingMessageCount)
