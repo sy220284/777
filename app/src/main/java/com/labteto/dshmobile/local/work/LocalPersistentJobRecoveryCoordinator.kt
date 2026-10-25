@@ -477,6 +477,9 @@ internal class LocalPersistentJobRecoveryCoordinator(
             decodeLocalAgentParentLink(raw as? JsonObject
                 ?: error("AGENT_PARENT_LINK_INVALID"))
         }
+        require(parentLink == null || parentLink.sessionId == sessionId) {
+            "AGENT_PARENT_SESSION_MISMATCH：恢复子代理的持久父节点不属于目标会话"
+        }
         val workflowFence = payload["workflow_fence"] as? JsonObject
         if (workflowFence != null) {
             try { requireWorkflowFenceCurrent(sessionId, workflowFence) }
