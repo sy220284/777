@@ -217,6 +217,7 @@ object LocalToolCatalog {
             "instructions" to string("可选；该子代理持续遵循的工作规则，不会扩大工具或权限"),
             "role" to string("专业角色：general、explore、plan、verify、review、security、qa、doc；只读入口不能选择 execute 或 integrate"),
             "skill_ids" to stringArray("可选；从本地已安装技能中选最多 3 个并冻结内容指纹；技能只提供方法，不授予工具权限"),
+            "execution_backend" to string("执行后端：in_process（可执行，默认）；isolated_process/trusted_remote 仅有安全协议，未配置可信执行端时启动前拒绝"),
             "context_mode" to buildJsonObject {
                 put("type", "string")
                 put("description", "isolated 只传任务（默认）；inherit 前台只读继承父会话历史，不能与后台或虚拟屏共用")
@@ -237,6 +238,7 @@ object LocalToolCatalog {
             "instructions" to string("可选；继承上下文之外，额外约束该子代理持续遵循的工作规则"),
             "role" to string("专业角色：general、explore、plan、execute、verify、review、integrate、security、qa、doc；只读角色收窄权限"),
             "skill_ids" to stringArray("可选；子代理调用前从本地技能仓库冻结最多 3 个 SKILL.md 版本，不能扩大实际工具授权"),
+            "execution_backend" to string("执行后端：in_process（可执行，默认）；isolated_process/trusted_remote 仅有安全协议，未配置可信执行端时启动前拒绝"),
             "output_schema" to jsonSchemaObject("可选；要求子代理最终只返回符合该 JSON Schema 的对象"),
             "allowed_tools" to stringArray("可选；限制 fork 子代理可见且可执行的工具名"),
         ), listOf("task")))
