@@ -126,7 +126,7 @@ internal class LocalSubagentRunner(
     private val newNestedRunner: (() -> LocalSubagentRunner)? = null,
     private val executeTeamTool: (suspend (String, LocalToolCall) -> AgentToolResult)? = null,
     private val requireTeamRootAuthorization: ((String) -> Unit)? = null,
-    private val requireTeamWorkspaceMutation: ((String, LocalToolCall) -> Unit)? = null,
+    private val requireTeamWorkspaceMutation: (suspend (String, LocalToolCall) -> Unit)? = null,
     private val spillToolOutput: (String, String) -> Boolean = { _, _ -> false },
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
     private val resolveImageMode: (LocalImageInputMode, String, String) -> LocalImageInputMode,
@@ -248,6 +248,9 @@ internal class LocalSubagentRunner(
         val task = spec.task
         val instructions = spec.instructions
         val capabilities: LocalSubagentCapabilities = spec.capabilities
+        require(!capabilities.workflowManaged || currentCoroutineContext()[LocalWorkflowExecutionFence] != null) {
+            "WORKFLOW_EXECUTION_FENCE_REQUIRED"
+        }
         val inheritHistory = capabilities.historyMode == LocalSubagentHistoryMode.INHERIT_PARENT
         val allowMutation = capabilities.allowMutation
         val backgroundJobId = spec.backgroundJobId

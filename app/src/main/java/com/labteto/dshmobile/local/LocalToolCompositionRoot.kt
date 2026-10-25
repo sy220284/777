@@ -27,6 +27,7 @@ import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
@@ -65,6 +66,14 @@ internal class LocalToolCompositionRoot @Inject constructor(
     )
     internal val agentWorkspaces = com.labteto.dshmobile.runtime.GitWorkspaceRuntime(File(workspace.path), process)
 
+    internal suspend fun resolveAgentWorkspace(sessionId: String, identity: String): com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext {
+        val admission = agentWorkspaces.operate(sessionId, "locate", buildJsonObject { put("workspace_id", identity) })
+        return com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext(
+            File(workspace.path), workspace.atRoot(File(admission.getValue("root").jsonPrimitive.content)), identity,
+            File(admission.getValue("source").jsonPrimitive.content),
+        )
+    }
+
     internal suspend fun forkAgentWorkspace(sessionId: String, invocationId: String, repository: String): kotlinx.serialization.json.JsonObject {
         val tool = requireNotNull(registry.get("workspace_fork")) { "工作区运行时未启用" }
         val lease = workspaceGate.acquire(tool)
@@ -75,6 +84,21 @@ internal class LocalToolCompositionRoot @Inject constructor(
         } finally {
             lease?.close()
         }
+    }
+
+    internal suspend fun integrateAgentWorkspace(
+        sessionId: String, identity: String, tree: String, allowedPaths: List<String>, beforeCommit: suspend () -> Unit,
+    ): kotlinx.serialization.json.JsonObject {
+        val tool = requireNotNull(registry.get("workspace_merge")) { "工作区运行时未启用" }
+        val lease = workspaceGate.acquire(tool)
+        try {
+            check(registry.get("workspace_merge") === tool) { "工作区运行时已更新" }
+            beforeCommit()
+            return agentWorkspaces.operate(sessionId, "merge", buildJsonObject {
+                put("workspace_id", identity); put("expected_tree", tree)
+                put("allowed_paths", kotlinx.serialization.json.JsonArray(allowedPaths.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+            })
+        } finally { lease?.close() }
     }
     private val preferences = LocalHarnessPreferences.from(context)
     private val languageServerComponents = OnDemandLanguageServerManager(

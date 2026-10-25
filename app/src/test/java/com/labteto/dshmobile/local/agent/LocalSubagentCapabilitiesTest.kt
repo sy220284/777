@@ -10,6 +10,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalSubagentCapabilitiesTest {
+    @Test fun writableGraphHasItsOwnPersistentCapabilityAndDoesNotPretendToBeTeam() {
+        val capabilities = buildLocalDelegationCapabilities(LocalAgentDelegationKind.WORKFLOW_NODE, allowMutation = true)
+        val accepted = launch(capabilities)
+        assertEquals(accepted, validateLocalSubagentLaunchSpec(accepted))
+        assertTrue(capabilities.workflowManaged)
+        assertTrue(!capabilities.teamManaged)
+        val restored = decodeLocalSubagentCapabilities(buildJsonObject {
+            put("capabilities", encodeLocalSubagentCapabilities(capabilities))
+        }, 3)
+        assertEquals(capabilities, restored)
+        assertTrue(runCatching { validateLocalSubagentLaunchSpec(accepted.copy(backgroundJobId = null)) }.isFailure)
+        assertTrue(runCatching { validateLocalSubagentLaunchSpec(launch(capabilities.copy(workflowManaged = false))) }.isFailure)
+    }
+
     @Test
     fun acceptsReadonlyContinuableIsolatedLaunch() {
         val spec = LocalSubagentLaunchSpec(

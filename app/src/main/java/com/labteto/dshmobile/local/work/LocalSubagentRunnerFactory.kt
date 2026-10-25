@@ -64,7 +64,7 @@ internal class LocalSubagentRunnerFactory(
     private val nestedReadonlySchemas: (() -> JsonArray)? = null,
     private val executeTeamTool: (suspend (String, String, LocalToolCall) -> AgentToolResult)? = null,
     private val requireTeamRootAuthorization: ((String, String) -> Unit)? = null,
-    private val requireTeamWorkspaceMutation: ((String, String, LocalToolCall) -> Unit)? = null,
+    private val requireTeamWorkspaceMutation: (suspend (String, String, LocalToolCall) -> Unit)? = null,
     private val importToolImages: suspend (com.labteto.dshmobile.harness.tools.ToolRichContent?) -> List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = { emptyList() },
 ) {
     fun createBound(
@@ -80,7 +80,7 @@ internal class LocalSubagentRunnerFactory(
         ) -> AgentToolResult,
         historySnapshot: () -> List<kotlinx.serialization.json.JsonObject> = modelHistory::snapshot,
         modelAdmission: LocalModelAdmissionPort? = null,
-        executionWorkspacePath: String? = null,
+        executionWorkspaceGuidance: String? = null,
     ): LocalSubagentRunner {
         val boundEventLog = eventLogFor(sessionId)
         val boundMemoryTools = LocalMemoryTools(
@@ -107,10 +107,7 @@ internal class LocalSubagentRunnerFactory(
                         lineageId = boundState.lineageId,
                         handoffSummary = boundState.handoffSummary,
                     ),
-                ) + executionWorkspacePath?.let {
-                    "\n\n当前工作目录为独立 Git worktree：$it。文件工具及本机命令均以此目录执行。" +
-                        "成果保留在此目录，由父代理审阅 workspace_status 后显式 workspace_merge；不要自行修改父目录或删除工作区。"
-                }.orEmpty()
+                ) + executionWorkspaceGuidance.orEmpty()
             },
             schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
                 schemasProvider(allowMutation, allowVirtualScreen, enabledOptional.toSet())
@@ -163,8 +160,8 @@ internal class LocalSubagentRunnerFactory(
         requireTeamRootAuthorization = requireTeamRootAuthorization?.let { check ->
             { jobId -> check(runSessionId(), jobId) }
         },
-        requireTeamWorkspaceMutation = requireTeamWorkspaceMutation?.let { check ->
-            { jobId, call -> check(runSessionId(), jobId, call) }
+        requireTeamWorkspaceMutation = if (requireTeamWorkspaceMutation == null) null else {
+            jobId, call -> requireTeamWorkspaceMutation.invoke(runSessionId(), jobId, call)
         },
         importToolImages = importToolImages,
         state = runnerState,

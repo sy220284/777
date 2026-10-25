@@ -105,7 +105,7 @@ def locked(root, store, owner, action, arguments):
         tree = snapshot(source)
         base = commit(source, tree, head)
         container.mkdir()
-        save(manifest, dict(workspace_id=workspace_id, owner=owner, source=str(source),
+        save(manifest, dict(workspace_id=workspace_id, owner=owner, invocation_id=arguments.get("invocation_id"), source=str(source),
                             root=str(directory), base_commit=base, base_tree=tree, state="creating"))
     if not manifest.is_file():
         raise ValueError("workspace not found")
@@ -161,6 +161,16 @@ def locked(root, store, owner, action, arguments):
         return dict(workspace_id=workspace_id, state="discarded")
     if action != "merge":
         raise ValueError("unknown workspace operation")
+    if "allowed_paths" in arguments:
+        allowed = arguments["allowed_paths"]
+        if not isinstance(allowed, list) or not allowed or any(
+                not isinstance(path, str) or not path or path.startswith("/") or
+                any(part in ("", ".", "..") for part in path.split("/")) for path in allowed):
+            raise ValueError("invalid integration paths")
+        changed = git(source, "diff", "--name-only", "--no-renames", "-z", base_tree, child_tree).stdout
+        paths = [os.fsdecode(path) for path in changed.split(b"\0") if path]
+        if any(not any(path == scope or path.startswith(scope + "/") for scope in allowed) for path in paths):
+            raise ValueError("workspace contains changes outside declared outputs; inspect before merging")
     parent_tree = snapshot(source)
     parent = commit(source, parent_tree, admission["base_commit"])
     child = commit(source, child_tree, admission["base_commit"])

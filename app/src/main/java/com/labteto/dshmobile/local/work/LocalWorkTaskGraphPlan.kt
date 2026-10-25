@@ -39,6 +39,7 @@ internal data class LocalWorkTaskGraphPlan(val value: JsonObject) {
     val model: String get() = value.getValue("model").jsonPrimitive.content
     val route: String get() = value.getValue("route").jsonPrimitive.content
     val writable: Boolean get() = value.getValue("allow_mutation").jsonPrimitive.boolean
+    val workspaceRepository: String? get() = decodeAgentWorkspaceRepository(value)
     val schema: JsonObject? get() = value["output_schema"] as? JsonObject
     val tools: Set<String>? get() = (value["allowed_tools"] as? JsonArray)?.map { it.jsonPrimitive.content }?.toSet()
     fun inputPaths(index: Int): List<String> = value.getValue("input_files").jsonArray.map { it.jsonPrimitive.content } +

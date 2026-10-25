@@ -43,6 +43,7 @@ internal class LocalAgentTaskGraphController(
         nodeInputFiles: List<List<String>> = emptyList(), nodeOutputFiles: List<List<String>> = emptyList(),
         resumeGraphId: String? = null,
         replanGraphId: String? = null,
+        workspaceRepository: String? = null,
     ): String = binding.workflowAdmission.withLock {
         require(resumeGraphId.isNullOrBlank() || replanGraphId.isNullOrBlank()) {
             "TASKGRAPH_RESUME_REPLAN_CONFLICT"
@@ -52,6 +53,7 @@ internal class LocalAgentTaskGraphController(
                 ?: error("未找到唯一未结算图：$resumeGraphId")
             val plan = LocalWorkTaskGraphPlan(requireNotNull(open.plan) { "历史图缺少完整定义，不能恢复" })
             require(!plan.writable || allowMutation) { "恢复可写图需要本次显式写授权" }
+            require(workspaceRepository == null || workspaceRepository == plan.workspaceRepository) { "恢复图不能更换工作区" }
             val execution = requireNotNull(open.graphExecutionId)
             binding.eventLog.append("taskgraph/resume-authorized", buildJsonObject {
                 put("graph_execution_id", execution)
@@ -68,6 +70,7 @@ internal class LocalAgentTaskGraphController(
                 ?: error("TASKGRAPH_REPLAN_SOURCE_NOT_OPEN:$originalId")
         }
         val route = persistentJobs.workflowRoute(LocalWorkerModelRouter.resolve(modelOverride, binding.aggregateSnapshot()))
+        require(workspaceRepository == null || allowMutation) { "独立工作区任务图需要显式写授权" }
         val model = route.first
         val prepared = LocalWorkflowCoordinator({ "" }, { it }, {}).prepare(tasks, mode, requiredEvidence, dependencies)
         require(nodeInputFiles.isEmpty() || nodeInputFiles.size == tasks.size) { "node_input_files 必须和 tasks 等长" }
@@ -83,6 +86,7 @@ internal class LocalAgentTaskGraphController(
             put("route", route.second)
             put("max_steps", binding.aggregateSnapshot().subagentMaxSteps)
             put("allow_mutation", allowMutation)
+            workspaceRepository?.let { put("workspace_repository", it) }
             put("pipeline", prepared.pipeline)
             put("goal_fingerprint", goal?.let(::localWorkGoalFingerprint).orEmpty())
             put("evidence", buildJsonArray { requiredEvidence.forEach { add(JsonPrimitive(it)) } })
@@ -104,6 +108,9 @@ internal class LocalAgentTaskGraphController(
         plan.nodes.indices.forEach { index -> plan.inputPaths(index).forEach { path ->
             require(localWorkFileSha256(workspaceRoot, path) != null) { "输入文件不存在或不属于安全工作区：$path" }
         } }
+        if (workspaceRepository != null) require(plan.nodes.indices.all { plan.outputPaths(it).isNotEmpty() }) {
+            "独立工作区节点必须逐项声明交付文件"
+        }
         val replan = replacing?.let { original ->
             val previous = LocalWorkTaskGraphPlan(requireNotNull(original.plan) {
                 "TASKGRAPH_REPLAN_SOURCE_PLAN_MISSING"
@@ -286,13 +293,14 @@ internal class LocalAgentTaskGraphController(
                     put("node_version", nodeVersion); put("files", files); put("dependencies", inputs)
                     put("dependency_versions", dependencyVersions(ctx.node.dependsOn))
                     put("output_paths", buildJsonArray { plan.outputPaths(ctx.index).forEach { add(JsonPrimitive(it)) } })
+                    put("required_evidence", plan.prepared.evidence.getOrNull(ctx.index).orEmpty())
                 }
                 val admissions = recovery.nodeAdmissions(log, execution, ctx.node.id)
                 val jobId = workflowAdmittedJobId(plan, ctx.index, admissions, fence, proposedJobId)
                 jobsByNode[ctx.node.id] = jobId
                 persistentJobs.awaitWorkflowNode(jobId, prompt, plan.model, plan.route,
                     plan.value.getValue("max_steps").jsonPrimitive.int, plan.schema, plan.tools,
-                    plan.writable, binding, fence)
+                    plan.writable, binding, fence, plan.workspaceRepository)
             },
             acceptNode = { ctx, _ ->
                 checkDependencies(ctx.node.dependsOn, ctx.dependencyOutputs)

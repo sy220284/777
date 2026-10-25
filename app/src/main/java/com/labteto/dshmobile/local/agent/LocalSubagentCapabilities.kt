@@ -27,6 +27,7 @@ internal data class LocalSubagentCapabilities(
     val toolAllowlist: Set<String>? = null,
     val outputSchema: JsonObject? = null,
     val teamManaged: Boolean = false,
+    val workflowManaged: Boolean = false,
     val initialOptionalTools: Set<String> = emptySet(),
 )
 
@@ -61,7 +62,8 @@ internal fun validateLocalSubagentLaunchSpec(
          !spec.capabilities.virtualScreen && !spec.capabilities.teamManaged)) {
         "SUBAGENT_RECURSION_SCOPE_BLOCKED：多级委派只允许前台只读代理"
     }
-    require(!spec.capabilities.continuable || !spec.capabilities.allowMutation || spec.capabilities.teamManaged) {
+    require(!spec.capabilities.continuable || !spec.capabilities.allowMutation ||
+        spec.capabilities.teamManaged || spec.capabilities.workflowManaged) {
         "SUBAGENT_CONTINUATION_MUTATION_BLOCKED：可继续子代理必须保持只读，避免冷恢复重放未知副作用"
     }
     require(
@@ -90,6 +92,8 @@ internal fun validateLocalSubagentLaunchSpec(
     require(!spec.capabilities.teamManaged || spec.backgroundJobId != null) {
         "SUBAGENT_TEAM_REQUIRES_PERSISTENT_JOB：可写团队助手必须绑定持久任务身份"
     }
+    require(!spec.capabilities.workflowManaged || (spec.backgroundJobId != null &&
+        spec.capabilities.continuable && !spec.capabilities.teamManaged)) { "SUBAGENT_WORKFLOW_REQUIRES_PERSISTENT_JOB" }
     require(spec.capabilities.initialOptionalTools.size <= 24 &&
         spec.capabilities.initialOptionalTools.none(String::isBlank)) {
         "SUBAGENT_TEAM_GRANTS_INVALID：扩展授权列表无效"
@@ -151,6 +155,7 @@ internal fun encodeLocalSubagentCapabilities(
     }
     capabilities.outputSchema?.let { put("output_schema", it) }
     if (capabilities.teamManaged) put("team_managed", true)
+    if (capabilities.workflowManaged) put("workflow_managed", true)
     if (capabilities.initialOptionalTools.isNotEmpty()) {
         put("initial_optional_tools", JsonArray(capabilities.initialOptionalTools.sorted().map(::JsonPrimitive)))
     }
@@ -191,6 +196,8 @@ internal fun decodeLocalSubagentCapabilities(
         toolAllowlist = toolAllowlist,
         outputSchema = data["output_schema"] as? JsonObject,
         teamManaged = data["team_managed"]?.jsonPrimitive?.booleanOrNull ?: false,
+        workflowManaged = if ("workflow_managed" in data) data["workflow_managed"]?.jsonPrimitive?.booleanOrNull
+            ?: error("SUBAGENT_WORKFLOW_CAPABILITY_INVALID") else false,
         initialOptionalTools = (data["initial_optional_tools"] as? JsonArray)
             ?.mapNotNull { it.jsonPrimitive.contentOrNull }?.toSet().orEmpty(),
     )

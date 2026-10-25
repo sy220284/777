@@ -6,9 +6,32 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class LocalAgentTeamRoleCodecTest {
+    @Test fun workspaceRepositorySurvivesRecoveryAndCannotChangeOnReenable() {
+        val original = member().copy(workspaceRepository = "projects/app")
+        val recovered = LocalAgentTeamEventCodec.decodeMember(original.toEvent("session-role"))
+        assertEquals("projects/app", recovered.workspaceRepository)
+        val disabled = recovered.copy(phase = LocalTeamMemberPhase.DISABLED)
+        LocalAgentTeamReducer.validateMemberTransition(listOf(recovered), disabled)
+        assertThrows(IllegalArgumentException::class.java) {
+            LocalAgentTeamReducer.validateMemberTransition(listOf(disabled), disabled.copy(
+                phase = LocalTeamMemberPhase.PROVISIONING, workspaceRepository = "other",
+            ))
+        }
+        assertNull(LocalAgentTeamEventCodec.decodeMember(member().toEvent("session-role")).workspaceRepository)
+    }
+
+    @Test fun corruptWorkspaceRepositoryCannotSilentlyRestoreSharedExecution() {
+        val durable = member().toEvent("session-role")
+        val body = durable.getValue("member") as JsonObject
+        val corrupt = JsonObject(durable + ("member" to JsonObject(body + ("workspaceRepository" to JsonPrimitive(1)))))
+        assertTrue(runCatching { LocalAgentTeamEventCodec.decodeMember(corrupt) }.isFailure)
+    }
+
     private fun member(role: String = "general") = LocalTeamMemberSnapshot(
         id = "member-role",
         jobId = "job-team-role",

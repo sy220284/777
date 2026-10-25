@@ -46,6 +46,7 @@ internal fun enforceTeamMemberWorkspaceMutation(
     writeScopes: List<String>,
     workspaceRoot: java.io.File,
     registeredTool: com.labteto.dshmobile.harness.tools.HarnessTool? = null,
+    wholeWorkspaceAllowed: Boolean = false,
 ) {
     val canonical = com.labteto.dshmobile.local.tools.LocalToolPolicy.canonical(call.name)
     require(registeredTool == null || registeredTool.name == canonical) {
@@ -86,14 +87,14 @@ internal fun enforceTeamMemberWorkspaceMutation(
         workspaceAccess == com.labteto.dshmobile.harness.tools.ToolWorkspaceAccess.WRITE) {
         "TEAM_WRITE_TOOL_CONTRACT_MISMATCH:$canonical"
     }
-    require(writeScopes.isNotEmpty()) {
+    require(wholeWorkspaceAllowed || writeScopes.isNotEmpty()) {
         "TEAM_WRITE_SCOPE_REQUIRED: Lead must assign a task with explicit write_scopes"
     }
     val bounded = normalizeLocalAgentWriteScopes(writeScopes, 32)
     fun requirePath(path: String) {
         require(path == path.trim() && '\\' !in path) { "TEAM_WRITE_PATH_INVALID" }
         val normalized = normalizeLocalAgentWriteScopes(listOf(path), 1).single()
-        require(bounded.any { normalized == it || normalized.startsWith("$it/") }) {
+        require(wholeWorkspaceAllowed || bounded.any { normalized == it || normalized.startsWith("$it/") }) {
             "TEAM_WRITE_SCOPE_VIOLATION:$normalized"
         }
         val root = workspaceRoot.canonicalFile.toPath()

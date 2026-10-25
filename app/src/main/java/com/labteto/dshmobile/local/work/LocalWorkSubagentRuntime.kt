@@ -55,10 +55,11 @@ internal class LocalWorkSubagentRuntime(
             put("parent_call_id", spec.parentCallId)
         })
         val scoped = sourceWorkspace.atRoot(directory)
-        val result = withContext(
-            com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext(workspaceRoot, scoped, identity),
-        ) {
-            runner(binding, directory).run(spec)
+        val workspaceContext = com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext(
+            workspaceRoot, scoped, identity, java.io.File(admission.getValue("source").jsonPrimitive.content),
+        )
+        val result = withContext(workspaceContext) {
+            runner(binding, workspaceContext.guidance).run(spec)
         }
         return buildJsonObject {
             put("workspace_id", identity)
@@ -68,7 +69,7 @@ internal class LocalWorkSubagentRuntime(
         }.toString()
     }
 
-    internal fun runner(binding: LocalWorkRunBinding, executionWorkspace: java.io.File? = null): LocalSubagentRunner =
+    internal fun runner(binding: LocalWorkRunBinding, executionWorkspaceGuidance: String? = null): LocalSubagentRunner =
         factory.createBound(
             sessionId = binding.sessionId,
             boundState = binding.aggregateSnapshot(),
@@ -81,7 +82,7 @@ internal class LocalWorkSubagentRuntime(
             },
             historySnapshot = binding.runHandle.modelHistory::snapshot,
             modelAdmission = binding.executionControl.asModelAdmissionPort(),
-            executionWorkspacePath = executionWorkspace?.path,
+            executionWorkspaceGuidance = executionWorkspaceGuidance,
         )
 
     private val taskGraphs = LocalAgentTaskGraphController(persistentJobs, workspaceRoot, pruneOutput)
@@ -94,10 +95,11 @@ internal class LocalWorkSubagentRuntime(
         nodeInputFiles: List<List<String>> = emptyList(), nodeOutputFiles: List<List<String>> = emptyList(),
         resumeGraphId: String? = null,
         replanGraphId: String? = null,
+        workspaceRepository: String? = null,
     ): String = taskGraphs.runWorkflow(
         tasks, mode, requiredEvidence, modelOverride, outputSchema, toolAllowlist, binding,
         dependencies, allowMutation, requiredFiles, inputFiles, nodeInputFiles, nodeOutputFiles,
-        resumeGraphId, replanGraphId,
+        resumeGraphId, replanGraphId, workspaceRepository,
     )
 
     internal suspend fun resumePendingWorkflows(binding: LocalWorkRunBinding) =

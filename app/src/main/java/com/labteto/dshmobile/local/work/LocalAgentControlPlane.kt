@@ -51,6 +51,7 @@ internal class LocalAgentControlPlane(
         binding: LocalWorkRunBinding?,
     ): String? {
         if (call.name !in TOOL_NAMES) return null
+        require(call.arguments["workspace_repository"] == null || allowMutation) { "创建独立工作区需要父任务写入权限" }
         val run = binding
             ?: return "Work 代理工具缺少活动运行上下文，已拒绝旧的无绑定执行路径"
         val args = call.arguments
@@ -95,7 +96,7 @@ internal class LocalAgentControlPlane(
                 ))
             }
             "subagent_fork", "fork_subagent" -> {
-                val workspaceRepository = args.optionalString("workspace_repository")
+                val workspaceRepository = decodeAgentWorkspaceRepository(args)
                 require(workspaceRepository == null || allowMutation) { "创建独立工作区需要父任务写入权限" }
                 val roleBinding = bindLocalAgentRole(
                     requested = args.optionalString("role"),
@@ -169,6 +170,7 @@ internal class LocalAgentControlPlane(
             "workflow" -> control.workflow(run, LocalAgentWorkflowRequest(
                 resumeGraphId = args.optionalString("resume_graph_id"),
                 replanGraphId = args.optionalString("replan_graph_id"),
+                workspaceRepository = decodeAgentWorkspaceRepository(args),
                 allowMutation = args.boolean("allow_mutation", false).also { requested ->
                     require(!requested || allowMutation) { "当前执行范围不允许可写任务图" }
                 },

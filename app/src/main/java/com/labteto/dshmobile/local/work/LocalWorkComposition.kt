@@ -207,10 +207,17 @@ internal class LocalWorkComposition @Inject constructor(
                     ?: runtimeStateStore.foregroundRunHandle.modelHistory.snapshot()
                         .takeIf { runtimeStateStore.state.value.sessionId == sessionId }
             },
-            subagentRunner = { sessionId, boundState, history ->
+            createWorkspace = tools::forkAgentWorkspace,
+            resolveWorkspace = tools::resolveAgentWorkspace,
+            inspectWorkspace = { sessionId, identity ->
+                tools.agentWorkspaces.operate(sessionId, "status", buildJsonObject { put("workspace_id", identity) })
+            },
+            mergeWorkspace = tools::integrateAgentWorkspace,
+            subagentRunner = { sessionId, boundState, history, workspaceBinding ->
                 subagentFactory.createBound(
                     sessionId = sessionId,
                     boundState = boundState,
+                    executionWorkspaceGuidance = workspaceBinding?.guidance,
                     runKind = LocalAgentRunKind.SUBAGENT,
                     schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
                         tools.schemas.subagentSchemas(
@@ -309,6 +316,7 @@ internal class LocalWorkComposition @Inject constructor(
                     requestedJobId = requestedJobId,
                     allowMutation = roleBinding.allowMutation,
                     teamManaged = true,
+                    workspaceRepository = agentTeams.memberWorkspaceRepository(binding.sessionId, requestedJobId),
                     // 基础网络、后台任务与技能可用；敏感扩展只能由 Lead 按名称授权。
                     initialOptionalTools = activeOptional,
                 )

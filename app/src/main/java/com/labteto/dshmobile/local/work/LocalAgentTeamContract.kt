@@ -14,7 +14,7 @@ internal object LocalAgentTeamContract {
         const val TEAM_EVENT_VERSION = 2
         // Official V2 whole-value protocol remains at version 4; local activity projection adds display state.
         const val OFFICIAL_TEAM_PROJECTION_STATE_VERSION = 4
-        const val LOCAL_TEAM_PROJECTION_STATE_VERSION = 10
+        const val LOCAL_TEAM_PROJECTION_STATE_VERSION = 11
         val TEAM_EVENTS = setOf(
             TEAM_MEMBER_EVENT,
             TEAM_TASK_EVENT,

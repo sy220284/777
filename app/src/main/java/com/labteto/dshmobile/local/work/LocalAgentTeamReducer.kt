@@ -319,6 +319,7 @@ internal object LocalAgentTeamReducer {
             "TEAM_MEMBER_PROVISIONAL_INTENT_OUTSIDE_ADMISSION"
         }
         require(next.name.isNotBlank()) { "TEAM_MEMBER_NAME_INVALID" }
+        require(next.workspaceRepository == null || next.workspaceRepository.isNotBlank()) { "TEAM_MEMBER_WORKSPACE_INVALID" }
         val byName = members.firstOrNull { it.name == next.name && it.id != next.id }
         require(byName == null) { "TEAM_MEMBER_NAME_CONFLICT：" + next.name }
         val previous = members.firstOrNull { it.id == next.id }
@@ -331,7 +332,7 @@ internal object LocalAgentTeamReducer {
         require(
             previous.name == next.name &&
                 previous.provider == next.provider &&
-                previous.context == next.context
+                previous.context == next.context && previous.workspaceRepository == next.workspaceRepository
         ) {
             "TEAM_MEMBER_IMMUTABLE_FIELDS_CHANGED：" + next.id
         }

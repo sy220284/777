@@ -148,6 +148,38 @@ class GitWorkspaceTest(unittest.TestCase):
             self.fork()
         self.assertFalse(child.exists())
 
+    def test_graph_merge_refuses_undeclared_files_before_any_source_write(self):
+        child = self.fork()
+        (child / "code.txt").write_text("node result")
+        (child / "extra.txt").write_text("undeclared")
+        reviewed = self.call("status")["tree"]
+        with self.assertRaisesRegex(ValueError, "outside declared outputs"):
+            self.call("merge", expected_tree=reviewed, allowed_paths=["code.txt"])
+        self.assertEqual("first\nsecond\nthird\n", (self.root / "code.txt").read_text())
+        self.assertFalse((self.root / "extra.txt").exists())
+        self.assertEqual("merged", self.call("merge", expected_tree=reviewed,
+                                            allowed_paths=["code.txt", "extra.txt"])["state"])
+
+    def test_graph_rename_cannot_move_a_declared_output_outside_its_scope(self):
+        child = self.fork()
+        (child / "code.txt").rename(child / "outside.txt")
+        with self.assertRaisesRegex(ValueError, "outside declared outputs"):
+            self.call("merge", expected_tree=self.call("status")["tree"], allowed_paths=["code.txt"])
+        self.assertTrue((self.root / "code.txt").is_file())
+        self.assertFalse((self.root / "outside.txt").exists())
+
+    def test_next_node_forks_from_merged_dependency_and_retains_job_identity(self):
+        first = self.call("fork", invocation_id="job-node-a")
+        child = Path(first["root"])
+        (child / "dependency.txt").write_text("producer output")
+        self.call("merge", expected_tree=self.call("status")["tree"], allowed_paths=["dependency.txt"])
+        self.identity = "b" * 32
+        second = self.call("fork", invocation_id="job-node-b")
+        self.assertEqual("producer output", (Path(second["root"]) / "dependency.txt").read_text())
+        listed = self.call("list")["workspaces"]
+        self.assertEqual({"job-node-a", "job-node-b"}, {item["invocation_id"] for item in listed})
+        self.assertNotEqual(first["root"], second["root"])
+
     def test_source_edit_during_merge_preflight_is_preserved_and_merge_stops(self):
         child = self.fork()
         (child / "code.txt").write_text("CHILD\nsecond\nthird\n")

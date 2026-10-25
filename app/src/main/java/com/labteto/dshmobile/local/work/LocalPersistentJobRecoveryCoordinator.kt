@@ -90,9 +90,14 @@ internal class LocalPersistentJobRecoveryCoordinator(
         sessionId: String,
         state: LocalHarnessState,
         history: () -> List<JsonObject>,
+        workspace: com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext?,
     ) -> LocalSubagentRunner,
     private val eventLogFor: (String) -> LocalSessionEventLog,
     private val webToolsForWorkspace: suspend (String, String) -> LocalWebTools,
+    private val createWorkspace: suspend (String, String, String) -> JsonObject,
+    private val resolveWorkspace: suspend (String, String) -> com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext,
+    private val inspectWorkspace: suspend (String, String) -> JsonObject,
+    private val mergeWorkspace: suspend (String, String, String, List<String>, suspend () -> Unit) -> JsonObject,
 ) {
     private val lock = Any()
     private val pendingRecoverySessions = linkedSetOf<String>()
@@ -149,6 +154,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         teamManaged: Boolean = false,
         initialOptionalTools: Set<String> = emptySet(),
         workflowFence: JsonObject? = null,
+        workspaceRepository: String? = null,
     ): JobStartResult {
         val runProfile = modelGateway.profileForRun(
             model ?: boundState.modelState.modelSelection.activeProfileId,
@@ -156,9 +162,9 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val protocol = effectiveProtocol(runProfile)
         val parentLink = captureLocalAgentParentLink(parentToolCallId ?: forkParentCallId)
         require(parentLink == null || parentLink.sessionId == sessionId) { "AGENT_PARENT_SESSION_MISMATCH" }
-        val runner = subagentRunner(sessionId, boundState, historySnapshot)
         val capabilities = buildLocalDelegationCapabilities(
             kind = if (teamManaged) LocalAgentDelegationKind.TEAM_MEMBER
+                else if (workflowFence != null) LocalAgentDelegationKind.WORKFLOW_NODE
                 else LocalAgentDelegationKind.PERSISTENT,
             allowMutation = allowMutation,
             virtualScreen = virtualScreen,
@@ -177,6 +183,12 @@ internal class LocalPersistentJobRecoveryCoordinator(
             ),
             structuredOutputSupported = true,
         )
+        val workspaceId = workspaceRepository?.let { repository ->
+            val stableId = requireNotNull(requestedJobId) { "持久独立工作区需要稳定 Job 编号" }
+            createWorkspace(sessionId, stableId, repository).getValue("workspace_id").jsonPrimitive.content
+        }
+        val workspaceBinding = workspaceId?.let { resolveWorkspace(sessionId, it) }
+        val runner = subagentRunner(sessionId, boundState, historySnapshot, workspaceBinding)
         val initialHistorySeed = forkParentCallId?.let { parentCallId ->
             val jobId = requestedJobId
                 ?: error("TEAM_FORK_REQUIRES_STABLE_JOB_ID：持久 fork 必须预分配稳定 jobId")
@@ -216,6 +228,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             parentLink?.let { put("parent_link", it.toJson()) }
             put("capabilities", encodeLocalSubagentCapabilities(capabilities))
             workflowFence?.let { put("workflow_fence", it) }
+            workspaceId?.let { put("workspace_id", it) }
         }.toString()
         return jobs.startPersistentResult(
             label = "子代理：${task.take(100)}",
@@ -227,7 +240,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         ) { jobId, report ->
             if (teamManaged) awaitTeamMemberSpawnCommit(eventLogFor(sessionId), sessionId, jobId)
             suspendWorkflowJobForNewUser(eventLogFor(sessionId), jobId, workflowFence != null, allowMutation, teamManaged)  {
-              withContext(LocalModelRunContext(runProfile) + LocalWorkflowExecutionFence {
+              withContext((workspaceBinding ?: kotlin.coroutines.EmptyCoroutineContext) + LocalModelRunContext(runProfile) + LocalWorkflowExecutionFence {
                 if (workflowFence != null) requireWorkflowFenceCurrent(sessionId, workflowFence)
               }) {
                 runner.runResult(
@@ -485,6 +498,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             "AGENT_PARENT_SESSION_MISMATCH：恢复子代理的持久父节点不属于目标会话"
         }
         val workflowFence = payload["workflow_fence"] as? JsonObject
+        require(!capabilities.workflowManaged || workflowFence != null) { "WORKFLOW_EXECUTION_FENCE_REQUIRED" }
         if (workflowFence != null) {
             try { requireWorkflowFenceCurrent(sessionId, workflowFence) }
             catch (_: LocalWorkflowSuperseded) { return } // New USER runs first; preserve a safe slice for explicit resume.
@@ -549,7 +563,6 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
             ?.let(LocalAgentRuntimeLimits::normalizeSubagentSteps)
             ?: boundState.subagentMaxSteps
-        val runner = subagentRunner(sessionId, boundState) { parentHistory }
 
         // A genuinely new message may have arrived after the first Inbox snapshot.
         // Refresh before rebuilding the recovery tail so terminal settlement cannot
@@ -591,7 +604,9 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     profile.credentialRef == credentialRef &&
                     profile.routeFingerprint() == fingerprint
             ) { "持久子代理原模型路由身份已变化，已停止自动续跑" }
-            withContext(LocalModelRunContext(profile) + LocalWorkflowExecutionFence {
+            val workspaceBinding = decodePersistentAgentWorkspaceId(payload)?.let { resolveWorkspace(sessionId, it) }
+            val runner = subagentRunner(sessionId, boundState, { parentHistory }, workspaceBinding)
+            withContext((workspaceBinding ?: kotlin.coroutines.EmptyCoroutineContext) + LocalModelRunContext(profile) + LocalWorkflowExecutionFence {
                 if (workflowFence != null) requireWorkflowFenceCurrent(sessionId, workflowFence)
             }) {
                 runner.runResult(
@@ -631,10 +646,29 @@ internal class LocalPersistentJobRecoveryCoordinator(
         modelGateway.profileForRun(model).let { it.id to it.routeFingerprint() }
     internal suspend fun workflowRouteFingerprint(model: String?): String = workflowRoute(model).second
 
-    private fun persistWorkflowOutput(sessionId: String, jobId: String, output: String, fence: JsonObject?) {
+    private suspend fun persistWorkflowOutput(sessionId: String, jobId: String, output: String, fence: JsonObject?) {
         if (fence == null) return
         requireWorkflowFenceCurrent(sessionId, fence)
         val toolExecutions = workflowToolSettlementEvidence(eventLogFor(sessionId), jobId)
+        val scope = currentCoroutineContext()[com.labteto.dshmobile.harness.capability.WorkspaceExecutionContext]
+            as? com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext
+        if (scope != null) {
+            workflowOutputRejection(output, fence["required_evidence"]?.jsonPrimitive?.contentOrNull.orEmpty())?.let { error(it) }
+            val paths = (fence["output_paths"] as? JsonArray).orEmpty().map { it.jsonPrimitive.content }
+            require(paths.isNotEmpty()) { "独立节点必须声明交付路径" }
+            paths.forEach { path ->
+                require(localWorkFileSha256(scope.root, scope.localPath(path)) != null) { "节点未产生声明成果：$path" }
+            }
+            val inspected = inspectWorkspace(sessionId, scope.workspaceId)
+            val merged = mergeWorkspace(sessionId, scope.workspaceId, inspected.getValue("tree").jsonPrimitive.content,
+                paths.map(scope::localPath)) { requireWorkflowFenceCurrent(sessionId, fence) }
+            check(merged["state"]?.jsonPrimitive?.contentOrNull in setOf("merged", "already_present")) {
+                "节点成果整合发生冲突，已保留原工作区：${scope.workspaceId}"
+            }
+            eventLogFor(sessionId).append("taskgraph/workspace-merged", buildJsonObject {
+                put("job_id", jobId); put("workspace_id", scope.workspaceId); put("receipt", merged)
+            })
+        }
         eventLogFor(sessionId).append("taskgraph/job-result", buildJsonObject {
             fence.forEach { (key, value) -> put(key, value) }
             put("job_id", jobId)
@@ -732,6 +766,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         jobId: String, task: String, model: String?, expectedRoute: String,
         maxSteps: Int, outputSchema: JsonObject?, toolAllowlist: Set<String>?,
         allowMutation: Boolean, binding: LocalWorkRunBinding, fence: JsonObject,
+        workspaceRepository: String? = null,
     ): String {
         val log = binding.eventLog
         requireWorkflowFenceCurrent(binding.sessionId, fence)
@@ -758,6 +793,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 historySnapshot = binding.runHandle.modelHistory::snapshot,
                 requestedJobId = jobId, allowMutation = allowMutation,
                 workflowFence = fence,
+                workspaceRepository = workspaceRepository,
             )
             if (!admitted.accepted) {
                 log.append("taskgraph/job-rejected", buildJsonObject { put("job_id", jobId); put("detail", admitted.message) })

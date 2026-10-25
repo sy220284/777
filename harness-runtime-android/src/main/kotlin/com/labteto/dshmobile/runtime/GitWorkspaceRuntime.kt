@@ -36,6 +36,7 @@ class GitWorkspaceRuntime(
         return operate(sessionId, "fork", buildJsonObject {
             put("workspace_id", id)
             put("repository", repository)
+            put("invocation_id", invocationId)
         })
     }
 

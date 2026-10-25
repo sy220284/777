@@ -7,6 +7,13 @@ import com.labteto.dshmobile.harness.workflow.TaskGraphOutcome
 import com.labteto.dshmobile.harness.workflow.TaskGraphProgress
 import com.labteto.dshmobile.local.agent.LocalSubagentExecutionException
 
+internal fun workflowOutputRejection(output: String, requiredEvidence: String): String? = when {
+    output.isBlank() -> "子任务没有产出"
+    requiredEvidence.trim().isNotEmpty() && !output.contains(requiredEvidence.trim(), ignoreCase = true) ->
+        "产出缺少验收证据：${requiredEvidence.trim().take(120)}"
+    else -> null
+}
+
 /**
  * Work's current Goal is an immutable execution fence for one delegated graph.
  * A changed acceptance contract, a pause, or a newly created Goal invalidates
@@ -146,12 +153,8 @@ internal class LocalWorkflowCoordinator(
             },
             accept = { context, output ->
                 val evidence = requiredEvidence.getOrNull(context.index)?.trim().orEmpty()
-                when {
-                    output.isBlank() -> TaskGraphAcceptance(false, "子任务没有产出")
-                    evidence.isNotEmpty() && !output.contains(evidence, ignoreCase = true) ->
-                        TaskGraphAcceptance(false, "产出缺少验收证据：${evidence.take(120)}")
-                    else -> acceptNode(context, output)
-                }
+                workflowOutputRejection(output, evidence)?.let { TaskGraphAcceptance(false, it) }
+                    ?: acceptNode(context, output)
             },
             onProgress = onProgress,
             shouldRetryError = { error ->

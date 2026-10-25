@@ -122,6 +122,7 @@ internal data class LocalTeamMemberSnapshot(
     val role: String = "general",
     /** null=legacy; true=uncommitted new Job; false=activation of existing durable Job. */
     val provisionalNewJob: Boolean? = null,
+    val workspaceRepository: String? = null,
 )
 
 @Serializable
@@ -461,6 +462,7 @@ internal class LocalAgentTeamRuntime(
                 displayName = args.optionalTeamString("display_name").orEmpty(),
                 context = args.optionalTeamContext(),
                 role = args.optionalTeamString("role"),
+                workspaceRepository = decodeAgentWorkspaceRepository(args),
             )
             "team_start_member" -> memberLifecycle.startMember(
                 binding = binding,
@@ -478,6 +480,7 @@ internal class LocalAgentTeamRuntime(
                 description = args.optionalTeamString("description").orEmpty(),
                 displayName = args.optionalTeamString("display_name").orEmpty(),
                 role = args.optionalTeamString("role"),
+                workspaceRepository = decodeAgentWorkspaceRepository(args),
                 task = args.requiredTeamString("task"),
                 model = args.optionalTeamString("model"),
                 maxSteps = args["max_steps"]?.jsonPrimitive?.intOrNull
@@ -1038,7 +1041,7 @@ internal class LocalAgentTeamRuntime(
      * Lead or user must explicitly assign the task and write_scopes. This does not
      * bypass the sandbox or ToolApproval checks in the real executor.
      */
-    internal fun requireMemberWorkspaceMutation(
+    internal suspend fun requireMemberWorkspaceMutation(
         sessionId: String,
         jobId: String,
         call: LocalToolCall,
@@ -1060,11 +1063,21 @@ internal class LocalAgentTeamRuntime(
                 sessionId, eventLogFor(sessionId),
             )
         }
+        val scope = kotlinx.coroutines.currentCoroutineContext()[com.labteto.dshmobile.harness.capability.WorkspaceExecutionContext]
+            as? com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext
+        val nativeWrite = com.labteto.dshmobile.local.tools.LocalToolPolicy.canonical(call.name) in setOf("write", "edit", "apply_patch")
+        val wholeRepository = nativeWrite && current?.writeScopes.orEmpty().any { scope?.coversRepository(it) == true }
         enforceTeamMemberWorkspaceMutation(
-            call = call, writeScopes = current?.writeScopes.orEmpty(),
-            workspaceRoot = workspaceRoot, registeredTool = registeredTool,
+            call = call, writeScopes = current?.writeScopes.orEmpty().filterNot { wholeRepository && scope?.coversRepository(it) == true }
+                .map { if (nativeWrite) scope?.localPath(it) ?: it else it },
+            workspaceRoot = scope?.rootFor(workspaceRoot) ?: workspaceRoot, registeredTool = registeredTool,
+            wholeWorkspaceAllowed = wholeRepository,
         )
     }
+
+    internal fun memberWorkspaceRepository(sessionId: String, jobId: String): String? =
+        (project(sessionId).members.singleOrNull { it.jobId == jobId }
+            ?: error("TEAM_WORKSPACE_MEMBER_NOT_FOUND")).workspaceRepository
 
     /** One canonical USER epoch for an owned task; stale children must not call tools. */
     internal fun requireCurrentRootAuthorization(sessionId: String, jobId: String) {

@@ -275,6 +275,7 @@ object LocalToolCatalog {
             "agent_id" to string("当前 Work 会话中的后台代理编号"),
         ), listOf("agent_id")))
         add(tool("workflow", "以持久 Kotlin DAG 调度子任务，恢复已验收节点并继续剩余依赖。默认只读；可写需显式授权且未知副作用不重放。非空/字符串验收仅是窄文本检查，不证明通用交付", properties(
+            "workspace_repository" to string("可选；工作区内 Git 仓库根目录。须 allow_mutation=true，并为每个节点声明交付文件；节点在独立目录执行，仅声明范围可三方合并，冲突或越界变更会停止整合"),
             "tasks" to buildJsonObject {
                 put("type", "array")
                 put("items", buildJsonObject { put("type", "string") })
@@ -323,6 +324,7 @@ object LocalToolCatalog {
             "target" to string("teammate 名称"),
         ), listOf("target")))
         add(tool("team_create_member", "只创建稳定 Team 成员身份，不立即启动模型执行；后续用 team_start_member 派活", properties(
+            "workspace_repository" to string("可选；工作区内 Git 仓库根目录。成员使用固定独立目录，唤醒/恢复不替换。write_scopes 仍按原工作区路径声明；成果须由 Lead 显式整合"),
             "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
             "role" to string("可选；固定专业身份 general/explore/plan/execute/verify/review/integrate/security/qa/doc/data_research/performance/incident_recovery/coordinator，恢复时保持不变，verify/review 为只读工具权限"),
             "description" to string("可选；职责说明"),
@@ -343,6 +345,7 @@ object LocalToolCatalog {
             "allowed_extensions" to stringArray("可选；Lead 核实后授权给本次启动成员的扩展工具名称"),
         ), listOf("target", "task")))
         add(tool("team_spawn", "创建具备持久身份、角色约束、授权工具和可选扩展的团队助手；只读角色禁止写入", properties(
+            "workspace_repository" to string("可选；工作区内 Git 仓库根目录，成员在固定独立 worktree 中工作，停用/恢复保持原目录"),
             "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
             "role" to string("可选；固定专业身份 general/explore/plan/execute/verify/review/integrate/security/qa/doc/data_research/performance/incident_recovery/coordinator，verify/review 为只读；旧成员默认 general"),
             "description" to string("可选；职责说明"),

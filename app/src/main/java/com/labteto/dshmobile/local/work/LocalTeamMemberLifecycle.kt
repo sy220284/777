@@ -88,6 +88,7 @@ internal class LocalTeamMemberLifecycle(
         displayName: String,
         context: LocalTeamMemberContext,
         role: String?,
+        workspaceRepository: String? = null,
     ): String {
         val roleBinding = bindLocalAgentRole(role, "", parentMutationAllowed = true)
         return synchronized(commandLock) {
@@ -104,6 +105,7 @@ internal class LocalTeamMemberLifecycle(
                 name = cleanName,
                 displayName = displayName.trim().take(32),
                 role = roleBinding.role.wireName,
+                workspaceRepository = workspaceRepository,
                 description = boundedTeamText(
                     value = description,
                     field = "description",
@@ -349,6 +351,7 @@ internal class LocalTeamMemberLifecycle(
         context: LocalTeamMemberContext,
         parentCallId: String,
         grantedExtensions: Set<String>,
+        workspaceRepository: String? = null,
     ): String {
         val roleBinding = bindLocalAgentRole(role, "", parentMutationAllowed = true)
         val provisioning = synchronized(commandLock) {
@@ -368,6 +371,7 @@ internal class LocalTeamMemberLifecycle(
                 role = roleBinding.role.wireName,
                 mutableToolsEnabled = roleBinding.allowMutation,
                 grantedExtensions = grantedExtensions,
+                workspaceRepository = workspaceRepository,
                 description = boundedTeamText(
                     value = description,
                     field = "description",

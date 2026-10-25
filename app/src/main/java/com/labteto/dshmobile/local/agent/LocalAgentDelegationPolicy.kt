@@ -4,7 +4,7 @@ import kotlinx.serialization.json.JsonObject
 
 /** Canonical authority-to-capabilities compiler shared by foreground, fork, durable and Team. */
 internal enum class LocalAgentDelegationKind {
-    FOREGROUND_READONLY, FORK, PERSISTENT, TEAM_MEMBER,
+    FOREGROUND_READONLY, FORK, PERSISTENT, TEAM_MEMBER, WORKFLOW_NODE,
 }
 
 /**
@@ -31,7 +31,7 @@ internal fun buildLocalDelegationCapabilities(
     require(kind != LocalAgentDelegationKind.FORK || !virtualScreen) {
         "FORK_CANNOT_BORROW_VIRTUAL_SCREEN"
     }
-    require(kind !in setOf(LocalAgentDelegationKind.PERSISTENT, LocalAgentDelegationKind.TEAM_MEMBER) ||
+    require(kind !in setOf(LocalAgentDelegationKind.PERSISTENT, LocalAgentDelegationKind.TEAM_MEMBER, LocalAgentDelegationKind.WORKFLOW_NODE) ||
         historyMode == LocalSubagentHistoryMode.ISOLATED) {
         "PERSISTENT_DELEGATION_REQUIRES_ISOLATED_HISTORY"
     }
@@ -41,7 +41,7 @@ internal fun buildLocalDelegationCapabilities(
     return LocalSubagentCapabilities(
         allowMutation = allowMutation,
         continuable = kind == LocalAgentDelegationKind.PERSISTENT ||
-            kind == LocalAgentDelegationKind.TEAM_MEMBER,
+            kind == LocalAgentDelegationKind.TEAM_MEMBER || kind == LocalAgentDelegationKind.WORKFLOW_NODE,
         virtualScreen = virtualScreen,
         historyMode = if (kind == LocalAgentDelegationKind.FORK)
             LocalSubagentHistoryMode.INHERIT_PARENT else historyMode,
@@ -49,6 +49,7 @@ internal fun buildLocalDelegationCapabilities(
         toolAllowlist = toolAllowlist,
         outputSchema = outputSchema,
         teamManaged = kind == LocalAgentDelegationKind.TEAM_MEMBER,
+        workflowManaged = kind == LocalAgentDelegationKind.WORKFLOW_NODE,
         initialOptionalTools = initialOptionalTools,
     )
 }
