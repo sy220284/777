@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.jobs
 
+import com.labteto.dshmobile.harness.jobs.JobSnapshot
+
 
 
 /** User-visible state for a background command. */
@@ -13,4 +15,10 @@ data class LocalJobInfo(
     val continuable: Boolean = false,
     val pendingMessageCount: Int = 0,
     val updatedAt: Long = 0L,
+)
+
+/** Read-only pair from one native Job manager lock; never persisted separately. */
+data class LocalJobRegistration(
+    val info: LocalJobInfo,
+    val snapshot: JobSnapshot,
 )
