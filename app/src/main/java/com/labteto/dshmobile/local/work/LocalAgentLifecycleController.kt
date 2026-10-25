@@ -12,18 +12,6 @@ import kotlinx.coroutines.ensureActive
  * This controller uses the existing Job manager as its sole durable status/Inbox owner.
  * It never starts an agent by directly re-running its model turn.
  */
-/** Canonical owner-sensitive admission for every standalone child-control operation. */
-internal fun requireOwnedAgentInfo(
-    available: List<LocalJobInfo>,
-    sessionId: String,
-    agentId: String,
-): LocalJobInfo {
-    require(sessionId.isNotBlank() && agentId.isNotBlank()) { "AGENT_TARGET_REQUIRED" }
-    return available.singleOrNull {
-        it.id == agentId && it.ownerSessionId == sessionId && it.isAgent
-    } ?: error("AGENT_TARGET_NOT_FOUND：目标不属于当前 Work 会话或不是后台代理")
-}
-
 /** Cursor is a projection, never a new durable execution state or a receipt for model work. */
 internal fun localAgentObservationCursor(info: LocalJobInfo): String =
     "${info.id}:${info.updatedAt}:${info.status}:${info.pendingMessageCount}"
@@ -49,15 +37,10 @@ internal class LocalAgentLifecycleController(
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
     private val registry: LocalAgentRegistry,
 ) {
-    private fun requireOwnedAgent(sessionId: String, agentId: String): LocalJobInfo {
-        return registry.resolveOwnedChild(sessionId, agentId)
-    }
-
     fun inspect(sessionId: String, agentId: String): String {
-        val info = requireOwnedAgent(sessionId, agentId)
-        val snapshot = jobs.snapshots().singleOrNull {
-            it.id == agentId && it.ownerId == sessionId
-        } ?: error("AGENT_SNAPSHOT_NOT_FOUND")
+        val registration = registry.resolveStandalone(sessionId, agentId)
+        val info = registration.info
+        val snapshot = registration.snapshot
         return buildString {
             append("agent_id=").append(info.id)
             append("\nstatus=").append(info.status)
@@ -83,7 +66,7 @@ internal class LocalAgentLifecycleController(
         val started = System.nanoTime()
         while (true) {
             currentCoroutineContext().ensureActive()
-            val now = requireOwnedAgent(sessionId, agentId)
+            val now = registry.resolveStandalone(sessionId, agentId).info
             if (localAgentObservationCursor(now) != afterCursor) {
                 return "changed=true\n" + inspect(sessionId, agentId)
             }
@@ -96,22 +79,20 @@ internal class LocalAgentLifecycleController(
     }
 
     fun interrupt(sessionId: String, agentId: String): String {
-        val info = registry.resolveStandaloneChild(sessionId, agentId)
+        val info = registry.resolveStandalone(sessionId, agentId).info
         require(info.continuable) { "AGENT_NOT_CONTINUABLE：非持久代理不可安全暂停，可使用 agent_close 永久关闭" }
         return jobs.interruptContinuableAgent(agentId, sessionId)
     }
 
     fun close(sessionId: String, agentId: String): String {
-        registry.resolveStandaloneChild(sessionId, agentId)
+        registry.resolveStandalone(sessionId, agentId)
         return jobs.kill(agentId, sessionId)
     }
 
     fun resume(sessionId: String, agentId: String): String {
-        val info = registry.resolveStandaloneChild(sessionId, agentId)
-        val snapshot = jobs.snapshots().singleOrNull {
-            it.id == agentId && it.ownerId == sessionId
-        } ?: error("AGENT_SNAPSHOT_NOT_FOUND")
-        validateAgentResumeAdmission(info, snapshot)
+        val registration = registry.resolveStandalone(sessionId, agentId)
+        val info = registration.info
+        validateAgentResumeAdmission(info, registration.snapshot)
         persistentJobs.scheduleAgentResume(sessionId, agentId)
         return "agent_id=$agentId\nresume_requested=true\nresume_admitted=unverified" +
             "\nstatus_before=" + info.status +
