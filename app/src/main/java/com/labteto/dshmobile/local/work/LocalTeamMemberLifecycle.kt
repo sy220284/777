@@ -345,6 +345,7 @@ internal class LocalTeamMemberLifecycle(
         val cleanName = provisioning.name
         val memberId = provisioning.id
         val jobId = provisioning.jobId
+        var launchAdmitted = false
 
         return try {
             val started = startTeammate(
@@ -369,6 +370,7 @@ internal class LocalTeamMemberLifecycle(
                 )
                 "[TEAM_MEMBER_START_REJECTED] " + started.message
             } else {
+                launchAdmitted = true
                 appendMember(
                     binding.sessionId,
                     provisioning.copy(phase = LocalTeamMemberPhase.ACTIVE),
@@ -376,16 +378,32 @@ internal class LocalTeamMemberLifecycle(
                 "teammate 已创建：" + cleanName + " | id=" + memberId + " | agent=" + jobId
             }
         } catch (error: Exception) {
-            runCatching {
-                appendMember(
-                    binding.sessionId,
-                    provisioning.copy(
-                        phase = LocalTeamMemberPhase.FAILED,
-                        error = error.message.orEmpty().take(MAX_ERROR_CHARS),
-                    ),
-                )
+            // A durable Job may have accepted its initial task before a cancelled caller
+            // observes its receipt. Never kill that accepted child as "failed spawn" cleanup:
+            // the existing Job/Team recovery ledger must adopt it on the next projection.
+            val durableChild = jobs.snapshotInfos().singleOrNull {
+                it.id == jobId && it.ownerSessionId == binding.sessionId && it.isAgent
             }
-            runCatching { jobs.kill(jobId, binding.sessionId) }
+            val recoveredPhase = recoverTeamStartPhase(
+                previous = LocalTeamMemberPhase.CREATED,
+                job = durableChild,
+                admitted = launchAdmitted,
+                cancelled = error is CancellationException,
+            )
+            synchronized(commandLock) {
+                val current = project(binding.sessionId).members.singleOrNull { it.id == memberId }
+                if (current?.phase == LocalTeamMemberPhase.PROVISIONING) {
+                    appendMember(
+                        binding.sessionId,
+                        provisioning.copy(
+                            phase = recoveredPhase,
+                            error = if (recoveredPhase == LocalTeamMemberPhase.FAILED) {
+                                error.message.orEmpty().take(MAX_ERROR_CHARS)
+                            } else null,
+                        ),
+                    )
+                }
+            }
             throw error
         } finally {
             synchronized(commandLock) { startingMembers.remove(binding.sessionId to memberId) }
