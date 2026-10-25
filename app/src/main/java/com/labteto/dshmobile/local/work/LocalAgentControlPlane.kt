@@ -152,7 +152,7 @@ internal class LocalAgentControlPlane(
                 run.sessionId, args.string("agent_id"),
                 args.string("after_cursor"), args.int("wait_ms", 0),
             )
-            "agent_resume" -> control.resume(run.sessionId, args.string("agent_id"))
+            "agent_resume" -> control.ensureChildLoaded(run.sessionId, args.string("agent_id"))
             "agent_close" -> control.close(run.sessionId, args.string("agent_id"))
             "workflow" -> control.workflow(run, LocalAgentWorkflowRequest(
                 resumeGraphId = args.optionalString("resume_graph_id"),
