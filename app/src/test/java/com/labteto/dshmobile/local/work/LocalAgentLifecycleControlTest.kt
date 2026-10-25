@@ -81,6 +81,38 @@ class LocalAgentLifecycleControlTest {
         }
     }
 
+    @Test fun triggerTurnWakesOnlyRecipientWhileQueueOnlyAndDuplicateStayPassive() {
+        val child = "job-ordinary-1"
+        val other = "job-ordinary-2"
+        val target = addressedAgentWakeTarget(
+            child, LocalAgentMessageDeliveryMode.TRIGGER_TURN,
+            accepted = true, requiresResume = true,
+        )
+        assertEquals(child, target)
+        assertTrue(matchesRequestedAgentRecovery(child, target))
+        assertFalse(matchesRequestedAgentRecovery(other, target))
+        assertEquals(null, addressedAgentWakeTarget(
+            child, LocalAgentMessageDeliveryMode.QUEUE_ONLY,
+            accepted = true, requiresResume = true,
+        ))
+        assertEquals(null, addressedAgentWakeTarget(
+            child, LocalAgentMessageDeliveryMode.TRIGGER_TURN,
+            accepted = true, requiresResume = true, duplicate = true,
+        ))
+        assertEquals(null, addressedAgentWakeTarget(
+            child, LocalAgentMessageDeliveryMode.TRIGGER_TURN,
+            accepted = false, requiresResume = true,
+        ))
+        assertEquals(null, addressedAgentWakeTarget(
+            child, LocalAgentMessageDeliveryMode.TRIGGER_TURN,
+            accepted = true, requiresResume = false,
+        ))
+        assertTrue(runCatching {
+            addressedAgentWakeTarget("", LocalAgentMessageDeliveryMode.TRIGGER_TURN,
+                accepted = true, requiresResume = true)
+        }.isFailure)
+    }
+
     @Test fun explicitResumeNeverSelectsAnotherAgentInSameSession() {
         assertTrue(matchesRequestedAgentRecovery("job-first", null))
         assertTrue(matchesRequestedAgentRecovery("job-second", null))
