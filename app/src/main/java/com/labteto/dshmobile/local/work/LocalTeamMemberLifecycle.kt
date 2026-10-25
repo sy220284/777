@@ -228,9 +228,19 @@ internal class LocalTeamMemberLifecycle(
         }
     }
 
+    /**
+     * Preserve the original recovery barrier before changing a member: first reconcile
+     * provisioning and terminal Job outcomes, then settle the durable Inbox.
+     */
+    private fun synchronizeMemberAndMailbox(sessionId: String) {
+        reconcileProvisioningMembers(sessionId)
+        reconcileMemberOutcomes(sessionId)
+        messageBus.recoverMemberMailbox(sessionId)
+    }
+
     fun disableMember(sessionId: String, targetName: String): String {
         return synchronized(commandLock) {
-            messageBus.recoverMemberMailbox(sessionId)
+            synchronizeMemberAndMailbox(sessionId)
             val state = project(sessionId)
             val member = state.members.singleOrNull { it.name == targetName.trim() }
                 ?: error("TEAM_MEMBER_NOT_FOUND：找不到 teammate：" + targetName)
@@ -252,7 +262,7 @@ internal class LocalTeamMemberLifecycle(
 
     fun dismissMember(sessionId: String, targetName: String): String {
         return synchronized(commandLock) {
-            messageBus.recoverMemberMailbox(sessionId)
+            synchronizeMemberAndMailbox(sessionId)
             val state = project(sessionId)
             val member = state.members.singleOrNull { it.name == targetName.trim() }
                 ?: error("TEAM_MEMBER_NOT_FOUND：找不到 teammate：" + targetName)
