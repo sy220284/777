@@ -1,6 +1,15 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.model.LocalToolCall
+import com.labteto.dshmobile.harness.tools.HarnessTool
+import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
+import com.labteto.dshmobile.harness.tools.ToolAccess
+import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
+import com.labteto.dshmobile.harness.tools.ToolMetadata
+import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.ToolWorkspaceAccess
+import com.labteto.dshmobile.harness.tools.functionToolSchema
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Rule
@@ -97,4 +106,84 @@ class LocalAgentWorkspaceScopePolicyTest {
             normalizeLocalAgentWriteScopes(listOf("one", "two"), 1)
         }.exceptionOrNull()?.message.orEmpty().contains("TEAM_TASK_WRITE_SCOPE_LIMIT"))
     }
+    private fun registeredTool(
+        name: String,
+        access: ToolAccess,
+        workspace: ToolWorkspaceAccess,
+    ) = HarnessTool(
+        name = name,
+        schema = functionToolSchema(name, "test"),
+        access = access,
+        approvalPolicy = ToolApprovalPolicy.NEVER,
+        exposure = ToolExposure.CORE,
+        metadata = ToolMetadata(family = "test", workspaceAccess = workspace),
+        executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+    )
+
+    @Test fun dynamicPluginsCannotSmuggleWorkspaceWritesUnderReadonlyOrMcpNames() {
+        val root = temporary.newFolder("dynamic-gate")
+        val forged = registeredTool("mcp_external_edit", ToolAccess.READ_ONLY, ToolWorkspaceAccess.WRITE)
+        val privileged = registeredTool("github_push", ToolAccess.PRIVILEGED, ToolWorkspaceAccess.NONE)
+        val benign = registeredTool("mcp_read", ToolAccess.READ_ONLY, ToolWorkspaceAccess.NONE)
+        for (plugin in listOf(forged, privileged)) {
+            val failure = runCatching {
+                enforceTeamMemberWorkspaceMutation(
+                    tool(plugin.name, "path", "src/Allowed.kt"), listOf("src"),
+                    root, registeredTool = plugin,
+                )
+            }.exceptionOrNull()
+            assertTrue(plugin.name, failure?.message.orEmpty().contains("TEAM_WRITE_TOOL_UNSCOPABLE"))
+        }
+        enforceTeamMemberWorkspaceMutation(
+            tool("mcp_read", "query", "read-only"), emptyList(), root,
+            registeredTool = benign,
+        )
+        assertTrue(runCatching {
+            enforceTeamMemberWorkspaceMutation(
+                tool("mcp_unregistered", "path", "src/Allowed.kt"), listOf("src"), root,
+            )
+        }.exceptionOrNull()?.message.orEmpty().contains("TEAM_WRITE_TOOL_UNREGISTERED"))
+    }
+
+    @Test fun sideEffectingBuiltinAndBackgroundFetchCannotBypassTeamWriteScopes() {
+        val root = temporary.newFolder("team-side-effects")
+        for (name in listOf("http_request", "job_kill", "memory_update", "media_image_create",
+            "skill_create", "mcp_start_local", "subagent")) {
+            assertTrue(name, runCatching {
+                enforceTeamMemberWorkspaceMutation(
+                    tool(name, "path", "src/Allowed.kt"), listOf("src"), root,
+                )
+            }.exceptionOrNull()?.message.orEmpty().contains("TEAM_WRITE_TOOL_UNSCOPABLE"))
+        }
+        val backgroundArgs = buildJsonObject { put("run_in_background", true) }
+        val backgroundCall = LocalToolCall(
+            "call-bg", "web_fetch", backgroundArgs, backgroundArgs.toString(),
+        )
+        assertTrue(runCatching {
+            enforceTeamMemberWorkspaceMutation(backgroundCall, listOf("src"), root)
+        }.exceptionOrNull()?.message.orEmpty().contains("web_fetch_background"))
+        val readArgs = buildJsonObject { put("run_in_background", false) }
+        enforceTeamMemberWorkspaceMutation(
+            LocalToolCall("call-ro", "web_fetch", readArgs, readArgs.toString()),
+            emptyList(), root,
+        )
+    }
+
+    @Test fun exactNativeWriteContractMustMatchRegistryAndStayWithinTaskScope() {
+        val root = temporary.newFolder("native-contract")
+        val malicious = registeredTool("write", ToolAccess.READ_ONLY, ToolWorkspaceAccess.NONE)
+        assertTrue(runCatching {
+            enforceTeamMemberWorkspaceMutation(
+                tool("write", "path", "src/Allowed.kt"), listOf("src"),
+                root, registeredTool = malicious,
+            )
+        }.exceptionOrNull()?.message.orEmpty().contains("TEAM_WRITE_TOOL_CONTRACT_MISMATCH"))
+        enforceTeamMemberWorkspaceMutation(
+            tool("write", "path", "src/Allowed.kt"), listOf("src"), root,
+            registeredTool = registeredTool(
+                "write", ToolAccess.WORKSPACE_WRITE, ToolWorkspaceAccess.WRITE,
+            ),
+        )
+    }
+
 }
