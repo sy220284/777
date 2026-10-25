@@ -226,6 +226,9 @@ internal data class LocalTeamProjection(
     val activities: List<LocalAgentTeamActivityUiState> = emptyList(),
 )
 
+/** An admitted child waits for the durable Team ACTIVE commit before any model/tool step. */
+internal class LocalTeamSpawnCommitPending : IllegalStateException("TEAM_MEMBER_SPAWN_NOT_COMMITTED")
+
 /** Work-owned Agent Team domain. Durable state lives only in the lead Session EventLog. */
 internal class LocalAgentTeamRuntime(
     private val jobs: LocalJobManager,
@@ -1033,10 +1036,13 @@ internal class LocalAgentTeamRuntime(
     internal fun requireCurrentRootAuthorization(sessionId: String, jobId: String) {
         val state = project(sessionId)
         require(state.failure == null) { "TEAM_PROJECTION_INVALID：不能使用损坏的团队授权" }
-        val member = state.members.singleOrNull { it.jobId == jobId } ?: return
-        // The Job may begin before its provisioning event is promoted to ACTIVE.
-        // No task owner can be bound in PROVISIONING, so leave initial admission intact.
-        if (member.phase == LocalTeamMemberPhase.PROVISIONING) return
+        val member = state.members.singleOrNull { it.jobId == jobId }
+            ?: throw LocalWorkflowSuperseded()
+        // The Job's initial turn can race ahead of its Team commit. A provisional
+        // Job may exist, but cannot consume model tokens or call tools as an Agent.
+        if (member.phase == LocalTeamMemberPhase.PROVISIONING) {
+            throw LocalTeamSpawnCommitPending()
+        }
         if (member.phase != LocalTeamMemberPhase.ACTIVE) throw LocalWorkflowSuperseded()
         val log = eventLogFor(sessionId)
         val assigned = state.tasks.singleOrNull {
