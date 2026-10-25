@@ -165,6 +165,25 @@ internal class LocalAgentTaskGraphController(
             val value = open.plan ?: return@forEach // Legacy progress is not an executable definition.
             val execution = open.graphExecutionId ?: return@forEach
             val plan = LocalWorkTaskGraphPlan(value)
+            val successor = durableTaskGraphReplacement(
+                log = binding.eventLog, sessionId = binding.sessionId,
+                oldGraphId = open.graphId, oldExecutionId = execution,
+                oldPlan = plan,
+            )
+            if (successor != null) {
+                // The replacement start is durable already. A crash between that
+                // start and the former graph's end must never execute both graphs.
+                persistentJobs.cancelWorkflowJobs(
+                    binding.sessionId, execution, preserveSafeSlice = false,
+                )
+                binding.eventLog.append("taskgraph/end", buildJsonObject {
+                    put("graph_id", open.graphId)
+                    put("graph_execution_id", execution)
+                    put("outcome", "replanned")
+                    put("detail", "recovered_successor:$successor")
+                })
+                return@forEach
+            }
             val auth = binding.eventLog.latestMatching(setOf("taskgraph/resume-authorized")) {
                 it["graph_execution_id"]?.jsonPrimitive?.contentOrNull == execution
             }?.data ?: value
