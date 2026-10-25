@@ -281,12 +281,12 @@ internal class LocalPersistentJobRecoveryCoordinator(
         mode: LocalAgentMessageDeliveryMode = LocalAgentMessageDeliveryMode.TRIGGER_TURN,
     ): JobMessageAdmission {
         val result = jobs.sendInput(agentId, input, sessionId)
-        if (shouldWakeAgentAfterAcceptedMessage(
-            mode, result.accepted, result.requiresResume, result.duplicate,
-        )) {
-            // Codex delivery.rs: TriggerTurn wakes the addressed child; QueueOnly is
-            // durable but does not activate it. Never scan unrelated Session Agents.
-            scheduleAgentResume(sessionId, agentId)
+        addressedAgentWakeTarget(
+            agentId, mode, result.accepted, result.requiresResume, result.duplicate,
+        )?.let { recipient ->
+            // TriggerTurn wakes only this recipient through the existing guarded
+            // recovery path. QueueOnly and duplicate deliveries remain passive.
+            scheduleAgentResume(sessionId, recipient)
         }
         return result
     }
