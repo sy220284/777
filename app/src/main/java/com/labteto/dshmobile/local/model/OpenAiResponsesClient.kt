@@ -636,10 +636,13 @@ class OpenAiResponsesClient @Inject constructor(
                 "max_output_tokens" -> LocalModelCompletionReason.OUTPUT_LIMIT
                 else -> LocalModelCompletionReason.INTERRUPTED
             }
-            "interrupted" -> LocalModelCompletionReason.INTERRUPTED
-            else -> LocalModelCompletionReason.COMPLETED
+            "interrupted", "failed", "cancelled", "canceled", "queued", "in_progress" -> LocalModelCompletionReason.INTERRUPTED
+            null, "completed" -> LocalModelCompletionReason.COMPLETED
+            else -> throw responseProtocolError("未知响应状态，不能接纳工具调用")
         }
+        if ("output" in response && response["output"] !is JsonArray) throw responseProtocolError("output 必须是数组")
         val output = response["output"] as? JsonArray ?: JsonArray(emptyList())
+        val allowStreamFallback = response["status"]?.jsonPrimitive?.contentOrNull != "completed" || output.isEmpty()
         if (output.any { item ->
                 val objectValue = item as? JsonObject
                 (objectValue?.get("content") as? JsonArray).orEmpty().any { part ->
@@ -725,14 +728,14 @@ class OpenAiResponsesClient @Inject constructor(
         }
         if (completionReason != LocalModelCompletionReason.COMPLETED) toolCalls.clear()
         val rawContent = content.toString().takeIf(String::isNotBlank)
-            ?: streamedContent.takeIf(String::isNotBlank)
+            ?: streamedContent.takeIf { allowStreamFallback && it.isNotBlank() }
         val settledContent = if (webSources.isEmpty()) rawContent else buildString {
             rawContent?.let { append(it).append("\n\n") }
             append("参考来源：\n")
             webSources.keys.take(8).forEach { append(it).append('\n') }
         }.trimEnd()
         val settledReasoning = reasoning.toString().takeIf(String::isNotBlank)
-            ?: streamedReasoning.takeIf(String::isNotBlank)
+            ?: streamedReasoning.takeIf { allowStreamFallback && it.isNotBlank() }
         val message = buildJsonObject {
             put("role", "assistant")
             if (generatedImageCount == 0) {

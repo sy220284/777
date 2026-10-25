@@ -293,6 +293,7 @@ internal class LocalAgentTaskGraphController(
                     put("node_version", nodeVersion); put("files", files); put("dependencies", inputs)
                     put("dependency_versions", dependencyVersions(ctx.node.dependsOn))
                     put("output_paths", buildJsonArray { plan.outputPaths(ctx.index).forEach { add(JsonPrimitive(it)) } })
+                    put("input_paths", buildJsonArray { plan.inputPaths(ctx.index).forEach { add(JsonPrimitive(it)) } })
                     put("required_evidence", plan.prepared.evidence.getOrNull(ctx.index).orEmpty())
                 }
                 val admissions = recovery.nodeAdmissions(log, execution, ctx.node.id)

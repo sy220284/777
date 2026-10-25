@@ -188,6 +188,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             createWorkspace(sessionId, stableId, repository).getValue("workspace_id").jsonPrimitive.content
         }
         val workspaceBinding = workspaceId?.let { resolveWorkspace(sessionId, it) }
+        if (workspaceBinding != null && workflowFence != null) requireWorkflowWorkspaceInputs(workspaceBinding, workflowFence)
         val runner = subagentRunner(sessionId, boundState, historySnapshot, workspaceBinding)
         val initialHistorySeed = forkParentCallId?.let { parentCallId ->
             val jobId = requestedJobId
@@ -605,6 +606,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     profile.routeFingerprint() == fingerprint
             ) { "持久子代理原模型路由身份已变化，已停止自动续跑" }
             val workspaceBinding = decodePersistentAgentWorkspaceId(payload)?.let { resolveWorkspace(sessionId, it) }
+            if (workspaceBinding != null && workflowFence != null) requireWorkflowWorkspaceInputs(workspaceBinding, workflowFence)
             val runner = subagentRunner(sessionId, boundState, { parentHistory }, workspaceBinding)
             withContext((workspaceBinding ?: kotlin.coroutines.EmptyCoroutineContext) + LocalModelRunContext(profile) + LocalWorkflowExecutionFence {
                 if (workflowFence != null) requireWorkflowFenceCurrent(sessionId, workflowFence)
@@ -653,6 +655,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val scope = currentCoroutineContext()[com.labteto.dshmobile.harness.capability.WorkspaceExecutionContext]
             as? com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext
         if (scope != null) {
+            requireWorkflowWorkspaceInputs(scope, fence)
             workflowOutputRejection(output, fence["required_evidence"]?.jsonPrimitive?.contentOrNull.orEmpty())?.let { error(it) }
             val paths = (fence["output_paths"] as? JsonArray).orEmpty().map { it.jsonPrimitive.content }
             require(paths.isNotEmpty()) { "独立节点必须声明交付路径" }

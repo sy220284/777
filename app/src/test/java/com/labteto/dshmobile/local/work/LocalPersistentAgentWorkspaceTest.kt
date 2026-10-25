@@ -39,4 +39,24 @@ class LocalPersistentAgentWorkspaceTest {
         assertNotNull(workflowOutputRejection("work in progress", "verified"))
         assertNull(workflowOutputRejection("VERIFIED result", " verified "))
     }
+
+    @Test fun copiedInputMustMatchTheAdmittedGraphVersionBeforeExecutionAndMerge() {
+        val home = kotlin.io.path.createTempDirectory("node-inputs-").toFile()
+        try {
+            val source = home.resolve("source").apply { mkdirs() }
+            val repository = source.resolve("project").apply { mkdirs() }
+            val child = home.resolve("child").apply { mkdirs() }
+            repository.resolve("input.txt").writeText("admitted")
+            child.resolve("input.txt").writeText("admitted")
+            val context = LocalWorkspaceExecutionContext(source, LocalWorkspace(child), "a".repeat(32), repository)
+            val fence = buildJsonObject {
+                put("input_paths", buildJsonArray { add(JsonPrimitive("project/input.txt")) })
+                put("files", buildJsonObject { put("project/input.txt", localWorkFileSha256(source, "project/input.txt")) })
+            }
+            requireWorkflowWorkspaceInputs(context, fence)
+            child.resolve("input.txt").writeText("changed during checkout or child work")
+            assertThrows(IllegalArgumentException::class.java) { requireWorkflowWorkspaceInputs(context, fence) }
+            assertEquals("admitted", repository.resolve("input.txt").readText())
+        } finally { home.deleteRecursively() }
+    }
 }
