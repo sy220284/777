@@ -956,9 +956,7 @@ internal class LocalSubagentRunner(
             )
 
             val executionContext = runContext?.let { runCoordinator?.executionContext(it) }
-            val result = if (executionContext != null) {
-                withContext(executionContext) { loop.run(task) }
-            } else loop.run(task)
+            val result = executeLocalSubagentTurn(loop, task, executionContext).getOrThrow()
             if (result.stopReason == com.labteto.dshmobile.harness.agent.AgentStopReason.COMPLETED) {
                 val answer = result.answer.ifBlank { "子代理已结束，但没有返回文字。" }
                 val outputSchema = capabilities.outputSchema

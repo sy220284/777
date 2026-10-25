@@ -46,7 +46,10 @@ class IsolatedAgentService : Service() {
                         val fd = Os.open(probe, OsConstants.O_RDONLY, 0)
                         Os.close(fd); false
                     } catch (error: ErrnoException) {
-                        error.errno == OsConstants.EACCES || error.errno == OsConstants.EPERM
+                        // Android app-data mount namespaces can hide the host's existing
+                        // canary entirely (ENOENT), rather than expose it with EACCES.
+                        error.errno == OsConstants.EACCES || error.errno == OsConstants.EPERM ||
+                            error.errno == OsConstants.ENOENT
                     }
                     connection.send(AgentBackendProtocol.frame(turn, 0, "hello", buildJsonObject {
                         put("pid", Process.myPid()); put("uid", Process.myUid())
