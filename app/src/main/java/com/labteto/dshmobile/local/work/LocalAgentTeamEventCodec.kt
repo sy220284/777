@@ -107,6 +107,10 @@ internal object LocalAgentTeamEventCodec {
             phase = runCatching {
                 LocalTeamMemberPhase.valueOf(member.requiredTeamString("phase").uppercase())
             }.getOrElse { error("TEAM_MEMBER_PHASE_INVALID") },
+            provisionalNewJob = if ("provisionalNewJob" in member) {
+                member["provisionalNewJob"]?.jsonPrimitive?.booleanOrNull
+                    ?: error("TEAM_MEMBER_PROVISIONAL_INTENT_INVALID")
+            } else null,
             error = member.optionalTeamString("error"),
         )
     }
