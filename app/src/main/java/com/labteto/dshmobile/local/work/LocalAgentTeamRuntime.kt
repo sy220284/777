@@ -640,6 +640,7 @@ internal class LocalAgentTeamRuntime(
                 revision = task.revision,
                 completionResultId = task.completionResultId,
                 completionEvidenceSequence = task.completionEvidenceSequence,
+                independentReviewStatus = verification.reviewStatus(sessionId, task, state),
             )
         }
         return LocalAgentTeamUiState(
