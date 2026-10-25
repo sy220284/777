@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.agent.LocalAgentDelegationKind
+import com.labteto.dshmobile.local.agent.requireExecutableAgentBackend
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.buildLocalDelegatedLaunchSpec
 import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
@@ -15,6 +16,8 @@ internal class LocalAgentSpawnController(
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
 ) {
     suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String {
+        // Fail before Job creation, event recording, credential access or model admission.
+        requireExecutableAgentBackend(request.executionBackend)
         val parent = captureLocalAgentParentLink(request.parentToolCallId)
         require(parent == null || parent.sessionId == binding.sessionId) { "AGENT_PARENT_SESSION_MISMATCH" }
         return when (request.kind) {
