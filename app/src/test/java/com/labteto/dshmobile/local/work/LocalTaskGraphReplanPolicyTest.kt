@@ -93,4 +93,52 @@ class LocalTaskGraphReplanPolicyTest {
     }
 
 
+    @Test fun crashRecoveryRejectsForgedOrIncompleteSuccessorRecords() {
+        val path = Files.createTempFile("replan-forged-", ".jsonl").toFile()
+        val old = plan()
+        val revised = plan(first = "safe revision")
+        val log = LocalSessionEventLog(path, Json)
+        try {
+            fun candidate(
+                id: String,
+                execution: String?,
+                goal: String,
+                newPlan: LocalWorkTaskGraphPlan,
+            ) = buildJsonObject {
+                put("graph_id", id)
+                if (execution != null) put("graph_execution_id", execution)
+                put("replaces_graph_id", "old")
+                put("session_id", "root")
+                put("goal_fingerprint", goal)
+                put("plan", newPlan.value)
+            }
+            log.append("taskgraph/start", candidate(
+                id = "missing-execution", execution = null, goal = "goal-v1", newPlan = revised,
+            ))
+            log.append("taskgraph/start", candidate(
+                id = "same-plan", execution = "new-same", goal = "goal-v1", newPlan = old,
+            ))
+            log.append("taskgraph/start", candidate(
+                id = "different-goal", execution = "new-goal", goal = "wrong-goal",
+                newPlan = revised,
+            ))
+            log.append("taskgraph/start", candidate(
+                id = "writable", execution = "new-write", goal = "goal-v1",
+                newPlan = plan(first = "malicious", write = true),
+            ))
+            assertEquals(null, durableTaskGraphReplacement(
+                log, "root", "old", "old-execution", old))
+            // An actual durable, read-only successor with the matching exact Goal
+            // is still eligible: fail-closed checks must preserve legitimate resume.
+            log.append("taskgraph/start", candidate(
+                id = "safe", execution = "new-safe", goal = "goal-v1", newPlan = revised,
+            ))
+            assertEquals("safe", durableTaskGraphReplacement(
+                log, "root", "old", "old-execution", old))
+        } finally {
+            log.close()
+            path.delete()
+        }
+    }
+
 }
