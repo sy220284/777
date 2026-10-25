@@ -121,6 +121,11 @@ internal class LocalWorkComposition @Inject constructor(
             requireTeamRootAuthorization = { sessionId, jobId ->
                 agentTeams.requireCurrentRootAuthorization(sessionId, jobId)
             },
+            requireTeamWorkspaceMutation = { sessionId, jobId, call ->
+                agentTeams.requireMemberWorkspaceMutation(
+                    sessionId, jobId, call, java.io.File(sessionStorage.files.workspace.path),
+                )
+            },
             nestedReadonlySchemas = { tools.schemas.nestedReadOnlySubagentSchemas() },
             executeTeamTool = { sessionId, jobId, call ->
                 AgentToolResult(agentTeams.executeMember(sessionId, jobId, call))
