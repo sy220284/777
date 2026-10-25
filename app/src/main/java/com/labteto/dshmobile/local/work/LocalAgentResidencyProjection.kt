@@ -10,6 +10,33 @@ import kotlinx.serialization.json.jsonObject
 /** Codex-style identity inspection never starts a child or changes its durable state. */
 internal enum class LocalAgentRuntimeResidency { ACTIVE_JOB, UNLOADED, TERMINAL }
 
+/**
+ * Loading a persisted child is an action of its immediate live parent slot, not of
+ * an arbitrary sibling in the same Session. runId may change on a resumed turn;
+ * slotId is the stable parent address and requireCurrent() proves its live owner.
+ * Legacy children without a parent link remain inspectable and use session-only
+ * compatibility until their original admission record can be migrated.
+ */
+internal fun validateImmediateAgentParentForLoad(
+    recorded: LocalAgentParentLink?,
+    caller: LocalAgentParentLink?,
+    ownerSessionId: String,
+) {
+    if (recorded == null) return
+    require(recorded.sessionId == ownerSessionId) {
+        "AGENT_PARENT_SESSION_MISMATCH"
+    }
+    require(caller != null) {
+        "AGENT_PARENT_CONTEXT_REQUIRED"
+    }
+    require(caller.sessionId == ownerSessionId) {
+        "AGENT_PARENT_SESSION_MISMATCH"
+    }
+    require(recorded.parentSlotId == caller.parentSlotId) {
+        "AGENT_PARENT_IMMEDIATE_SLOT_MISMATCH"
+    }
+}
+
 internal data class LocalAgentResidencyView(
     val registration: LocalJobRegistration,
     val residency: LocalAgentRuntimeResidency,
