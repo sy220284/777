@@ -16,6 +16,7 @@ class AgentEagerToolContext internal constructor(
 
 /** Per-step dispatch cache, not another durable ledger: the injected executor owns effect receipts. */
 internal class AgentEagerToolStep(
+    private val scope: CoroutineScope,
     private val turnId: String,
     private val step: Int,
     private val tools: AgentToolExecutor,
@@ -38,7 +39,8 @@ internal class AgentEagerToolStep(
                 emit.append(AgentEvent.ToolStarted(turnId, step, call))
                 val parallel = mayRunParallel(call)
                 val predecessors = if (parallel) listOfNotNull(lastSerial) else entries.values.map { it.result }
-                val task = CoroutineScope(currentCoroutineContext()).async {
+                // Tool children belong to the step/activation, not the provider lease.
+                val task = scope.async {
                     predecessors.forEach { it.await() }
                     currentCoroutineContext().ensureActive()
                     tools.execute(call)

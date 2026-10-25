@@ -57,4 +57,24 @@ class AgentEagerToolStepTest {
         }, isParallelTool = { it.name == "read" }, maxSteps = 1).run("task")
         assertEquals(listOf("mutate", "read"), order)
     }
+    @Test fun providerCompletionReleasesItsModelPermitBeforeEagerChildWaitsForAModel() = runTest {
+        val modelPermit = kotlinx.coroutines.sync.Semaphore(1)
+        val engine = AgentTurnEngine(model = AgentModel {
+            modelPermit.acquire()
+            try {
+                // Models hold their admission lease outside the provider stream context.
+                kotlinx.coroutines.withContext(kotlinx.coroutines.CoroutineName("provider")) {
+                    requireNotNull(currentCoroutineContext()[AgentEagerToolContext]).offer(call)
+                    AgentModelReply(toolCalls = listOf(call))
+                }
+            } finally { modelPermit.release() }
+        }, tools = AgentToolExecutor {
+            modelPermit.acquire()
+            try { AgentToolResult("child model completed") } finally { modelPermit.release() }
+        }, maxSteps = 1)
+        val result = withTimeout(1000) { engine.run("delegate") }
+        assertEquals("child model completed", result.messages.last().content)
+        assertEquals(AgentStopReason.STEP_LIMIT, result.stopReason)
+    }
+
 }

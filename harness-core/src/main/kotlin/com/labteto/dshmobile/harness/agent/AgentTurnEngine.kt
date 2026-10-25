@@ -5,6 +5,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.coroutineScope
 
 /**
  * Kotlin native Turn executor shared by foreground Work, child Agents and
@@ -58,10 +59,15 @@ class AgentTurnEngine(
                 execution?.requireCurrent()
                 val step = turn.startStep()
                 eventSink.append(AgentEvent.StepStarted(turn.turnId, step))
-                val eager = AgentEagerToolStep(turn.turnId, step, tools, eventSink, isParallelTool)
-                val observed = withContext(eager.context) { model.complete(turn.snapshot()) }
-                // An interrupted response may settle already-admitted items, never start new ones.
-                val reply = eager.validate(observed)
+                val (reply, eager) = coroutineScope {
+                    val eager = AgentEagerToolStep(this, turn.turnId, step, tools, eventSink, isParallelTool)
+                    val observed = withContext(eager.context) { model.complete(turn.snapshot()) }
+                    // Provider/model admission is released before waiting for delegated tool work.
+                    val reply = eager.validate(observed)
+                    reply.toolCalls.forEach { eager.result(it) }
+                    reply to eager
+                }
+                // Durable step events stay outside the sampling scope, preserving their original error.
                 execution?.requireCurrent()
                 turn.acceptModelReply(reply)
                 eventSink.append(AgentEvent.AssistantObserved(

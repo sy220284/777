@@ -6,6 +6,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -90,7 +91,11 @@ object AgentBackendProtocol {
     }
 
     /** Host broker verifies worker events against actual model/tool receipts before publishing. */
-    suspend fun host(channel: AgentBackendChannel, request: AgentBackendRequest, services: AgentBackendServices): AgentRunResult {
+    suspend fun host(channel: AgentBackendChannel, request: AgentBackendRequest, services: AgentBackendServices): AgentRunResult =
+        coroutineScope { hostOwned(channel, request, services, this) }
+
+    private suspend fun hostOwned(channel: AgentBackendChannel, request: AgentBackendRequest,
+        services: AgentBackendServices, scope: CoroutineScope): AgentRunResult {
         val state = AgentTurnState(request.turnId, request.input.trim(), request.history)
         var sequence = 0L
         var started = false
@@ -115,7 +120,7 @@ object AgentBackendProtocol {
                 is AgentEvent.StepStarted -> {
                     check(started && stepClosed && (modelReply == null || (requireNotNull(modelReply).toolCalls.isNotEmpty() && requireNotNull(modelReply).completionReason == AgentCompletionReason.COMPLETED)) && terminal == null && event.step == state.steps + 1 && event.step <= limit)
                     state.startStep(); stepClosed = false; extensionDenied = false; delivered.clear()
-                    eager = AgentEagerToolStep(request.turnId, event.step, services.tools, services.events, services.isParallel)
+                    eager = AgentEagerToolStep(scope, request.turnId, event.step, services.tools, services.events, services.isParallel)
                     modelReply = null; observed = false; declared = 0; finished = 0; receipts.clear()
                 }
                 is AgentEvent.AssistantObserved -> {
