@@ -354,7 +354,7 @@ internal class LocalWorkComposition @Inject constructor(
         },
         onRootExecutionSliceStarted = { binding ->
             persistentJobs.schedule(binding.sessionId, rootSliceAdmitted = true)
-            subagents.resumePendingWorkflows(binding)
+            agentControlBuiltins.resumePendingWorkflows(binding)
         },
     )
 
