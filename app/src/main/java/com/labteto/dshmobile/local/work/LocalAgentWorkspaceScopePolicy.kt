@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.work
 
+import kotlinx.serialization.json.booleanOrNull
+
 /**
  * E10: a declared Team write scope is a canonical relative-workspace path.
  * It is an admission/conflict fact; it never substitutes for the actual
