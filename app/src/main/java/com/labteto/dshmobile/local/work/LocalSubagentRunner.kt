@@ -717,8 +717,25 @@ internal class LocalSubagentRunner(
                             requireNotNull(executeTeamTool) { "TEAM_CALLER_UNAVAILABLE" }(
                                 requireNotNull(backgroundJobId), call.toLocalToolCall(),
                             )
-                        } else execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
-                            .also { currentCoroutineContext().ensureActive() }
+                        } else {
+                            val admittedCall = call.toLocalToolCall()
+                            val invoke: suspend () -> AgentToolResult = {
+                                execute(admittedCall, allowMutation, enabledOptionalTools)
+                                    .also { currentCoroutineContext().ensureActive() }
+                            }
+                            if (capabilities.teamManaged) {
+                                val jobId = requireNotNull(backgroundJobId)
+                                val check = requireNotNull(requireTeamWorkspaceMutation) {
+                                    "TEAM_WORKSPACE_WRITE_GATE_REQUIRED"
+                                }
+                                withContext(LocalTeamToolExecutionAdmission {
+                                    executionFence()
+                                    ensureTeamRootAuthorization()
+                                    runContext?.let { runCoordinator?.ensureCurrentOwner(it) }
+                                    check(jobId, admittedCall)
+                                }) { invoke() }
+                            } else invoke()
+                        }
                     }
                 },
                 eventSink = AgentEventSink { event ->
