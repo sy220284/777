@@ -14,10 +14,23 @@ internal class LocalAgentSubtreeBudget(
     }
     private var admitted = 0
     private var requests = 0
+    private val admittedDelegations = hashSetOf<String>()
     @Synchronized fun claim() {
         require(admitted < maxDescendants) { "AGENT_SUBTREE_FANOUT_EXHAUSTED" }
         admitted++
     }
+    /**
+     * Unique identity combines the live immediate parent Run and its model tool call.
+     * Duplicate provider/tool delivery must never create another descendant.
+     */
+    @Synchronized fun claim(delegationIdentity: String) {
+        require(delegationIdentity.isNotBlank()) { "AGENT_SUBTREE_DELEGATION_ID_REQUIRED" }
+        require(delegationIdentity !in admittedDelegations) { "AGENT_SUBTREE_DUPLICATE_DELEGATION" }
+        require(admitted < maxDescendants) { "AGENT_SUBTREE_FANOUT_EXHAUSTED" }
+        admittedDelegations.add(delegationIdentity)
+        admitted++
+    }
+
     @Synchronized fun used(): Int = admitted
     @Synchronized fun claimModelStep() {
         require(requests < maxDescendantModelSteps) { "AGENT_SUBTREE_MODEL_BUDGET_EXHAUSTED" }
