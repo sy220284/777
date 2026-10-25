@@ -137,11 +137,11 @@ internal class LocalTeamMemberLifecycle(
                     " 当前 phase=" + member.phase.name.lowercase()
             }
             val cleanTask = boundedTeamText(task, "task", MAX_TASK_CHARS, allowEmpty = false)
-            if (member.phase == LocalTeamMemberPhase.DISABLED && jobs.snapshotInfos().any { it.id == member.jobId }) {
+            if (member.phase == LocalTeamMemberPhase.DISABLED && jobs.snapshotInfos().any { it.id == member.jobId && it.ownerSessionId == binding.sessionId && it.isAgent }) {
                 JobInboxContract.normalize(QueuedAgentInput(id = "team-resume-validation", content = cleanTask, memoryInput = cleanTask))
             }
             val resumingExisting = member.phase == LocalTeamMemberPhase.DISABLED &&
-                jobs.snapshotInfos().any { it.id == member.jobId }
+                jobs.snapshotInfos().any { it.id == member.jobId && it.ownerSessionId == binding.sessionId && it.isAgent }
             require(!resumingExisting || grantedExtensions.isEmpty() ||
                 grantedExtensions == member.grantedExtensions) {
                 "TEAM_GRANTS_IMMUTABLE：历史成员的持久执行权限不能直接变更；请让 Lead 重新招募成员"
@@ -161,7 +161,9 @@ internal class LocalTeamMemberLifecycle(
         var launchAdmitted = false
         var committed = false
         return try {
-            val existingJob = jobs.snapshotInfos().firstOrNull { it.id == member.jobId }
+            val existingJob = jobs.snapshotInfos().singleOrNull {
+                it.id == member.jobId && it.ownerSessionId == binding.sessionId && it.isAgent
+            }
             if (member.phase == LocalTeamMemberPhase.DISABLED && existingJob != null) {
                 val admission = sendToTeammate(
                     member.jobId,
@@ -288,7 +290,7 @@ internal class LocalTeamMemberLifecycle(
                     " 当前 phase=" + member.phase.name.lowercase()
             }
             if (member.phase == LocalTeamMemberPhase.ACTIVE) {
-                require(jobs.snapshotInfos().any { it.id == member.jobId }) {
+                require(jobs.snapshotInfos().any { it.id == member.jobId && it.ownerSessionId == sessionId && it.isAgent }) {
                     "TEAM_MEMBER_CHILD_MISSING：" + member.name
                 }
                 jobs.interruptContinuableAgent(member.jobId, sessionId)
@@ -319,7 +321,7 @@ internal class LocalTeamMemberLifecycle(
             if (member.phase == LocalTeamMemberPhase.ACTIVE ||
                 member.phase == LocalTeamMemberPhase.DISABLED
             ) {
-                val childExists = jobs.snapshotInfos().any { it.id == member.jobId }
+                val childExists = jobs.snapshotInfos().any { it.id == member.jobId && it.ownerSessionId == sessionId && it.isAgent }
                 require(childExists || member.phase == LocalTeamMemberPhase.DISABLED) {
                     "TEAM_MEMBER_CHILD_MISSING：" + member.name
                 }
