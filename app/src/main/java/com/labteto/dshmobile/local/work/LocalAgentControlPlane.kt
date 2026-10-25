@@ -162,6 +162,7 @@ internal class LocalAgentControlPlane(
             "agent_close" -> control.close(run.sessionId, args.string("agent_id"))
             "workflow" -> control.workflow(run, LocalAgentWorkflowRequest(
                 resumeGraphId = args.optionalString("resume_graph_id"),
+                replanGraphId = args.optionalString("replan_graph_id"),
                 allowMutation = args.boolean("allow_mutation", false).also { requested ->
                     require(!requested || allowMutation) { "当前执行范围不允许可写任务图" }
                 },
