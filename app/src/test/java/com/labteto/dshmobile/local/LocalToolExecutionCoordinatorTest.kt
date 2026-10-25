@@ -34,6 +34,38 @@ import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
 
+    @Test fun teamRevocationDuringApprovalCannotReachARegisteredWriteExecutor() = runBlocking {
+        var liveTask = true
+        var checkedAfterApproval = 0
+        var executed = 0
+        val registry = ToolRegistry().apply {
+            register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) {
+                executed++
+                ToolResult("unacceptable-write")
+            })
+        }
+        val result = coordinator(registry).executeScoped(
+            original = LocalToolCall(
+                "late-team-write", "write", JsonObject(emptyMap()), "{}",
+            ),
+            sessionId = "team-session",
+            allowMutation = true,
+            planModeEnabled = false,
+            approval = { _, _, _ ->
+                liveTask = false // Simulates Lead reassigning the task while approval is open.
+                true
+            },
+            beforeExecution = {
+                checkedAfterApproval++
+                liveTask
+            },
+        )
+        assertTrue(result.isError)
+        assertEquals(0, executed)
+        assertTrue(checkedAfterApproval > 0)
+    }
+
+
     @Test
     fun explicitlyDiscoveredCapabilitySurvivesLaterWorkStepHeuristicRefresh() {
         val registry = ToolRegistry().apply {
