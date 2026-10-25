@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.work
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
+import com.labteto.dshmobile.harness.agent.AgentRunExecutionContext
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -114,7 +115,16 @@ internal class LocalAgentLifecycleController(
             LocalAgentRuntimeResidency.UNLOADED -> Unit
         }
         validateAgentResumeAdmission(view.registration.info, view.registration.snapshot)
-        persistentJobs.scheduleAgentResume(sessionId, agentId)
+        // Handoff is committed under the same live run-slot lock that revokes
+        // previous activations. A displaced caller cannot race a new parent turn.
+        val liveOwner = currentCoroutineContext()[AgentRunExecutionContext]
+        if (liveOwner != null) {
+            liveOwner.commitCurrent(sessionId) {
+                persistentJobs.scheduleAgentResume(sessionId, agentId)
+            }
+        } else {
+            persistentJobs.scheduleAgentResume(sessionId, agentId)
+        }
         return "agent_id=$agentId\nload_requested=true\nload_admitted=unverified" +
             "\nstatus_before=" + view.registration.info.status +
             "\nparent_slot=" + (view.recordedParent?.parentSlotId ?: "legacy_unknown") +
