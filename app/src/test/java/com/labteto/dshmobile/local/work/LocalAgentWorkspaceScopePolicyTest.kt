@@ -62,14 +62,14 @@ class LocalAgentWorkspaceScopePolicyTest {
 
     @Test fun patchMustHaveExplicitAuditedHeadersWithinSameWriteScope() {
         val root = temporary.newFolder("scope-patch")
-        val allowed = "diff --git a/src/Ok.kt b/src/Ok.kt\\n--- a/src/Ok.kt\\n+++ b/src/Ok.kt\\n@@ -1 +1 @@\\n-old\\n+new"
+        val allowed = "diff --git a/src/Ok.kt b/src/Ok.kt\n--- a/src/Ok.kt\n+++ b/src/Ok.kt\n@@ -1 +1 @@\n-old\n+new"
         enforceTeamMemberWorkspaceMutation(tool("apply_patch", "patch", allowed), listOf("src"), root)
         for (patch in listOf(
             allowed.replace("src/Ok.kt", "docs/Other.kt"),
             allowed.replace("src/Ok.kt", "../escape.kt"),
-            allowed + "\\nrename to docs/Other.kt",
-            "--- a/src/Ok.kt\\n+++ b/src/Ok.kt\\n@@ -1 +1 @@\\n-old\\n+new",
-            allowed + "\\nnew file mode 120000",
+            allowed + "\nrename to docs/Other.kt",
+            "--- a/src/Ok.kt\n+++ b/src/Ok.kt\n@@ -1 +1 @@\n-old\n+new",
+            allowed + "\nnew file mode 120000",
         )) {
             assertTrue(runCatching {
                 enforceTeamMemberWorkspaceMutation(tool("apply_patch", "patch", patch),
