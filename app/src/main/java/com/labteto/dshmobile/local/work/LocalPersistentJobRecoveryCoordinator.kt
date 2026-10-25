@@ -284,7 +284,9 @@ internal class LocalPersistentJobRecoveryCoordinator(
         if (shouldWakeAgentAfterAcceptedMessage(
             mode, result.accepted, result.requiresResume, result.duplicate,
         )) {
-            schedule(sessionId)
+            // Codex delivery.rs: TriggerTurn wakes the addressed child; QueueOnly is
+            // durable but does not activate it. Never scan unrelated Session Agents.
+            scheduleAgentResume(sessionId, agentId)
         }
         return result
     }
