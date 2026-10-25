@@ -56,9 +56,10 @@ class LocalWorkGoalDriverTest {
             updateReviewer("review_invalid")
             assertThrows(IllegalStateException::class.java) { commands.updateGoal("completed", null) }
             assertEquals("active", binding.workState.snapshot().goal?.status)
-            assertEquals(LocalWorkGoalDriveResult.PARTIAL, drive(binding, goal, root) {
-                error("Reviewer is unverified; cannot settle")
-            })
+            assertFalse(decideLocalWorkIntegration(localWorkCompletionEvidence(
+                binding.workState.snapshot(),
+                localWorkDeliveryEvidence(binding.eventLog, goal, root),
+            )).readyForGoalAdmission)
             updateReviewer("reviewer_rejected")
             assertThrows(IllegalStateException::class.java) { commands.updateGoal("completed", null) }
             assertEquals("active", binding.workState.snapshot().goal?.status)
