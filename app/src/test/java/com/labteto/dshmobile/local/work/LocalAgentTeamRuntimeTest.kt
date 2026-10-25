@@ -2504,8 +2504,9 @@ class LocalAgentTeamRuntimeTest {
         ).orEmpty()
         assertTrue(taskView.contains("workspace=shared"))
         assertTrue(taskView.contains("write_execution=serialized"))
-        assertTrue(taskView.contains("scope_enforcement=advisory_only"))
+        assertTrue(taskView.contains("scope_enforcement=tool_time_native_path_guard"))
         assertTrue(taskView.contains("claim_conflict=enforced"))
+        assertTrue(taskView.contains("opaque_mutation=denied"))
         assertTrue(taskView.contains("file_isolation=none"))
     }
 
