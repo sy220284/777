@@ -45,7 +45,7 @@ internal val SUBAGENT_EXCLUDED_TOOLS = setOf(
     "session_search", "session_event_trace", "session_event_read", "todo_write", "update_plan",
     "exit_plan_mode",
     "memory_remember", "memory_update", "memory_forget", "vision_analyze_screen",
-    "list_agents", "agent_tree", "agent_inspect", "agent_watch", "agent_resume", "agent_close", "send_message", "interrupt_agent", "list_subagent_models",
+    "list_agents", "agent_tree", "agent_inspect", "agent_watch", "agent_resume", "agent_close", "send_message", "interrupt_agent", "list_subagent_models", "list_agent_roles",
     "team_members", "team_member_status", "team_create_member", "team_start_member",
     "team_spawn", "team_send_message", "team_request_shutdown", "team_messages", "team_message_receipt", "team_wait_for_message",
     "team_task_create", "team_task_get", "team_task_list", "team_task_evidence", "team_task_review", "team_task_update",
