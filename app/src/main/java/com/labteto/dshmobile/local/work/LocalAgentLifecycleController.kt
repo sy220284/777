@@ -106,8 +106,8 @@ internal class LocalAgentLifecycleController(
         val view = registry.observeStandalone(sessionId, agentId)
         validateImmediateAgentParentForLoad(view.recordedParent, caller, sessionId)
         when (view.residency) {
-            LocalAgentRuntimeResidency.ACTIVE_JOB -> return
-                "agent_id=$agentId\\nchild_loaded=true\\nload_action=already_active"
+            LocalAgentRuntimeResidency.ACTIVE_JOB ->
+                return "agent_id=$agentId\nchild_loaded=true\nload_action=already_active"
             LocalAgentRuntimeResidency.TERMINAL -> error(
                 "AGENT_CHILD_TERMINAL：终态代理不能重新加载"
             )
