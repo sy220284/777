@@ -52,7 +52,7 @@ internal class LocalTeamVerificationController(
         val reviewer = state.members.singleOrNull { it.name == reviewerName || it.id == reviewerName }
             ?: error("TEAM_TASK_REVIEW_MEMBER_NOT_FOUND")
         require(reviewer.id != task.ownerId && reviewer.phase == LocalTeamMemberPhase.ACTIVE &&
-            reviewer.role in setOf("verify", "review")) {
+            isQualifiedIndependentReviewRole(reviewer.role)) {
             "TEAM_TASK_REVIEW_INDEPENDENT_MEMBER_REQUIRED"
         }
         require(jobs.snapshotInfos().any {
@@ -112,7 +112,7 @@ internal class LocalTeamVerificationController(
         state: LocalTeamProjection,
     ): Boolean {
         val reviewer = state.members.singleOrNull { it.id == review.reviewerId } ?: return false
-        if (reviewer.id == task.ownerId || reviewer.role !in setOf("verify", "review")) return false
+        if (reviewer.id == task.ownerId || !isQualifiedIndependentReviewRole(reviewer.role)) return false
         if (review.taskId != task.id || review.taskRevision != task.revision ||
             review.taskResultId != task.completionResultId ||
             review.reviewEvidenceSequence <= (task.completionEvidenceSequence ?: return false)) return false
