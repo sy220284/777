@@ -125,7 +125,7 @@ internal class LocalWorkAgentControlRuntime(
         subagents.resumePendingWorkflows(binding)
     }
 
-    override fun list(sessionId: String): String = jobs.listAgents(sessionId)
+    override fun list(sessionId: String): String = registry.list(sessionId)
     override fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String =
         readLocalAgentTree(binding.eventLog, maxNodes).render()
     override fun send(
@@ -134,7 +134,7 @@ internal class LocalWorkAgentControlRuntime(
         message: String,
         mode: LocalAgentMessageDeliveryMode,
     ): String {
-        registry.resolveStandaloneChild(sessionId, agentId)
+        registry.resolveStandalone(sessionId, agentId)
         return persistentJobs.sendMessage(agentId, message, sessionId, mode)
     }
     private val registry = LocalAgentRegistry(jobs)
