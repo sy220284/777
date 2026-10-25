@@ -139,7 +139,12 @@ internal class LocalWorkAgentControlRuntime(
             infos = jobs.snapshotInfos(),
             maxVisible = maxNodes,
         )
-        return "$historical\n\n$live"
+        val durable = renderLocalAgentDurableLineage(
+            sessionId = binding.sessionId,
+            registrations = jobs.agentRegistrations(binding.sessionId),
+            maxVisible = maxNodes,
+        )
+        return "$historical\n\n$live\n\n$durable"
     }
     override fun send(
         sessionId: String,
