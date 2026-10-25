@@ -30,3 +30,29 @@ internal fun admitLocalTaskGraphReplan(
         newPlanVersion = proposed.version,
     )
 }
+
+/**
+ * A durable new start is the recovery cut-over point. Crashing before the older
+ * taskgraph/end must NOT resume both DAGs or replay old model/tool invocations.
+ * The old plan is allowed to be suppressed only for verified read-only replans.
+ */
+internal fun durableTaskGraphReplacement(
+    log: com.labteto.dshmobile.local.session.LocalSessionEventLog,
+    sessionId: String,
+    oldGraphId: String,
+    oldExecutionId: String,
+    oldPlan: LocalWorkTaskGraphPlan,
+): String? {
+    if (oldPlan.writable) return null
+    val candidate = log.latestMatching(setOf("taskgraph/start")) { data ->
+        data["replaces_graph_id"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } == oldGraphId &&
+            data["session_id"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } == sessionId &&
+            data["graph_execution_id"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } != oldExecutionId &&
+            data["goal_fingerprint"] == oldPlan.value["goal_fingerprint"] &&
+            (data["plan"] as? kotlinx.serialization.json.JsonObject)?.let { plan ->
+                plan["allow_mutation"]?.toString() == "false"
+            } == true
+    } ?: return null
+    return (candidate.data["graph_id"] as? kotlinx.serialization.json.JsonPrimitive)
+        ?.content?.takeIf(String::isNotBlank)
+}
