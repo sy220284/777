@@ -2594,6 +2594,17 @@ class LocalAgentTeamRuntimeTest {
         f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
             with(LocalAgentTeamEventCodec) { completed.toEvent(session) })
         val binding = teamBinding(f, session)
+        val pendingProjection = f.runtime.uiState(session)
+        assertEquals("pending", pendingProjection.tasks.single { it.id == "task-1" }.independentReviewStatus)
+        val goal = LocalGoal("核验后的任务可交付", id = "review-goal")
+        val pendingWork = LocalWorkState(
+            goal = goal,
+            team = pendingProjection.copy(members = emptyList(), pendingMessageCount = 0),
+        )
+        assertEquals(1, localWorkCompletionEvidence(pendingWork).unreviewedTeamResults)
+        assertFalse(resolveWorkGoalTransition(
+            goal, goal.copy(status = "completed"), pendingWork,
+        ).accepted)
         suspend fun review(id: String, member: String = "auditor") = f.runtime.execute(
             LocalToolCall(id, "team_task_review", buildJsonObject {
                 put("task_id", "task-1")
@@ -2638,6 +2649,16 @@ class LocalAgentTeamRuntimeTest {
         assertTrue(evidence.contains("review_evidence_binding_valid=true"))
         assertTrue(evidence.contains("reviewer_declared_verdict=approve"))
         assertTrue(evidence.contains("content_verified=false"))
+        val approvedProjection = f.runtime.uiState(session)
+        assertEquals("reviewer_approved",
+            approvedProjection.tasks.single { it.id == "task-1" }.independentReviewStatus)
+        val approvedWork = pendingWork.copy(
+            team = approvedProjection.copy(members = emptyList(), pendingMessageCount = 0),
+        )
+        assertEquals(0, localWorkCompletionEvidence(approvedWork).unreviewedTeamResults)
+        assertTrue(resolveWorkGoalTransition(
+            goal, goal.copy(status = "completed"), approvedWork,
+        ).accepted)
         val cold = LocalAgentTeamRuntime(f.jobs,
             { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
             { _, _, _ -> JobMessageAdmission(false, false, false, "unused") },
