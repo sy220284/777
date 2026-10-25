@@ -315,6 +315,9 @@ internal object LocalAgentTeamReducer {
         next: LocalTeamMemberSnapshot,
     ) {
         require(next.id.isNotBlank() && next.jobId == teamJobId(next.id)) { "TEAM_MEMBER_ID_INVALID" }
+        require(next.phase == LocalTeamMemberPhase.PROVISIONING || next.provisionalNewJob == null) {
+            "TEAM_MEMBER_PROVISIONAL_INTENT_OUTSIDE_ADMISSION"
+        }
         require(next.name.isNotBlank()) { "TEAM_MEMBER_NAME_INVALID" }
         val byName = members.firstOrNull { it.name == next.name && it.id != next.id }
         require(byName == null) { "TEAM_MEMBER_NAME_CONFLICT：" + next.name }
