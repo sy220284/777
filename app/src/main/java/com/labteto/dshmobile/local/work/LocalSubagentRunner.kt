@@ -125,6 +125,7 @@ internal class LocalSubagentRunner(
     private val newNestedRunner: (() -> LocalSubagentRunner)? = null,
     private val executeTeamTool: (suspend (String, LocalToolCall) -> AgentToolResult)? = null,
     private val requireTeamRootAuthorization: ((String) -> Unit)? = null,
+    private val requireTeamWorkspaceMutation: ((String, LocalToolCall) -> Unit)? = null,
     private val spillToolOutput: (String, String) -> Boolean = { _, _ -> false },
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
     private val resolveImageMode: (LocalImageInputMode, String, String) -> LocalImageInputMode,
@@ -672,6 +673,11 @@ internal class LocalSubagentRunner(
                             )
                         } else withContext(LocalModelRunContext(runProfile)) {
                         currentCoroutineContext().ensureActive()
+                        if (capabilities.teamManaged) {
+                            requireNotNull(requireTeamWorkspaceMutation) {
+                                "TEAM_WORKSPACE_WRITE_GATE_REQUIRED"
+                            }(requireNotNull(backgroundJobId), call.toLocalToolCall())
+                        }
                         if (canDelegateNested && call.name == "subagent") {
                             dispatchLocalNestedSubagent(
                                 call = call,
