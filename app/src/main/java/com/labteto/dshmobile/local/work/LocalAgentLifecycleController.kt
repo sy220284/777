@@ -115,10 +115,10 @@ internal class LocalAgentLifecycleController(
         }
         validateAgentResumeAdmission(view.registration.info, view.registration.snapshot)
         persistentJobs.scheduleAgentResume(sessionId, agentId)
-        return "agent_id=$agentId\\nload_requested=true\\nload_admitted=unverified" +
-            "\\nstatus_before=" + view.registration.info.status +
-            "\\nparent_slot=" + (view.recordedParent?.parentSlotId ?: "legacy_unknown") +
-            "\\n说明=加载由原持久 Job 恢复入口处理，身份、邮箱与模型路由不替换"
+        return "agent_id=$agentId\nload_requested=true\nload_admitted=unverified" +
+            "\nstatus_before=" + view.registration.info.status +
+            "\nparent_slot=" + (view.recordedParent?.parentSlotId ?: "legacy_unknown") +
+            "\n说明=加载由原持久 Job 恢复入口处理，身份、邮箱与模型路由不替换"
     }
 
     fun resume(sessionId: String, agentId: String): String {
