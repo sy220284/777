@@ -51,6 +51,12 @@ data class JobMessageAdmission(
     val message: String,
 )
 
+/** A single coherent read of an Agent's UI identity and durable execution state. */
+data class JobRegistration(
+    val info: JobInfo,
+    val snapshot: JobSnapshot,
+)
+
 data class JobSnapshot(
     val id: String,
     val label: String,
@@ -671,6 +677,16 @@ class HarnessJobManager(
     fun list(ownerId: String? = null): String = snapshotRecords(ownerId).let { snapshot ->
         if (snapshot.isEmpty()) "没有后台任务"
         else snapshot.joinToString("\n") { "${it.id} [${it.status}] ${publicLabel(it.label)}" }
+    }
+
+    /**
+     * Inspect live and unloaded Agent identities without activating them. Both projections
+     * are captured under the same existing Job lock, so status and Inbox cannot diverge.
+     */
+    fun agentRegistrations(ownerId: String): List<JobRegistration> = synchronized(lock) {
+        records.values
+            .filter { it.ownerId == ownerId && it.label.startsWith(AGENT_PREFIX) }
+            .map { JobRegistration(it.toJobInfo(), snapshot(it)) }
     }
 
     fun listAgents(ownerId: String? = null): String = synchronized(lock) {
