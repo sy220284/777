@@ -57,7 +57,7 @@ internal object LocalToolPolicy {
         "session_event_trace", "session_event_read", "present" -> ToolExposure.OPTIONAL
         "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect", "list_files",
         "glob", "grep", "bash", "capability_search", "update_plan", "exit_plan_mode",
-        "ask_user_question", "subagent", "list_subagent_models", "session_event_search" -> ToolExposure.CORE
+        "ask_user_question", "subagent", "list_subagent_models", "list_agent_roles", "session_event_search" -> ToolExposure.CORE
         else -> error("内置工具尚未声明模型暴露策略：$name")
     }
 
@@ -115,7 +115,7 @@ internal object LocalToolPolicy {
         "http_request", "media_image_create", "mcp_start_local" -> ToolAccess.PRIVILEGED
         "read", "tool_output_read", "file_inspect", "list_files", "glob", "grep", "job_list", "job_output", "json_query",
         "media_image_options", "media_image_status",
-        "environment_info", "capability_search", "get_goal", "skill", "extension_inspect", "list_subagent_models", "list_agents", "agent_tree", "agent_inspect", "agent_watch",
+        "environment_info", "capability_search", "get_goal", "skill", "extension_inspect", "list_subagent_models", "list_agent_roles", "list_agents", "agent_tree", "agent_inspect", "agent_watch",
         "session_event_search", "session_search", "memory_search", "memory_list",
         "session_trace", "session_event_trace", "session_event_read",
         "team_members", "team_member_status", "team_messages", "team_message_receipt", "team_wait_for_message",
@@ -136,7 +136,7 @@ internal object LocalToolPolicy {
             "ask_user_question" -> "任务"
             "skill", "skill_create", "skill_update", "skill_rollback" -> "技能"
             "extension_record", "extension_inspect", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local" -> "扩展能力"
-            "subagent", "subagent_fork", "workflow", "list_subagent_models", "list_agents", "agent_tree",
+            "subagent", "subagent_fork", "workflow", "list_subagent_models", "list_agent_roles", "list_agents", "agent_tree",
             "send_message", "interrupt_agent", "agent_inspect", "agent_watch", "agent_resume", "agent_close", "team_members", "team_member_status",
             "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown", "team_respond_shutdown", "team_ack_message",
             "team_messages", "team_message_receipt", "team_wait_for_message", "team_task_create", "team_task_get",
@@ -182,6 +182,7 @@ internal object LocalToolPolicy {
             "subagent" -> setOf("子代理", "只读代理", "继承上下文", "并行代理", "subagent")
             "subagent_fork" -> setOf("可写子代理", "继承权限", "fork", "代理写入")
             "list_subagent_models" -> setOf("子代理模型", "worker模型", "模型列表", "模型配置", "密钥可用模型")
+            "list_agent_roles" -> setOf("子代理角色", "代理能力", "安全审查", "Agent roles", "角色配置")
             "list_agents", "send_message", "interrupt_agent", "agent_inspect", "agent_watch", "agent_resume", "agent_close" -> setOf("代理", "agent", "子任务", "消息", "中断")
             "agent_tree" -> setOf("代理树", "主子代理关系", "运行拓扑", "agent tree", "agent lineage")
             "workflow" -> setOf("工作流", "workflow", "流水线", "pipeline", "并行任务")
