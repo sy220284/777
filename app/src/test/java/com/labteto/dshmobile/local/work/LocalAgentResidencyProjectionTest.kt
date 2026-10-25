@@ -1,6 +1,11 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
+import com.labteto.dshmobile.harness.agent.AgentRunIdentity
+import com.labteto.dshmobile.harness.agent.AgentRunOwnership
+import com.labteto.dshmobile.local.agent.captureLocalAgentParentLink
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.agent.LocalAgentParentLink
 import com.labteto.dshmobile.local.agent.toJson
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
@@ -93,4 +98,58 @@ class LocalAgentResidencyProjectionTest {
             projectLocalAgentResidency(registration(payload = "not-json"))
         }.isFailure)
     }
+    @Test fun directParentSlotCanResumeItsChildAcrossRunReplacements() {
+        validateImmediateAgentParentForLoad(parent, parent, "session-1")
+        validateImmediateAgentParentForLoad(
+            parent, parent.copy(parentRunId = "later-parent-turn"), "session-1",
+        )
+        validateImmediateAgentParentForLoad(
+            recorded = null, caller = null, ownerSessionId = "session-1",
+        ) // Explicit legacy compatibility; no fabricated parent is claimed.
+    }
+
+    @Test fun siblingAgentAndForeignSessionCannotLoadRecordedChild() {
+        assertTrue(runCatching {
+            validateImmediateAgentParentForLoad(parent, null, "session-1")
+        }.exceptionOrNull()?.message.orEmpty().contains("AGENT_PARENT_CONTEXT_REQUIRED"))
+        assertTrue(runCatching {
+            validateImmediateAgentParentForLoad(
+                parent, parent.copy(parentSlotId = "sibling-slot"), "session-1",
+            )
+        }.exceptionOrNull()?.message.orEmpty().contains("AGENT_PARENT_IMMEDIATE_SLOT_MISMATCH"))
+        assertTrue(runCatching {
+            validateImmediateAgentParentForLoad(
+                parent, parent.copy(sessionId = "session-foreign"), "session-1",
+            )
+        }.exceptionOrNull()?.message.orEmpty().contains("AGENT_PARENT_SESSION_MISMATCH"))
+        assertTrue(runCatching {
+            validateImmediateAgentParentForLoad(
+                parent.copy(sessionId = "session-foreign"), parent, "session-1",
+            )
+        }.exceptionOrNull()?.message.orEmpty().contains("AGENT_PARENT_SESSION_MISMATCH"))
+    }
+
+    @Test fun onlyCurrentLiveExecutionCanSupplyTheParentLoadCredential() = runBlocking {
+        val owner = AgentRunOwnership()
+        val first = AgentRunIdentity("session-1", "slot-parent", "run-parent")
+        owner.claim(first) {}
+        val firstContext = owner.executionContext(first)
+        withContext(firstContext) {
+            val caller = captureLocalAgentParentLink("call-1")
+            validateImmediateAgentParentForLoad(parent, caller, "session-1")
+        }
+        val next = first.copy(runId = "run-parent-new")
+        owner.claim(next) {}
+        val replacedCaller = withContext(owner.executionContext(next)) {
+            captureLocalAgentParentLink("call-new")
+        }
+        validateImmediateAgentParentForLoad(parent, replacedCaller, "session-1")
+        // Run replacement revoked the first activation. A stale coroutine cannot
+        // regain rights simply because it still knows the same durable slotId.
+        val obsolete = runCatching {
+            withContext(firstContext) { captureLocalAgentParentLink("call-old") }
+        }
+        assertTrue(obsolete.isFailure)
+    }
+
 }
