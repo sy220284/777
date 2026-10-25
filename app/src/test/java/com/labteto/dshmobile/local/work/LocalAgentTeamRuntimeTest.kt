@@ -2576,12 +2576,14 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
-    fun teamRootFenceAllowsProvisioningButRejectsDismissedMembership() {
+    fun teamRootFenceRequiresCommittedMemberAndRejectsDismissedMembership() {
         val session = "team-root-provisioning"
         val f = fixture(session)
         f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member(session, "member-1", "worker", "provisioning"))
-        f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+        assertTrue(runCatching {
+            f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+        }.exceptionOrNull() is LocalTeamSpawnCommitPending)
         f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member(session, "member-1", "worker", "active"))
         f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
@@ -2589,6 +2591,9 @@ class LocalAgentTeamRuntimeTest {
             member(session, "member-1", "worker", "dismissed"))
         assertTrue(runCatching {
             f.runtime.requireCurrentRootAuthorization(session, "job-team-1")
+        }.exceptionOrNull() is LocalWorkflowSuperseded)
+        assertTrue(runCatching {
+            f.runtime.requireCurrentRootAuthorization(session, "job-team-missing")
         }.exceptionOrNull() is LocalWorkflowSuperseded)
         assertNull(f.runtime.project(session).failure)
     }
