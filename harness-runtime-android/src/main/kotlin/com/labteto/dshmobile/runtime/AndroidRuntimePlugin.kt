@@ -457,7 +457,7 @@ class AndroidRuntimePlugin(
                 },
             )
             put("working_directory", buildJsonObject { put("type", "string") })
-            put("tty", buildJsonObject { put("type", "boolean"); put("default", true) })
+            put("tty", buildJsonObject { put("type", "boolean"); put("description", "默认 true；false 为普通管道") })
             for (key in listOf("rows", "columns")) put(key, buildJsonObject {
                 put("type", "integer"); put("minimum", 1); put("maximum", 65535)
             })

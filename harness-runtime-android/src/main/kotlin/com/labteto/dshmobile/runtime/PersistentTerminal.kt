@@ -11,7 +11,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.supervisorScope
 import java.nio.ByteBuffer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -61,7 +61,7 @@ class PersistentPipeTerminalProvider(
                 val python = searchPaths().asSequence().map { File(it, "python3") }
                     .firstOrNull { it.isFile && it.canExecute() }
                     ?: error("PTY_PYTHON_UNAVAILABLE：内置 Python 尚未准备好")
-                val script = requireNotNull(javaClass.getResourceAsStream("pty_bridge.py")) {
+                val script = requireNotNull(PersistentPipeTerminalProvider::class.java.getResourceAsStream("/com/labteto/dshmobile/runtime/pty_bridge.py")) {
                     "PTY_BRIDGE_MISSING：安装包缺少 PTY 传输代码"
                 }.bufferedReader().use { it.readText() }
                 val directory = workingDirectory?.let(::File) ?: defaultWorkingDirectory
@@ -168,14 +168,15 @@ class PersistentPipeTerminalProvider(
         }
     }
 
-    private suspend fun send(sessionId: String, action: (Session) -> Unit): Unit = coroutineScope {
+    private suspend fun send(sessionId: String, action: (Session) -> Unit): Unit = supervisorScope {
         val session = requireLiveSession(sessionId)
         val writer = async(Dispatchers.IO) { action(session) }
         try {
             writer.await()
         } catch (cancelled: CancellationException) {
             // await is cancellable even when the child stopped consuming stdin. Close the
-            // process before coroutineScope joins the blocked OS writer, releasing its pipe.
+            // process before the scope joins the blocked OS writer, releasing its pipe.
+            // Teardown's broken pipe must not replace the caller's cancellation cause.
             withContext(NonCancellable + Dispatchers.IO) { close(sessionId) }
             throw cancelled
         }
