@@ -65,7 +65,7 @@ private val WORK_RUN_REQUIRED = setOf(
     "get_goal", "update_goal", "ask_user_question",
 )
 private val WORK_AGENT_REQUIRED = setOf(
-    "subagent", "subagent_fork", "list_subagent_models", "list_agents", "agent_tree",
+    "subagent", "subagent_fork", "list_subagent_models", "list_agent_roles", "list_agents", "agent_tree",
     "send_message", "interrupt_agent", "agent_inspect", "agent_watch", "agent_resume", "agent_close", "workflow",
     "team_members", "team_member_status", "team_create_member", "team_start_member",
     "team_spawn", "team_send_message", "team_request_shutdown", "team_messages", "team_message_receipt", "team_wait_for_message",
