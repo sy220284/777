@@ -314,6 +314,7 @@ internal class LocalWorkComposition @Inject constructor(
             subagents = subagents,
             persistentJobs = persistentJobs,
             teams = agentTeams,
+            skillWorkspace = sessionStorage.files.workspace,
         )
     }
     private val turnExecutor = LocalWorkAgentTurnExecutor(
