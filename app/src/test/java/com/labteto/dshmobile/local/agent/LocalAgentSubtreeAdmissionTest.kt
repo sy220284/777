@@ -70,4 +70,26 @@ class LocalAgentSubtreeAdmissionTest {
         assertTrue(runCatching { budget.claim() }.isFailure)
         assertEquals(2, budget.used())
     }
+    @Test fun duplicatedToolReceiptCannotCreateAnotherDescendant() {
+        val budget = LocalAgentSubtreeBudget(maxDescendants = 3, maxDescendantModelSteps = 10)
+        budget.claim("session:slot:run-1:tool-1")
+        assertEquals(1, budget.used())
+        assertTrue(runCatching { budget.claim("session:slot:run-1:tool-1") }
+            .exceptionOrNull()?.message.orEmpty().contains("AGENT_SUBTREE_DUPLICATE_DELEGATION"))
+        assertEquals(1, budget.used())
+        budget.claim("session:slot:run-2:tool-1")
+        budget.claim("session:other-slot:run-2:tool-1")
+        assertEquals(3, budget.used())
+    }
+
+    @Test fun exhaustedSubtreeCannotForgetEarlierAdmissionOrUseAnotherIdentity() {
+        val budget = LocalAgentSubtreeBudget(maxDescendants = 1)
+        budget.claim("root:one")
+        assertTrue(runCatching { budget.claim("root:two") }
+            .exceptionOrNull()?.message.orEmpty().contains("AGENT_SUBTREE_FANOUT_EXHAUSTED"))
+        assertTrue(runCatching { budget.claim("root:one") }
+            .exceptionOrNull()?.message.orEmpty().contains("AGENT_SUBTREE_DUPLICATE_DELEGATION"))
+        assertEquals(1, budget.used())
+    }
+
 }
