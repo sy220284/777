@@ -89,7 +89,7 @@ internal object LocalAgentTeamReducer {
                     val reviewer = state.members.singleOrNull { it.id == reviewerId }
                         ?: error("TEAM_TASK_REVIEW_MEMBER_NOT_FOUND")
                     require(reviewer.id != task.ownerId && reviewer.phase == LocalTeamMemberPhase.ACTIVE &&
-                        reviewer.role in setOf("verify", "review")) {
+                        isQualifiedIndependentReviewRole(reviewer.role)) {
                         "TEAM_TASK_REVIEW_INDEPENDENT_MEMBER_REQUIRED"
                     }
                     require(reviewSeq > task.completionEvidenceSequence!! &&
