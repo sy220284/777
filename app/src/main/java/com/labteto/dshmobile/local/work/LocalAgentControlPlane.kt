@@ -5,6 +5,10 @@ import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.agent.bindLocalAgentRole
+import com.labteto.dshmobile.local.agent.renderLocalAgentRoleCatalog
+import com.labteto.dshmobile.local.agent.resolveLocalAgentSkillBindings
+import com.labteto.dshmobile.local.agent.renderDelegatedAgentSkillGuidance
+import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
@@ -30,6 +34,7 @@ internal class LocalAgentControlPlane(
     private val subagents: LocalWorkSubagentRuntime,
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
     private val teams: LocalAgentTeamRuntime,
+    private val skillWorkspace: LocalWorkspace? = null,
 ) {
     private val control: LocalAgentControlPort =
         LocalWorkAgentControlRuntime(jobs, subagents, persistentJobs, teams)
@@ -52,11 +57,12 @@ internal class LocalAgentControlPlane(
         control.executeTeam(run, call)?.let { return it }
 
         return when (call.name) {
+            "list_agent_roles" -> renderLocalAgentRoleCatalog()
             "subagent", "spawn_subagent" -> {
                 val task = args.string("task")
                 val roleBinding = bindLocalAgentRole(
                     requested = args.optionalString("role"),
-                    userInstructions = args.optionalString("instructions").orEmpty(),
+                    userInstructions = delegatedAgentInstructions(args),
                     parentMutationAllowed = false,
                 )
                 val instructions = roleBinding.instructions
@@ -89,7 +95,7 @@ internal class LocalAgentControlPlane(
             "subagent_fork", "fork_subagent" -> {
                 val roleBinding = bindLocalAgentRole(
                     requested = args.optionalString("role"),
-                    userInstructions = args.optionalString("instructions").orEmpty(),
+                    userInstructions = delegatedAgentInstructions(args),
                     parentMutationAllowed = allowMutation,
                 )
                 control.delegate(run, LocalAgentDispatchRequest(
@@ -194,6 +200,22 @@ internal class LocalAgentControlPlane(
         }
     }
 
+    /** Bound by the actual installed local skill inventory, never a model-authored grant. */
+    private fun delegatedAgentInstructions(args: JsonObject): String {
+        val original = args.optionalString("instructions").orEmpty()
+        val skills = args["skill_ids"] ?: return original
+        require(skills is JsonArray) { "AGENT_SKILL_IDS_INVALID" }
+        val requested = skills.map { item ->
+            require(item is JsonPrimitive && item.isString) { "AGENT_SKILL_IDS_INVALID" }
+            item.content
+        }
+        if (requested.isEmpty()) return original
+        val workspace = skillWorkspace ?: error("AGENT_SKILL_WORKSPACE_UNAVAILABLE")
+        val bindings = resolveLocalAgentSkillBindings(workspace, requested)
+        val skillInstructions = renderDelegatedAgentSkillGuidance(bindings)
+        return if (original.isBlank()) skillInstructions else original + "\n\n" + skillInstructions
+    }
+
     private fun JsonObject.outputSchema(): JsonObject? {
         val raw = this["output_schema"] ?: return null
         return raw as? JsonObject ?: error("output_schema 必须是 JSON object")
@@ -218,6 +240,7 @@ internal class LocalAgentControlPlane(
             "subagent_fork",
             "fork_subagent",
             "list_subagent_models",
+            "list_agent_roles",
             "list_agents",
             "agent_tree",
             "send_message",
