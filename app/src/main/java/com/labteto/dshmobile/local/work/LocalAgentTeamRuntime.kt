@@ -252,18 +252,31 @@ internal class LocalAgentTeamRuntime(
 ) {
     // All synchronous Team commands share one commit boundary; suspend starts reserve first.
     private val commandLock = Any()
-    private val memberLifecycle by lazy {
+    private val memberLifecycle: LocalTeamMemberLifecycle by lazy {
         LocalTeamMemberLifecycle(
             jobs, eventLogFor, ::project, commandLock, taskBoard, messageBus,
             startTeammate, sendToTeammate,
         )
     }
-    private val messageBus by lazy {
+    private val messageBus: LocalTeamMessageBus by lazy {
         LocalTeamMessageBus(
             jobs, eventLogFor, ::project, commandLock, sendToTeammate, sendToLead,
-            taskBoard, { session, member -> memberLifecycle.appendMember(session, member) },
+            taskBoard, ::appendMemberThroughLifecycle,
         )
     }
+    /**
+     * MessageBus never owns Team membership; this callback only commits the authoritative
+     * member event through its lifecycle owner, avoiding circular property inference.
+     */
+    private fun appendMemberThroughLifecycle(sessionId: String, member: LocalTeamMemberSnapshot) {
+        memberLifecycle.appendMember(sessionId, member)
+    }
+
+    /** Preserve the original mailbox reconciliation barrier for Lead/UI commands. */
+    private fun synchronizeTeamRuntime(sessionId: String) {
+        messageBus.recoverMemberMailbox(sessionId)
+    }
+
     private val resultMailbox by lazy {
         LocalTeamResultMailbox(eventLogFor, ::project, verification)
     }
