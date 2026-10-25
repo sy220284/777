@@ -254,7 +254,7 @@ internal class LocalSubagentRunner(
             val check = requireNotNull(requireTeamRootAuthorization) {
                 "TEAM_MEMBER_AUTHORIZATION_GATE_REQUIRED"
             }
-            awaitCommittedTeamAgentAdmission { check(jobId) }
+            awaitCommittedTeamAgentAdmission(check = { check(jobId) })
         }
         val parentCallId = spec.parentCallId
         val modelOverride = spec.modelOverride
