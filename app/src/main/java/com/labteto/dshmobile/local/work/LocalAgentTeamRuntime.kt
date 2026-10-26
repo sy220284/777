@@ -729,6 +729,31 @@ internal class LocalAgentTeamRuntime(
         messageBus.sendMessage(sessionId, member.name, message)
     }
 
+    /** Shared AgentControl addresses the original Job, while Team retains all membership effects. */
+    internal suspend fun stopOwnedAgentJob(sessionId: String, agentId: String, permanently: Boolean): String {
+        val caller = requireNotNull(currentCoroutineContext()[com.labteto.dshmobile.harness.agent.AgentRunExecutionContext]) {
+            "AGENT_CONTROL_CALLER_REQUIRED"
+        }
+        caller.requireCurrent(sessionId)
+        val parent = com.labteto.dshmobile.local.agent.captureLocalAgentParentLink()
+        awaitProjection(sessionId)
+        currentCoroutineContext().ensureActive()
+        return caller.commitCurrent(sessionId) {
+            synchronized(commandLock) {
+                val registration = requireAgentRegistration(jobs.agentRegistrations(sessionId), sessionId, agentId)
+                validateImmediateAgentParentForLoad(projectLocalAgentResidency(registration).recordedParent, parent, sessionId)
+                synchronizeTeamRuntime(sessionId)
+                val member = project(sessionId).members.singleOrNull { it.jobId == agentId }
+                    ?: error("TEAM_MEMBER_EXPIRED：原成员执行身份已改变")
+                if (permanently) memberLifecycle.dismissMember(sessionId, member.name)
+                else {
+                    require(member.phase == LocalTeamMemberPhase.ACTIVE) { "TEAM_MEMBER_NOT_ACTIVE" }
+                    jobs.interruptContinuableAgent(agentId, sessionId)
+                }
+            }
+        }
+    }
+
     internal fun interruptUiMember(sessionId: String, memberId: String, expectedJobId: String? = null): String = synchronized(commandLock) {
         synchronizeTeamRuntime(sessionId)
         val member = project(sessionId).members.singleOrNull {
