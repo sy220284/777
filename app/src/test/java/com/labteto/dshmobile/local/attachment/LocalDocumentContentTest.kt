@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.attachment
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.charset.StandardCharsets
+import java.util.zip.GZIPOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import org.junit.Assert.assertFalse
@@ -216,6 +217,69 @@ class LocalDocumentContentTest {
             assertTrue(result.text.contains("压缩包内正文"))
         } finally {
             file.parentFile?.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun largeZipEntryRemainsAttachableWithExplicitPartialPreview() {
+        val root = kotlin.io.path.createTempDirectory("large-zip-").toFile()
+        try {
+            val file = File(root, "large.zip")
+            ZipOutputStream(file.outputStream()).use { zip ->
+                zip.putNextEntry(ZipEntry("big.md"))
+                val chunk = ByteArray(16 * 1024) { 'A'.code.toByte() }
+                repeat(576) { zip.write(chunk) }
+                zip.closeEntry()
+            }
+            val result = LocalDocumentContent.extract(file, file.name, "application/zip")
+            assertTrue(result.parsed)
+            assertTrue(result.text.contains("big.md"))
+            assertTrue(result.truncated)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun largeGzipShowsTruncatedPreviewInsteadOfRejectingExpandedBytes() {
+        val root = kotlin.io.path.createTempDirectory("large-gzip-").toFile()
+        try {
+            val file = File(root, "large.log.gz")
+            GZIPOutputStream(file.outputStream()).use { output ->
+                val buffer = ("log entry\n".repeat(4096)).toByteArray()
+                repeat(240) { output.write(buffer) }
+            }
+            val result = LocalDocumentContent.extract(file, file.name, "application/gzip")
+            assertTrue(result.parsed)
+            assertTrue(result.truncated)
+            assertTrue(result.text.contains("log entry"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun tarGzipDisplaysFileListWithoutUnpackingWholeArchive() {
+        val root = kotlin.io.path.createTempDirectory("tar-gzip-").toFile()
+        try {
+            val file = File(root, "source.tar.gz")
+            val data = "hello from archive".toByteArray()
+            val header = ByteArray(512)
+            "src/main.kt".toByteArray().copyInto(header)
+            data.size.toString(8).padStart(11, '0').plus("\u0000")
+                .toByteArray().copyInto(header, destinationOffset = 124)
+            GZIPOutputStream(file.outputStream()).use { output ->
+                output.write(header)
+                output.write(data)
+                output.write(ByteArray(512 - data.size))
+                output.write(ByteArray(1024))
+            }
+            val result = LocalDocumentContent.extract(file, file.name, "application/gzip")
+            assertTrue(result.parsed)
+            assertTrue(result.text.contains("src/main.kt"))
+            assertTrue(result.text.contains("hello from archive"))
+        } finally {
+            root.deleteRecursively()
         }
     }
 

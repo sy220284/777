@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.tools
 
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -82,5 +83,22 @@ internal data class LocalToolCapabilityIntent(
             "release",
         )
         private val PR_INTENT_REGEX = Regex("(^|[^a-z])pr([^a-z]|$)")
+    }
+}
+
+/** A local archive reference on the newest user turn admits archive tools without making them global core tools. */
+internal fun latestUserTurnHasArchive(history: List<JsonObject>): Boolean {
+    val user = history.lastOrNull { it["role"]?.jsonPrimitive?.contentOrNull == "user" }
+        ?: return false
+    val parts = user["content"] as? JsonArray ?: return false
+    return parts.any { part ->
+        val obj = part as? JsonObject ?: return@any false
+        if (obj["type"]?.jsonPrimitive?.contentOrNull != "local_file_ref") return@any false
+        val name = obj["name"]?.jsonPrimitive?.contentOrNull.orEmpty().lowercase()
+        val type = obj["mediaType"]?.jsonPrimitive?.contentOrNull.orEmpty().lowercase()
+        listOf(".zip", ".tar", ".tar.gz", ".tgz", ".gz", ".jar", ".aar", ".apk",
+            ".docx", ".xlsx", ".pptx", ".epub").any(name::endsWith) ||
+            type in setOf("application/zip", "application/gzip", "application/x-gzip",
+                "application/x-tar")
     }
 }

@@ -317,7 +317,7 @@ internal object LocalDocumentContent {
     }
 
     private fun extractPdfBestEffort(file: File, maxChars: Int): LocalDocumentText {
-        val raw = readBounded(file, 20 * 1024 * 1024)
+        val raw = readPrefix(file, MAX_ZIP_ENTRY_BYTES)
         val source = String(raw, StandardCharsets.ISO_8859_1)
         val out = BoundedText(maxChars)
         var cursor = 0
@@ -357,7 +357,7 @@ internal object LocalDocumentContent {
         return LocalDocumentText(
             formatLabel = "PDF",
             text = cleaned.take(maxChars),
-            truncated = out.truncated || cleaned.length > maxChars,
+            truncated = out.truncated || cleaned.length > maxChars || file.length() > raw.size,
             parsed = cleaned.isNotBlank(),
         )
     }
@@ -375,8 +375,7 @@ internal object LocalDocumentContent {
             out.appendLine("压缩包文件列表（最多显示 $MAX_ARCHIVE_ENTRIES 项）：")
             entries.forEach { out.appendLine("- ${it.name}（${it.size.coerceAtLeast(0)} B）") }
             entries.filter { entry ->
-                entry.name.substringAfterLast('.', "").lowercase() in plainTextExtensions &&
-                    entry.size in 0L..MAX_ZIP_ENTRY_BYTES.toLong()
+                entry.name.substringAfterLast('.', "").lowercase() in plainTextExtensions
             }.take(12).forEach { entry ->
                 val text = zip.readEntryText(entry.name) ?: return@forEach
                 out.appendLine()
@@ -389,18 +388,32 @@ internal object LocalDocumentContent {
                     },
                 )
             }
+            incomplete = incomplete || zip.previewLimited
         }
         return LocalDocumentText("ZIP", out.value(), out.truncated || incomplete)
     }
 
     private fun extractGzip(file: File, displayName: String, maxChars: Int): LocalDocumentText {
-        val bytes = GZIPInputStream(file.inputStream()).use { readInputBounded(it, MAX_ZIP_ENTRY_BYTES) }
-        val text = decodeText(bytes)
-        return bounded("GZIP ${displayName.substringBeforeLast('.')}", text, maxChars)
+        // A large compressed attachment is stored in full. Only its bounded preview
+        // is inflated here; the full archive remains accessible to workspace tools.
+        val bytes = GZIPInputStream(file.inputStream()).use { readPrefix(it, MAX_ZIP_ENTRY_BYTES + 1) }
+        val isTar = displayName.endsWith(".tar.gz", ignoreCase = true) ||
+            displayName.endsWith(".tgz", ignoreCase = true)
+        if (isTar) return extractTarPreview(bytes, maxChars, bytes.size > MAX_ZIP_ENTRY_BYTES)
+        val preview = bounded("GZIP ${displayName.substringBeforeLast('.')}", decodeText(bytes), maxChars)
+        return preview.copy(truncated = preview.truncated || bytes.size > MAX_ZIP_ENTRY_BYTES)
     }
 
     private fun extractTar(file: File, maxChars: Int): LocalDocumentText {
-        val bytes = readBounded(file, 20 * 1024 * 1024)
+        val bytes = readPrefix(file, MAX_ZIP_ENTRY_BYTES + 1)
+        return extractTarPreview(bytes, maxChars, file.length() > MAX_ZIP_ENTRY_BYTES)
+    }
+
+    private fun extractTarPreview(
+        bytes: ByteArray,
+        maxChars: Int,
+        prefixTruncated: Boolean,
+    ): LocalDocumentText {
         val out = BoundedText(maxChars)
         var offset = 0
         var entries = 0
@@ -425,11 +438,11 @@ internal object LocalDocumentContent {
         val moreEntries = if (entries >= MAX_ARCHIVE_ENTRIES && offset + 512 <= bytes.size) {
             bytes.copyOfRange(offset, offset + 512).any { it != 0.toByte() }
         } else false
-        return LocalDocumentText("TAR", out.value(), out.truncated || moreEntries)
+        return LocalDocumentText("TAR", out.value(), out.truncated || moreEntries || prefixTruncated)
     }
 
     private fun extractLegacyOffice(file: File, extension: String, maxChars: Int): LocalDocumentText {
-        val bytes = readBounded(file, 20 * 1024 * 1024)
+        val bytes = readPrefix(file, MAX_ZIP_ENTRY_BYTES)
         val candidates = LinkedHashSet<String>()
         collectAsciiRuns(bytes, candidates)
         collectUtf16LeRuns(bytes, candidates)
@@ -445,7 +458,9 @@ internal object LocalDocumentContent {
             "xls" -> "Excel XLS（兼容提取）"
             else -> "PowerPoint PPT（兼容提取）"
         }
-        return bounded(label, text, maxChars).copy(parsed = text.isNotBlank())
+        val preview = bounded(label, text, maxChars)
+        return preview.copy(parsed = text.isNotBlank(),
+            truncated = preview.truncated || file.length() > bytes.size)
     }
 
     private fun withSafeZip(file: File, block: (SafeZip) -> Unit) {
@@ -454,15 +469,26 @@ internal object LocalDocumentContent {
 
     private class SafeZip(private val zip: ZipFile) {
         private var totalInflated = 0
+        var previewLimited = false
+            private set
 
         fun entries() = zip.entries()
 
         fun readEntryText(name: String): String? {
             val entry = zip.getEntry(name) ?: return null
-            if (entry.isDirectory || entry.size > MAX_ZIP_ENTRY_BYTES) return null
-            val bytes = zip.getInputStream(entry).use { readInputBounded(it, MAX_ZIP_ENTRY_BYTES) }
+            if (entry.isDirectory) return null
+            val remaining = minOf(MAX_ZIP_ENTRY_BYTES, MAX_ZIP_TOTAL_BYTES - totalInflated)
+            if (remaining <= 0 || entry.size > remaining) {
+                previewLimited = true
+                return null
+            }
+            // Unknown uncompressed entry sizes cannot force an unbounded inflate.
+            val bytes = zip.getInputStream(entry).use { readPrefix(it, remaining + 1) }
+            if (bytes.size > remaining) {
+                previewLimited = true
+                return null
+            }
             totalInflated += bytes.size
-            require(totalInflated <= MAX_ZIP_TOTAL_BYTES) { "压缩文档解压内容超过安全上限" }
             return decodeText(bytes)
         }
     }
@@ -720,16 +746,18 @@ internal object LocalDocumentContent {
         file.inputStream().use { readInputBounded(it, maxBytes) }
 
     private fun readPrefix(file: File, maxBytes: Int): ByteArray =
-        file.inputStream().use { input ->
-            val out = ByteArrayOutputStream()
-            val buffer = ByteArray(16 * 1024)
-            while (out.size() < maxBytes) {
-                val read = input.read(buffer, 0, minOf(buffer.size, maxBytes - out.size()))
-                if (read < 0) break
-                out.write(buffer, 0, read)
-            }
-            out.toByteArray()
+        file.inputStream().use { readPrefix(it, maxBytes) }
+
+    private fun readPrefix(input: java.io.InputStream, maxBytes: Int): ByteArray {
+        val out = ByteArrayOutputStream()
+        val buffer = ByteArray(16 * 1024)
+        while (out.size() < maxBytes) {
+            val read = input.read(buffer, 0, minOf(buffer.size, maxBytes - out.size()))
+            if (read < 0) break
+            out.write(buffer, 0, read)
         }
+        return out.toByteArray()
+    }
 
     private fun readInputBounded(input: java.io.InputStream, maxBytes: Int): ByteArray {
         val out = ByteArrayOutputStream()

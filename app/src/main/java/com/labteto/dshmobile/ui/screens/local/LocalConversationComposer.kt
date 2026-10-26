@@ -13,6 +13,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -33,7 +37,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
@@ -89,6 +95,7 @@ internal fun LocalConversationComposer(
     activeModelProfile: LocalModelProfile?,
     input: String,
     attachments: List<LocalImportedAttachment>,
+    attachmentImportProgress: Pair<Int, Int>? = null,
     onInputChange: (String) -> Unit,
     onRemoveAttachment: (Int) -> Unit,
     onClearAttachments: () -> Unit,
@@ -143,7 +150,7 @@ internal fun LocalConversationComposer(
     // A chat temperature change is committed asynchronously. Do not submit the next
     // turn with the old sampling value while the new persona setting is still saving.
     val temperatureWritePending = state.usageMode == LocalUsageMode.CHAT && temperatureSaving
-    val canSend = !state.loading &&
+    val canSend = !state.loading && attachmentImportProgress == null &&
         !temperatureWritePending &&
         groupChatReady &&
         (input.isNotBlank() || attachments.isNotEmpty())
@@ -217,6 +224,7 @@ internal fun LocalConversationComposer(
             icon = null,
             iconPainter = painterResource(R.drawable.ic_ui_add),
             contentDescription = moreActionsLabel,
+            enabled = attachmentImportProgress == null,
             onClick = {
                 capabilityPanel = null
                 // Both collapsed and expanded composers open the same complete action sheet.
@@ -318,33 +326,47 @@ internal fun LocalConversationComposer(
                 },
             )
         }
-        val imageAttachments = attachments.mapIndexedNotNull { index, attachment ->
-            (index to attachment).takeIf { attachment.mediaType.startsWith("image/") }
-        }
-        if (imageAttachments.isNotEmpty()) {
-            LazyRow(
+        if (attachments.size > 1 || attachmentImportProgress != null) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                items(
-                    items = imageAttachments,
-                    key = { (index, attachment) -> "$index:${attachment.relativePath}" },
-                ) { (index, attachment) ->
-                    ImportedImageAttachmentTile(
-                        attachment = attachment,
-                        workspacePath = state.workspacePath,
-                        onRemove = { onRemoveAttachment(index) },
-                    )
+                Text(
+                    if (attachmentImportProgress != null) {
+                        "正在添加附件 ${attachmentImportProgress.first}/${attachmentImportProgress.second}"
+                    } else "已添加 ${attachments.size} 个附件",
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.textSecondary,
+                )
+                if (attachments.isNotEmpty() && attachmentImportProgress == null) {
+                    SyButton("清空", onClearAttachments,
+                        variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
                 }
             }
         }
-        attachments.forEachIndexed { index, attachment ->
-            if (!attachment.mediaType.startsWith("image/")) {
-                ImportedAttachmentRow(
-                    attachment = attachment,
-                    workspacePath = state.workspacePath,
-                    onRemove = { onRemoveAttachment(index) },
-                )
+        if (attachments.isNotEmpty()) {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().testTag("composer-attachments"),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+            ) {
+                items(
+                    items = attachments.mapIndexed { index, attachment -> index to attachment },
+                    key = { (index, attachment) -> "$index:${attachment.relativePath}" },
+                ) { (index, attachment) ->
+                    if (attachment.mediaType.startsWith("image/")) {
+                        ImportedImageAttachmentTile(
+                            attachment = attachment,
+                            workspacePath = state.workspacePath,
+                            onRemove = { onRemoveAttachment(index) },
+                        )
+                    } else {
+                        ImportedAttachmentRow(
+                            attachment = attachment,
+                            onRemove = { onRemoveAttachment(index) },
+                        )
+                    }
+                }
             }
         }
 
@@ -493,61 +515,60 @@ private fun ImportedImageAttachmentTile(
     }
 }
 
+/** Consistent, readable sizes for compact file chips. */
+internal fun localAttachmentDisplaySize(bytes: Long): String = when {
+    bytes < 1_024L -> "$bytes B"
+    bytes < 1_048_576L -> "${bytes / 1_024L} KB"
+    bytes < 1_073_741_824L -> java.lang.String.format(java.util.Locale.ROOT, "%.1f MB", bytes / 1_048_576.0)
+    else -> java.lang.String.format(java.util.Locale.ROOT, "%.2f GB", bytes / 1_073_741_824.0)
+}
+
 @Composable
 private fun ImportedAttachmentRow(
     attachment: LocalImportedAttachment,
-    workspacePath: String,
     onRemove: () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    var thumbnail by remember(attachment.relativePath, workspacePath) {
-        mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)
-    }
-    LaunchedEffect(attachment.relativePath, workspacePath) {
-        thumbnail = if (attachment.mediaType.startsWith("image/")) {
-            withContext(Dispatchers.IO) {
-                decodeLocalAttachmentThumbnail(workspacePath, attachment.relativePath)
-            }
-        } else {
-            null
-        }
-    }
-    SyGlassCard {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            thumbnail?.let { image ->
-                Image(
-                    bitmap = image,
-                    contentDescription = null,
-                    modifier = Modifier.size(52.dp).clip(DsShapes.block),
-                )
-            }
-            androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
-                Text(
-                    attachment.name,
-                    style = DsType.small13Strong.withReadingWeight(),
-                    color = colors.text,
-                )
-                val dimensions = if (attachment.width != null && attachment.height != null) {
-                    " · ${attachment.width}×${attachment.height}"
-                } else {
-                    ""
-                }
-                Text(
-                    "${attachment.mediaType}$dimensions · ${attachment.bytes} B",
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.textTertiary,
-                )
-            }
-            SyButton(
-                stringResource(R.string.common_remove),
-                onRemove,
-                variant = SyButtonVariant.Ghost,
-                size = SyButtonSize.Small,
+    val kind = attachment.name.substringAfterLast('.', "").uppercase()
+        .takeIf { it.length in 1..7 } ?: "文件"
+    Row(
+        modifier = Modifier
+            .widthIn(max = 276.dp)
+            .heightIn(min = 60.dp)
+            .clip(DsShapes.block)
+            .background(colors.selected.copy(alpha = 0.55f))
+            .border(1.dp, colors.border, DsShapes.block)
+            .padding(start = SyMetric.gapMd, end = SyMetric.gapXs, top = SyMetric.gapSm, bottom = SyMetric.gapSm),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = FeatherIcons.FileText,
+            contentDescription = null,
+            modifier = Modifier.size(19.dp),
+            tint = colors.textSecondary,
+        )
+        Column(modifier = Modifier.weight(1f, fill = false)) {
+            Text(
+                attachment.name,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = DsType.small13Strong.withReadingWeight(),
+                color = colors.text,
+            )
+            Text(
+                "$kind · ${localAttachmentDisplaySize(attachment.bytes)}",
+                maxLines = 1,
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.textSecondary,
             )
         }
+        SyIconButton(
+            icon = FeatherIcons.X,
+            contentDescription = stringResource(R.string.common_remove) + " " + attachment.name,
+            onClick = onRemove,
+            iconSize = 16.dp,
+            tint = colors.textSecondary,
+        )
     }
 }

@@ -2,8 +2,6 @@ package com.labteto.dshmobile.local
 
 import android.content.Context
 import com.labteto.dshmobile.core.net.withCancellableHttpResponse
-import com.labteto.dshmobile.local.runtime.DEFAULT_DOWNLOAD_BYTES
-import com.labteto.dshmobile.local.runtime.MAX_DOWNLOAD_BYTES
 import com.labteto.dshmobile.local.web.BoundedWebBody
 import com.labteto.dshmobile.local.web.LOCAL_WEB_MAX_RESPONSE_BYTES
 import com.labteto.dshmobile.local.web.LOCAL_WEB_USER_AGENT
@@ -214,13 +212,13 @@ class LocalWebProvider @Inject constructor(
     suspend fun downloadTo(
         input: String,
         destination: File,
-        maxBytes: Long = DEFAULT_DOWNLOAD_BYTES,
+        maxBytes: Long = Long.MAX_VALUE,
         timeoutSeconds: Long = DEFAULT_FETCH_TIMEOUT_SECONDS,
     ): LocalDownloadResult = withContext(Dispatchers.IO) {
-        val boundedMax = maxBytes.coerceIn(MIN_DOWNLOAD_BYTES, MAX_DOWNLOAD_BYTES)
+        require(maxBytes > 0L) { "最大下载字节数必须大于 0" }
         var current = validateTarget(input)
         repeat(MAX_REDIRECTS + 1) { redirectCount ->
-            val route = requestRoute(current, timeoutSeconds)
+            val route = requestRoute(current, timeoutSeconds, streamingDownload = true)
             val builder = Request.Builder()
                 .url(route.url)
                 .header("User-Agent", LOCAL_WEB_USER_AGENT)
@@ -244,8 +242,8 @@ class LocalWebProvider @Inject constructor(
                 }
                 val body = response.body ?: throw LocalWebException("EMPTY_BODY", "下载响应为空")
                 val declared = body.contentLength()
-                if (declared > boundedMax) {
-                    throw LocalWebException("DOWNLOAD_TOO_LARGE", "下载文件超过 ${boundedMax} 字节上限")
+                if (declared > maxBytes) {
+                    throw LocalWebException("DOWNLOAD_TOO_LARGE", "下载文件超过指定的 ${maxBytes} 字节上限")
                 }
                 destination.parentFile?.mkdirs()
                 val temporary = File.createTempFile("web-download-", ".part", destination.absoluteFile.parentFile)
@@ -260,13 +258,13 @@ class LocalWebProvider @Inject constructor(
                                 val read = inputStream.read(buffer)
                                 currentCoroutineContext().ensureActive()
                                 if (read < 0) break
-                                total += read
-                                if (total > boundedMax) {
+                                if (read.toLong() > maxBytes - total) {
                                     throw LocalWebException(
                                         "DOWNLOAD_TOO_LARGE",
-                                        "下载文件超过 ${boundedMax} 字节上限",
+                                        "下载文件超过指定的 ${maxBytes} 字节上限",
                                     )
                                 }
+                                total += read
                                 digest.update(buffer, 0, read)
                                 output.write(buffer, 0, read)
                             }
@@ -395,8 +393,12 @@ class LocalWebProvider @Inject constructor(
 
     private fun validateTarget(input: String): com.labteto.dshmobile.local.web.LocalWebTargetResolver.ValidatedTarget = targetResolver.validateTarget(input)
     private fun normalizeInput(input: String): String = targetResolver.normalizeInput(input)
-    private fun requestRoute(target: com.labteto.dshmobile.local.web.LocalWebTargetResolver.ValidatedTarget, timeoutSeconds: Long): com.labteto.dshmobile.local.web.LocalWebTargetResolver.RequestRoute =
-        targetResolver.requestRoute(target, timeoutSeconds)
+    private fun requestRoute(
+        target: com.labteto.dshmobile.local.web.LocalWebTargetResolver.ValidatedTarget,
+        timeoutSeconds: Long,
+        streamingDownload: Boolean = false,
+    ): com.labteto.dshmobile.local.web.LocalWebTargetResolver.RequestRoute =
+        targetResolver.requestRoute(target, timeoutSeconds, streamingDownload)
     private suspend fun <T> executeWithTransientRetry(
         client: OkHttpClient,
         request: Request,
@@ -446,9 +448,6 @@ class LocalWebProvider @Inject constructor(
         const val NETWORK_RETRY_BACKOFF_MS = 200L
         const val DEFAULT_FETCH_TIMEOUT_SECONDS = 45L
         const val MAX_REQUEST_BODY_BYTES = 1024 * 1024
-        const val MIN_DOWNLOAD_BYTES = 1024L
-        const val DEFAULT_DOWNLOAD_BYTES = 20L * 1024L * 1024L
-        const val MAX_DOWNLOAD_BYTES = 100L * 1024L * 1024L
         val HTTP_METHODS = setOf("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE")
         val SAFE_RETRY_METHODS = setOf("GET", "HEAD")
         val SAFE_REQUEST_HEADERS = setOf("accept", "content-type", "if-none-match", "if-modified-since")
