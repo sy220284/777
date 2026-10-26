@@ -34,7 +34,7 @@ class LocalWorkToolActivityReaderTest {
         assertFalse(shouldShowWorkToolReadFailure(0, true))
     }
 
-    @Test fun failedReadRetriesAutomaticallyWithoutANewEventSequence() {
+    @Test fun failedReadCanRecoverOnSameRevisionWithoutReplaying() {
         var unavailable = true
         var reads = 0
         val row = LocalToolActivityUiItem("call", "read", LocalToolUiPhase.RUNNING)
