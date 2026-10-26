@@ -193,7 +193,7 @@ class LocalSessionEventLog(
         var before = sequenceExclusive
         var remaining = limit
         while (remaining > 0) {
-            val batch = minOf(remaining, SessionEventLog.MAX_PAGE_EVENTS)
+            val batch = minOf(remaining, 200) // The file-backed SessionEventLog has a 200-event page limit.
             val page = fileLog().pageBeforeChronological(before, batch)
             if (page.isEmpty()) break
             reversePages.addFirst(page)
