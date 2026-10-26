@@ -522,12 +522,16 @@ class LocalWorkspace(
             } else searchCursors[needle] ?: error("搜索会话已过期，请重新搜索")
             require(offset <= scan.matches.size) { "搜索游标已经失效，请重新搜索" }
             val endWanted = (offset + pageSize).coerceAtMost(10_000)
-            while (scan.matches.size < endWanted && !scan.exhausted) {
+            // Bound discovery work per response, including queries with very few matches.
+            // Empty/partial pages are continued automatically by the UI, not shown as "load more".
+            var visitedInPage = 0
+            while (scan.matches.size < endWanted && !scan.exhausted && visitedInPage < 2_048) {
                 if (!scan.iterator.hasNext()) {
                     scan.exhausted = true
                     break
                 }
                 val file = scan.iterator.next()
+                visitedInPage++
                 if (!file.isFile || !isInsideWorkspace(file)) continue
                 val path = file.relativeTo(canonicalRoot).invariantSeparatorsPath
                 if (path.contains(needle, ignoreCase = true)) {
