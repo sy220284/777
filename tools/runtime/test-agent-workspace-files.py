@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 import importlib.util
+import json
+import subprocess
+import sys
 import os
 from pathlib import Path
 import tempfile
@@ -53,6 +56,15 @@ class WorkspaceFilesTest(unittest.TestCase):
             self.call('write', path='nested/result', content='safe')
         self.assertEqual(Path('moved/result').read_text(), 'safe')
         self.assertFalse((outside / 'result').exists())
+
+    def test_named_pipe_is_rejected_without_waiting_for_a_writer(self):
+        os.mkfifo('pipe')
+        result = subprocess.run([sys.executable, str(SOURCE)],
+            input=json.dumps(dict(operation='read', path='pipe', original_path='pipe')),
+            text=True, capture_output=True, timeout=2, check=True)
+        receipt = json.loads(result.stdout)
+        self.assertTrue(receipt['isError'])
+        self.assertIn('regular file', receipt['content'])
 
     def test_symlink_and_traversal_are_not_followed(self):
         Path('protected').write_text('original')
