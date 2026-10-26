@@ -67,10 +67,12 @@ internal class LocalPublicWorkspaceBridge(
         val previousTree = preferences.getString(TREE_KEY, null)
         changes.putString(TREE_KEY, uri.toString()).apply()
         if (previousTree != null && previousTree != uri.toString()) {
-            resolver.releasePersistableUriPermission(
-                Uri.parse(previousTree),
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-            )
+            val oldGrant = Uri.parse(previousTree)
+            if (resolver.persistedUriPermissions.any { it.uri == oldGrant }) {
+                resolver.releasePersistableUriPermission(
+                    oldGrant, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
         }
     }
 
