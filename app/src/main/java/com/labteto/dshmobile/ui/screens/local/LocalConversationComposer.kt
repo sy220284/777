@@ -223,6 +223,7 @@ internal fun LocalConversationComposer(
             icon = null,
             iconPainter = painterResource(R.drawable.ic_ui_add),
             contentDescription = moreActionsLabel,
+            enabled = attachmentImportProgress == null,
             onClick = {
                 capabilityPanel = null
                 // Both collapsed and expanded composers open the same complete action sheet.
