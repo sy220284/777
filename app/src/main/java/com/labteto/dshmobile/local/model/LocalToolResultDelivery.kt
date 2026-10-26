@@ -27,7 +27,7 @@ internal suspend fun deliverLocalToolResult(
     } catch (error: Exception) {
         // The tool may already have run. Record the real failure phase/cause for diagnosis
         // without repeating it or incorrectly assuming the disk is full.
-        AppLog.failure("ToolResultDelivery", "deliver_tool_result_$"+"phase", error)
+        AppLog.failure("ToolResultDelivery", "deliver_tool_result_${phase}", error)
         LocalToolResultDelivery(
             content = (retained?.plus("\n") ?: "完整结果未能保存，本次结果不可回查。\n") +
                 "工具已执行，但本机结果保存或图片导入失败。请检查存储/附件限制；禁止自动重放本次调用。",
