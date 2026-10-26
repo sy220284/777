@@ -37,7 +37,9 @@ class LocalSessionRuntime @Inject internal constructor(
     internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment = sessionFiles.importAttachment(uri)
     internal suspend fun workspaceFilesForUi(): List<LocalWorkspaceFile> = sessionFiles.workspaceFiles()
     internal suspend fun workspaceDirectoryForUi(path: String) = sessionFiles.workspaceDirectory(path)
+    internal suspend fun workspaceDirectoryPageForUi(path: String, offset: Int) = sessionFiles.workspaceDirectoryPage(path, offset)
     internal suspend fun searchWorkspaceFilesForUi(query: String) = sessionFiles.searchWorkspaceFiles(query)
+    internal suspend fun searchWorkspacePageForUi(query: String, offset: Int) = sessionFiles.searchWorkspacePage(query, offset)
     internal suspend fun conversationFilesForUi(sessionId: String): LocalConversationFiles =
         sessionFiles.conversationFiles(sessionId)
     internal suspend fun previewWorkspaceFileForUi(path: String): LocalWorkspaceFilePreview =

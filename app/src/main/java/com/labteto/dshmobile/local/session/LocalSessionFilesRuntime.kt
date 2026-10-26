@@ -9,6 +9,8 @@ import com.labteto.dshmobile.local.attachment.inspectImportedAttachmentFile
 import com.labteto.dshmobile.uicontract.UiAttachmentInspectionReceipt
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
+import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
+import com.labteto.dshmobile.local.files.LocalWorkspaceSearchPage
 import com.labteto.dshmobile.local.files.LocalWorkspaceToolGuide
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.runtime.LocalBundledRuntimeManager
@@ -67,6 +69,7 @@ class LocalSessionFilesRuntime @Inject internal constructor(
 
     internal val coordinator = LocalConversationFilesCoordinator(
         workspaceFilesProvider = workspace::files,
+        workspaceFileAt = workspace::workspaceFileAt,
         previewWorkspaceFile = workspace::preview,
         eventLogFor = eventLogs::get,
         currentSessionId = { runtimeStateStore.currentSessionId },
@@ -99,8 +102,14 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     override suspend fun workspaceDirectory(path: String): List<LocalWorkspaceDirectoryEntry> =
         withContext(Dispatchers.IO) { workspace.directoryEntries(path) }
 
+    override suspend fun workspaceDirectoryPage(path: String, offset: Int): LocalWorkspaceDirectoryPage =
+        withContext(Dispatchers.IO) { workspace.directoryPage(path, offset) }
+
     override suspend fun searchWorkspaceFiles(query: String): List<LocalWorkspaceFile> =
         withContext(Dispatchers.IO) { workspace.searchWorkspaceFileNames(query) }
+
+    override suspend fun searchWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage =
+        withContext(Dispatchers.IO) { workspace.searchWorkspacePage(query, offset) }
 
     override suspend fun conversationFiles(sessionId: String): LocalConversationFiles =
         withContext(Dispatchers.IO) { coordinator.conversationFiles(sessionId) }

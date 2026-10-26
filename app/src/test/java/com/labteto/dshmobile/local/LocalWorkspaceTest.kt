@@ -42,6 +42,79 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun sparseSearchAdvancesAcrossEmptyPagesInsteadOfRepeatingTheFirstScan() {
+        val dir = root.resolve("任务/稀疏目录").apply { mkdirs() }
+        repeat(2_080) { index ->
+            dir.resolve("甲-${index.toString().padStart(4, '0')}.txt").writeText("无关")
+        }
+        dir.resolve("终-唯一报告.md").writeText("目标")
+        val first = workspace.searchWorkspacePage("唯一报告")
+        assertTrue(first.files.isEmpty())
+        assertEquals(1, first.nextOffset)
+        val second = workspace.searchWorkspacePage("唯一报告", requireNotNull(first.nextOffset))
+        assertEquals(listOf("任务/稀疏目录/终-唯一报告.md"), second.files.map { it.path })
+        assertEquals(null, second.nextOffset)
+    }
+
+    @Test
+    fun searchPagesReturnAllMatchingPathsWithoutDuplicateOrEagerContentReads() {
+        val folder = root.resolve("任务/搜索目录").apply { mkdirs() }
+        repeat(235) { n -> folder.resolve("报告-${n.toString().padStart(4, '0')}.md").writeText("不应预览的正文") }
+        repeat(60) { n -> folder.resolve("其它-${n.toString().padStart(4, '0')}.txt").writeText("不相关") }
+        val results = mutableListOf<String>()
+        var cursor: Int? = 0
+        var batches = 0
+        while (cursor != null) {
+            val page = workspace.searchWorkspacePage("报告", cursor, 96)
+            results += page.files.map { it.path }
+            cursor = page.nextOffset
+            batches++
+        }
+        assertTrue(batches in 3..4)
+        assertEquals(235, results.size)
+        assertEquals(235, results.toSet().size)
+        assertTrue(results.all { it.startsWith("任务/搜索目录/报告-") })
+        assertEquals(results.take(96), workspace.searchWorkspacePage("报告", 0, 96).files.map { it.path })
+    }
+
+    @Test
+    fun directoryPagesAreDisjointAndKeepStableOrderWithThousandsOfFiles() {
+        val folder = root.resolve("任务/大量资料").apply { mkdirs() }
+        repeat(1_024) { n -> folder.resolve("文档-${n.toString().padStart(4, '0')}.md").writeText("内容$n") }
+        val names = mutableListOf<String>()
+        var offset: Int? = 0
+        var pageCount = 0
+        while (offset != null) {
+            val page = workspace.directoryPage("任务/大量资料", offset, 96)
+            pageCount++
+            assertTrue(page.entries.size <= 96)
+            names += page.entries.map { it.path }
+            offset = page.nextOffset
+        }
+        assertEquals(11, pageCount)
+        assertEquals(1_024, names.size)
+        assertEquals(1_024, names.toSet().size)
+        assertEquals(names.sorted(), names)
+        assertEquals("任务/大量资料/文档-0000.md", names.first())
+        assertEquals("任务/大量资料/文档-1023.md", names.last())
+        assertEquals(names, workspace.directoryEntries("任务/大量资料").map { it.path })
+    }
+
+    @Test
+    fun directoryPagesDoNotMixChangesIntoAnOldCursor() {
+        val folder = root.resolve("任务/版本变化").apply { mkdirs() }
+        repeat(150) { folder.resolve("文件-${it.toString().padStart(3, '0')}.txt").writeText("已有") }
+        val first = workspace.directoryPage("任务/版本变化", 0, 80)
+        assertEquals(80, first.entries.size)
+        folder.resolve("新增文件.txt").writeText("新的")
+        folder.setLastModified(folder.lastModified() + 2_000L)
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.directoryPage("任务/版本变化", requireNotNull(first.nextOffset), 80)
+        }
+        assertEquals(80, workspace.directoryPage("任务/版本变化", 0, 80).entries.size)
+    }
+
+    @Test
     fun directoryBrowserOnlyReadsImmediateChildren() {
         workspace.write("任务/第一项/subfolder/source.txt", "source")
         workspace.write("任务/第二项/draft.md", "draft")
