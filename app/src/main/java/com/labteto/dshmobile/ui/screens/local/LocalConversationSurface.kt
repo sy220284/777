@@ -783,22 +783,30 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     attachmentError = imageLimitMessage
                     return@launch
                 }
+                val chosen = uris.take(available)
+                attachmentImportProgress = 0 to chosen.size
                 var failure: String? = if (uris.size > available) imageLimitMessage else null
-                uris.take(available).forEach { uri ->
-                    try {
-                        val imported = onImportAttachment(uri)
-                        when (localComposerAttachmentDecision(attachments, imported)) {
-                            LocalComposerAttachmentDecision.ACCEPT -> attachments += imported
-                            LocalComposerAttachmentDecision.DUPLICATE -> Unit
-                            LocalComposerAttachmentDecision.IMAGE_LIMIT -> failure = imageLimitMessage
+                try {
+                    chosen.forEachIndexed { index, uri ->
+                        try {
+                            val imported = onImportAttachment(uri)
+                            when (localComposerAttachmentDecision(attachments, imported)) {
+                                LocalComposerAttachmentDecision.ACCEPT -> attachments += imported
+                                LocalComposerAttachmentDecision.DUPLICATE -> Unit
+                                LocalComposerAttachmentDecision.IMAGE_LIMIT -> failure = imageLimitMessage
+                            }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            failure = localComposerAttachmentFailureMessage(error, imageImportFailedMessage)
+                        } finally {
+                            attachmentImportProgress = (index + 1) to chosen.size
                         }
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        failure = localComposerAttachmentFailureMessage(error, imageImportFailedMessage)
                     }
+                    attachmentError = failure
+                } finally {
+                    attachmentImportProgress = null
                 }
-                attachmentError = failure
             }
         }
     }
