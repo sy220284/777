@@ -95,14 +95,14 @@ class LocalWorkTypedToolReferenceTest {
         val tool = buildJsonObject {
             put("role", "tool")
             put("tool_call_id", "tool-call-1")
-            put("content", "结果已保存\\n[工具原文引用：tool_output_read(call_id=$"+"outputId)]")
+            put("content", "已成功执行")
         }
         val history = listOf(attached, message("assistant", "检查文件"), tool)
         assertEquals(listOf("tool-call-1"), referencedWorkToolCallIds(history))
         assertEquals(listOf("tool-call-1"),
             referencedWorkToolCallIds(listOf(attached) + history.takeLast(2)))
         // A plain text output reference is also retained, but a user attachment never is.
-        val rawReference = message("tool", "工具原文引用：[工具原文引用：tool_output_read(call_id=$"+"outputId)]")
+        val rawReference = message("tool", "[工具原文引用：tool_output_read(call_id=${outputId})]")
         assertTrue(referencedWorkToolCallIds(listOf(attached, rawReference)).contains(outputId))
     }
 
