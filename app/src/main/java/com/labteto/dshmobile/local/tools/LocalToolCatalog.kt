@@ -35,6 +35,18 @@ object LocalToolCatalog {
         add(tool("apply_patch", "应用标准 unified diff 补丁到工作区；先执行 git apply --check，成功后原子式应用", properties(
             "patch" to string("完整 unified diff 文本"),
         ), listOf("patch")))
+        add(tool("archive_list", "完整枚举 ZIP/TAR.GZ/TAR 等归档的内部文件；按 cursor 翻页直到 next_cursor=none，不能把预览当作全量结果", properties(
+            "path" to string("工作区相对归档路径，如 .dsh/attachments/xxx.gz"),
+            "cursor" to integerRange("页游标；默认 0；必须根据 next_cursor 翻页", 0),
+            "limit" to integerRange("每页文件数量，默认 100，最大 200", 1, 200),
+            "prefix" to string("可选；仅列出以该路径前缀开头的成员；全量核查应省略"),
+        ), listOf("path")))
+        add(tool("archive_read", "按字符分段读取 ZIP/TAR.GZ/TAR 内的一个源码文件；若 complete=false 必须按 next_char 继续，原压缩包无需整体解压", properties(
+            "path" to string("工作区相对归档路径"),
+            "member" to string("archive_list 返回的完整内部文件路径"),
+            "start_char" to integer("起始字符偏移；默认 0；按 next_char 续读"),
+            "max_chars" to integerRange("本次最大返回字符，默认 20000，上限 40000", 1, 40000),
+        ), listOf("path", "member")))
         add(tool("file_inspect", "检查工作区文件元数据；图片返回宽高和可用的常见 EXIF，不解码整张图片", properties(
             "path" to string("相对工作区的文件路径"),
         ), listOf("path")))
