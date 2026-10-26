@@ -118,7 +118,7 @@ internal class LocalArchiveReader(private val root: File) {
                 val entries = zip.entries()
                 while (entries.hasMoreElements()) {
                     val member = entries.nextElement()
-                    if (!member.isDirectory && safeName(member.name)) {
+                    if (!member.isDirectory) {
                         zip.getInputStream(member).use { if (visit(Item(member.name, member.size), it)) return }
                     }
                 }
@@ -165,7 +165,7 @@ internal class LocalArchiveReader(private val root: File) {
                     else Regex("""(?:^|\n)\d+ path=([^\n]+)""").find(String(bytes, StandardCharsets.UTF_8))?.groupValues?.get(1)
             } else {
                 extendedName = null
-                if ((kind == '0' || kind == '\u0000') && safeName(name)) {
+                if (kind == '0' || kind == '\u0000') {
                     if (visit(Item(name, size), body)) return
                 }
             }
