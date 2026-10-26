@@ -122,11 +122,11 @@ internal class LocalWorkProgressCoordinator(
         state.update { it.copy(goal = goal.copy(startedAtSequence = event.sequence)) }
         persist()
         buildString {
-            append("目标已创建：${goal.description}\\n成果：${goal.artifactPaths.joinToString()}\\n验收命令：${goal.verificationCommands.joinToString()}")
+            append("目标已创建：${goal.description}\n成果：${goal.artifactPaths.joinToString()}\n验收命令：${goal.verificationCommands.joinToString()}")
             folders?.let {
-                append("\\n任务文件目录：${it.work}")
-                append("\\n交付成果目录：${it.deliverables}")
-                append("\\n新增工作资料统一保存在任务文件目录；最终成果保存在交付成果目录。")
+                append("\n任务文件目录：${it.work}")
+                append("\n交付成果目录：${it.deliverables}")
+                append("\n新增工作资料统一保存在任务文件目录；最终成果保存在交付成果目录。")
                 append("已明确声明的成果验收路径保持不变。")
             }
         }
