@@ -17,6 +17,7 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalSessionAccessCoordinator
 import com.labteto.dshmobile.local.session.LocalSessionAccessScope
+import com.labteto.dshmobile.local.tools.LocalArchiveReader
 import com.labteto.dshmobile.local.tools.LocalFileInspector
 import com.labteto.dshmobile.local.tools.LocalExtensionWorkshop
 import com.labteto.dshmobile.local.tools.LocalShellTool
@@ -169,6 +170,14 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 callId = args.string("call_id"),
                 startByte = args.int("start_byte", 0),
                 maxBytes = args.int("max_bytes", LocalToolOutputStore.DEFAULT_READ_BYTES),
+            )
+            "archive_list" -> LocalArchiveReader(File(workspace.path)).list(
+                args.string("path"), args.int("cursor", 0), args.int("limit", 100),
+                args.optionalString("prefix").orEmpty(),
+            )
+            "archive_read" -> LocalArchiveReader(File(workspace.path)).read(
+                args.string("path"), args.string("member"), args.long("start_char", 0L),
+                args.int("max_chars", 20_000),
             )
             "file_inspect" -> LocalFileInspector(File(workspace.path)).inspect(args.string("path"))
             "write", "write_file" -> {
