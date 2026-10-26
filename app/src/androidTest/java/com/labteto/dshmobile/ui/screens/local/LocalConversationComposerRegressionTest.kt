@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
@@ -32,6 +33,53 @@ import org.junit.Test
 class LocalConversationComposerRegressionTest {
     @get:Rule val compose = createComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Test
+    fun multipleFilesUseCompactChipsAndImportDisablesSend() {
+        val files = listOf(
+            LocalImportedAttachment(
+                name = "claude-code-very-long-release-file-name-linux-x64.tar.gz",
+                relativePath = ".dsh/attachments/one.gz",
+                mediaType = "application/gzip",
+                bytes = 104_857_600L,
+            ),
+            LocalImportedAttachment(
+                name = "notes.md",
+                relativePath = ".dsh/attachments/two.md",
+                mediaType = "text/markdown",
+                bytes = 512,
+            ),
+        )
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = false, configured = true,
+                        sessionId = "multi-documents", usageMode = LocalUsageMode.WORK,
+                    ),
+                    activeModelProfile = null,
+                    input = "分析这些文件",
+                    attachments = files,
+                    attachmentImportProgress = 1 to 2,
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = {},
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onSend = { _, _ -> LocalSendResult.Empty },
+                    onStop = {},
+                    onPlanModeChange = {},
+                )
+            }
+        }
+        compose.onNodeWithText("正在添加附件 1/2").assertIsDisplayed()
+        compose.onNodeWithText("100.0 MB").assertDoesNotExist()
+        compose.onNodeWithText("GZ · 100.0 MB").assertIsDisplayed()
+        compose.onNodeWithText("notes.md").assertIsDisplayed()
+        compose.onNodeWithContentDescription(context.getString(R.string.chat_composer_send))
+            .assertIsNotEnabled()
+    }
 
     @Test
     fun plusButtonOpensAttachmentPickerDirectly() {
