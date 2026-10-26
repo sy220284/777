@@ -519,8 +519,8 @@ private fun ImportedImageAttachmentTile(
 internal fun localAttachmentDisplaySize(bytes: Long): String = when {
     bytes < 1_024L -> "$bytes B"
     bytes < 1_048_576L -> "${bytes / 1_024L} KB"
-    bytes < 1_073_741_824L -> "%.1f MB".format(bytes / 1_048_576.0)
-    else -> "%.2f GB".format(bytes / 1_073_741_824.0)
+    bytes < 1_073_741_824L -> java.lang.String.format(java.util.Locale.ROOT, "%.1f MB", bytes / 1_048_576.0)
+    else -> java.lang.String.format(java.util.Locale.ROOT, "%.2f GB", bytes / 1_073_741_824.0)
 }
 
 @Composable
