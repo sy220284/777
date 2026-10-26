@@ -147,7 +147,7 @@ internal fun LocalWorkspaceFilesDialog(
     fun syncPublicWorkspace() {
         if (publicSyncing) return
         publicSyncing = true
-        publicSyncStatus = null
+        publicSyncStatus = "正在同步公共工作区，请勿移动文件…"
         scope.launch {
             try {
                 publicSyncStatus = publicWorkspace.synchronize().summary

@@ -64,7 +64,14 @@ internal class LocalPublicWorkspaceBridge(
             // Changing public folders invalidates every previous external-file fingerprint.
             preferences.all.keys.filter { it.startsWith("synced:") }.forEach { changes.remove(it) }
         }
+        val previousTree = preferences.getString(TREE_KEY, null)
         changes.putString(TREE_KEY, uri.toString()).apply()
+        if (previousTree != null && previousTree != uri.toString()) {
+            resolver.releasePersistableUriPermission(
+                Uri.parse(previousTree),
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+        }
     }
 
     suspend fun synchronize(): SyncResult = withContext(Dispatchers.IO) {
