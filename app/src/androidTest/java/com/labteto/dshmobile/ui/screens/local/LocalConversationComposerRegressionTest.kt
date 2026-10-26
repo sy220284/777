@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -76,6 +77,7 @@ class LocalConversationComposerRegressionTest {
         compose.onNodeWithText("正在添加附件 1/2").assertIsDisplayed()
         compose.onNodeWithText("100.0 MB").assertDoesNotExist()
         compose.onNodeWithText("GZ · 100.0 MB").assertIsDisplayed()
+        compose.onNodeWithTag("composer-attachments").performScrollToIndex(1)
         compose.onNodeWithText("notes.md").assertIsDisplayed()
         compose.onNodeWithContentDescription(context.getString(R.string.chat_composer_send))
             .assertIsNotEnabled()
