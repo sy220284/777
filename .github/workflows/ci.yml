@@ -197,6 +197,8 @@ jobs:
           python3 .github/scripts/check-build-baseline.py
           python3 .github/scripts/check-test-quality.py
           python3 .github/scripts/check-acceptance-matrix.py
+          python3 .github/scripts/sync-feature-tree.py --check
+          python3 .github/scripts/check-feature-tree-sync.py
           python3 .github/scripts/check-v3-refactor-ledger.py --self-test
           python3 .github/scripts/check-v3-refactor-ledger.py
           bash .github/scripts/run-android-instrumentation.sh --self-test

@@ -27,8 +27,7 @@ class LspPluginTest {
     /** Only respond when the matching request was actually received. Notifications are not RPCs. */
     private fun requestDrivenMockLsp(vararg replies: String): String {
         val prelude = """
-            read_rpc() {
-              while :; do
+            read_frame() {
                 IFS= read -r header || exit 31
                 header=§(printf '%s' "§header" | tr -d '\r')
                 length=§(printf '%s\n' "§header" | sed -n 's/^Content-Length: //p')
@@ -38,6 +37,10 @@ class LspPluginTest {
                   [ -z "§line" ] && break
                 done
                 payload=§(dd bs=1 count="§length" 2>/dev/null)
+            }
+            read_rpc() {
+              while :; do
+                read_frame
                 case "§payload" in
                   *'"id":'*) return 0 ;;
                 esac
@@ -96,7 +99,6 @@ class LspPluginTest {
         val initialized = """{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}"""
         val hover1 = """{"jsonrpc":"2.0","id":2,"result":{"contents":"example type"}}"""
         val hover2 = """{"jsonrpc":"2.0","id":3,"result":{"contents":"example type again"}}"""
-        fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
         val script = temporary.newFile("server.sh")
         script.writeText(requestDrivenMockLsp(initialized, hover1, hover2))
         temporary.newFile("example.txt").writeText("example")
@@ -136,10 +138,9 @@ class LspPluginTest {
     @Test fun diagnosticsCancellationIsNotSwallowed() = runBlocking {
         Assume.assumeTrue(File("/bin/sh").isFile)
         val initialized = """{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}"""
-        fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
         val script = temporary.newFile("slow-server.sh")
         script.writeText(
-            "printf '%s' '" + frame(initialized) + "'\nwhile IFS= read -r line; do :; done\n",
+requestDrivenMockLsp(initialized),
         )
         temporary.newFile("example.kt").writeText("fun main() = Unit")
         val context = HarnessContext()
@@ -207,7 +208,6 @@ class LspPluginTest {
 
     @Test fun cancellingStopStillClosesEveryLanguageServerLease() = runBlocking {
         Assume.assumeTrue(File("/bin/sh").isFile)
-        fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
         fun server(name: String): File {
             val initialized = """{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}"""
             val hover = """{"jsonrpc":"2.0","id":2,"result":{"contents":"$name"}}"""
@@ -274,8 +274,6 @@ class LspPluginTest {
 
     @Test fun onDemandInstallationOccursOnlyOnFirstSemanticQueryAndRequiresApproval() = runBlocking {
         Assume.assumeTrue(File("/bin/sh").isFile)
-        fun frame(json: String) =
-            "Content-Length: " + json.toByteArray().size + "\r\n\r\n" + json
         val server = temporary.newFile("on-demand-server.sh")
         server.writeText(requestDrivenMockLsp(
             """{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}""",
@@ -425,10 +423,12 @@ class LspPluginTest {
         val notification = """{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"$publishedUri","version":1,"diagnostics":[{"message":"Type number is not assignable to string","severity":1,"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":1}}}]}}"""
         val script = temporary.newFile("delayed-diagnostics.sh").apply {
             writeText(
-                "printf '%s' '" + frame(init) + "'\n" +
-                    "sleep 1\n" +
-                    "printf '%s' '" + frame(notification) + "'\n" +
-                    "while IFS= read -r line; do :; done\n",
+                requestDrivenMockLsp(init).replace(
+                    "while IFS= read -r line; do :; done",
+                    "while :; do read_frame; case \"\$payload\" in " +
+                        "*'textDocument/didOpen'*|*'textDocument/didChange'*) " +
+                        "printf '%s' '" + frame(notification) + "';; esac; done",
+                ),
             )
         }
         val context = HarnessContext()

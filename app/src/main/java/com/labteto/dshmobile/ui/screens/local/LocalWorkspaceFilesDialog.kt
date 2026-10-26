@@ -740,12 +740,12 @@ private fun LocalWorkspaceDirectoryList(
         if (pageError != null) {
             item(key = "directory-page-read-error") {
                 Column {
-                Text("部分文件暂未显示：$pageError",
-                    modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk)
-                SyButton(text = stringResource(R.string.common_retry), onClick = onRetry,
-                    size = SyButtonSize.Small, variant = SyButtonVariant.Outline)
+                    Text("部分文件暂未显示：$pageError",
+                        modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk)
+                    SyButton(text = stringResource(R.string.common_retry), onClick = onRetry,
+                        size = SyButtonSize.Small, variant = SyButtonVariant.Outline)
                 }
             }
         }
@@ -853,12 +853,12 @@ private fun LocalFlatFileList(
         if (pageError != null) {
             item(key = "search-page-read-error") {
                 Column {
-                Text("部分搜索结果暂未显示：$pageError",
-                    modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk)
-                SyButton(text = stringResource(R.string.common_retry), onClick = onRetry,
-                    size = SyButtonSize.Small, variant = SyButtonVariant.Outline)
+                    Text("部分搜索结果暂未显示：$pageError",
+                        modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk)
+                    SyButton(text = stringResource(R.string.common_retry), onClick = onRetry,
+                        size = SyButtonSize.Small, variant = SyButtonVariant.Outline)
                 }
             }
         }

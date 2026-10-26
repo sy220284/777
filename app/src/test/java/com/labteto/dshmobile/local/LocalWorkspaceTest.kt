@@ -40,6 +40,12 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun windowsLineEndingsKeepTheExistingLineReadContract() {
+        root.resolve("Windows资料.txt").writeText("甲\r\n乙\r\n")
+        assertEquals("1: 甲\n2: 乙", workspace.read("Windows资料.txt", 1, 2))
+    }
+
+    @Test
     fun longLinePagesPreserveEveryCharacterIncludingSurrogatePairs() {
         val text = "中文😀🚀abc".repeat(13_000) + "末尾"
         root.resolve("长行.txt").writeText(text)

@@ -20,6 +20,9 @@ internal fun readLocalTextPage(file: File, startLine: Int, endLine: Int, startCh
         }
         var column = 0
         while (column < startChar) {
+            if (column % 8_192 == 0 && Thread.currentThread().isInterrupted) {
+                throw InterruptedIOException("文件读取已取消")
+            }
             val char = reader.read()
             require(char >= 0 && char != '\n'.code) { "行内字符偏移已失效，请从当前行开头重读" }
             column++
@@ -39,7 +42,16 @@ internal fun readLocalTextPage(file: File, startLine: Int, endLine: Int, startCh
                 reader.mark(2)
                 val first = reader.read()
                 if (first < 0) return output.toString().trimEnd('\n')
-                if (first == '\n'.code) {
+                var newline = first == '\n'.code
+                if (first == '\r'.code) {
+                    val next = reader.read()
+                    newline = next == '\n'.code
+                    if (!newline) {
+                        reader.reset()
+                        reader.read()
+                    }
+                }
+                if (newline) {
                     output.append('\n')
                     line++
                     column = 0

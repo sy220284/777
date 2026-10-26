@@ -449,9 +449,9 @@ class LocalWorkspace(
             val snapshot = directoryNameSnapshots[key]?.takeIf { offset > 0 || it.modifiedAt == modified }
             if (snapshot != null) snapshot.names else {
                 require(offset == 0) { "目录内容已更新，请重新打开当前目录" }
-                directory.list()?.sorted() ?: error("文件夹读取失败：${relativePath}")
-            }.also {
-                directoryNameSnapshots[key] = DirectoryNameSnapshot(modified, it)
+                val refreshed = directory.list()?.sorted() ?: error("文件夹读取失败：${relativePath}")
+                directoryNameSnapshots[key] = DirectoryNameSnapshot(modified, refreshed)
+                refreshed
             }
         }
         require(offset <= names.size) { "目录页码已失效，请刷新" }
