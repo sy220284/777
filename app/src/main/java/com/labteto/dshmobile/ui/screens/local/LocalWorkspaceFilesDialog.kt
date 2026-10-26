@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -34,6 +36,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
+import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
@@ -68,6 +72,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.first
 
 internal enum class LocalFilesMode { WORKSPACE, CONVERSATION }
 
@@ -87,6 +92,10 @@ internal fun LocalWorkspaceFilesDialog(
     workspacePath: String,
     loadWorkspace: suspend () -> List<LocalWorkspaceFile>,
     loadDirectory: suspend (String) -> List<LocalWorkspaceDirectoryEntry> = { emptyList() },
+    loadDirectoryPage: suspend (String, Int) -> LocalWorkspaceDirectoryPage = { path, offset ->
+        if (offset == 0) LocalWorkspaceDirectoryPage(loadDirectory(path), null)
+        else LocalWorkspaceDirectoryPage(emptyList(), null)
+    },
     loadSearch: suspend (String) -> List<LocalWorkspaceFile> = { query ->
         loadWorkspace().filter { it.path.contains(query, ignoreCase = true) }
     },
@@ -101,6 +110,11 @@ internal fun LocalWorkspaceFilesDialog(
     var error by remember(mode, sessionId) { mutableStateOf<String?>(null) }
     var workspace by remember(mode, sessionId) { mutableStateOf(emptyList<LocalWorkspaceFile>()) }
     var entries by remember(mode, sessionId) { mutableStateOf(emptyList<LocalWorkspaceDirectoryEntry>()) }
+    var nextDirectoryOffset by remember(mode, sessionId) { mutableStateOf<Int?>(null) }
+    var loadingNextPage by remember(mode, sessionId) { mutableStateOf(false) }
+    var pageReadError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
+    var loadEpoch by remember(mode, sessionId) { mutableStateOf(0) }
+    var lastLoadedSearch by remember(mode, sessionId) { mutableStateOf("") }
     var conversation by remember(mode, sessionId) { mutableStateOf(LocalConversationFiles()) }
     var preview by remember(mode, sessionId) { mutableStateOf<LocalWorkspaceFilePreview?>(null) }
     var previewPath by com.labteto.dshmobile.ui.components.rememberNavigationEntryState<String?>(null, entryRequest, mode, sessionId)
@@ -197,51 +211,89 @@ internal fun LocalWorkspaceFilesDialog(
     }
 
     suspend fun reload() {
+        val epoch = loadEpoch + 1
+        loadEpoch = epoch
+        val pageDirectory = directory
+        val currentQuery = query.trim()
+        val currentSection = section
         selected.clear()
         selecting = false
         loading = true
+        loadingNextPage = false
+        pageReadError = null
         error = null
         preview = null
         try {
             when (mode) {
                 LocalFilesMode.WORKSPACE -> {
-                    if (query.isNotBlank()) {
-                        workspace = loadSearch(query.trim())
+                    if (currentQuery.isNotEmpty()) {
+                        val found = loadSearch(currentQuery)
+                        if (loadEpoch == epoch) workspace = found
                     } else {
-                        entries = if (section == -1) emptyList() else
-                            loadDirectory(directory.ifBlank { "." })
+                        val page = if (currentSection == -1) LocalWorkspaceDirectoryPage(emptyList(), null)
+                            else loadDirectoryPage(pageDirectory.ifBlank { "." }, 0)
+                        if (loadEpoch == epoch) {
+                            entries = page.entries
+                            nextDirectoryOffset = page.nextOffset
+                        }
                     }
                 }
-                LocalFilesMode.CONVERSATION -> conversation = loadConversation(sessionId)
+                LocalFilesMode.CONVERSATION -> {
+                    val found = loadConversation(sessionId)
+                    if (loadEpoch == epoch) conversation = found
+                }
             }
-            previewPath?.let { path ->
-                preview = loadPreview(path)
+            if (loadEpoch == epoch) {
+                lastLoadedSearch = currentQuery
+                previewPath?.let { path -> preview = loadPreview(path) }
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            error = failure.message ?: if (previewPath == null) readFilesFailed else previewFailed
-            preview = null
-            previewPath = null
+            if (loadEpoch == epoch) {
+                error = failure.message ?: if (previewPath == null) readFilesFailed else previewFailed
+                preview = null
+                previewPath = null
+            }
         } finally {
-            loading = false
+            if (loadEpoch == epoch) loading = false
         }
     }
 
-    // Search is debounced while typing; directory browsing does not trigger a full scan.
+    fun fetchNextDirectoryPage() {
+        val offset = nextDirectoryOffset ?: return
+        if (loading || loadingNextPage || pageReadError != null || query.isNotBlank() ||
+            mode != LocalFilesMode.WORKSPACE || section < 0) return
+        val epoch = loadEpoch
+        val currentDirectory = directory
+        loadingNextPage = true
+        scope.launch {
+            try {
+                val page = loadDirectoryPage(currentDirectory.ifBlank { "." }, offset)
+                if (loadEpoch == epoch && directory == currentDirectory && query.isBlank()) {
+                    entries = entries + page.entries
+                    nextDirectoryOffset = page.nextOffset
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                if (loadEpoch == epoch) pageReadError = failure.message ?: readFilesFailed
+            } finally {
+                if (loadEpoch == epoch) loadingNextPage = false
+            }
+        }
+    }
+
+    // Search is debounced; folder navigation and rendering never wait on a global search.
     LaunchedEffect(mode, sessionId, query) {
-        if (mode == LocalFilesMode.WORKSPACE && loadedForEntry) {
+        if (mode == LocalFilesMode.WORKSPACE && loadedForEntry && query.trim() != lastLoadedSearch) {
             kotlinx.coroutines.delay(280)
             reload()
         }
     }
 
     LaunchedEffect(mode, sessionId, initialFilePath, entryRequest) {
-        // Acknowledging a handled request must not start a second load. New requests to
-        // an already mounted file page still replace the restored preview immediately.
         if (initialFilePath == null && loadedForEntry) return@LaunchedEffect
-        // An explicit route request wins over restored browsing state, then is consumed.
-        // Rotating after returning to the list must not reopen an already handled artifact.
         if (initialFilePath != null) {
             previewPath = initialFilePath
             selecting = false
@@ -476,6 +528,10 @@ internal fun LocalWorkspaceFilesDialog(
                                     entries.filterNot { it.path == "任务" || it.path == "交付成果" }
                                 else entries,
                                 localizedInternalName = section == 2 && directory.isEmpty(),
+                                hasMore = nextDirectoryOffset != null,
+                                loadingMore = loadingNextPage,
+                                pageError = pageReadError,
+                                onPrefetch = ::fetchNextDirectoryPage,
                                 section = section,
                                 isCategoryRoot = directory.isEmpty() || directory == "任务" || directory == "交付成果",
                                 onDirectory = {
@@ -547,13 +603,26 @@ private fun LocalWorkspaceRootList(onOpen: (Int) -> Unit) {
 private fun LocalWorkspaceDirectoryList(
     entries: List<LocalWorkspaceDirectoryEntry>,
     localizedInternalName: Boolean,
+    hasMore: Boolean,
+    loadingMore: Boolean,
+    pageError: String?,
+    onPrefetch: () -> Unit,
     section: Int,
     isCategoryRoot: Boolean,
     onDirectory: (String) -> Unit,
     onOpen: suspend (LocalWorkspaceFile) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    if (entries.isEmpty()) {
+    val listState = rememberLazyListState()
+    // Prefetch 40 rows ahead; next pages append without replacing the list or a "load more" row.
+    LaunchedEffect(entries.size, hasMore, loadingMore, pageError) {
+        if (hasMore && !loadingMore && pageError == null) {
+            snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+                .first { it >= entries.size - 40 }
+            onPrefetch()
+        }
+    }
+    if (entries.isEmpty() && !hasMore) {
         LocalFilesEmpty(
             title = stringResource(
                 when {
@@ -574,7 +643,7 @@ private fun LocalWorkspaceDirectoryList(
         )
         return
     }
-    LazyColumn(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.fillMaxSize(), state = listState) {
         items(entries, key = LocalWorkspaceDirectoryEntry::path) { entry ->
             if (entry.isDirectory) {
                 val internal = localizedInternalName && entry.path in setOf(".dsh", ".adsh")
@@ -587,6 +656,14 @@ private fun LocalWorkspaceDirectoryList(
             } else {
                 val file = LocalWorkspaceFile(entry.path, entry.bytes, entry.modifiedAt)
                 LocalFileRow(file, showPath = false) { scope.launch { onOpen(file) } }
+            }
+        }
+        if (pageError != null) {
+            item(key = "directory-page-read-error") {
+                Text("部分文件暂未显示：$"+"pageError",
+                    modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk)
             }
         }
     }
