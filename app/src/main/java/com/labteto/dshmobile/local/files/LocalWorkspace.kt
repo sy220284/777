@@ -63,6 +63,12 @@ data class LocalWorkspaceDirectoryPage(
     val nextOffset: Int?,
 )
 
+/** Progressive path/name search; result rows hold metadata only, never file contents. */
+data class LocalWorkspaceSearchPage(
+    val files: List<LocalWorkspaceFile>,
+    val nextOffset: Int?,
+)
+
 /** Sandboxed filesystem and shell provider for the on-device Harness. */
 class LocalWorkspace(
     private val root: File,
@@ -493,6 +499,47 @@ class LocalWorkspace(
             next = page.nextOffset
         }
         return all
+    }
+
+    private class SearchCursor(
+        val iterator: Iterator<File>,
+        val matches: MutableList<LocalWorkspaceFile> = mutableListOf(),
+        var exhausted: Boolean = false,
+    )
+    private val searchCursors = object : LinkedHashMap<String, SearchCursor>(4, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, SearchCursor>?): Boolean =
+            size > 4
+    }
+
+    /** Resume a matching-path scan without rescanning previous files for every visual page. */
+    fun searchWorkspacePage(query: String, offset: Int = 0, pageSize: Int = 96): LocalWorkspaceSearchPage {
+        val needle = query.trim()
+        require(needle.isNotEmpty() && offset >= 0 && pageSize in 1..256) { "搜索分页参数不合法" }
+        return synchronized(searchCursors) {
+            val scan = if (offset == 0) {
+                SearchCursor(safeWalk(canonicalRoot, maxVisited = 50_000,
+                    maxMillis = Long.MAX_VALUE).iterator()).also { searchCursors[needle] = it }
+            } else searchCursors[needle] ?: error("搜索会话已过期，请重新搜索")
+            require(offset <= scan.matches.size) { "搜索游标已经失效，请重新搜索" }
+            val endWanted = (offset + pageSize).coerceAtMost(10_000)
+            while (scan.matches.size < endWanted && !scan.exhausted) {
+                if (!scan.iterator.hasNext()) {
+                    scan.exhausted = true
+                    break
+                }
+                val file = scan.iterator.next()
+                if (!file.isFile || !isInsideWorkspace(file)) continue
+                val path = file.relativeTo(canonicalRoot).invariantSeparatorsPath
+                if (path.contains(needle, ignoreCase = true)) {
+                    scan.matches += LocalWorkspaceFile(path, file.length(), file.lastModified())
+                }
+            }
+            val end = minOf(scan.matches.size, endWanted)
+            LocalWorkspaceSearchPage(
+                files = scan.matches.subList(offset, end).toList(),
+                nextOffset = end.takeIf { it < 10_000 && !scan.exhausted },
+            )
+        }
     }
 
     /** Search by path/name without truncating before matching files are considered. */

@@ -20,6 +20,7 @@ import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
+import com.labteto.dshmobile.local.files.LocalWorkspaceSearchPage
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 import kotlinx.coroutines.flow.StateFlow
@@ -106,6 +107,9 @@ internal data class LocalWorkFeatureUiActions(
         LocalWorkspaceDirectoryPage(emptyList(), null)
     },
     val searchWorkspaceFiles: suspend (String) -> List<LocalWorkspaceFile> = { emptyList() },
+    val searchWorkspacePage: suspend (String, Int) -> LocalWorkspaceSearchPage = { _, _ ->
+        LocalWorkspaceSearchPage(emptyList(), null)
+    },
     val conversationFiles: suspend (String) -> LocalConversationFiles,
     val previewWorkspaceFile: suspend (String) -> LocalWorkspaceFilePreview,
     val artifactsForUi: (String) -> List<LocalArtifactUiItem>,
