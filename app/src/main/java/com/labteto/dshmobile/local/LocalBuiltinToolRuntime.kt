@@ -7,10 +7,8 @@ import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.runtime.BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS
-import com.labteto.dshmobile.local.runtime.DEFAULT_DOWNLOAD_BYTES
 import com.labteto.dshmobile.local.runtime.DEFAULT_WEB_FETCH_BYTES
 import com.labteto.dshmobile.local.runtime.FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS
-import com.labteto.dshmobile.local.runtime.MAX_DOWNLOAD_BYTES
 import com.labteto.dshmobile.local.runtime.MAX_PATCH_CHARS
 import com.labteto.dshmobile.local.runtime.MAX_WEB_FETCH_BYTES
 import com.labteto.dshmobile.local.runtime.PLAN_MODE_BLOCKED_TOOLS
@@ -308,9 +306,10 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 webTools.download(
                     url = args.string("url"),
                     path = args.string("path"),
-                    maxBytes = args.int("max_bytes", DEFAULT_DOWNLOAD_BYTES)
-                        .coerceIn(1_024, MAX_DOWNLOAD_BYTES)
-                        .toLong(),
+                    // Unspecified means stream the whole response; a caller can still opt into a limit.
+                    maxBytes = args.long("max_bytes", Long.MAX_VALUE).also {
+                        require(it > 0L) { "max_bytes 必须大于 0" }
+                    },
                     timeoutSeconds = BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS,
                 )
             }
