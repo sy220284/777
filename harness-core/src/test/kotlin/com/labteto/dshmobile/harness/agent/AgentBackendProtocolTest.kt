@@ -156,6 +156,14 @@ class AgentBackendProtocolTest {
     }
 
     @Test fun admittedEnvironmentToolRunsOnWorkerAndReturnsHostReceipt() = runTest {
+        exerciseEnvironmentRoundTrip(offerEarly = false)
+    }
+
+    @Test fun eagerEnvironmentToolRunsWhileWorkerStillAwaitsModelReply() = runTest {
+        exerciseEnvironmentRoundTrip(offerEarly = true)
+    }
+
+    private suspend fun exerciseEnvironmentRoundTrip(offerEarly: Boolean) = kotlinx.coroutines.coroutineScope {
         val (host, worker) = pair()
         val call = AgentToolCall("remote-write", "write", buildJsonObject { put("path", "a") })
         val registry = com.labteto.dshmobile.harness.tools.ToolRegistry()
@@ -183,7 +191,10 @@ class AgentBackendProtocolTest {
             }
         } }
         val result = AgentBackendProtocol.host(host, AgentBackendRequest("t", "task", emptyList(), 1, remoteTools = true),
-            AgentBackendServices(AgentModel { AgentModelReply(toolCalls = listOf(call)) }, AgentToolExecutor {
+            AgentBackendServices(AgentModel {
+                if (offerEarly) requireNotNull(kotlinx.coroutines.currentCoroutineContext()[AgentEagerToolContext]).offer(call)
+                AgentModelReply(toolCalls = listOf(call))
+            }, AgentToolExecutor {
                 kotlinx.coroutines.withContext(com.labteto.dshmobile.harness.tools.ToolInvocationContext("s", it.id, "durable-id")) {
                     val receipt = registry.executeTracked("write", buildJsonObject {},
                         context = com.labteto.dshmobile.harness.tools.ToolContext(sessionId = "s", approval = { true }))

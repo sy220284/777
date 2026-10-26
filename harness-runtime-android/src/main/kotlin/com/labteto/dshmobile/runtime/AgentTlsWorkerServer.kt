@@ -21,6 +21,7 @@ class AgentTlsWorkerServer(
     private val permits = Semaphore(maxActivations)
     private val connections = ConcurrentHashMap.newKeySet<SSLSocket>()
 
+    // FEATURE_TREE: {"id":"runtime.agent-remote.environment","path":"第三层｜平台与工程保障 / 代理执行后端 / 受审批的远端文件与原生进程执行（PR #874 未合并，完整环境待验收）","entry":"serve","owner":"TOOLS","test":"harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#tlsToolEffectWritesOnlyTheServerWorkspaceAfterHostApproval"}
     suspend fun serve(): Unit = coroutineScope {
         while (isActive && !listener.isClosed) {
             permits.acquire()

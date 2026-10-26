@@ -77,6 +77,7 @@ object AgentBackendProtocol {
         require(start["sequence"]?.jsonPrimitive?.longOrNull == 0L)
         val environment = environmentFor(request)
         var sequence = 0L
+        var environmentSequence = 0L
         val rpcMutex = Mutex()
         suspend fun rpc(operation: String, body: JsonElement): JsonElement = rpcMutex.withLock {
             val id = ++sequence
@@ -87,6 +88,9 @@ object AgentBackendProtocol {
                 checkFrame(reply, request.turnId)
                 if (reply["operation"]?.jsonPrimitive?.content == "heartbeat") continue
                 if (reply["operation"]?.jsonPrimitive?.content == "environment") {
+                    check(reply["sequence"]?.jsonPrimitive?.longOrNull == ++environmentSequence) {
+                        "AGENT_ENVIRONMENT_REPLAY_OR_GAP"
+                    }
                     val invocation = decode<AgentEnvironmentToolRequest>(reply.getValue("body"))
                     val executor = requireNotNull(environment) { "AGENT_REMOTE_ENVIRONMENT_NOT_ADMITTED" }
                     val result = try { executor.execute(invocation) }
