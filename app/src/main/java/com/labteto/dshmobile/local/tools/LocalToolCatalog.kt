@@ -121,7 +121,7 @@ object LocalToolCatalog {
         add(tool("download_file", "把公网 HTTP/HTTPS 文件流式下载到工作区并计算 SHA-256", properties(
             "url" to string("完整公网 HTTP/HTTPS 地址"),
             "path" to string("工作区相对目标路径"),
-            "max_bytes" to integer("最大下载字节数，默认 20971520，最高 104857600"),
+            "max_bytes" to integer("可选；指定下载总字节数上限；不传则下载完整文件，不限制大小"),
         ), listOf("url", "path")))
         add(tool("json_query", "从工作区 JSON 文件读取一个字段/数组片段，无需 jq；支持 a.b[0].c 形式", properties(
             "path" to string("JSON 文件的工作区相对路径"),
