@@ -389,6 +389,7 @@ internal object LocalDocumentContent {
                     },
                 )
             }
+            incomplete = incomplete || zip.previewLimited
         }
         return LocalDocumentText("ZIP", out.value(), out.truncated || incomplete)
     }
@@ -469,15 +470,26 @@ internal object LocalDocumentContent {
 
     private class SafeZip(private val zip: ZipFile) {
         private var totalInflated = 0
+        var previewLimited = false
+            private set
 
         fun entries() = zip.entries()
 
         fun readEntryText(name: String): String? {
             val entry = zip.getEntry(name) ?: return null
-            if (entry.isDirectory || entry.size > MAX_ZIP_ENTRY_BYTES) return null
-            val bytes = zip.getInputStream(entry).use { readInputBounded(it, MAX_ZIP_ENTRY_BYTES) }
+            if (entry.isDirectory) return null
+            val remaining = minOf(MAX_ZIP_ENTRY_BYTES, MAX_ZIP_TOTAL_BYTES - totalInflated)
+            if (remaining <= 0 || entry.size > remaining) {
+                previewLimited = true
+                return null
+            }
+            // Unknown uncompressed entry sizes cannot force an unbounded inflate.
+            val bytes = zip.getInputStream(entry).use { readPrefix(it, remaining + 1) }
+            if (bytes.size > remaining) {
+                previewLimited = true
+                return null
+            }
             totalInflated += bytes.size
-            require(totalInflated <= MAX_ZIP_TOTAL_BYTES) { "压缩文档解压内容超过安全上限" }
             return decodeText(bytes)
         }
     }
