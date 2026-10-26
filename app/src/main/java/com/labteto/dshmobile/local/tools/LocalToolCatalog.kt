@@ -175,7 +175,7 @@ object LocalToolCatalog {
                 })
             },
         ), listOf("items")))
-        add(tool("create_goal", "维护跨多轮任务的目标与验收条件。简单的一次性任务无需额外创建；不要代替 update_plan 或 todo_write", properties(
+        add(tool("create_goal", "维护跨多轮任务的目标与验收条件，创建时自动建立任务文件和交付成果目录并返回路径。简单的一次性任务无需额外创建；不要代替 update_plan 或 todo_write", properties(
             "description" to string("目标和完成标准"),
             "artifact_paths" to buildJsonObject { put("type", "array"); put("items", string("按用户要求交付的工作区相对文件路径；讨论任务填空数组")) },
             "verification_commands" to buildJsonObject { put("type", "array"); put("items", string("按用户要求执行的完整 shell 命令原文或 process_exec command 的 JSON 数组原文；通过真实退出码和成果版本核验，不能以打印成功日志替代。无需命令的任务填空数组")) },

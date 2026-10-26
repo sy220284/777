@@ -121,7 +121,10 @@ internal fun LocalWorkspaceFilesDialog(
         val normalizedQuery = query.trim()
         val candidates = when (mode) {
             LocalFilesMode.WORKSPACE -> when {
-                normalizedQuery.isNotBlank() -> workspace
+                normalizedQuery.isNotBlank() ->
+                    workspaceSectionFiles(workspace, 1) +
+                        workspaceSectionFiles(workspace, 0) +
+                        workspaceSectionFiles(workspace, 2)
                 section == -1 -> emptyList()
                 else -> entries.filterNot(LocalWorkspaceDirectoryEntry::isDirectory).map {
                     LocalWorkspaceFile(it.path, it.bytes, it.modifiedAt)
