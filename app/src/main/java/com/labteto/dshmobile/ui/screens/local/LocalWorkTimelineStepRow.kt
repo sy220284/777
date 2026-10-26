@@ -269,12 +269,9 @@ internal fun WorkPendingToolRow(activity: com.labteto.dshmobile.local.presentati
 }
 
 @Composable
-internal fun WorkToolStatusNotice(onRetry: () -> Unit) {
+internal fun WorkToolStatusNotice() {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    Column(Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd)) {
-        Text("工具状态暂时无法更新，已保存的回复仍可查看", style = DsType.std14.withReadingWeight(),
-            color = colors.warningInk)
-        SyButton("重试状态读取", onClick = onRetry, size = SyButtonSize.Small,
-            variant = SyButtonVariant.Ghost)
-    }
+    Text("工具状态同步暂不可用，正在自动恢复；已保存的回复仍可查看",
+        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd),
+        style = DsType.std14.withReadingWeight(), color = colors.warningInk)
 }
