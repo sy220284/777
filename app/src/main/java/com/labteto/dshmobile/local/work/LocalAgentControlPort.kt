@@ -112,7 +112,7 @@ internal class LocalWorkAgentControlRuntime(
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
     private val teams: LocalAgentTeamRuntime,
 ) : LocalAgentControlPort {
-    // FEATURE_TREE: {"id":"work.agent-control.team-stop","path":"第一层｜产品功能与界面 / 工作功能 / 团队协作 / 按原 Job 身份统一中断与关闭 Team 成员（PR #874 未合并，待验收）","entry":"executeTeam","owner":"WORK","test":"app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#genericTeamStopUsesExactJobAndPreservesInterruptVersusClose"}
+    // FEATURE_TREE: {"id":"work.agent-control.team-stop","path":"第一层｜产品功能与界面 / 工作功能 / 团队协作 / 按原 Job 身份统一中断与关闭 Team 成员（PR #874）","entry":"executeTeam","owner":"WORK","test":"app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#genericTeamStopUsesExactJobAndPreservesInterruptVersusClose"}
     override suspend fun executeTeam(binding: LocalWorkRunBinding, call: LocalToolCall): String? {
         if (call.name in setOf("interrupt_agent", "agent_close")) {
             val agentId = call.arguments["agent_id"]?.jsonPrimitive?.contentOrNull
