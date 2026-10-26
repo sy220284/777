@@ -290,14 +290,22 @@ internal fun LocalWorkspaceFilesDialog(
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val headerTitle = when {
                     preview != null -> preview?.file?.path?.substringAfterLast('/').orEmpty()
+                    mode == LocalFilesMode.WORKSPACE && directory.contains('/') ->
+                        directory.substringAfterLast('/')
+                    mode == LocalFilesMode.WORKSPACE && section == 0 ->
+                        stringResource(R.string.local_workspace_tasks)
+                    mode == LocalFilesMode.WORKSPACE && section == 1 ->
+                        stringResource(R.string.local_workspace_deliverables)
+                    mode == LocalFilesMode.WORKSPACE && section == 2 ->
+                        stringResource(R.string.local_workspace_other_files)
                     mode == LocalFilesMode.WORKSPACE -> stringResource(R.string.app_project_title)
                     else -> stringResource(R.string.local_files_conversation_title)
                 }
                 val headerSubtitle = when {
                     preview != null -> preview?.file?.path
                     mode == LocalFilesMode.WORKSPACE && section >= 0 ->
-                        directory.takeIf(String::isNotEmpty)
-                            ?: stringResource(R.string.local_workspace_other_files)
+                        directory.takeIf(String::isNotEmpty)?.replace("/", " / ")
+                            ?: stringResource(R.string.app_project_title)
                     else -> null
                 }
                 SyTopBar(
@@ -468,6 +476,8 @@ internal fun LocalWorkspaceFilesDialog(
                                     entries.filterNot { it.path == "任务" || it.path == "交付成果" }
                                 else entries,
                                 localizedInternalName = section == 2 && directory.isEmpty(),
+                                section = section,
+                                isCategoryRoot = directory.isEmpty() || directory == "任务" || directory == "交付成果",
                                 onDirectory = {
                                     directory = it
                                     scope.launch { reload() }
@@ -537,14 +547,30 @@ private fun LocalWorkspaceRootList(onOpen: (Int) -> Unit) {
 private fun LocalWorkspaceDirectoryList(
     entries: List<LocalWorkspaceDirectoryEntry>,
     localizedInternalName: Boolean,
+    section: Int,
+    isCategoryRoot: Boolean,
     onDirectory: (String) -> Unit,
     onOpen: suspend (LocalWorkspaceFile) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     if (entries.isEmpty()) {
         LocalFilesEmpty(
-            title = stringResource(R.string.local_empty_workspace_title),
-            body = stringResource(R.string.local_empty_workspace_body),
+            title = stringResource(
+                when {
+                    !isCategoryRoot -> R.string.local_empty_workspace_title
+                    section == 0 -> R.string.local_workspace_tasks_empty_title
+                    section == 1 -> R.string.local_workspace_deliverables_empty_title
+                    else -> R.string.local_empty_workspace_title
+                }
+            ),
+            body = stringResource(
+                when {
+                    !isCategoryRoot -> R.string.local_empty_workspace_body
+                    section == 0 -> R.string.local_workspace_tasks_empty_body
+                    section == 1 -> R.string.local_workspace_deliverables_empty_body
+                    else -> R.string.local_empty_workspace_body
+                }
+            ),
         )
         return
     }
@@ -553,7 +579,8 @@ private fun LocalWorkspaceDirectoryList(
             if (entry.isDirectory) {
                 val internal = localizedInternalName && entry.path in setOf(".dsh", ".adsh")
                 LocalDirectoryRow(
-                    name = if (internal) "应用内部文件" else entry.path.substringAfterLast('/'),
+                    name = if (internal) "应用内部文件（${entry.path}）"
+                        else entry.path.substringAfterLast('/'),
                     subtitle = if (internal) "系统资料 · 不建议手动修改" else null,
                     onClick = { onDirectory(entry.path) },
                 )
