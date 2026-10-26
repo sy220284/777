@@ -102,7 +102,7 @@ internal fun LocalWorkspaceFilesDialog(
     var previewLoading by remember(mode, sessionId) { mutableStateOf(false) }
     var directory by com.labteto.dshmobile.ui.components.rememberNavigationEntryState("", entryRequest, mode, sessionId)
     var section by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(
-        if (mode == LocalFilesMode.WORKSPACE) 0 else 1, entryRequest, mode, sessionId,
+        if (mode == LocalFilesMode.WORKSPACE) -1 else 1, entryRequest, mode, sessionId,
     )
     var query by com.labteto.dshmobile.ui.components.rememberNavigationEntryState("", entryRequest, mode, sessionId)
     val scope = rememberCoroutineScope()
@@ -116,14 +116,17 @@ internal fun LocalWorkspaceFilesDialog(
     val limitText = stringResource(R.string.local_files_share_limit, MAX_LOCAL_SHARE_FILES)
     val shareableFiles = remember(mode, section, directory, workspace, conversation, query) {
         val normalizedQuery = query.trim()
-        (when (mode) {
-            LocalFilesMode.WORKSPACE -> when (section) {
-                0 -> workspace.filter { normalizedQuery.isNotBlank() || it.path.substringBeforeLast('/', "") == directory }
-                1 -> conversation.involved
-                else -> conversation.artifacts
+        val candidates = when (mode) {
+            LocalFilesMode.WORKSPACE -> {
+                val sectionFiles = if (normalizedQuery.isNotBlank()) workspace
+                    else workspaceSectionFiles(workspace, section)
+                if (normalizedQuery.isNotBlank()) sectionFiles
+                else sectionFiles.filter { it.path.substringBeforeLast('/', "") == directory }
             }
-            LocalFilesMode.CONVERSATION -> (conversation.artifacts + conversation.involved).distinctBy { it.path }
-        }).filter { isShareableWorkspacePath(it.path) &&
+            LocalFilesMode.CONVERSATION ->
+                (conversation.artifacts + conversation.involved).distinctBy { it.path }
+        }
+        candidates.filter { isShareableWorkspacePath(it.path) &&
             (normalizedQuery.isBlank() || it.path.contains(normalizedQuery, ignoreCase = true)) }
     }
     val visibleSharePaths = remember(shareableFiles) {
@@ -193,7 +196,6 @@ internal fun LocalWorkspaceFilesDialog(
             when (mode) {
                 LocalFilesMode.WORKSPACE -> {
                     workspace = loadWorkspace()
-                    conversation = loadConversation(sessionId)
                 }
                 LocalFilesMode.CONVERSATION -> conversation = loadConversation(sessionId)
             }
@@ -240,8 +242,15 @@ internal fun LocalWorkspaceFilesDialog(
                 error = null
             }
             query.isNotBlank() -> query = ""
-            mode == LocalFilesMode.WORKSPACE && directory.isNotEmpty() ->
-                directory = directory.substringBeforeLast('/', "")
+            mode == LocalFilesMode.WORKSPACE && section >= 0 -> {
+                if (directory.isNotEmpty() &&
+                    directory != "任务" && directory != "交付成果") {
+                    directory = directory.substringBeforeLast('/', "")
+                } else {
+                    directory = ""
+                    section = -1
+                }
+            }
             else -> onDismiss()
         }
     }
@@ -249,7 +258,7 @@ internal fun LocalWorkspaceFilesDialog(
     val hasInternalBackLayer =
         preview != null ||
             previewPath != null ||
-            (mode == LocalFilesMode.WORKSPACE && directory.isNotEmpty()) ||
+            (mode == LocalFilesMode.WORKSPACE && section >= 0) ||
             selecting || query.isNotBlank()
     BackHandler(enabled = hasInternalBackLayer, onBack = ::navigateBack)
 
@@ -262,8 +271,9 @@ internal fun LocalWorkspaceFilesDialog(
                 }
                 val headerSubtitle = when {
                     preview != null -> preview?.file?.path
-                    mode == LocalFilesMode.WORKSPACE && section == 0 ->
+                    mode == LocalFilesMode.WORKSPACE && section >= 0 ->
                         directory.takeIf(String::isNotEmpty)
+                            ?: stringResource(R.string.local_workspace_other_files)
                     else -> null
                 }
                 SyTopBar(
@@ -283,48 +293,13 @@ internal fun LocalWorkspaceFilesDialog(
                             base.localArtifactSharedBounds(workspacePath, selectedPath)
                         } else base
                     },
-                    largeTitle = preview == null && directory.isEmpty(),
+                    largeTitle = preview == null && directory.isEmpty() &&
+                        (mode != LocalFilesMode.WORKSPACE || section == -1),
                     actionIcon = FeatherIcons.RefreshCw,
                     actionContentDescription = stringResource(R.string.local_files_refresh),
                     actionEnabled = !loading && preview == null,
                     onAction = { scope.launch { reload() } },
                 )
-
-                if (preview == null && mode == LocalFilesMode.WORKSPACE) {
-                    FluidSectionNavigation(
-                        labels = listOf(
-                            stringResource(R.string.app_project_materials),
-                            stringResource(R.string.app_project_context),
-                            stringResource(R.string.panel_artifacts),
-                        ),
-                        selected = section,
-                        onSelect = { selected ->
-                            section = selected
-                            directory = ""
-                        },
-                        modifier = Modifier.padding(
-                            horizontal = SyMetric.gapLg,
-                            vertical = SyMetric.gapMd,
-                        ),
-                    )
-                }
-
-                // Work owns the report contents; the existing Workspace file UI only opens
-                // their human-readable projection, without obtaining a second fact owner.
-                if (preview == null && mode == LocalFilesMode.WORKSPACE &&
-                    workspace.any { it.path == "自我改进/00-自我改进总览.md" }) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        SyButton(
-                            text = stringResource(R.string.local_improvement_archive),
-                            onClick = { scope.launch { openPreview("自我改进/00-自我改进总览.md") } },
-                            size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Outline,
-                        )
-                    }
-                }
 
                 if (preview == null) SySearchField(query, { query = it },
                     placeholder = stringResource(R.string.fluid_files_search),
@@ -444,30 +419,21 @@ internal fun LocalWorkspaceFilesDialog(
                         else LocalFlatFileList(shareableFiles) { file -> openPreview(file.path) }
                     }
                     mode == LocalFilesMode.WORKSPACE -> {
-                        val files = when (section) {
-                            1 -> conversation.involved
-                            2 -> conversation.artifacts
-                            else -> null
-                        }
-                        if (files == null) {
-                            LocalFileList(workspace, directory, onDirectory = { directory = it }) { file ->
-                                openPreview(file.path)
+                        if (section == -1) {
+                            LocalWorkspaceRootList(workspace) { category ->
+                                section = category
+                                directory = when (category) {
+                                    0 -> "任务"
+                                    1 -> "交付成果"
+                                    else -> ""
+                                }
                             }
-                        } else if (files.isEmpty()) {
-                            LocalFilesEmpty(
-                                title = stringResource(
-                                    if (section == 2) R.string.local_empty_artifacts_title
-                                    else R.string.local_empty_involved_title,
-                                ),
-                                body = stringResource(
-                                    if (section == 2) R.string.local_empty_artifacts_body
-                                    else R.string.local_empty_involved_body,
-                                ),
-                            )
                         } else {
-                            LocalFlatFileList(files) { file ->
-                                openPreview(file.path)
-                            }
+                            LocalFileList(
+                                files = workspaceSectionFiles(workspace, section),
+                                directory = directory,
+                                onDirectory = { directory = it },
+                            ) { file -> openPreview(file.path) }
                         }
                     }
                     conversation.isEmpty -> LocalFilesEmpty(
@@ -490,6 +456,45 @@ internal fun LocalWorkspaceFilesDialog(
                 }
             }
         }
+}
+
+/** Virtual root categories; actual file locations never change during an upgrade. */
+internal fun workspaceSectionFiles(files: List<LocalWorkspaceFile>, section: Int): List<LocalWorkspaceFile> =
+    when (section) {
+        0 -> files.filter { it.path.startsWith("任务/") }
+        1 -> files.filter { it.path.startsWith("交付成果/") }
+        2 -> files.filterNot { it.path.startsWith("任务/") || it.path.startsWith("交付成果/") }
+        else -> emptyList()
+    }
+
+@Composable
+private fun LocalWorkspaceRootList(files: List<LocalWorkspaceFile>, onOpen: (Int) -> Unit) {
+    val tasks = remember(files) { workspaceSectionFiles(files, 0).size }
+    val deliveries = remember(files) { workspaceSectionFiles(files, 1).size }
+    val others = remember(files) { workspaceSectionFiles(files, 2).size }
+    LazyColumn(Modifier.fillMaxSize()) {
+        item(key = "workspace-task-folders") {
+            LocalDirectoryRow(
+                name = stringResource(R.string.local_workspace_tasks),
+                subtitle = stringResource(R.string.local_workspace_tasks_hint, tasks),
+                onClick = { onOpen(0) },
+            )
+        }
+        item(key = "workspace-deliverables") {
+            LocalDirectoryRow(
+                name = stringResource(R.string.local_workspace_deliverables),
+                subtitle = stringResource(R.string.local_workspace_deliverables_hint, deliveries),
+                onClick = { onOpen(1) },
+            )
+        }
+        item(key = "workspace-other-files") {
+            LocalDirectoryRow(
+                name = stringResource(R.string.local_workspace_other_files),
+                subtitle = stringResource(R.string.local_workspace_other_hint, others),
+                onClick = { onOpen(2) },
+            )
+        }
+    }
 }
 
 @Composable
@@ -626,6 +631,7 @@ private fun LocalFileList(
 private fun LocalDirectoryRow(
     name: String,
     onClick: () -> Unit,
+    subtitle: String? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val dark = colors.canvas.luminance() < 0.5f
@@ -665,7 +671,7 @@ private fun LocalDirectoryRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    stringResource(R.string.panel_folder),
+                    subtitle ?: stringResource(R.string.panel_folder),
                     style = DsType.caption11.withReadingWeight(),
                     color = colors.textTertiary,
                     maxLines = 1,

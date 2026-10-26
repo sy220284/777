@@ -636,6 +636,12 @@
     <string name="local_files_refresh">刷新</string>
     <string name="local_files_workspace_empty">项目暂无资料</string>
     <string name="local_files_loading">正在读取文件…</string>
+    <string name="local_workspace_tasks">任务文件</string>
+    <string name="local_workspace_tasks_hint">按任务分别存放工作资料 · %1$d 个文件</string>
+    <string name="local_workspace_deliverables">交付成果</string>
+    <string name="local_workspace_deliverables_hint">已整理的最终成果 · %1$d 个文件</string>
+    <string name="local_workspace_other_files">其他文件</string>
+    <string name="local_workspace_other_hint">历史文件、旧目录及系统资料 · %1$d 个文件</string>
     <string name="chat_diary_loading">正在整理角色日记…</string>
     <string name="local_files_binary_hint">这种文件目前无法直接显示内容，你仍可查看名称、位置和大小。</string>
     <string name="local_files_truncated_hint">文件较大，以下为前 512 KB 预览。</string>
