@@ -385,12 +385,12 @@ class SqliteSessionEventDatabase(
         )
     }
 
-    /** Most recent bounded window returned in chronological order by SQLite itself. */
+    /** Work/tool projections legitimately read up to 4096 events; ordinary UI pages stay at 200. */
     fun pageBeforeChronological(
         sessionId: String, beforeSequenceExclusive: Long = Long.MAX_VALUE, limit: Int = 80,
     ): List<SessionEvent> {
         validateSessionId(sessionId)
-        require(limit in 1..MAX_PAGE) { "事件分页大小不合法" }
+        require(limit in 1..LOCAL_SESSION_PROJECTION_WINDOW_MAX) { "工作状态投影读取数量越界" }
         return queryPage(
             "SELECT sequence,event_type,created_at,schema_version,payload FROM (" +
                 "SELECT sequence,event_type,created_at,schema_version,payload " +

@@ -274,6 +274,32 @@ class LocalSessionEventLogTest {
     }
 
     @Test
+    fun legacyFileBackendAlsoHonorsWorkProjectionWindowsBeyondTwoHundredEvents() {
+        val dir = Files.createTempDirectory("legacy-work-projection-window").toFile()
+        try {
+            val log = LocalSessionEventLog(dir.resolve("work.events.jsonl"), json, maxBytes = 4_000_000)
+            try {
+                repeat(275) { number ->
+                    log.append("tool/call", buildJsonObject {
+                        put("id", "call-${number}")
+                        put("name", "read")
+                    })
+                }
+                assertEquals((0L..274L).toList(),
+                    log.pageBeforeChronological(limit = 1_024).map { it.sequence })
+                assertEquals((75L..274L).toList(),
+                    log.pageBeforeChronological(limit = 200).map { it.sequence })
+                assertEquals((0L..249L).toList(),
+                    log.pageBeforeChronological(sequenceExclusive = 250L, limit = 4_096).map { it.sequence })
+            } finally {
+                log.close()
+            }
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun newerEventSchemaBlocksColdSessionOwnerInsteadOfDeletingOrSkippingHistory() {
         val dir = Files.createTempDirectory("local-future-event").toFile()
         val file = dir.resolve("session.events.jsonl")
