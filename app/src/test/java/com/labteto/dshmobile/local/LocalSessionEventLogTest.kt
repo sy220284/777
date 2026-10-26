@@ -281,7 +281,7 @@ class LocalSessionEventLogTest {
             try {
                 repeat(275) { number ->
                     log.append("tool/call", buildJsonObject {
-                        put("id", "call-$"+"number")
+                        put("id", "call-${number}")
                         put("name", "read")
                     })
                 }
