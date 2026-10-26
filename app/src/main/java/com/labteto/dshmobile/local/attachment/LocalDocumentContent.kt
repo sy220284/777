@@ -394,13 +394,26 @@ internal object LocalDocumentContent {
     }
 
     private fun extractGzip(file: File, displayName: String, maxChars: Int): LocalDocumentText {
-        val bytes = GZIPInputStream(file.inputStream()).use { readInputBounded(it, MAX_ZIP_ENTRY_BYTES) }
-        val text = decodeText(bytes)
-        return bounded("GZIP ${displayName.substringBeforeLast('.')}", text, maxChars)
+        // A large compressed attachment is stored in full. Only its bounded preview
+        // is inflated here; the full archive remains accessible to workspace tools.
+        val bytes = GZIPInputStream(file.inputStream()).use { readPrefix(it, MAX_ZIP_ENTRY_BYTES + 1) }
+        val isTar = displayName.endsWith(".tar.gz", ignoreCase = true) ||
+            displayName.endsWith(".tgz", ignoreCase = true)
+        if (isTar) return extractTarPreview(bytes, maxChars, bytes.size > MAX_ZIP_ENTRY_BYTES)
+        val preview = bounded("GZIP ${displayName.substringBeforeLast('.')}", decodeText(bytes), maxChars)
+        return preview.copy(truncated = preview.truncated || bytes.size > MAX_ZIP_ENTRY_BYTES)
     }
 
     private fun extractTar(file: File, maxChars: Int): LocalDocumentText {
-        val bytes = readBounded(file, 20 * 1024 * 1024)
+        val bytes = readPrefix(file, MAX_ZIP_ENTRY_BYTES + 1)
+        return extractTarPreview(bytes, maxChars, file.length() > MAX_ZIP_ENTRY_BYTES)
+    }
+
+    private fun extractTarPreview(
+        bytes: ByteArray,
+        maxChars: Int,
+        prefixTruncated: Boolean,
+    ): LocalDocumentText {
         val out = BoundedText(maxChars)
         var offset = 0
         var entries = 0
@@ -425,7 +438,7 @@ internal object LocalDocumentContent {
         val moreEntries = if (entries >= MAX_ARCHIVE_ENTRIES && offset + 512 <= bytes.size) {
             bytes.copyOfRange(offset, offset + 512).any { it != 0.toByte() }
         } else false
-        return LocalDocumentText("TAR", out.value(), out.truncated || moreEntries)
+        return LocalDocumentText("TAR", out.value(), out.truncated || moreEntries || prefixTruncated)
     }
 
     private fun extractLegacyOffice(file: File, extension: String, maxChars: Int): LocalDocumentText {
@@ -720,16 +733,18 @@ internal object LocalDocumentContent {
         file.inputStream().use { readInputBounded(it, maxBytes) }
 
     private fun readPrefix(file: File, maxBytes: Int): ByteArray =
-        file.inputStream().use { input ->
-            val out = ByteArrayOutputStream()
-            val buffer = ByteArray(16 * 1024)
-            while (out.size() < maxBytes) {
-                val read = input.read(buffer, 0, minOf(buffer.size, maxBytes - out.size()))
-                if (read < 0) break
-                out.write(buffer, 0, read)
-            }
-            out.toByteArray()
+        file.inputStream().use { readPrefix(it, maxBytes) }
+
+    private fun readPrefix(input: java.io.InputStream, maxBytes: Int): ByteArray {
+        val out = ByteArrayOutputStream()
+        val buffer = ByteArray(16 * 1024)
+        while (out.size() < maxBytes) {
+            val read = input.read(buffer, 0, minOf(buffer.size, maxBytes - out.size()))
+            if (read < 0) break
+            out.write(buffer, 0, read)
         }
+        return out.toByteArray()
+    }
 
     private fun readInputBounded(input: java.io.InputStream, maxBytes: Int): ByteArray {
         val out = ByteArrayOutputStream()
