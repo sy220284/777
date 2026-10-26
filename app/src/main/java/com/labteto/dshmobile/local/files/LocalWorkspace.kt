@@ -441,6 +441,8 @@ class LocalWorkspace(
         require(needle.isNotBlank()) { "搜索关键词不能为空" }
         return safeWalk(canonicalRoot, maxVisited = 50_000, maxMillis = 5_000L)
             .filter { it.isFile && isInsideWorkspace(it) }
+            .filter { it.relativeTo(canonicalRoot).invariantSeparatorsPath.contains(needle, ignoreCase = true) }
+            .take(limit.coerceIn(1, 500))
             .map { file ->
                 LocalWorkspaceFile(
                     path = file.relativeTo(canonicalRoot).invariantSeparatorsPath,
@@ -448,8 +450,6 @@ class LocalWorkspace(
                     modifiedAt = file.lastModified(),
                 )
             }
-            .filter { it.path.contains(needle, ignoreCase = true) }
-            .take(limit.coerceIn(1, 500))
             .sortedBy(LocalWorkspaceFile::path)
             .toList()
     }
