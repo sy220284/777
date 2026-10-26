@@ -6,6 +6,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.performTextInput
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
@@ -131,8 +133,19 @@ class LocalWorkspaceShareSelectionUiTest {
             }
         }
         compose.onNodeWithText(context.getString(R.string.local_workspace_tasks)).assertExists()
-        compose.onNodeWithText(context.getString(R.string.fluid_files_search)).assertExists()
-        // Search input is editable; the backend callback is only invoked after debounce.
+        compose.onNode(hasSetTextAction()).performTextInput("报告")
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("报告-000.md").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNode(hasScrollAction()).performScrollToIndex(68)
+        compose.waitUntil(5_000) { offsets.contains(96) }
+        compose.waitForIdle()
+        compose.onNode(hasScrollAction()).performScrollToIndex(124)
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("报告-124.md").fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals(listOf(0, 96), offsets)
+        compose.onNodeWithText("加载更多").assertDoesNotExist()
     }
 
     @Test
