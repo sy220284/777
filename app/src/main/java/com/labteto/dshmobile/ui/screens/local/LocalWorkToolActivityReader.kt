@@ -1,7 +1,15 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import kotlinx.coroutines.CancellationException
+
+/** Only a restored, identified Work session may query its durable event cursor. */
+internal fun shouldReadWorkToolStatus(
+    mode: LocalUsageMode,
+    loading: Boolean,
+    sessionId: String,
+): Boolean = mode == LocalUsageMode.WORK && !loading && sessionId.isNotBlank()
 
 internal sealed interface LocalWorkToolActivityRead {
     data class Available(val activities: List<LocalToolActivityUiItem>) : LocalWorkToolActivityRead
