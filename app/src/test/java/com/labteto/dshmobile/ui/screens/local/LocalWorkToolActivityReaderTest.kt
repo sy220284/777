@@ -16,7 +16,25 @@ class LocalWorkToolActivityReaderTest {
         assertTrue(shouldReadWorkToolStatus(LocalUsageMode.WORK, loading = false, sessionId = "fresh-session"))
     }
 
-    @Test fun failedReadDoesNotAdvanceTheCursorAndManualRetryReadsSameRevision() {
+    @Test fun automaticRetryBacksOffWithoutBusyPolling() {
+        assertEquals(750L, workToolReadRetryDelayMs(1))
+        assertEquals(1_500L, workToolReadRetryDelayMs(2))
+        assertEquals(3_000L, workToolReadRetryDelayMs(3))
+        assertEquals(6_000L, workToolReadRetryDelayMs(4))
+        assertEquals(12_000L, workToolReadRetryDelayMs(5))
+        assertEquals(20_000L, workToolReadRetryDelayMs(6))
+        assertEquals(20_000L, workToolReadRetryDelayMs(100))
+    }
+
+    @Test fun transientFailuresAndEmptyWelcomePageStayQuiet() {
+        assertFalse(shouldShowWorkToolReadFailure(1, true))
+        assertFalse(shouldShowWorkToolReadFailure(2, true))
+        assertFalse(shouldShowWorkToolReadFailure(10, false))
+        assertTrue(shouldShowWorkToolReadFailure(3, true))
+        assertFalse(shouldShowWorkToolReadFailure(0, true))
+    }
+
+    @Test fun failedReadRetriesAutomaticallyWithoutANewEventSequence() {
         var unavailable = true
         var reads = 0
         val row = LocalToolActivityUiItem("call", "read", LocalToolUiPhase.RUNNING)
