@@ -52,7 +52,7 @@ class AgentWorkspaceEnvironment private constructor(
             put("operation", operation)
             put("path", file.relativeTo(root).invariantSeparatorsPath)
             put("original_path", original)
-            observations[file.path]?.let { put("observed", it) }
+            put("observed", observations[file.path]?.let(::JsonPrimitive) ?: JsonNull)
         })
         val script = requireNotNull(javaClass.getResourceAsStream(
             "/com/labteto/dshmobile/runtime/agent_workspace_files.py")).bufferedReader().use { it.readText() }

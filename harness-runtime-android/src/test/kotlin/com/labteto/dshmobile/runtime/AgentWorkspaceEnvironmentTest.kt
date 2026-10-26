@@ -22,6 +22,10 @@ class AgentWorkspaceEnvironmentTest {
             assertEquals("old", java.io.File(root, "src/a").readText())
             assertEquals(64, written.fileVersions.getValue("src/a").length)
             assertTrue(runCatching { environment.execute(invocation("edit", true,
+                "path" to "src/a", "old_text" to "old", "new_text" to "forged",
+                "observed" to written.fileVersions.getValue("src/a"))) }.isFailure)
+            assertEquals("old", java.io.File(root, "src/a").readText())
+            assertTrue(runCatching { environment.execute(invocation("edit", true,
                 "path" to "src/a", "old_text" to "old", "new_text" to "new")) }.isFailure)
             assertEquals("1: old", environment.execute(invocation("read", false, "path" to "src/a")).content)
             environment.execute(invocation("edit", true, "path" to "src/a", "old_text" to "old", "new_text" to "new"))
