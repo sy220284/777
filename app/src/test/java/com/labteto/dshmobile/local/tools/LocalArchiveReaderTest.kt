@@ -19,7 +19,7 @@ class LocalArchiveReaderTest {
             val code = "中文注释/hello\n".repeat(5000)
             ZipOutputStream(file.outputStream()).use { archive ->
                 for (i in 0 until 233) {
-                    archive.putNextEntry(ZipEntry("src/File" + i.toString().padStart(3, '0') + ".kt"))
+                    archive.putNextEntry(ZipEntry("./src/File" + i.toString().padStart(3, '0') + ".kt"))
                     archive.write(if (i == 17) code.toByteArray(StandardCharsets.UTF_8) else "val n = $i\n".toByteArray())
                     archive.closeEntry()
                 }
