@@ -120,10 +120,10 @@ class LocalWorkspaceShareSelectionUiTest {
                         assertEquals("报告", query)
                         offsets += offset
                         com.labteto.dshmobile.local.files.LocalWorkspaceSearchPage(
-                            files = (offset until minOf(180, offset + 96)).map { n ->
+                            files = (offset * 96 until minOf(180, offset * 96 + 96)).map { n ->
                                 LocalWorkspaceFile("任务/报告-${n.toString().padStart(3, '0')}.md", 3L, 1L)
                             },
-                            nextOffset = (offset + 96).takeIf { it < 180 },
+                            nextOffset = (offset + 1).takeIf { it * 96 < 180 },
                         )
                     },
                     loadConversation = { error("搜索不应加载会话数据") },
@@ -144,7 +144,7 @@ class LocalWorkspaceShareSelectionUiTest {
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("报告-124.md").fetchSemanticsNodes().isNotEmpty()
         }
-        assertEquals(listOf(0, 96), offsets)
+        assertEquals(listOf(0, 1), offsets)
         compose.onNodeWithText("加载更多").assertDoesNotExist()
     }
 

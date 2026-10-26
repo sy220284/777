@@ -503,7 +503,8 @@ class LocalWorkspace(
 
     private class SearchCursor(
         val iterator: Iterator<File>,
-        val matches: MutableList<LocalWorkspaceFile> = mutableListOf(),
+        var nextPage: Int = 0,
+        var emitted: Int = 0,
         var exhausted: Boolean = false,
     )
     private val searchCursors = object : LinkedHashMap<String, SearchCursor>(4, .75f, true) {
@@ -511,7 +512,10 @@ class LocalWorkspace(
             size > 4
     }
 
-    /** Resume a matching-path scan without rescanning previous files for every visual page. */
+    /**
+     * A cursor advances once per scan batch, even when the batch finds zero matches.
+     * This is essential for sparse searches: an empty partial page must not rewind to page zero.
+     */
     fun searchWorkspacePage(query: String, offset: Int = 0, pageSize: Int = 96): LocalWorkspaceSearchPage {
         val needle = query.trim()
         require(needle.isNotEmpty() && offset >= 0 && pageSize in 1..256) { "搜索分页参数不合法" }
@@ -520,28 +524,29 @@ class LocalWorkspace(
                 SearchCursor(safeWalk(canonicalRoot, maxVisited = 50_000,
                     maxMillis = Long.MAX_VALUE).iterator()).also { searchCursors[needle] = it }
             } else searchCursors[needle] ?: error("搜索会话已过期，请重新搜索")
-            require(offset <= scan.matches.size) { "搜索游标已经失效，请重新搜索" }
-            val endWanted = (offset + pageSize).coerceAtMost(10_000)
-            // Bound discovery work per response, including queries with very few matches.
-            // Empty/partial pages are continued automatically by the UI, not shown as "load more".
-            var visitedInPage = 0
-            while (scan.matches.size < endWanted && !scan.exhausted && visitedInPage < 2_048) {
+            require(offset == scan.nextPage) { "搜索游标已经失效，请重新搜索" }
+            val matched = ArrayList<LocalWorkspaceFile>(pageSize)
+            var visited = 0
+            while (matched.size < pageSize && !scan.exhausted &&
+                visited < 2_048 && scan.emitted < 10_000
+            ) {
                 if (!scan.iterator.hasNext()) {
                     scan.exhausted = true
                     break
                 }
                 val file = scan.iterator.next()
-                visitedInPage++
+                visited++
                 if (!file.isFile || !isInsideWorkspace(file)) continue
                 val path = file.relativeTo(canonicalRoot).invariantSeparatorsPath
                 if (path.contains(needle, ignoreCase = true)) {
-                    scan.matches += LocalWorkspaceFile(path, file.length(), file.lastModified())
+                    matched += LocalWorkspaceFile(path, file.length(), file.lastModified())
+                    scan.emitted++
                 }
             }
-            val end = minOf(scan.matches.size, endWanted)
+            scan.nextPage++
             LocalWorkspaceSearchPage(
-                files = scan.matches.subList(offset, end).toList(),
-                nextOffset = end.takeIf { it < 10_000 && !scan.exhausted },
+                files = matched,
+                nextOffset = scan.nextPage.takeIf { !scan.exhausted && scan.emitted < 10_000 },
             )
         }
     }
