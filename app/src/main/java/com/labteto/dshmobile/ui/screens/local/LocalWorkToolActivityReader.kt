@@ -11,6 +11,14 @@ internal fun shouldReadWorkToolStatus(
     sessionId: String,
 ): Boolean = mode == LocalUsageMode.WORK && !loading && sessionId.isNotBlank()
 
+/** Retrying read-only projection queries never resends models or executes tools. */
+internal fun workToolReadRetryDelayMs(failures: Int): Long =
+    (750L shl (failures - 1).coerceIn(0, 5)).coerceAtMost(20_000L)
+
+/** Empty welcome sessions should not show an internal read error. */
+internal fun shouldShowWorkToolReadFailure(failures: Int, hasWorkContent: Boolean): Boolean =
+    failures >= 3 && hasWorkContent
+
 internal sealed interface LocalWorkToolActivityRead {
     data class Available(val activities: List<LocalToolActivityUiItem>) : LocalWorkToolActivityRead
     data class Failed(val cause: Exception) : LocalWorkToolActivityRead
