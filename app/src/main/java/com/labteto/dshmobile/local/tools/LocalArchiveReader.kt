@@ -213,12 +213,14 @@ internal class LocalArchiveReader(private val root: File) {
         override fun read(): Int {
             if (left == 0L) return -1
             val n = upstream.read()
-            if (n >= 0) left--
+            require(n >= 0) { "TAR 成员内容被截断" }
+            left--
             return n
         }
         override fun read(b: ByteArray, off: Int, len: Int): Int {
             if (left == 0L) return -1
             val n = upstream.read(b, off, minOf(left, len.toLong()).toInt())
+            require(n >= 0) { "TAR 成员内容被截断" }
             if (n > 0) left -= n
             return n
         }
