@@ -127,12 +127,19 @@ class LocalWebCancellationAndroidTest {
     private fun streamingBody(totalBytes: Long, chunk: ByteArray): ResponseBody {
         val source = object : Source {
             var remaining = totalBytes
+            var chunkOffset = 0
             override fun timeout() = Timeout.NONE
             override fun close() {}
             override fun read(sink: Buffer, byteCount: Long): Long {
                 if (remaining == 0L) return -1L
                 val count = minOf(remaining, byteCount, chunk.size.toLong()).toInt()
-                sink.write(chunk, 0, count)
+                var pending = count
+                while (pending > 0) {
+                    val part = minOf(pending, chunk.size - chunkOffset)
+                    sink.write(chunk, chunkOffset, part)
+                    chunkOffset = (chunkOffset + part) % chunk.size
+                    pending -= part
+                }
                 remaining -= count
                 return count.toLong()
             }
