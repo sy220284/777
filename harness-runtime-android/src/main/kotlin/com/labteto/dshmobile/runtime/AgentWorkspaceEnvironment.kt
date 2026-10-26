@@ -7,11 +7,9 @@ import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolInvocationContext
 import com.labteto.dshmobile.harness.tools.ToolResult
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
-import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.*
 
 /** One activation owns file observations and native terminal sessions in a server-configured root. */
@@ -19,49 +17,14 @@ class AgentWorkspaceEnvironment private constructor(
     private val root: File,
     private val context: HarnessContext,
     private val plugin: AndroidRuntimePlugin,
+    private val process: AndroidProcessRuntime,
 ) : AgentEnvironmentTools {
     private val observations = mutableMapOf<String, String>()
 
     override suspend fun execute(request: AgentEnvironmentToolRequest): ToolResult =
         withContext(Dispatchers.IO + ProcessIsolationContext() + ToolInvocationContext(request.sessionId.orEmpty(), request.callId, request.executionId)) {
             when (request.name) {
-                "read", "read_file" -> {
-                    val file = resolve(request.input.text("path"))
-                    val before = fingerprint(file)
-                    val from = request.input.number("start_line", 1).coerceAtLeast(1)
-                    val until = request.input.number("end_line", from + 399).coerceAtLeast(from)
-                    val content = file.bufferedReader().useLines { lines -> lines.drop(from - 1)
-                        .take(until - from + 1).mapIndexed { index, row -> "${from + index}: $row" }.joinToString("\n") }
-                    check(before == fingerprint(file)) { "文件在读取过程中变化，请重新读取" }
-                    observations[file.path] = before
-                    ToolResult(content, fileVersions = mapOf(request.input.text("path") to before))
-                }
-                "write", "write_file", "edit", "edit_file" -> {
-                    require(request.allowMutation) { "该任务没有写入权限" }
-                    val path = request.input.text("path")
-                    val file = resolve(path)
-                    val content = if (request.name in setOf("edit", "edit_file")) {
-                        val observed = requireNotNull(observations[file.path]) { "编辑前必须先读取文件" }
-                        check(observed == fingerprint(file)) { "文件在读取后变化，请重新读取" }
-                        val source = file.readText()
-                        check(observed == fingerprint(file)) { "文件在准备编辑时变化，请重新读取" }
-                        val old = request.input.text("old_text")
-                        require(old.isNotEmpty()) { "待替换内容不能为空" }
-                        val offset = source.indexOf(old)
-                        require(offset >= 0 && source.indexOf(old, offset + old.length) < 0) { "待替换内容必须唯一" }
-                        source.replaceRange(offset, offset + old.length, request.input.text("new_text"))
-                    } else request.input.text("content")
-                    file.parentFile.mkdirs()
-                    val staged = Files.createTempFile(file.parentFile.toPath(), ".agent-write-", ".tmp")
-                    try {
-                        Files.write(staged, content.toByteArray(Charsets.UTF_8))
-                        Files.move(staged, file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-                    } finally { Files.deleteIfExists(staged) }
-                    val version = fingerprint(file)
-                    if (request.name in setOf("edit", "edit_file")) observations[file.path] = version
-                    else observations.remove(file.path)
-                    ToolResult("已写入远端文件 $path", fileVersions = mapOf(path to version))
-                }
+                "read", "read_file", "write", "write_file", "edit", "edit_file" -> executeFile(request)
                 else -> {
                     // Only tools explicitly installed in this environment are callable. Device,
                     // account and model providers are never installed or exported here.
@@ -80,13 +43,29 @@ class AgentWorkspaceEnvironment private constructor(
         return candidate
     }
 
-    private fun fingerprint(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { stream ->
-            val buffer = ByteArray(8192)
-            while (true) { val size = stream.read(buffer); if (size < 0) break; digest.update(buffer, 0, size) }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
+    private suspend fun executeFile(request: AgentEnvironmentToolRequest): ToolResult {
+        val operation = request.name.removeSuffix("_file")
+        require(operation == "read" || request.allowMutation) { "该任务没有写入权限" }
+        val original = request.input.text("path")
+        val file = resolve(original)
+        val payload = JsonObject(request.input + buildJsonObject {
+            put("operation", operation)
+            put("path", file.relativeTo(root).invariantSeparatorsPath)
+            put("original_path", original)
+            observations[file.path]?.let { put("observed", it) }
+        })
+        val script = requireNotNull(javaClass.getResourceAsStream(
+            "/com/labteto/dshmobile/runtime/agent_workspace_files.py")).bufferedReader().use { it.readText() }
+        val receipt = process.execute(com.labteto.dshmobile.harness.capability.ProcessRequest(
+            listOf("python3", "-P", "-s", "-u", "-c", script), workingDirectory = root.path,
+            stdin = payload.toString(),
+        ))
+        check(!receipt.timedOut && receipt.exitCode == 0) { "远端文件操作中断，须检查实际状态：${receipt.stderr}" }
+        val result = com.labteto.dshmobile.harness.agent.AgentBackendProtocol.json.decodeFromString<ToolResult>(receipt.stdout)
+        if (result.isError) error(result.content)
+        if (operation == "write") observations.remove(file.path)
+        else result.fileVersions[original]?.let { observations[file.path] = it }
+        return result
     }
 
     override suspend fun close() { plugin.uninstall(context); observations.clear() }
@@ -107,10 +86,9 @@ class AgentWorkspaceEnvironment private constructor(
             val context = HarnessContext()
             val plugin = AndroidRuntimePlugin(directory, process, terminals)
             plugin.install(context)
-            return AgentWorkspaceEnvironment(directory, context, plugin)
+            return AgentWorkspaceEnvironment(directory, context, plugin, process)
         }
     }
 }
 
 private fun JsonObject.text(key: String): String = getValue(key).jsonPrimitive.content
-private fun JsonObject.number(key: String, default: Int): Int = get(key)?.jsonPrimitive?.intOrNull ?: default

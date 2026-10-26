@@ -79,7 +79,11 @@ internal class LocalWebTargetResolver(
         throw LocalWebException("DNS_FAILED", "无法解析域名 $host", error)
     }
 
-    fun requestRoute(target: ValidatedTarget, timeoutSeconds: Long): RequestRoute {
+    fun requestRoute(
+        target: ValidatedTarget,
+        timeoutSeconds: Long,
+        streamingDownload: Boolean = false,
+    ): RequestRoute {
         val timeout = timeoutSeconds.coerceIn(MIN_FETCH_TIMEOUT_SECONDS, MAX_FETCH_TIMEOUT_SECONDS)
         val proxy = systemHttpProxy()
         val fakeIp = target.addresses.any { isAllowedVpnFakeAddress(target.uri.host, it, target.vpn) }
@@ -98,7 +102,7 @@ internal class LocalWebTargetResolver(
                 })
                 .connectTimeout(FETCH_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .readTimeout(timeout, TimeUnit.SECONDS)
-                .callTimeout(timeout + FETCH_CALL_GRACE_SECONDS, TimeUnit.SECONDS)
+                .callTimeout(if (streamingDownload) 0L else timeout + FETCH_CALL_GRACE_SECONDS, TimeUnit.SECONDS)
                 .build()
             return RequestRoute(client, target.uri.toString(), null)
         }
@@ -113,7 +117,7 @@ internal class LocalWebTargetResolver(
             .proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress(proxy.host, proxy.port)))
             .connectTimeout(FETCH_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(timeout, TimeUnit.SECONDS)
-            .callTimeout(timeout + FETCH_CALL_GRACE_SECONDS, TimeUnit.SECONDS)
+            .callTimeout(if (streamingDownload) 0L else timeout + FETCH_CALL_GRACE_SECONDS, TimeUnit.SECONDS)
 
         if (target.uri.scheme.equals("https", ignoreCase = true)) {
             val originalHost = target.uri.host

@@ -69,32 +69,39 @@ internal fun LocalTranscriptAutoPager(
     enabled: Boolean,
     onLoadOlder: suspend (String) -> Result<Int>,
 ) {
-    LaunchedEffect(sessionId, listState, enabled) {
-        if (!enabled) return@LaunchedEffect
-        // A freshly displayed short page can already be at index 0. That must not
-        // trigger a cascade of reads until the entire history is materialized.
-        // Only an actual upward movement toward older content may prefetch.
+    // Loading a page changes enabled; restarting this effect would cancel the
+    // very history request that switched the row into its loading state.
+    val canLoad = rememberUpdatedState(enabled)
+    val loadOlder = rememberUpdatedState(onLoadOlder)
+    val readerDragging = listState.interactionSource.collectIsDraggedAsState()
+    LaunchedEffect(sessionId, listState) {
         var priorPosition: Pair<Int, Int>? = null
         var requestedDuringCurrentGesture = false
         snapshotFlow {
-            Triple(
-                listState.firstVisibleItemIndex,
-                listState.firstVisibleItemScrollOffset,
-                listState.isScrollInProgress,
+            Pair(
+                Triple(
+                    listState.firstVisibleItemIndex,
+                    listState.firstVisibleItemScrollOffset,
+                    listState.isScrollInProgress,
+                ),
+                readerDragging.value,
             )
-        }.collect { (index, offset, scrolling) ->
+        }.collect { (position, dragging) ->
+            val (index, offset, scrolling) = position
             val previous = priorPosition
             priorPosition = index to offset
             if (!scrolling) requestedDuringCurrentGesture = false
             val movingTowardOlder = previous != null &&
                 (index < previous.first || (index == previous.first && offset < previous.second))
-            if (scrolling && !requestedDuringCurrentGesture && movingTowardOlder &&
-                index <= LOCAL_TRANSCRIPT_AUTOLOAD_THRESHOLD_ITEMS
+            // An already-visible first row cannot move any farther. An actual drag
+            // at that boundary must still request the next durable history page.
+            val draggingAtTop = dragging && index == 0 && offset == 0
+            if (canLoad.value && scrolling && !requestedDuringCurrentGesture &&
+                index <= LOCAL_TRANSCRIPT_AUTOLOAD_THRESHOLD_ITEMS &&
+                (movingTowardOlder || draggingAtTop)
             ) {
-                // A single long drag near the top can emit dozens of pixel offsets.
-                // One bounded page per gesture avoids a burst of serialized reads.
                 requestedDuringCurrentGesture = true
-                onLoadOlder(sessionId)
+                loadOlder.value(sessionId)
             }
         }
     }

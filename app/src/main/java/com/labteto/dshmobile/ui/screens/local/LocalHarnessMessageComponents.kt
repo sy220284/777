@@ -658,7 +658,7 @@ private fun LocalTranscriptFile(file: LocalMessageBlock.File, workspacePath: Str
         resolveLocalTranscriptFile(workspacePath, file.relativePath)
     }
     SyMaterialSurface(
-        modifier = Modifier.clickable(enabled = localFile != null) {
+        modifier = Modifier.widthIn(max = 316.dp).clickable(enabled = localFile != null) {
             localFile?.let { attached ->
                 viewMediaFile(context, attached, file.mediaType) { error ->
                     Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
@@ -670,12 +670,13 @@ private fun LocalTranscriptFile(file: LocalMessageBlock.File, workspacePath: Str
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier = Modifier.heightIn(min = 52.dp)
+                .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
         ) {
             Icon(
-                FeatherIcons.Tool,
+                FeatherIcons.FileText,
                 contentDescription = null,
                 tint = colors.textSecondary,
                 modifier = Modifier.size(18.dp),
@@ -683,25 +684,26 @@ private fun LocalTranscriptFile(file: LocalMessageBlock.File, workspacePath: Str
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     file.name,
-                    style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                    style = DsType.small13Strong.withReadingWeight(),
                     color = colors.text,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (localFile == null) {
-                    Text(
-                        stringResource(R.string.media_chat_work_file_missing),
-                        style = DsType.caption11.withReadingWeight(),
-                        color = colors.textSecondary,
-                    )
-                }
+                Text(
+                    if (localFile == null) stringResource(R.string.media_chat_work_file_missing)
+                    else "${file.name.substringAfterLast('.', "").uppercase().take(7)} · ${localAttachmentDisplaySize(file.bytes)}",
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             if (localFile != null) {
                 Icon(
                     FeatherIcons.ChevronRight,
                     contentDescription = stringResource(R.string.media_chat_open_result),
                     tint = colors.textTertiary,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }

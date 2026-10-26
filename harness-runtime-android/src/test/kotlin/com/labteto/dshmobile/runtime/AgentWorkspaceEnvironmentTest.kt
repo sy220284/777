@@ -33,6 +33,21 @@ class AgentWorkspaceEnvironmentTest {
         } finally { environment.close() }
     }
 
+    @Test fun editingAnExecutablePreservesItsExecutionPermission() = runBlocking {
+        val root = temporary.newFolder("remote")
+        val file = java.io.File(root, "script.sh").apply {
+            writeText("#!/bin/sh\nprintf old")
+            assertTrue(setExecutable(true, true))
+        }
+        val environment = AgentWorkspaceEnvironment.create(root)
+        try {
+            environment.execute(invocation("read", false, "path" to "script.sh"))
+            environment.execute(invocation("edit", true, "path" to "script.sh", "old_text" to "old", "new_text" to "new"))
+            assertTrue(file.canExecute())
+            assertEquals("#!/bin/sh\nprintf new", file.readText())
+        } finally { environment.close() }
+    }
+
     @Test fun readonlyTraversalAndSymlinkCannotWriteOutsideRemoteRoot() = runBlocking {
         val root = temporary.newFolder("remote")
         val outside = temporary.newFile("outside")

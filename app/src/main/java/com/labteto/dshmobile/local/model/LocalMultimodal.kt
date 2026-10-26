@@ -246,9 +246,6 @@ internal suspend fun prepareLocalMultimodalMessages(
                     val file = File(root, relative).canonicalFile
                     require(file.toPath().startsWith(root.toPath())) { "文件引用越过工作区边界" }
                     require(file.isFile) { "文件附件不存在：$relative" }
-                    require(file.length() in 1..MAX_LOCAL_DOCUMENT_BYTES) {
-                        "文件附件超过 ${MAX_LOCAL_DOCUMENT_BYTES / 1024 / 1024} MB 解析上限：$relative"
-                    }
                     val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: file.name
                     val mediaType = obj["mediaType"]?.jsonPrimitive?.contentOrNull ?: "application/octet-stream"
                     // Send the active document as a request-scoped input_file when this is an
@@ -262,7 +259,7 @@ internal suspend fun prepareLocalMultimodalMessages(
                         activeFileBytes + file.length() <= MAX_NATIVE_FILES_TOTAL_BYTES
                     if (nativeFileAllowed) {
                         activeFileBytes += file.length()
-                        val bytes = readLocalImageBytesBounded(file, MAX_LOCAL_DOCUMENT_BYTES)
+                        val bytes = readLocalImageBytesBounded(file, MAX_NATIVE_FILES_TOTAL_BYTES)
                         add(buildJsonObject {
                             put("type", "input_file")
                             put("filename", name.substringAfterLast('/').substringAfterLast('\\'))
@@ -308,6 +305,15 @@ internal suspend fun prepareLocalMultimodalMessages(
                             append("[附件内容：").append(name).append(" · ").append(extracted.formatLabel)
                             if (extracted.truncated) append(" · 已按上下文预算截断")
                             append("]\n").append(extracted.text)
+                            append("\n[完整附件在工作区：").append(relative).append("；以上仅为请求上下文预览]")
+                            if (name.endsWith(".zip", true) || name.endsWith(".tar.gz", true) ||
+                                name.endsWith(".tgz", true) || name.endsWith(".tar", true) ||
+                                name.endsWith(".jar", true) || name.endsWith(".gz", true)) {
+                                append("\n[归档全量分析：先使用 archive_list(path) 枚举全部页，直到 next_cursor=none；")
+                                append("再用 archive_read(path, member) 读取所有相关文件；如 complete=false，")
+                                append("按 next_char 继续。应报告文件总数、已分析数量和未分析原因，")
+                                append("未完整遍历前不得宣称分析完成。无需用户手动解压。]")
+                            }
                         }
                         activeDocumentChars += body.length
                         add(buildJsonObject {
@@ -592,7 +598,6 @@ internal val SUPPORTED_LOCAL_IMAGE_TYPES = setOf(
 internal const val MAX_LOCAL_IMAGE_EDGE = 8192
 internal const val MAX_LOCAL_IMAGE_PIXELS = 64_000_000L
 private const val MAX_NATIVE_IMAGE_BYTES = 20L * 1024L * 1024L
-private const val MAX_LOCAL_DOCUMENT_BYTES = 20L * 1024L * 1024L
 private const val MAX_NATIVE_FILES_TOTAL_BYTES = 32L * 1024L * 1024L
 private const val MAX_KIMI_VIDEO_BYTES = 20L * 1024L * 1024L
 private const val MAX_KIMI_VIDEOS_PER_REQUEST = 1

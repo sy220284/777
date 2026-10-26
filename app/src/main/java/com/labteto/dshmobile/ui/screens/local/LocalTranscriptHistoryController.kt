@@ -64,6 +64,13 @@ internal class LocalTranscriptHistoryController(
                 hasMore = loaded.nextCursor != null,
             )
         } catch (cancelled: CancellationException) {
+            // A cancelled bootstrap must not leave an apparently endless spinner.
+            if (isCurrent(sessionId, requestGeneration)) {
+                _history.value = _history.value.copy(
+                    loading = false,
+                    error = "会话历史加载已取消，请重试",
+                )
+            }
             throw cancelled
         } catch (error: Exception) {
             if (!isCurrent(sessionId, requestGeneration)) return
@@ -112,6 +119,11 @@ internal class LocalTranscriptHistoryController(
             )
             Result.success(loaded.loadedRawMessages)
         } catch (cancelled: CancellationException) {
+            // Cancellation can come from a disappearing UI collector while the
+            // Session owner remains alive. Keep its cursor and allow a new drag.
+            if (isCurrent(sessionId, requestGeneration)) {
+                _history.value = _history.value.copy(loading = false)
+            }
             throw cancelled
         } catch (error: Exception) {
             if (isCurrent(sessionId, requestGeneration)) {

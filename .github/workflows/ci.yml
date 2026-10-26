@@ -181,6 +181,7 @@ jobs:
           python3 tools/runtime/test-verification.py
           python3 tools/runtime/test-pty-bridge.py
           python3 tools/runtime/test-git-workspace.py
+          python3 tools/runtime/test-agent-workspace-files.py
           python3 tools/runtime/test-process-sandbox.py
           while IFS= read -r -d '' file; do
             bash -n "$file"

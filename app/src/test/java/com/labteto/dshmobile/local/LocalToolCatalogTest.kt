@@ -20,7 +20,7 @@ class LocalToolCatalogTest {
         assertTrue(
             names.containsAll(
                 setOf(
-                    "read", "file_inspect", "write", "edit", "apply_patch", "glob", "grep", "bash", "job_list",
+                    "read", "file_inspect", "archive_list", "archive_read", "write", "edit", "apply_patch", "glob", "grep", "bash", "job_list",
                     "web_search", "web_fetch", "http_request", "download_file", "json_query",
                     "media_image_options", "media_image_create", "media_image_status",
                     "network_diagnose", "environment_info", "capability_search",

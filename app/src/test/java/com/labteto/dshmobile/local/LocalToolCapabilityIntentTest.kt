@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
+import com.labteto.dshmobile.local.tools.latestUserTurnHasArchive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertFalse
@@ -51,6 +53,42 @@ class LocalToolCapabilityIntentTest {
                 listOf(message("user", "之前不用 GitHub")),
             ).requestsGitHub,
         )
+    }
+
+    @Test
+    fun newestUserArchiveAutomaticallyQualifiesButOlderArchiveDoesNot() {
+        val archive = buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", "text")
+                    put("text", "帮我检查")
+                })
+                add(buildJsonObject {
+                    put("type", "local_file_ref")
+                    put("name", "release.tar.gz")
+                    put("path", ".dsh/attachments/sha.gz")
+                    put("mediaType", "application/gzip")
+                })
+            })
+        }
+        assertTrue(latestUserTurnHasArchive(listOf(message("assistant", "before"), archive)))
+        assertFalse(latestUserTurnHasArchive(listOf(archive, message("user", "继续普通话题"))))
+        assertFalse(latestUserTurnHasArchive(listOf(message("user", "仅包含压缩包三个字"))))
+    }
+
+    @Test
+    fun imageAndPlainDocumentsDoNotActivateArchiveTools() {
+        val onlyImage = buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", "local_image_ref")
+                    put("name", "a.zip")
+                })
+            })
+        }
+        assertFalse(latestUserTurnHasArchive(listOf(onlyImage)))
     }
 
     private fun message(role: String, content: String) = buildJsonObject {

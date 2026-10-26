@@ -7,10 +7,8 @@ import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.runtime.BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS
-import com.labteto.dshmobile.local.runtime.DEFAULT_DOWNLOAD_BYTES
 import com.labteto.dshmobile.local.runtime.DEFAULT_WEB_FETCH_BYTES
 import com.labteto.dshmobile.local.runtime.FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS
-import com.labteto.dshmobile.local.runtime.MAX_DOWNLOAD_BYTES
 import com.labteto.dshmobile.local.runtime.MAX_PATCH_CHARS
 import com.labteto.dshmobile.local.runtime.MAX_WEB_FETCH_BYTES
 import com.labteto.dshmobile.local.runtime.PLAN_MODE_BLOCKED_TOOLS
@@ -19,6 +17,7 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalSessionAccessCoordinator
 import com.labteto.dshmobile.local.session.LocalSessionAccessScope
+import com.labteto.dshmobile.local.tools.LocalArchiveReader
 import com.labteto.dshmobile.local.tools.LocalFileInspector
 import com.labteto.dshmobile.local.tools.LocalExtensionWorkshop
 import com.labteto.dshmobile.local.tools.LocalShellTool
@@ -172,6 +171,14 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 startByte = args.int("start_byte", 0),
                 maxBytes = args.int("max_bytes", LocalToolOutputStore.DEFAULT_READ_BYTES),
             )
+            "archive_list" -> LocalArchiveReader(File(workspace.path)).list(
+                args.string("path"), args.int("cursor", 0), args.int("limit", 100),
+                args.optionalString("prefix").orEmpty(),
+            )
+            "archive_read" -> LocalArchiveReader(File(workspace.path)).read(
+                args.string("path"), args.string("member"), args.long("start_char", 0L),
+                args.int("max_chars", 20_000),
+            )
             "file_inspect" -> LocalFileInspector(File(workspace.path)).inspect(args.string("path"))
             "write", "write_file" -> {
                 if (!allowMutation) return "子代理无写入权限"
@@ -308,9 +315,10 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 webTools.download(
                     url = args.string("url"),
                     path = args.string("path"),
-                    maxBytes = args.int("max_bytes", DEFAULT_DOWNLOAD_BYTES)
-                        .coerceIn(1_024, MAX_DOWNLOAD_BYTES)
-                        .toLong(),
+                    // Unspecified means stream the whole response; a caller can still opt into a limit.
+                    maxBytes = args.long("max_bytes", Long.MAX_VALUE).also {
+                        require(it > 0L) { "max_bytes 必须大于 0" }
+                    },
                     timeoutSeconds = BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS,
                 )
             }

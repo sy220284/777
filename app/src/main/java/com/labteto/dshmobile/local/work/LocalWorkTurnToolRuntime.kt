@@ -19,6 +19,7 @@ import com.labteto.dshmobile.local.runtime.isolatedParallelMap
 import com.labteto.dshmobile.local.runtime.shouldAutoApproveTool
 import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
+import com.labteto.dshmobile.local.tools.latestUserTurnHasArchive
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.isParallelSafeReadTool
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
@@ -66,6 +67,18 @@ internal class LocalWorkTurnToolRuntime(
         // 此时最新用户消息已从 PendingInput 队列写进历史，首轮集群标记才可靠。
         val history = binding.runHandle.modelHistory.snapshot()
         val teamMode = isLocalAgentTeamTurn(history)
+        // A user attachment is authoritative even if their text is merely "analyse this".
+        // Surface read-only archive tools for that turn without permanently enlarging CORE.
+        if (latestUserTurnHasArchive(history)) {
+            synchronized(binding.enabledOptionalTools) {
+                val requested = listOf("archive_list", "archive_read")
+                    .filter { registry.get(it) != null }
+                val previous = binding.enabledOptionalTools.toList()
+                binding.enabledOptionalTools.clear()
+                binding.enabledOptionalTools.addAll(requested)
+                binding.enabledOptionalTools.addAll(previous)
+            }
+        }
         // A connection or plugin install can register new tools during this run.
         // Re-evaluate only the active user's task before each model step; newly registered
         // capabilities become available automatically without restarting or editing tool maps.
