@@ -62,7 +62,7 @@ internal class LocalPublicWorkspaceBridge(
         val changes = preferences.edit()
         if (preferences.getString(TREE_KEY, null) != uri.toString()) {
             // Changing public folders invalidates every previous external-file fingerprint.
-            preferences.all.keys.filter { it.startsWith("synced:") }.forEach(changes::remove)
+            preferences.all.keys.filter { it.startsWith("synced:") }.forEach { changes.remove(it) }
         }
         changes.putString(TREE_KEY, uri.toString()).apply()
     }
