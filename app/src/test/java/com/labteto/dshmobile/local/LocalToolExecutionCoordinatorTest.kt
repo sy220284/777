@@ -1706,6 +1706,32 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(listOf("read", "remote_lookup"), projection.names(schemas))
     }
 
+    @Test fun unsupportedRemoteFileAndShellToolsCannotFallBackToPhoneEffects() = runBlocking {
+        var localEffects = 0
+        var remoteRequests = 0
+        val registry = ToolRegistry()
+        val names = listOf("list_files", "grep", "apply_patch", "bash", "job_kill", "present", "download_file", "json_query")
+        for (name in names) registry.register(tool(name,
+            com.labteto.dshmobile.local.tools.LocalToolPolicy.access(name), ToolApprovalPolicy.ALWAYS) {
+            localEffects++; ToolResult("phone effect")
+        }.copy(metadata = com.labteto.dshmobile.local.tools.LocalToolPolicy.metadata(name)))
+        val selected = com.labteto.dshmobile.harness.tools.ToolExecutionEnvironmentContext { _, _, _, _ ->
+            remoteRequests++
+            ToolResult("远端环境暂不支持", isError = true, errorCode = "REMOTE_TOOL_UNSUPPORTED")
+        }
+        withContext(selected) {
+            for (name in names) {
+                val result = coordinator(registry).executeScoped(
+                    LocalToolCall("remote-$name", name, JsonObject(emptyMap()), "{}"),
+                    "s1", true, false, approval = { _, _, _ -> true })
+                assertTrue(result.isError)
+                assertEquals("REMOTE_TOOL_UNSUPPORTED", result.errorCode)
+            }
+        }
+        assertEquals(names.size, remoteRequests)
+        assertEquals(0, localEffects)
+    }
+
     @Test fun remoteWorkspaceReceiptCannotBorrowLocalLeaseOrFileVersion() = runBlocking {
         val gate = com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate()
         val registry = ToolRegistry().apply {

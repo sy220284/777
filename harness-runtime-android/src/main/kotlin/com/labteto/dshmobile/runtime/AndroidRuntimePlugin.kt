@@ -50,13 +50,14 @@ class AndroidRuntimePlugin(
         defaultWorkingDirectory = workspaceRoot,
     ),
     private val resourceScheduler: HarnessResourceScheduler? = null,
+    private val includeGitWorkspaces: Boolean = true,
 ) : HarnessPlugin {
     override val id: String = "android-runtime"
     private val terminalLeases = ConcurrentHashMap<String, HarnessResourceLease>()
     private val gitWorkspaces = GitWorkspaceRuntime(workspaceRoot, processRuntime)
 
     override suspend fun install(context: HarnessContext) {
-        gitWorkspaces.install(context)
+        if (includeGitWorkspaces) gitWorkspaces.install(context)
         context.tools.register(
             HarnessTool(
                 name = "runtime_command_status",
@@ -351,7 +352,7 @@ class AndroidRuntimePlugin(
     }
 
     override suspend fun uninstall(context: HarnessContext) {
-        gitWorkspaces.uninstall(context)
+        if (includeGitWorkspaces) gitWorkspaces.uninstall(context)
         terminalProvider.closeAll()
         terminalLeases.keys.toList().forEach { sessionId ->
             runCatching { terminalProvider.close(sessionId) }

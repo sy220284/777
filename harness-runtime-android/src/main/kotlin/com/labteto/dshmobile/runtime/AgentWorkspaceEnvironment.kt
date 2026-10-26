@@ -84,7 +84,7 @@ class AgentWorkspaceEnvironment private constructor(
             val directory = root.canonicalFile
             require(directory.isDirectory) { "远端工作区不存在：$directory" }
             val context = HarnessContext()
-            val plugin = AndroidRuntimePlugin(directory, process, terminals)
+            val plugin = AndroidRuntimePlugin(directory, process, terminals, includeGitWorkspaces = false)
             plugin.install(context)
             return AgentWorkspaceEnvironment(directory, context, plugin, process)
         }

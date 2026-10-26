@@ -209,7 +209,10 @@ internal object LocalToolPolicy {
         }
         return ToolMetadata(
             family = family,
-            environmentBound = canonical in setOf("read", "write", "edit"),
+            environmentBound = canonical in setOf(
+                "read", "write", "edit", "apply_patch", "file_inspect", "list_files", "glob", "grep",
+                "bash", "job_list", "job_output", "job_kill", "present", "download_file", "json_query",
+            ),
             finishesOnCancellation = canonical in setOf("write", "edit", "apply_patch"),
             workspaceAccess = when (canonical) {
                 "read", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "skill", "json_query", "update_goal", "extension_inspect" -> ToolWorkspaceAccess.READ
