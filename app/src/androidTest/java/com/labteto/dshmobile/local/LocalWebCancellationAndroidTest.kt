@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -52,6 +53,82 @@ class LocalWebCancellationAndroidTest {
             job.cancel()
             root.deleteRecursively()
         }
+    }
+
+    @Test
+    fun downloadLargerThanOneHundredMiBStreamsFullyAndVerifiesHash() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = context.cacheDir.resolve("web-large-${UUID.randomUUID()}").apply { mkdirs() }
+        val totalBytes = 101L * 1024L * 1024L + 4096L
+        val pattern = ByteArray(32 * 1024) { (it % 251).toByte() }
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("test").body(streamingBody(totalBytes, pattern)).build()
+        }.build()
+        try {
+            val target = root.resolve("large.tar.gz")
+            val receipt = provider(client).downloadTo("http://93.184.216.34/file", target)
+            assertEquals(totalBytes, receipt.bytes)
+            assertEquals(totalBytes, target.length())
+            assertEquals(expectedRepeatedSha256(totalBytes, pattern), receipt.sha256)
+            assertEquals(listOf(target.name), root.list()!!.toList())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun explicitDownloadLimitPreservesExistingDestination() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = context.cacheDir.resolve("web-limit-${UUID.randomUUID()}").apply { mkdirs() }
+        val pattern = ByteArray(32 * 1024) { (it % 251).toByte() }
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("test").body(streamingBody(65_536L, pattern)).build()
+        }.build()
+        try {
+            val target = root.resolve("saved.bin").apply { writeText("original") }
+            val failed = runCatching {
+                provider(client).downloadTo("http://93.184.216.34/file", target, maxBytes = 16_384L)
+            }.exceptionOrNull()
+            assertTrue(failed is LocalWebException)
+            assertEquals("DOWNLOAD_TOO_LARGE", (failed as LocalWebException).code)
+            assertEquals("original", target.readText())
+            assertEquals(listOf(target.name), root.list()!!.toList())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    private fun streamingBody(totalBytes: Long, chunk: ByteArray): ResponseBody {
+        val source = object : Source {
+            var remaining = totalBytes
+            override fun timeout() = Timeout.NONE
+            override fun close() {}
+            override fun read(sink: Buffer, byteCount: Long): Long {
+                if (remaining == 0L) return -1L
+                val count = minOf(remaining, byteCount, chunk.size.toLong()).toInt()
+                sink.write(chunk, 0, count)
+                remaining -= count
+                return count.toLong()
+            }
+        }.buffer()
+        return object : ResponseBody() {
+            override fun contentType(): MediaType? = null
+            override fun contentLength() = totalBytes
+            override fun source() = source
+        }
+    }
+
+    private fun expectedRepeatedSha256(totalBytes: Long, chunk: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        var remaining = totalBytes
+        while (remaining > 0L) {
+            val count = minOf(remaining, chunk.size.toLong()).toInt()
+            digest.update(chunk, 0, count)
+            remaining -= count
+        }
+        return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
     }
 
     @Test
