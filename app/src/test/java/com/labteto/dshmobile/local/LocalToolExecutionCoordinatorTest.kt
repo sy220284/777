@@ -1706,6 +1706,33 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(listOf("read", "remote_lookup"), projection.names(schemas))
     }
 
+    @Test fun remoteWorkspaceReceiptCannotBorrowLocalLeaseOrFileVersion() = runBlocking {
+        val gate = com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate()
+        val registry = ToolRegistry().apply {
+            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) { error("host filesystem") }
+                .copy(metadata = com.labteto.dshmobile.local.tools.LocalToolPolicy.metadata("read")))
+        }
+        var recordedEnvironment: String? = null
+        val execution = coordinator(registry, workspaceGate = gate, recordExecutionStarted = { _, _, identity ->
+            recordedEnvironment = identity.attributes["execution_environment"]
+        })
+        val selected = com.labteto.dshmobile.harness.tools.ToolExecutionEnvironmentContext(environmentId = "remote:test") { _, _, _, _ ->
+            ToolResult("remote document", fileVersions = mapOf("README.md" to "remote-version"))
+        }
+        val result = kotlinx.coroutines.withTimeout(1000) {
+            gate.withWrite {
+                withContext(selected) {
+                    execution.executeScoped(LocalToolCall("remote-read", "read", JsonObject(emptyMap()), "{}"),
+                        "s1", false, false, approval = { _, _, _ -> true },
+                        observeFileVersions = { error("remote effect must not observe the phone filesystem") })
+                }
+            }
+        }
+        assertFalse(result.isError)
+        assertEquals(mapOf("README.md" to "remote-version"), result.fileVersions)
+        assertEquals("remote:test", recordedEnvironment)
+    }
+
     @Test
     fun existingFileDeliveryCanBeObservedUnderReadLeaseWithoutInventingWrites() = runBlocking {
         val registry = ToolRegistry().apply {

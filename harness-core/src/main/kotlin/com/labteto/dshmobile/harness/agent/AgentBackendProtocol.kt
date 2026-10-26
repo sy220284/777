@@ -152,7 +152,7 @@ object AgentBackendProtocol {
         if (!request.remoteTools) return coroutineScope { hostOwned(channel, request, services, this) }
         val environmentMutex = Mutex()
         var environmentSequence = 0L
-        val environment = com.labteto.dshmobile.harness.tools.ToolExecutionEnvironmentContext { tool, context, input, raw ->
+        val environment = com.labteto.dshmobile.harness.tools.ToolExecutionEnvironmentContext(environmentId = "remote:${request.turnId}") { tool, context, input, raw ->
             environmentMutex.withLock {
                 requireEnvironmentGrant()
                 val invocation = requireNotNull(currentCoroutineContext()[com.labteto.dshmobile.harness.tools.ToolInvocationContext]) {

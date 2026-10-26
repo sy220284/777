@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonObject
 
 /** Selected by the execution backend; ToolRegistry still owns admission and the effect receipt. */
 class ToolExecutionEnvironmentContext(
+    val environmentId: String = "selected",
     val execute: suspend (HarnessTool, ToolContext, JsonObject, String) -> ToolResult,
 ) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<ToolExecutionEnvironmentContext>
