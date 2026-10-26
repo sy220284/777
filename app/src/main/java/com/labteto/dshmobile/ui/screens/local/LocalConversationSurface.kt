@@ -573,9 +573,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var workToolReadFailed by remember(state.sessionId, state.usageMode) { mutableStateOf(false) }
     var workToolRetry by remember(state.sessionId) { mutableStateOf(0) }
     val timelineLifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(state.sessionId, state.usageMode, workActions, state.running, workToolRetry, timelineLifecycle) {
+    // A fresh Work session is not readable until bootstrap/restore has published its snapshot.
+    // A failed pre-ready read must not strand the timeline behind a manual retry.
+    LaunchedEffect(state.sessionId, state.usageMode, state.loading, workActions, state.running, workToolRetry, timelineLifecycle) {
         workToolReadFailed = false
-        if (state.usageMode != LocalUsageMode.WORK || workActions == null) {
+        if (!shouldReadWorkToolStatus(state.usageMode, state.loading, state.sessionId) || workActions == null) {
             workToolActivities = emptyList()
         } else timelineLifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             val reader = LocalWorkToolActivityReader(
