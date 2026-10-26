@@ -317,7 +317,7 @@ internal object LocalDocumentContent {
     }
 
     private fun extractPdfBestEffort(file: File, maxChars: Int): LocalDocumentText {
-        val raw = readBounded(file, 20 * 1024 * 1024)
+        val raw = readPrefix(file, MAX_ZIP_ENTRY_BYTES)
         val source = String(raw, StandardCharsets.ISO_8859_1)
         val out = BoundedText(maxChars)
         var cursor = 0
@@ -357,7 +357,7 @@ internal object LocalDocumentContent {
         return LocalDocumentText(
             formatLabel = "PDF",
             text = cleaned.take(maxChars),
-            truncated = out.truncated || cleaned.length > maxChars,
+            truncated = out.truncated || cleaned.length > maxChars || file.length() > raw.size,
             parsed = cleaned.isNotBlank(),
         )
     }
@@ -442,7 +442,7 @@ internal object LocalDocumentContent {
     }
 
     private fun extractLegacyOffice(file: File, extension: String, maxChars: Int): LocalDocumentText {
-        val bytes = readBounded(file, 20 * 1024 * 1024)
+        val bytes = readPrefix(file, MAX_ZIP_ENTRY_BYTES)
         val candidates = LinkedHashSet<String>()
         collectAsciiRuns(bytes, candidates)
         collectUtf16LeRuns(bytes, candidates)
@@ -458,7 +458,9 @@ internal object LocalDocumentContent {
             "xls" -> "Excel XLS（兼容提取）"
             else -> "PowerPoint PPT（兼容提取）"
         }
-        return bounded(label, text, maxChars).copy(parsed = text.isNotBlank())
+        val preview = bounded(label, text, maxChars)
+        return preview.copy(parsed = text.isNotBlank(),
+            truncated = preview.truncated || file.length() > bytes.size)
     }
 
     private fun withSafeZip(file: File, block: (SafeZip) -> Unit) {
