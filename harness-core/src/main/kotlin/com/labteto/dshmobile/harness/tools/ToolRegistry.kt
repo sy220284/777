@@ -238,9 +238,14 @@ class ToolRegistry private constructor(
         rawArguments: String,
         context: ToolContext,
     ): ToolInvocationResult {
+        val environment = currentCoroutineContext()[ToolExecutionEnvironmentContext]
+        suspend fun executeActual(): ToolResult =
+            if (tool.metadata.environmentBound && environment != null) {
+                environment.execute(tool, context, input, rawArguments)
+            } else tool.executor.execute(context, input, rawArguments)
         val timeoutMillis = tool.timeoutMillis
         if (timeoutMillis == null) {
-            val result = tool.executor.execute(context, input, rawArguments)
+            val result = executeActual()
             context.onExecutionFinished?.invoke(tool, result)
             return ToolInvocationResult(
                 result = result,
@@ -249,7 +254,7 @@ class ToolRegistry private constructor(
         }
         require(timeoutMillis > 0L) { "工具超时必须大于 0：${tool.name}" }
         val result = withTimeoutOrNull(timeoutMillis) {
-            tool.executor.execute(context, input, rawArguments)
+            executeActual()
         }
         val settled = result ?: ToolResult(
                 content = "工具执行超时：${tool.name}（${timeoutMillis} ms）",

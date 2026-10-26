@@ -15,6 +15,7 @@ class AgentTlsWorkerServer(
     private val listener: SSLServerSocket,
     private val connectorCredential: String,
     maxActivations: Int = 8,
+    private val environmentFactory: (suspend (com.labteto.dshmobile.harness.agent.AgentBackendRequest) -> com.labteto.dshmobile.harness.agent.AgentEnvironmentTools)? = null,
     private val onConnectionFailure: (String) -> Unit = { System.err.println(it) },
 ) : AutoCloseable {
     private val permits = Semaphore(maxActivations)
@@ -35,7 +36,7 @@ class AgentTlsWorkerServer(
                     DataOutputStream(socket.outputStream).apply { writeInt(AgentBackendProtocol.VERSION); flush() }
                     socket.soTimeout = 90_000 // Active host heartbeats keep approval/long-tool waits alive.
                     val channel = FramedAgentChannel(socket.inputStream, socket.outputStream, onClose = socket::close)
-                    try { AgentBackendProtocol.worker(channel) } finally { channel.close() }
+                    try { AgentBackendProtocol.worker(channel, environmentFactory) } finally { channel.close() }
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (failure: Exception) {
                     onConnectionFailure("AGENT_BACKEND_CONNECTION_CLOSED: ${failure.javaClass.simpleName}")

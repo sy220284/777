@@ -67,6 +67,7 @@ class AndroidRuntimePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "运行时",
+                    environmentBound = true,
                     discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
                     requirements = emptyList(),
                 ),
@@ -106,6 +107,7 @@ class AndroidRuntimePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "运行时",
+                    environmentBound = true,
                     discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
                     requirements = listOf("目标命令必须存在；可先调用 runtime_command_status 检查"),
                 ),
@@ -147,6 +149,7 @@ class AndroidRuntimePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "运行时",
+                    environmentBound = true,
                     discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
                     requirements = listOf("目标命令必须存在；可先调用 runtime_command_status 检查"),
                 ),
@@ -194,6 +197,7 @@ class AndroidRuntimePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "运行时",
+                    environmentBound = true,
                     discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
                     requirements = emptyList(),
                 ),
@@ -220,6 +224,7 @@ class AndroidRuntimePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "运行时",
+                    environmentBound = true,
                     discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
                     requirements = emptyList(),
                 ),
@@ -250,6 +255,7 @@ class AndroidRuntimePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "运行时",
+                    environmentBound = true,
                     discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
                     requirements = emptyList(),
                 ),
@@ -290,6 +296,7 @@ class AndroidRuntimePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "运行时",
+                    environmentBound = true,
                     discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
                     requirements = emptyList(),
                 ),
@@ -316,7 +323,7 @@ class AndroidRuntimePlugin(
             }, required = setOf("session_id", "rows", "columns")),
             access = ToolAccess.PROCESS, approvalPolicy = ToolApprovalPolicy.ALWAYS,
             exposure = ToolExposure.OPTIONAL, timeoutMillis = 10_000L,
-            metadata = ToolMetadata("运行时", discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS),
+            metadata = ToolMetadata("运行时", environmentBound = true, discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS),
             executor = HarnessToolExecutor { _, input, _ ->
                 val sessionId = input.requiredString("session_id")
                 requireTerminalWorkspace(sessionId)
