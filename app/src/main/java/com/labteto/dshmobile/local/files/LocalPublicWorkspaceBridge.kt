@@ -49,7 +49,12 @@ internal class LocalPublicWorkspaceBridge(
         resolver.takePersistableUriPermission(
             uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
         )
-        preferences.edit().putString(TREE_KEY, uri.toString()).apply()
+        val changes = preferences.edit()
+        if (preferences.getString(TREE_KEY, null) != uri.toString()) {
+            // Changing public folders invalidates every previous external-file fingerprint.
+            preferences.all.keys.filter { it.startsWith("synced:") }.forEach(changes::remove)
+        }
+        changes.putString(TREE_KEY, uri.toString()).apply()
     }
 
     suspend fun synchronize(): SyncResult = withContext(Dispatchers.IO) {
@@ -100,7 +105,10 @@ internal class LocalPublicWorkspaceBridge(
         fun copyIntoPublic(source: File, destination: Uri) {
             resolver.openOutputStream(destination, "wt").use { output ->
                 requireNotNull(output) { "公共文件无法写入" }
-                source.inputStream().use { input -> input.copyTo(output, 64 * 1024) }
+                source.inputStream().use { input ->
+                    val copied = input.copyTo(output, 64 * 1024)
+                    check(copied == source.length()) { "源文件在同步过程中发生变化" }
+                }
             }
         }
         fun digest(file: File): String {
