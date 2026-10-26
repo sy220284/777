@@ -454,6 +454,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
     val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
+    var attachmentImportProgress by remember(state.sessionId) { mutableStateOf<Pair<Int, Int>?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
     var showMediaStudio by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var documentGenerationMessageId by remember(state.sessionId) { mutableStateOf<String?>(null) }
@@ -801,23 +802,41 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             }
         }
     }
-    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { selected ->
+        val uris = selected.distinct()
+        if (uris.isNotEmpty()) {
             scope.launch {
+                attachmentError = null
+                attachmentImportProgress = 0 to uris.size
+                var failed = 0
+                var firstFailure: String? = null
                 try {
-                    val imported = onImportAttachment(uri)
-                    attachmentError = when (localComposerAttachmentDecision(attachments, imported)) {
-                        LocalComposerAttachmentDecision.ACCEPT -> {
-                            attachments += imported
-                            null
+                    uris.forEachIndexed { index, uri ->
+                        try {
+                            val imported = onImportAttachment(uri)
+                            when (localComposerAttachmentDecision(attachments, imported)) {
+                                LocalComposerAttachmentDecision.ACCEPT -> attachments += imported
+                                LocalComposerAttachmentDecision.DUPLICATE -> Unit
+                                LocalComposerAttachmentDecision.IMAGE_LIMIT -> {
+                                    failed++
+                                    if (firstFailure == null) firstFailure = imageLimitMessage
+                                }
+                            }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            failed++
+                            if (firstFailure == null) {
+                                firstFailure = localComposerAttachmentFailureMessage(error, fileImportFailedMessage)
+                            }
+                        } finally {
+                            attachmentImportProgress = (index + 1) to uris.size
                         }
-                        LocalComposerAttachmentDecision.DUPLICATE -> null
-                        LocalComposerAttachmentDecision.IMAGE_LIMIT -> imageLimitMessage
                     }
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (error: Exception) {
-                    attachmentError = localComposerAttachmentFailureMessage(error, fileImportFailedMessage)
+                    attachmentError = if (failed == 0) null else
+                        "有 $failed 个附件未能添加：${firstFailure ?: fileImportFailedMessage}"
+                } finally {
+                    attachmentImportProgress = null
                 }
             }
         }
@@ -1532,6 +1551,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             activeModelProfile = activeModelProfile,
             input = input,
             attachments = attachments,
+            attachmentImportProgress = attachmentImportProgress,
             onInputChange = { drafts.putBoundedLocalDraft(state.sessionId, it) },
             onRemoveAttachment = { index -> attachments.removeAt(index) },
             onClearAttachments = attachments::clear,
