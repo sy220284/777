@@ -130,8 +130,16 @@ internal class LocalArchiveReader(private val root: File) {
                 32 * 1024
             ).use { tar(it, visit) }
         } else if (name.endsWith(".gz")) {
-            GZIPInputStream(file.inputStream(), 32 * 1024).use {
-                visit(Item(file.name.dropLast(3), -1L), it)
+            // Imported .tar.gz files are content-addressed as <sha>.gz. Detect the TAR
+            // stream by its header instead of relying on the lost original filename.
+            BufferedInputStream(GZIPInputStream(file.inputStream(), 32 * 1024), 32 * 1024).use { stream ->
+                stream.mark(512)
+                val head = stream.readNBytes(512)
+                stream.reset()
+                val tarHeader = head.size == 512 &&
+                    String(head, 257, 5, StandardCharsets.US_ASCII) == "ustar"
+                if (tarHeader) tar(stream, visit)
+                else visit(Item(file.name.dropLast(3), -1L), stream)
             }
         } else error("当前不支持的归档格式：" + file.name)
     }
