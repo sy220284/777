@@ -453,6 +453,7 @@ internal fun LocalWorkspaceFilesDialog(
                                 entries = if (section == 2 && directory.isEmpty())
                                     entries.filterNot { it.path == "任务" || it.path == "交付成果" }
                                 else entries,
+                                localizedInternalName = section == 2 && directory.isEmpty(),
                                 onDirectory = {
                                     directory = it
                                     scope.launch { reload() }
@@ -521,6 +522,7 @@ private fun LocalWorkspaceRootList(onOpen: (Int) -> Unit) {
 @Composable
 private fun LocalWorkspaceDirectoryList(
     entries: List<LocalWorkspaceDirectoryEntry>,
+    localizedInternalName: Boolean,
     onDirectory: (String) -> Unit,
     onOpen: suspend (LocalWorkspaceFile) -> Unit,
 ) {
@@ -535,13 +537,15 @@ private fun LocalWorkspaceDirectoryList(
     LazyColumn(Modifier.fillMaxSize()) {
         items(entries, key = LocalWorkspaceDirectoryEntry::path) { entry ->
             if (entry.isDirectory) {
+                val internal = localizedInternalName && entry.path in setOf(".dsh", ".adsh")
                 LocalDirectoryRow(
-                    name = entry.path.substringAfterLast('/'),
+                    name = if (internal) "应用内部文件" else entry.path.substringAfterLast('/'),
+                    subtitle = if (internal) "系统资料 · 不建议手动修改" else null,
                     onClick = { onDirectory(entry.path) },
                 )
             } else {
                 val file = LocalWorkspaceFile(entry.path, entry.bytes, entry.modifiedAt)
-                LocalFileRow(file) { scope.launch { onOpen(file) } }
+                LocalFileRow(file, showPath = false) { scope.launch { onOpen(file) } }
             }
         }
     }
@@ -739,7 +743,11 @@ private fun LocalDirectoryRow(
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
-private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
+private fun LocalFileRow(
+    file: LocalWorkspaceFile,
+    showPath: Boolean = true,
+    onClick: () -> Unit,
+) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val controls = LocalFileSelectionUi.current
     val canShare = isShareableWorkspacePath(file.path)
@@ -785,7 +793,8 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "${file.path} · ${formatBytes(file.bytes)}",
+                    if (showPath) "${file.path} · ${formatBytes(file.bytes)}"
+                    else formatBytes(file.bytes),
                     style = DsType.caption11.withReadingWeight(),
                     color = colors.textTertiary,
                     maxLines = 1,

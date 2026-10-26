@@ -23,8 +23,8 @@ object LocalToolCatalog {
             "start_byte" to integerRange("起始 UTF-8 字节偏移，默认 0；优先使用上次结果给出的下一偏移", min = 0),
             "max_bytes" to integerRange("单次可见读取字节数，默认 ${WORK_TOOL_RECOVERY_PAGE_BYTES}，允许 1024–${WORK_TOOL_RECOVERY_PAGE_BYTES}；请按结果返回的下一偏移分页读取", min = 1_024, max = WORK_TOOL_RECOVERY_PAGE_BYTES),
         ), listOf("call_id")))
-        add(tool("write", "创建或完整替换工作区文件", properties(
-            "path" to string("相对工作区的路径"),
+        add(tool("write", "创建或完整替换工作区文件；新建普通文档与文件夹优先中文命名，已有代码、技术约定与用户指定路径除外", properties(
+            "path" to string("相对工作区的路径；任务中间文件优先保存到 create_goal 返回的任务目录，普通文档默认中文文件名，扩展名不变"),
             "content" to string("完整文件内容"),
         ), listOf("path", "content")))
         add(tool("edit", "唯一字面量替换；修改前必须先用 read 读取包含待替换内容的目标区域，write 创建或覆盖不算读取", properties(
@@ -132,7 +132,7 @@ object LocalToolCatalog {
         ), listOf("method", "url")))
         add(tool("download_file", "把公网 HTTP/HTTPS 文件流式下载到工作区并计算 SHA-256", properties(
             "url" to string("完整公网 HTTP/HTTPS 地址"),
-            "path" to string("工作区相对目标路径"),
+            "path" to string("工作区相对目标路径；用户资料优先中文命名，但保留技术必需的原始文件名、扩展名和用户指定名称"),
             "max_bytes" to integer("可选；指定下载总字节数上限；不传则下载完整文件，不限制大小"),
         ), listOf("url", "path")))
         add(tool("json_query", "从工作区 JSON 文件读取一个字段/数组片段，无需 jq；支持 a.b[0].c 形式", properties(

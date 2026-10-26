@@ -17,6 +17,11 @@ class LocalWorkTaskFoldersTest {
             assertTrue(root.resolve(paths.deliverables).isDirectory)
             assertEquals("kept", old.readText())
             assertEquals(paths, ensureLocalWorkTaskFolders(root, "修复文件加载 / UI", "12345678-aaaa-aaaa-aaaa-123456789abc"))
+            val english = localWorkTaskFolderPaths("Workspace file review", "abcdef12-aaaa")
+            assertEquals("任务/工作任务-abcdef12", english.work)
+            assertEquals("交付成果/工作任务-abcdef12", english.deliverables)
+            val mixed = localWorkTaskFolderPaths("审计 v23 SDK", "aabbccdd-aaaa")
+            assertEquals("任务/审计-v23-SDK-aabbccdd", mixed.work)
         } finally { root.deleteRecursively() }
     }
 }
