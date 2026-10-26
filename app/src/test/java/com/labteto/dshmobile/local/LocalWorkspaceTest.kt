@@ -30,6 +30,22 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun directoryBrowserOnlyReadsImmediateChildren() {
+        workspace.write("任务/第一项/subfolder/source.txt", "source")
+        workspace.write("任务/第二项/draft.md", "draft")
+        workspace.write("交付成果/第二项/final.md", "final")
+        val rootEntries = workspace.directoryEntries()
+        assertTrue(rootEntries.any { it.path == "任务" && it.isDirectory })
+        assertTrue(rootEntries.any { it.path == "交付成果" && it.isDirectory })
+        val taskEntries = workspace.directoryEntries("任务")
+        assertEquals(setOf("任务/第一项", "任务/第二项"), taskEntries.map { it.path }.toSet())
+        assertTrue(taskEntries.all { it.isDirectory })
+        assertEquals(listOf("任务/第二项/draft.md"),
+            workspace.directoryEntries("任务/第二项").map { it.path })
+        assertTrue(workspace.directoryEntries("任务/尚未创建").isEmpty())
+    }
+
+    @Test
     fun writeReadListAndSearchStayInsideWorkspace() {
         workspace.write("notes/one.txt", "alpha\nbeta\ngamma")
 

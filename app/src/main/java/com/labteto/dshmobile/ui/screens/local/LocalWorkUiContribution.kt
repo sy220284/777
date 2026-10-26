@@ -35,6 +35,7 @@ internal fun localWorkFeatureUiContribution(
             sessionId = shell.sessionId,
             workspacePath = shell.workspacePath,
             loadWorkspace = actions.workspaceFiles,
+            loadDirectory = actions.workspaceDirectory,
             loadConversation = actions.conversationFiles,
             loadPreview = actions.previewWorkspaceFile,
             onDismiss = onPopFeature,

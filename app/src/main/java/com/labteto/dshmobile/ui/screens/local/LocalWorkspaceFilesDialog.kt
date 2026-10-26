@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
@@ -85,6 +86,7 @@ internal fun LocalWorkspaceFilesDialog(
     sessionId: String,
     workspacePath: String,
     loadWorkspace: suspend () -> List<LocalWorkspaceFile>,
+    loadDirectory: suspend (String) -> List<LocalWorkspaceDirectoryEntry> = { emptyList() },
     loadConversation: suspend (String) -> LocalConversationFiles,
     loadPreview: suspend (String) -> LocalWorkspaceFilePreview,
     onDismiss: () -> Unit,
@@ -95,6 +97,7 @@ internal fun LocalWorkspaceFilesDialog(
     var loading by remember(mode, sessionId) { mutableStateOf(true) }
     var error by remember(mode, sessionId) { mutableStateOf<String?>(null) }
     var workspace by remember(mode, sessionId) { mutableStateOf(emptyList<LocalWorkspaceFile>()) }
+    var entries by remember(mode, sessionId) { mutableStateOf(emptyList<LocalWorkspaceDirectoryEntry>()) }
     var conversation by remember(mode, sessionId) { mutableStateOf(LocalConversationFiles()) }
     var preview by remember(mode, sessionId) { mutableStateOf<LocalWorkspaceFilePreview?>(null) }
     var previewPath by com.labteto.dshmobile.ui.components.rememberNavigationEntryState<String?>(null, entryRequest, mode, sessionId)
@@ -114,14 +117,15 @@ internal fun LocalWorkspaceFilesDialog(
     val chooserTitle = stringResource(R.string.local_files_share_chooser)
     val failedText = stringResource(R.string.local_files_share_failed)
     val limitText = stringResource(R.string.local_files_share_limit, MAX_LOCAL_SHARE_FILES)
-    val shareableFiles = remember(mode, section, directory, workspace, conversation, query) {
+    val shareableFiles = remember(mode, section, entries, workspace, conversation, query) {
         val normalizedQuery = query.trim()
         val candidates = when (mode) {
-            LocalFilesMode.WORKSPACE -> {
-                val sectionFiles = if (normalizedQuery.isNotBlank()) workspace
-                    else workspaceSectionFiles(workspace, section)
-                if (normalizedQuery.isNotBlank()) sectionFiles
-                else sectionFiles.filter { it.path.substringBeforeLast('/', "") == directory }
+            LocalFilesMode.WORKSPACE -> when {
+                normalizedQuery.isNotBlank() -> workspace
+                section == -1 -> emptyList()
+                else -> entries.filterNot(LocalWorkspaceDirectoryEntry::isDirectory).map {
+                    LocalWorkspaceFile(it.path, it.bytes, it.modifiedAt)
+                }
             }
             LocalFilesMode.CONVERSATION ->
                 (conversation.artifacts + conversation.involved).distinctBy { it.path }
@@ -195,7 +199,12 @@ internal fun LocalWorkspaceFilesDialog(
         try {
             when (mode) {
                 LocalFilesMode.WORKSPACE -> {
-                    workspace = loadWorkspace()
+                    if (query.isNotBlank()) {
+                        workspace = loadWorkspace()
+                    } else {
+                        entries = if (section == -1) emptyList() else
+                            loadDirectory(directory.ifBlank { "." })
+                    }
                 }
                 LocalFilesMode.CONVERSATION -> conversation = loadConversation(sessionId)
             }
@@ -250,6 +259,7 @@ internal fun LocalWorkspaceFilesDialog(
                     directory = ""
                     section = -1
                 }
+                scope.launch { reload() }
             }
             else -> onDismiss()
         }
@@ -301,7 +311,13 @@ internal fun LocalWorkspaceFilesDialog(
                     onAction = { scope.launch { reload() } },
                 )
 
-                if (preview == null) SySearchField(query, { query = it },
+                if (preview == null) SySearchField(query, { value ->
+                    val requiresSearch = query.isBlank() && value.isNotBlank()
+                    query = value
+                    if (mode == LocalFilesMode.WORKSPACE && requiresSearch) {
+                        scope.launch { reload() }
+                    }
+                },
                     placeholder = stringResource(R.string.fluid_files_search),
                     modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd))
 
@@ -420,19 +436,24 @@ internal fun LocalWorkspaceFilesDialog(
                     }
                     mode == LocalFilesMode.WORKSPACE -> {
                         if (section == -1) {
-                            LocalWorkspaceRootList(workspace) { category ->
+                            LocalWorkspaceRootList { category ->
                                 section = category
                                 directory = when (category) {
                                     0 -> "任务"
                                     1 -> "交付成果"
                                     else -> ""
                                 }
+                                scope.launch { reload() }
                             }
                         } else {
-                            LocalFileList(
-                                files = workspaceSectionFiles(workspace, section),
-                                directory = directory,
-                                onDirectory = { directory = it },
+                            LocalWorkspaceDirectoryList(
+                                entries = if (section == 2 && directory.isEmpty())
+                                    entries.filterNot { it.path == "任务" || it.path == "交付成果" }
+                                else entries,
+                                onDirectory = {
+                                    directory = it
+                                    scope.launch { reload() }
+                                },
                             ) { file -> openPreview(file.path) }
                         }
                     }
@@ -468,31 +489,57 @@ internal fun workspaceSectionFiles(files: List<LocalWorkspaceFile>, section: Int
     }
 
 @Composable
-private fun LocalWorkspaceRootList(files: List<LocalWorkspaceFile>, onOpen: (Int) -> Unit) {
-    val tasks = remember(files) { workspaceSectionFiles(files, 0).size }
-    val deliveries = remember(files) { workspaceSectionFiles(files, 1).size }
-    val others = remember(files) { workspaceSectionFiles(files, 2).size }
+private fun LocalWorkspaceRootList(onOpen: (Int) -> Unit) {
     LazyColumn(Modifier.fillMaxSize()) {
         item(key = "workspace-task-folders") {
             LocalDirectoryRow(
                 name = stringResource(R.string.local_workspace_tasks),
-                subtitle = stringResource(R.string.local_workspace_tasks_hint, tasks),
+                subtitle = stringResource(R.string.local_workspace_tasks_hint),
                 onClick = { onOpen(0) },
             )
         }
         item(key = "workspace-deliverables") {
             LocalDirectoryRow(
                 name = stringResource(R.string.local_workspace_deliverables),
-                subtitle = stringResource(R.string.local_workspace_deliverables_hint, deliveries),
+                subtitle = stringResource(R.string.local_workspace_deliverables_hint),
                 onClick = { onOpen(1) },
             )
         }
         item(key = "workspace-other-files") {
             LocalDirectoryRow(
                 name = stringResource(R.string.local_workspace_other_files),
-                subtitle = stringResource(R.string.local_workspace_other_hint, others),
+                subtitle = stringResource(R.string.local_workspace_other_hint),
                 onClick = { onOpen(2) },
             )
+        }
+    }
+}
+
+@Composable
+private fun LocalWorkspaceDirectoryList(
+    entries: List<LocalWorkspaceDirectoryEntry>,
+    onDirectory: (String) -> Unit,
+    onOpen: suspend (LocalWorkspaceFile) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    if (entries.isEmpty()) {
+        LocalFilesEmpty(
+            title = stringResource(R.string.local_empty_workspace_title),
+            body = stringResource(R.string.local_empty_workspace_body),
+        )
+        return
+    }
+    LazyColumn(Modifier.fillMaxSize()) {
+        items(entries, key = LocalWorkspaceDirectoryEntry::path) { entry ->
+            if (entry.isDirectory) {
+                LocalDirectoryRow(
+                    name = entry.path.substringAfterLast('/'),
+                    onClick = { onDirectory(entry.path) },
+                )
+            } else {
+                val file = LocalWorkspaceFile(entry.path, entry.bytes, entry.modifiedAt)
+                LocalFileRow(file) { scope.launch { onOpen(file) } }
+            }
         }
     }
 }

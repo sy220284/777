@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalog
 import com.labteto.dshmobile.local.attachment.inspectImportedAttachmentFile
 import com.labteto.dshmobile.uicontract.UiAttachmentInspectionReceipt
 import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
 import com.labteto.dshmobile.local.files.LocalWorkspaceToolGuide
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.runtime.LocalBundledRuntimeManager
@@ -94,6 +95,9 @@ class LocalSessionFilesRuntime @Inject internal constructor(
 
     override suspend fun workspaceFiles(): List<LocalWorkspaceFile> =
         withContext(Dispatchers.IO) { coordinator.workspaceFiles() }
+
+    override suspend fun workspaceDirectory(path: String): List<LocalWorkspaceDirectoryEntry> =
+        withContext(Dispatchers.IO) { workspace.directoryEntries(path) }
 
     override suspend fun conversationFiles(sessionId: String): LocalConversationFiles =
         withContext(Dispatchers.IO) { coordinator.conversationFiles(sessionId) }

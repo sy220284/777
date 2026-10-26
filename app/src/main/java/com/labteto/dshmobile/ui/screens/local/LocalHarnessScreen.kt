@@ -559,6 +559,7 @@ fun LocalHarnessScreen(
     val workActions = LocalWorkFeatureUiActions(
         workState = viewModel.workState,
         workspaceFiles = viewModel::workspaceFiles,
+        workspaceDirectory = viewModel::workspaceDirectory,
         conversationFiles = viewModel::conversationFiles,
         previewWorkspaceFile = viewModel::previewWorkspaceFile,
         artifactsForUi = viewModel::artifactsForUi,
