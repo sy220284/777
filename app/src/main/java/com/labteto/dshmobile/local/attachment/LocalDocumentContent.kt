@@ -375,8 +375,7 @@ internal object LocalDocumentContent {
             out.appendLine("压缩包文件列表（最多显示 $MAX_ARCHIVE_ENTRIES 项）：")
             entries.forEach { out.appendLine("- ${it.name}（${it.size.coerceAtLeast(0)} B）") }
             entries.filter { entry ->
-                entry.name.substringAfterLast('.', "").lowercase() in plainTextExtensions &&
-                    entry.size in 0L..MAX_ZIP_ENTRY_BYTES.toLong()
+                entry.name.substringAfterLast('.', "").lowercase() in plainTextExtensions
             }.take(12).forEach { entry ->
                 val text = zip.readEntryText(entry.name) ?: return@forEach
                 out.appendLine()
