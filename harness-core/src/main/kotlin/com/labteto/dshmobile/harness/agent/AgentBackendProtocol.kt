@@ -263,7 +263,12 @@ object AgentBackendProtocol {
             }
         }
         try {
-            channel.send(frame(request.turnId, 0, "start", encode(request)))
+            val encodedRequest = encode(request).jsonObject.let { value ->
+                // Strict legacy workers know the original four fields. Preserve their
+                // control-loop mode; opting into remote tools requires a capable worker.
+                if (request.remoteTools) value else JsonObject(value - "remoteTools")
+            }
+            channel.send(frame(request.turnId, 0, "start", encodedRequest))
             heartbeat = CoroutineScope(currentCoroutineContext()).launch {
                 while (isActive) { delay(20_000); channel.send(frame(request.turnId, 0, "heartbeat")) }
             }

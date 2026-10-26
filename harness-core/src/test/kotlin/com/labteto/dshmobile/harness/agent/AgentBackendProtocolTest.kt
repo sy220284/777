@@ -24,7 +24,14 @@ class AgentBackendProtocolTest {
         return Endpoint(a, b) to Endpoint(b, a)
     }
     @Test fun canonicalWorkerRunsToolsAndReturnsOnlyHostVerifiedResults() = runTest {
-        val (host, worker) = pair()
+        val (host, wire) = pair()
+        val worker = object : AgentBackendChannel by wire {
+            override suspend fun receive(): JsonObject = wire.receive().also { incoming ->
+                if (incoming["operation"] == kotlinx.serialization.json.JsonPrimitive("start")) {
+                    assertTrue(!(incoming.getValue("body") as JsonObject).containsKey("remoteTools"))
+                }
+            }
+        }
         val call = AgentToolCall("c1", "write", buildJsonObject { put("path", "a") })
         val events = mutableListOf<AgentEvent>()
         var modelCalls = 0; var effects = 0

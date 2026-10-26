@@ -160,7 +160,7 @@ class AndroidRuntimePlugin(
                         ?.mapNotNull { it.jsonPrimitive.contentOrNull }
                         ?.filter(String::isNotBlank)
                         ?.takeIf { it.isNotEmpty() }
-                        ?: listOf("/system/bin/sh")
+                        ?: listOf("sh")
                     val workingDirectory = resolveWorkingDirectory(input.optionalString("working_directory"))
                     val lease = resourceScheduler?.acquire(
                         HarnessResourceKind.TERMINAL,

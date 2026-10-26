@@ -64,4 +64,30 @@ class AgentWorkspaceEnvironmentTest {
             assertEquals("remote", java.io.File(root, "process-file").readText())
         } finally { environment.close() }
     }
+    @Test fun defaultRemoteTerminalUsesAvailableShellAndPreservesExitReceipt() = runBlocking {
+        val root = temporary.newFolder("remote")
+        val environment = AgentWorkspaceEnvironment.create(root)
+        fun request(name: String, input: JsonObject) = AgentEnvironmentToolRequest(name, input, input.toString(),
+            true, "s", "c", "e")
+        try {
+            val terminal = environment.execute(request("terminal_open", buildJsonObject { put("tty", false) })).content
+            environment.execute(request("terminal_write", buildJsonObject {
+                put("session_id", terminal); put("input", "printf terminal-remote; exit 7\n")
+            }))
+            val output = StringBuilder()
+            val final = kotlinx.coroutines.withTimeout(20_000) {
+                var read: com.labteto.dshmobile.harness.tools.ToolResult
+                do {
+                    read = environment.execute(request("terminal_read", buildJsonObject { put("session_id", terminal) }))
+                    output.append(read.content)
+                    if (read.processExitCode == null) kotlinx.coroutines.delay(10)
+                } while (read.processExitCode == null)
+                read
+            }
+            assertTrue(output.contains("terminal-remote"))
+            assertEquals(7, final.processExitCode)
+            assertTrue(final.isError)
+        } finally { environment.close() }
+    }
+
 }
