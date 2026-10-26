@@ -136,8 +136,16 @@ internal class LocalWorkProgressCoordinator(
         val goal = state.snapshot().goal ?: return "当前会话没有目标"
         val folders = goal.id.takeIf(String::isNotBlank)
             ?.let { localWorkTaskFolderPaths(goal.description, it) }
-        return "目标：[${goal.status}] ${goal.description}${goal.note?.let { "\n说明：$"+"it" }.orEmpty()}\n成果：${goal.artifactPaths.joinToString()}\n验收命令：${goal.verificationCommands.joinToString()}" +
-            (folders?.let { "\n任务资料建议目录：${it.work}\n最终交付建议目录：${it.deliverables}" }.orEmpty())
+        return buildString {
+            append("目标：[${goal.status}] ${goal.description}")
+            goal.note?.let { append("\n说明：").append(it) }
+            append("\n成果：").append(goal.artifactPaths.joinToString())
+            append("\n验收命令：").append(goal.verificationCommands.joinToString())
+            folders?.let {
+                append("\n任务资料建议目录：").append(it.work)
+                append("\n最终交付建议目录：").append(it.deliverables)
+            }
+        }
     }
 
     fun updateGoal(

@@ -12,6 +12,7 @@ import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -46,14 +47,14 @@ class LocalWorkspaceShareSelectionUiTest {
             compose.onAllNodesWithText(context.getString(R.string.local_workspace_tasks))
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        assert(fullScans == 0)
-        assert(directoryReads == 0)
+        assertEquals(0, fullScans)
+        assertEquals(0, directoryReads)
         compose.onNodeWithText(context.getString(R.string.local_workspace_tasks)).performClick()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("第一项").fetchSemanticsNodes().isNotEmpty()
         }
-        assert(fullScans == 0)
-        assert(directoryReads == 1)
+        assertEquals(0, fullScans)
+        assertEquals(1, directoryReads)
     }
 
     @Test
