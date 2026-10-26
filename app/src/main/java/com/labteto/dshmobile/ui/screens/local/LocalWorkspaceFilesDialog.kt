@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
+import com.labteto.dshmobile.local.files.LocalWorkspaceSearchPage
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
@@ -98,6 +99,10 @@ internal fun LocalWorkspaceFilesDialog(
     loadSearch: suspend (String) -> List<LocalWorkspaceFile> = { query ->
         loadWorkspace().filter { it.path.contains(query, ignoreCase = true) }
     },
+    loadSearchPage: suspend (String, Int) -> LocalWorkspaceSearchPage = { search, offset ->
+        if (offset == 0) LocalWorkspaceSearchPage(loadSearch(search), null)
+        else LocalWorkspaceSearchPage(emptyList(), null)
+    },
     loadConversation: suspend (String) -> LocalConversationFiles,
     loadPreview: suspend (String) -> LocalWorkspaceFilePreview,
     onDismiss: () -> Unit,
@@ -114,6 +119,9 @@ internal fun LocalWorkspaceFilesDialog(
     var pageReadError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
     var loadEpoch by remember(mode, sessionId) { mutableStateOf(0) }
     var lastLoadedSearch by remember(mode, sessionId) { mutableStateOf("") }
+    var nextSearchOffset by remember(mode, sessionId) { mutableStateOf<Int?>(null) }
+    var loadingNextSearchPage by remember(mode, sessionId) { mutableStateOf(false) }
+    var searchPageError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
     var conversation by remember(mode, sessionId) { mutableStateOf(LocalConversationFiles()) }
     var preview by remember(mode, sessionId) { mutableStateOf<LocalWorkspaceFilePreview?>(null) }
     var previewPath by com.labteto.dshmobile.ui.components.rememberNavigationEntryState<String?>(null, entryRequest, mode, sessionId)
@@ -137,10 +145,7 @@ internal fun LocalWorkspaceFilesDialog(
         val normalizedQuery = query.trim()
         val candidates = when (mode) {
             LocalFilesMode.WORKSPACE -> when {
-                normalizedQuery.isNotBlank() ->
-                    workspaceSectionFiles(workspace, 1) +
-                        workspaceSectionFiles(workspace, 0) +
-                        workspaceSectionFiles(workspace, 2)
+                normalizedQuery.isNotBlank() -> workspace
                 section == -1 -> emptyList()
                 else -> entries.filterNot(LocalWorkspaceDirectoryEntry::isDirectory).map {
                     LocalWorkspaceFile(it.path, it.bytes, it.modifiedAt)
@@ -222,15 +227,21 @@ internal fun LocalWorkspaceFilesDialog(
         selecting = false
         loading = true
         loadingNextPage = false
+        loadingNextSearchPage = false
+        nextSearchOffset = null
         pageReadError = null
+        searchPageError = null
         error = null
         preview = null
         try {
             when (mode) {
                 LocalFilesMode.WORKSPACE -> {
                     if (currentQuery.isNotEmpty()) {
-                        val found = loadSearch(currentQuery)
-                        if (stillCurrent()) workspace = found
+                        val page = loadSearchPage(currentQuery, 0)
+                        if (stillCurrent()) {
+                            workspace = page.files
+                            nextSearchOffset = page.nextOffset
+                        }
                     } else {
                         val page = if (currentSection == -1) LocalWorkspaceDirectoryPage(emptyList(), null)
                             else loadDirectoryPage(pageDirectory.ifBlank { "." }, 0)
@@ -282,6 +293,30 @@ internal fun LocalWorkspaceFilesDialog(
                 if (loadEpoch == epoch) pageReadError = failure.message ?: readFilesFailed
             } finally {
                 if (loadEpoch == epoch) loadingNextPage = false
+            }
+        }
+    }
+
+    fun fetchNextSearchPage() {
+        val offset = nextSearchOffset ?: return
+        val search = query.trim()
+        if (loading || loadingNextSearchPage || searchPageError != null || search.isEmpty() ||
+            mode != LocalFilesMode.WORKSPACE) return
+        val epoch = loadEpoch
+        loadingNextSearchPage = true
+        scope.launch {
+            try {
+                val page = loadSearchPage(search, offset)
+                if (loadEpoch == epoch && query.trim() == search) {
+                    workspace = workspace + page.files
+                    nextSearchOffset = page.nextOffset
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                if (loadEpoch == epoch) searchPageError = failure.message ?: readFilesFailed
+            } finally {
+                if (loadEpoch == epoch) loadingNextSearchPage = false
             }
         }
     }
@@ -510,9 +545,16 @@ internal fun LocalWorkspaceFilesDialog(
                     }
                     preview != null -> LocalFilePreviewBody(preview!!)
                     query.isNotBlank() -> {
-                        if (shareableFiles.isEmpty()) LocalFilesEmpty(
+                        if (shareableFiles.isEmpty() && nextSearchOffset == null) LocalFilesEmpty(
                             stringResource(R.string.fluid_files_no_matches), query.trim())
-                        else LocalFlatFileList(shareableFiles) { file -> openPreview(file.path) }
+                        else LocalFlatFileList(
+                            files = shareableFiles,
+                            searchKey = query.trim(),
+                            hasMore = nextSearchOffset != null && mode == LocalFilesMode.WORKSPACE,
+                            loadingMore = loadingNextSearchPage,
+                            pageError = searchPageError,
+                            onPrefetch = ::fetchNextSearchPage,
+                        ) { file -> openPreview(file.path) }
                     }
                     mode == LocalFilesMode.WORKSPACE -> {
                         if (section == -1) {
@@ -745,12 +787,33 @@ private fun ConversationLocalFileList(
 @Composable
 private fun LocalFlatFileList(
     files: List<LocalWorkspaceFile>,
+    searchKey: String,
+    hasMore: Boolean,
+    loadingMore: Boolean,
+    pageError: String?,
+    onPrefetch: () -> Unit,
     onOpen: suspend (LocalWorkspaceFile) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    LazyColumn(Modifier.fillMaxSize()) {
+    val listState = remember(searchKey) { LazyListState() }
+    LaunchedEffect(searchKey, files.size, hasMore, loadingMore, pageError) {
+        if (hasMore && !loadingMore && pageError == null) {
+            snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+                .first { it >= files.size - 40 }
+            onPrefetch()
+        }
+    }
+    LazyColumn(Modifier.fillMaxSize(), state = listState) {
         items(files, key = LocalWorkspaceFile::path) { file ->
             LocalFileRow(file) { scope.launch { onOpen(file) } }
+        }
+        if (pageError != null) {
+            item(key = "search-page-read-error") {
+                Text("部分搜索结果暂未显示：$"+"pageError",
+                    modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk)
+            }
         }
     }
 }

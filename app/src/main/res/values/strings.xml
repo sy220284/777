@@ -642,7 +642,7 @@
     <string name="local_workspace_deliverables_hint">集中查看任务完成后交付的文件</string>
     <string name="local_workspace_other_files">其他文件</string>
     <string name="local_workspace_other_hint">保留原路径的项目和历史文件</string>
-    <string name="local_workspace_search_scope">按文件名或路径查找；最多展示 500 项，超大工作区可能只扫描部分目录。</string>
+    <string name="local_workspace_search_scope">按文件名或路径查找，结果会自动连续显示；超大工作区可能只扫描部分目录。</string>
     <string name="local_workspace_tasks_empty_title">还没有任务文件</string>
     <string name="local_workspace_tasks_empty_body">创建工作目标后，任务资料将按任务分别保存在这里。</string>
     <string name="local_workspace_deliverables_empty_title">还没有交付成果</string>
