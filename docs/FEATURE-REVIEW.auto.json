@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "snapshot": "7eebda7d5fc5",
+  "snapshot": "6eec3462afb3",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1652,
-  "production_sources_scanned": 1003,
-  "feature_nodes": 543,
-  "functional_leaves": 448,
+  "code_files_scanned": 1874,
+  "production_sources_scanned": 1107,
+  "feature_nodes": 549,
+  "functional_leaves": 453,
   "existing_executable_test_mappings": 121,
   "leaf_evidence": [
     {
@@ -2478,7 +2478,7 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 创建团队和启动助手",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "历史生产文件仍存在（待入口复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
@@ -2488,7 +2488,7 @@
       "named_symbols": [
         {
           "symbol": "createMember",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2496,11 +2496,11 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0039",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队负责人编排与任务分配",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "历史生产文件仍存在（待入口复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
@@ -2510,7 +2510,7 @@
       "named_symbols": [
         {
           "symbol": "createTask",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2520,7 +2520,7 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员招募、职责和生命周期",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "历史生产文件仍存在（待入口复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
@@ -2530,7 +2530,7 @@
       "named_symbols": [
         {
           "symbol": "spawn",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2538,11 +2538,11 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0038",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员启动、停用、解散与停止全部",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "历史生产文件仍存在（待入口复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
@@ -2552,7 +2552,7 @@
       "named_symbols": [
         {
           "symbol": "startMember",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2560,11 +2560,11 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0035",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务创建、领取、修改与分配",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "历史生产文件仍存在（待入口复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
@@ -2574,7 +2574,7 @@
       "named_symbols": [
         {
           "symbol": "updateTask",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2582,11 +2582,11 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0046",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务依赖与阻塞关系",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "历史生产文件仍存在（待入口复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
@@ -2596,7 +2596,7 @@
       "named_symbols": [
         {
           "symbol": "dependenciesReady",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2604,7 +2604,7 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0047",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务重开、删除和完成确认",
@@ -2630,7 +2630,7 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 并发文件修改范围冲突提示",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "历史生产文件仍存在（待入口复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
@@ -2640,7 +2640,7 @@
       "named_symbols": [
         {
           "symbol": "writeScopeWarnings",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2648,7 +2648,7 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0045",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 发消息、收消息、等待消息",
@@ -2685,7 +2685,7 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 助手执行结果回收",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "历史生产文件仍存在（待入口复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
@@ -2695,7 +2695,7 @@
       "named_symbols": [
         {
           "symbol": "reconcileMemberOutcomes",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2703,11 +2703,11 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0037",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 主智能体核验结果后结算",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "历史生产文件仍存在（待入口复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
@@ -2717,7 +2717,7 @@
       "named_symbols": [
         {
           "symbol": "hasFreshTaskResult",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -2725,7 +2725,7 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0036",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 工作输入区内的集群入口",
@@ -3003,7 +3003,7 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 失败、停用和失联任务重新释放",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "历史生产文件仍存在（待入口复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
@@ -3013,7 +3013,7 @@
       "named_symbols": [
         {
           "symbol": "releaseOwnedTasks",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -3021,7 +3021,7 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0050",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 团队冷恢复与批量投影",
@@ -5588,7 +5588,7 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 缓存命中及费用分解",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "历史生产文件仍存在（待入口复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
@@ -5598,7 +5598,7 @@
       "named_symbols": [
         {
           "symbol": "TokenPromptBreakdown",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -5606,7 +5606,7 @@
       "explicit_test_candidates": [],
       "workflow_evidence": [],
       "identity_id": "existing.0088",
-      "identity_status": "静态声明已核，尚未授权自动改树"
+      "identity_status": "待复核入口变化"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 模型价格和未知价格提示",
@@ -6062,6 +6062,141 @@
         "test_methods_confirmed": 1,
         "explanation": "未合并：复用Team Owner与持久Jobs，真实运行身份约束成员消息和任务CAS；测试源码存在，按用户要求未执行工具链。"
       }
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 工作区长期记录与用户备注保护",
+      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
+      "test_reference_count": 0,
+      "historical_grade": null,
+      "existing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkImprovementArchive.kt"
+      ],
+      "missing_production_sources": [],
+      "named_symbols": [
+        {
+          "symbol": "LocalWorkImprovementArchive",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "当前主线具名源码和对应测试声明已逐项核实；静态映射仅证明代码及局部测试存在，不证明真实模型对照收益或全部设备运行通过。",
+      "explicit_test_candidates": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/improvement/LocalWorkImprovementArchiveTest.kt",
+          "method": "createsSevenWorkspaceDocumentsAndPreservesUserNotesAcrossRefreshes",
+          "references": "LocalWorkImprovementArchive",
+          "status": "仅发现测试源码，未验证CI是否执行通过"
+        }
+      ],
+      "workflow_evidence": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / Work 完成证据驱动的经验／提示词候选",
+      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
+      "test_reference_count": 0,
+      "historical_grade": null,
+      "existing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyLearning.kt"
+      ],
+      "missing_production_sources": [],
+      "named_symbols": [
+        {
+          "symbol": "parseProposal",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "当前主线具名源码和对应测试声明已逐项核实；静态映射仅证明代码及局部测试存在，不证明真实模型对照收益或全部设备运行通过。",
+      "explicit_test_candidates": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyLearningTest.kt",
+          "method": "strictValidJsonBecomesCandidateNotAnActivePolicy",
+          "references": "parseProposal",
+          "status": "仅发现测试源码，未验证CI是否执行通过"
+        }
+      ],
+      "workflow_evidence": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 同 Goal 契约的动态指导与长任务试用",
+      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
+      "test_reference_count": 0,
+      "historical_grade": null,
+      "existing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkImprovementGuidance.kt"
+      ],
+      "missing_production_sources": [],
+      "named_symbols": [
+        {
+          "symbol": "workImprovementGuidanceForStep",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "当前主线具名源码和对应测试声明已逐项核实；静态映射仅证明代码及局部测试存在，不证明真实模型对照收益或全部设备运行通过。",
+      "explicit_test_candidates": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkImprovementGuidanceTest.kt",
+          "method": "eligibleAdviceIsRequestOnlyAndKeepsUserApprovalRules",
+          "references": "workImprovementGuidanceForStep",
+          "status": "仅发现测试源码，未验证CI是否执行通过"
+        }
+      ],
+      "workflow_evidence": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 独立测试回执／Token 对照及窄范围采纳",
+      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
+      "test_reference_count": 0,
+      "historical_grade": null,
+      "existing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyEvaluation.kt"
+      ],
+      "missing_production_sources": [],
+      "named_symbols": [
+        {
+          "symbol": "shouldRetireWorkAdvice",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "当前主线具名源码和对应测试声明已逐项核实；静态映射仅证明代码及局部测试存在，不证明真实模型对照收益或全部设备运行通过。",
+      "explicit_test_candidates": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyLearningTest.kt",
+          "method": "activeAdviceRetiresWhenVerifiedQualityRegresses",
+          "references": "shouldRetireWorkAdvice",
+          "status": "仅发现测试源码，未验证CI是否执行通过"
+        }
+      ],
+      "workflow_evidence": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 技能改进草案与 App 问题迭代记录",
+      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
+      "test_reference_count": 0,
+      "historical_grade": null,
+      "existing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkImprovementArchive.kt"
+      ],
+      "missing_production_sources": [],
+      "named_symbols": [
+        {
+          "symbol": "LocalWorkImprovementArchive",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "当前主线具名源码和对应测试声明已逐项核实；静态映射仅证明代码及局部测试存在，不证明真实模型对照收益或全部设备运行通过。",
+      "explicit_test_candidates": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/improvement/LocalWorkImprovementArchiveTest.kt",
+          "method": "promotedSkillRemainsAnUninstalledDraftInUserWorkspace",
+          "references": "LocalWorkImprovementArchive",
+          "status": "仅发现测试源码，未验证CI是否执行通过"
+        }
+      ],
+      "workflow_evidence": []
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话创建、读写、删除和归档",
@@ -7061,7 +7196,7 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 执行编排 / 阶段任务分配",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "历史生产文件仍存在（待入口复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
@@ -7071,7 +7206,7 @@
       "named_symbols": [
         {
           "symbol": "createTask",
-          "declaration_found": true
+          "declaration_found": false
         }
       ],
       "explicit_source_anchor": false,
@@ -8506,16 +8641,16 @@
   ],
   "evidence_grade_summary": {
     "真实测试映射（仅局部）": 120,
-    "具名源码声明存在（静态，待调用链复核）": 206,
+    "具名源码声明存在（静态，待调用链复核）": 194,
     "没有可确认的现行入口证据": 19,
-    "历史生产文件仍存在（待入口复核）": 75,
-    "具名源码及仪表测试声明存在（静态，未执行）": 10,
+    "历史生产文件仍存在（待入口复核）": 87,
+    "具名源码及仪表测试声明存在（静态，未执行）": 15,
     "真实测试映射及具名源码声明（静态）": 1,
     "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）": 14,
     "候选生产文件仍存在（不足以证明功能）": 3
   },
   "workflow_evidence_features": 14,
-  "declared_unexecuted_test_methods": 10,
+  "declared_unexecuted_test_methods": 15,
   "tracked_legacy_identities": 117,
   "stale_legacy_identities": [
     {
@@ -8528,10 +8663,100 @@
       "problem": "稳定身份关联的功能路径已不在现行树；可能改名或退役"
     },
     {
+      "id": "existing.0035",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员启动、停用、解散与停止全部",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "startMember",
+      "owner": "WORK",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "具名入口在原文件已消失；须核实替代实现"
+    },
+    {
+      "id": "existing.0036",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 主智能体核验结果后结算",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "hasFreshTaskResult",
+      "owner": "WORK",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "具名入口在原文件已消失；须核实替代实现"
+    },
+    {
+      "id": "existing.0037",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 助手执行结果回收",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "reconcileMemberOutcomes",
+      "owner": "WORK",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "具名入口在原文件已消失；须核实替代实现"
+    },
+    {
+      "id": "existing.0038",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员招募、职责和生命周期",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "spawn",
+      "owner": "WORK",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "具名入口在原文件已消失；须核实替代实现"
+    },
+    {
+      "id": "existing.0039",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 创建团队和启动助手",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "createMember",
+      "owner": "WORK",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "具名入口在原文件已消失；须核实替代实现"
+    },
+    {
+      "id": "existing.0045",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 并发文件修改范围冲突提示",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "writeScopeWarnings",
+      "owner": "WORK",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "具名入口在原文件已消失；须核实替代实现"
+    },
+    {
+      "id": "existing.0046",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务创建、领取、修改与分配",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "updateTask",
+      "owner": "WORK",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "具名入口在原文件已消失；须核实替代实现"
+    },
+    {
+      "id": "existing.0047",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务依赖与阻塞关系",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "dependenciesReady",
+      "owner": "WORK",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "具名入口在原文件已消失；须核实替代实现"
+    },
+    {
+      "id": "existing.0050",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 失败、停用和失联任务重新释放",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "releaseOwnedTasks",
+      "owner": "WORK",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "具名入口在原文件已消失；须核实替代实现"
+    },
+    {
       "id": "existing.0086",
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 7／30／90 天消耗趋势",
       "source": "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
       "entry": "TokenUsageDailyBucket",
+      "owner": "SETTINGS",
+      "verification": "静态源码声明，未授权自动变更",
+      "problem": "具名入口在原文件已消失；须核实替代实现"
+    },
+    {
+      "id": "existing.0088",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 缓存命中及费用分解",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
+      "entry": "TokenPromptBreakdown",
       "owner": "SETTINGS",
       "verification": "静态源码声明，未授权自动变更",
       "problem": "具名入口在原文件已消失；须核实替代实现"
@@ -8616,7 +8841,6 @@
     "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 目标、约束和当前进展提取",
     "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 恢复时任务邮箱续投",
     "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 未完成任务阻止错误完成声明",
-    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队负责人编排与任务分配",
     "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 持久邮箱和重启后补投",
     "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 不能收消息时禁用发送并保留草稿",
     "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 停止单个和全部助手",
@@ -8628,6 +8852,8 @@
     "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 待办事项 / 完成状态和执行关联",
     "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 待办事项 / 待办建立与更新",
     "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 目标管理 / 目标结果核验",
+    "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 工作区长期记录与用户备注保护",
+    "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 技能改进草案与 App 问题迭代记录",
     "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 屏幕截图和动作执行",
     "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 无障碍界面读取与操作",
     "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 虚拟屏资源归属和权限",
@@ -8690,7 +8916,6 @@
     "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 满载拒绝和消息去重",
     "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 稳定身份与本轮任务分离",
     "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 输出结构校验",
-    "第二层｜共享运行能力 / 共享智能体核心 / 执行编排 / 阶段任务分配",
     "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 推理－工具－结果多步循环",
     "第二层｜共享运行能力 / 共享用量和诊断 / 结构化诊断与故障报告",
     "第二层｜共享运行能力 / 共享用量和诊断 / 运行事件和错误日志",
@@ -8805,14 +9030,6 @@
     },
     {
       "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
-      "symbol": "createTask",
-      "features": [
-        "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队负责人编排与任务分配",
-        "第二层｜共享运行能力 / 共享智能体核心 / 执行编排 / 阶段任务分配"
-      ]
-    },
-    {
-      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
       "symbol": "recoverMailbox",
       "features": [
         "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 恢复时任务邮箱续投",
@@ -8895,6 +9112,14 @@
       "features": [
         "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能使用范围和提示词预算",
         "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能调用标记识别"
+      ]
+    },
+    {
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkImprovementArchive.kt",
+      "symbol": "LocalWorkImprovementArchive",
+      "features": [
+        "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 工作区长期记录与用户备注保护",
+        "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 技能改进草案与 App 问题迭代记录"
       ]
     },
     {
@@ -9478,11 +9703,295 @@
   "followup_production_or_compatibility": 12,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "faae4175b55e",
-    "added_production_files": [],
+    "baseline": "7eebda7d5fc5",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/connection/ThemeBootstrapPreferences.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LegacyProviderUsageCompat.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalModelException.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalWebException.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/TokenUsageRecordAdapters.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentBackendRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentDelegationPolicy.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentExecutionBackend.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentInboxProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentParentLink.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentRoleDefinition.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentRolePolicy.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentSkillBinding.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentSubtreeBudget.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentToolGrantPolicy.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalNestedDelegationContract.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalRecursiveReadOnlyToolScope.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentResourceAdmission.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/ipc/AndroidIsolatedAgentBackend.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/ipc/IsolatedAgentService.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/attachment/SqliteLocalAssetCatalog.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/context/LocalPromptPressure.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextReadPage.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceExecutionContext.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/DeepSeekUsageAccounting.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalHistorySummaryMode.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalInstructionScope.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStudioBackupInstaller.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStudioBackupSnapshot.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStudioZipEntries.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptPressureType.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/network/AndroidLocalNetworkPermissionPolicy.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalLegacySqliteMigration.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionSnapshotStore.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionConsistencyGate.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionEventDatabase.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionMediaArchive.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionSnapshotStore.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionStorageManager.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalArchiveReader.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalBuiltinStructuredResult.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalExtensionWorkshop.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/usage/LegacyUsageProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/usage/ReportedTokenUsage.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/usage/SharedTokenEstimate.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalSearchUsageStore.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentControlPlane.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentControlPort.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentLifecycleController.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentMessageDeliveryMode.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentOperationalProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentRegistry.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentResidencyProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentRootDirectiveSnapshot.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentSpawnController.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTaskGraphController.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTreeProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentWorkspaceScopePolicy.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalNestedAgentDispatcher.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalPersistentAgentWorkspace.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentTurnExecution.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalTaskGraphReplanPolicy.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalTeamIdleTaskDispatch.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalTeamMemberLifecycle.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalTeamMessageBus.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalTeamMessageReceipt.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalTeamResultMailbox.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalTeamReviewRolePolicy.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalTeamSpawnAdmission.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalTeamSpawnCommitGate.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalTeamTaskBoard.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalTeamToolExecutionAdmission.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalTeamVerificationController.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalTeamWaitProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCapabilityRecovery.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkImprovementGuidance.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkIntegrationDecision.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunMcpDiscovery.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskFolders.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkToolPriority.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkImprovementArchive.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyEvaluation.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyLearning.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/improvement/WorkExperienceBootstrap.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/components/ConversationMenuIcons.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/InlineSpeechPlayerOwner.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptVisibleWindow.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageSearchComponents.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/AgentBackendSettings.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentBackendExecutionContext.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentBackendProtocol.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentEagerToolStep.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentTurnBackend.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/capability/WorkspaceExecutionContext.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/optimization/StrategyComparison.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolBindingSnapshot.kt",
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackend.kt",
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AgentTlsWorkerServer.kt",
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AgentWorkerServerMain.kt",
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/FramedAgentChannel.kt",
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/GitWorkspaceRuntime.kt",
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/ProcessIsolation.kt",
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PtyTransport.kt",
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/TerminalOutputBuffer.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptPresentation.kt"
+      "app/src/main/java/com/labteto/dshmobile/DshApplication.kt",
+      "app/src/main/java/com/labteto/dshmobile/connection/HostsStore.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalForegroundSessionLoader.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalModelHistoryProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalSessionComposition.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalSessionNavigationInbox.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/OnDemandLanguageServerManager.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/TokenUsageValues.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentCapabilities.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentContextPolicy.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentImporter.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentMaintenance.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalDocumentContent.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatControlProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatReplyMedia.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatSessionLifecyclePlanner.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatWebContextProvider.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/PendingChatTurnStore.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/context/LocalContextCheckpointEnvelope.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/context/LocalRequestContextProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/interaction/LocalInteractionModels.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/jobs/LocalJobManager.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/jobs/LocalJobsModels.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/AnthropicMessagesClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/DeepSeekBilling.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalAgentModelRequestRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalCanonicalModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalHistoryCompactor.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaDatabase.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStore.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaValues.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMultimodal.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptPressure.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalSystemPromptContinuity.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalTextRetention.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalToolResultDelivery.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalWorkRuntimeContext.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/OpenAiResponsesClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/OpenAiResponsesStreamSnapshot.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/TurnContextPlacement.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalMediaCreationRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSessionUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsDataFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTranscriptHistoryLoader.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUsageUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgentRunCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalDiagnosticsRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalProcessExitStatus.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionStorageRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/security/KeystorePreferenceSecretStore.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalConversationFiles.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalConversationFilesCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionAccessCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionDeletionCleanup.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLogRegistry.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionReadRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionStorageStatus.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionTranscriptPager.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalUiDocumentSessionStore.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalModelToolStepSurface.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalNetworkSearchSettings.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalShellTool.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolActivityProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCapabilityIntent.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolSchemaProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolScopeProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/usage/PromptTokenEstimateCache.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/usage/TokenUsageDatabase.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/usage/UsageArithmetic.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalKeylessWebSearchClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebSearchClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTargetResolver.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTools.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamActivityProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamContract.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamEventCodec.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamReducer.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalPersistentJobRecoveryCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentContinuation.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentInboxRecoveryScan.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunner.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunnerFactory.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentControlBuiltinRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkBackgroundToolExecutor.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionEvidence.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkComposition.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkControlProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalDriver.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalTransitionPolicy.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkMediaToolRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkModelHistoryRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunBinding.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivation.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkState.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlan.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphRecovery.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkToolResultRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnToolRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkflowCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/components/ConversationScrollShortcut.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationActionsMenu.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaders.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureUiActions.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalGeneratedMediaMessage.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawerComponents.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModelDefaults.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryController.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryLoader.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptPagingUi.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptPresentation.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalUsageModePill.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkTimelineStepRow.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkToolActivityReader.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkUiContribution.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AppSettingsComponents.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalSessionStorageCard.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationComponents.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationPage.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/uicontract/FilesUiPort.kt",
+      "app/src/main/java/com/labteto/dshmobile/uicontract/SettingsUiPort.kt",
+      "app/src/main/java/com/shenyan/designsystem/components/ShenyanDataViews.kt",
+      "app/src/main/java/com/shenyan/designsystem/components/ShenyanFeedback.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentExecutionContracts.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentToolDispatch.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentTurnEngine.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentTurnState.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/jobs/HarnessJobManager.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionRecovery.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolContract.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolRegistry.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolRichContent.kt",
+      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
+      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt",
+      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpClient.kt",
+      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpLegacyTransports.kt",
+      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/ManagedProcess.kt",
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/ProcessRuntime.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

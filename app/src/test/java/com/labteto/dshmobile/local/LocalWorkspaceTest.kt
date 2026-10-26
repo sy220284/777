@@ -40,6 +40,30 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun longLinePagesPreserveEveryCharacterIncludingSurrogatePairs() {
+        val text = "中文😀🚀abc".repeat(13_000) + "末尾"
+        root.resolve("长行.txt").writeText(text)
+        val joined = StringBuilder()
+        var offset = 0
+        var pages = 0
+        do {
+            val page = workspace.read("长行.txt", 1, 1, startChar = offset)
+            assertTrue(page.length <= 50_000)
+            val part = page.substringBefore("\n[读取未完").removePrefix("1: ")
+            assertFalse(part.lastOrNull()?.isHighSurrogate() == true)
+            joined.append(part)
+            val next = Regex("start_line=1, start_char=(\\d+)").find(page)
+            if (next == null) break
+            val cursor = next.groupValues[1].toInt()
+            assertTrue(cursor > offset)
+            offset = cursor
+            pages++
+        } while (pages < 10)
+        assertEquals(text, joined.toString())
+        assertTrue(pages > 1)
+    }
+
+    @Test
     fun fileNameSearchStillFindsFilesBeyondTheFirstTwoThousand() {
         val folder = root.resolve("无关资料").apply { mkdirs() }
         repeat(2_050) { index -> folder.resolve("无关-${index}.txt").writeText("旧资料") }
@@ -318,7 +342,7 @@ class LocalWorkspaceTest {
 
         assertEquals(".dsh/fetches/large.json", path)
         assertEquals(content, workspace.readRaw(path))
-        assertTrue(workspace.read(path, 1, 1).contains(middleMarker))
+        assertTrue(workspace.read(path, 1, 1, startChar = content.indexOf(middleMarker)).contains(middleMarker))
         assertTrue(workspace.search(middleMarker, path).contains(middleMarker))
     }
 

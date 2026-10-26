@@ -457,11 +457,9 @@ class LspPluginTest {
     @Test fun diagnosticsTimeoutNeverClaimsAnEmptyErrorListIsFinal() = runBlocking {
         Assume.assumeTrue(File("/bin/sh").isFile)
         temporary.newFile("waiting.ts").writeText("const a = 1")
-        fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
         val script = temporary.newFile("silent-diagnostics.sh").apply {
             writeText(
-                "printf '%s' '" + frame("""{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}""") +
-                    "'\nwhile IFS= read -r line; do :; done\n",
+                requestDrivenMockLsp("""{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}"""),
             )
         }
         val context = HarnessContext()

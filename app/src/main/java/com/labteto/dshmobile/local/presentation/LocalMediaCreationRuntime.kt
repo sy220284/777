@@ -73,6 +73,9 @@ class LocalMediaCreationRuntime @Inject internal constructor(
             com.labteto.dshmobile.uicontract.UiDocumentMediaKind.VIDEO) }
         return null
     }
+    internal suspend fun creationForSession(id: String, sessionId: String): com.labteto.dshmobile.local.model.LocalMediaCreationSnapshot? =
+        withContext(Dispatchers.IO) { store.creationForSession(id, sessionId) }
+
     override fun assetForSession(id: String, sessionId: String): UiMediaAsset? {
         if (sessionId.isBlank()) return null
         store.result(id)?.takeIf { it.sessionId == sessionId }?.let { result ->
@@ -230,7 +233,8 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         // silently fall back to text-to-image and spend credits on the wrong operation.
         val sourceImage = editSourceImageId?.let { id -> withContext(Dispatchers.IO) {
             require(offer.provider == LocalMediaProvider.OPENAI) { "当前模型不支持原图编辑，请选择支持的图片模型" }
-            val previous = store.result(id) ?: error("原图片已删除，无法以原图编辑")
+            val previous = store.creationForSession(id, sessionId)?.result
+                ?: error("原图片已删除或不属于当前会话，无法以原图编辑")
             require(previous.kind == LocalMediaKind.IMAGE.name) { "原记录不是图片" }
             store.file(previous.fileName) ?: error("本地原图已不可用，请切换为重新画图")
         } }

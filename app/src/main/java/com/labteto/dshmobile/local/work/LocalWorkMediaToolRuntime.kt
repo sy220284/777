@@ -8,7 +8,6 @@ import com.labteto.dshmobile.local.presentation.LocalMediaCreationRuntime
 import com.labteto.dshmobile.local.tools.optionalString
 import com.labteto.dshmobile.local.tools.string
 import javax.inject.Provider
-import kotlinx.coroutines.flow.first
 
 /**
  * Work adapter to the ONE media creation owner. Billing, receipts, API credentials, persistence
@@ -45,8 +44,8 @@ internal class LocalWorkMediaToolRuntime(
                 val sourceId = call.arguments.optionalString("edit_source_image_id")
                 if (sourceId != null) {
                     // Never allow Work to edit a different session's private image by guessing an id.
-                    val page = media.get().observe(sessionId, 500).first()
-                    require(page.results.any { it.id == sourceId && it.kind == LocalMediaKind.IMAGE.name }) {
+                    val source = media.get().creationForSession(sourceId, sessionId)?.result
+                    require(source?.kind == LocalMediaKind.IMAGE.name) {
                         "MEDIA_EDIT_SOURCE_UNAVAILABLE：当前会话未找到已保存的原图，请先打开图片创作界面确认"
                     }
                 }
@@ -59,11 +58,10 @@ internal class LocalWorkMediaToolRuntime(
             }
             "media_image_status" -> {
                 val id = call.arguments.string("job_id")
-                val page = media.get().observe(sessionId, 500).first()
-                require(!page.unavailable) { "MEDIA_STORE_UNAVAILABLE：无法核实任务状态，禁止重复付费提交" }
-                val job = page.jobs.firstOrNull { it.id == id }
-                    ?: return "MEDIA_JOB_NOT_FOUND：当前会话最近的媒体任务中没有该编号；请在媒体记录中继续核实，不得猜测状态"
-                val result = page.results.firstOrNull { it.id == id }
+                val record = media.get().creationForSession(id, sessionId)
+                val job = record?.job
+                    ?: return "MEDIA_JOB_NOT_FOUND：当前会话媒体档案中没有该编号；请核实任务编号，不得猜测状态或重复付费提交"
+                val result = record.result
                 buildString {
                     append("job_id=${job.id}; state=${job.phase}")
                     job.errorCode?.let { append("; code=$it") }

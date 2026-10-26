@@ -95,6 +95,11 @@ data class LocalMediaCreationJob(
 )
 
 
+internal data class LocalMediaCreationSnapshot(
+    val job: LocalMediaCreationJob?,
+    val result: LocalMediaResult?,
+)
+
 data class LocalMediaPage(
     val results: List<LocalMediaResult> = emptyList(),
     val jobs: List<LocalMediaCreationJob> = emptyList(),

@@ -157,6 +157,13 @@ class LocalSessionEventLog(
             .map { it.toLocalEvent() }
     }
 
+    /** Stream only the event kinds consumed by a derived projection. */
+    internal fun forEachOfTypesAfter(sequenceExclusive: Long, types: Set<String>, visitor: (Event) -> Unit) {
+        require(types.isNotEmpty())
+        if (sqlite != null) sqlite.forEachOfTypesAfter(sqliteId, sequenceExclusive, types) { visitor(it.toLocalEvent()) }
+        else fileLog().forEachAfter(sequenceExclusive) { if (it.type in types) visitor(it.toLocalEvent()) }
+    }
+
     /**
      * Native SQL skips events without a visible transcript or rewrite semantics.
      * File-based tests retain the conservative full replay contract.

@@ -157,6 +157,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 relativePath = args.string("path"),
                 startLine = args.int("start_line", 1),
                 endLine = args.int("end_line", args.int("start_line", 1) + 399),
+                startChar = args.int("start_char", 0),
             )
             "tool_output_read" -> args.optionalString("query")?.takeIf(String::isNotBlank)?.let { query ->
                 root.toolOutputStore.search(

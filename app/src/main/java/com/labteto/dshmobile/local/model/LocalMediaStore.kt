@@ -160,6 +160,15 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
     fun result(id: String): LocalMediaResult? = operation {
         initialize(); database.get(id)?.takeUnless { it.deleted }?.result
     }
+    /** Exact identity lookup, independent of UI paging, with session isolation at the owner. */
+    @Synchronized
+    internal fun creationForSession(id: String, sessionId: String): LocalMediaCreationSnapshot? = operation {
+        initialize()
+        val row = database.get(id)?.takeUnless { it.deleted }?.takeIf { it.sessionId == sessionId && sessionId.isNotBlank() }
+            ?: return@operation null
+        LocalMediaCreationSnapshot(row.job, row.result)
+    }
+
     /** Atomically attach a downloaded original image, rejecting deletion or changed provenance. */
     @Synchronized
     fun attachDownloadedImage(id: String, sessionId: String, expectedUrl: String, file: File): Boolean = operation {
