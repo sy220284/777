@@ -42,6 +42,21 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun sparseSearchAdvancesAcrossEmptyPagesInsteadOfRepeatingTheFirstScan() {
+        val dir = root.resolve("任务/稀疏目录").apply { mkdirs() }
+        repeat(2_080) { index ->
+            dir.resolve("甲-${index.toString().padStart(4, '0')}.txt").writeText("无关")
+        }
+        dir.resolve("终-唯一报告.md").writeText("目标")
+        val first = workspace.searchWorkspacePage("唯一报告")
+        assertTrue(first.files.isEmpty())
+        assertEquals(1, first.nextOffset)
+        val second = workspace.searchWorkspacePage("唯一报告", requireNotNull(first.nextOffset))
+        assertEquals(listOf("任务/稀疏目录/终-唯一报告.md"), second.files.map { it.path })
+        assertEquals(null, second.nextOffset)
+    }
+
+    @Test
     fun searchPagesReturnAllMatchingPathsWithoutDuplicateOrEagerContentReads() {
         val folder = root.resolve("任务/搜索目录").apply { mkdirs() }
         repeat(235) { n -> folder.resolve("报告-${n.toString().padStart(4, '0')}.md").writeText("不应预览的正文") }
