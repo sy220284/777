@@ -306,6 +306,14 @@ internal suspend fun prepareLocalMultimodalMessages(
                             if (extracted.truncated) append(" · 已按上下文预算截断")
                             append("]\n").append(extracted.text)
                             append("\n[完整附件在工作区：").append(relative).append("；以上仅为请求上下文预览]")
+                            if (name.endsWith(".zip", true) || name.endsWith(".tar.gz", true) ||
+                                name.endsWith(".tgz", true) || name.endsWith(".tar", true) ||
+                                name.endsWith(".jar", true) || name.endsWith(".gz", true)) {
+                                append("\n[归档全量分析：先使用 archive_list(path) 枚举全部页，直到 next_cursor=none；")
+                                append("再用 archive_read(path, member) 读取所有相关文件；如 complete=false，")
+                                append("按 next_char 继续。应报告文件总数、已分析数量和未分析原因，")
+                                append("未完整遍历前不得宣称分析完成。无需用户手动解压。]")
+                            }
                         }
                         activeDocumentChars += body.length
                         add(buildJsonObject {
