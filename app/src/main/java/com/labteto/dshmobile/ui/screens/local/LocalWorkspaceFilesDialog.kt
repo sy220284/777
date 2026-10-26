@@ -324,7 +324,7 @@ internal fun LocalWorkspaceFilesDialog(
     // Search is debounced; folder navigation and rendering never wait on a global search.
     LaunchedEffect(mode, sessionId, query) {
         if (mode == LocalFilesMode.WORKSPACE && loadedForEntry && query.trim() != lastLoadedSearch) {
-            kotlinx.coroutines.delay(280)
+            if (query.isNotBlank()) kotlinx.coroutines.delay(280)
             reload()
         }
     }
@@ -804,6 +804,14 @@ private fun LocalFlatFileList(
         }
     }
     LazyColumn(Modifier.fillMaxSize(), state = listState) {
+        if (files.isEmpty() && hasMore) {
+            item(key = "search-discovery-in-progress") {
+                Text("正在查找文件名…",
+                    modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+            }
+        }
         items(files, key = LocalWorkspaceFile::path) { file ->
             LocalFileRow(file) { scope.launch { onOpen(file) } }
         }
