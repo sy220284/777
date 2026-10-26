@@ -23,7 +23,7 @@ class AgentWorkspaceEnvironment private constructor(
     private val observations = mutableMapOf<String, String>()
 
     override suspend fun execute(request: AgentEnvironmentToolRequest): ToolResult =
-        withContext(Dispatchers.IO + ToolInvocationContext(request.sessionId.orEmpty(), request.callId, request.executionId)) {
+        withContext(Dispatchers.IO + ProcessIsolationContext() + ToolInvocationContext(request.sessionId.orEmpty(), request.callId, request.executionId)) {
             when (request.name) {
                 "read", "read_file" -> {
                     val file = resolve(request.input.text("path"))
@@ -93,8 +93,14 @@ class AgentWorkspaceEnvironment private constructor(
 
     companion object {
         /** Runtime paths/environment are supplied by the server administrator, never the model. */
-        suspend fun create(root: File, process: AndroidProcessRuntime = AndroidProcessRuntime(root),
-            terminals: PersistentPipeTerminalProvider = PersistentPipeTerminalProvider(defaultWorkingDirectory = root),
+        suspend fun create(root: File,
+            runtimePaths: List<File> = System.getenv("PATH").orEmpty().split(File.pathSeparator)
+                .filter(String::isNotBlank).map(::File),
+            runtimeReadRoots: List<File> = listOf("/usr/lib", "/usr/local/lib", "/lib", "/lib64", "/usr/share", "/etc/ssl/certs").map(::File),
+            process: AndroidProcessRuntime = AndroidProcessRuntime(root, extraSearchPaths = runtimePaths,
+                inheritEnvironment = false, trustedReadRoots = runtimeReadRoots),
+            terminals: PersistentPipeTerminalProvider = PersistentPipeTerminalProvider(defaultWorkingDirectory = root,
+                extraSearchPaths = { runtimePaths }, inheritEnvironment = false, trustedReadRoots = runtimeReadRoots),
         ): AgentWorkspaceEnvironment {
             val directory = root.canonicalFile
             require(directory.isDirectory) { "远端工作区不存在：$directory" }

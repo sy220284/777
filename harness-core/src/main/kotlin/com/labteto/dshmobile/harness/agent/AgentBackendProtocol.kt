@@ -190,6 +190,12 @@ object AgentBackendProtocol {
         var terminalEvent: AgentEvent? = null
         var heartbeat: Job? = null
         val receipts = linkedMapOf<String, AgentToolResult>()
+        // Close the wire as soon as the activation is cancelled, even while an audited
+        // commit handler is finishing its receipt in NonCancellable. That receipt may be
+        // uncertain; cancellation never keeps the remote process lease alive.
+        val cancellationCloser = scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            try { kotlinx.coroutines.awaitCancellation() } finally { channel.close() }
+        }
         suspend fun publish(event: AgentEvent) {
             require(event.turnId == request.turnId) { "AGENT_BACKEND_EVENT_IDENTITY" }
             check(terminal == null) { "AGENT_BACKEND_ALREADY_TERMINAL" }
@@ -320,6 +326,6 @@ object AgentBackendProtocol {
         } catch (failure: Exception) {
             runCatching { services.events.append(AgentEvent.TurnFailed(request.turnId, "后端连接或执行中断；已执行工具须依据原回执核实")) }
             throw failure
-        } finally { heartbeat?.cancel(); channel.close() }
+        } finally { heartbeat?.cancel(); cancellationCloser.cancel(); channel.close() }
     }
 }
