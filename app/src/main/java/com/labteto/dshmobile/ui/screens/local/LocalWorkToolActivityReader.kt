@@ -1,7 +1,23 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import kotlinx.coroutines.CancellationException
+
+/** Only a restored, identified Work session may query its durable event cursor. */
+internal fun shouldReadWorkToolStatus(
+    mode: LocalUsageMode,
+    loading: Boolean,
+    sessionId: String,
+): Boolean = mode == LocalUsageMode.WORK && !loading && sessionId.isNotBlank()
+
+/** Retrying read-only projection queries never resends models or executes tools. */
+internal fun workToolReadRetryDelayMs(failures: Int): Long =
+    (750L shl (failures - 1).coerceIn(0, 5)).coerceAtMost(20_000L)
+
+/** Empty welcome sessions should not show an internal read error. */
+internal fun shouldShowWorkToolReadFailure(failures: Int, hasWorkContent: Boolean): Boolean =
+    failures >= 3 && hasWorkContent
 
 internal sealed interface LocalWorkToolActivityRead {
     data class Available(val activities: List<LocalToolActivityUiItem>) : LocalWorkToolActivityRead

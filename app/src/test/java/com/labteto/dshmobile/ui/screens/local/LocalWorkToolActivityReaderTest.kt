@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 import java.io.IOException
@@ -8,7 +9,32 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class LocalWorkToolActivityReaderTest {
-    @Test fun failedReadDoesNotAdvanceTheCursorAndManualRetryReadsSameRevision() {
+    @Test fun workToolReaderWaitsForStartupRestoreAndValidSession() {
+        assertFalse(shouldReadWorkToolStatus(LocalUsageMode.WORK, loading = true, sessionId = "fresh-session"))
+        assertFalse(shouldReadWorkToolStatus(LocalUsageMode.WORK, loading = false, sessionId = ""))
+        assertFalse(shouldReadWorkToolStatus(LocalUsageMode.CHAT, loading = false, sessionId = "fresh-session"))
+        assertTrue(shouldReadWorkToolStatus(LocalUsageMode.WORK, loading = false, sessionId = "fresh-session"))
+    }
+
+    @Test fun automaticRetryBacksOffWithoutBusyPolling() {
+        assertEquals(750L, workToolReadRetryDelayMs(1))
+        assertEquals(1_500L, workToolReadRetryDelayMs(2))
+        assertEquals(3_000L, workToolReadRetryDelayMs(3))
+        assertEquals(6_000L, workToolReadRetryDelayMs(4))
+        assertEquals(12_000L, workToolReadRetryDelayMs(5))
+        assertEquals(20_000L, workToolReadRetryDelayMs(6))
+        assertEquals(20_000L, workToolReadRetryDelayMs(100))
+    }
+
+    @Test fun transientFailuresAndEmptyWelcomePageStayQuiet() {
+        assertFalse(shouldShowWorkToolReadFailure(1, true))
+        assertFalse(shouldShowWorkToolReadFailure(2, true))
+        assertFalse(shouldShowWorkToolReadFailure(10, false))
+        assertTrue(shouldShowWorkToolReadFailure(3, true))
+        assertFalse(shouldShowWorkToolReadFailure(0, true))
+    }
+
+    @Test fun failedReadCanRecoverOnSameRevisionWithoutReplaying() {
         var unavailable = true
         var reads = 0
         val row = LocalToolActivityUiItem("call", "read", LocalToolUiPhase.RUNNING)

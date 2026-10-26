@@ -122,12 +122,10 @@ class WorkReplyTimelineVisualTest {
         saveScreenshot("dark-320dp-large-text")
     }
 
-    @Test fun statusRetryRemainsAnExplicitReadAction() {
-        var requests = 0
-        compose.setContent { DshTheme { WorkToolStatusNotice { requests++ } } }
-        compose.onNodeWithText("工具状态暂时无法更新，已保存的回复仍可查看").assertIsDisplayed()
-        compose.onNodeWithText("重试状态读取").performClick()
-        compose.runOnIdle { org.junit.Assert.assertEquals(1, requests) }
+    @Test fun statusFailureExplainsAutomaticRecoveryWithoutManualAction() {
+        compose.setContent { DshTheme { WorkToolStatusNotice() } }
+        compose.onNodeWithText("工具状态同步暂不可用，正在自动恢复；已保存的回复仍可查看").assertIsDisplayed()
+        compose.onNodeWithText("重试状态读取").assertDoesNotExist()
     }
 
     private fun saveScreenshot(name: String) {

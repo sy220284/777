@@ -570,36 +570,41 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             }
         }
     }
-    var workToolReadFailed by remember(state.sessionId, state.usageMode) { mutableStateOf(false) }
-    var workToolRetry by remember(state.sessionId) { mutableStateOf(0) }
+    var workToolReadFailures by remember(state.sessionId, state.usageMode) { mutableStateOf(0) }
     val timelineLifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(state.sessionId, state.usageMode, workActions, state.running, workToolRetry, timelineLifecycle) {
-        workToolReadFailed = false
-        if (state.usageMode != LocalUsageMode.WORK || workActions == null) {
+    // Read only after session restore; lifecycle and session changes cancel pending retries.
+    LaunchedEffect(state.sessionId, state.usageMode, state.loading, workActions, state.running, timelineLifecycle) {
+        workToolReadFailures = 0
+        if (!shouldReadWorkToolStatus(state.usageMode, state.loading, state.sessionId) || workActions == null) {
             workToolActivities = emptyList()
         } else timelineLifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             val reader = LocalWorkToolActivityReader(
                 sequence = { workActions.eventSequenceForUi(state.sessionId) },
                 activities = { workActions.toolActivities(state.sessionId) },
             )
-            do {
+            var failures = 0
+            while (true) {
                 when (val read = withContext(Dispatchers.IO) { reader.read() }) {
                     is LocalWorkToolActivityRead.Available -> {
                         workToolActivities = read.activities
-                        workToolReadFailed = false
+                        failures = 0
+                        workToolReadFailures = 0
                     }
                     is LocalWorkToolActivityRead.Failed -> {
+                        // Never show stale running rows or replay a tool; only retry the read.
                         workToolActivities = emptyList()
-                        workToolReadFailed = true
-                        com.labteto.dshmobile.observability.AppLog.failure(
-                            "WorkTimeline", "read_tool_activity", read.cause, sessionId = state.sessionId)
-                        break // Retry is explicit; never replay tools or present stale live state.
+                        failures += 1
+                        workToolReadFailures = failures
+                        if (failures == 1 || failures == 3) {
+                            com.labteto.dshmobile.observability.AppLog.failure(
+                                "WorkTimeline", "read_tool_activity", read.cause, sessionId = state.sessionId)
+                        }
                     }
                     null -> Unit
                 }
-                if (!state.running) break
-                delay(600)
-            } while (true)
+                if (!state.running && failures == 0) break
+                delay(if (failures > 0) workToolReadRetryDelayMs(failures) else 600L)
+            }
         }
     }
     // Cache each projection stage independently: an active tool tick must not parse the
@@ -1363,9 +1368,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         }
                     }
                 }
-                if (workToolReadFailed) {
+                if (shouldShowWorkToolReadFailure(workToolReadFailures,
+                        state.running || transcriptMessages.isNotEmpty())) {
                     item(key = "work-tool-read-error:${state.sessionId}") {
-                        WorkToolStatusNotice(onRetry = { workToolRetry += 1 })
+                        WorkToolStatusNotice()
                     }
                 }
                 if (showStreamingTail) {
