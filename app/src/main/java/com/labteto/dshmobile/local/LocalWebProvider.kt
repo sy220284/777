@@ -218,7 +218,7 @@ class LocalWebProvider @Inject constructor(
         require(maxBytes > 0L) { "最大下载字节数必须大于 0" }
         var current = validateTarget(input)
         repeat(MAX_REDIRECTS + 1) { redirectCount ->
-            val route = requestRoute(current, timeoutSeconds)
+            val route = requestRoute(current, timeoutSeconds, streamingDownload = true)
             val builder = Request.Builder()
                 .url(route.url)
                 .header("User-Agent", LOCAL_WEB_USER_AGENT)
@@ -393,8 +393,12 @@ class LocalWebProvider @Inject constructor(
 
     private fun validateTarget(input: String): com.labteto.dshmobile.local.web.LocalWebTargetResolver.ValidatedTarget = targetResolver.validateTarget(input)
     private fun normalizeInput(input: String): String = targetResolver.normalizeInput(input)
-    private fun requestRoute(target: com.labteto.dshmobile.local.web.LocalWebTargetResolver.ValidatedTarget, timeoutSeconds: Long): com.labteto.dshmobile.local.web.LocalWebTargetResolver.RequestRoute =
-        targetResolver.requestRoute(target, timeoutSeconds)
+    private fun requestRoute(
+        target: com.labteto.dshmobile.local.web.LocalWebTargetResolver.ValidatedTarget,
+        timeoutSeconds: Long,
+        streamingDownload: Boolean = false,
+    ): com.labteto.dshmobile.local.web.LocalWebTargetResolver.RequestRoute =
+        targetResolver.requestRoute(target, timeoutSeconds, streamingDownload)
     private suspend fun <T> executeWithTransientRetry(
         client: OkHttpClient,
         request: Request,
