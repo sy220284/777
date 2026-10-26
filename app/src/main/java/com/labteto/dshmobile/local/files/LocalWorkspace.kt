@@ -49,6 +49,14 @@ internal class LocalFileObservationCache(
 private const val MAX_MODEL_SKILL_LIST = 128
 private const val MAX_SKILL_BYTES = 128 * 1024
 
+/** One immediate child of a workspace directory, never a recursive search result. */
+data class LocalWorkspaceDirectoryEntry(
+    val path: String,
+    val isDirectory: Boolean,
+    val bytes: Long,
+    val modifiedAt: Long,
+)
+
 /** Sandboxed filesystem and shell provider for the on-device Harness. */
 class LocalWorkspace(
     private val root: File,
@@ -405,7 +413,48 @@ class LocalWorkspace(
         }
     }
 
-    /** Snapshot real files for the app UI without exposing raw File handles outside the sandbox. */
+    /** Browsing touches only one directory. Global discovery is reserved for explicit search. */
+    fun directoryEntries(relativePath: String = "."): List<LocalWorkspaceDirectoryEntry> {
+        val directory = resolve(relativePath)
+        require(directory.toPath().startsWith(canonicalRoot.toPath())) { "目录不属于工作区" }
+        if (!directory.exists()) return emptyList()
+        require(directory.isDirectory) { "路径不是文件夹：${relativePath}" }
+        return directory.listFiles().orEmpty().asSequence()
+            .filter { child ->
+                !Files.isSymbolicLink(child.toPath()) &&
+                    boundary.isWorkspace(child) && (child.isDirectory || child.isFile)
+            }
+            .sortedWith(compareByDescending<File> { it.isDirectory }.thenBy(File::getName))
+            .map { child ->
+                LocalWorkspaceDirectoryEntry(
+                    path = child.relativeTo(canonicalRoot).invariantSeparatorsPath,
+                    isDirectory = child.isDirectory,
+                    bytes = if (child.isFile) child.length() else 0L,
+                    modifiedAt = child.lastModified(),
+                )
+            }.toList()
+    }
+
+    /** Search by path/name without truncating before matching files are considered. */
+    fun searchWorkspaceFileNames(query: String, limit: Int = 500): List<LocalWorkspaceFile> {
+        val needle = query.trim()
+        require(needle.isNotBlank()) { "搜索关键词不能为空" }
+        return safeWalk(canonicalRoot, maxVisited = 50_000, maxMillis = 5_000L)
+            .filter { it.isFile && isInsideWorkspace(it) }
+            .filter { it.relativeTo(canonicalRoot).invariantSeparatorsPath.contains(needle, ignoreCase = true) }
+            .take(limit.coerceIn(1, 500))
+            .map { file ->
+                LocalWorkspaceFile(
+                    path = file.relativeTo(canonicalRoot).invariantSeparatorsPath,
+                    bytes = file.length(),
+                    modifiedAt = file.lastModified(),
+                )
+            }
+            .sortedBy(LocalWorkspaceFile::path)
+            .toList()
+    }
+
+    /** Snapshot real files for explicit global search without exposing raw File handles. */
     fun files(limit: Int = 2_000): List<LocalWorkspaceFile> =
         safeWalk(canonicalRoot)
             .filter { it.isFile && isInsideWorkspace(it) }

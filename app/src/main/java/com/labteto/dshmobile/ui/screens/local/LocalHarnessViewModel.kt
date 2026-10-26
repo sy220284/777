@@ -302,6 +302,8 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun deleteSessions(ids: Set<String>): Int = conversationUiState.deleteSessions(ids, runtime.session::deleteSessions)
     suspend fun importAttachment(uri: Uri): LocalImportedAttachment = runtime.session.importAttachment(uri)
     suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
+    suspend fun workspaceDirectory(path: String) = runtime.session.workspaceDirectoryForUi(path)
+    suspend fun searchWorkspaceFiles(query: String) = runtime.session.searchWorkspaceFilesForUi(query)
     suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)
     suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
     internal fun artifactRevisionForUi(sessionId: String) = runtime.work.artifactRevisionForUi(sessionId)

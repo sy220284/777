@@ -30,6 +30,34 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun fileNameSearchStillFindsFilesBeyondTheFirstTwoThousand() {
+        val folder = root.resolve("无关资料").apply { mkdirs() }
+        repeat(2_050) { index -> folder.resolve("无关-${index}.txt").writeText("旧资料") }
+        workspace.write("任务/中文项目/最终报告.md", "正文")
+        assertEquals(
+            listOf("任务/中文项目/最终报告.md"),
+            workspace.searchWorkspaceFileNames("最终报告").map { it.path },
+        )
+        assertTrue(workspace.searchWorkspaceFileNames("不存在的名称").isEmpty())
+    }
+
+    @Test
+    fun directoryBrowserOnlyReadsImmediateChildren() {
+        workspace.write("任务/第一项/subfolder/source.txt", "source")
+        workspace.write("任务/第二项/draft.md", "draft")
+        workspace.write("交付成果/第二项/final.md", "final")
+        val rootEntries = workspace.directoryEntries()
+        assertTrue(rootEntries.any { it.path == "任务" && it.isDirectory })
+        assertTrue(rootEntries.any { it.path == "交付成果" && it.isDirectory })
+        val taskEntries = workspace.directoryEntries("任务")
+        assertEquals(setOf("任务/第一项", "任务/第二项"), taskEntries.map { it.path }.toSet())
+        assertTrue(taskEntries.all { it.isDirectory })
+        assertEquals(listOf("任务/第二项/draft.md"),
+            workspace.directoryEntries("任务/第二项").map { it.path })
+        assertTrue(workspace.directoryEntries("任务/尚未创建").isEmpty())
+    }
+
+    @Test
     fun writeReadListAndSearchStayInsideWorkspace() {
         workspace.write("notes/one.txt", "alpha\nbeta\ngamma")
 

@@ -6,17 +6,56 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
 class LocalWorkspaceShareSelectionUiTest {
     @get:Rule val compose = createComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Test
+    fun workspaceRootAndTaskFoldersDoNotTriggerGlobalFileScan() {
+        var fullScans = 0
+        var directoryReads = 0
+        compose.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(
+                    mode = LocalFilesMode.WORKSPACE,
+                    sessionId = "root-fast-browser",
+                    workspacePath = File(context.filesDir, "local-harness/workspace").absolutePath,
+                    loadWorkspace = { fullScans++; emptyList() },
+                    loadDirectory = { path ->
+                        directoryReads++
+                        if (path == "任务")
+                            listOf(LocalWorkspaceDirectoryEntry("任务/第一项", true, 0L, 0L))
+                        else emptyList()
+                    },
+                    loadConversation = { error("不能为工作区浏览扫描会话事件") },
+                    loadPreview = { error("本测试不预览") },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText(context.getString(R.string.local_workspace_tasks))
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals(0, fullScans)
+        assertEquals(0, directoryReads)
+        compose.onNodeWithText(context.getString(R.string.local_workspace_tasks)).performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("第一项").fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals(0, fullScans)
+        assertEquals(1, directoryReads)
+    }
 
     @Test
     fun artifactsSupportOneAndMultipleSelectionsAndCancel() {
