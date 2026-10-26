@@ -60,9 +60,11 @@ internal class LocalWorkToolResultRuntime(
  */
 internal fun referencedWorkToolCallIds(snapshot: List<kotlinx.serialization.json.JsonObject>): List<String> {
     val recent = snapshot.takeLast(80).mapNotNull { message ->
-        message["content"]?.jsonPrimitive?.contentOrNull?.let {
+        // User messages with attachments have JSON-array content. They are not tool-output
+        // references; requesting jsonPrimitive here throws and breaks EVERY later tool receipt.
+        (message["content"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull?.let {
             com.labteto.dshmobile.local.model.retainedToolOutputReference(it)
-        } ?: message["tool_call_id"]?.jsonPrimitive?.contentOrNull
+        } ?: (message["tool_call_id"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
     }
     val checkpoint = LocalWorkCheckpoint.latestFrom(snapshot)
     val checkpointIds = if (checkpoint?.hasTypedToolReferences == true) {

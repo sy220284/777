@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.work
 import com.labteto.dshmobile.local.context.buildTrustedWorkCheckpointModelMessage
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -71,6 +73,37 @@ class LocalWorkTypedToolReferenceTest {
             referencedWorkToolCallIds(listOf(restored(next))))
         assertFalse(referencedWorkToolCallIds(listOf(restored(next)))
             .contains("not-an-authorized-reference"))
+    }
+
+    @Test
+    fun attachmentHistoryMustNotBreakToolResultRetentionForSubsequentCalls() {
+        // Real user uploads are stored as multi-part content arrays, not JsonPrimitive text.
+        val attached = buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", "text")
+                    put("text", "分析这个压缩文件")
+                })
+                add(buildJsonObject {
+                    put("type", "_dsh_file_ref")
+                    put("path", ".dsh/uploads/archive.tar.gz")
+                })
+            })
+        }
+        val outputId = "output-" + "a".repeat(64)
+        val tool = buildJsonObject {
+            put("role", "tool")
+            put("tool_call_id", "tool-call-1")
+            put("content", "结果已保存\\n[工具原文引用：tool_output_read(call_id=$"+"outputId)]")
+        }
+        val history = listOf(attached, message("assistant", "检查文件"), tool)
+        assertEquals(listOf("tool-call-1"), referencedWorkToolCallIds(history))
+        assertEquals(listOf("tool-call-1"),
+            referencedWorkToolCallIds(listOf(attached) + history.takeLast(2)))
+        // A plain text output reference is also retained, but a user attachment never is.
+        val rawReference = message("tool", "工具原文引用：[工具原文引用：tool_output_read(call_id=$"+"outputId)]")
+        assertTrue(referencedWorkToolCallIds(listOf(attached, rawReference)).contains(outputId))
     }
 
     @Test
