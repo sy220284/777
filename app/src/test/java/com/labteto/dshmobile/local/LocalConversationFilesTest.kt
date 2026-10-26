@@ -18,6 +18,31 @@ import org.junit.Test
 
 class LocalConversationFilesTest {
     @Test
+    fun activeBranchKeepsTypedAttachmentsWithoutInternalPathsInVisibleText() {
+        val path = ".dsh/attachments/当前资料.txt"
+        val message = LocalHarnessMessage("user-kept", "user", "请看资料", createdAt = 1L,
+            blocks = listOf(com.labteto.dshmobile.local.session.LocalMessageBlock.File(
+                path, "text/plain", "当前资料.txt", 12L)))
+        val index = localConversationFiles(sequenceOf(event(3, "chat/active-transcript",
+            buildJsonObject { put("transcript", encodeTranscriptMessages(listOf(message))) })), listOf(file(path)))
+        assertEquals(listOf(path), index.involved.map { it.path })
+    }
+
+    @Test
+    fun queuedAttachmentsAppearFromTheirDurableTranscript() {
+        val path = ".dsh/attachments/排队图片.png"
+        val message = LocalHarnessMessage("queued-user", "user", "看图", createdAt = 1L,
+            blocks = listOf(com.labteto.dshmobile.local.session.LocalMessageBlock.Image(
+                path, "image/png", "排队图片.png", 12L)))
+        val index = localConversationFiles(sequenceOf(event(1, "agent/inbox/spliced",
+            buildJsonObject {
+                put("action", "queued")
+                put("transcript", encodeTranscriptMessages(listOf(message)))
+            })), listOf(file(path)))
+        assertEquals(listOf(path), index.involved.map { it.path })
+    }
+
+    @Test
     fun rebuildsArtifactsAndInvolvedFilesFromDurableEvents() {
         val files = listOf(
             file(".dsh/uploads/input.txt"),

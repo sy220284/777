@@ -30,6 +30,16 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun lineReadBoundsTheResultBeforeToolRetention() {
+        root.resolve("长行资料.txt").bufferedWriter().use { out ->
+            repeat(100) { out.append("资料".repeat(1_000)).append('\n') }
+        }
+        val page = workspace.read("长行资料.txt", 1, 100)
+        assertTrue("读取阶段就应分段，不能先拼接全部工具结果", page.length < 60_000)
+        assertTrue("分段必须给出续读位置", page.contains("start_line="))
+    }
+
+    @Test
     fun fileNameSearchStillFindsFilesBeyondTheFirstTwoThousand() {
         val folder = root.resolve("无关资料").apply { mkdirs() }
         repeat(2_050) { index -> folder.resolve("无关-${index}.txt").writeText("旧资料") }
@@ -108,10 +118,11 @@ class LocalWorkspaceTest {
         assertEquals(80, first.entries.size)
         folder.resolve("新增文件.txt").writeText("新的")
         folder.setLastModified(folder.lastModified() + 2_000L)
-        assertThrows(IllegalArgumentException::class.java) {
-            workspace.directoryPage("任务/版本变化", requireNotNull(first.nextOffset), 80)
-        }
-        assertEquals(80, workspace.directoryPage("任务/版本变化", 0, 80).entries.size)
+        val rest = workspace.directoryPage("任务/版本变化", requireNotNull(first.nextOffset), 80)
+        assertEquals(70, rest.entries.size)
+        assertEquals(150, (first.entries + rest.entries).map { it.path }.distinct().size)
+        assertFalse(rest.entries.any { it.path.endsWith("新增文件.txt") })
+        assertTrue(workspace.directoryEntries("任务/版本变化").any { it.path.endsWith("新增文件.txt") })
     }
 
     @Test
