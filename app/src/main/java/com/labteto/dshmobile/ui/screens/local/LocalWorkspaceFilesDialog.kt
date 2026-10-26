@@ -216,6 +216,9 @@ internal fun LocalWorkspaceFilesDialog(
         val pageDirectory = directory
         val currentQuery = query.trim()
         val currentSection = section
+        fun stillCurrent(): Boolean =
+            loadEpoch == epoch && directory == pageDirectory && section == currentSection &&
+                query.trim() == currentQuery
         selected.clear()
         selecting = false
         loading = true
@@ -228,11 +231,11 @@ internal fun LocalWorkspaceFilesDialog(
                 LocalFilesMode.WORKSPACE -> {
                     if (currentQuery.isNotEmpty()) {
                         val found = loadSearch(currentQuery)
-                        if (loadEpoch == epoch) workspace = found
+                        if (stillCurrent()) workspace = found
                     } else {
                         val page = if (currentSection == -1) LocalWorkspaceDirectoryPage(emptyList(), null)
                             else loadDirectoryPage(pageDirectory.ifBlank { "." }, 0)
-                        if (loadEpoch == epoch) {
+                        if (stillCurrent()) {
                             entries = page.entries
                             nextDirectoryOffset = page.nextOffset
                         }
@@ -240,23 +243,23 @@ internal fun LocalWorkspaceFilesDialog(
                 }
                 LocalFilesMode.CONVERSATION -> {
                     val found = loadConversation(sessionId)
-                    if (loadEpoch == epoch) conversation = found
+                    if (stillCurrent()) conversation = found
                 }
             }
-            if (loadEpoch == epoch) {
+            if (stillCurrent()) {
                 lastLoadedSearch = currentQuery
                 previewPath?.let { path -> preview = loadPreview(path) }
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            if (loadEpoch == epoch) {
+            if (stillCurrent()) {
                 error = failure.message ?: if (previewPath == null) readFilesFailed else previewFailed
                 preview = null
                 previewPath = null
             }
         } finally {
-            if (loadEpoch == epoch) loading = false
+            if (stillCurrent()) loading = false
         }
     }
 

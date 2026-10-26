@@ -39,7 +39,11 @@ internal class LocalConversationFilesCoordinator(
         }
         if (cached != null) return refreshExistingFiles(cached)
 
-        val projected = log.withEvents { localConversationFiles(it, workspaceFileAt) }
+        // Cache all durable referenced paths, including currently missing paths. A file
+        // created later can become visible without replaying the whole event history.
+        val projected = log.withEvents { events ->
+            localConversationFiles(events) { path -> LocalWorkspaceFile(path, 0L, 0L) }
+        }
         synchronized(lock) {
             cache[sessionId] = CacheEntry(eventStamp = eventStamp, value = projected)
             while (cache.size > maxCacheEntries) {
@@ -47,7 +51,7 @@ internal class LocalConversationFilesCoordinator(
                 cache.remove(oldest)
             }
         }
-        return projected
+        return refreshExistingFiles(projected)
     }
 
     private fun refreshExistingFiles(files: LocalConversationFiles): LocalConversationFiles =
