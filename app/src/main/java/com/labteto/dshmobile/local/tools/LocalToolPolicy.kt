@@ -54,8 +54,8 @@ internal object LocalToolPolicy {
         "team_dismiss_member", "team_stop_all", "team_wait",
         "memory_search", "memory_list", "memory_remember",
         "memory_update", "memory_forget", "session_search", "session_trace",
-        "session_event_trace", "session_event_read", "present" -> ToolExposure.OPTIONAL
-        "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect", "archive_list", "archive_read", "list_files",
+        "session_event_trace", "session_event_read", "present", "archive_list", "archive_read" -> ToolExposure.OPTIONAL
+        "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect", "list_files",
         "glob", "grep", "bash", "capability_search", "update_plan", "exit_plan_mode",
         "ask_user_question", "subagent", "list_subagent_models", "list_agent_roles", "session_event_search" -> ToolExposure.CORE
         else -> error("内置工具尚未声明模型暴露策略：$name")
@@ -165,6 +165,7 @@ internal object LocalToolPolicy {
             "web_fetch" -> setOf("网页", "网址", "url", "抓取", "web")
             "http_request" -> setOf("http", "https", "api", "接口请求")
             "download_file" -> setOf("下载", "文件下载", "download", "url")
+            "archive_list", "archive_read" -> setOf("压缩包", "归档", "tar.gz", "tgz", "zip", "源码包", "archive")
             "network_diagnose" -> setOf("网络诊断", "连通性", "dns", "tls", "vpn", "代理")
             "job_list", "job_output", "job_kill" -> setOf("后台", "后台任务", "进程", "job", "process")
             "json_query" -> setOf("json", "json查询", "结构化数据")
