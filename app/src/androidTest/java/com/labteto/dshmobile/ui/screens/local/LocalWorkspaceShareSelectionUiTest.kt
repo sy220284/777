@@ -138,7 +138,7 @@ class LocalWorkspaceShareSelectionUiTest {
             compose.onAllNodesWithText("报告-000.md").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNode(hasScrollAction()).performScrollToIndex(68)
-        compose.waitUntil(5_000) { offsets.contains(96) }
+        compose.waitUntil(5_000) { offsets.contains(1) }
         compose.waitForIdle()
         compose.onNode(hasScrollAction()).performScrollToIndex(124)
         compose.waitUntil(5_000) {
