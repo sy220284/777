@@ -173,7 +173,7 @@ internal class LocalPublicWorkspaceBridge(
             val publicEntries = childList(uri, publicDir)
             val localEntries = localDir.listFiles().orEmpty().filter { entry ->
                 publishableWorkspaceName(entry.name) && !Files.isSymbolicLink(entry.toPath())
-            }.associateBy(File::getName)
+            }.associateBy { it.name }
             for ((name, local) in localEntries) {
                 val path = if (prefix.isEmpty()) name else "$prefix/$name"
                 val remote = publicEntries[name]
