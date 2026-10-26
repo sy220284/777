@@ -221,6 +221,26 @@ class LocalDocumentContentTest {
     }
 
     @Test
+    fun largeZipEntryRemainsAttachableWithExplicitPartialPreview() {
+        val root = kotlin.io.path.createTempDirectory("large-zip-").toFile()
+        try {
+            val file = File(root, "large.zip")
+            ZipOutputStream(file.outputStream()).use { zip ->
+                zip.putNextEntry(ZipEntry("big.md"))
+                val chunk = ByteArray(16 * 1024) { 'A'.code.toByte() }
+                repeat(576) { zip.write(chunk) }
+                zip.closeEntry()
+            }
+            val result = LocalDocumentContent.extract(file, file.name, "application/zip")
+            assertTrue(result.parsed)
+            assertTrue(result.text.contains("big.md"))
+            assertTrue(result.truncated)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun largeGzipShowsTruncatedPreviewInsteadOfRejectingExpandedBytes() {
         val root = kotlin.io.path.createTempDirectory("large-gzip-").toFile()
         try {
