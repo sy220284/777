@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 import java.io.IOException
@@ -8,6 +9,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class LocalWorkToolActivityReaderTest {
+    @Test fun workToolReaderWaitsForStartupRestoreAndValidSession() {
+        assertFalse(shouldReadWorkToolStatus(LocalUsageMode.WORK, loading = true, sessionId = "fresh-session"))
+        assertFalse(shouldReadWorkToolStatus(LocalUsageMode.WORK, loading = false, sessionId = ""))
+        assertFalse(shouldReadWorkToolStatus(LocalUsageMode.CHAT, loading = false, sessionId = "fresh-session"))
+        assertTrue(shouldReadWorkToolStatus(LocalUsageMode.WORK, loading = false, sessionId = "fresh-session"))
+    }
+
     @Test fun failedReadDoesNotAdvanceTheCursorAndManualRetryReadsSameRevision() {
         var unavailable = true
         var reads = 0
