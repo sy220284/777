@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalConversationFilesCoordinator
+import com.labteto.dshmobile.local.files.LocalWorkspace
+import java.nio.file.Files
+import kotlinx.serialization.json.Json
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import com.labteto.dshmobile.local.session.localConversationFiles
@@ -75,6 +79,36 @@ class LocalConversationFilesTest {
         assertEquals(listOf("任务/资料/说明.md"), index.involved.map { it.path })
         assertTrue(index.artifacts.isEmpty())
         assertEquals(setOf("任务/资料/说明.md", "任务/不存在.md"), lookups.toSet())
+    }
+
+    @Test
+    fun conversationCacheTracksReferencedFileAppearAndDisappearWithoutGlobalScans() {
+        val root = Files.createTempDirectory("conversation-files-index").toFile()
+        try {
+            val workspace = LocalWorkspace(root.resolve("work"))
+            val log = LocalSessionEventLog(root.resolve("session.events.jsonl"), Json)
+            log.append("tool/call", buildJsonObject {
+                put("name", "read")
+                put("arguments", buildJsonObject { put("path", "任务/待生成资料.md") })
+            })
+            val coordinator = LocalConversationFilesCoordinator(
+                workspaceFilesProvider = { error("会话文件不能扫描整个工作区") },
+                workspaceFileAt = workspace::workspaceFileAt,
+                previewWorkspaceFile = workspace::preview,
+                eventLogFor = { log },
+                currentSessionId = { "current" },
+                currentEventLog = { log },
+            )
+            assertTrue(coordinator.conversationFiles("current").involved.isEmpty())
+            workspace.write("任务/待生成资料.md", "内容")
+            assertEquals(listOf("任务/待生成资料.md"),
+                coordinator.conversationFiles("current").involved.map { it.path })
+            root.resolve("work/任务/待生成资料.md").delete()
+            assertTrue(coordinator.conversationFiles("current").involved.isEmpty())
+            log.close()
+        } finally {
+            root.deleteRecursively()
+        }
     }
 
     @Test
