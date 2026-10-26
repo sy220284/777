@@ -36,7 +36,9 @@ class McpToolBridgePluginTest {
             val methods = mutableListOf<String>()
             val plugin = McpToolBridgePlugin(http = OkHttpClient(), json = Json, transportFactory = {
                 connections++
-                object : McpTransport {
+                object : McpTransport, McpResourceDiscovery {
+                    override suspend fun supportedResourceMethods() =
+                        setOf("resources/list", "resources/templates/list", "resources/read")
                     override suspend fun request(method: String, params: JsonObject): JsonObject {
                         methods += method
                         if (method == "tools/list" && toolCount == 0) return buildJsonObject {
@@ -69,12 +71,43 @@ class McpToolBridgePluginTest {
         }
     }
 
+    @Test fun toolOnlyServerDoesNotExposeUnimplementedResourceMethods() = runBlocking {
+        val plugin = McpToolBridgePlugin(http = OkHttpClient(), json = Json, transportFactory = {
+            object : McpTransport {
+                override suspend fun request(method: String, params: JsonObject): JsonObject =
+                    if (method == "tools/list") buildJsonObject {
+                        put("result", buildJsonObject {
+                            put("tools", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("name", "echo")
+                                    put("inputSchema", buildJsonObject { put("type", "object") })
+                                })
+                            })
+                        })
+                    } else error("不允许向仅支持工具的 MCP 服务调用 $method")
+                override fun close() = Unit
+            }
+        })
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        try {
+            plugin.connectHttpFromUi(registry.context, "tools_only", "https://example.com/mcp")
+            assertEquals(listOf("mcp_tools_only_echo"), plugin.serverSnapshots().single().tools)
+            assertNull(registry.context.tools.get("mcp_tools_only_resources_list"))
+            assertNull(registry.context.tools.get("mcp_tools_only_resources_read"))
+        } finally {
+            plugin.uninstall(registry.context)
+        }
+    }
+
     @Test fun resourceToolsShareApprovalBindingAndDisconnectCancellation() = runBlocking {
         val entered = CompletableDeferred<Unit>()
         val cancelled = CompletableDeferred<String>()
         var resourceCalls = 0
         val plugin = McpToolBridgePlugin(http = OkHttpClient(), json = Json, transportFactory = {
-            object : McpTransport {
+            object : McpTransport, McpResourceDiscovery {
+                override suspend fun supportedResourceMethods() =
+                    setOf("resources/list", "resources/templates/list", "resources/read")
                 override suspend fun request(method: String, params: JsonObject): JsonObject {
                     if (method == "tools/list") return buildJsonObject {
                         put("result", buildJsonObject { put("tools", buildJsonArray { }) })
@@ -176,7 +209,7 @@ class McpToolBridgePluginTest {
         registry.install(plugin)
         plugin.connectHttpFromUi(registry.context, "server", "https://example.com/mcp")
         val registered = plugin.serverSnapshots().single().tools
-        assertEquals(4, registered.size)
+        assertEquals(1, registered.size)
         assertTrue(registered.all { registry.context.tools.get(it) != null })
         val revision = plugin.lifecycleRevisions.value
         termination.emit(java.io.IOException("stream ended without a request"))

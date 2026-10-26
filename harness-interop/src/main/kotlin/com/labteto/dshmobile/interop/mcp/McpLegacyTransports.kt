@@ -372,7 +372,10 @@ class McpNegotiatingHttpTransport(
     endpoint: String,
     http: OkHttpClient,
     json: Json,
-) : McpTransport, McpTerminationSource {
+) : McpTransport, McpTerminationSource, McpResourceDiscovery {
+    override suspend fun supportedResourceMethods(): Set<String> =
+        selected?.let { discoverMcpResourceMethods(it) } ?: emptySet()
+
     // Modern request/response HTTP has no persistent stream to observe between calls.
     // The legacy SSE variant has one and reports genuine transport termination.
     override val terminalEvents: Flow<Throwable> = flow {
@@ -517,7 +520,10 @@ class McpNegotiatingStdioTransport(
     workingDirectory: File? = null,
     commandResolver: (List<String>) -> List<String> = { it },
     environmentProvider: () -> Map<String, String> = { emptyMap() },
-) : McpTransport, McpTerminationSource {
+) : McpTransport, McpTerminationSource, McpResourceDiscovery {
+    override suspend fun supportedResourceMethods(): Set<String> =
+        selected?.let { discoverMcpResourceMethods(it) } ?: emptySet()
+
     override val terminalEvents: Flow<Throwable> = flow {
         val stream = (selected as McpTerminationSource).terminalEvents
         stream.collect { emit(it) }

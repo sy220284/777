@@ -55,6 +55,50 @@ class McpClientTest {
     }
 
     @Test
+    fun resourceCapabilityProbeExposesOnlyImplementedMethods() = runTest {
+        val requested = mutableListOf<String>()
+        val transport = object : McpTransport {
+            override suspend fun request(method: String, params: JsonObject): JsonObject {
+                requested += method
+                return when (method) {
+                    "resources/list" -> buildJsonObject {
+                        put("result", buildJsonObject { put("resources", buildJsonArray { }) })
+                    }
+                    "resources/templates/list" -> buildJsonObject {
+                        put("error", buildJsonObject { put("code", -32601) })
+                    }
+                    else -> error("不允许探测执行性接口：$method")
+                }
+            }
+            override fun close() = Unit
+        }
+        assertEquals(setOf("resources/list", "resources/read"),
+            discoverMcpResourceMethods(transport))
+        assertEquals(listOf("resources/list", "resources/templates/list"), requested)
+    }
+
+    @Test
+    fun resourceCapabilityProbeRejectsFalsePositiveAndPreservesRealFailures() = runTest {
+        val absent = object : McpTransport {
+            override suspend fun request(method: String, params: JsonObject): JsonObject =
+                buildJsonObject { put("result", buildJsonObject { put("tools", buildJsonArray { }) }) }
+            override fun close() = Unit
+        }
+        assertTrue(discoverMcpResourceMethods(absent).isEmpty())
+        val failed = object : McpTransport {
+            override suspend fun request(method: String, params: JsonObject): JsonObject =
+                buildJsonObject { put("error", buildJsonObject { put("code", -32000) }) }
+            override fun close() = Unit
+        }
+        try {
+            discoverMcpResourceMethods(failed)
+            org.junit.Assert.fail("非方法不存在错误不能当作不支持")
+        } catch (error: McpRpcException) {
+            assertEquals(-32000, error.code)
+        }
+    }
+
+    @Test
     fun resourceRequestsPreservePagesAndContents() = runTest {
         val requests = mutableListOf<Pair<String, JsonObject>>()
         val result = Json.parseToJsonElement("""{"nextCursor":"next/opaque+","contents":[{"uri":"test:a","blob":"YWJj","mimeType":"image/png"}],"extension":{"kept":true}}""") as JsonObject
