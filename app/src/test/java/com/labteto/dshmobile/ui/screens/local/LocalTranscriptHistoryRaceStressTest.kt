@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -133,5 +134,48 @@ class LocalTranscriptHistoryRaceStressTest {
         assertEquals("message-final", owner.history.value.olderMessages.single().id)
         assertFalse(owner.history.value.loading)
         assertFalse(owner.history.value.hasMore)
+    }
+
+    @Test fun cancelledOlderReadReleasesLoadingAndKeepsCursorForRetry() = runBlocking {
+        var selected = "A"
+        val source = ControlledSource()
+        val owner = LocalTranscriptHistoryController(source, { selected }, this)
+        val bootstrap = async(start = CoroutineStart.UNDISPATCHED) { owner.prepare("A") }
+        source.bootstraps.receive().reply.complete(page("A", 100))
+        bootstrap.await()
+
+        val cancelledRead = async(start = CoroutineStart.UNDISPATCHED) { owner.loadOlder("A") }
+        val firstRequest = source.older.receive()
+        assertEquals(100L, firstRequest.cursor.beforeSequenceExclusive)
+        assertTrue(owner.history.value.loading)
+        cancelledRead.cancelAndJoin()
+        assertFalse(owner.history.value.loading)
+        assertTrue(owner.history.value.hasMore)
+
+        val retriedRead = async(start = CoroutineStart.UNDISPATCHED) { owner.loadOlder("A") }
+        val retryRequest = source.older.receive()
+        assertEquals(100L, retryRequest.cursor.beforeSequenceExclusive)
+        retryRequest.reply.complete(page("A-OLDER", null))
+        assertEquals(1, retriedRead.await().getOrThrow())
+        assertEquals("message-A-OLDER", owner.history.value.olderMessages.single().id)
+        assertFalse(owner.history.value.hasMore)
+    }
+
+    @Test fun cancelledBootstrapExposesRetryInsteadOfPermanentSpinner() = runBlocking {
+        val source = ControlledSource()
+        val owner = LocalTranscriptHistoryController(source, { "A" }, this)
+        val cancelledBootstrap = async(start = CoroutineStart.UNDISPATCHED) { owner.prepare("A") }
+        source.bootstraps.receive()
+        assertTrue(owner.history.value.loading)
+        cancelledBootstrap.cancelAndJoin()
+        assertFalse(owner.history.value.loading)
+        assertTrue(owner.history.value.error != null)
+
+        val retry = async(start = CoroutineStart.UNDISPATCHED) { owner.prepare("A") }
+        source.bootstraps.receive().reply.complete(page("A", null))
+        retry.await()
+        assertFalse(owner.history.value.loading)
+        assertEquals(null, owner.history.value.error)
+        assertEquals("message-A", owner.history.value.olderMessages.single().id)
     }
 }
