@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -328,6 +327,7 @@ internal fun LocalWorkspaceFilesDialog(
                     directory = ""
                     section = -1
                 }
+                loading = true
                 scope.launch { reload() }
             }
             else -> onDismiss()
@@ -523,6 +523,7 @@ internal fun LocalWorkspaceFilesDialog(
                                     1 -> "交付成果"
                                     else -> ""
                                 }
+                                loading = true
                                 scope.launch { reload() }
                             }
                         } else {
@@ -540,6 +541,7 @@ internal fun LocalWorkspaceFilesDialog(
                                 isCategoryRoot = directory.isEmpty() || directory == "任务" || directory == "交付成果",
                                 onDirectory = {
                                     directory = it
+                                    loading = true
                                     scope.launch { reload() }
                                 },
                             ) { file -> openPreview(file.path) }
