@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 interface FilesUiPort {
     suspend fun workspaceFiles(): List<LocalWorkspaceFile>
     suspend fun workspaceDirectory(path: String): List<LocalWorkspaceDirectoryEntry>
+    suspend fun searchWorkspaceFiles(query: String): List<LocalWorkspaceFile>
     suspend fun conversationFiles(sessionId: String): LocalConversationFiles
     suspend fun previewWorkspaceFile(path: String): LocalWorkspaceFilePreview
 

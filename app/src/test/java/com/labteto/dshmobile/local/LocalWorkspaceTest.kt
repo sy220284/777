@@ -30,6 +30,18 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun fileNameSearchStillFindsFilesBeyondTheFirstTwoThousand() {
+        val folder = root.resolve("无关资料").apply { mkdirs() }
+        repeat(2_050) { index -> folder.resolve("无关-${index}.txt").writeText("旧资料") }
+        workspace.write("任务/中文项目/最终报告.md", "正文")
+        assertEquals(
+            listOf("任务/中文项目/最终报告.md"),
+            workspace.searchWorkspaceFileNames("最终报告").map { it.path },
+        )
+        assertTrue(workspace.searchWorkspaceFileNames("不存在的名称").isEmpty())
+    }
+
+    @Test
     fun directoryBrowserOnlyReadsImmediateChildren() {
         workspace.write("任务/第一项/subfolder/source.txt", "source")
         workspace.write("任务/第二项/draft.md", "draft")

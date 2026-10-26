@@ -87,6 +87,9 @@ internal fun LocalWorkspaceFilesDialog(
     workspacePath: String,
     loadWorkspace: suspend () -> List<LocalWorkspaceFile>,
     loadDirectory: suspend (String) -> List<LocalWorkspaceDirectoryEntry> = { emptyList() },
+    loadSearch: suspend (String) -> List<LocalWorkspaceFile> = { query ->
+        loadWorkspace().filter { it.path.contains(query, ignoreCase = true) }
+    },
     loadConversation: suspend (String) -> LocalConversationFiles,
     loadPreview: suspend (String) -> LocalWorkspaceFilePreview,
     onDismiss: () -> Unit,
@@ -203,7 +206,7 @@ internal fun LocalWorkspaceFilesDialog(
             when (mode) {
                 LocalFilesMode.WORKSPACE -> {
                     if (query.isNotBlank()) {
-                        workspace = loadWorkspace()
+                        workspace = loadSearch(query.trim())
                     } else {
                         entries = if (section == -1) emptyList() else
                             loadDirectory(directory.ifBlank { "." })
@@ -222,6 +225,14 @@ internal fun LocalWorkspaceFilesDialog(
             previewPath = null
         } finally {
             loading = false
+        }
+    }
+
+    // Search is debounced while typing; directory browsing does not trigger a full scan.
+    LaunchedEffect(mode, sessionId, query) {
+        if (mode == LocalFilesMode.WORKSPACE && loadedForEntry) {
+            kotlinx.coroutines.delay(280)
+            reload()
         }
     }
 
@@ -314,15 +325,18 @@ internal fun LocalWorkspaceFilesDialog(
                     onAction = { scope.launch { reload() } },
                 )
 
-                if (preview == null) SySearchField(query, { value ->
-                    val requiresSearch = query.isBlank() && value.isNotBlank()
-                    query = value
-                    if (mode == LocalFilesMode.WORKSPACE && requiresSearch) {
-                        scope.launch { reload() }
-                    }
-                },
+                if (preview == null) SySearchField(query, { query = it },
                     placeholder = stringResource(R.string.fluid_files_search),
                     modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd))
+
+                if (preview == null && query.isNotBlank() && mode == LocalFilesMode.WORKSPACE) {
+                    Text(
+                        stringResource(R.string.local_workspace_search_scope),
+                        modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
+                    )
+                }
 
                 if (preview == null && !loading && error == null && visibleSharePaths.isNotEmpty()) {
                     if (selecting) {

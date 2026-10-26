@@ -101,6 +101,7 @@ internal data class LocalWorkFeatureUiActions(
     val workState: StateFlow<LocalWorkUiState>,
     val workspaceFiles: suspend () -> List<LocalWorkspaceFile>,
     val workspaceDirectory: suspend (String) -> List<LocalWorkspaceDirectoryEntry> = { emptyList() },
+    val searchWorkspaceFiles: suspend (String) -> List<LocalWorkspaceFile> = { emptyList() },
     val conversationFiles: suspend (String) -> LocalConversationFiles,
     val previewWorkspaceFile: suspend (String) -> LocalWorkspaceFilePreview,
     val artifactsForUi: (String) -> List<LocalArtifactUiItem>,

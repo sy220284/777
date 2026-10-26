@@ -642,6 +642,7 @@
     <string name="local_workspace_deliverables_hint">集中查看任务完成后交付的文件</string>
     <string name="local_workspace_other_files">其他文件</string>
     <string name="local_workspace_other_hint">保留原路径的项目和历史文件</string>
+    <string name="local_workspace_search_scope">搜索整个工作区的文件名和路径，最多显示 500 项；没有找到时可缩小搜索范围。</string>
     <string name="chat_diary_loading">正在整理角色日记…</string>
     <string name="local_files_binary_hint">这种文件目前无法直接显示内容，你仍可查看名称、位置和大小。</string>
     <string name="local_files_truncated_hint">文件较大，以下为前 512 KB 预览。</string>
