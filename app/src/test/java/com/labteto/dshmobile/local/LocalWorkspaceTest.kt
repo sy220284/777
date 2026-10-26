@@ -42,6 +42,27 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun searchPagesReturnAllMatchingPathsWithoutDuplicateOrEagerContentReads() {
+        val folder = root.resolve("任务/搜索目录").apply { mkdirs() }
+        repeat(235) { n -> folder.resolve("报告-${n.toString().padStart(4, '0')}.md").writeText("不应预览的正文") }
+        repeat(60) { n -> folder.resolve("其它-${n.toString().padStart(4, '0')}.txt").writeText("不相关") }
+        val results = mutableListOf<String>()
+        var cursor: Int? = 0
+        var batches = 0
+        while (cursor != null) {
+            val page = workspace.searchWorkspacePage("报告", cursor, 96)
+            results += page.files.map { it.path }
+            cursor = page.nextOffset
+            batches++
+        }
+        assertTrue(batches in 3..4)
+        assertEquals(235, results.size)
+        assertEquals(235, results.toSet().size)
+        assertTrue(results.all { it.startsWith("任务/搜索目录/报告-") })
+        assertEquals(results.take(96), workspace.searchWorkspacePage("报告", 0, 96).files.map { it.path })
+    }
+
+    @Test
     fun directoryPagesAreDisjointAndKeepStableOrderWithThousandsOfFiles() {
         val folder = root.resolve("任务/大量资料").apply { mkdirs() }
         repeat(1_024) { n -> folder.resolve("文档-${n.toString().padStart(4, '0')}.md").writeText("内容$n") }

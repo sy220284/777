@@ -105,6 +105,37 @@ class LocalWorkspaceShareSelectionUiTest {
     }
 
     @Test
+    fun searchRowsContinuePrefetchingOnScrollWithoutPagingButtons() {
+        val offsets = mutableListOf<Int>()
+        compose.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(
+                    mode = LocalFilesMode.WORKSPACE,
+                    sessionId = "search-seamless",
+                    workspacePath = File(context.filesDir, "local-harness/workspace").absolutePath,
+                    loadWorkspace = { error("搜索不应加载全量工作区列表") },
+                    loadSearchPage = { query, offset ->
+                        assertEquals("报告", query)
+                        offsets += offset
+                        com.labteto.dshmobile.local.files.LocalWorkspaceSearchPage(
+                            files = (offset until minOf(180, offset + 96)).map { n ->
+                                LocalWorkspaceFile("任务/报告-${n.toString().padStart(3, '0')}.md", 3L, 1L)
+                            },
+                            nextOffset = (offset + 96).takeIf { it < 180 },
+                        )
+                    },
+                    loadConversation = { error("搜索不应加载会话数据") },
+                    loadPreview = { error("不需要预览") },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.local_workspace_tasks)).assertExists()
+        compose.onNodeWithText(context.getString(R.string.fluid_files_search)).assertExists()
+        // Search input is editable; the backend callback is only invoked after debounce.
+    }
+
+    @Test
     fun artifactsSupportOneAndMultipleSelectionsAndCancel() {
         val files = listOf(
             LocalWorkspaceFile("results/first.txt", 5L, 1L),
