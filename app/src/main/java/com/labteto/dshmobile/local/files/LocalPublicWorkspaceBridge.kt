@@ -28,10 +28,20 @@ internal class LocalPublicWorkspaceBridge(
     private val resolver get() = context.contentResolver
     private val privateRoot = workspace.canonicalFile
 
-    data class SyncResult(val uploaded: Int, val downloaded: Int, val conflicts: Int) {
-        val summary: String get() =
-            "公共工作区同步完成：导出${uploaded}项，导入${downloaded}项，冲突${conflicts}项" +
-                if (conflicts > 0) "。冲突文件未覆盖，请检查对应文件。" else ""
+    data class SyncResult(
+        val uploaded: Int,
+        val downloaded: Int,
+        val conflicts: Int,
+        val conflictPaths: List<String>,
+    ) {
+        val summary: String get() = buildString {
+            append("公共工作区同步完成：导出${uploaded}项，导入${downloaded}项，冲突${conflicts}项")
+            if (conflictPaths.isNotEmpty()) {
+                append("。未覆盖冲突文件：")
+                append(conflictPaths.take(3).joinToString("、"))
+                if (conflictPaths.size > 3) append("等${conflictPaths.size}项")
+            }
+        }
     }
 
     fun selectedFolder(): Uri? {
@@ -66,6 +76,7 @@ internal class LocalPublicWorkspaceBridge(
         var pushed = 0
         var pulled = 0
         var conflicts = 0
+        val conflictPaths = mutableListOf<String>()
         var inspected = 0
         var bytes = 0L
         val changes = preferences.edit()
@@ -156,7 +167,10 @@ internal class LocalPublicWorkspaceBridge(
                 previous == null -> {
                     if (local.length() == remote.size && digest(local) == digest(remote.uri)) {
                         record(path, local, remote)
-                    } else conflicts++
+                    } else {
+                        conflicts++
+                        conflictPaths += path
+                    }
                 }
                 fingerprint(local) == wasLocal && value == wasRemote -> Unit
                 fingerprint(local) != wasLocal && value == wasRemote -> {
@@ -174,7 +188,10 @@ internal class LocalPublicWorkspaceBridge(
                     record(path, local, remote)
                     pulled++
                 }
-                else -> conflicts++
+                else -> {
+                    conflicts++
+                    conflictPaths += path
+                }
             }
         }
         fun walk(localDir: File, publicDir: Uri, prefix: String) {
@@ -218,7 +235,7 @@ internal class LocalPublicWorkspaceBridge(
         }
         walk(privateRoot, publicRoot, "")
         changes.apply()
-        SyncResult(pushed, pulled, conflicts)
+        SyncResult(pushed, pulled, conflicts, conflictPaths)
     }
 
     private data class DocumentEntry(val uri: Uri, val mime: String, val size: Long, val modified: Long)
