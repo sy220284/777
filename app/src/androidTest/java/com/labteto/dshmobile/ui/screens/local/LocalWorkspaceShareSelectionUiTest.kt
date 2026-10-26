@@ -94,6 +94,7 @@ class LocalWorkspaceShareSelectionUiTest {
         }
         compose.onNode(hasScrollAction()).performScrollToIndex(68)
         compose.waitUntil(5_000) { pageRequests.contains(96) }
+        compose.waitForIdle()
         compose.onNode(hasScrollAction()).performScrollToIndex(124)
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("文档-124.md").fetchSemanticsNodes().isNotEmpty()
