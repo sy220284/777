@@ -56,6 +56,20 @@ class LocalWebCancellationAndroidTest {
     }
 
     @Test
+    fun streamingDownloadUsesIdleTimeoutNotTotalFileDeadline() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val resolver = com.labteto.dshmobile.local.web.LocalWebTargetResolver(
+            context, OkHttpClient(),
+        )
+        val target = resolver.validateTarget("http://93.184.216.34/file")
+        val download = resolver.requestRoute(target, 240, streamingDownload = true)
+        val ordinaryFetch = resolver.requestRoute(target, 240)
+        assertEquals(0, download.client.callTimeoutMillis)
+        assertTrue(download.client.readTimeoutMillis > 0)
+        assertTrue(ordinaryFetch.client.callTimeoutMillis > 0)
+    }
+
+    @Test
     fun downloadLargerThanOneHundredMiBStreamsFullyAndVerifiesHash() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val root = context.cacheDir.resolve("web-large-${UUID.randomUUID()}").apply { mkdirs() }
