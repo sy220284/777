@@ -25,6 +25,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -84,11 +85,49 @@ interface McpTerminationSource {
     val terminalEvents: Flow<Throwable>
 }
 
+/** Resource methods must be discovered independently of tools/list. */
+interface McpResourceDiscovery {
+    suspend fun supportedResourceMethods(): Set<String>
+}
+
+/** Safe, read-only capability probe: never advertise methods a server rejects or cannot list. */
+internal suspend fun discoverMcpResourceMethods(transport: McpTransport): Set<String> {
+    suspend fun accepts(method: String, resultKey: String): Boolean {
+        val response = try {
+            transport.request(method)
+        } catch (error: McpRpcException) {
+            if (error.code == -32601) return false
+            throw error
+        } catch (error: McpHttpException) {
+            if (error.statusCode in setOf(404, 405, 501)) return false
+            throw error
+        }
+        response["error"]?.let { failure ->
+            val code = (failure as? JsonObject)?.get("code")?.jsonPrimitive?.intOrNull
+                ?: error("MCP 资源能力探测返回不合法的错误")
+            if (code == -32601) return false
+            throw McpRpcException(code)
+        }
+        val result = response["result"] as? JsonObject
+            ?: error("MCP 资源能力探测缺少 result")
+        return result[resultKey] is JsonArray
+    }
+    val lists = accepts("resources/list", "resources")
+    val templates = accepts("resources/templates/list", "resourceTemplates")
+    return buildSet {
+        if (lists) add("resources/list")
+        if (templates) add("resources/templates/list")
+        if (lists || templates) add("resources/read")
+    }
+}
+
 class McpClient(
     private val transport: McpTransport,
 ) : Closeable {
     val terminalEvents: Flow<Throwable>? get() =
         (transport as? McpTerminationSource)?.terminalEvents
+    suspend fun supportedResourceMethods(): Set<String> =
+        (transport as? McpResourceDiscovery)?.supportedResourceMethods() ?: emptySet()
     suspend fun listTools(allowUnsupported: Boolean = false): List<McpToolDefinition> {
         val tools = mutableListOf<McpToolDefinition>()
         val names = mutableSetOf<String>()
