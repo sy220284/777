@@ -21,6 +21,46 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class SqliteLocalSessionEventAdapterAndroidTest {
+
+    @Test fun toolActivityAndArtifactProjectionWindowsRespectTheirDeclaredLimits() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val key = UUID.randomUUID().toString()
+        val name = "work-tool-window-$key.db"
+        val legacyPath = File(context.cacheDir, "$key.events.jsonl")
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { db ->
+                val log = LocalSessionEventLog(legacyPath, Json, sessionId = key, sqlite = db)
+                // The old SQLite contract rejected limit=1024 even when the log had one row.
+                log.append("tool/call", buildJsonObject {
+                    put("id", "tool-start")
+                    put("name", "read")
+                })
+                assertEquals(1, log.pageBeforeChronological(limit = 1_024).size)
+                // After >200 rows, a Work projection must see the full window in order.
+                repeat(230) { index ->
+                    log.append("progress/step", buildJsonObject { put("index", index) })
+                }
+                log.append("tool/result", buildJsonObject {
+                    put("id", "tool-start")
+                    put("name", "read")
+                    put("content", "读取结束")
+                })
+                val toolWindow = log.pageBeforeChronological(limit = 1_024)
+                assertEquals(232, toolWindow.size)
+                assertEquals((0L..231L).toList(), toolWindow.map { it.sequence })
+                assertEquals(232, log.pageBeforeChronological(limit = 4_096).size)
+                val toolFacts = com.labteto.dshmobile.local.tools.localToolActivityProjectionEvents(log)
+                assertEquals(listOf("tool/call", "tool/result"), toolFacts.map { it.type })
+                assertEquals(listOf(0L, 231L), toolFacts.map { it.sequence })
+                // The narrow transcript paging contract is not weakened.
+                assertEquals(200, log.pageBeforeNewestFirst(limit = 200).size)
+                log.close()
+            }
+        } finally {
+            context.deleteDatabase(name)
+            legacyPath.delete()
+        }
+    }
     @Test fun adapterUsesSqliteForPagingRepairProjectionAndReset() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val key = UUID.randomUUID().toString()
