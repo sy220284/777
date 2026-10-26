@@ -20,6 +20,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
+/** Upper bound for bounded, chronological Work/tool projection windows (not UI transcript pages). */
+internal const val LOCAL_SESSION_PROJECTION_WINDOW_MAX = 4_096
+
 /** Android-facing event adapter; durable storage lives in the native core module. */
 class LocalSessionEventLog(
     private val file: File,
@@ -172,13 +175,34 @@ class LocalSessionEventLog(
         else fileLog().forEachAfter(sequenceExclusive) { visitor(it.toLocalEvent()) }
     }
 
-    /** 按 sequence 递增返回旧事件页，适合 Projection / fold 等从旧到新的消费路径。 */
+    /**
+     * Chronological Work/tool projection window. This is intentionally larger than the
+     * 200-event interactive transcript page. Both durable backends must honor the full
+     * requested limit: silently truncating to 200 loses activities and artifact evidence.
+     */
     fun pageBeforeChronological(
         sequenceExclusive: Long = Long.MAX_VALUE,
         limit: Int = 80,
-    ): List<Event> = (if (sqlite != null)
-        sqlite.pageBeforeChronological(sqliteId, sequenceExclusive, limit)
-        else fileLog().pageBeforeChronological(sequenceExclusive, limit)).map { it.toLocalEvent() }
+    ): List<Event> {
+        require(limit in 1..LOCAL_SESSION_PROJECTION_WINDOW_MAX) { "工作状态投影读取数量越界" }
+        if (sqlite != null) {
+            return sqlite.pageBeforeChronological(sqliteId, sequenceExclusive, limit)
+                .map { it.toLocalEvent() }
+        }
+        val reversePages = ArrayDeque<List<com.labteto.dshmobile.harness.session.SessionEvent>>()
+        var before = sequenceExclusive
+        var remaining = limit
+        while (remaining > 0) {
+            val batch = minOf(remaining, SessionEventLog.MAX_PAGE_EVENTS)
+            val page = fileLog().pageBeforeChronological(before, batch)
+            if (page.isEmpty()) break
+            reversePages.addFirst(page)
+            remaining -= page.size
+            before = page.first().sequence
+            if (page.size < batch) break
+        }
+        return reversePages.flatMap { page -> page.map { it.toLocalEvent() } }
+    }
 
     /**
      * Transcript-only reverse feed. Native SQLite uses the visible-hint index;
