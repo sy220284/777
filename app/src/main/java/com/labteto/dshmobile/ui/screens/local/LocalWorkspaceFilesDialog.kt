@@ -527,6 +527,7 @@ internal fun LocalWorkspaceFilesDialog(
                             }
                         } else {
                             LocalWorkspaceDirectoryList(
+                                directoryKey = directory,
                                 entries = if (section == 2 && directory.isEmpty())
                                     entries.filterNot { it.path == "任务" || it.path == "交付成果" }
                                 else entries,
@@ -604,6 +605,7 @@ private fun LocalWorkspaceRootList(onOpen: (Int) -> Unit) {
 
 @Composable
 private fun LocalWorkspaceDirectoryList(
+    directoryKey: String,
     entries: List<LocalWorkspaceDirectoryEntry>,
     localizedInternalName: Boolean,
     hasMore: Boolean,
@@ -616,9 +618,9 @@ private fun LocalWorkspaceDirectoryList(
     onOpen: suspend (LocalWorkspaceFile) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val listState = rememberLazyListState()
+    val listState = remember(directoryKey) { LazyListState() }
     // Prefetch 40 rows ahead; next pages append without replacing the list or a "load more" row.
-    LaunchedEffect(entries.size, hasMore, loadingMore, pageError) {
+    LaunchedEffect(directoryKey, entries.size, hasMore, loadingMore, pageError) {
         if (hasMore && !loadingMore && pageError == null) {
             snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
                 .first { it >= entries.size - 40 }
