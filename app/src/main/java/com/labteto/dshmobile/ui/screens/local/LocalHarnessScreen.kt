@@ -560,6 +560,7 @@ fun LocalHarnessScreen(
         workState = viewModel.workState,
         workspaceFiles = viewModel::workspaceFiles,
         workspaceDirectory = viewModel::workspaceDirectory,
+        workspaceDirectoryPage = viewModel::workspaceDirectoryPage,
         searchWorkspaceFiles = viewModel::searchWorkspaceFiles,
         conversationFiles = viewModel::conversationFiles,
         previewWorkspaceFile = viewModel::previewWorkspaceFile,

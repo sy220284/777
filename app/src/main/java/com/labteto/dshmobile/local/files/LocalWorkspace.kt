@@ -57,6 +57,12 @@ data class LocalWorkspaceDirectoryEntry(
     val modifiedAt: Long,
 )
 
+/** One immutable slice of a directory name snapshot; no file contents are read. */
+data class LocalWorkspaceDirectoryPage(
+    val entries: List<LocalWorkspaceDirectoryEntry>,
+    val nextOffset: Int?,
+)
+
 /** Sandboxed filesystem and shell provider for the on-device Harness. */
 class LocalWorkspace(
     private val root: File,
@@ -413,26 +419,80 @@ class LocalWorkspace(
         }
     }
 
-    /** Browsing touches only one directory. Global discovery is reserved for explicit search. */
-    fun directoryEntries(relativePath: String = "."): List<LocalWorkspaceDirectoryEntry> {
+    private data class DirectoryNameSnapshot(val modifiedAt: Long, val names: List<String>)
+    private val directoryNameSnapshots = object : LinkedHashMap<String, DirectoryNameSnapshot>(12, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DirectoryNameSnapshot>?): Boolean =
+            size > 12
+    }
+
+    /** Index names once and inspect only the requested slice; existing files are never opened. */
+    fun directoryPage(
+        relativePath: String = ".",
+        offset: Int = 0,
+        pageSize: Int = 96,
+    ): LocalWorkspaceDirectoryPage {
+        require(offset >= 0 && pageSize in 1..256) { "文件目录分页参数不合法" }
         val directory = resolve(relativePath)
         require(directory.toPath().startsWith(canonicalRoot.toPath())) { "目录不属于工作区" }
-        if (!directory.exists()) return emptyList()
+        if (!directory.exists()) return LocalWorkspaceDirectoryPage(emptyList(), null)
         require(directory.isDirectory) { "路径不是文件夹：${relativePath}" }
-        return directory.listFiles().orEmpty().asSequence()
-            .filter { child ->
-                !Files.isSymbolicLink(child.toPath()) &&
-                    boundary.isWorkspace(child) && (child.isDirectory || child.isFile)
+        val key = directory.path
+        val modified = directory.lastModified()
+        val names = synchronized(directoryNameSnapshots) {
+            val snapshot = directoryNameSnapshots[key]?.takeIf { it.modifiedAt == modified }
+            if (snapshot != null) snapshot.names else {
+                require(offset == 0) { "目录内容已更新，请重新打开当前目录" }
+                directory.list()?.sorted() ?: error("文件夹读取失败：${relativePath}")
+            }.also {
+                directoryNameSnapshots[key] = DirectoryNameSnapshot(modified, it)
             }
-            .sortedWith(compareByDescending<File> { it.isDirectory }.thenBy(File::getName))
-            .map { child ->
-                LocalWorkspaceDirectoryEntry(
-                    path = child.relativeTo(canonicalRoot).invariantSeparatorsPath,
-                    isDirectory = child.isDirectory,
-                    bytes = if (child.isFile) child.length() else 0L,
-                    modifiedAt = child.lastModified(),
-                )
-            }.toList()
+        }
+        require(offset <= names.size) { "目录页码已失效，请刷新" }
+        val end = minOf(names.size, offset + pageSize)
+        val children = names.subList(offset, end).mapNotNull { name ->
+            val file = File(directory, name)
+            if (Files.isSymbolicLink(file.toPath()) || !boundary.isWorkspace(file)) return@mapNotNull null
+            val isDirectory = file.isDirectory
+            if (!isDirectory && !file.isFile) return@mapNotNull null
+            LocalWorkspaceDirectoryEntry(
+                path = file.relativeTo(canonicalRoot).invariantSeparatorsPath,
+                isDirectory = isDirectory,
+                bytes = if (isDirectory) 0L else file.length(),
+                modifiedAt = file.lastModified(),
+            )
+        }
+        return LocalWorkspaceDirectoryPage(children, end.takeIf { it < names.size })
+    }
+
+    /** Inspect one path referenced by a conversation without scanning unrelated files. */
+    fun workspaceFileAt(relativePath: String): LocalWorkspaceFile? {
+        if (relativePath.isBlank() || relativePath.startsWith('/')) return null
+        val original = File(canonicalRoot, relativePath).toPath().normalize()
+        if (!original.startsWith(canonicalRoot.toPath())) return null
+        var current = canonicalRoot.toPath()
+        for (part in canonicalRoot.toPath().relativize(original)) {
+            current = current.resolve(part)
+            if (Files.isSymbolicLink(current)) return null
+        }
+        val file = resolve(relativePath)
+        if (!file.isFile || !boundary.isWorkspace(file)) return null
+        return LocalWorkspaceFile(
+            path = file.relativeTo(canonicalRoot).invariantSeparatorsPath,
+            bytes = file.length(),
+            modifiedAt = file.lastModified(),
+        )
+    }
+
+    /** Compatibility listing for internal callers; not used by the scrolling file browser. */
+    fun directoryEntries(relativePath: String = "."): List<LocalWorkspaceDirectoryEntry> {
+        val all = ArrayList<LocalWorkspaceDirectoryEntry>()
+        var next: Int? = 0
+        while (next != null) {
+            val page = directoryPage(relativePath, next)
+            all.addAll(page.entries)
+            next = page.nextOffset
+        }
+        return all
     }
 
     /** Search by path/name without truncating before matching files are considered. */

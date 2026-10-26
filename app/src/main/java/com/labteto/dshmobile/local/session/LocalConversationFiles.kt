@@ -16,12 +16,22 @@ internal fun localConversationFiles(
     workspaceFiles: List<LocalWorkspaceFile>,
 ): LocalConversationFiles {
     val existing = workspaceFiles.associateBy(LocalWorkspaceFile::path)
+    return localConversationFiles(events) { existing[it] }
+}
+
+/** Resolve only paths actually mentioned by durable session events. */
+internal fun localConversationFiles(
+    events: Sequence<LocalSessionEventLog.Event>,
+    fileAt: (String) -> LocalWorkspaceFile?,
+): LocalConversationFiles {
+    val existing = mutableMapOf<String, LocalWorkspaceFile?>()
     val artifactSeq = linkedMapOf<String, Long>()
     val involvedSeq = linkedMapOf<String, Long>()
 
     fun remember(raw: String?, artifact: Boolean, seq: Long) {
         val path = normalizeLocalWorkspacePath(raw) ?: return
-        if (path !in existing) return
+        val file = existing.getOrPut(path) { fileAt(path) }
+        if (file == null) return
         if (artifact) {
             artifactSeq[path] = maxOf(artifactSeq[path] ?: Long.MIN_VALUE, seq)
             involvedSeq.remove(path)
