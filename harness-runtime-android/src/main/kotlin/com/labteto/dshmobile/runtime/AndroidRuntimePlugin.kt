@@ -50,13 +50,14 @@ class AndroidRuntimePlugin(
         defaultWorkingDirectory = workspaceRoot,
     ),
     private val resourceScheduler: HarnessResourceScheduler? = null,
+    private val includeGitWorkspaces: Boolean = true,
 ) : HarnessPlugin {
     override val id: String = "android-runtime"
     private val terminalLeases = ConcurrentHashMap<String, HarnessResourceLease>()
     private val gitWorkspaces = GitWorkspaceRuntime(workspaceRoot, processRuntime)
 
     override suspend fun install(context: HarnessContext) {
-        gitWorkspaces.install(context)
+        if (includeGitWorkspaces) gitWorkspaces.install(context)
         context.tools.register(
             HarnessTool(
                 name = "runtime_command_status",
@@ -67,6 +68,7 @@ class AndroidRuntimePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "运行时",
+                    environmentBound = true,
                     discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
                     requirements = emptyList(),
                 ),
@@ -106,6 +108,7 @@ class AndroidRuntimePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "运行时",
+                    environmentBound = true,
                     discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
                     requirements = listOf("目标命令必须存在；可先调用 runtime_command_status 检查"),
                 ),
@@ -147,6 +150,7 @@ class AndroidRuntimePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "运行时",
+                    environmentBound = true,
                     discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
                     requirements = listOf("目标命令必须存在；可先调用 runtime_command_status 检查"),
                 ),
@@ -157,7 +161,7 @@ class AndroidRuntimePlugin(
                         ?.mapNotNull { it.jsonPrimitive.contentOrNull }
                         ?.filter(String::isNotBlank)
                         ?.takeIf { it.isNotEmpty() }
-                        ?: listOf("/system/bin/sh")
+                        ?: listOf("sh")
                     val workingDirectory = resolveWorkingDirectory(input.optionalString("working_directory"))
                     val lease = resourceScheduler?.acquire(
                         HarnessResourceKind.TERMINAL,
@@ -194,6 +198,7 @@ class AndroidRuntimePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "运行时",
+                    environmentBound = true,
                     discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
                     requirements = emptyList(),
                 ),
@@ -220,6 +225,7 @@ class AndroidRuntimePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "运行时",
+                    environmentBound = true,
                     discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
                     requirements = emptyList(),
                 ),
@@ -250,6 +256,7 @@ class AndroidRuntimePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "运行时",
+                    environmentBound = true,
                     discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
                     requirements = emptyList(),
                 ),
@@ -290,6 +297,7 @@ class AndroidRuntimePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "运行时",
+                    environmentBound = true,
                     discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
                     requirements = emptyList(),
                 ),
@@ -316,7 +324,7 @@ class AndroidRuntimePlugin(
             }, required = setOf("session_id", "rows", "columns")),
             access = ToolAccess.PROCESS, approvalPolicy = ToolApprovalPolicy.ALWAYS,
             exposure = ToolExposure.OPTIONAL, timeoutMillis = 10_000L,
-            metadata = ToolMetadata("运行时", discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS),
+            metadata = ToolMetadata("运行时", environmentBound = true, discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS),
             executor = HarnessToolExecutor { _, input, _ ->
                 val sessionId = input.requiredString("session_id")
                 requireTerminalWorkspace(sessionId)
@@ -344,7 +352,7 @@ class AndroidRuntimePlugin(
     }
 
     override suspend fun uninstall(context: HarnessContext) {
-        gitWorkspaces.uninstall(context)
+        if (includeGitWorkspaces) gitWorkspaces.uninstall(context)
         terminalProvider.closeAll()
         terminalLeases.keys.toList().forEach { sessionId ->
             runCatching { terminalProvider.close(sessionId) }
