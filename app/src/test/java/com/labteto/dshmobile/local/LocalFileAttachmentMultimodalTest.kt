@@ -98,6 +98,33 @@ class LocalFileAttachmentMultimodalTest {
     }
 
     @Test
+    fun oversizedLocalDocumentIsAcceptedWithBoundedPreviewAndWorkspacePath() = runTest {
+        val root = kotlin.io.path.createTempDirectory("large-file-input-").toFile()
+        try {
+            val file = File(root, ".dsh/attachments/source.txt").apply {
+                parentFile?.mkdirs()
+                java.io.RandomAccessFile(this, "rw").use { output ->
+                    output.write("Large attachment stays readable".toByteArray())
+                    output.setLength(24L * 1024L * 1024L)
+                }
+            }
+            val relative = file.relativeTo(root).invariantSeparatorsPath
+            val source = buildLocalUserModelMessage("阅读这个文件", listOf(
+                LocalImportedAttachment("source.txt", relative, "text/plain", file.length()),
+            ))
+            val prepared = prepareLocalMultimodalMessages(
+                messages = listOf(source), workspaceRoot = root, mode = LocalImageInputMode.TOOL,
+            ).single().toString()
+            assertTrue(prepared.contains("Large attachment stays readable"))
+            assertTrue(prepared.contains(relative))
+            assertTrue(prepared.contains("仅为请求上下文预览"))
+            assertEquals(24L * 1024L * 1024L, file.length())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun olderFileBodyIsNotInjectedAgainOnEveryTurn() = runTest {
         val root = kotlin.io.path.createTempDirectory("file-history-").toFile()
         try {
