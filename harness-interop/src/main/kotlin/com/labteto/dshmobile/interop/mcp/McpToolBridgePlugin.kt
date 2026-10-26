@@ -710,11 +710,13 @@ class McpToolBridgePlugin(
         val registered = mutableListOf<String>()
         try {
             val remoteDefinitions = client.listTools(allowUnsupported = true)
-            val resourceDefinitions = resourceToolDefinitions(serverId, remoteDefinitions)
-            val resourceMethods = resourceDefinitions.map { it.name }.zip(
-                listOf("resources/list", "resources/templates/list", "resources/read"),
-            ).toMap()
-            val definitions = remoteDefinitions + resourceDefinitions
+            val resourceDefinitions = resourceToolDefinitions(
+                serverId, remoteDefinitions, client.supportedResourceMethods(),
+            )
+            val resourceMethods = resourceDefinitions.associate { (method, definition) ->
+                definition.name to method
+            }
+            val definitions = remoteDefinitions + resourceDefinitions.map { it.second }
             require(remoteDefinitions.size <= MAX_REMOTE_TOOLS) {
                 "MCP 服务工具过多：${remoteDefinitions.size}，上限 $MAX_REMOTE_TOOLS"
             }
@@ -1069,11 +1071,15 @@ class McpToolBridgePlugin(
         return prefix + normalized.ifBlank { "tool" }.take(available)
     }
 
-    private fun resourceToolDefinitions(serverId: String, remote: List<McpToolDefinition>): List<McpToolDefinition> = listOf(
-        "resources_list" to "分页列出资源（原样返回 nextCursor）",
-        "resources_templates_list" to "分页列出资源模板（原样返回 nextCursor）",
-        "resources_read" to "读取资源 URI 的完整内容",
-    ).map { (baseName, description) ->
+    private fun resourceToolDefinitions(
+        serverId: String,
+        remote: List<McpToolDefinition>,
+        supportedMethods: Set<String>,
+    ): List<Pair<String, McpToolDefinition>> = listOf(
+        Triple("resources/list", "resources_list", "分页列出资源（原样返回 nextCursor）"),
+        Triple("resources/templates/list", "resources_templates_list", "分页列出资源模板（原样返回 nextCursor）"),
+        Triple("resources/read", "resources_read", "读取资源 URI 的完整内容"),
+    ).filter { it.first in supportedMethods }.map { (method, baseName, description) ->
         // Synthetic tools must never intercept a same-named legitimate tools/call operation.
         val reserved = remote.map { localToolName(serverId, it.name) }.toSet()
         var name = baseName
@@ -1086,7 +1092,7 @@ class McpToolBridgePlugin(
             })
             if (baseName == "resources_read") put("required", buildJsonArray { add(JsonPrimitive("uri")) })
         }
-        McpToolDefinition(name, description, schema, buildJsonObject {
+        method to McpToolDefinition(name, description, schema, buildJsonObject {
             put("name", name); put("description", description); put("inputSchema", schema)
         })
     }
