@@ -61,6 +61,23 @@ class LocalConversationFilesTest {
     }
 
     @Test
+    fun conversationIndexResolvesOnlyReferencedFiles() {
+        val paths = mapOf("任务/资料/说明.md" to file("任务/资料/说明.md"))
+        val lookups = mutableListOf<String>()
+        val events = sequenceOf(
+            toolCall(1, "read", buildJsonObject { put("path", "任务/资料/说明.md") }),
+            toolCall(2, "present", buildJsonObject { put("path", "任务/不存在.md") }),
+        )
+        val index = localConversationFiles(events) { path ->
+            lookups += path
+            paths[path]
+        }
+        assertEquals(listOf("任务/资料/说明.md"), index.involved.map { it.path })
+        assertTrue(index.artifacts.isEmpty())
+        assertEquals(setOf("任务/资料/说明.md", "任务/不存在.md"), lookups.toSet())
+    }
+
+    @Test
     fun excludesStaleAndEscapingPaths() {
         val files = listOf(file("src/App.kt"))
         val events = listOf(

@@ -4,9 +4,12 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
+import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
@@ -55,6 +58,49 @@ class LocalWorkspaceShareSelectionUiTest {
         }
         assertEquals(0, fullScans)
         assertEquals(1, directoryReads)
+    }
+
+    @Test
+    fun scrollingPrefetchesNextDirectoryPageWithoutLoadMoreControls() {
+        val pageRequests = mutableListOf<Int>()
+        compose.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(
+                    mode = LocalFilesMode.WORKSPACE,
+                    sessionId = "seamless-paging",
+                    workspacePath = File(context.filesDir, "local-harness/workspace").absolutePath,
+                    loadWorkspace = { error("不允许在目录列表扫描整个工作区") },
+                    loadDirectoryPage = { path, offset ->
+                        if (path != "任务") LocalWorkspaceDirectoryPage(emptyList(), null)
+                        else {
+                            pageRequests += offset
+                            LocalWorkspaceDirectoryPage(
+                                entries = (offset until minOf(180, offset + 96)).map { n ->
+                                    LocalWorkspaceDirectoryEntry("任务/文档-${n.toString().padStart(3, '0')}.md", false, 3L, 1L)
+                                },
+                                nextOffset = (offset + 96).takeIf { it < 180 },
+                            )
+                        }
+                    },
+                    loadConversation = { error("目录列表不应读取会话内容") },
+                    loadPreview = { error("不需要预览") },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.local_workspace_tasks)).performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("文档-000.md").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNode(hasScrollAction()).performScrollToIndex(68)
+        compose.waitUntil(5_000) { pageRequests.contains(96) }
+        compose.onNode(hasScrollAction()).performScrollToIndex(124)
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("文档-124.md").fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals(listOf(0, 96), pageRequests)
+        compose.onNodeWithText("加载更多").assertDoesNotExist()
+        compose.onNodeWithText("点击加载更多").assertDoesNotExist()
     }
 
     @Test

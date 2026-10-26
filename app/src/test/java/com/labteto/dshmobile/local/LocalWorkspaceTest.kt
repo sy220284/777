@@ -42,6 +42,43 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun directoryPagesAreDisjointAndKeepStableOrderWithThousandsOfFiles() {
+        val folder = root.resolve("任务/大量资料").apply { mkdirs() }
+        repeat(1_024) { n -> folder.resolve("文档-${n.toString().padStart(4, '0')}.md").writeText("内容$n") }
+        val names = mutableListOf<String>()
+        var offset: Int? = 0
+        var pageCount = 0
+        while (offset != null) {
+            val page = workspace.directoryPage("任务/大量资料", offset, 96)
+            pageCount++
+            assertTrue(page.entries.size <= 96)
+            names += page.entries.map { it.path }
+            offset = page.nextOffset
+        }
+        assertEquals(11, pageCount)
+        assertEquals(1_024, names.size)
+        assertEquals(1_024, names.toSet().size)
+        assertEquals(names.sorted(), names)
+        assertEquals("任务/大量资料/文档-0000.md", names.first())
+        assertEquals("任务/大量资料/文档-1023.md", names.last())
+        assertEquals(names, workspace.directoryEntries("任务/大量资料").map { it.path })
+    }
+
+    @Test
+    fun directoryPagesDoNotMixChangesIntoAnOldCursor() {
+        val folder = root.resolve("任务/版本变化").apply { mkdirs() }
+        repeat(150) { folder.resolve("文件-${it.toString().padStart(3, '0')}.txt").writeText("已有") }
+        val first = workspace.directoryPage("任务/版本变化", 0, 80)
+        assertEquals(80, first.entries.size)
+        folder.resolve("新增文件.txt").writeText("新的")
+        folder.setLastModified(folder.lastModified() + 2_000L)
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.directoryPage("任务/版本变化", requireNotNull(first.nextOffset), 80)
+        }
+        assertEquals(80, workspace.directoryPage("任务/版本变化", 0, 80).entries.size)
+    }
+
+    @Test
     fun directoryBrowserOnlyReadsImmediateChildren() {
         workspace.write("任务/第一项/subfolder/source.txt", "source")
         workspace.write("任务/第二项/draft.md", "draft")
