@@ -154,28 +154,29 @@ class LocalWorkspace(
     )
 
     /** Read a UTF-8 text range, bounded to keep one result out of the model's entire context. */
-    fun read(relativePath: String, startLine: Int = 1, endLine: Int = startLine + 399): String {
+    fun read(
+        relativePath: String,
+        startLine: Int = 1,
+        endLine: Int = startLine + 399,
+        startChar: Int = 0,
+    ): String {
         val file = resolve(relativePath)
         require(file.isFile) { "文件不存在：$relativePath" }
-        val from = startLine.coerceAtLeast(1)
-        val requestedEnd = endLine.coerceAtLeast(from)
-        // Stream only the requested page instead of loading the entire file into memory.
-        val until = minOf(requestedEnd.toLong(), from.toLong() + MAX_READ_LINES - 1)
-        val before = fingerprint(file)
-        val rows = mutableListOf<String>()
-        file.bufferedReader().use { reader ->
-            var lineNumber = 0L
-            while (lineNumber < until) {
-                val line = readBoundedLine(reader, MAX_READ_LINE_CHARS) ?: break
-                lineNumber++
-                if (lineNumber >= from) rows += "$lineNumber: $line"
-            }
-        }
-        val after = fingerprint(file)
-        require(before == after) { "文件在读取过程中发生变化，请重新读取：$relativePath" }
-        observations.put(file.path, after)
-        return rows.joinToString("\n") +
-            if (until < requestedEnd.toLong()) "\n[仅返回前 $MAX_READ_LINES 行；请从 start_line=${until + 1} 继续读取]" else ""
+        require(startChar >= 0) { "行内字符偏移不能为负数" }
+        // Only editable files need a content observation. Large read-only pages must not
+        // hash the entire source twice before returning a small excerpt.
+        val editable = file.length() <= MAX_TEXT_BYTES
+        val before = if (editable) fingerprint(file) else null
+        val attributes = Files.readAttributes(file.toPath(), java.nio.file.attribute.BasicFileAttributes::class.java)
+        val page = readLocalTextPage(file, startLine.coerceAtLeast(1), endLine.coerceAtLeast(startLine.coerceAtLeast(1)), startChar)
+        val after = Files.readAttributes(file.toPath(), java.nio.file.attribute.BasicFileAttributes::class.java)
+        require(attributes.size() == after.size() && attributes.lastModifiedTime() == after.lastModifiedTime() &&
+            attributes.fileKey() == after.fileKey()) { "文件在读取过程中发生变化，请重新读取：$relativePath" }
+        if (before != null) {
+            require(before == fingerprint(file)) { "文件在读取过程中发生变化，请重新读取：$relativePath" }
+            observations.put(file.path, before)
+        } else observations.remove(file.path)
+        return page
     }
 
     /** Replace one UTF-8 file, creating its parent directories. */
@@ -445,12 +446,12 @@ class LocalWorkspace(
         val key = directory.path
         val modified = directory.lastModified()
         val names = synchronized(directoryNameSnapshots) {
-            val snapshot = directoryNameSnapshots[key]?.takeIf { it.modifiedAt == modified }
+            val snapshot = directoryNameSnapshots[key]?.takeIf { offset > 0 || it.modifiedAt == modified }
             if (snapshot != null) snapshot.names else {
                 require(offset == 0) { "目录内容已更新，请重新打开当前目录" }
-                directory.list()?.sorted() ?: error("文件夹读取失败：${relativePath}")
-            }.also {
-                directoryNameSnapshots[key] = DirectoryNameSnapshot(modified, it)
+                val refreshed = directory.list()?.sorted() ?: error("文件夹读取失败：${relativePath}")
+                directoryNameSnapshots[key] = DirectoryNameSnapshot(modified, refreshed)
+                refreshed
             }
         }
         require(offset <= names.size) { "目录页码已失效，请刷新" }

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.session
 
+import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -24,14 +25,23 @@ internal fun localConversationFiles(
     events: Sequence<LocalSessionEventLog.Event>,
     fileAt: (String) -> LocalWorkspaceFile?,
 ): LocalConversationFiles {
-    val existing = mutableMapOf<String, LocalWorkspaceFile?>()
-    val artifactSeq = linkedMapOf<String, Long>()
-    val involvedSeq = linkedMapOf<String, Long>()
+    val index = LocalConversationFileIndex()
+    events.forEach(index::apply)
+    return index.snapshot(fileAt)
+}
 
-    fun remember(raw: String?, artifact: Boolean, seq: Long) {
+/** Derived, incrementally replayable references; the event stream remains the authority. */
+internal class LocalConversationFileIndex {
+    private val artifactSeq = linkedMapOf<String, Long>()
+    private val involvedSeq = linkedMapOf<String, Long>()
+
+    fun copy(): LocalConversationFileIndex = LocalConversationFileIndex().also {
+        it.artifactSeq.putAll(artifactSeq)
+        it.involvedSeq.putAll(involvedSeq)
+    }
+
+    private fun remember(raw: String?, artifact: Boolean, seq: Long) {
         val path = normalizeLocalWorkspacePath(raw) ?: return
-        val file = existing.getOrPut(path) { fileAt(path) }
-        if (file == null) return
         if (artifact) {
             artifactSeq[path] = maxOf(artifactSeq[path] ?: Long.MIN_VALUE, seq)
             involvedSeq.remove(path)
@@ -40,31 +50,39 @@ internal fun localConversationFiles(
         }
     }
 
-    for (event in events) {
+    private fun rememberTranscript(data: JsonObject, sequence: Long) {
+        decodeTranscriptMessages(data).orEmpty().filter { it.role == "user" }.forEach { message ->
+            ATTACHMENT_PATH.findAll(message.content).forEach { remember(it.groupValues[1], false, sequence) }
+            message.blocks.forEach { block ->
+                val path = when (block) {
+                    is LocalMessageBlock.Image -> block.relativePath
+                    is LocalMessageBlock.File -> block.relativePath
+                    else -> null
+                }
+                remember(path, false, sequence)
+            }
+        }
+    }
+
+    fun apply(event: LocalSessionEventLog.Event) {
         if (event.type == "chat/active-transcript") {
             // A destructive edit/branch materialization defines the only active chat timeline.
             // Old tool/file events after the retained prefix must not leak back into the UI.
             artifactSeq.clear()
             involvedSeq.clear()
-            decodeTranscriptMessages(event.data)
-                .orEmpty()
-                .asSequence()
-                .filter { message -> message.role == "user" }
-                .forEach { message ->
-                    ATTACHMENT_PATH.findAll(message.content).forEach { match ->
-                        remember(match.groupValues[1], false, event.sequence)
-                    }
-                }
-            continue
+            rememberTranscript(event.data, event.sequence)
+            return
         }
         when (event.type) {
+            LOCAL_AGENT_INBOX_EVENT_TYPE -> rememberTranscript(event.data, event.sequence)
             "user/message" -> {
+                rememberTranscript(event.data, event.sequence)
                 val text = event.data["content"]?.jsonPrimitive?.contentOrNull.orEmpty()
                 ATTACHMENT_PATH.findAll(text).forEach { remember(it.groupValues[1], false, event.sequence) }
             }
             "tool/call" -> {
                 val name = event.data["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
-                val args = event.data["arguments"] as? JsonObject ?: continue
+                val args = event.data["arguments"] as? JsonObject ?: return
                 val artifactTool = isLocalArtifactTool(name)
                 for (key in LOCAL_FILE_KEYS) {
                     if (key == "path" && name.lowercase() in LOCAL_DIRECTORY_PATH_TOOLS) continue
@@ -98,15 +116,12 @@ internal fun localConversationFiles(
         }
     }
 
-    fun rows(source: Map<String, Long>): List<LocalWorkspaceFile> =
-        source.entries
+    fun snapshot(fileAt: (String) -> LocalWorkspaceFile?): LocalConversationFiles {
+        fun rows(source: Map<String, Long>): List<LocalWorkspaceFile> = source.entries
             .sortedWith(compareByDescending<Map.Entry<String, Long>> { it.value }.thenBy { it.key })
-            .mapNotNull { existing[it.key] }
-
-    return LocalConversationFiles(
-        artifacts = rows(artifactSeq),
-        involved = rows(involvedSeq),
-    )
+            .mapNotNull { fileAt(it.key) }
+        return LocalConversationFiles(artifacts = rows(artifactSeq), involved = rows(involvedSeq))
+    }
 }
 
 private fun normalizeLocalWorkspacePath(raw: String?): String? {

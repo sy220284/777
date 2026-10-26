@@ -52,6 +52,17 @@ class LocalMediaStoreAndroidTest {
         root.deleteRecursively()
     }
 
+    @Test fun exactMediaIdentityLookupKeepsOldRecordsAndSessionIsolation() {
+        legacy((0..520).map { result("image-$it", time = it.toLong()) })
+        val owner = store()
+        assertFalse(owner.page("session", 500).results.any { it.id == "image-0" })
+        assertEquals("image-0", owner.creationForSession("image-0", "session")?.result?.id)
+        assertEquals(null, owner.creationForSession("image-0", "another-session"))
+        assertEquals(null, owner.creationForSession("image-0", ""))
+        owner.remove("image-0")
+        assertEquals(null, owner.creationForSession("image-0", "session"))
+    }
+
     @Test fun migrationFailureRollsBackRowsAndMarkerTogether() {
         val db = LocalMediaDatabase(context, json)
         db.writableDatabase.execSQL("CREATE TRIGGER fail_fixture BEFORE INSERT ON media WHEN NEW.id='bad' BEGIN SELECT RAISE(ABORT, 'fixture failure'); END")

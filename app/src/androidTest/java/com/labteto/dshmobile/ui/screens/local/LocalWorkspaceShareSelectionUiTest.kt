@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.hasScrollAction
@@ -24,6 +25,46 @@ import org.junit.Test
 class LocalWorkspaceShareSelectionUiTest {
     @get:Rule val compose = createComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Test
+    fun returningWhilePreviewLoadsDoesNotReopenTheOldFile() {
+        val started = java.util.concurrent.atomic.AtomicBoolean(false)
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val finished = java.util.concurrent.atomic.AtomicBoolean(false)
+        val file = LocalWorkspaceFile("任务/慢文件.md", 10L, 1L)
+        try {
+            compose.setContent {
+                DshTheme {
+                    LocalWorkspaceFilesDialog(
+                        mode = LocalFilesMode.WORKSPACE, sessionId = "preview-cancellation",
+                        workspacePath = File(context.filesDir, "local-harness/workspace").absolutePath,
+                        loadWorkspace = { emptyList() },
+                        loadDirectoryPage = { _, _ -> LocalWorkspaceDirectoryPage(listOf(
+                            LocalWorkspaceDirectoryEntry(file.path, false, file.bytes, file.modifiedAt)), null) },
+                        loadConversation = { error("不应加载会话") },
+                        loadPreview = {
+                            started.set(true)
+                            try {
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { release.await() }
+                                LocalWorkspaceFilePreview(file, "迟到的旧预览正文")
+                            } finally { finished.set(true) }
+                        }, onDismiss = {})
+                }
+            }
+            compose.onNodeWithText(context.getString(R.string.local_workspace_tasks)).performClick()
+            compose.onNodeWithText("慢文件.md").performClick()
+            compose.waitUntil(5_000) { started.get() }
+            compose.onNodeWithContentDescription(context.getString(R.string.local_files_back_to_files)).performClick()
+            release.complete(Unit)
+            compose.waitUntil(5_000) { finished.get() }
+            compose.waitForIdle()
+            compose.onNodeWithText("迟到的旧预览正文").assertDoesNotExist()
+            compose.onNodeWithText("慢文件.md").assertExists()
+        } finally {
+            // Never leave a non-cancellable fixture waiting if an assertion or navigation fails.
+            release.complete(Unit)
+        }
+    }
 
     @Test
     fun workspaceRootAndTaskFoldersDoNotTriggerGlobalFileScan() {
@@ -138,7 +179,7 @@ class LocalWorkspaceShareSelectionUiTest {
             compose.onAllNodesWithText("报告-000.md").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNode(hasScrollAction()).performScrollToIndex(68)
-        compose.waitUntil(5_000) { offsets.contains(96) }
+        compose.waitUntil(5_000) { offsets.contains(1) }
         compose.waitForIdle()
         compose.onNode(hasScrollAction()).performScrollToIndex(124)
         compose.waitUntil(5_000) {

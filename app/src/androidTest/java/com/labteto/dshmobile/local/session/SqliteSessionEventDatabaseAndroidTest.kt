@@ -18,6 +18,24 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class SqliteSessionEventDatabaseAndroidTest {
+    @Test fun fileProjectionStreamsOnlyItsTypesAndResumesAfterItsWatermark() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "sqlite-file-projection-${UUID.randomUUID()}.db"
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { db ->
+                db.append("files", "tool/call", buildJsonObject { put("path", "旧.md") })
+                db.append("files", "llm/request", buildJsonObject { put("large", "不相关的模型证据") })
+                db.append("files", "tool/result", buildJsonObject { put("path", "新.md") })
+                db.append("another", "tool/result", buildJsonObject { put("path", "别的会话.md") })
+                // Unrelated payloads must never be decoded by the file projection query.
+                db.writableDatabase.execSQL("UPDATE session_events SET payload='not-json' WHERE session_id='files' AND event_type='llm/request'")
+                val seen = mutableListOf<Long>()
+                db.forEachOfTypesAfter("files", 0L, setOf("tool/call", "tool/result")) { seen += it.sequence }
+                assertEquals(listOf(2L), seen)
+            }
+        } finally { context.deleteDatabase(name) }
+    }
+
     @Test fun atomicBatchAppendAndConcurrentWritersNeverLeaveSequenceGaps() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "sqlite-batch-test-${UUID.randomUUID()}.db"

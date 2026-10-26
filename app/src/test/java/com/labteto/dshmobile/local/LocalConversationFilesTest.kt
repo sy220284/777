@@ -18,6 +18,68 @@ import org.junit.Test
 
 class LocalConversationFilesTest {
     @Test
+    fun incrementalFileIndexDoesNotReintroduceDiscardedBranchReferences() {
+        val index = com.labteto.dshmobile.local.session.LocalConversationFileIndex()
+        index.apply(toolCall(1, "read", buildJsonObject { put("path", "旧分支.md") }))
+        val next = index.copy()
+        val kept = LocalHarnessMessage("kept", "user", "当前", createdAt = 2L,
+            blocks = listOf(com.labteto.dshmobile.local.session.LocalMessageBlock.File(
+                "当前.md", "text/markdown", "当前.md", 1L)))
+        next.apply(event(2, "chat/active-transcript", buildJsonObject {
+            put("transcript", encodeTranscriptMessages(listOf(kept)))
+        }))
+        next.apply(toolCall(3, "read", buildJsonObject { put("path", "新增.md") }))
+        assertEquals(listOf("新增.md", "当前.md"), next.snapshot { file(it) }.involved.map { it.path })
+        assertEquals(listOf("旧分支.md"), index.snapshot { file(it) }.involved.map { it.path })
+    }
+
+    @Test
+    fun conversationCacheRejectsAResetLogEvenWhenSequenceNumbersRepeat() {
+        val root = Files.createTempDirectory("conversation-files-reset").toFile()
+        val log = LocalSessionEventLog(root.resolve("session.events.jsonl"), Json)
+        try {
+            val coordinator = LocalConversationFilesCoordinator(
+                workspaceFilesProvider = { error("不应扫描工作区") },
+                workspaceFileAt = { file(it) }, previewWorkspaceFile = { error("不应预览") },
+                eventLogFor = { log }, currentSessionId = { "current" }, currentEventLog = { log })
+            log.append("tool/call", buildJsonObject {
+                put("name", "read"); put("arguments", buildJsonObject { put("path", "旧.md") })
+            })
+            assertEquals(listOf("旧.md"), coordinator.conversationFiles("current").involved.map { it.path })
+            log.clear()
+            log.append("tool/call", buildJsonObject {
+                put("name", "read"); put("arguments", buildJsonObject { put("path", "新.md") })
+            })
+            assertEquals(listOf("新.md"), coordinator.conversationFiles("current").involved.map { it.path })
+        } finally { log.close(); root.deleteRecursively() }
+    }
+
+    @Test
+    fun activeBranchKeepsTypedAttachmentsWithoutInternalPathsInVisibleText() {
+        val path = ".dsh/attachments/当前资料.txt"
+        val message = LocalHarnessMessage("user-kept", "user", "请看资料", createdAt = 1L,
+            blocks = listOf(com.labteto.dshmobile.local.session.LocalMessageBlock.File(
+                path, "text/plain", "当前资料.txt", 12L)))
+        val index = localConversationFiles(sequenceOf(event(3, "chat/active-transcript",
+            buildJsonObject { put("transcript", encodeTranscriptMessages(listOf(message))) })), listOf(file(path)))
+        assertEquals(listOf(path), index.involved.map { it.path })
+    }
+
+    @Test
+    fun queuedAttachmentsAppearFromTheirDurableTranscript() {
+        val path = ".dsh/attachments/排队图片.png"
+        val message = LocalHarnessMessage("queued-user", "user", "看图", createdAt = 1L,
+            blocks = listOf(com.labteto.dshmobile.local.session.LocalMessageBlock.Image(
+                path, "image/png", "排队图片.png", 12L)))
+        val index = localConversationFiles(sequenceOf(event(1, "agent/inbox/spliced",
+            buildJsonObject {
+                put("action", "queued")
+                put("transcript", encodeTranscriptMessages(listOf(message)))
+            })), listOf(file(path)))
+        assertEquals(listOf(path), index.involved.map { it.path })
+    }
+
+    @Test
     fun rebuildsArtifactsAndInvolvedFilesFromDurableEvents() {
         val files = listOf(
             file(".dsh/uploads/input.txt"),

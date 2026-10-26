@@ -69,6 +69,8 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -127,6 +129,15 @@ internal fun LocalWorkspaceFilesDialog(
     var previewPath by com.labteto.dshmobile.ui.components.rememberNavigationEntryState<String?>(null, entryRequest, mode, sessionId)
     var loadedForEntry by remember(mode, sessionId, entryRequest) { mutableStateOf(false) }
     var previewLoading by remember(mode, sessionId) { mutableStateOf(false) }
+    var previewEpoch by remember(mode, sessionId) { mutableStateOf(0L) }
+    var previewJob by remember(mode, sessionId) { mutableStateOf<Job?>(null) }
+
+    fun invalidatePreview() {
+        previewEpoch++
+        previewJob?.cancel()
+        previewJob = null
+        previewLoading = false
+    }
     var directory by com.labteto.dshmobile.ui.components.rememberNavigationEntryState("", entryRequest, mode, sessionId)
     var section by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(
         if (mode == LocalFilesMode.WORKSPACE) -1 else 1, entryRequest, mode, sessionId,
@@ -198,23 +209,34 @@ internal fun LocalWorkspaceFilesDialog(
     val previewFailed = stringResource(R.string.local_files_preview_failed)
 
     suspend fun openPreview(path: String) {
+        invalidatePreview()
+        val epoch = previewEpoch
+        previewJob = currentCoroutineContext()[Job]
+        previewPath = path
+        preview = null
         previewLoading = true
         error = null
         try {
-            preview = loadPreview(path)
-            previewPath = path
+            val loaded = loadPreview(path)
+            if (previewEpoch == epoch) preview = loaded
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            error = failure.message ?: previewFailed
-            preview = null
-            previewPath = null
+            if (previewEpoch == epoch) {
+                error = failure.message ?: previewFailed
+                preview = null
+                previewPath = null
+            }
         } finally {
-            previewLoading = false
+            if (previewEpoch == epoch) {
+                previewLoading = false
+                previewJob = null
+            }
         }
     }
 
     suspend fun reload() {
+        invalidatePreview()
         val epoch = loadEpoch + 1
         loadEpoch = epoch
         val pageDirectory = directory
@@ -258,7 +280,7 @@ internal fun LocalWorkspaceFilesDialog(
             }
             if (stillCurrent()) {
                 lastLoadedSearch = currentQuery
-                previewPath?.let { path -> preview = loadPreview(path) }
+                previewPath?.let { path -> openPreview(path) }
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -342,6 +364,7 @@ internal fun LocalWorkspaceFilesDialog(
     }
 
     fun navigateBack() {
+        invalidatePreview()
         when {
             selecting -> {
                 selecting = false
@@ -423,7 +446,11 @@ internal fun LocalWorkspaceFilesDialog(
                     onAction = { scope.launch { reload() } },
                 )
 
-                if (preview == null) SySearchField(query, { query = it },
+                if (preview == null) SySearchField(query, {
+                    invalidatePreview()
+                    previewPath = null
+                    query = it
+                },
                     placeholder = stringResource(R.string.fluid_files_search),
                     modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd))
 
@@ -554,6 +581,7 @@ internal fun LocalWorkspaceFilesDialog(
                             loadingMore = loadingNextSearchPage,
                             pageError = searchPageError,
                             onPrefetch = ::fetchNextSearchPage,
+                            onRetry = { scope.launch { reload() } },
                         ) { file -> openPreview(file.path) }
                     }
                     mode == LocalFilesMode.WORKSPACE -> {
@@ -579,6 +607,7 @@ internal fun LocalWorkspaceFilesDialog(
                                 loadingMore = loadingNextPage,
                                 pageError = pageReadError,
                                 onPrefetch = ::fetchNextDirectoryPage,
+                                onRetry = { scope.launch { reload() } },
                                 section = section,
                                 isCategoryRoot = directory.isEmpty() || directory == "任务" || directory == "交付成果",
                                 onDirectory = {
@@ -656,6 +685,7 @@ private fun LocalWorkspaceDirectoryList(
     loadingMore: Boolean,
     pageError: String?,
     onPrefetch: () -> Unit,
+    onRetry: () -> Unit,
     section: Int,
     isCategoryRoot: Boolean,
     onDirectory: (String) -> Unit,
@@ -709,10 +739,14 @@ private fun LocalWorkspaceDirectoryList(
         }
         if (pageError != null) {
             item(key = "directory-page-read-error") {
-                Text("部分文件暂未显示：$"+"pageError",
-                    modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk)
+                Column {
+                    Text("部分文件暂未显示：$pageError",
+                        modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk)
+                    SyButton(text = stringResource(R.string.common_retry), onClick = onRetry,
+                        size = SyButtonSize.Small, variant = SyButtonVariant.Outline)
+                }
             }
         }
     }
@@ -792,6 +826,7 @@ private fun LocalFlatFileList(
     loadingMore: Boolean,
     pageError: String?,
     onPrefetch: () -> Unit,
+    onRetry: () -> Unit,
     onOpen: suspend (LocalWorkspaceFile) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -817,10 +852,14 @@ private fun LocalFlatFileList(
         }
         if (pageError != null) {
             item(key = "search-page-read-error") {
-                Text("部分搜索结果暂未显示：$"+"pageError",
-                    modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk)
+                Column {
+                    Text("部分搜索结果暂未显示：$pageError",
+                        modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk)
+                    SyButton(text = stringResource(R.string.common_retry), onClick = onRetry,
+                        size = SyButtonSize.Small, variant = SyButtonVariant.Outline)
+                }
             }
         }
     }

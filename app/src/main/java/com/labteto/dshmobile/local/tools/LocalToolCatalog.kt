@@ -12,9 +12,10 @@ import kotlinx.serialization.json.put
 /** Model-facing tools mirroring the official Harness capability families on Android. */
 object LocalToolCatalog {
     val specs: JsonArray = buildJsonArray {
-        add(tool("read", "读取本机工作区内的文本文件", properties(
+        add(tool("read", "按行和行内字符分段读取文本；结果未完时按返回的 start_line/start_char 继续", properties(
             "path" to string("相对工作区的路径"),
             "start_line" to integer("起始行，默认 1"),
+            "start_char" to integerRange("起始行内的 UTF-16 字符偏移，默认 0；使用上一页返回值续读长行", min = 0),
             "end_line" to integer("结束行，默认读取 400 行"),
         ), listOf("path")))
         add(tool("tool_output_read", "读取本机会话仍保留的完整工具结果，或按原文字面量搜索匹配的 UTF-8 偏移", properties(

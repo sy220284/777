@@ -30,6 +30,46 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun lineReadBoundsTheResultBeforeToolRetention() {
+        root.resolve("长行资料.txt").bufferedWriter().use { out ->
+            repeat(100) { out.append("资料".repeat(1_000)).append('\n') }
+        }
+        val page = workspace.read("长行资料.txt", 1, 100)
+        assertTrue("读取阶段就应分段，不能先拼接全部工具结果", page.length < 60_000)
+        assertTrue("分段必须给出续读位置", page.contains("start_line="))
+    }
+
+    @Test
+    fun windowsLineEndingsKeepTheExistingLineReadContract() {
+        root.resolve("Windows资料.txt").writeText("甲\r\n乙\r\n")
+        assertEquals("1: 甲\n2: 乙", workspace.read("Windows资料.txt", 1, 2))
+    }
+
+    @Test
+    fun longLinePagesPreserveEveryCharacterIncludingSurrogatePairs() {
+        val text = "中文😀🚀abc".repeat(13_000) + "末尾"
+        root.resolve("长行.txt").writeText(text)
+        val joined = StringBuilder()
+        var offset = 0
+        var pages = 0
+        do {
+            val page = workspace.read("长行.txt", 1, 1, startChar = offset)
+            assertTrue(page.length <= 50_000)
+            val part = page.substringBefore("\n[读取未完").removePrefix("1: ")
+            assertFalse(part.lastOrNull()?.isHighSurrogate() == true)
+            joined.append(part)
+            val next = Regex("start_line=1, start_char=(\\d+)").find(page)
+            if (next == null) break
+            val cursor = next.groupValues[1].toInt()
+            assertTrue(cursor > offset)
+            offset = cursor
+            pages++
+        } while (pages < 10)
+        assertEquals(text, joined.toString())
+        assertTrue(pages > 1)
+    }
+
+    @Test
     fun fileNameSearchStillFindsFilesBeyondTheFirstTwoThousand() {
         val folder = root.resolve("无关资料").apply { mkdirs() }
         repeat(2_050) { index -> folder.resolve("无关-${index}.txt").writeText("旧资料") }
@@ -108,10 +148,11 @@ class LocalWorkspaceTest {
         assertEquals(80, first.entries.size)
         folder.resolve("新增文件.txt").writeText("新的")
         folder.setLastModified(folder.lastModified() + 2_000L)
-        assertThrows(IllegalArgumentException::class.java) {
-            workspace.directoryPage("任务/版本变化", requireNotNull(first.nextOffset), 80)
-        }
-        assertEquals(80, workspace.directoryPage("任务/版本变化", 0, 80).entries.size)
+        val rest = workspace.directoryPage("任务/版本变化", requireNotNull(first.nextOffset), 80)
+        assertEquals(70, rest.entries.size)
+        assertEquals(150, (first.entries + rest.entries).map { it.path }.distinct().size)
+        assertFalse(rest.entries.any { it.path.endsWith("新增文件.txt") })
+        assertTrue(workspace.directoryEntries("任务/版本变化").any { it.path.endsWith("新增文件.txt") })
     }
 
     @Test
@@ -307,7 +348,7 @@ class LocalWorkspaceTest {
 
         assertEquals(".dsh/fetches/large.json", path)
         assertEquals(content, workspace.readRaw(path))
-        assertTrue(workspace.read(path, 1, 1).contains(middleMarker))
+        assertTrue(workspace.read(path, 1, 1, startChar = content.indexOf(middleMarker)).contains(middleMarker))
         assertTrue(workspace.search(middleMarker, path).contains(middleMarker))
     }
 

@@ -916,6 +916,101 @@
         }
       ],
       "scope": "源码与具名回归测试存在；尚未合并，运行结果以最新提交CI为准，不代表设备与真实服务验收。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 工作区长期记录与用户备注保护",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkImprovementArchive.kt",
+          "symbols": [
+            "LocalWorkImprovementArchive"
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/improvement/LocalWorkImprovementArchiveTest.kt",
+          "method": "createsSevenWorkspaceDocumentsAndPreservesUserNotesAcrossRefreshes",
+          "references": "LocalWorkImprovementArchive"
+        }
+      ],
+      "scope": "当前主线具名源码和对应测试声明已逐项核实；静态映射仅证明代码及局部测试存在，不证明真实模型对照收益或全部设备运行通过。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / Work 完成证据驱动的经验／提示词候选",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyLearning.kt",
+          "symbols": [
+            "parseProposal"
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyLearningTest.kt",
+          "method": "strictValidJsonBecomesCandidateNotAnActivePolicy",
+          "references": "parseProposal"
+        }
+      ],
+      "scope": "当前主线具名源码和对应测试声明已逐项核实；静态映射仅证明代码及局部测试存在，不证明真实模型对照收益或全部设备运行通过。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 同 Goal 契约的动态指导与长任务试用",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkImprovementGuidance.kt",
+          "symbols": [
+            "workImprovementGuidanceForStep"
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkImprovementGuidanceTest.kt",
+          "method": "eligibleAdviceIsRequestOnlyAndKeepsUserApprovalRules",
+          "references": "workImprovementGuidanceForStep"
+        }
+      ],
+      "scope": "当前主线具名源码和对应测试声明已逐项核实；静态映射仅证明代码及局部测试存在，不证明真实模型对照收益或全部设备运行通过。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 独立测试回执／Token 对照及窄范围采纳",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyEvaluation.kt",
+          "symbols": [
+            "shouldRetireWorkAdvice"
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyLearningTest.kt",
+          "method": "activeAdviceRetiresWhenVerifiedQualityRegresses",
+          "references": "shouldRetireWorkAdvice"
+        }
+      ],
+      "scope": "当前主线具名源码和对应测试声明已逐项核实；静态映射仅证明代码及局部测试存在，不证明真实模型对照收益或全部设备运行通过。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 技能改进草案与 App 问题迭代记录",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkImprovementArchive.kt",
+          "symbols": [
+            "LocalWorkImprovementArchive"
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/improvement/LocalWorkImprovementArchiveTest.kt",
+          "method": "promotedSkillRemainsAnUninstalledDraftInUserWorkspace",
+          "references": "LocalWorkImprovementArchive"
+        }
+      ],
+      "scope": "当前主线具名源码和对应测试声明已逐项核实；静态映射仅证明代码及局部测试存在，不证明真实模型对照收益或全部设备运行通过。"
     }
   ]
 }
