@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.tools.LocalFileInspector
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.UUID
@@ -85,6 +87,14 @@ class LocalWebCancellationAndroidTest {
             assertEquals(totalBytes, receipt.bytes)
             assertEquals(totalBytes, target.length())
             assertEquals(expectedRepeatedSha256(totalBytes, pattern), receipt.sha256)
+            // The same path must be discoverable and readable by Work after HTTP closes.
+            val workspace = LocalWorkspace(root)
+            val preview = workspace.preview(target.name)
+            assertEquals(totalBytes, preview.file.bytes)
+            assertEquals(null, preview.text) // Archive bytes must never be decoded as text.
+            val inspected = LocalFileInspector(root).inspect(target.name)
+            assertTrue(inspected.contains("bytes=$totalBytes"))
+            assertTrue(inspected.contains("sha256=${receipt.sha256}"))
             assertEquals(listOf(target.name), root.list()!!.toList())
         } finally {
             root.deleteRecursively()
