@@ -86,9 +86,6 @@ internal class LocalPublicWorkspaceBridge(
         }
         fun fingerprint(file: File): String = "${file.length()}:${file.lastModified()}"
         fun fingerprint(entry: DocumentEntry): String = "${entry.size}:${entry.modified}"
-        fun record(path: String, file: File, entry: DocumentEntry) {
-            changes.putString("synced:$path", "${fingerprint(file)}|${fingerprint(entry)}")
-        }
         fun safeLocal(path: String): File {
             val f = File(privateRoot, path)
             require(f.canonicalFile.toPath().startsWith(privateRoot.toPath())) { "文件路径越界" }
@@ -147,12 +144,17 @@ internal class LocalPublicWorkspaceBridge(
             }
             return hash.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
         }
+        fun record(path: String, file: File, entry: DocumentEntry) {
+            changes.putString("synced:${path}",
+                "${fingerprint(file)}|${fingerprint(entry)}|${digest(file)}")
+        }
         fun updateFile(path: String, local: File, parent: Uri, remote: DocumentEntry?) {
             checkBudget()
             val value = remote?.let { fingerprint(it) }
             val previous = preferences.getString("synced:$path", null)?.split('|')
             val wasLocal = previous?.getOrNull(0)
             val wasRemote = previous?.getOrNull(1)
+            val originalDigest = previous?.getOrNull(2)
             when {
                 remote == null -> {
                     bytes += local.length()
@@ -174,19 +176,29 @@ internal class LocalPublicWorkspaceBridge(
                 }
                 fingerprint(local) == wasLocal && value == wasRemote -> Unit
                 fingerprint(local) != wasLocal && value == wasRemote -> {
-                    bytes += local.length()
-                    check(bytes <= MAX_COPY_BYTES)
-                    copyIntoPublic(local, remote.uri)
-                    val saved = childList(uri, parent)[local.name] ?: error("公共文件状态不可读：$path")
-                    record(path, local, saved)
-                    pushed++
+                    if (originalDigest == null || digest(remote.uri) != originalDigest) {
+                        conflicts++
+                        conflictPaths += path
+                    } else {
+                        bytes += local.length()
+                        check(bytes <= MAX_COPY_BYTES)
+                        copyIntoPublic(local, remote.uri)
+                        val saved = childList(uri, parent)[local.name] ?: error("公共文件状态不可读：${path}")
+                        record(path, local, saved)
+                        pushed++
+                    }
                 }
                 fingerprint(local) == wasLocal && value != wasRemote -> {
-                    bytes += remote.size.coerceAtLeast(0)
-                    check(bytes <= MAX_COPY_BYTES)
-                    copyIntoPrivate(remote.uri, local)
-                    record(path, local, remote)
-                    pulled++
+                    if (originalDigest == null || digest(local) != originalDigest) {
+                        conflicts++
+                        conflictPaths += path
+                    } else {
+                        bytes += remote.size.coerceAtLeast(0)
+                        check(bytes <= MAX_COPY_BYTES)
+                        copyIntoPrivate(remote.uri, local)
+                        record(path, local, remote)
+                        pulled++
+                    }
                 }
                 else -> {
                     conflicts++
