@@ -100,6 +100,12 @@ internal class LocalArchiveReader(private val root: File) {
         return file
     }
 
+    private fun normalMember(name: String): String {
+        var normalized = name
+        while (normalized.startsWith("./")) normalized = normalized.removePrefix("./")
+        return normalized
+    }
+
     private fun safeName(name: String): Boolean =
         name.isNotBlank() && !name.startsWith("/") && !name.contains('\\') &&
             !name.contains('\u0000') && name.split('/').none { it == "." || it == ".." }
@@ -119,7 +125,7 @@ internal class LocalArchiveReader(private val root: File) {
                 while (entries.hasMoreElements()) {
                     val member = entries.nextElement()
                     if (!member.isDirectory) {
-                        zip.getInputStream(member).use { if (visit(Item(member.name, member.size), it)) return }
+                        zip.getInputStream(member).use { if (visit(Item(normalMember(member.name), member.size), it)) return }
                     }
                 }
             }
@@ -166,7 +172,7 @@ internal class LocalArchiveReader(private val root: File) {
             } else {
                 extendedName = null
                 if (kind == '0' || kind == '\u0000') {
-                    if (visit(Item(name, size), body)) return
+                    if (visit(Item(normalMember(name), size), body)) return
                 }
             }
             body.drain()
