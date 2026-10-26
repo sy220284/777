@@ -3,6 +3,9 @@ package com.labteto.dshmobile.ui.screens.local
 import com.shenyan.designsystem.foundation.SyMetric
 
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import java.io.File
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -52,6 +55,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
 import com.labteto.dshmobile.local.files.LocalWorkspaceSearchPage
+import com.labteto.dshmobile.local.files.LocalPublicWorkspaceBridge
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
@@ -134,6 +138,44 @@ internal fun LocalWorkspaceFilesDialog(
     var query by com.labteto.dshmobile.ui.components.rememberNavigationEntryState("", entryRequest, mode, sessionId)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val publicWorkspace = remember(context, workspacePath) {
+        LocalPublicWorkspaceBridge(context, File(workspacePath))
+    }
+    var publicSyncing by remember(workspacePath) { mutableStateOf(false) }
+    var publicSyncStatus by remember(workspacePath) { mutableStateOf<String?>(null) }
+    var publicLinked by remember(workspacePath) { mutableStateOf(publicWorkspace.selectedFolder() != null) }
+    fun syncPublicWorkspace() {
+        if (publicSyncing) return
+        publicSyncing = true
+        publicSyncStatus = null
+        scope.launch {
+            try {
+                publicSyncStatus = publicWorkspace.synchronize().summary
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                publicSyncStatus = "公共工作区同步失败：${error.message.orEmpty()}"
+            } finally {
+                publicSyncing = false
+            }
+        }
+    }
+    val publicWorkspacePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            try {
+                publicWorkspace.selectFolder(uri)
+                publicLinked = true
+                syncPublicWorkspace()
+            } catch (error: Exception) {
+                publicSyncStatus = "公共目录授权失败：${error.message.orEmpty()}"
+            }
+        }
+    }
+    LaunchedEffect(mode, workspacePath) {
+        if (mode == LocalFilesMode.WORKSPACE && publicWorkspace.selectedFolder() != null) {
+            syncPublicWorkspace()
+        }
+    }
     var selecting by rememberSaveable(mode, sessionId, section, directory) { mutableStateOf(false) }
     val selected = remember(mode, sessionId, section, directory) { mutableStateListOf<String>() }
     var sharing by remember { mutableStateOf(false) }
@@ -426,6 +468,49 @@ internal fun LocalWorkspaceFilesDialog(
                 if (preview == null) SySearchField(query, { query = it },
                     placeholder = stringResource(R.string.fluid_files_search),
                     modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd))
+
+                if (preview == null && mode == LocalFilesMode.WORKSPACE &&
+                    section == -1 && query.isBlank()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                    ) {
+                        SyButton(
+                            text = stringResource(if (publicLinked)
+                                R.string.local_public_workspace_change
+                                else R.string.local_public_workspace_connect),
+                            onClick = { publicWorkspacePicker.launch(null) },
+                            enabled = !publicSyncing,
+                            modifier = Modifier.weight(1f),
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                        )
+                        if (publicLinked) SyButton(
+                            text = stringResource(R.string.local_public_workspace_sync),
+                            onClick = ::syncPublicWorkspace,
+                            enabled = !publicSyncing,
+                            modifier = Modifier.weight(1f),
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                        )
+                    }
+                    Text(
+                        stringResource(if (publicLinked)
+                            R.string.local_public_workspace_linked_hint
+                            else R.string.local_public_workspace_hint),
+                        modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
+                    )
+                    publicSyncStatus?.let { status ->
+                        Text(
+                            status,
+                            modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
+                            style = DsType.caption11.withReadingWeight(),
+                            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
+                        )
+                    }
+                }
 
                 if (preview == null && query.isNotBlank() && mode == LocalFilesMode.WORKSPACE) {
                     Text(

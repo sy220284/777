@@ -637,6 +637,11 @@
     <string name="local_files_workspace_empty">项目暂无资料</string>
     <string name="local_files_loading">正在读取文件…</string>
     <string name="local_workspace_tasks">任务文件</string>
+    <string name="local_public_workspace_connect">连接公共工作区</string>
+    <string name="local_public_workspace_change">更换公共目录</string>
+    <string name="local_public_workspace_sync">同步文件</string>
+    <string name="local_public_workspace_hint">选择手机「文档」下的文件夹后，自动建立「777工作区」；运行环境、数据库、私有附件不公开。</string>
+    <string name="local_public_workspace_linked_hint">公共文件夹已连接。打开工作区时同步，也可随时手动同步；文件冲突不会自动覆盖。</string>
     <string name="local_workspace_tasks_hint">按任务分别存放草稿、资料和过程文件</string>
     <string name="local_workspace_deliverables">交付成果</string>
     <string name="local_workspace_deliverables_hint">集中查看任务完成后交付的文件</string>
