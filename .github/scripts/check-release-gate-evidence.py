@@ -106,19 +106,28 @@ CI = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 ci_concurrency = CI.split("\nconcurrency:\n", 1)[1].split("\n\njobs:", 1)[0]
 ci_group = re.search(r"(?m)^  group: (.+)$", ci_concurrency)
 if (ci_group is None or
-        "github.event_name" not in ci_group.group(1) or
-        "github.sha" not in ci_group.group(1) or
-        "github.event.pull_request.number" not in ci_group.group(1)):
-    fail("CI must use distinct concurrency groups per event and main commit / PR")
-# Never cancel the exact main commit / manually validated main SHA. Obsolete
-# feature-branch dispatches and PR checks may be replaced by newer revisions.
-if ("github.event_name == 'workflow_dispatch'" not in ci_group.group(1) or
-        "github.ref_name != 'main'" not in ci_group.group(1)):
-    fail("CI must preserve main commit isolation while coalescing feature-branch runs")
-expected_cancel = ("cancel-in-progress: ${{ github.event_name == 'pull_request' || "
-                   "(github.event_name == 'workflow_dispatch' && github.ref_name != 'main') }}")
+        "github.event.pull_request.head.repo.full_name || github.repository" not in ci_group.group(1) or
+        "github.event.pull_request.head.ref || github.ref_name" not in ci_group.group(1) or
+        "github.ref_name == 'main' && github.sha" not in ci_group.group(1) or
+        "'latest'" not in ci_group.group(1)):
+    fail("CI must coalesce PR and dispatch checks by branch, preserving main commit-specific evidence")
+if ("github.event_name" in ci_group.group(1) or
+        "github.event.pull_request.number" in ci_group.group(1)):
+    fail("Feature PR checks and manual dispatch must not split into independent runner queues")
+expected_cancel = "cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref_name != 'main' }}"
 if expected_cancel not in ci_concurrency:
-    fail("CI must retain immutable main validation and cancel only replaceable PR/branch runs")
+    fail("CI must cancel superseded feature checks but never cancel main checks")
+
+# Matrix duplicates consume separate Android emulator runners; apply the
+# same branch identity policy and keep its own workflow-level isolation.
+matrix = (ROOT / ".github/workflows/android-page-matrix.yml").read_text(encoding="utf-8")
+matrix_concurrency = matrix.split("\nconcurrency:\n", 1)[1].split("\n\njobs:", 1)[0]
+matrix_group = re.search(r"(?m)^  group: (.+)$", matrix_concurrency)
+if (matrix_group is None or
+        "github.event.pull_request.head.ref || github.ref_name" not in matrix_group.group(1) or
+        "github.ref_name == 'main' && github.sha" not in matrix_group.group(1) or
+        expected_cancel not in matrix_concurrency):
+    fail("Android matrix must deduplicate branch runs and retain immutable main commit validation")
 
 if CI.count("git diff --no-renames --name-only --diff-filter=ACMRD") < 2:
     fail("CI rename detection can conceal a removed product source")

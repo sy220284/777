@@ -11,12 +11,11 @@ permissions:
   actions: read
 
 concurrency:
-  # Main push and explicit main verification retain immutable SHA-specific runs.
-  # Auto-dispatched verification on a feature branch is replaceable: a newer
-  # index-generated HEAD supersedes its predecessor instead of multiplying runners.
-  # PR checks remain isolated from workflow_dispatch by event name.
-  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.event_name == 'workflow_dispatch' && github.ref_name != 'main' && github.ref_name || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref_name != 'main') }}
+  # PR and dispatch on the same feature branch share one queue. Obsolete
+  # builds cannot exhaust runners while an index-synced HEAD waits for CI.
+  # Main retains commit-specific, non-cancellable validation regardless of event.
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.event.pull_request.head.ref || github.ref_name }}-${{ github.event_name != 'pull_request' && github.ref_name == 'main' && github.sha || 'latest' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref_name != 'main' }}
 
 jobs:
   scope:

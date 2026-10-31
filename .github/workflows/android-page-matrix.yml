@@ -16,11 +16,12 @@ on:
 permissions:
   contents: read
 
-# Independent of the normal Android 16/17 CI workflow. This avoids a previous
-# 180-minute four-cell job blocking current full-CI feedback.
+# Independent of the normal CI, but PR and manual dispatch for one feature
+# branch share one queue to avoid duplicate four-device test runs.
+# Main commit checks must remain immutable and uncancelled.
 concurrency:
-  group: page-size-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: page-size-${{ github.workflow }}-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.event.pull_request.head.ref || github.ref_name }}-${{ github.event_name != 'pull_request' && github.ref_name == 'main' && github.sha || 'latest' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref_name != 'main' }}
 
 jobs:
   android-16-17-four-way:
