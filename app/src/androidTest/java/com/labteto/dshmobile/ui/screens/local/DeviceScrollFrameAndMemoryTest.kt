@@ -6,9 +6,7 @@ import android.os.Bundle
 import android.os.Debug
 import android.os.Handler
 import android.os.HandlerThread
-import android.os.SystemClock
-import android.view.InputDevice
-import android.view.MotionEvent
+import java.io.FileInputStream
 import android.view.FrameMetrics
 import android.view.Window
 import androidx.compose.foundation.layout.fillMaxSize
@@ -107,34 +105,23 @@ class DeviceScrollFrameAndMemoryTest {
         var peakJavaKb = (heap.totalMemory() - heap.freeMemory()) / 1024L
         var maxVisibleIndex = 0
         fun realSwipe(downwards: Boolean) {
-            // Compose performTouchInput advances its virtual test clock: in CI it can
-            // scroll hundreds of rows while generating almost no actual VSYNC frames.
-            // Inject 480 ms of wall-clock touchscreen input into the visible Activity
-            // instead, so Window FrameMetrics captures the renderer under real load.
-            val x = (viewport.left + viewport.right) / 2f
-            val upperY = viewport.top + viewport.height * 0.22f
-            val lowerY = viewport.top + viewport.height * 0.80f
-            val fromY = if (downwards) upperY else lowerY
-            val toY = if (downwards) lowerY else upperY
-            val downTime = SystemClock.uptimeMillis()
-            fun sendPointer(action: Int, y: Float) {
-                val event = MotionEvent.obtain(
-                    downTime, SystemClock.uptimeMillis(), action, x, y, 0,
-                )
-                event.source = InputDevice.SOURCE_TOUCHSCREEN
-                try {
-                    instrumentation.sendPointerSync(event)
-                } finally {
-                    event.recycle()
+            // Android's 'input swipe' injects actual wall-clock paced touch events
+            // through UiAutomation; Compose's synthetic test clock is never used.
+            // Waiting for shell stdout EOF ensures each swipe has finished before
+            // inspecting the visible index or starting the next gesture.
+            val x = ((viewport.left + viewport.right) / 2f).toInt()
+            val topY = (viewport.top + viewport.height * 0.22f).toInt()
+            val bottomY = (viewport.top + viewport.height * 0.80f).toInt()
+            val fromY = if (downwards) topY else bottomY
+            val toY = if (downwards) bottomY else topY
+            val command = "input touchscreen swipe $x $fromY $x $toY 480"
+            instrumentation.uiAutomation.executeShellCommand(command).use { descriptor ->
+                FileInputStream(descriptor.fileDescriptor).use { pipe ->
+                    val buffer = ByteArray(256)
+                    // A returned pipe is complete only after the real shell input gesture exits.
+                    while (pipe.read(buffer) >= 0) { /* no output is expected */ }
                 }
             }
-            sendPointer(MotionEvent.ACTION_DOWN, fromY)
-            repeat(30) { index ->
-                Thread.sleep(16)
-                val fraction = (index + 1) / 30f
-                sendPointer(MotionEvent.ACTION_MOVE, fromY + (toY - fromY) * fraction)
-            }
-            sendPointer(MotionEvent.ACTION_UP, toY)
         }
         try {
             repeat(16) { index ->
@@ -172,7 +159,7 @@ class DeviceScrollFrameAndMemoryTest {
         val output = String.format(Locale.US,
             "ANDROID_PERF api=%d scenario=work_timeline_scroll_frames samples=%d " +
                 "refresh_hz=%.1f observed_fps_p50=%s jank_pct=%s " +
-                "sample_quality=%s gesture_source=instrumentation_realtime_touch " +
+                "sample_quality=%s gesture_source=android_input_realtime_touch " +
                 "valid_vsync_intervals=%d max_visible_index=%d " +
                 "peak_pss_kib=%d peak_java_used_kib=%d",
             Build.VERSION.SDK_INT, frames.size, refreshRate, observedFps, jankPct,
