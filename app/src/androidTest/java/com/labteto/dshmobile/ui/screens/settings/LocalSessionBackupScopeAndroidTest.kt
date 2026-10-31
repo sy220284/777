@@ -29,6 +29,7 @@ class LocalSessionBackupScopeAndroidTest {
                         busy = false,
                         onCompact = {},
                         onExport = {},
+                        onExportFull = {},
                         onRestore = {},
                         onLegacyRestore = {},
                         onCancelRestore = {},
