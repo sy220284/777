@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.session
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import com.labteto.dshmobile.local.persistence.DurableFileCommit
 import com.labteto.dshmobile.local.model.LocalMediaStudioBackupInstaller
 import com.labteto.dshmobile.local.model.LocalMediaStudioBackupSnapshot
 import com.labteto.dshmobile.local.model.LocalMediaStudioZipEntries
@@ -9,6 +10,9 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.zip.ZipEntry
@@ -39,6 +43,7 @@ internal class SqliteSessionStorageManager(
     private val stageStudioSnapshot: ((File) -> LocalMediaStudioBackupSnapshot.Prepared)? = null,
 ) {
     private val pendingRoot get() = File(context.filesDir, "local-harness/.sqlite-restore-pending-$restoreKey")
+    private val committedRoot get() = File(context.filesDir, "local-harness/.sqlite-restore-committed-$restoreKey")
     private val snapshotFile get() = context.getDatabasePath(snapshotDatabaseName)
     private val eventFile get() = context.getDatabasePath(eventDatabaseName)
     private val mediaBackup get() = SqliteSessionMediaArchive(context)
@@ -348,6 +353,10 @@ internal class SqliteSessionStorageManager(
 
     @Synchronized
     fun applyPendingRestore(): Int {
+        // A completed install may have been interrupted during garbage collection.
+        // The atomic directory rename is the durable commit boundary; this cleanup
+        // never replays a completed install or requires its already-deleted manifest.
+        cleanupCommittedRestore()
         val ready = File(pendingRoot, "READY")
         if (!ready.isFile) return 0
         val restoreVersion = ready.readText()
@@ -414,7 +423,12 @@ internal class SqliteSessionStorageManager(
             check(tmp.renameTo(dst)) { "SQLite 备份恢复无法完成：${dst.name}" }
         }
         val count = countRows(File(pendingRoot, SNAPSHOT_ENTRY), "session_snapshots")
-        check(pendingRoot.deleteRecursively()) { "SQLite 数据已恢复，但待恢复标记未能删除" }
+        check(!Files.exists(committedRoot.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            "SQLite 恢复已提交目录发生冲突，禁止覆盖"
+        }
+        Files.move(pendingRoot.toPath(), committedRoot.toPath(), StandardCopyOption.ATOMIC_MOVE)
+        DurableFileCommit.syncDirectory(requireNotNull(committedRoot.parentFile))
+        cleanupCommittedRestore()
         return count
     }
 
@@ -423,6 +437,15 @@ internal class SqliteSessionStorageManager(
      * replay after restore could repeat effects or omit committed messages.
      * Validate user-imported ZIPs as well as locally exported pairs.
      */
+    private fun cleanupCommittedRestore() {
+        if (!Files.exists(committedRoot.toPath(), LinkOption.NOFOLLOW_LINKS)) return
+        check(committedRoot.isDirectory && !Files.isSymbolicLink(committedRoot.toPath())) {
+            "SQLite 已提交恢复目录存在不安全的文件类型"
+        }
+        check(committedRoot.deleteRecursively()) { "SQLite 已成功恢复，但清理已提交暂存文件失败" }
+        DurableFileCommit.syncDirectory(requireNotNull(committedRoot.parentFile))
+    }
+
     private fun validateSnapshotEventCursors(snapshotCopy: File, eventCopy: File) {
         SQLiteDatabase.openDatabase(
             snapshotCopy.path, null, SQLiteDatabase.OPEN_READONLY,
