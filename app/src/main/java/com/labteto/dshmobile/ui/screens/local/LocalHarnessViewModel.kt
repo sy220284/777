@@ -308,6 +308,7 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun searchWorkspacePage(query: String, offset: Int) = runtime.session.searchWorkspacePageForUi(query, offset)
     suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)
     suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
+    internal fun workEventChangesForUi(sessionId: String) = runtime.work.workEventChangesForUi(sessionId)
     internal fun artifactRevisionForUi(sessionId: String) = runtime.work.artifactRevisionForUi(sessionId)
     internal fun refreshArtifactFilesForUi(sessionId: String, items: List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>) = runtime.work.refreshArtifactFilesForUi(sessionId, items)
     internal fun inspectArtifactForUi(sessionId: String, item: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem) = runtime.work.inspectArtifactForUi(sessionId, item)
