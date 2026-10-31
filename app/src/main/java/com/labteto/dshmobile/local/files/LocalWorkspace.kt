@@ -215,7 +215,7 @@ class LocalWorkspace(
     ): String {
         val file = resolveForWrite(relativePath)
         val result = synchronized(fileWriteLock) {
-            LocalLargeFileIO.writeChunk(file, bytes, offset, finish, sessionId)
+            LocalLargeFileIO.writeChunk(file, bytes, offset, finish, sessionId, canonicalRoot)
         }
         if (finish) observations.remove(file.path)
         return "分块写入 " + relativePath + "；session_id=" + result.sessionId +
