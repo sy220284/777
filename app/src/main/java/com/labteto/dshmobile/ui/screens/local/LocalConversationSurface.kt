@@ -127,6 +127,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -549,32 +550,42 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var workArtifacts by remember(state.sessionId) {
         mutableStateOf<List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>>(emptyList())
     }
-    LaunchedEffect(state.sessionId, state.usageMode, workActions) {
+    val timelineLifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(state.sessionId, state.usageMode, workActions, timelineLifecycle) {
         workArtifacts = emptyList()
         if (state.usageMode == LocalUsageMode.WORK && workActions != null) {
-            var lastRevision: com.labteto.dshmobile.local.presentation.LocalWorkHistoryRevision? = null
-            while (true) {
-                try {
-                    val (revision, next) = withContext(Dispatchers.IO) {
-                        val current = workActions.artifactRevision(state.sessionId)
-                        val items = if (current != lastRevision) workActions.artifactsForUi(state.sessionId) else workArtifacts
-                        current to workActions.refreshArtifactFiles(state.sessionId, items)
+            timelineLifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                var lastRevision: com.labteto.dshmobile.local.presentation.LocalWorkHistoryRevision? = null
+                workActions.eventChanges(state.sessionId).collectLatest {
+                    var failures = 0
+                    while (true) {
+                        try {
+                            val (revision, next) = withContext(Dispatchers.IO) {
+                                val current = workActions.artifactRevision(state.sessionId)
+                                val items = if (current != lastRevision) workActions.artifactsForUi(state.sessionId) else workArtifacts
+                                current to workActions.refreshArtifactFiles(state.sessionId, items)
+                            }
+                            workArtifacts = next
+                            lastRevision = revision
+                            break
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (failure: Exception) {
+                            failures++
+                            if (failures == 1 || failures == 3) {
+                                com.labteto.dshmobile.observability.AppLog.failure(
+                                    "WorkTimeline", "read_artifacts", failure, sessionId = state.sessionId)
+                            }
+                            delay(workToolReadRetryDelayMs(failures))
+                        }
                     }
-                    workArtifacts = next
-                    lastRevision = revision
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    // Keep already-visible deliverables; a transient read failure is not deletion.
                 }
-                delay(2500)
             }
         }
     }
     var workToolReadFailures by remember(state.sessionId, state.usageMode) { mutableStateOf(0) }
-    val timelineLifecycle = LocalLifecycleOwner.current.lifecycle
-    // Read only after session restore; lifecycle and session changes cancel pending retries.
-    LaunchedEffect(state.sessionId, state.usageMode, state.loading, workActions, state.running, timelineLifecycle) {
+    // Live Work activity is projected only after a commit or lifecycle resume.
+    LaunchedEffect(state.sessionId, state.usageMode, state.loading, workActions, timelineLifecycle) {
         workToolReadFailures = 0
         if (!shouldReadWorkToolStatus(state.usageMode, state.loading, state.sessionId) || workActions == null) {
             workToolActivities = emptyList()
@@ -584,27 +595,23 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 activities = { workActions.toolActivities(state.sessionId) },
             )
             var failures = 0
-            while (true) {
-                when (val read = withContext(Dispatchers.IO) { reader.read() }) {
+            observeWorkToolActivityChanges(workActions.eventChanges(state.sessionId), reader) { read ->
+                when (read) {
                     is LocalWorkToolActivityRead.Available -> {
                         workToolActivities = read.activities
                         failures = 0
                         workToolReadFailures = 0
                     }
                     is LocalWorkToolActivityRead.Failed -> {
-                        // Never show stale running rows or replay a tool; only retry the read.
                         workToolActivities = emptyList()
-                        failures += 1
+                        failures++
                         workToolReadFailures = failures
                         if (failures == 1 || failures == 3) {
                             com.labteto.dshmobile.observability.AppLog.failure(
                                 "WorkTimeline", "read_tool_activity", read.cause, sessionId = state.sessionId)
                         }
                     }
-                    null -> Unit
                 }
-                if (!state.running && failures == 0) break
-                delay(if (failures > 0) workToolReadRetryDelayMs(failures) else 600L)
             }
         }
     }
