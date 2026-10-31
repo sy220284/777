@@ -53,6 +53,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -128,6 +129,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -556,7 +561,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         if (state.usageMode == LocalUsageMode.WORK && workActions != null) {
             timelineLifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 var lastRevision: com.labteto.dshmobile.local.presentation.LocalWorkHistoryRevision? = null
-                workActions.eventChanges(state.sessionId).collectLatest {
+                val eventUpdates = workActions.eventChanges(state.sessionId).map { Unit }
+                val fileUpdates = snapshotFlow {
+                    workArtifacts.asSequence()
+                        .filter { it.category == "file" }
+                        .map { it.reference }.distinct().take(100).toList()
+                }.distinctUntilChanged().flatMapLatest { paths ->
+                    workActions.artifactFileChanges(state.sessionId, paths)
+                }
+                merge(eventUpdates, fileUpdates).collectLatest {
                     var failures = 0
                     while (true) {
                         try {
