@@ -121,16 +121,20 @@ internal class LocalWorkspaceIntermediateMaintenance(private val workspaceRoot: 
         while (pending.isNotEmpty() && scanned < MAX_VISITS) {
             val (directory, depth) = pending.removeFirst()
             if (!directory.isDirectory || Files.isSymbolicLink(directory.toPath())) continue
-            val children = directory.listFiles() ?: error("无法读取工作区目录：${directory.path}")
-            for (candidate in children) {
-                if (++scanned > MAX_VISITS) break
-                if (Files.isSymbolicLink(candidate.toPath())) continue
-                if (regular(candidate)) {
-                    if (WRITE_TEMP.matches(candidate.name) &&
-                        stale(candidate, TEMP_GRACE_MS)) deleteOwned(candidate)
-                } else if (candidate.isDirectory && depth < MAX_DEPTH &&
-                    candidate.name !in setOf(".git", "node_modules", ".gradle", "build", ".dsh")) {
-                    pending.add(candidate to depth + 1)
+            // DirectoryStream avoids materializing tens of thousands of names in
+            // one Array when the workspace contains huge generated source trees.
+            Files.newDirectoryStream(directory.toPath()).use { children ->
+                for (entry in children) {
+                    if (++scanned > MAX_VISITS) break
+                    val candidate = entry.toFile()
+                    if (Files.isSymbolicLink(entry)) continue
+                    if (regular(candidate)) {
+                        if (WRITE_TEMP.matches(candidate.name) &&
+                            stale(candidate, TEMP_GRACE_MS)) deleteOwned(candidate)
+                    } else if (candidate.isDirectory && depth < MAX_DEPTH &&
+                        candidate.name !in setOf(".git", "node_modules", ".gradle", "build", ".dsh")) {
+                        pending.add(candidate to depth + 1)
+                    }
                 }
             }
         }
