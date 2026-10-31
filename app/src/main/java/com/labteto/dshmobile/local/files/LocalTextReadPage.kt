@@ -2,16 +2,23 @@ package com.labteto.dshmobile.local.files
 
 import com.labteto.dshmobile.local.runtime.MAX_TOOL_RESULT_CHARS
 import java.io.File
+import java.io.FileInputStream
 import java.io.InterruptedIOException
 
 /** Bound allocation while reading, and expose the exact next character instead of losing a long line. */
-internal fun readLocalTextPage(file: File, startLine: Int, endLine: Int, startChar: Int): String {
+internal fun readLocalTextPage(
+    file: File, startLine: Int, endLine: Int, startChar: Int,
+    checkpointLine: Int = 1, checkpointByte: Long = 0L,
+): String {
     val output = StringBuilder()
     // Reserve room inside the existing tool result budget for line labels and the continuation.
     val contentLimit = MAX_TOOL_RESULT_CHARS - 512
     val lastLine = minOf(endLine.toLong(), startLine.toLong() + 399L)
-    file.bufferedReader().use { reader ->
-        var line = 1L
+    require(checkpointLine in 1..startLine && checkpointByte >= 0L) { "文本索引位置无效" }
+    val source = FileInputStream(file)
+    source.channel.position(checkpointByte)
+    source.bufferedReader().use { reader ->
+        var line = checkpointLine.toLong()
         val skipBuffer = CharArray(8 * 1024)
         // Scan large line ranges in blocks. A read() per character made a 100 MB
         // file expensive to revisit, even though the returned page is bounded.

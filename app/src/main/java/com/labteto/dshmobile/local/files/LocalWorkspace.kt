@@ -83,6 +83,7 @@ class LocalWorkspace(
 ) {
     private val canonicalRoot = root.canonicalFile
     private val observations = LocalFileObservationCache()
+    private val textIndex = LocalTextLineIndex(canonicalRoot)
     private val fileWriteLock = Any()
     // Retain only the small traversal frontier between consecutive tool pages. On a
     // cache miss (process restart, different query or competing caller), numeric cursors
@@ -167,20 +168,21 @@ class LocalWorkspace(
         // Only editable files need a content observation. Large read-only pages must not
         // hash the entire source twice before returning a small excerpt.
         val editable = file.length() <= 8L * 1024 * 1024
-        val before = if (editable) fingerprint(file) else null
         val attributes = Files.readAttributes(file.toPath(), java.nio.file.attribute.BasicFileAttributes::class.java)
-        val page = readLocalTextPage(file, startLine.coerceAtLeast(1), endLine.coerceAtLeast(startLine.coerceAtLeast(1)), startChar)
+        val version = if (editable) null else textIndex.checkpoint(file, startLine.coerceAtLeast(1))
+        val before = if (editable) fingerprint(file) else requireNotNull(version).digest
+        val page = readLocalTextPage(
+            file, startLine.coerceAtLeast(1), endLine.coerceAtLeast(startLine.coerceAtLeast(1)), startChar,
+            checkpointLine = version?.line ?: 1, checkpointByte = version?.offset ?: 0L,
+        )
         val after = Files.readAttributes(file.toPath(), java.nio.file.attribute.BasicFileAttributes::class.java)
         require(attributes.size() == after.size() && attributes.lastModifiedTime() == after.lastModifiedTime() &&
             attributes.fileKey() == after.fileKey()) { "文件在读取过程中发生变化，请重新读取：$relativePath" }
-        if (before != null) {
-            require(before == fingerprint(file)) { "文件在读取过程中发生变化，请重新读取：$relativePath" }
-            observations.put(file.path, before)
-        } else {
-            // A large file is observed through a streaming digest, not a whole-file string.
-            // The edit path re-checks the same digest before publishing a replacement.
-            observations.put(file.path, fingerprint(file))
+        if (editable) require(before == fingerprint(file)) {
+            "文件在读取过程中发生变化，请重新读取：$relativePath"
         }
+        // The line-index SHA tracks this exact version; edit verifies full SHA again.
+        observations.put(file.path, before)
         return page
     }
 
