@@ -136,9 +136,13 @@ class LocalSessionFilesRuntime @Inject internal constructor(
         ) { workspace.preview(path, offset = offset) } }
 
     override suspend fun exportWorkspaceFile(path: String, output: java.io.OutputStream): Long =
-        withContext(Dispatchers.IO) { resourceScheduler.withResource(
-            HarnessResourceKind.FILE_IO, "file:export"
-        ) { workspace.exportFileForUi(path, output) } }
+        withContext(Dispatchers.IO) {
+            val units = com.labteto.dshmobile.harness.resource.harnessFileIoUnitsForBytes(
+                workspace.fileSizeForResourceBudget(path))
+            resourceScheduler.withResource(HarnessResourceKind.FILE_IO, "file:export", units = units) {
+                workspace.exportFileForUi(path, output)
+            }
+        }
 }
 
 @dagger.Module
