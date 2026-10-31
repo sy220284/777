@@ -123,6 +123,14 @@ internal fun localResourceBudgetForMemoryClass(
             else -> 1
         },
         maxLanguageServers = (slots - 1).coerceIn(2, 6),
+        maxFileIo = when {
+            deviceMemory.lowMemory || deviceMemory.lowRamDevice -> 1
+            deviceMemory.availableRamMb in 1 until 2_048 -> 1
+            memoryClassMb >= 256 && slots >= 4 -> 2
+            else -> 1
+        },
+        maxMediaDecode = if (memoryClassMb >= 512 && slots >= 8 &&
+            !deviceMemory.lowMemory && !deviceMemory.lowRamDevice) 2 else 1,
     )
 }
 
@@ -162,6 +170,8 @@ internal fun localAdaptiveResourceBudget(
         maxTerminals = localLimit(initial.maxTerminals, memory.maxTerminals),
         maxVirtualDisplays = localLimit(initial.maxVirtualDisplays, memory.maxVirtualDisplays),
         maxLanguageServers = localLimit(initial.maxLanguageServers, memory.maxLanguageServers),
+        maxFileIo = localLimit(initial.maxFileIo, memory.maxFileIo),
+        maxMediaDecode = localLimit(initial.maxMediaDecode, memory.maxMediaDecode),
     )
 }
 

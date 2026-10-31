@@ -395,6 +395,8 @@ internal class LocalToolExecutionCoordinator(
             )
         }
 
+        val environment = currentCoroutineContext()[com.labteto.dshmobile.harness.tools.ToolExecutionEnvironmentContext]
+            ?.takeIf { registered.metadata.environmentBound }
         val executionOwner = currentCoroutineContext()[SessionExecutionContext]?.lease
         val runOwner = currentCoroutineContext()[AgentRunExecutionContext]
         val callerJob = currentCoroutineContext()[Job]
@@ -406,7 +408,8 @@ internal class LocalToolExecutionCoordinator(
             rootCallId = call.id,
             attributes = buildMap {
                 putAll(executionAttributes)
-                currentCoroutineContext()[com.labteto.dshmobile.harness.capability.WorkspaceExecutionContext]?.let {
+                environment?.let { put("execution_environment", it.environmentId) }
+                currentCoroutineContext()[com.labteto.dshmobile.harness.capability.WorkspaceExecutionContext]?.takeIf { environment == null }?.let {
                     put("workspace_id", it.workspaceId)
                     put("workspace_root", it.root.path)
                 }
@@ -466,7 +469,7 @@ internal class LocalToolExecutionCoordinator(
                             if (!beforeExecution()) throw LocalToolSampleSuperseded()
                             // The registry calls this only after schema checks and user approval.
                             // Waiting for approval must never hold a filesystem read/write lease.
-                            executionLease = workspaceReadWriteGate.acquire(admittedTool)
+                            executionLease = if (environment == null) workspaceReadWriteGate.acquire(admittedTool) else null
                             // Admission can suspend behind another read/write operation. A correction
                             // committed during that wait must invalidate this still-unstarted call.
                             executionOwner?.requireCurrent(sessionId)

@@ -44,6 +44,8 @@ class LocalSessionRuntime @Inject internal constructor(
         sessionFiles.conversationFiles(sessionId)
     internal suspend fun previewWorkspaceFileForUi(path: String): LocalWorkspaceFilePreview =
         sessionFiles.previewWorkspaceFile(path)
+    internal suspend fun previewWorkspaceFilePageForUi(path: String, offset: Long): LocalWorkspaceFilePreview =
+        sessionFiles.previewWorkspaceFilePage(path, offset)
     internal fun transcriptPageForUi(
         sessionId: String,
         cursor: LocalTranscriptPageCursor? = null,

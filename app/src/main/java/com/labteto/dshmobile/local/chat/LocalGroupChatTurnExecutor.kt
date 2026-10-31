@@ -243,6 +243,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 baseUrl = snapshot.modelState.baseUrl,
                 planSharing = snapshot.modelState.modelSelection.activeProfile?.authKind ==
                     com.labteto.dshmobile.local.model.LocalModelAuthKind.CHATGPT_PLAN,
+                resourceScheduler = runtimeStateStore.resourceScheduler,
             )
             val rawReply = completeWithRetry(
                 key = key,

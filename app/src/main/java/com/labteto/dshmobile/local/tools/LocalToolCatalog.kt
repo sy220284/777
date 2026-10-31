@@ -28,6 +28,19 @@ object LocalToolCatalog {
             "path" to string("相对工作区的路径；任务中间文件优先保存到 create_goal 返回的任务目录，普通文档默认中文文件名，扩展名不变"),
             "content" to string("完整文件内容"),
         ), listOf("path", "content")))
+        add(tool("read_chunk", "按字节偏移读取大文件，返回有界 Base64 页和下一字节位置", properties(
+            "path" to string("工作区文件路径"),
+            "start_byte" to integerRange("起始字节偏移，默认 0", min = 0),
+            "max_bytes" to integerRange("读取字节数，最大 49152", 1, 49152),
+        ), listOf("path")))
+        add(tool("write_chunk", "文本或 Base64 二进制分块续写；续写时必须提供返回的 session_id，完成后原子提交", properties(
+            "path" to string("工作区目标文件路径"),
+            "content" to string("当前分块 UTF-8 文本（与 content_base64 二选一）"),
+            "content_base64" to string("二进制分块的 Base64 编码（与 content 二选一，解码后最多 256 KiB）"),
+            "session_id" to string("续写会话令牌；首次 offset=0 不填写，后续必须使用首次返回的值"),
+            "offset" to integerRange("必须等于上次返回的 next_byte，首次 0", min = 0),
+            "finish" to boolean("是否提交完整文件，默认 false"),
+        ), listOf("path", "offset")))
         add(tool("edit", "唯一字面量替换；修改前必须先用 read 读取包含待替换内容的目标区域，write 创建或覆盖不算读取", properties(
             "path" to string("相对工作区的路径"),
             "old_text" to string("必须只出现一次的原文"),
@@ -284,7 +297,7 @@ object LocalToolCatalog {
             "message" to string("需要追加的消息"),
             "delivery_mode" to string("trigger_turn（默认，投递后按需唤醒）或 queue_only（只入持久队列，不启动新轮次）"),
         ), listOf("agent_id", "message")))
-        add(tool("interrupt_agent", "仅中断可恢复后台代理当前 Activation，保留身份、检查点与持久 Inbox；不会永久关闭。非可恢复 Agent 将被拒绝", properties(
+        add(tool("interrupt_agent", "仅中断可恢复后台代理当前 Activation，含本会话 Team 成员；保留身份、检查点与持久 Inbox。非可恢复 Agent 将被拒绝", properties(
             "agent_id" to string("当前 Work 会话中的可恢复代理编号"),
         ), listOf("agent_id")))
         add(tool("agent_inspect", "检查当前 Work 会话后台 Agent 的身份、运行状态、消息数、持久恢复类型和摘要；状态输出并非最终成果验收", properties(
@@ -298,7 +311,7 @@ object LocalToolCatalog {
         add(tool("agent_resume", "仅请求已中断或 dormant 的持久只读代理通过既有恢复检查点重新激活；需要待处理 Inbox 消息或安全暂停执行片；返回的是请求回执，不代表轮次已被准入", properties(
             "agent_id" to string("当前 Work 会话中的持久可恢复代理编号"),
         ), listOf("agent_id")))
-        add(tool("agent_close", "永久取消当前 Work 会话的后台 Agent，清理待处理 Inbox；与只中断当前轮次的 interrupt_agent 区别明确", properties(
+        add(tool("agent_close", "永久取消当前 Work 会话的后台 Agent；Team 成员由团队生命周期解雇、释放任务并清理邮箱，普通代理清理持久 Inbox", properties(
             "agent_id" to string("当前 Work 会话中的后台代理编号"),
         ), listOf("agent_id")))
         add(tool("workflow", "以持久 Kotlin DAG 调度子任务，恢复已验收节点并继续剩余依赖。默认只读；可写需显式授权且未知副作用不重放。非空/字符串验收仅是窄文本检查，不证明通用交付", properties(

@@ -191,6 +191,7 @@ internal class LocalSubagentRunnerFactory(
                     it.authKind == com.labteto.dshmobile.local.model.LocalModelAuthKind.CHATGPT_PLAN &&
                         it.model == model && it.baseUrl.trimEnd('/') == baseUrl.trimEnd('/')
                 } == true,
+                resourceScheduler = resourceScheduler,
             )
         },
         resolveImageMode = { mode, baseUrl, model -> resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model) },

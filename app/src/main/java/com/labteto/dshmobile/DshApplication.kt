@@ -8,6 +8,7 @@ import android.os.LocaleList
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.connection.ThemeBootstrapPreferences
 import androidx.work.WorkManager
+import com.labteto.dshmobile.local.files.LocalWorkspaceIntermediateMaintenance
 import com.labteto.dshmobile.local.runtime.LocalRuntimeKernel
 import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
 import com.labteto.dshmobile.observability.AppLog
@@ -59,6 +60,15 @@ class DshApplication : Application() {
         // Cancel relay reconnect work left by older installations.
         WorkManager.getInstance(this).cancelUniqueWork("dsh-keep-alive")
         localRuntimeKernelProvider.get().start()
+
+        // Reclaim only expired, reproducible workspace intermediates off the UI thread.
+        // No periodic worker: startup is an existing lifecycle trigger. Durable
+        // resumable chunks and all user/session data remain untouched.
+        maintenanceScope.launch {
+            LocalWorkspaceIntermediateMaintenance(
+                File(filesDir, "local-harness/workspace"),
+            ).cleanup()
+        }
 
         // Legacy update files are removed immediately. A verified APK that has already been handed
         // to Android's installer is kept only until either this installed build reaches the target

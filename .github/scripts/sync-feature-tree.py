@@ -1475,6 +1475,28 @@ if __name__ == "__main__":
                     target.write_text(content, encoding="utf-8")
         print(f"完成全量扫描；需要同步 {len(stale)} 个文件: {', '.join(stale)}")
         if args.check and stale:
+            # Give contributors enough deterministic evidence to restore generated
+            # documents without disabling drift checks or guessing the source SHA.
+            current_index = json.loads(output[INDEX])
+            old_index = json.loads((ROOT / INDEX).read_text(encoding="utf-8"))
+            old_hashes = {entry["path"]: entry["sha256"] for entry in
+                          old_index.get("production_file_fingerprints", [])}
+            changed_hashes = [entry for entry in
+                              current_index.get("production_file_fingerprints", [])
+                              if old_hashes.get(entry["path"]) != entry["sha256"]]
+            changed_meta = {key: value for key, value in current_index.items()
+                            if key != "production_file_fingerprints" and old_index.get(key) != value}
+            current_review = json.loads(output[REVIEW])
+            old_review = json.loads((ROOT / REVIEW).read_text(encoding="utf-8"))
+            review_changes = {key: value for key, value in current_review.items()
+                              if old_review.get(key) != value}
+            print("功能树同步差异：" + json.dumps({
+                "source_snapshot": current_index.get("source_snapshot"),
+                "modified_source_hashes": changed_hashes,
+                "index_changed_fields": changed_meta,
+                "review_changed_fields": review_changes,
+            }, ensure_ascii=False, separators=(",", ":")))
+        if args.check and stale:
             sys.exit(1)
     except (OSError, ValueError, AssertionError, KeyError, TypeError) as error:
         import traceback

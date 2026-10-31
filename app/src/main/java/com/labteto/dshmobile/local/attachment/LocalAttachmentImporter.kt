@@ -139,7 +139,14 @@ internal class LocalAttachmentImporter(
         }
 
         val mediaType = imageMetadata?.mediaType ?: declaredMediaType
-        val attachmentId = sha256(normalized.file)
+        // copyAttachmentCancellably already hashed the original stream. Re-reading a
+        // 100 MB non-transcoded attachment doubles disk I/O during import.
+        // Rehash only when image normalization produced different bytes.
+        val attachmentId = if (normalized.file == incoming) {
+            digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        } else {
+            sha256(normalized.file)
+        }
         val extension = when (mediaType) {
             "image/png" -> "png"
             "image/jpeg" -> "jpg"
