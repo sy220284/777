@@ -121,6 +121,23 @@ class LocalLargeFileOperationsTest {
         assertEquals(text, builder.toString())
     }
 
+    @Test fun sparse512MiBFileCanReadItsTailWithoutAllocatingItsLength() {
+        val file = root.resolve("sparse.txt")
+        val suffix = "文件末尾😀".toByteArray(Charsets.UTF_8)
+        java.io.RandomAccessFile(file, "rw").use { stream ->
+            stream.setLength(512L * 1024L * 1024L)
+            stream.write(ByteArray(8192) { 'a'.code.toByte() })
+            stream.seek(stream.length() - suffix.size)
+            stream.write(suffix)
+        }
+        val offset = file.length() - suffix.size
+        val result = workspace.preview("sparse.txt", maxBytes = 4096, offset = offset)
+        assertEquals(offset, result.offset)
+        assertEquals("文件末尾😀", result.text)
+        assertEquals(null, result.nextOffset)
+        assertEquals(512L * 1024L * 1024L, result.file.bytes)
+    }
+
     @Test fun largeToolArtifactsAreStoredWithoutFormerFiveMiBCeiling() {
         val content = "abcd-".repeat(1_300_000)
         val path = workspace.writeToolArtifact(".dsh/queries/large.txt", content)
