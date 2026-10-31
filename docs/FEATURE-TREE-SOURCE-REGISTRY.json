@@ -10,6 +10,14 @@
       "test": "app/src/test/java/com/labteto/dshmobile/automation/AutomationReceiptTest.kt#keepsNewestTwoHundredReceipts"
     },
     {
+      "id": "runtime.agent-remote.environment",
+      "path": "第三层｜平台与工程保障 / 代理执行后端 / 受审批的远端文件与原生进程执行（PR #874，完整环境仍待补齐）",
+      "source": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AgentTlsWorkerServer.kt",
+      "entry": "serve",
+      "owner": "TOOLS",
+      "test": "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#tlsToolEffectWritesOnlyTheServerWorkspaceAfterHostApproval"
+    },
+    {
       "id": "settings.memory.management-query",
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆记录查看和维护",
       "source": "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt",

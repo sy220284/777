@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.attachment.LocalAttachmentImporter
 import com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalog
 import com.labteto.dshmobile.local.attachment.inspectImportedAttachmentFile
 import com.labteto.dshmobile.uicontract.UiAttachmentInspectionReceipt
+import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
@@ -39,6 +40,8 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     runtimeStateStore: LocalRuntimeStateStore,
     eventLogs: LocalSessionEventLogRegistry,
 ) : com.labteto.dshmobile.uicontract.FilesUiPort {
+    private val resourceScheduler = runtimeStateStore.resourceScheduler
+    private val context = context
     internal val workspace = LocalWorkspace(
         root = File(context.filesDir, "local-harness/workspace"),
         extraSearchPaths = bundledRuntimeManager::searchPaths,
@@ -77,7 +80,15 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     )
 
     internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment =
-        withContext(Dispatchers.IO) { attachmentImporter.import(uri) }
+        withContext(Dispatchers.IO) { resourceScheduler.withResource(
+            HarnessResourceKind.FILE_IO, "file:import"
+        ) {
+            if (context.contentResolver.getType(uri)?.startsWith("image/") == true) {
+                resourceScheduler.withResource(HarnessResourceKind.MEDIA_DECODE, "file:import_image") {
+                    attachmentImporter.import(uri)
+                }
+            } else attachmentImporter.import(uri)
+        } }
 
     internal suspend fun importToolImages(content: com.labteto.dshmobile.harness.tools.ToolRichContent?): List<LocalImportedAttachment> =
         withContext(Dispatchers.IO) {
@@ -115,10 +126,23 @@ class LocalSessionFilesRuntime @Inject internal constructor(
         withContext(Dispatchers.IO) { coordinator.conversationFiles(sessionId) }
 
     override suspend fun previewWorkspaceFile(path: String): LocalWorkspaceFilePreview =
-        withContext(Dispatchers.IO) { coordinator.preview(path) }
+        withContext(Dispatchers.IO) { resourceScheduler.withResource(
+            HarnessResourceKind.FILE_IO, "file:preview"
+        ) { coordinator.preview(path) } }
+
+    override suspend fun previewWorkspaceFilePage(path: String, offset: Long): LocalWorkspaceFilePreview =
+        withContext(Dispatchers.IO) { resourceScheduler.withResource(
+            HarnessResourceKind.FILE_IO, "file:preview_page"
+        ) { workspace.preview(path, offset = offset) } }
 
     override suspend fun exportWorkspaceFile(path: String, output: java.io.OutputStream): Long =
-        withContext(Dispatchers.IO) { workspace.exportFileForUi(path, output) }
+        withContext(Dispatchers.IO) {
+            val units = com.labteto.dshmobile.harness.resource.harnessFileIoUnitsForBytes(
+                workspace.fileSizeForResourceBudget(path))
+            resourceScheduler.withResource(HarnessResourceKind.FILE_IO, "file:export", units = units) {
+                workspace.exportFileForUi(path, output)
+            }
+        }
 }
 
 @dagger.Module

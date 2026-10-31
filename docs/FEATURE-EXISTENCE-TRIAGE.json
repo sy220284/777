@@ -428,6 +428,33 @@
         }
       ],
       "conclusion": "未合并：复用Team Owner与持久Jobs，真实运行身份约束成员消息和任务CAS；测试源码存在，按用户要求未执行工具链。"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 代理执行后端 / 受审批的远端文件与原生进程执行（PR #874，完整环境仍待补齐）",
+      "kind": "partial_remote_workspace_environment",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironment.kt",
+          "symbol": "AgentWorkspaceEnvironment"
+        },
+        {
+          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentEnvironmentTools.kt",
+          "symbol": "AgentEnvironmentToolRequest"
+        }
+      ],
+      "test": [
+        {
+          "path": "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt",
+          "method": "fileEffectsAndFreshObservationBelongToTheRemoteRoot"
+        },
+        {
+          "path": "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt",
+          "method": "nativeProcessReturnsRealExitCodeAndRemoteWorkingDirectory"
+        }
+      ],
+      "conclusion": "远端文件读写、文件版本校验与原生进程在指定工作区有生产实现及JVM测试源码；Android产品设置授权、完整工具契约、工件回收、Goal证据接纳与跨模式冷恢复仍待实证，不能标记为完整交付。"
     }
   ]
 }

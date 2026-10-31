@@ -9,7 +9,7 @@ from pathlib import Path
 FIELDS = ("round", "scenario", "api", "samples", "p50_ms", "p95_ms", "max_ms",
           "refresh_hz", "observed_fps_p50", "jank_pct", "peak_pss_kib",
           "peak_java_used_kib", "sample_pss_kib", "sample_java_used_kib",
-          "sample_quality", "valid_vsync_intervals",
+          "sample_quality", "gesture_source", "valid_vsync_intervals",
           "max_visible_index")
 EXPECTED = {
     "work_2000_events_cold_projection",
@@ -56,6 +56,8 @@ def parse(path, round_number, api):
                             f"round {round_number}: missing/invalid {field} in {scenario}")
             continue
         quality = row.get("sample_quality")
+        if row.get("gesture_source") != "android_input_realtime_touch":
+            raise ValueError(f"round {round_number}: scrolling must use actual wall-clock touch events")
         frames = int(row.get("samples", -1))
         intervals = int(row.get("valid_vsync_intervals", -1))
         if quality not in {"valid", "insufficient"} or frames < 0 or intervals < 0:

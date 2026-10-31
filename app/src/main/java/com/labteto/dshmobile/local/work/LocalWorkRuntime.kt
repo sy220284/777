@@ -163,9 +163,29 @@ class LocalWorkRuntime @Inject internal constructor(
     }
 
     /** Same authoritative EventLog across app restarts; source version checked on display. */
-    /** The authoritative Session event stream; evidence cards never poll a timer. */
-    internal fun requirementEvidenceChangesForUi(sessionId: String): kotlinx.coroutines.flow.StateFlow<Long> =
+    /** The committed Session EventLog is the only revision source for Work UI updates. */
+    internal fun workEventChangesForUi(sessionId: String): kotlinx.coroutines.flow.StateFlow<Long> =
         eventLogs.get(sessionId).changes
+
+    /** Only visible, already-admitted artifact paths are watched. No filesystem polling. */
+    internal fun workArtifactFileChangesForUi(sessionId: String, paths: List<String>): kotlinx.coroutines.flow.Flow<Unit> =
+        channelFlow {
+            if (sessionId != runtimeStateStore.currentSessionId || paths.isEmpty()) return@channelFlow
+            // Re-arm inode observers after atomic file replacement and rename events.
+            val rearm = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+            merge(kotlinx.coroutines.flow.flowOf(Unit), rearm).collectLatest {
+                watchLocalWorkEvidenceFiles(
+                    File(sessionFiles.workspace.path), emptyList(), paths.take(100),
+                ).collect {
+                    send(Unit)
+                    rearm.tryEmit(Unit)
+                }
+            }
+        }.flowOn(Dispatchers.IO)
+
+    /** Evidence and timeline read the same owner; no separate Work revision store. */
+    internal fun requirementEvidenceChangesForUi(sessionId: String): kotlinx.coroutines.flow.StateFlow<Long> =
+        workEventChangesForUi(sessionId)
 
     /** Exact file edits are surfaced by Android's event notifier, never a display timer. */
     internal fun requirementEvidenceFileChangesForUi(sessionId: String): kotlinx.coroutines.flow.Flow<Unit> =

@@ -112,6 +112,7 @@ internal data class LocalWorkFeatureUiActions(
     },
     val conversationFiles: suspend (String) -> LocalConversationFiles,
     val previewWorkspaceFile: suspend (String) -> LocalWorkspaceFilePreview,
+    val previewWorkspaceFilePage: suspend (String, Long) -> LocalWorkspaceFilePreview = { path, _ -> previewWorkspaceFile(path) },
     val artifactsForUi: (String) -> List<LocalArtifactUiItem>,
     val eventSequenceForUi: (String) -> Long,
     val artifactRevision: (String) -> com.labteto.dshmobile.local.presentation.LocalWorkHistoryRevision?,
@@ -122,6 +123,8 @@ internal data class LocalWorkFeatureUiActions(
     val toolEvidence: (String, String, Long) -> String?,
     val requirementEvidence: (String) -> List<com.labteto.dshmobile.local.work.LocalRequirementEvidenceLink>,
     val linkRequirementEvidence: (String, com.labteto.dshmobile.local.presentation.LocalRequirementUiTarget, LocalArtifactUiItem) -> Boolean,
+    val eventChanges: (String) -> kotlinx.coroutines.flow.Flow<Long>,
+    val artifactFileChanges: (String, List<String>) -> kotlinx.coroutines.flow.Flow<Unit>,
 )
 
 internal data class LocalAutomationFeatureUiActions(

@@ -19,9 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -107,6 +105,7 @@ internal fun LocalWorkspaceFilesDialog(
     },
     loadConversation: suspend (String) -> LocalConversationFiles,
     loadPreview: suspend (String) -> LocalWorkspaceFilePreview,
+    loadPreviewPage: suspend (String, Long) -> LocalWorkspaceFilePreview = { path, _ -> loadPreview(path) },
     onDismiss: () -> Unit,
     initialFilePath: String? = null,
     entryRequest: Int = 0,
@@ -126,6 +125,7 @@ internal fun LocalWorkspaceFilesDialog(
     var searchPageError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
     var conversation by remember(mode, sessionId) { mutableStateOf(LocalConversationFiles()) }
     var preview by remember(mode, sessionId) { mutableStateOf<LocalWorkspaceFilePreview?>(null) }
+    val previewPreviousOffsets = remember(mode, sessionId) { mutableStateListOf<Long>() }
     var previewPath by com.labteto.dshmobile.ui.components.rememberNavigationEntryState<String?>(null, entryRequest, mode, sessionId)
     var loadedForEntry by remember(mode, sessionId, entryRequest) { mutableStateOf(false) }
     var previewLoading by remember(mode, sessionId) { mutableStateOf(false) }
@@ -210,6 +210,7 @@ internal fun LocalWorkspaceFilesDialog(
 
     suspend fun openPreview(path: String) {
         invalidatePreview()
+        previewPreviousOffsets.clear()
         val epoch = previewEpoch
         previewJob = currentCoroutineContext()[Job]
         previewPath = path
@@ -227,6 +228,39 @@ internal fun LocalWorkspaceFilesDialog(
                 preview = null
                 previewPath = null
             }
+        } finally {
+            if (previewEpoch == epoch) {
+                previewLoading = false
+                previewJob = null
+            }
+        }
+    }
+
+    suspend fun pagePreview(offset: Long, backward: Boolean) {
+        val path = previewPath ?: return
+        val previous = preview ?: return
+        invalidatePreview()
+        val epoch = previewEpoch
+        previewJob = currentCoroutineContext()[Job]
+        previewLoading = true
+        error = null
+        try {
+            val loaded = loadPreviewPage(path, offset)
+            if (previewEpoch == epoch) {
+                require(loaded.offset == offset && loaded.file.path == previous.file.path &&
+                    loaded.file.bytes == previous.file.bytes &&
+                    loaded.file.modifiedAt == previous.file.modifiedAt) {
+                    "文件预览内容已经发生变化，请刷新后重试"
+                }
+                if (backward) {
+                    if (previewPreviousOffsets.isNotEmpty()) previewPreviousOffsets.removeAt(previewPreviousOffsets.lastIndex)
+                } else previewPreviousOffsets.add(previous.offset)
+                preview = loaded
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            if (previewEpoch == epoch) error = failure.message ?: previewFailed
         } finally {
             if (previewEpoch == epoch) {
                 previewLoading = false
@@ -570,7 +604,17 @@ internal fun LocalWorkspaceFilesDialog(
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
-                    preview != null -> LocalFilePreviewBody(preview!!)
+                    preview != null -> LocalFilePreviewBody(
+                        preview = preview!!,
+                        loadingPage = previewLoading,
+                        hasPrevious = previewPreviousOffsets.isNotEmpty(),
+                        onPrevious = { previewPreviousOffsets.lastOrNull()?.let { offset -> scope.launch {
+                            pagePreview(offset, backward = true)
+                        } } },
+                        onNext = { preview?.nextOffset?.let { offset -> scope.launch {
+                            pagePreview(offset, backward = false)
+                        } } },
+                    )
                     query.isNotBlank() -> {
                         if (shareableFiles.isEmpty() && nextSearchOffset == null) LocalFilesEmpty(
                             stringResource(R.string.fluid_files_no_matches), query.trim())
@@ -1054,7 +1098,13 @@ private fun LocalFileRow(
 }
 
 @Composable
-private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
+private fun LocalFilePreviewBody(
+    preview: LocalWorkspaceFilePreview,
+    loadingPage: Boolean = false,
+    hasPrevious: Boolean = false,
+    onPrevious: () -> Unit = {},
+    onNext: () -> Unit = {},
+) {
     Column(
         Modifier.fillMaxSize().padding(horizontal = SyMetric.gapLg),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
@@ -1073,17 +1123,33 @@ private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
         } else {
             if (preview.truncated) {
                 Text(
-                    stringResource(R.string.local_files_truncated_hint),
+                    "文件仍有后续内容。当前起点：" + formatBytes(preview.offset),
                     style = DsType.caption11.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                 )
             }
-            SelectionContainer {
-                Text(
-                    preview.text,
-                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                    style = DsType.mdCode,
-                )
+            // Compose must never lay out half a megabyte as one Text paragraph.
+            // Virtualized chunks preserve the full bounded preview and selection
+            // without a single pathological text-measurement operation.
+            val previewChunks = remember(preview.text) { chunkWorkspacePreviewText(preview.text) }
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(previewChunks.size) { index ->
+                    SelectionContainer {
+                        Text(previewChunks[index], style = DsType.mdCode)
+                    }
+                }
+                item(key = "preview-paging-actions") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                        if (hasPrevious) SyButton(
+                            text = "上一段", onClick = onPrevious, enabled = !loadingPage,
+                            size = SyButtonSize.Small, variant = SyButtonVariant.Outline,
+                        )
+                        if (preview.nextOffset != null) SyButton(
+                            text = "继续阅读", onClick = onNext, enabled = !loadingPage,
+                            size = SyButtonSize.Small,
+                        )
+                    }
+                }
             }
         }
     }
@@ -1093,4 +1159,22 @@ private fun formatBytes(bytes: Long): String = when {
     bytes < 1024 -> "$bytes B"
     bytes < 1024 * 1024 -> "${bytes / 1024} KB"
     else -> "${"%.1f".format(bytes / (1024.0 * 1024.0))} MB"
+}
+
+/** Split a bounded UI preview into independently measured Compose text blocks. */
+internal fun chunkWorkspacePreviewText(text: String, maxChars: Int = 4_096): List<String> {
+    require(maxChars >= 2) { "预览分块长度必须至少两个字符" }
+    if (text.isEmpty()) return emptyList()
+    return buildList {
+        var offset = 0
+        while (offset < text.length) {
+            var end = minOf(text.length, offset + maxChars)
+            if (end < text.length && text[end - 1].isHighSurrogate() &&
+                text[end].isLowSurrogate()) {
+                end--
+            }
+            add(text.substring(offset, end))
+            offset = end
+        }
+    }
 }

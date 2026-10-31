@@ -125,10 +125,22 @@ def compare(root, ci):
             f"| Android {release} / {page}KB | {item['valid_frame_rounds']}/10 | "
             f"{fps} | {item['peak_pss_kib_median']:.0f} |"
         )
+    validated_frame_evidence = all(item["valid_frame_rounds"] >= 2 for item in frame_info.values())
+    markdown.extend([
+        "",
+        "## 验收边界",
+        "Android 四种组合的功能和构建结果全部通过。" +
+        ("有效的模拟器滚动帧样本已覆盖全部四种组合；仍需要真机复核用户可感知流畅度。"
+         if validated_frame_evidence else
+         "存在滚动帧率采样不足的组合；FPS/卡顿率验收仍未完成，不得标记流畅度达标。"),
+    ])
     out = {
         "source_git_sha": envs[(16, 4)]["git_sha"],
         "host_cpu": envs[(16, 4)]["host_cpu"],
         "all_four_verified": True,
+        "frame_metrics_verified": validated_frame_evidence,
+        "frame_metrics_note": ("emulator reference only; physical-device frame gate still required"
+            if validated_frame_evidence else "incomplete FPS/jank evidence; do not claim smoothness"),
         "comparison_rows": rows,
         "frame_evidence": frame_info,
         "environment_by_cell": {

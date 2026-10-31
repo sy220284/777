@@ -10,6 +10,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProcessRuntimeTest {
+    @Test fun cleanEnvironmentKeepsOnlyRuntimeAndExplicitChildValues() = runTest {
+        val runtime = AndroidProcessRuntime(inheritEnvironment = false,
+            baseEnvironment = { mapOf("AGENT_RUNTIME_TEST" to "configured") })
+        val result = runtime.execute(ProcessRequest(listOf("sh", "-c", "env"),
+            environment = mapOf("AGENT_CHILD_TEST" to "requested")))
+        val values = result.stdout.lineSequence().filter { '=' in it }.associate {
+            it.substringBefore('=') to it.substringAfter('=')
+        }
+        assertEquals(0, result.exitCode)
+        assertEquals("configured", values["AGENT_RUNTIME_TEST"])
+        assertEquals("requested", values["AGENT_CHILD_TEST"])
+        assertFalse(values.containsKey("HOME"))
+        assertTrue(values.containsKey("PATH"))
+    }
+
     @Test
     fun executesProcessAndCapturesStreams() = runTest {
         val runtime = AndroidProcessRuntime()

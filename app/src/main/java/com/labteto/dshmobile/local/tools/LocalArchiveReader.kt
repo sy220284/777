@@ -4,6 +4,13 @@ import java.io.BufferedInputStream
 import java.io.File
 import java.io.InputStream
 import java.io.InputStreamReader
+import java.io.RandomAccessFile
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
+import java.util.Base64
+import java.util.UUID
 import java.io.SequenceInputStream
 import java.nio.charset.StandardCharsets
 import java.util.zip.GZIPInputStream
@@ -22,13 +29,29 @@ internal class LocalArchiveReader(private val root: File) {
         val entries = ArrayList<Item>(limit)
         var total = 0
         var unsafe = 0
-        traverse(source(path)) { item, _ ->
+        val archive = source(path)
+        val visitItem: (Item) -> Unit = { item ->
             if (!safeName(item.name)) unsafe++
             else if (item.name.startsWith(prefix)) {
                 if (total >= cursor && entries.size < limit) entries.add(item)
                 total++
             }
-            false
+        }
+        if (isZipArchive(archive)) {
+            // Listing requires metadata only: never open or inflate ZIP members.
+            ZipFile(archive).use { zip ->
+                val members = zip.entries()
+                while (members.hasMoreElements()) {
+                    if (Thread.currentThread().isInterrupted)
+                        throw java.io.InterruptedIOException("归档枚举已取消")
+                    val entry = members.nextElement()
+                    if (!entry.isDirectory) visitItem(Item(normalMember(entry.name), entry.size))
+                }
+            }
+        } else {
+            // Compressed TAR enumeration is expensive. Keep an on-disk compact
+            // index keyed by the exact archive identity for subsequent pages.
+            indexedEntries(archive, visitItem)
         }
         val end = cursor.toLong() + entries.size
         val next = if (end < total) end.toString() else "none"
@@ -48,8 +71,8 @@ internal class LocalArchiveReader(private val root: File) {
         require(startChar >= 0L) { "start_char 不能为负数" }
         require(maxChars in 1..40_000) { "max_chars 必须在 1 到 40000 之间" }
         var result: String? = null
-        traverse(source(path)) { item, data ->
-            if (item.name != member) return@traverse false
+        val archive = source(path)
+        val readMember: (Item, InputStream) -> Unit = { item, data ->
             result = if (isBinaryName(member)) {
                 "成员 " + member + " 为二进制文件（" + item.size + " B），需使用专用解析工具"
             } else {
@@ -60,7 +83,20 @@ internal class LocalArchiveReader(private val root: File) {
                     page(SequenceInputStream(probe.inputStream(), data), member, startChar, maxChars)
                 }
             }
-            true
+        }
+        if (isZipArchive(archive)) {
+            ZipFile(archive).use { zip ->
+                // Do not open streams for unrelated members when reading the last
+                // entry of an archive containing tens of thousands of files.
+                val entry = zip.getEntry(member) ?: zip.entries().asSequence()
+                    .firstOrNull { !it.isDirectory && normalMember(it.name) == member }
+                if (entry != null && !entry.isDirectory) {
+                    zip.getInputStream(entry).use { readMember(Item(normalMember(entry.name), entry.size), it) }
+                }
+            }
+        } else traverse(archive) { item, data ->
+            if (item.name != member) false
+            else { readMember(item, data); true }
         }
         return result ?: error("归档中找不到文件：" + member)
     }
@@ -90,6 +126,107 @@ internal class LocalArchiveReader(private val root: File) {
                 append("--- 内容结束 ---")
             }
         }
+    }
+
+    private fun isZipArchive(file: File): Boolean =
+        listOf(".zip", ".jar", ".aar", ".apk", ".epub", ".docx", ".xlsx", ".pptx")
+            .any(file.name.lowercase()::endsWith)
+
+    /**
+     * The index itself is stored on disk; pagination holds only one current item
+     * and at most [limit] returned entries, independent of archive byte size.
+     */
+    private fun indexedEntries(archive: File, visit: (Item) -> Unit) {
+        val owner = root.canonicalFile
+        val directory = File(owner, ".dsh/archive-index")
+        require(directory.isDirectory || directory.mkdirs()) { "无法创建压缩包目录缓存" }
+        require(!Files.isSymbolicLink(directory.toPath()) &&
+            directory.canonicalFile.toPath().startsWith(owner.toPath())) {
+            "压缩包目录缓存位置不安全"
+        }
+        val name = sha256(archive.canonicalPath) + ".index"
+        val index = File(directory, name)
+        val identity = archiveIdentity(archive)
+        fun valid(): Boolean =
+            index.isFile && !Files.isSymbolicLink(index.toPath()) &&
+                index.bufferedReader().use { it.readLine() == identity }
+        if (!valid()) {
+            val pending = File(directory, "." + name + "-" + UUID.randomUUID() + ".tmp")
+            try {
+                pending.bufferedWriter().use { output ->
+                    output.appendLine(identity)
+                    traverse(archive) { item, _ ->
+                        val nameBytes = item.name.toByteArray(Charsets.UTF_8)
+                        require(nameBytes.size <= 64 * 1024) { "归档成员名称过长" }
+                        output.append(Base64.getEncoder().encodeToString(nameBytes))
+                            .append('\t').append(item.size.toString()).append('\n')
+                        false
+                    }
+                }
+                try {
+                    Files.move(pending.toPath(), index.toPath(),
+                        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                    Files.move(pending.toPath(), index.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+            } finally {
+                pending.delete()
+            }
+        }
+        index.bufferedReader().use { input ->
+            check(input.readLine() == identity) { "压缩包在建立目录索引后发生变化" }
+            while (true) {
+                if (Thread.currentThread().isInterrupted)
+                    throw java.io.InterruptedIOException("压缩包枚举已取消")
+                val row = input.readLine() ?: break
+                val separator = row.indexOf('\t')
+                require(separator > 0) { "归档目录索引已损坏" }
+                val member = String(Base64.getDecoder().decode(row.substring(0, separator)), Charsets.UTF_8)
+                val bytes = row.substring(separator + 1).toLong()
+                visit(Item(member, bytes))
+            }
+        }
+    }
+
+    private fun sha256(value: String): String =
+        MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it.toInt() and 255) }
+
+    private fun archiveIdentity(file: File): String {
+        val attributes = Files.readAttributes(file.toPath(),
+            java.nio.file.attribute.BasicFileAttributes::class.java)
+        val digest = MessageDigest.getInstance("SHA-256")
+        RandomAccessFile(file, "r").use { input ->
+            val sample = ByteArray(64 * 1024)
+            val first = input.read(sample)
+            if (first > 0) digest.update(sample, 0, first)
+            if (input.length() > sample.size) {
+                input.seek((input.length() - sample.size).coerceAtLeast(0L))
+                val last = input.read(sample)
+                if (last > 0) digest.update(sample, 0, last)
+            }
+        }
+        // In-place changes that restore the original mtime must invalidate the catalog.
+        // The fallback full hash is used only on filesystems without a change-time attribute.
+        val changeToken = runCatching {
+            Files.getAttribute(file.toPath(), "unix:ctime", LinkOption.NOFOLLOW_LINKS).toString()
+        }.getOrElse {
+            val full = MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { stream ->
+                val chunk = ByteArray(64 * 1024)
+                while (true) {
+                    if (Thread.currentThread().isInterrupted)
+                        throw java.io.InterruptedIOException("归档校验已取消")
+                    val n = stream.read(chunk)
+                    if (n < 0) break
+                    full.update(chunk, 0, n)
+                }
+            }
+            full.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+        }
+        return listOf(file.canonicalPath, attributes.size().toString(),
+            attributes.lastModifiedTime().toString(), attributes.fileKey().toString(), changeToken,
+            digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }).joinToString("|")
     }
 
     private fun source(path: String): File {
@@ -154,6 +291,8 @@ internal class LocalArchiveReader(private val root: File) {
         val header = ByteArray(512)
         var extendedName: String? = null
         while (true) {
+            if (Thread.currentThread().isInterrupted)
+                throw java.io.InterruptedIOException("TAR 读取已取消")
             if (!headerBlock(input, header)) break
             if (header.all { it == 0.toByte() }) break
             val size = zeroString(header, 124, 12).trim().trim('\u0000').toLongOrNull(8)
@@ -202,6 +341,8 @@ internal class LocalArchiveReader(private val root: File) {
         var rest = length
         val buffer = ByteArray(32 * 1024)
         while (rest > 0L) {
+            if (Thread.currentThread().isInterrupted)
+                throw java.io.InterruptedIOException("归档跳过已取消")
             val n = input.read(buffer, 0, minOf(rest, buffer.size.toLong()).toInt())
             require(n > 0) { "归档在读取过程中被截断" }
             rest -= n
@@ -228,6 +369,8 @@ internal class LocalArchiveReader(private val root: File) {
         fun drain() {
             val bytes = ByteArray(32 * 1024)
             while (left > 0L) {
+                if (Thread.currentThread().isInterrupted)
+                    throw java.io.InterruptedIOException("归档解压已取消")
                 val n = read(bytes)
                 require(n > 0) { "TAR 成员被截断" }
             }

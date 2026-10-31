@@ -23,6 +23,10 @@ import com.labteto.dshmobile.local.tools.LocalExtensionWorkshop
 import com.labteto.dshmobile.local.tools.LocalShellTool
 import com.labteto.dshmobile.local.tools.toolCapabilityTarget
 import kotlinx.coroutines.currentCoroutineContext
+import com.labteto.dshmobile.harness.resource.HarnessResourceKind
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
 import com.labteto.dshmobile.local.files.executionLocalWorkspace
 import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
@@ -153,12 +157,24 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         work.get().executeBuiltin(call, allowMutation, binding)?.let { return it }
 
         return when (call.name) {
-            "read", "read_file" -> workspace.read(
+            "read", "read_file" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+                HarnessResourceKind.FILE_IO, "tool:read"
+            ) { runInterruptible(Dispatchers.IO) { workspace.read(
                 relativePath = args.string("path"),
                 startLine = args.int("start_line", 1),
                 endLine = args.int("end_line", args.int("start_line", 1) + 399),
                 startChar = args.int("start_char", 0),
-            )
+            ) } } }
+            "read_chunk" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+                HarnessResourceKind.FILE_IO, "tool:read_chunk"
+            ) {
+                val offset = args.long("start_byte", 0L)
+                val page = runInterruptible(Dispatchers.IO) {
+                    workspace.readRawPage(args.string("path"), offset, args.int("max_bytes", 48 * 1024))
+                }
+                "start_byte=" + offset + "；next_byte=" + (offset + page.size) +
+                    "；本页字节=" + page.size + "\n" + java.util.Base64.getEncoder().encodeToString(page)
+            } }
             "tool_output_read" -> args.optionalString("query")?.takeIf(String::isNotBlank)?.let { query ->
                 root.toolOutputStore.search(
                     sessionId = boundSessionId,
@@ -172,24 +188,71 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 startByte = args.int("start_byte", 0),
                 maxBytes = args.int("max_bytes", LocalToolOutputStore.DEFAULT_READ_BYTES),
             )
-            "archive_list" -> LocalArchiveReader(File(workspace.path)).list(
+            "archive_list" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+                HarnessResourceKind.FILE_IO, "tool:archive_list"
+            ) { runInterruptible(Dispatchers.IO) { LocalArchiveReader(File(workspace.path)).list(
                 args.string("path"), args.int("cursor", 0), args.int("limit", 100),
                 args.optionalString("prefix").orEmpty(),
-            )
-            "archive_read" -> LocalArchiveReader(File(workspace.path)).read(
+            ) } } }
+            "archive_read" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+                HarnessResourceKind.FILE_IO, "tool:archive_read"
+            ) { runInterruptible(Dispatchers.IO) { LocalArchiveReader(File(workspace.path)).read(
                 args.string("path"), args.string("member"), args.long("start_char", 0L),
                 args.int("max_chars", 20_000),
-            )
+            ) } } }
             "file_inspect" -> LocalFileInspector(File(workspace.path)).inspect(args.string("path"))
             "write", "write_file" -> {
                 if (!allowMutation) return "子代理无写入权限"
-                workspace.write(args.string("path"), args.string("content"))
+                withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+                    HarnessResourceKind.FILE_IO, "tool:write"
+                ) { runInterruptible(Dispatchers.IO) {
+                    workspace.write(args.string("path"), args.string("content"))
+                } } }
+            }
+            "write_chunk" -> {
+                if (!allowMutation) return "子代理无写入权限"
+                withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+                    HarnessResourceKind.FILE_IO, "tool:write_chunk"
+                ) {
+                    runInterruptible(Dispatchers.IO) {
+                        val text = args.optionalString("content")
+                        val encoded = args.optionalString("content_base64")
+                        require((text == null) != (encoded == null)) {
+                            "content 和 content_base64 必须且只能提供一种"
+                        }
+                        // Keep model tool input bounded; repeat calls for arbitrarily large files.
+                        val maxChunk = 256 * 1024
+                        val bytes = if (encoded != null) {
+                            require(encoded.length <= ((maxChunk + 2) / 3) * 4) {
+                                "Base64 续写分块超过容量上限"
+                            }
+                            java.util.Base64.getDecoder().decode(encoded)
+                        } else {
+                            val value = requireNotNull(text)
+                            require(value.length <= maxChunk) { "文本续写分块超过容量上限" }
+                            value.toByteArray(Charsets.UTF_8)
+                        }
+                        require(bytes.size <= maxChunk) { "单个续写分块不能超过 256 KiB" }
+                        workspace.writeChunkBytes(
+                            args.string("path"), bytes, args.long("offset", 0L),
+                            args.boolean("finish", false), args.optionalString("session_id"),
+                        )
+                    }
+                } }
             }
             "edit", "edit_file" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
                 val path = args.string("path")
                 workspace.requireFreshObservation(path)
-                workspace.edit(path, args.string("old_text"), args.string("new_text"))
+                withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+                    HarnessResourceKind.FILE_IO, "tool:edit",
+                    units = com.labteto.dshmobile.harness.resource.harnessFileIoUnitsForBytes(
+                        workspace.fileSizeForResourceBudget(path)),
+                ) {
+                    runInterruptible(Dispatchers.IO) {
+                        workspace.edit(path, args.string("old_text"), args.string("new_text"))
+                    }
+                } }
             }
             "apply_patch" -> {
                 if (!allowMutation) return "该子任务处于只读模式"

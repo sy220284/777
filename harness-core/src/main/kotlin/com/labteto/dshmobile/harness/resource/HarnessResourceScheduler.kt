@@ -12,6 +12,8 @@ enum class HarnessResourceKind {
     TERMINAL,
     VIRTUAL_DISPLAY,
     LANGUAGE_SERVER,
+    FILE_IO,
+    MEDIA_DECODE,
 }
 
 enum class HarnessResourcePressure {
@@ -26,6 +28,8 @@ data class HarnessResourceBudget(
     val maxTerminals: Int = 3,
     val maxVirtualDisplays: Int = 2,
     val maxLanguageServers: Int = 3,
+    val maxFileIo: Int = 2,
+    val maxMediaDecode: Int = 1,
 ) {
     init {
         require(maxModelRequests in 1..16) { "模型并发预算必须在 1..16 之间" }
@@ -33,6 +37,7 @@ data class HarnessResourceBudget(
         require(maxTerminals in 1..16) { "终端预算必须在 1..16 之间" }
         require(maxVirtualDisplays in 1..8) { "虚拟屏预算必须在 1..8 之间" }
         require(maxLanguageServers in 1..16) { "语言服务预算必须在 1..16 之间" }
+        require(maxFileIo in 1..8 && maxMediaDecode in 1..4) { "大文件并发预算无效" }
     }
 
     fun limit(kind: HarnessResourceKind): Int = when (kind) {
@@ -41,6 +46,8 @@ data class HarnessResourceBudget(
         HarnessResourceKind.TERMINAL -> maxTerminals
         HarnessResourceKind.VIRTUAL_DISPLAY -> maxVirtualDisplays
         HarnessResourceKind.LANGUAGE_SERVER -> maxLanguageServers
+        HarnessResourceKind.FILE_IO -> maxFileIo
+        HarnessResourceKind.MEDIA_DECODE -> maxMediaDecode
     }
 }
 
@@ -49,6 +56,8 @@ data class HarnessResourceLeaseInfo(
     val kind: HarnessResourceKind,
     val owner: String,
     val acquiredAt: Long,
+    /** Reserved cost units; one heavy file operation may occupy two file-I/O slots. */
+    val units: Int = 1,
 )
 
 data class HarnessResourceSnapshot(
@@ -57,17 +66,25 @@ data class HarnessResourceSnapshot(
     val activeTerminals: Int,
     val activeVirtualDisplays: Int,
     val activeLanguageServers: Int,
+    val activeFileIo: Int = 0,
+    val activeMediaDecode: Int = 0,
     val budget: HarnessResourceBudget,
     val leases: List<HarnessResourceLeaseInfo> = emptyList(),
+    /** Derived from the exact lease ledger, never a second mutable counter. */
+    val activeUnits: Map<HarnessResourceKind, Int> = emptyMap(),
 ) {
     val pressure: HarnessResourcePressure
         get() {
+            fun ratio(kind: HarnessResourceKind, count: Int): Double =
+                (activeUnits[kind] ?: count).toDouble() / budget.limit(kind)
             val ratios = listOf(
-                activeModelRequests.toDouble() / budget.maxModelRequests,
-                activeAgents.toDouble() / budget.maxAgents,
-                activeTerminals.toDouble() / budget.maxTerminals,
-                activeVirtualDisplays.toDouble() / budget.maxVirtualDisplays,
-                activeLanguageServers.toDouble() / budget.maxLanguageServers,
+                ratio(HarnessResourceKind.MODEL_REQUEST, activeModelRequests),
+                ratio(HarnessResourceKind.AGENT, activeAgents),
+                ratio(HarnessResourceKind.TERMINAL, activeTerminals),
+                ratio(HarnessResourceKind.VIRTUAL_DISPLAY, activeVirtualDisplays),
+                ratio(HarnessResourceKind.LANGUAGE_SERVER, activeLanguageServers),
+                ratio(HarnessResourceKind.FILE_IO, activeFileIo),
+                ratio(HarnessResourceKind.MEDIA_DECODE, activeMediaDecode),
             )
             val ratio = ratios.maxOrNull() ?: 0.0
             return when {
@@ -118,6 +135,8 @@ class HarnessResourceScheduler(
     private val activeTerminals = AtomicInteger()
     private val activeVirtualDisplays = AtomicInteger()
     private val activeLanguageServers = AtomicInteger()
+    private val activeFileIo = AtomicInteger()
+    private val activeMediaDecode = AtomicInteger()
     // Counters and the lease registry are one state projection: reports must never see
     // a changed count with a stale lease list (or vice versa).
     private val leaseStateLock = Any()
@@ -142,7 +161,9 @@ class HarnessResourceScheduler(
     suspend fun acquire(
         kind: HarnessResourceKind,
         owner: String = kind.name.lowercase(),
+        units: Int = 1,
     ): HarnessResourceLease {
+        require(units in 1..32) { "资源请求成本须在 1..32 之间" }
         // Refresh the device budget at the admission boundary, not on a polling timer.
         beforeAcquire()
         val ticket = synchronized(leaseStateLock) {
@@ -155,14 +176,19 @@ class HarnessResourceScheduler(
                 var admitted: HarnessResourceLeaseInfo? = null
                 val observedRevision = synchronized(leaseStateLock) {
                     val queue = admissionQueues.getValue(kind)
-                    if (queue.peekFirst() == ticket &&
-                        counter(kind).get() < currentBudget.limit(kind)) {
+                    val capacity = currentBudget.limit(kind)
+                    // An adaptive device budget may shrink below the original request cost.
+                    // Charge every available slot instead of blocking that job forever.
+                    val actualUnits = minOf(units, capacity)
+                    val occupied = leases.values.sumOf { if (it.kind == kind) it.units else 0 }
+                    if (queue.peekFirst() == ticket && occupied <= capacity - actualUnits) {
                         queue.removeFirst()
                         admitted = HarnessResourceLeaseInfo(
                             id = "lease-" + UUID.randomUUID().toString().replace("-", "").take(16),
                             kind = kind,
                             owner = owner.take(160),
                             acquiredAt = System.currentTimeMillis(),
+                            units = actualUnits,
                         )
                         increment(kind)
                         leases[admitted!!.id] = admitted!!
@@ -198,9 +224,10 @@ class HarnessResourceScheduler(
     suspend fun <T> withResource(
         kind: HarnessResourceKind,
         owner: String = kind.name.lowercase(),
+        units: Int = 1,
         block: suspend () -> T,
     ): T {
-        val lease = acquire(kind, owner)
+        val lease = acquire(kind, owner, units)
         return try {
             block()
         } finally {
@@ -214,8 +241,13 @@ class HarnessResourceScheduler(
         activeTerminals = activeTerminals.get(),
         activeVirtualDisplays = activeVirtualDisplays.get(),
         activeLanguageServers = activeLanguageServers.get(),
+        activeFileIo = activeFileIo.get(),
+        activeMediaDecode = activeMediaDecode.get(),
         budget = currentBudget,
         leases = leases.values.sortedBy(HarnessResourceLeaseInfo::acquiredAt),
+        activeUnits = HarnessResourceKind.values().associateWith { kind ->
+            leases.values.sumOf { if (it.kind == kind) it.units else 0 }
+        },
     ) }
 
     private fun increment(kind: HarnessResourceKind) {
@@ -232,6 +264,8 @@ class HarnessResourceScheduler(
         HarnessResourceKind.TERMINAL -> activeTerminals
         HarnessResourceKind.VIRTUAL_DISPLAY -> activeVirtualDisplays
         HarnessResourceKind.LANGUAGE_SERVER -> activeLanguageServers
+        HarnessResourceKind.FILE_IO -> activeFileIo
+        HarnessResourceKind.MEDIA_DECODE -> activeMediaDecode
     }
 
     private fun publish() = synchronized(publicationLock) {
@@ -241,3 +275,7 @@ class HarnessResourceScheduler(
         runCatching { onChanged(snapshot()) }
     }
 }
+
+/** Large file transfers reserve the full I/O pool when the device has two available slots. */
+fun harnessFileIoUnitsForBytes(bytes: Long): Int =
+    if (bytes >= 64L * 1024L * 1024L) 2 else 1

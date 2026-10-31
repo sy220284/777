@@ -74,6 +74,37 @@ class LocalArchiveReaderTest {
         } finally { dir.deleteRecursively() }
     }
 
+    @Test fun gzipInventoryReusesDiskIndexAndRebuildsAfterSourceChanges() {
+        val dir = Files.createTempDirectory("archive-index-").toFile()
+        try {
+            val archive = File(dir, "source.tar.gz")
+            fun create(count: Int) {
+                GZIPOutputStream(archive.outputStream()).use { zip ->
+                    repeat(count) { i ->
+                        val data = "member $i".toByteArray()
+                        writeTarHeader(zip, "src/file-$i.txt", data.size.toLong())
+                        zip.write(data)
+                        zip.write(ByteArray(512 - data.size))
+                    }
+                    zip.write(ByteArray(1024))
+                }
+            }
+            create(302)
+            val reader = LocalArchiveReader(dir)
+            val first = reader.list(archive.name, 0, 200)
+            assertTrue(first.contains("匹配文件总数：302"))
+            val index = File(dir, ".dsh/archive-index").listFiles().orEmpty().single()
+            val prior = index.readBytes()
+            val second = reader.list(archive.name, 200, 200)
+            assertTrue(second.contains("src/file-301.txt"))
+            assertTrue(prior.contentEquals(index.readBytes()))
+            create(303)
+            val refreshed = reader.list(archive.name, 200, 200)
+            assertTrue(refreshed.contains("匹配文件总数：303"))
+            assertTrue(refreshed.contains("src/file-302.txt"))
+        } finally { dir.deleteRecursively() }
+    }
+
     @Test fun archivePathsStayWithinWorkspace() {
         val dir = Files.createTempDirectory("archive-boundary-").toFile()
         try {

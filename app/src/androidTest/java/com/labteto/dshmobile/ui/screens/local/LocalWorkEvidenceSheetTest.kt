@@ -124,5 +124,7 @@ class LocalWorkEvidenceSheetTest {
         toolEvidence = { _, _, _ -> null },
         requirementEvidence = { emptyList() },
         linkRequirementEvidence = { _, _, _ -> true },
+        eventChanges = { MutableStateFlow(0L) },
+        artifactFileChanges = { _, _ -> kotlinx.coroutines.flow.emptyFlow() },
     )
 }
