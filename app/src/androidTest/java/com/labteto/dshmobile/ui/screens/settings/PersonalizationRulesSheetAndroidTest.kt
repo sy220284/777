@@ -82,6 +82,9 @@ class PersonalizationRulesSheetAndroidTest {
         compose.runOnIdle {
             assertEquals(true, editor.state.value.saving)
             onPage.value = false
+        }
+        compose.onNodeWithTag("personalizationRulesSave").assertDoesNotExist()
+        compose.runOnIdle {
             editor.cancel()
             editor.open("current disk value")
             lateReceipt!!(true, null)
@@ -91,5 +94,44 @@ class PersonalizationRulesSheetAndroidTest {
         }
         compose.onNodeWithTag("personalizationRulesSave").assertExists()
         compose.runOnIdle { assertEquals(0, reported) }
+    }
+
+    @Test fun switchingAwayAndBackDuringPendingSavePreservesDraft() {
+        val editor = PersonalizationRulesEditor()
+        val onPage = mutableStateOf(true)
+        var pending: ((Boolean, String?) -> Unit)? = null
+        editor.open("old disk value")
+        editor.edit("draft being saved")
+        compose.setContent {
+            val state by editor.state.collectAsState()
+            DshTheme {
+                if (onPage.value) PersonalizationRulesSheet(
+                    rules = state,
+                    onDismiss = editor::cancel,
+                    onDraftChange = editor::edit,
+                    onSave = {
+                        editor.save(
+                            submit = { _, receipt -> pending = receipt },
+                            onSaved = {},
+                        )
+                    },
+                )
+            }
+        }
+        compose.onNodeWithTag("personalizationRulesSave").performClick()
+        compose.runOnIdle { onPage.value = false }
+        compose.onNodeWithTag("personalizationRulesSave").assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals("draft being saved", editor.state.value.text)
+            assertEquals(true, editor.state.value.saving)
+            onPage.value = true
+        }
+        compose.onNodeWithTag("personalizationRulesSave").assertExists()
+        compose.runOnIdle {
+            assertEquals("draft being saved", editor.state.value.text)
+            pending!!(false, "disk failed after page switch")
+        }
+        compose.onNodeWithText("disk failed after page switch").assertExists()
+        compose.runOnIdle { assertEquals("draft being saved", editor.state.value.text) }
     }
 }
