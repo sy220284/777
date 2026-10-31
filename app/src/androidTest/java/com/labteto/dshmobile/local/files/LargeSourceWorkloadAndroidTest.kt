@@ -48,7 +48,7 @@ class LargeSourceWorkloadAndroidTest {
             val expected = 32L * 1024L * 1024L
             val restarted = LocalWorkspace(root)
             report.step("chunk_resume_32m") {
-                while (offset + repeatChunk.toByteArray(Charsets.UTF_8).size < expected) {
+                while (offset < expected) {
                     val result = restarted.writeChunk("module.kt", repeatChunk, offset, false)
                     offset = offsetFrom(result)
                 }
@@ -223,26 +223,23 @@ class LargeSourceWorkloadAndroidTest {
         val peakNative = AtomicLong(0)
         private val running = AtomicBoolean(false)
         private var thread: Thread? = null
+        private val stopSignal = java.util.concurrent.CountDownLatch(1)
 
         fun start() {
             running.set(true)
             thread = Thread({
                 val vm = Runtime.getRuntime()
                 while (running.get()) {
-                    peakJava.accumulateAndGet(vm.totalMemory() - vm.freeMemory(), ::maxOf)
-                    peakNative.accumulateAndGet(Debug.getNativeHeapAllocatedSize(), ::maxOf)
-                    try {
-                        Thread.sleep(200)
-                    } catch (_: InterruptedException) {
-                        break
-                    }
+                    peakJava.accumulateAndGet(vm.totalMemory() - vm.freeMemory()) { a, b -> maxOf(a, b) }
+                    peakNative.accumulateAndGet(Debug.getNativeHeapAllocatedSize()) { a, b -> maxOf(a, b) }
+                    if (stopSignal.await(200, java.util.concurrent.TimeUnit.MILLISECONDS)) break
                 }
             }, "large-source-memory-sampler").apply { isDaemon = true; start() }
         }
 
         fun stop() {
             running.set(false)
-            thread?.interrupt()
+            stopSignal.countDown()
             thread?.join(3_000)
         }
     }
