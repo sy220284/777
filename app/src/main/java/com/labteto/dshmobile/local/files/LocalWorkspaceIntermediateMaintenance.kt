@@ -47,7 +47,8 @@ internal class LocalWorkspaceIntermediateMaintenance(private val workspaceRoot: 
         var indexBytes = 0L
 
         fun stale(file: File, ageMillis: Long): Boolean =
-            file.lastModified() in 1..nowMillis && nowMillis - file.lastModified() >= ageMillis
+            file.lastModified() > 0L && file.lastModified() <= nowMillis &&
+                nowMillis - file.lastModified() >= ageMillis
 
         fun regular(file: File): Boolean =
             Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS)
