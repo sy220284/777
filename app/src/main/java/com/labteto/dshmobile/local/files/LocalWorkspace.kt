@@ -922,6 +922,7 @@ class LocalWorkspace(
         file.inputStream().use { input ->
             val buffer = ByteArray(32 * 1024)
             while (true) {
+                if (Thread.currentThread().isInterrupted) throw java.io.InterruptedIOException("文件校验已取消")
                 val read = input.read(buffer)
                 if (read < 0) break
                 digest.update(buffer, 0, read)

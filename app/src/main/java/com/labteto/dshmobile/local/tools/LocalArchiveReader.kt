@@ -41,6 +41,8 @@ internal class LocalArchiveReader(private val root: File) {
             ZipFile(archive).use { zip ->
                 val members = zip.entries()
                 while (members.hasMoreElements()) {
+                    if (Thread.currentThread().isInterrupted)
+                        throw java.io.InterruptedIOException("归档枚举已取消")
                     val entry = members.nextElement()
                     if (!entry.isDirectory) visitItem(Item(normalMember(entry.name), entry.size))
                 }
@@ -270,6 +272,8 @@ internal class LocalArchiveReader(private val root: File) {
         val header = ByteArray(512)
         var extendedName: String? = null
         while (true) {
+            if (Thread.currentThread().isInterrupted)
+                throw java.io.InterruptedIOException("TAR 读取已取消")
             if (!headerBlock(input, header)) break
             if (header.all { it == 0.toByte() }) break
             val size = zeroString(header, 124, 12).trim().trim('\u0000').toLongOrNull(8)
@@ -318,6 +322,8 @@ internal class LocalArchiveReader(private val root: File) {
         var rest = length
         val buffer = ByteArray(32 * 1024)
         while (rest > 0L) {
+            if (Thread.currentThread().isInterrupted)
+                throw java.io.InterruptedIOException("归档跳过已取消")
             val n = input.read(buffer, 0, minOf(rest, buffer.size.toLong()).toInt())
             require(n > 0) { "归档在读取过程中被截断" }
             rest -= n
@@ -344,6 +350,8 @@ internal class LocalArchiveReader(private val root: File) {
         fun drain() {
             val bytes = ByteArray(32 * 1024)
             while (left > 0L) {
+                if (Thread.currentThread().isInterrupted)
+                    throw java.io.InterruptedIOException("归档解压已取消")
                 val n = read(bytes)
                 require(n > 0) { "TAR 成员被截断" }
             }

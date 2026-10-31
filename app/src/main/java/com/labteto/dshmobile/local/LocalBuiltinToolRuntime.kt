@@ -26,6 +26,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
 import com.labteto.dshmobile.local.files.executionLocalWorkspace
 import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
@@ -158,17 +159,19 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         return when (call.name) {
             "read", "read_file" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
                 HarnessResourceKind.FILE_IO, "tool:read"
-            ) { workspace.read(
+            ) { runInterruptible(Dispatchers.IO) { workspace.read(
                 relativePath = args.string("path"),
                 startLine = args.int("start_line", 1),
                 endLine = args.int("end_line", args.int("start_line", 1) + 399),
                 startChar = args.int("start_char", 0),
-            ) } }
+            ) } } }
             "read_chunk" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
                 HarnessResourceKind.FILE_IO, "tool:read_chunk"
             ) {
                 val offset = args.long("start_byte", 0L)
-                val page = workspace.readRawPage(args.string("path"), offset, args.int("max_bytes", 48 * 1024))
+                val page = runInterruptible(Dispatchers.IO) {
+                    workspace.readRawPage(args.string("path"), offset, args.int("max_bytes", 48 * 1024))
+                }
                 "start_byte=" + offset + "；next_byte=" + (offset + page.size) +
                     "；本页字节=" + page.size + "\n" + java.util.Base64.getEncoder().encodeToString(page)
             } }
@@ -187,32 +190,34 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
             )
             "archive_list" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
                 HarnessResourceKind.FILE_IO, "tool:archive_list"
-            ) { LocalArchiveReader(File(workspace.path)).list(
+            ) { runInterruptible(Dispatchers.IO) { LocalArchiveReader(File(workspace.path)).list(
                 args.string("path"), args.int("cursor", 0), args.int("limit", 100),
                 args.optionalString("prefix").orEmpty(),
-            ) } }
+            ) } } }
             "archive_read" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
                 HarnessResourceKind.FILE_IO, "tool:archive_read"
-            ) { LocalArchiveReader(File(workspace.path)).read(
+            ) { runInterruptible(Dispatchers.IO) { LocalArchiveReader(File(workspace.path)).read(
                 args.string("path"), args.string("member"), args.long("start_char", 0L),
                 args.int("max_chars", 20_000),
-            ) } }
+            ) } } }
             "file_inspect" -> LocalFileInspector(File(workspace.path)).inspect(args.string("path"))
             "write", "write_file" -> {
                 if (!allowMutation) return "子代理无写入权限"
                 withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
                     HarnessResourceKind.FILE_IO, "tool:write"
-                ) { workspace.write(args.string("path"), args.string("content")) } }
+                ) { runInterruptible(Dispatchers.IO) {
+                    workspace.write(args.string("path"), args.string("content"))
+                } } }
             }
             "write_chunk" -> {
                 if (!allowMutation) return "子代理无写入权限"
                 withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
                     HarnessResourceKind.FILE_IO, "tool:write_chunk"
                 ) {
-                    workspace.writeChunk(
+                    runInterruptible(Dispatchers.IO) { workspace.writeChunk(
                         args.string("path"), args.string("content"),
                         args.long("offset", 0L), args.boolean("finish", false),
-                    )
+                    ) }
                 } }
             }
             "edit", "edit_file" -> {
@@ -222,7 +227,9 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
                     HarnessResourceKind.FILE_IO, "tool:edit"
                 ) {
-                    workspace.edit(path, args.string("old_text"), args.string("new_text"))
+                    runInterruptible(Dispatchers.IO) {
+                        workspace.edit(path, args.string("old_text"), args.string("new_text"))
+                    }
                 } }
             }
             "apply_patch" -> {
