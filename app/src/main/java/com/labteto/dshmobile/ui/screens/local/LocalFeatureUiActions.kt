@@ -112,6 +112,7 @@ internal data class LocalWorkFeatureUiActions(
     },
     val conversationFiles: suspend (String) -> LocalConversationFiles,
     val previewWorkspaceFile: suspend (String) -> LocalWorkspaceFilePreview,
+    val previewWorkspaceFilePage: suspend (String, Long) -> LocalWorkspaceFilePreview = { path, _ -> previewWorkspaceFile(path) },
     val artifactsForUi: (String) -> List<LocalArtifactUiItem>,
     val eventSequenceForUi: (String) -> Long,
     val artifactRevision: (String) -> com.labteto.dshmobile.local.presentation.LocalWorkHistoryRevision?,
