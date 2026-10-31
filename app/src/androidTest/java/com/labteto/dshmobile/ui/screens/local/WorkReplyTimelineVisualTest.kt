@@ -122,6 +122,16 @@ class WorkReplyTimelineVisualTest {
         saveScreenshot("dark-320dp-large-text")
     }
 
+    @Test fun artifactReadFailureClearlyExplainsRestorationWithoutHidingOldResults() {
+        compose.setContent {
+            DshTheme {
+                WorkToolStatusNotice("成果文件状态读取失败，正在尝试恢复；已保存的成果列表仍可查看")
+            }
+        }
+        compose.onNodeWithText("成果文件状态读取失败，正在尝试恢复；已保存的成果列表仍可查看")
+            .assertIsDisplayed()
+    }
+
     @Test fun statusFailureExplainsAutomaticRecoveryWithoutManualAction() {
         compose.setContent { DshTheme { WorkToolStatusNotice() } }
         compose.onNodeWithText("工具状态同步暂不可用，正在自动恢复；已保存的回复仍可查看").assertIsDisplayed()

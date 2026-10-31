@@ -556,6 +556,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var workArtifacts by remember(state.sessionId) {
         mutableStateOf<List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>>(emptyList())
     }
+    var workArtifactReadFailures by remember(state.sessionId, state.usageMode) { mutableStateOf(0) }
     val timelineLifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(state.sessionId, state.usageMode, workActions, timelineLifecycle) {
         workArtifacts = emptyList()
@@ -580,12 +581,14 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 current to workActions.refreshArtifactFiles(state.sessionId, items)
                             }
                             workArtifacts = next
+                            workArtifactReadFailures = 0
                             lastRevision = revision
                             break
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (failure: Exception) {
                             failures++
+                            workArtifactReadFailures = failures
                             if (failures == 1 || failures == 3) {
                                 com.labteto.dshmobile.observability.AppLog.failure(
                                     "WorkTimeline", "read_artifacts", failure, sessionId = state.sessionId)
@@ -1420,6 +1423,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         state.running || transcriptMessages.isNotEmpty())) {
                     item(key = "work-tool-read-error:${state.sessionId}") {
                         WorkToolStatusNotice()
+                    }
+                }
+                if (state.usageMode == LocalUsageMode.WORK && workArtifactReadFailures > 0) {
+                    item(key = "work-artifact-read-error:${state.sessionId}") {
+                        WorkToolStatusNotice("成果文件状态读取失败，正在尝试恢复；已保存的成果列表仍可查看")
                     }
                 }
                 if (showStreamingTail) {
