@@ -3,6 +3,11 @@ package com.labteto.dshmobile.ui.screens.local
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.withContext
 
 /** Only a restored, identified Work session may query its durable event cursor. */
 internal fun shouldReadWorkToolStatus(
@@ -43,5 +48,30 @@ internal class LocalWorkToolActivityReader(
     } catch (failure: Exception) {
         lastSequence = null
         LocalWorkToolActivityRead.Failed(failure)
+    }
+}
+
+/** Committed EventLog revisions wake the reader; only failed reads retry with backoff. */
+internal suspend fun observeWorkToolActivityChanges(
+    revisions: Flow<Long>,
+    reader: LocalWorkToolActivityReader,
+    onRead: suspend (LocalWorkToolActivityRead) -> Unit,
+) {
+    revisions.collectLatest {
+        var failures = 0
+        while (true) {
+            when (val result = withContext(Dispatchers.IO) { reader.read() }) {
+                null -> break
+                is LocalWorkToolActivityRead.Available -> {
+                    onRead(result)
+                    break
+                }
+                is LocalWorkToolActivityRead.Failed -> {
+                    onRead(result)
+                    failures++
+                    delay(workToolReadRetryDelayMs(failures))
+                }
+            }
+        }
     }
 }
