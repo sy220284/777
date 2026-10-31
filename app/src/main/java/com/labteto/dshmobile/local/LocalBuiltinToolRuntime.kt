@@ -221,9 +221,18 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                             "content 和 content_base64 必须且只能提供一种"
                         }
                         // Keep model tool input bounded; repeat calls for arbitrarily large files.
-                        val bytes = if (encoded != null) java.util.Base64.getDecoder().decode(encoded)
-                            else requireNotNull(text).toByteArray(Charsets.UTF_8)
-                        require(bytes.size <= 256 * 1024) { "单个续写分块不能超过 256 KiB" }
+                        val maxChunk = 256 * 1024
+                        val bytes = if (encoded != null) {
+                            require(encoded.length <= ((maxChunk + 2) / 3) * 4) {
+                                "Base64 续写分块超过容量上限"
+                            }
+                            java.util.Base64.getDecoder().decode(encoded)
+                        } else {
+                            val value = requireNotNull(text)
+                            require(value.length <= maxChunk) { "文本续写分块超过容量上限" }
+                            value.toByteArray(Charsets.UTF_8)
+                        }
+                        require(bytes.size <= maxChunk) { "单个续写分块不能超过 256 KiB" }
                         workspace.writeChunkBytes(
                             args.string("path"), bytes, args.long("offset", 0L),
                             args.boolean("finish", false), args.optionalString("session_id"),
