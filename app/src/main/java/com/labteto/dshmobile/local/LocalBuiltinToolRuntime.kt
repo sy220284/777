@@ -23,6 +23,7 @@ import com.labteto.dshmobile.local.tools.LocalExtensionWorkshop
 import com.labteto.dshmobile.local.tools.LocalShellTool
 import com.labteto.dshmobile.local.tools.toolCapabilityTarget
 import kotlinx.coroutines.currentCoroutineContext
+import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.files.executionLocalWorkspace
@@ -155,18 +156,22 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         work.get().executeBuiltin(call, allowMutation, binding)?.let { return it }
 
         return when (call.name) {
-            "read", "read_file" -> withContext(Dispatchers.IO) { workspace.read(
+            "read", "read_file" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+                HarnessResourceKind.FILE_IO, "tool:read"
+            ) { workspace.read(
                 relativePath = args.string("path"),
                 startLine = args.int("start_line", 1),
                 endLine = args.int("end_line", args.int("start_line", 1) + 399),
                 startChar = args.int("start_char", 0),
-            ) }
-            "read_chunk" -> withContext(Dispatchers.IO) {
+            ) } }
+            "read_chunk" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+                HarnessResourceKind.FILE_IO, "tool:read_chunk"
+            ) {
                 val offset = args.long("start_byte", 0L)
                 val page = workspace.readRawPage(args.string("path"), offset, args.int("max_bytes", 48 * 1024))
                 "start_byte=" + offset + "；next_byte=" + (offset + page.size) +
                     "；本页字节=" + page.size + "\n" + java.util.Base64.getEncoder().encodeToString(page)
-            }
+            } }
             "tool_output_read" -> args.optionalString("query")?.takeIf(String::isNotBlank)?.let { query ->
                 root.toolOutputStore.search(
                     sessionId = boundSessionId,
@@ -180,35 +185,45 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 startByte = args.int("start_byte", 0),
                 maxBytes = args.int("max_bytes", LocalToolOutputStore.DEFAULT_READ_BYTES),
             )
-            "archive_list" -> LocalArchiveReader(File(workspace.path)).list(
+            "archive_list" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+                HarnessResourceKind.FILE_IO, "tool:archive_list"
+            ) { LocalArchiveReader(File(workspace.path)).list(
                 args.string("path"), args.int("cursor", 0), args.int("limit", 100),
                 args.optionalString("prefix").orEmpty(),
-            )
-            "archive_read" -> LocalArchiveReader(File(workspace.path)).read(
+            ) } }
+            "archive_read" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+                HarnessResourceKind.FILE_IO, "tool:archive_read"
+            ) { LocalArchiveReader(File(workspace.path)).read(
                 args.string("path"), args.string("member"), args.long("start_char", 0L),
                 args.int("max_chars", 20_000),
-            )
+            ) } }
             "file_inspect" -> LocalFileInspector(File(workspace.path)).inspect(args.string("path"))
             "write", "write_file" -> {
                 if (!allowMutation) return "子代理无写入权限"
-                withContext(Dispatchers.IO) { workspace.write(args.string("path"), args.string("content")) }
+                withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+                    HarnessResourceKind.FILE_IO, "tool:write"
+                ) { workspace.write(args.string("path"), args.string("content")) } }
             }
             "write_chunk" -> {
                 if (!allowMutation) return "子代理无写入权限"
-                withContext(Dispatchers.IO) {
+                withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+                    HarnessResourceKind.FILE_IO, "tool:write_chunk"
+                ) {
                     workspace.writeChunk(
                         args.string("path"), args.string("content"),
                         args.long("offset", 0L), args.boolean("finish", false),
                     )
-                }
+                } }
             }
             "edit", "edit_file" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
                 val path = args.string("path")
                 workspace.requireFreshObservation(path)
-                withContext(Dispatchers.IO) {
+                withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+                    HarnessResourceKind.FILE_IO, "tool:edit"
+                ) {
                     workspace.edit(path, args.string("old_text"), args.string("new_text"))
-                }
+                } }
             }
             "apply_patch" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
