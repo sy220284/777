@@ -163,9 +163,13 @@ class LocalWorkRuntime @Inject internal constructor(
     }
 
     /** Same authoritative EventLog across app restarts; source version checked on display. */
-    /** The authoritative Session event stream; evidence cards never poll a timer. */
-    internal fun requirementEvidenceChangesForUi(sessionId: String): kotlinx.coroutines.flow.StateFlow<Long> =
+    /** The committed Session EventLog is the only revision source for Work UI updates. */
+    internal fun workEventChangesForUi(sessionId: String): kotlinx.coroutines.flow.StateFlow<Long> =
         eventLogs.get(sessionId).changes
+
+    /** Evidence and timeline read the same owner; no separate Work revision store. */
+    internal fun requirementEvidenceChangesForUi(sessionId: String): kotlinx.coroutines.flow.StateFlow<Long> =
+        workEventChangesForUi(sessionId)
 
     /** Exact file edits are surfaced by Android's event notifier, never a display timer. */
     internal fun requirementEvidenceFileChangesForUi(sessionId: String): kotlinx.coroutines.flow.Flow<Unit> =
