@@ -134,15 +134,15 @@ class LocalLargeFileOperationsTest {
         try {
             val source = File(shared, "large-source.kt")
             source.bufferedWriter().use { writer ->
-                repeat(220_000) { writer.write("val sourceLine = \"sample content\"\n") }
+                repeat(300_000) { writer.write("val sourceLine = \"sample content\"\n") }
                 writer.write("val finalSymbol = 42\n")
             }
             assertTrue(source.length() > 8L * 1024 * 1024)
             val allowed = LocalWorkspace(root, boundary = LocalSandboxBoundary(root, listOf(shared)))
-            assertTrue(allowed.read(source.absolutePath, 220_001, 220_001).contains("finalSymbol"))
+            assertTrue(allowed.read(source.absolutePath, 300_001, 300_001).contains("finalSymbol"))
             assertTrue(File(root, ".dsh/text-index").listFiles().orEmpty().isNotEmpty())
             assertThrows(IllegalArgumentException::class.java) {
-                workspace.read(source.absolutePath, 220_001, 220_001)
+                workspace.read(source.absolutePath, 300_001, 300_001)
             }
         } finally {
             shared.deleteRecursively()
