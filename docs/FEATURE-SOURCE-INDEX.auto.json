@@ -4504,24 +4504,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "64d87dc9861b",
+  "source_snapshot": "40c05d8c3c84",
   "observed_delta": {
-    "baseline": "500e85d4fcb1",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextLineIndex.kt"
-    ],
+    "baseline": "64d87dc9861b",
+    "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextReadPage.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMultimodal.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessRuntimePolicy.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunnerFactory.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
