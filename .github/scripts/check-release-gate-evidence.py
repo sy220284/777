@@ -111,7 +111,7 @@ if (ci_group is None or
         "github.ref_name == 'main' && github.sha" not in ci_group.group(1) or
         "'latest'" not in ci_group.group(1)):
     fail("CI must coalesce PR and dispatch checks by branch, preserving main commit-specific evidence")
-if ("github.event_name" in ci_group.group(1) or
+if ("${{ github.event_name }}" in ci_group.group(1) or
         "github.event.pull_request.number" in ci_group.group(1)):
     fail("Feature PR checks and manual dispatch must not split into independent runner queues")
 expected_cancel = "cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref_name != 'main' }}"
