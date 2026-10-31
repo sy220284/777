@@ -182,8 +182,22 @@ class LargeSourceWorkloadAndroidTest {
         val report = BenchmarkRecorder(sizeMiB, mode)
         try {
             sampler.start()
+            val started = SystemClock.elapsedRealtimeNanos()
             report.step("whole_scenario") { body(root, report) }
-            report.emit("complete", 0, sampler.peakJava.get(), sampler.peakNative.get())
+            val totalMillis = (SystemClock.elapsedRealtimeNanos() - started) / 1_000_000L
+            report.emit("complete", totalMillis, sampler.peakJava.get(), sampler.peakNative.get())
+            // Android 16/17 device baselines: 256 MiB 17-27s, Java heap 19-25 MiB.
+            // Generous ceilings detect substantial regression without requiring fixed CPU speed.
+            val elapsedBudget = when {
+                sizeMiB >= 256 -> 140_000L
+                sizeMiB >= 128 -> 90_000L
+                else -> 45_000L
+            }
+            assertTrue("源码任务耗时超过回归预算：$totalMillis ms", totalMillis <= elapsedBudget)
+            assertTrue("Java 堆峰值超过 128 MiB：${sampler.peakJava.get()}",
+                sampler.peakJava.get() <= 128L * 1024L * 1024L)
+            assertTrue("Native 堆峰值超过 128 MiB：${sampler.peakNative.get()}",
+                sampler.peakNative.get() <= 128L * 1024L * 1024L)
         } catch (failure: Throwable) {
             report.emit("failed", 0, sampler.peakJava.get(), sampler.peakNative.get())
             throw failure
