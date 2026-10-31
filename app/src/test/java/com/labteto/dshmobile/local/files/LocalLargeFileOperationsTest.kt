@@ -122,6 +122,18 @@ class LocalLargeFileOperationsTest {
         assertEquals("BBBBCCCC", root.resolve("collision.bin").readText())
     }
 
+    @Test fun resumedUploadCannotOverwriteAFileChangedAfterItsFirstChunk() {
+        workspace.write("protected.txt", "original")
+        val first = workspace.writeChunk("protected.txt", "pending", 0L, false)
+        val id = Regex("session_id=([0-9a-f-]+)").find(first)!!.groupValues[1]
+        val changed = LocalWorkspace(root)
+        changed.write("protected.txt", "newer and important")
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.writeChunk("protected.txt", "-done", 7L, true, id)
+        }
+        assertEquals("newer and important", root.resolve("protected.txt").readText())
+    }
+
     @Test fun binaryChunksRoundTripAfterRestartWithoutTextDecoding() {
         val bytes = byteArrayOf(0, -1, -2, 3, 10)
         val first = workspace.writeChunkBytes("data.bin", bytes, 0L, false)
