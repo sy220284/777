@@ -259,6 +259,13 @@ class LocalWorkspace(
 
     }
 
+    /** Size-only estimate from the same sandbox resolver used by the actual operation. */
+    internal fun fileSizeForResourceBudget(relativePath: String): Long {
+        val file = resolve(relativePath)
+        require(file.isFile) { "文件不存在：" + relativePath }
+        return file.length()
+    }
+
     /** Binary-safe paged raw read. The file size never determines allocation size. */
     fun readRawPage(relativePath: String, offset: Long, maxBytes: Int = 64 * 1024): ByteArray {
         require(offset >= 0L && maxBytes in 1..1024 * 1024) { "分页读取参数无效" }
