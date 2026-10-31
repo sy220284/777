@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local.files
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.LinkOption
-import java.util.ArrayDeque
 
 /**
  * App-startup reclamation of strictly identified, reproducible intermediate files.
@@ -30,7 +29,6 @@ internal class LocalWorkspaceIntermediateMaintenance(private val workspaceRoot: 
         const val INDEX_PRESSURE_GRACE_MS = DAY_MS
         const val INDEX_BUDGET = 64L * 1024 * 1024
         const val MAX_VISITS = 30_000
-        const val MAX_DEPTH = 16
         val INDEX_FILE = Regex("^[0-9a-f]{64}\\.index$")
         val INDEX_TEMP = Regex("^\\.[0-9a-f]{64}\\.index-[0-9a-fA-F-]{36}\\.tmp$")
         val ATTACHMENT_TEMP = Regex("^\\.(?:incoming-[0-9a-fA-F-]{36}|normalized-[0-9a-fA-F-]{36}\\.jpg)$")
@@ -72,7 +70,9 @@ internal class LocalWorkspaceIntermediateMaintenance(private val workspaceRoot: 
                 "缓存目录不安全：$relative"
             }
             require(dir.isDirectory) { "索引缓存路径不是目录：$relative" }
-            for (candidate in dir.listFiles() ?: error("无法读取索引缓存：$relative")) {
+            Files.newDirectoryStream(dir.toPath()).use { entries ->
+             for (entry in entries) {
+                val candidate = entry.toFile()
                 if (++scanned > MAX_VISITS) break
                 if (!regular(candidate)) continue
                 when {
@@ -85,6 +85,7 @@ internal class LocalWorkspaceIntermediateMaintenance(private val workspaceRoot: 
                         indexBytes += candidate.length()
                     }
                 }
+             }
             }
         }
         // Pressure eviction is LRU by last indexed use and never targets recently built data.
@@ -106,35 +107,31 @@ internal class LocalWorkspaceIntermediateMaintenance(private val workspaceRoot: 
                 "附件暂存目录不安全"
             }
             require(attachments.isDirectory) { "附件暂存路径不是目录" }
-            for (candidate in attachments.listFiles() ?: error("无法读取附件暂存目录")) {
+            Files.newDirectoryStream(attachments.toPath()).use { entries ->
+              for (entry in entries) {
+                val candidate = entry.toFile()
                 if (++scanned > MAX_VISITS) break
                 if (ATTACHMENT_TEMP.matches(candidate.name) && regular(candidate) &&
                     stale(candidate, TEMP_GRACE_MS)) deleteOwned(candidate)
+              }
             }
         }
 
-        // Commit leftovers can occur in nested workspaces after a sudden process kill.
-        // Never follow symlinks, traverse other roots, or remove .write-in-progress
-        // which is a durable, deliberately resumable user operation.
-        val pending = ArrayDeque<Pair<File, Int>>()
-        pending.add(root to 0)
-        while (pending.isNotEmpty() && scanned < MAX_VISITS) {
-            val (directory, depth) = pending.removeFirst()
-            if (!directory.isDirectory || Files.isSymbolicLink(directory.toPath())) continue
-            // DirectoryStream avoids materializing tens of thousands of names in
-            // one Array when the workspace contains huge generated source trees.
-            Files.newDirectoryStream(directory.toPath()).use { children ->
-                for (entry in children) {
+        // Reclaim only the app-owned write-temp directory. Never delete matching
+        // names in user source trees; filename patterns alone prove no ownership.
+        val writes = File(root, ".dsh/write-temp")
+        if (writes.exists()) {
+            require(!Files.isSymbolicLink(writes.toPath()) &&
+                writes.canonicalFile.toPath().startsWith(root.toPath())) {
+                "写入缓存目录不安全"
+            }
+            require(writes.isDirectory) { "写入缓存路径不是目录" }
+            Files.newDirectoryStream(writes.toPath()).use { entries ->
+                for (entry in entries) {
                     if (++scanned > MAX_VISITS) break
                     val candidate = entry.toFile()
-                    if (Files.isSymbolicLink(entry)) continue
-                    if (regular(candidate)) {
-                        if (WRITE_TEMP.matches(candidate.name) &&
-                            stale(candidate, TEMP_GRACE_MS)) deleteOwned(candidate)
-                    } else if (candidate.isDirectory && depth < MAX_DEPTH &&
-                        candidate.name !in setOf(".git", "node_modules", ".gradle", "build", ".dsh")) {
-                        pending.add(candidate to depth + 1)
-                    }
+                    if (WRITE_TEMP.matches(candidate.name) && regular(candidate) &&
+                        stale(candidate, TEMP_GRACE_MS)) deleteOwned(candidate)
                 }
             }
         }
