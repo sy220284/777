@@ -43,33 +43,7 @@ internal class LocalMediaStudioBackupInstaller(
             return count
         }
         val archive = LocalMediaStudioBackupSnapshot(context, json).validate(staging)
-        val targetMedia = File(context.filesDir, "media-studio")
-        check(!Files.isSymbolicLink(staging.toPath()) &&
-            !Files.isSymbolicLink(context.filesDir.toPath()) &&
-            !Files.isSymbolicLink(database.parentFile.toPath()) &&
-            !Files.isSymbolicLink(targetMedia.toPath())) {
-            "媒体恢复目标目录不安全"
-        }
-        // A normal Studio database may contain uncheckpointed WAL business receipts.
-        // Never open/checkpoint/discard them as part of a destructive restore attempt.
-        check(!File(database.path + "-wal").exists() &&
-            !File(database.path + "-shm").exists()) {
-            "目标媒体数据库仍有 WAL/SHM，拒绝覆盖已有创作事实"
-        }
-        if (Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)) check(
-            Files.isRegularFile(database.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-                sameBytes(database, archive.database)
-        ) { "目标媒体数据库已有不同创作记录，禁止恢复覆盖" }
-
-        val pairs = archive.mediaFiles.map { it to File(targetMedia, it.name) }
-        // Before writing anything, reject every conflicting original. No partial
-        // installation can follow from a known conflict in a later item.
-        pairs.forEach { (original, destination) ->
-            if (Files.exists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) check(
-                Files.isRegularFile(destination.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-                    sameBytes(original, destination)
-            ) { "目标已有不同内容的付费成果：${destination.name}" }
-        }
+        val (targetMedia, pairs) = preflightTargets(archive)
         check(database.parentFile?.let { it.isDirectory || it.mkdirs() } == true) {
             "无法建立媒体 SQLite 恢复目录"
         }
@@ -139,6 +113,51 @@ internal class LocalMediaStudioBackupInstaller(
         check(cleanup.deleteRecursively()) { "媒体已恢复，残留目录清理未完成，可再次清理" }
         DurableFileCommit.syncDirectory(requireNotNull(cleanup.parentFile))
         return restoredCount
+    }
+
+
+    /**
+     * Validate live targets before accepting a full restore plan. Import staging must
+     * reject a conflicting Studio database or paid original now, rather than
+     * making the next process startup fail after the user has already rebooted.
+     */
+    fun validateDestination(staging: File) {
+        val archive = LocalMediaStudioBackupSnapshot(context, json).validate(staging)
+        preflightTargets(archive)
+    }
+
+    private fun preflightTargets(
+        archive: LocalMediaStudioBackupSnapshot.Prepared,
+    ): Pair<File, List<Pair<File, File>>> {
+        val database = context.getDatabasePath("local_media_v1.db")
+        val targetMedia = File(context.filesDir, "media-studio")
+        check(!Files.isSymbolicLink(staging.toPath()) &&
+            !Files.isSymbolicLink(context.filesDir.toPath()) &&
+            !Files.isSymbolicLink(database.parentFile.toPath()) &&
+            !Files.isSymbolicLink(targetMedia.toPath())) {
+            "媒体恢复目标目录不安全"
+        }
+        // A normal Studio database may contain uncheckpointed WAL business receipts.
+        // Never open/checkpoint/discard them as part of a destructive restore attempt.
+        check(!File(database.path + "-wal").exists() &&
+            !File(database.path + "-shm").exists()) {
+            "目标媒体数据库仍有 WAL/SHM，拒绝覆盖已有创作事实"
+        }
+        if (Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)) check(
+            Files.isRegularFile(database.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+                sameBytes(database, archive.database)
+        ) { "目标媒体数据库已有不同创作记录，禁止恢复覆盖" }
+
+        val pairs = archive.mediaFiles.map { it to File(targetMedia, it.name) }
+        // Before writing anything, reject every conflicting original. No partial
+        // installation can follow from a known conflict in a later item.
+        pairs.forEach { (original, destination) ->
+            if (Files.exists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) check(
+                Files.isRegularFile(destination.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+                    sameBytes(original, destination)
+            ) { "目标已有不同内容的付费成果：${destination.name}" }
+        }
+        return targetMedia to pairs
     }
 
     private fun installedCount(database: File): Int = SQLiteDatabase.openDatabase(
