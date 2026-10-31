@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.files
 import com.labteto.dshmobile.local.tools.LocalSandboxBoundary
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
+import com.labteto.dshmobile.local.io.readBoundedLine
 import java.io.File
 import com.labteto.dshmobile.observability.AppLog
 import java.io.FileOutputStream
