@@ -1078,12 +1078,16 @@ private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                 )
             }
+            // Compose must never lay out half a megabyte as one Text paragraph.
+            // Virtualized chunks preserve the full bounded preview and selection
+            // without a single pathological text-measurement operation.
+            val previewChunks = remember(preview.text) { chunkWorkspacePreviewText(preview.text) }
             SelectionContainer {
-                Text(
-                    preview.text,
-                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                    style = DsType.mdCode,
-                )
+                LazyColumn(Modifier.fillMaxSize()) {
+                    items(previewChunks.size) { index ->
+                        Text(previewChunks[index], style = DsType.mdCode)
+                    }
+                }
             }
         }
     }
@@ -1093,4 +1097,18 @@ private fun formatBytes(bytes: Long): String = when {
     bytes < 1024 -> "$bytes B"
     bytes < 1024 * 1024 -> "${bytes / 1024} KB"
     else -> "${"%.1f".format(bytes / (1024.0 * 1024.0))} MB"
+}
+
+/** Split a bounded UI preview into independently measured Compose text blocks. */
+internal fun chunkWorkspacePreviewText(text: String, maxChars: Int = 4_096): List<String> {
+    require(maxChars > 0) { "预览分块长度必须大于零" }
+    if (text.isEmpty()) return emptyList()
+    return buildList {
+        var offset = 0
+        while (offset < text.length) {
+            val end = minOf(text.length, offset + maxChars)
+            add(text.substring(offset, end))
+            offset = end
+        }
+    }
 }
