@@ -334,10 +334,12 @@ class LocalVisionPlugin(
         return file
     }
 
-    private suspend fun imageFileDataUrl(file: File): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    private fun imageFileDataUrl(file: File): String {
+        // The tool executor already owns the execution context. Avoid an extra
+        // dispatcher hop inside time-limited calls (including virtual-time tests).
         val mime = sniffLocalImageMediaType(file)
             ?: error("视觉文件仅支持真实的 PNG/JPEG/WebP/GIF 图片")
-        com.labteto.dshmobile.local.model.encodeLocalFileDataUrl(file, mime, MAX_IMAGE_FILE_BYTES)
+        return com.labteto.dshmobile.local.model.encodeLocalFileDataUrl(file, mime, MAX_IMAGE_FILE_BYTES)
     }
 
     private fun JsonObject.requiredString(name: String): String =
