@@ -56,7 +56,7 @@ def parse(path, round_number, api):
                             f"round {round_number}: missing/invalid {field} in {scenario}")
             continue
         quality = row.get("sample_quality")
-        if row.get("gesture_source") != "instrumentation_realtime_touch":
+        if row.get("gesture_source") != "android_input_realtime_touch":
             raise ValueError(f"round {round_number}: scrolling must use actual wall-clock touch events")
         frames = int(row.get("samples", -1))
         intervals = int(row.get("valid_vsync_intervals", -1))
