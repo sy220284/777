@@ -294,4 +294,49 @@ class SqliteSessionMediaRestoreAndroidTest {
             }
         } finally { root.deleteRecursively() }
     }
+
+    @Test fun completeBackupRejectsExistingStudioDataBeforeStagingAnyRestore() {
+        val base = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(base.cacheDir, "complete-backup-conflict-" + UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val source = isolatedContext(base, File(root, "source").apply { mkdirs() })
+            val destination = isolatedContext(base, File(root, "destination").apply { mkdirs() })
+            val sourceFile = File(source.filesDir, "media-studio/original.png")
+            check(sourceFile.parentFile!!.mkdirs())
+            sourceFile.writeBytes(byteArrayOf(1, 2, 3))
+            LocalMediaDatabase(source, Json).use { db ->
+                db.migrate(listOf(LocalMediaRecord(id = "original",
+                    result = LocalMediaResult("original", "test", "test", "IMAGE", 1L,
+                        fileName = "original.png", sessionId = "chat"))))
+            }
+            val archive = ByteArrayOutputStream()
+            SqliteSessionSnapshotStore(source, Json).use { snapshots ->
+                SqliteSessionEventDatabase(source, Json).use { events ->
+                    SqliteSessionStorageManager(source, snapshots, events,
+                        studioJson = Json,
+                        stageStudioSnapshot = { LocalMediaStore(source, Json).stageMediaStudioBackup(it) },
+                    ).exportAll(archive, includeMediaStudio = true)
+                }
+            }
+            LocalMediaDatabase(destination, Json).use { db ->
+                db.migrate(listOf(LocalMediaRecord(id = "existing",
+                    result = LocalMediaResult("existing", "test", "test", "TRANSCRIBE", 1L,
+                        textOutput = "必须保留的历史记录", sessionId = "other"))))
+            }
+            SqliteSessionSnapshotStore(destination, Json).use { snapshots ->
+                SqliteSessionEventDatabase(destination, Json).use { events ->
+                    val manager = SqliteSessionStorageManager(destination, snapshots, events,
+                        studioJson = Json)
+                    org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+                        manager.stageRestore(ByteArrayInputStream(archive.toByteArray()))
+                    }
+                    assertTrue(!manager.status().pendingRestore)
+                }
+            }
+            LocalMediaDatabase(destination, Json).use { db ->
+                assertEquals("必须保留的历史记录", db.get("existing")?.result?.textOutput)
+                assertEquals(null, db.get("original"))
+            }
+        } finally { root.deleteRecursively() }
+    }
 }
