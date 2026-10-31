@@ -192,7 +192,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
-      "sha256": "d56279adb7776bbe"
+      "sha256": "b94f565cf06bcf02"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalChatGroupUiAdapter.kt",
@@ -1140,7 +1140,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalLargeFileIO.kt",
-      "sha256": "a1a589c919b0fae1"
+      "sha256": "9cd0996d1577fdd7"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalSkillMetadata.kt",
@@ -1152,7 +1152,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextLineIndex.kt",
-      "sha256": "11600d56d3b97964"
+      "sha256": "16fe43e8bffa7a91"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextReadPage.kt",
@@ -1160,7 +1160,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
-      "sha256": "e5cedc5994e7645e"
+      "sha256": "3e16015f0dd9c18b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceExecutionContext.kt",
@@ -1168,7 +1168,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceIntermediateMaintenance.kt",
-      "sha256": "9a74a381b0a4c42b"
+      "sha256": "c276117e5fdcc50d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceToolGuide.kt",
@@ -2312,7 +2312,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalArchiveReader.kt",
-      "sha256": "e56793bbd01112ab"
+      "sha256": "a6353950a00b50b9"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalBuiltinPlugin.kt",
@@ -2424,7 +2424,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt",
-      "sha256": "c1e640804c4af9ca"
+      "sha256": "c9a9a0df75a1c642"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolFailure.kt",
@@ -4512,15 +4512,19 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "18d8a9fe4d42",
+  "source_snapshot": "5ea2c2e23b5d",
   "observed_delta": {
-    "baseline": "f349421836a0",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceIntermediateMaintenance.kt"
-    ],
+    "baseline": "18d8a9fe4d42",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/DshApplication.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalLargeFileIO.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextLineIndex.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceIntermediateMaintenance.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalArchiveReader.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
