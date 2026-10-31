@@ -301,6 +301,9 @@ internal class SqliteSessionStorageManager(
             if (completeStudio) {
                 requireNotNull(studioReceiver) { "完整备份缺少媒体工作室数据库与文件清单" }
                     .validateStaged()
+                LocalMediaStudioBackupInstaller(context, studioJson).validateDestination(
+                    File(staging, STUDIO_STAGE_DIR),
+                )
             } else {
                 require(studioReceiver == null) { "会话备份范围声明不包含媒体工作室，但归档含媒体数据" }
             }
