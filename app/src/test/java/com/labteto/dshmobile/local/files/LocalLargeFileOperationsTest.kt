@@ -116,8 +116,10 @@ class LocalLargeFileOperationsTest {
         assertThrows(IllegalArgumentException::class.java) {
             workspace.writeChunk("collision.bin", "WRONG", 4, true, "00000000-0000-0000-0000-000000000000")
         }
-        workspace.writeChunk("collision.bin", "DDDD", 4, true, a)
-        assertEquals("AAAADDDD", root.resolve("collision.bin").readText())
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.writeChunk("collision.bin", "DDDD", 4, true, a)
+        }
+        assertEquals("BBBBCCCC", root.resolve("collision.bin").readText())
     }
 
     @Test fun binaryChunksRoundTripAfterRestartWithoutTextDecoding() {
