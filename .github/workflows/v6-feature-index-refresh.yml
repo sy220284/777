@@ -1,44 +1,66 @@
-name: 恢复 V6 后重建功能索引
+name: 功能树与源码证据自动同步
 on:
   push:
     branches:
       - refactor/restore-native-v63-remove-ui3-zhaoxi-20261019
-    paths:
-      - .github/workflows/v6-feature-index-refresh.yml
-      - docs/FEATURE-TREE-EXPLICIT-EVIDENCE.json
-      - docs/FEATURE-CODE-EVIDENCE.zh-CN.md
-      - docs/FEATURE-TREE-SOURCE-REGISTRY.json
-      - docs/FEATURE-TREE-LEGACY-IDENTITIES.json
-      - docs/FEATURE-EXISTENCE-TRIAGE.json
-      - .github/scripts/sync-feature-tree.py
-      - 'app/src/**'
-      - 'core/src/**'
-      - 'harness-core/src/**'
-      - '.github/scripts/check-feature-tree-sync.py'
+      - fix/large-file-stability-20261031
+      - feat/architecture-31-20261031
+    # The source fingerprint scans repository-wide Kotlin, Python, shell, Gradle and
+    # workflow files. A partial path allowlist made some code changes invisible here.
+    # Only machine-written outputs are excluded; mixed source+generated pushes still run.
+    paths-ignore:
+      - 'docs/FEATURE-TREE.zh-CN.md'
+      - 'docs/FEATURE-TREE.zh-CN.html'
+      - 'docs/FEATURE-SOURCE-INDEX.auto.json'
+      - 'docs/FEATURE-REVIEW.auto.json'
+      - 'docs/ACCEPTANCE-MATRIX.json'
 
 permissions:
   contents: write
+  actions: write
+
+concurrency:
+  group: feature-index-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   rebuild-index:
+    if: github.repository == 'sy220284/777' && github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: true
-      - name: 根据实际生产源码完整重建功能索引
+          fetch-depth: 1
+      - name: 按当前源码重建并独立校验功能证据
         run: |
           python3 .github/scripts/sync-feature-tree.py
           python3 .github/scripts/check-feature-tree-sync.py
-      - name: 写回真实来源索引与功能树
+      - name: 只写回确实变化的生成索引
+        id: sync
         run: |
           git add docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html docs/ACCEPTANCE-MATRIX.json docs/FEATURE-TREE-SOURCE-REGISTRY.json docs/FEATURE-SOURCE-INDEX.auto.json docs/FEATURE-REVIEW.auto.json
           if git diff --cached --quiet; then
-            echo "功能索引已与现有源码一致"
+            echo "功能证据已与实际源码一致，无需提交"
+            echo "updated=false" >> "$GITHUB_OUTPUT"
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "基于 V6 原生代码重建功能树和源码索引，移除已退役 UI 入口"
-            git push origin "HEAD:refactor/restore-native-v63-remove-ui3-zhaoxi-20261019"
+            git commit -m "自动同步真实源码功能树与证据索引"
+            git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
+            echo "updated=true" >> "$GITHUB_OUTPUT"
           fi
+      - name: 对机器人写回的最新提交直接触发完整代码和设备验收
+        if: steps.sync.outputs.updated == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The GITHUB_TOKEN push does not trigger normal push/PR workflows.
+          # workflow_dispatch is the official exception: run tests on the generated HEAD.
+          expected="$(git rev-parse HEAD)"
+          actual="$(git ls-remote origin "refs/heads/${GITHUB_REF_NAME}" | cut -f1)"
+          test "$actual" = "$expected"
+          gh workflow run ci.yml --ref "$GITHUB_REF_NAME"
+          gh workflow run android-page-matrix.yml --ref "$GITHUB_REF_NAME"

@@ -2,30 +2,54 @@ package com.labteto.dshmobile.local.files
 
 import com.labteto.dshmobile.local.runtime.MAX_TOOL_RESULT_CHARS
 import java.io.File
+import java.io.FileInputStream
 import java.io.InterruptedIOException
 
 /** Bound allocation while reading, and expose the exact next character instead of losing a long line. */
-internal fun readLocalTextPage(file: File, startLine: Int, endLine: Int, startChar: Int): String {
+internal fun readLocalTextPage(
+    file: File, startLine: Int, endLine: Int, startChar: Int,
+    checkpointLine: Int = 1, checkpointByte: Long = 0L,
+): String {
     val output = StringBuilder()
     // Reserve room inside the existing tool result budget for line labels and the continuation.
     val contentLimit = MAX_TOOL_RESULT_CHARS - 512
     val lastLine = minOf(endLine.toLong(), startLine.toLong() + 399L)
-    file.bufferedReader().use { reader ->
-        var line = 1L
+    require(checkpointLine in 1..startLine && checkpointByte >= 0L) { "文本索引位置无效" }
+    val source = FileInputStream(file)
+    source.channel.position(checkpointByte)
+    source.bufferedReader().use { reader ->
+        var line = checkpointLine.toLong()
+        val skipBuffer = CharArray(8 * 1024)
+        // Scan large line ranges in blocks. A read() per character made a 100 MB
+        // file expensive to revisit, even though the returned page is bounded.
         while (line < startLine) {
-            val char = reader.read()
-            if (char < 0) return ""
-            if (char == '\n'.code) line++
             if (Thread.currentThread().isInterrupted) throw InterruptedIOException("文件读取已取消")
+            reader.mark(skipBuffer.size)
+            val count = reader.read(skipBuffer)
+            if (count < 0) return ""
+            var lastNewline = -1
+            for (index in 0 until count) {
+                if (skipBuffer[index] == '\n') {
+                    line++
+                    if (line == startLine.toLong()) {
+                        lastNewline = index
+                        break
+                    }
+                }
+            }
+            if (lastNewline >= 0) {
+                reader.reset()
+                reader.skip((lastNewline + 1).toLong())
+            }
         }
         var column = 0
         while (column < startChar) {
-            if (column % 8_192 == 0 && Thread.currentThread().isInterrupted) {
-                throw InterruptedIOException("文件读取已取消")
+            if (Thread.currentThread().isInterrupted) throw InterruptedIOException("文件读取已取消")
+            val count = reader.read(skipBuffer, 0, minOf(skipBuffer.size, startChar - column))
+            require(count > 0 && (0 until count).none { skipBuffer[it] == '\n' }) {
+                "行内字符偏移已失效，请从当前行开头重读"
             }
-            val char = reader.read()
-            require(char >= 0 && char != '\n'.code) { "行内字符偏移已失效，请从当前行开头重读" }
-            column++
+            column += count
         }
         fun continuation(): String = output.toString().trimEnd('\n') +
             "\n[读取未完：保持 path/end_line，使用 start_line=$line, start_char=$column 继续]"

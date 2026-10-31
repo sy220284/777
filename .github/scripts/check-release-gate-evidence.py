@@ -110,8 +110,15 @@ if (ci_group is None or
         "github.sha" not in ci_group.group(1) or
         "github.event.pull_request.number" not in ci_group.group(1)):
     fail("CI must use distinct concurrency groups per event and main commit / PR")
-if "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" not in ci_concurrency:
-    fail("CI must not cancel main push validation or preserve obsolete PR checks")
+# Never cancel the exact main commit / manually validated main SHA. Obsolete
+# feature-branch dispatches and PR checks may be replaced by newer revisions.
+if ("github.event_name == 'workflow_dispatch'" not in ci_group.group(1) or
+        "github.ref_name != 'main'" not in ci_group.group(1)):
+    fail("CI must preserve main commit isolation while coalescing feature-branch runs")
+expected_cancel = ("cancel-in-progress: ${{ github.event_name == 'pull_request' || "
+                   "(github.event_name == 'workflow_dispatch' && github.ref_name != 'main') }}")
+if expected_cancel not in ci_concurrency:
+    fail("CI must retain immutable main validation and cancel only replaceable PR/branch runs")
 
 if CI.count("git diff --no-renames --name-only --diff-filter=ACMRD") < 2:
     fail("CI rename detection can conceal a removed product source")

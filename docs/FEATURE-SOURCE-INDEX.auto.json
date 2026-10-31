@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1874,
-  "production_source_count": 1107,
-  "test_code_file_count": 627,
+  "repository_code_file_count": 1889,
+  "production_source_count": 1112,
+  "test_code_file_count": 637,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -68,7 +68,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/DshApplication.kt",
-      "sha256": "2e2aea908c7a1006"
+      "sha256": "00bfa567198ea90d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/MainActivity.kt",
@@ -192,7 +192,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
-      "sha256": "725e9b597083f756"
+      "sha256": "814922a1ab3f1d1a"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalChatGroupUiAdapter.kt",
@@ -472,7 +472,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentImporter.kt",
-      "sha256": "e20ee54a5749033b"
+      "sha256": "787bdeff002d9b15"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentInspection.kt",
@@ -808,7 +808,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt",
-      "sha256": "59fea6a13cc79d27"
+      "sha256": "a61a65bb41ee9ff6"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDomainStateEvent.kt",
@@ -984,7 +984,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt",
-      "sha256": "4853db97872d6bad"
+      "sha256": "f317b41a516781e7"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupExecutionModels.kt",
@@ -1139,20 +1139,36 @@
       "sha256": "0c0e50f1ff1e77f9"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalLargeFileIO.kt",
+      "sha256": "aebef7eea1c0a31d"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalSkillMetadata.kt",
       "sha256": "a121a6bb6e2827c2"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalSourceLineScanner.kt",
+      "sha256": "74bdd42f9e95a3ee"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextLineIndex.kt",
+      "sha256": "16fe43e8bffa7a91"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextReadPage.kt",
-      "sha256": "9fa84467caee550e"
+      "sha256": "c6f01eb601c21ad3"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
-      "sha256": "3abc30e9340f49b2"
+      "sha256": "334eb9f6f1cc6464"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceExecutionContext.kt",
       "sha256": "1d5b06a8ff84943a"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceIntermediateMaintenance.kt",
+      "sha256": "c276117e5fdcc50d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceToolGuide.kt",
@@ -1329,6 +1345,10 @@
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalImageInputMode.kt",
       "sha256": "7dadcc6d6feccca3"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalInlineFileEncoding.kt",
+      "sha256": "ab0a051281d8e7fc"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalInstructionScope.kt",
@@ -1548,7 +1568,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMultimodal.kt",
-      "sha256": "ced9224610e8f9e5"
+      "sha256": "eeae60d429b0d244"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalNativeModelTools.kt",
@@ -2032,7 +2052,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt",
-      "sha256": "26cdf95323aa7b89"
+      "sha256": "e2452b1cdb0550cb"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessResourceProjection.kt",
@@ -2040,7 +2060,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessRuntimePolicy.kt",
-      "sha256": "199a4f9541d262f8"
+      "sha256": "1c218b708c61dc3b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessStartup.kt",
@@ -2184,7 +2204,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
-      "sha256": "39e66df0d3d12dc5"
+      "sha256": "afe677fab5e38d2e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionLifecyclePort.kt",
@@ -2208,7 +2228,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt",
-      "sha256": "cb853bcb6d7aa2ff"
+      "sha256": "41f1f6395cb1b1c6"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionSnapshotStore.kt",
@@ -2292,7 +2312,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalArchiveReader.kt",
-      "sha256": "8f36ec2583f23a0b"
+      "sha256": "a6353950a00b50b9"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalBuiltinPlugin.kt",
@@ -2312,7 +2332,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalFileUiValues.kt",
-      "sha256": "ab9567a2fc2308c0"
+      "sha256": "aa018ee34ba982c1"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubCredentialManager.kt",
@@ -2404,7 +2424,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt",
-      "sha256": "3d644d0610ae8f1d"
+      "sha256": "c9a9a0df75a1c642"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolFailure.kt",
@@ -2416,7 +2436,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt",
-      "sha256": "0a891b0a8738d748"
+      "sha256": "9e1be1e1e0a4675b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPromptBudgetPolicy.kt",
@@ -2516,7 +2536,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt",
-      "sha256": "b5ca59f6038dfdad"
+      "sha256": "2787d6c5c686c916"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/vision/VisionClient.kt",
@@ -2696,7 +2716,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunnerFactory.kt",
-      "sha256": "4a2e94a677368b83"
+      "sha256": "6b07257bdbbde598"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentTurnExecution.kt",
@@ -2772,7 +2792,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-      "sha256": "d3a8babbf4bea13f"
+      "sha256": "e5eeecb29bbe3d38"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkApprovalCoordinator.kt",
@@ -3364,7 +3384,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureUiActions.kt",
-      "sha256": "df51c9faa4b7a3e1"
+      "sha256": "8741784fa2de454a"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalGeneratedMediaMessage.kt",
@@ -3396,7 +3416,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "sha256": "7088d1119900f969"
+      "sha256": "e49a8f0ea79fd98b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStreamingComponents.kt",
@@ -3404,7 +3424,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "sha256": "838d8b40368a3167"
+      "sha256": "d426cb2fb3134f8c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModelDefaults.kt",
@@ -3524,11 +3544,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkUiContribution.kt",
-      "sha256": "9e9a547982e31f8f"
+      "sha256": "b95bc590c8fb14ad"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt",
-      "sha256": "d0205ce0d1a3bf5b"
+      "sha256": "f83ea986e3374919"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceShare.kt",
@@ -3884,7 +3904,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/uicontract/FilesUiPort.kt",
-      "sha256": "bbc466cfb4ba5d44"
+      "sha256": "86e14dc59c6eed96"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/uicontract/HostPreferencesUiPort.kt",
@@ -4292,7 +4312,7 @@
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/resource/HarnessResourceScheduler.kt",
-      "sha256": "3388802fedfd36c0"
+      "sha256": "d81f8845804e2525"
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/CompressedEventSegmentCache.kt",
@@ -4492,9 +4512,9 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "10dc7f24d7ba",
+  "source_snapshot": "d2154e74fe96",
   "observed_delta": {
-    "baseline": "32420a9838e3",
+    "baseline": "ad189b760555",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [],
