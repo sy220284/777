@@ -41,6 +41,7 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     eventLogs: LocalSessionEventLogRegistry,
 ) : com.labteto.dshmobile.uicontract.FilesUiPort {
     private val resourceScheduler = runtimeStateStore.resourceScheduler
+    private val context = context
     internal val workspace = LocalWorkspace(
         root = File(context.filesDir, "local-harness/workspace"),
         extraSearchPaths = bundledRuntimeManager::searchPaths,
@@ -81,7 +82,13 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment =
         withContext(Dispatchers.IO) { resourceScheduler.withResource(
             HarnessResourceKind.FILE_IO, "file:import"
-        ) { attachmentImporter.import(uri) } }
+        ) {
+            if (context.contentResolver.getType(uri)?.startsWith("image/") == true) {
+                resourceScheduler.withResource(HarnessResourceKind.MEDIA_DECODE, "file:import_image") {
+                    attachmentImporter.import(uri)
+                }
+            } else attachmentImporter.import(uri)
+        } }
 
     internal suspend fun importToolImages(content: com.labteto.dshmobile.harness.tools.ToolRichContent?): List<LocalImportedAttachment> =
         withContext(Dispatchers.IO) {

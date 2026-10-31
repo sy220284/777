@@ -215,7 +215,8 @@ class LocalWorkspace(
     fun writeToolArtifact(relativePath: String, content: String): String {
         val file = resolveForWrite(relativePath)
         LocalLargeFileIO.writeText(file, content)
-        observations.remove(file.path)
+        // Keep the last observed version: edit must report stale bytes (rather than
+        // a missing observation) when a tool artifact overwrote the read file.
         return file.relativeTo(canonicalRoot).invariantSeparatorsPath
     }
 
@@ -662,7 +663,7 @@ class LocalWorkspace(
         return LocalWorkspaceFilePreview(
             file = LocalWorkspaceFile(displayPath(file), length, file.lastModified()),
             text = content,
-            truncated = next != null,
+            truncated = if (binary) length > pageBytes else next != null,
             offset = offset,
             nextOffset = next,
         )
