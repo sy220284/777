@@ -19,6 +19,47 @@ import org.junit.Test
 
 class HarnessResourceSchedulerTest {
     @Test
+    fun weightedLargeFileReservesCapacityAndReleasesItExactlyOnce() = runTest {
+        val scheduler = HarnessResourceScheduler(
+            HarnessResourceBudget(maxModelRequests = 2, maxAgents = 2, maxFileIo = 2),
+        )
+        val heavy = scheduler.acquire(HarnessResourceKind.FILE_IO, "large-export", units = 2)
+        assertEquals(1, scheduler.snapshot().activeFileIo)
+        assertEquals(2, scheduler.snapshot().activeUnits[HarnessResourceKind.FILE_IO])
+        assertEquals(HarnessResourcePressure.HIGH, scheduler.snapshot().pressure)
+
+        val pending = async { scheduler.acquire(HarnessResourceKind.FILE_IO, "small-preview") }
+        runCurrent()
+        assertFalse(pending.isCompleted)
+        heavy.close()
+        heavy.close()
+        val small = pending.await()
+        assertEquals(1, scheduler.snapshot().activeUnits[HarnessResourceKind.FILE_IO])
+        small.close()
+        assertEquals(0, scheduler.snapshot().activeUnits[HarnessResourceKind.FILE_IO])
+        assertTrue(scheduler.snapshot().leases.isEmpty())
+    }
+
+    @Test
+    fun adaptiveDownsizingDoesNotDeadlockHeavyFileRequests() = runTest {
+        val scheduler = HarnessResourceScheduler(
+            HarnessResourceBudget(maxModelRequests = 2, maxAgents = 2, maxFileIo = 2),
+        )
+        scheduler.updateBudget(HarnessResourceBudget(maxModelRequests = 1, maxAgents = 1, maxFileIo = 1))
+        val acquired = scheduler.acquire(HarnessResourceKind.FILE_IO, "large-import", units = 2)
+        assertEquals(1, acquired.info.units)
+        assertEquals(1, scheduler.snapshot().activeUnits[HarnessResourceKind.FILE_IO])
+        acquired.close()
+    }
+
+    @Test
+    fun sizeClassChangesOnlyAtTheLargeTransferThreshold() {
+        assertEquals(1, harnessFileIoUnitsForBytes(0))
+        assertEquals(1, harnessFileIoUnitsForBytes(64L * 1024 * 1024 - 1))
+        assertEquals(2, harnessFileIoUnitsForBytes(64L * 1024 * 1024))
+    }
+
+    @Test
     fun fileAndMediaAdmissionUseIndependentBoundedLeases() = runTest {
         val scheduler = HarnessResourceScheduler(
             HarnessResourceBudget(maxModelRequests = 2, maxAgents = 2, maxFileIo = 1, maxMediaDecode = 1),
