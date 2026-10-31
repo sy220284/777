@@ -232,6 +232,13 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - 同一测试保留本机通知、主题、头像、背景、阅读设置、会话排序以及独立的本机 Webhook 凭据数据，重复清理仍保持一致；Keystore 专项验证旧中继密钥被删除且无关密钥保留。
 - CI 覆盖迁移逻辑与 Android 16/17 仪器化验证；真实旧版 APK 安装后覆盖升级属于另行设备验收，不能仅用数据夹具测试冒充已做 APK 原地升级。
 
+## 个性化设置持久保存专项回归（Issue #783）
+
+- **落盘确认**：`LocalHarnessSettingsCoordinatorTest` 必须核对写盘前无成功确认、单写盘队列覆盖的请求不悬挂、并发阻塞写入时只有最后一代返回成功，失败后重试可恢复。
+- **状态契约**：`SettingsUiPortReceiptTest` 必须区分异步受理的 `Submitted` 与真正执行完成的 `Applied`；失败不得被包装成成功。
+- **草稿与生命周期**：`PersonalizationRulesEditorTest` 及 `PersonalizationRulesSheetAndroidTest` 必须验证失败留草稿、重试、页面卸载再进入、显式取消时忽略迟到结果；切换页面不应把成功提示投递到旧界面。
+- **平台验收**：变更 `androidTest` 必须从同一提交执行 Android 16 与 Android 17 仪器测试；跳过或仅完成编译均不算设备回归通过。
+
 ## 功能专项验证
 
 新增能力必须在通用 CI 外补自己的专项测试。
