@@ -16,6 +16,11 @@ enum class HarnessResourceKind {
     MEDIA_DECODE,
 }
 
+/** Foreground work may overtake queued background work, with a bounded bypass. */
+enum class HarnessResourcePriority(val weight: Int) {
+    BACKGROUND(0), NORMAL(1), INTERACTIVE(2),
+}
+
 enum class HarnessResourcePressure {
     LOW,
     MEDIUM,
@@ -58,6 +63,8 @@ data class HarnessResourceLeaseInfo(
     val acquiredAt: Long,
     /** Reserved cost units; one heavy file operation may occupy two file-I/O slots. */
     val units: Int = 1,
+    val priority: HarnessResourcePriority = HarnessResourcePriority.NORMAL,
+    val queuedMillis: Long = 0L,
 )
 
 data class HarnessResourceSnapshot(
@@ -72,6 +79,7 @@ data class HarnessResourceSnapshot(
     val leases: List<HarnessResourceLeaseInfo> = emptyList(),
     /** Derived from the exact lease ledger, never a second mutable counter. */
     val activeUnits: Map<HarnessResourceKind, Int> = emptyMap(),
+    val queuedByKind: Map<HarnessResourceKind, Int> = emptyMap(),
 ) {
     val pressure: HarnessResourcePressure
         get() {
@@ -126,9 +134,12 @@ class HarnessResourceScheduler(
     private var currentBudget = budget
     val budget: HarnessResourceBudget get() = synchronized(leaseStateLock) { currentBudget }
     private val capacityRevision = MutableStateFlow(0L)
-    // FIFO tickets retain the fairness of the old semaphore when capacity changes.
+    // Strict FIFO within one priority; an older low-priority waiter is admitted
+    // after at most three overtakes by higher priorities. No priority lane can starve.
+    private data class Waiter(val id: Long, val priority: HarnessResourcePriority)
     private val admissionQueues = HarnessResourceKind.values()
-        .associateWith { java.util.ArrayDeque<Long>() }
+        .associateWith { java.util.ArrayDeque<Waiter>() }
+    private val priorityBypasses = HarnessResourceKind.values().associateWith { 0 }.toMutableMap()
     private var nextTicket = 0L
     private val activeModels = AtomicInteger()
     private val activeAgents = AtomicInteger()
@@ -162,33 +173,42 @@ class HarnessResourceScheduler(
         kind: HarnessResourceKind,
         owner: String = kind.name.lowercase(),
         units: Int = 1,
+        priority: HarnessResourcePriority = HarnessResourcePriority.NORMAL,
     ): HarnessResourceLease {
         require(units in 1..32) { "资源请求成本须在 1..32 之间" }
         // Refresh the device budget at the admission boundary, not on a polling timer.
         beforeAcquire()
+        val queuedAt = System.nanoTime()
         val ticket = synchronized(leaseStateLock) {
-            val id = ++nextTicket
-            admissionQueues.getValue(kind).addLast(id)
-            id
+            Waiter(++nextTicket, priority).also { admissionQueues.getValue(kind).addLast(it) }
         }
         try {
             while (true) {
                 var admitted: HarnessResourceLeaseInfo? = null
                 val observedRevision = synchronized(leaseStateLock) {
                     val queue = admissionQueues.getValue(kind)
+                    val oldest = queue.peekFirst()
+                    val best = if (priorityBypasses.getValue(kind) >= 3) oldest else
+                        queue.minWithOrNull(compareByDescending<Waiter> { it.priority.weight }
+                            .thenBy { it.id })
                     val capacity = currentBudget.limit(kind)
                     // An adaptive device budget may shrink below the original request cost.
                     // Charge every available slot instead of blocking that job forever.
                     val actualUnits = minOf(units, capacity)
                     val occupied = leases.values.sumOf { if (it.kind == kind) it.units else 0 }
-                    if (queue.peekFirst() == ticket && occupied <= capacity - actualUnits) {
-                        queue.removeFirst()
+                    if (best == ticket && occupied <= capacity - actualUnits) {
+                        check(queue.remove(ticket)) { "资源队列登记已丢失" }
+                        priorityBypasses[kind] = if (ticket != oldest) {
+                            priorityBypasses.getValue(kind) + 1
+                        } else 0
                         admitted = HarnessResourceLeaseInfo(
                             id = "lease-" + UUID.randomUUID().toString().replace("-", "").take(16),
                             kind = kind,
                             owner = owner.take(160),
                             acquiredAt = System.currentTimeMillis(),
                             units = actualUnits,
+                            priority = priority,
+                            queuedMillis = ((System.nanoTime() - queuedAt) / 1_000_000L).coerceAtLeast(0L),
                         )
                         increment(kind)
                         leases[admitted!!.id] = admitted!!
@@ -225,9 +245,10 @@ class HarnessResourceScheduler(
         kind: HarnessResourceKind,
         owner: String = kind.name.lowercase(),
         units: Int = 1,
+        priority: HarnessResourcePriority = HarnessResourcePriority.NORMAL,
         block: suspend () -> T,
     ): T {
-        val lease = acquire(kind, owner, units)
+        val lease = acquire(kind, owner, units, priority)
         return try {
             block()
         } finally {
@@ -247,6 +268,9 @@ class HarnessResourceScheduler(
         leases = leases.values.sortedBy(HarnessResourceLeaseInfo::acquiredAt),
         activeUnits = HarnessResourceKind.values().associateWith { kind ->
             leases.values.sumOf { if (it.kind == kind) it.units else 0 }
+        },
+        queuedByKind = HarnessResourceKind.values().associateWith { kind ->
+            admissionQueues.getValue(kind).size
         },
     ) }
 
