@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1901,
-  "production_source_count": 1116,
-  "test_code_file_count": 643,
+  "repository_code_file_count": 1903,
+  "production_source_count": 1117,
+  "test_code_file_count": 644,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -2288,11 +2288,15 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionEventDatabase.kt",
-      "sha256": "bcafd40c052c4cdf"
+      "sha256": "a01fd3c01655cbfa"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionMediaArchive.kt",
       "sha256": "3a0aa3dbb38dfb6b"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionSearchBlockIndex.kt",
+      "sha256": "f8cfc47f95673e0d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionSnapshotStore.kt",
@@ -4528,13 +4532,15 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "7b269aa65886",
+  "source_snapshot": "04cb19663124",
   "observed_delta": {
-    "baseline": "27d9466a39e8",
-    "added_production_files": [],
+    "baseline": "7b269aa65886",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionSearchBlockIndex.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTurnSettlement.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionEventDatabase.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
