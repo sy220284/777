@@ -22,7 +22,6 @@ import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
@@ -173,7 +172,8 @@ class DeviceScrollFrameAndMemoryTest {
         val output = String.format(Locale.US,
             "ANDROID_PERF api=%d scenario=work_timeline_scroll_frames samples=%d " +
                 "refresh_hz=%.1f observed_fps_p50=%s jank_pct=%s " +
-                "sample_quality=%s valid_vsync_intervals=%d max_visible_index=%d " +
+                "sample_quality=%s gesture_source=instrumentation_realtime_touch " +
+                "valid_vsync_intervals=%d max_visible_index=%d " +
                 "peak_pss_kib=%d peak_java_used_kib=%d",
             Build.VERSION.SDK_INT, frames.size, refreshRate, observedFps, jankPct,
             if (validSample) "valid" else "insufficient", intervals.size, maxVisibleIndex,
