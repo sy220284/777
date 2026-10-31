@@ -71,4 +71,3 @@ jobs:
           test "$actual" = "$expected"
           gh workflow run ci.yml --ref "$GITHUB_REF_NAME"
           gh workflow run android-page-matrix.yml --ref "$GITHUB_REF_NAME"
-
