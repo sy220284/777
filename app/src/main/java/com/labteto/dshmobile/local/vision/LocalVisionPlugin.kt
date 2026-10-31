@@ -19,7 +19,6 @@ import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.imageInputUnsupported
 import com.labteto.dshmobile.local.model.sniffLocalImageMediaType
 import java.io.File
-import java.util.Base64
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -335,11 +334,10 @@ class LocalVisionPlugin(
         return file
     }
 
-    private fun imageFileDataUrl(file: File): String {
+    private suspend fun imageFileDataUrl(file: File): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val mime = sniffLocalImageMediaType(file)
             ?: error("视觉文件仅支持真实的 PNG/JPEG/WebP/GIF 图片")
-        val encoded = Base64.getEncoder().encodeToString(file.readBytes())
-        return "data:$mime;base64,$encoded"
+        com.labteto.dshmobile.local.model.encodeLocalFileDataUrl(file, mime, MAX_IMAGE_FILE_BYTES)
     }
 
     private fun JsonObject.requiredString(name: String): String =
