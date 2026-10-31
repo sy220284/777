@@ -69,6 +69,32 @@ class LocalTurnSettlementTest {
         }
     }
 
+
+    @Test
+    fun unrelatedLargeProgressHistoryCannotChangePendingToolSettlement() {
+        withLog { log ->
+            log.append("step/start", buildJsonObject { put("step", 11) })
+            val write = call("stable-write")
+            admit(log, write, readOnly = false)
+            repeat(300) { index ->
+                log.append("work/progress", buildJsonObject {
+                    put("content", "progress-$index " + "unrelated".repeat(48))
+                })
+                log.append("model/usage", buildJsonObject { put("tokens", index) })
+            }
+            val single = pendingToolSettlements(log, listOf(write), emptySet()).single()
+            assertTrue(single.started)
+            assertEquals("exec-stable-write", single.executionId)
+            assertFalse(single.verifiedReadOnly)
+            log.append("tool/result", buildJsonObject {
+                put("id", write.id)
+                put("execution_id", single.executionId)
+                put("is_error", false)
+            })
+            assertTrue(pendingToolSettlements(log, listOf(write), emptySet()).isEmpty())
+        }
+    }
+
     private fun call(id: String) = AgentToolCall(id, id, buildJsonObject { })
     private fun admit(log: LocalSessionEventLog, call: AgentToolCall, readOnly: Boolean) {
         log.append("tool/call", buildJsonObject {
