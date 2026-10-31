@@ -408,6 +408,12 @@ class SettingsViewModel @Inject constructor(
     }
 
     /** Validates the archive in the existing Session owner; staging never overwrites live chats. */
+    suspend fun exportCompleteLocalSessionStorage(uri: Uri): Long = withContext(Dispatchers.IO) {
+        appContext.contentResolver.openOutputStream(uri)?.use { output ->
+            localHarness.exportCompleteSessionStorage(output)
+        } ?: error("无法打开完整数据备份导出文件")
+    }
+
     suspend fun importLocalSessionStorage(uri: Uri): Int = withContext(Dispatchers.IO) {
         appContext.contentResolver.openInputStream(uri)?.use { input ->
             localHarness.stageRestoreSessionStorage(input)
