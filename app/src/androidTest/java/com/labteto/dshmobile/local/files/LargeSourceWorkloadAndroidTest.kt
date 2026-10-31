@@ -81,7 +81,7 @@ class LargeSourceWorkloadAndroidTest {
     }
 
     @Test fun code256MiB_longIndexedReadAnalysisAndEdit() {
-        sourceWorkload(256, grep = false, edit = true)
+        sourceWorkload(256, grep = true, edit = true)
     }
 
     private fun sourceWorkload(sizeMiB: Int, grep: Boolean, edit: Boolean) {
