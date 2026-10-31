@@ -2204,7 +2204,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
-      "sha256": "0a091af3ef9c7320"
+      "sha256": "9e08bbe438134d99"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionLifecyclePort.kt",
@@ -4324,7 +4324,7 @@
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/resource/HarnessResourceScheduler.kt",
-      "sha256": "6c5374ce0f52610a"
+      "sha256": "47e9d4966aa24070"
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/CompressedEventSegmentCache.kt",
@@ -4532,15 +4532,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "04cb19663124",
+  "source_snapshot": "1f635d78c523",
   "observed_delta": {
-    "baseline": "7b269aa65886",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionSearchBlockIndex.kt"
-    ],
+    "baseline": "04cb19663124",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionEventDatabase.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/resource/HarnessResourceScheduler.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
