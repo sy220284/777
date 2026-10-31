@@ -28,7 +28,8 @@ class LocalIntermediateMaintenanceAndroidTest {
             val workspace = LocalWorkspace(root)
             workspace.write("src.kt", "original version")
             val start = workspace.writeChunk("src.kt", "partial source", 0L, false)
-            val stage = File(root, ".src.kt.write-in-progress")
+            val sessionId = Regex("session_id=([0-9a-f-]+)").find(start)!!.groupValues[1]
+            val stage = File(root, ".src.kt.write-in-progress-" + sessionId)
             assertTrue(stage.isFile)
             val report = LocalWorkspaceIntermediateMaintenance(root).cleanup(now)
             assertEquals(1, report.deletedFiles)
@@ -37,7 +38,7 @@ class LocalIntermediateMaintenanceAndroidTest {
             assertTrue(stage.isFile)
             assertEquals("original version", File(root, "src.kt").readText())
             val offset = Regex("next_byte=([0-9]+)").find(start)!!.groupValues[1].toLong()
-            LocalWorkspace(root).writeChunk("src.kt", " complete", offset, true)
+            LocalWorkspace(root).writeChunk("src.kt", " complete", offset, true, sessionId)
             assertEquals("partial source complete", File(root, "src.kt").readText())
             assertFalse(stage.exists())
         } finally {
