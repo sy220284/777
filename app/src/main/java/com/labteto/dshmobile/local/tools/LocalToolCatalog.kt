@@ -28,6 +28,17 @@ object LocalToolCatalog {
             "path" to string("相对工作区的路径；任务中间文件优先保存到 create_goal 返回的任务目录，普通文档默认中文文件名，扩展名不变"),
             "content" to string("完整文件内容"),
         ), listOf("path", "content")))
+        add(tool("read_chunk", "按字节偏移读取大文件，返回有界 Base64 页和下一字节位置", properties(
+            "path" to string("工作区文件路径"),
+            "start_byte" to integerRange("起始字节偏移，默认 0", min = 0),
+            "max_bytes" to integerRange("读取字节数，最大 49152", 1, 49152),
+        ), listOf("path")))
+        add(tool("write_chunk", "分块写入任意大小文件，按 next_byte 追加，finish=true 时原子发布", properties(
+            "path" to string("工作区目标文件路径"),
+            "content" to string("当前分块 UTF-8 文本"),
+            "offset" to integerRange("必须等于上次返回的 next_byte，首次 0", min = 0),
+            "finish" to boolean("是否提交完整文件，默认 false"),
+        ), listOf("path", "content", "offset")))
         add(tool("edit", "唯一字面量替换；修改前必须先用 read 读取包含待替换内容的目标区域，write 创建或覆盖不算读取", properties(
             "path" to string("相对工作区的路径"),
             "old_text" to string("必须只出现一次的原文"),

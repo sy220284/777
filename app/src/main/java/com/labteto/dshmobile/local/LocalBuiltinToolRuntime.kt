@@ -23,6 +23,8 @@ import com.labteto.dshmobile.local.tools.LocalExtensionWorkshop
 import com.labteto.dshmobile.local.tools.LocalShellTool
 import com.labteto.dshmobile.local.tools.toolCapabilityTarget
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.files.executionLocalWorkspace
 import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
@@ -153,12 +155,18 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         work.get().executeBuiltin(call, allowMutation, binding)?.let { return it }
 
         return when (call.name) {
-            "read", "read_file" -> workspace.read(
+            "read", "read_file" -> withContext(Dispatchers.IO) { workspace.read(
                 relativePath = args.string("path"),
                 startLine = args.int("start_line", 1),
                 endLine = args.int("end_line", args.int("start_line", 1) + 399),
                 startChar = args.int("start_char", 0),
-            )
+            ) }
+            "read_chunk" -> withContext(Dispatchers.IO) {
+                val offset = args.long("start_byte", 0L)
+                val page = workspace.readRawPage(args.string("path"), offset, args.int("max_bytes", 48 * 1024))
+                "start_byte=" + offset + "；next_byte=" + (offset + page.size) +
+                    "；本页字节=" + page.size + "\n" + java.util.Base64.getEncoder().encodeToString(page)
+            }
             "tool_output_read" -> args.optionalString("query")?.takeIf(String::isNotBlank)?.let { query ->
                 root.toolOutputStore.search(
                     sessionId = boundSessionId,
@@ -183,13 +191,24 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
             "file_inspect" -> LocalFileInspector(File(workspace.path)).inspect(args.string("path"))
             "write", "write_file" -> {
                 if (!allowMutation) return "子代理无写入权限"
-                workspace.write(args.string("path"), args.string("content"))
+                withContext(Dispatchers.IO) { workspace.write(args.string("path"), args.string("content")) }
+            }
+            "write_chunk" -> {
+                if (!allowMutation) return "子代理无写入权限"
+                withContext(Dispatchers.IO) {
+                    workspace.writeChunk(
+                        args.string("path"), args.string("content"),
+                        args.long("offset", 0L), args.boolean("finish", false),
+                    )
+                }
             }
             "edit", "edit_file" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
                 val path = args.string("path")
                 workspace.requireFreshObservation(path)
-                workspace.edit(path, args.string("old_text"), args.string("new_text"))
+                withContext(Dispatchers.IO) {
+                    workspace.edit(path, args.string("old_text"), args.string("new_text"))
+                }
             }
             "apply_patch" -> {
                 if (!allowMutation) return "该子任务处于只读模式"

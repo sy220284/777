@@ -54,7 +54,7 @@ internal object LocalToolPolicy {
         "team_dismiss_member", "team_stop_all", "team_wait",
         "memory_search", "memory_list", "memory_remember",
         "memory_update", "memory_forget", "session_search", "session_trace",
-        "session_event_trace", "session_event_read", "present", "archive_list", "archive_read" -> ToolExposure.OPTIONAL
+        "session_event_trace", "session_event_read", "present", "archive_list", "archive_read", "read_chunk", "write_chunk" -> ToolExposure.OPTIONAL
         "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect", "list_files",
         "glob", "grep", "bash", "capability_search", "update_plan", "exit_plan_mode",
         "ask_user_question", "subagent", "list_subagent_models", "list_agent_roles", "session_event_search" -> ToolExposure.CORE
@@ -102,7 +102,7 @@ internal object LocalToolPolicy {
     }
 
     fun access(name: String): ToolAccess = when (canonical(name)) {
-        "write", "edit", "apply_patch", "download_file", "present",
+        "write", "edit", "write_chunk", "apply_patch", "download_file", "present",
         "skill_create", "skill_update", "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local" -> ToolAccess.WORKSPACE_WRITE
         "update_plan", "exit_plan_mode", "todo_write", "create_goal", "update_goal",
         "ask_user_question", "memory_remember", "memory_update", "memory_forget" -> ToolAccess.SESSION_WRITE
@@ -113,7 +113,7 @@ internal object LocalToolPolicy {
         "team_dismiss_member", "team_stop_all" -> ToolAccess.AGENT_CONTROL
         "web_search", "web_fetch", "network_diagnose" -> ToolAccess.NETWORK
         "http_request", "media_image_create", "mcp_start_local" -> ToolAccess.PRIVILEGED
-        "read", "tool_output_read", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "job_list", "job_output", "json_query",
+        "read", "read_chunk", "tool_output_read", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "job_list", "job_output", "json_query",
         "media_image_options", "media_image_status",
         "environment_info", "capability_search", "get_goal", "skill", "extension_inspect", "list_subagent_models", "list_agent_roles", "list_agents", "agent_tree", "agent_inspect", "agent_watch",
         "session_event_search", "session_search", "memory_search", "memory_list",
@@ -126,7 +126,7 @@ internal object LocalToolPolicy {
     fun metadata(name: String): ToolMetadata {
         val canonical = canonical(name)
         val family = when (canonical) {
-            "read", "tool_output_read", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "write", "edit",
+            "read", "read_chunk", "tool_output_read", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "write", "edit", "write_chunk",
             "apply_patch", "download_file", "json_query", "present" -> "文件"
             "bash", "job_list", "job_output", "job_kill" -> "运行时"
             "web_search", "web_fetch", "http_request", "network_diagnose" -> "网络"
