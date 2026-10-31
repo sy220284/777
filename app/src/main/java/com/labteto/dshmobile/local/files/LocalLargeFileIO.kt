@@ -254,7 +254,8 @@ internal object LocalLargeFileIO {
         val digest = MessageDigest.getInstance("SHA-256")
             .digest(target.canonicalPath.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it.toInt() and 255) }
-        val lockPath = File(dir, "$digest.lck").toPath()
+        // Fixed-size lock stripes prevent one permanent marker per distinct source file.
+        val lockPath = File(dir, digest.take(2) + ".lck").toPath()
         val monitor = publishMonitors[(digest.hashCode() and Int.MAX_VALUE) % publishMonitors.size]
         return synchronized(monitor) {
             FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE,
