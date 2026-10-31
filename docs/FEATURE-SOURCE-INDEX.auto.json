@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1878,
+  "repository_code_file_count": 1879,
   "production_source_count": 1108,
-  "test_code_file_count": 630,
+  "test_code_file_count": 631,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -4496,20 +4496,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "cf7c1f680b12",
+  "source_snapshot": "6bd01db5c41c",
   "observed_delta": {
-    "baseline": "10dc7f24d7ba",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalInlineFileEncoding.kt"
-    ],
+    "baseline": "cf7c1f680b12",
+    "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentImporter.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextReadPage.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMultimodal.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
