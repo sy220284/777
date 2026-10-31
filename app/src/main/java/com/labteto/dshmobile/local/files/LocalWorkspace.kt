@@ -618,33 +618,53 @@ class LocalWorkspace(
             .sortedBy(LocalWorkspaceFile::path)
             .toList()
 
-    /** Bounded preview for local workspace files; binary files still return metadata and no text. */
-    fun preview(relativePath: String, maxBytes: Int = 512 * 1024): LocalWorkspaceFilePreview {
+    /** Random-access UTF-8 windows; nextOffset navigates an arbitrarily large file. */
+    fun preview(relativePath: String, maxBytes: Int = 64 * 1024, offset: Long = 0L): LocalWorkspaceFilePreview {
         val file = resolve(relativePath)
-        require(file.isFile) { "文件不存在：$relativePath" }
-        val safeMax = maxBytes.coerceIn(1, 2 * 1024 * 1024)
-        val buffer = ByteArray(minOf(file.length().coerceAtMost(safeMax.toLong()).toInt(), safeMax))
-        val count = file.inputStream().use { input ->
-            var offset = 0
-            while (offset < buffer.size) {
-                val read = input.read(buffer, offset, buffer.size - offset)
-                if (read < 0) break
-                offset += read
+        require(file.isFile) { "文件不存在：" + relativePath }
+        val length = file.length()
+        require(offset in 0..length) { "预览字节偏移已失效" }
+        val pageBytes = maxBytes.coerceIn(4, 256 * 1024)
+        var binary = relativePath.substringAfterLast('.', "").lowercase() in BINARY_PREVIEW_EXTENSIONS
+        var content: String? = null
+        var used = 0
+        java.io.RandomAccessFile(file, "r").use { reader ->
+            if (!binary) {
+                val sample = ByteArray(minOf(length, 8192L).toInt())
+                reader.readFully(sample)
+                binary = sample.any { it == 0.toByte() }
             }
-            offset
+            if (!binary) {
+                reader.seek(offset)
+                val data = ByteArray(minOf(pageBytes.toLong(), length - offset).toInt())
+                reader.readFully(data)
+                val decoder = Charsets.UTF_8.newDecoder()
+                    .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+                for (trim in 0..minOf(3, data.size)) {
+                    decoder.reset()
+                    val decoded = runCatching {
+                        decoder.decode(java.nio.ByteBuffer.wrap(data, 0, data.size - trim)).toString()
+                    }.getOrNull()
+                    if (decoded != null) {
+                        content = decoded
+                        used = data.size - trim
+                        break
+                    }
+                }
+                if (content == null) {
+                    content = String(data, Charsets.UTF_8)
+                    used = data.size
+                }
+            }
         }
-        val bytes = if (count == buffer.size) buffer else buffer.copyOf(count)
-        val binary = bytes.take(8_192).any { it == 0.toByte() } ||
-            relativePath.substringAfterLast('.', "").lowercase() in BINARY_PREVIEW_EXTENSIONS
-        val info = LocalWorkspaceFile(
-            path = displayPath(file),
-            bytes = file.length(),
-            modifiedAt = file.lastModified(),
-        )
+        val next = (offset + used).takeIf { !binary && it < length }
         return LocalWorkspaceFilePreview(
-            file = info,
-            text = if (binary) null else String(bytes, Charsets.UTF_8),
-            truncated = file.length() > bytes.size,
+            file = LocalWorkspaceFile(displayPath(file), length, file.lastModified()),
+            text = content,
+            truncated = next != null,
+            offset = offset,
+            nextOffset = next,
         )
     }
 

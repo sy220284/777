@@ -12,4 +12,6 @@ data class LocalWorkspaceFilePreview(
     val file: LocalWorkspaceFile,
     val text: String? = null,
     val truncated: Boolean = false,
+    val offset: Long = 0L,
+    val nextOffset: Long? = null,
 )

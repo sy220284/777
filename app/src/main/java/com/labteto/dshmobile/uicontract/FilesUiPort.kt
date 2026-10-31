@@ -16,6 +16,9 @@ interface FilesUiPort {
     suspend fun searchWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage
     suspend fun conversationFiles(sessionId: String): LocalConversationFiles
     suspend fun previewWorkspaceFile(path: String): LocalWorkspaceFilePreview
+    suspend fun previewWorkspaceFilePage(path: String, offset: Long): LocalWorkspaceFilePreview =
+        if (offset == 0L) previewWorkspaceFile(path)
+        else throw UnsupportedOperationException("当前文件入口不支持分页预览")
 
     /** User-granted SAF destination; the Owner alone validates and streams a workspace-local file. */
     suspend fun exportWorkspaceFile(path: String, output: java.io.OutputStream): Long =
