@@ -1080,9 +1080,9 @@ private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
             // Virtualized chunks preserve the full bounded preview and selection
             // without a single pathological text-measurement operation.
             val previewChunks = remember(preview.text) { chunkWorkspacePreviewText(preview.text) }
-            SelectionContainer {
-                LazyColumn(Modifier.fillMaxSize()) {
-                    items(previewChunks.size) { index ->
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(previewChunks.size) { index ->
+                    SelectionContainer {
                         Text(previewChunks[index], style = DsType.mdCode)
                     }
                 }
