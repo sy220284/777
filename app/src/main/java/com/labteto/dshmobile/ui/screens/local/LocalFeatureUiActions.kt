@@ -123,8 +123,8 @@ internal data class LocalWorkFeatureUiActions(
     val toolEvidence: (String, String, Long) -> String?,
     val requirementEvidence: (String) -> List<com.labteto.dshmobile.local.work.LocalRequirementEvidenceLink>,
     val linkRequirementEvidence: (String, com.labteto.dshmobile.local.presentation.LocalRequirementUiTarget, LocalArtifactUiItem) -> Boolean,
-    val eventChanges: (String) -> kotlinx.coroutines.flow.Flow<Long> = { kotlinx.coroutines.flow.flowOf(0L) },
-    val artifactFileChanges: (String, List<String>) -> kotlinx.coroutines.flow.Flow<Unit> = { _, _ -> kotlinx.coroutines.flow.emptyFlow() },
+    val eventChanges: (String) -> kotlinx.coroutines.flow.Flow<Long>,
+    val artifactFileChanges: (String, List<String>) -> kotlinx.coroutines.flow.Flow<Unit>,
 )
 
 internal data class LocalAutomationFeatureUiActions(
