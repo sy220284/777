@@ -4528,14 +4528,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "d1c6b5ef0ec2",
+  "source_snapshot": "a69b52bedb0a",
   "observed_delta": {
-    "baseline": "a3183b116696",
+    "baseline": "d1c6b5ef0ec2",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStudioBackupInstaller.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
