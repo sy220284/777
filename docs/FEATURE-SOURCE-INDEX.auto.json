@@ -1392,7 +1392,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStudioBackupInstaller.kt",
-      "sha256": "70879563b091f562"
+      "sha256": "134f4861857fc3e5"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStudioBackupSnapshot.kt",
@@ -1892,7 +1892,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
-      "sha256": "c7fdd8049506155b"
+      "sha256": "f4b61a3397288f43"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTaskRuntime.kt",
@@ -2104,7 +2104,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionStorageRuntime.kt",
-      "sha256": "6d892e80247ee1c5"
+      "sha256": "20350697a73b22c1"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalWorkDiagnosticsProvider.kt",
@@ -2300,7 +2300,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionStorageManager.kt",
-      "sha256": "450bf25bc1333266"
+      "sha256": "b2e05627ed4dd689"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt",
@@ -3672,7 +3672,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalSessionStorageCard.kt",
-      "sha256": "50674d39dba4e1ed"
+      "sha256": "5c037e2abf959a14"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsController.kt",
@@ -3708,11 +3708,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "sha256": "db724dde78216ce4"
+      "sha256": "53dc98d98b80d591"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
-      "sha256": "986fdb7f3ed461f8"
+      "sha256": "1534fbb2f16340b0"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationComponents.kt",
@@ -3980,7 +3980,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/uicontract/SettingsUiPort.kt",
-      "sha256": "bbb8ba9edc71b097"
+      "sha256": "2ade53a3395ddc3e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/uicontract/ToolsUiPort.kt",
@@ -4528,12 +4528,21 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "39424f830d15",
+  "source_snapshot": "448f0292f55b",
   "observed_delta": {
-    "baseline": "031021c674fc",
+    "baseline": "39424f830d15",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStudioBackupInstaller.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionStorageRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionStorageManager.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalSessionStorageCard.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/uicontract/SettingsUiPort.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
