@@ -4,7 +4,6 @@ import com.labteto.dshmobile.local.tools.LocalSandboxBoundary
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 import java.io.File
-import com.labteto.dshmobile.local.io.readBoundedLine
 import com.labteto.dshmobile.observability.AppLog
 import java.io.FileOutputStream
 import java.io.Reader
@@ -413,10 +412,11 @@ class LocalWorkspace(
                 java.io.FileInputStream(file).use { source ->
                     if (checkpoint != null) source.channel.position(checkpoint.offset)
                     source.bufferedReader(Charsets.UTF_8).use { reader ->
+                    val scanner = LocalSourceLineScanner(reader, MAX_SEARCH_LINE_CHARS)
                     var lineNumber = (checkpoint?.line ?: 1) - 1
                     if (entry == resumeEntry && resumeLine > 0) {
                         while (lineNumber < resumeLine &&
-                            readBoundedLine(reader, MAX_SEARCH_LINE_CHARS) != null) {
+                            scanner.readLine() != null) {
                             lineNumber++
                         }
                         startedAt = System.nanoTime()
@@ -427,7 +427,7 @@ class LocalWorkspace(
                             nextCursor = "$entry:$lineNumber"
                             break
                         }
-                        val line = readBoundedLine(reader, MAX_SEARCH_LINE_CHARS) ?: break
+                        val line = scanner.readLine() ?: break
                         lineNumber++
                         val matchStart = expression?.find(line)?.range?.first
                             ?: if (expression == null) line.indexOf(query, ignoreCase = true) else -1
