@@ -44,6 +44,7 @@ jobs:
           python3 .github/scripts/classify-ci-scope.py --self-test
           python3 .github/scripts/check-ci-repository-integrity.py
           python3 .github/scripts/check-release-gate-evidence.py
+          python3 .github/scripts/report-executed-feature-evidence.py --self-test
       - name: Collect changed files
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -267,6 +268,17 @@ jobs:
       - name: Unit tests and Harness conformance
         run: |
           ./gradlew             :core:test             :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :app:testDebugUnitTest             :reference-validation:test             --continue --stacktrace
+      - name: Associate real JVM test execution with the 454-function evidence index
+        if: always()
+        run: python3 .github/scripts/report-executed-feature-evidence.py
+      - name: Upload per-commit executable feature evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: executed-jvm-feature-evidence
+          path: .ci/feature-jvm-evidence.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Verify JVM 21 bytecode output
         run: python3 .github/scripts/check-jvm21-bytecode.py
 

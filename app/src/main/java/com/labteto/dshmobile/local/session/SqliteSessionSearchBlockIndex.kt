@@ -41,7 +41,7 @@ internal class SqliteSessionSearchBlockIndex(private val json: Json) {
         db.execSQL(
             "UPDATE session_search_coverage SET through_sequence=? " +
                 "WHERE session_id=? AND through_sequence=?",
-            arrayOf(events.last().sequence, id, first - 1L),
+            arrayOf<Any>(events.last().sequence, id, first - 1L),
         )
     }
 
