@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "3290f193dbfd",
+  "snapshot": "02aca4366609",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1889,
   "production_sources_scanned": 1112,
@@ -9703,14 +9703,10 @@
   "followup_production_or_compatibility": 12,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "5ea2c2e23b5d",
+    "baseline": "3290f193dbfd",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/files/LocalLargeFileIO.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
