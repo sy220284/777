@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1881,
-  "production_source_count": 1109,
-  "test_code_file_count": 632,
+  "repository_code_file_count": 1883,
+  "production_source_count": 1110,
+  "test_code_file_count": 633,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -808,7 +808,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt",
-      "sha256": "59fea6a13cc79d27"
+      "sha256": "a61a65bb41ee9ff6"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDomainStateEvent.kt",
@@ -984,7 +984,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt",
-      "sha256": "4853db97872d6bad"
+      "sha256": "f317b41a516781e7"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupExecutionModels.kt",
@@ -1147,12 +1147,16 @@
       "sha256": "a121a6bb6e2827c2"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextLineIndex.kt",
+      "sha256": "11600d56d3b97964"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextReadPage.kt",
-      "sha256": "947ce06288d4ae51"
+      "sha256": "c6f01eb601c21ad3"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
-      "sha256": "9ecf5462d60cd5c2"
+      "sha256": "e54744f898907c86"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceExecutionContext.kt",
@@ -1556,7 +1560,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMultimodal.kt",
-      "sha256": "bd71618025160411"
+      "sha256": "eeae60d429b0d244"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalNativeModelTools.kt",
@@ -2048,7 +2052,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessRuntimePolicy.kt",
-      "sha256": "199a4f9541d262f8"
+      "sha256": "1c218b708c61dc3b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessStartup.kt",
@@ -2192,7 +2196,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
-      "sha256": "a7eb80b6e577f9d2"
+      "sha256": "afe677fab5e38d2e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionLifecyclePort.kt",
@@ -2704,7 +2708,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunnerFactory.kt",
-      "sha256": "4a2e94a677368b83"
+      "sha256": "6b07257bdbbde598"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentTurnExecution.kt",
@@ -2780,7 +2784,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-      "sha256": "d3a8babbf4bea13f"
+      "sha256": "e5eeecb29bbe3d38"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkApprovalCoordinator.kt",
@@ -4500,13 +4504,23 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "500e85d4fcb1",
+  "source_snapshot": "64d87dc9861b",
   "observed_delta": {
-    "baseline": "9b6672355bdd",
-    "added_production_files": [],
+    "baseline": "500e85d4fcb1",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextLineIndex.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextReadPage.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMultimodal.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessRuntimePolicy.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunnerFactory.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
