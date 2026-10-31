@@ -19,9 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -1101,12 +1099,16 @@ private fun formatBytes(bytes: Long): String = when {
 
 /** Split a bounded UI preview into independently measured Compose text blocks. */
 internal fun chunkWorkspacePreviewText(text: String, maxChars: Int = 4_096): List<String> {
-    require(maxChars > 0) { "预览分块长度必须大于零" }
+    require(maxChars >= 2) { "预览分块长度必须至少两个字符" }
     if (text.isEmpty()) return emptyList()
     return buildList {
         var offset = 0
         while (offset < text.length) {
-            val end = minOf(text.length, offset + maxChars)
+            var end = minOf(text.length, offset + maxChars)
+            if (end < text.length && text[end - 1].isHighSurrogate() &&
+                text[end].isLowSurrogate()) {
+                end--
+            }
             add(text.substring(offset, end))
             offset = end
         }
