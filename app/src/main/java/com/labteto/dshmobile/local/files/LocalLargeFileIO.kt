@@ -256,7 +256,7 @@ internal object LocalLargeFileIO {
             .joinToString("") { "%02x".format(it.toInt() and 255) }
         // Fixed-size lock stripes prevent one permanent marker per distinct source file.
         val lockPath = File(dir, digest.take(2) + ".lck").toPath()
-        val monitor = publishMonitors[(digest.hashCode() and Int.MAX_VALUE) % publishMonitors.size]
+        val monitor = publishMonitors[digest.take(2).toInt(16) % publishMonitors.size]
         return synchronized(monitor) {
             FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE,
                 LinkOption.NOFOLLOW_LINKS).use { channel ->
