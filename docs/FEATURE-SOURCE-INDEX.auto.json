@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1886,
-  "production_source_count": 1111,
-  "test_code_file_count": 635,
+  "repository_code_file_count": 1889,
+  "production_source_count": 1112,
+  "test_code_file_count": 637,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -68,7 +68,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/DshApplication.kt",
-      "sha256": "2e2aea908c7a1006"
+      "sha256": "00bfa567198ea90d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/MainActivity.kt",
@@ -1165,6 +1165,10 @@
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceExecutionContext.kt",
       "sha256": "1d5b06a8ff84943a"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceIntermediateMaintenance.kt",
+      "sha256": "9a74a381b0a4c42b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceToolGuide.kt",
@@ -4508,13 +4512,15 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "f349421836a0",
+  "source_snapshot": "18d8a9fe4d42",
   "observed_delta": {
-    "baseline": "e6bfbfb5120f",
-    "added_production_files": [],
+    "baseline": "f349421836a0",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceIntermediateMaintenance.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
+      "app/src/main/java/com/labteto/dshmobile/DshApplication.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
