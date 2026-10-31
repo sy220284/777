@@ -3356,7 +3356,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "sha256": "5f21b15fa85ba133"
+      "sha256": "a39ec5235974293d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationTemperatureUi.kt",
@@ -4528,13 +4528,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "d9aa47fe1147",
+  "source_snapshot": "63e6cc1133f3",
   "observed_delta": {
-    "baseline": "b3631eecbe6f",
+    "baseline": "d9aa47fe1147",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureUiActions.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
