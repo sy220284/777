@@ -5,22 +5,15 @@ on:
       - refactor/restore-native-v63-remove-ui3-zhaoxi-20261019
       - fix/large-file-stability-20261031
       - feat/architecture-31-20261031
-    paths:
-      - .github/workflows/v6-feature-index-refresh.yml
-      - docs/FEATURE-TREE-EXPLICIT-EVIDENCE.json
-      - docs/FEATURE-CODE-EVIDENCE.zh-CN.md
-      - docs/FEATURE-TREE-SOURCE-REGISTRY.json
-      - docs/FEATURE-TREE-LEGACY-IDENTITIES.json
-      - docs/FEATURE-EXISTENCE-TRIAGE.json
-      - .github/scripts/sync-feature-tree.py
-      - 'app/src/**'
-      - 'core/src/**'
-      - 'harness-core/src/**'
-      - 'harness-interop/src/**'
-      - 'harness-runtime-android/src/**'
-      - 'harness-device-android/src/**'
-      - 'reference-validation/src/**'
-      - '.github/scripts/check-feature-tree-sync.py'
+    # The source fingerprint scans repository-wide Kotlin, Python, shell, Gradle and
+    # workflow files. A partial path allowlist made some code changes invisible here.
+    # Only machine-written outputs are excluded; mixed source+generated pushes still run.
+    paths-ignore:
+      - 'docs/FEATURE-TREE.zh-CN.md'
+      - 'docs/FEATURE-TREE.zh-CN.html'
+      - 'docs/FEATURE-SOURCE-INDEX.auto.json'
+      - 'docs/FEATURE-REVIEW.auto.json'
+      - 'docs/ACCEPTANCE-MATRIX.json'
 
 permissions:
   contents: write
