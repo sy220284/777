@@ -338,15 +338,20 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val saved = localHarness.savePersonalization(userRules, recall, memory)
-                if (saved && request == latestPersonalizationRequest) {
+                val current = request == latestPersonalizationRequest
+                if (saved && current) {
                     desiredAutoRecall = null
                     desiredAutoMemory = null
                 }
-                onDone(saved, null)
+                // Even an already-written older request must not toast after a newer tap.
+                onDone(saved && current, null)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
-                onDone(false, failure.message ?: "个性化设置保存失败")
+                onDone(
+                    false,
+                    if (request == latestPersonalizationRequest) failure.message ?: "个性化设置保存失败" else null,
+                )
             }
         }
     }
