@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.runtime
 import android.content.Context
 import com.labteto.dshmobile.harness.session.SessionProjectionRegistry
 import com.labteto.dshmobile.local.session.LocalSessionCoordinator
+import com.labteto.dshmobile.local.model.LocalMediaStore
 import com.labteto.dshmobile.local.session.SqliteSessionSnapshotStore
 import com.labteto.dshmobile.local.session.LocalLegacySqliteMigration
 import com.labteto.dshmobile.local.session.LocalSessionRepository
@@ -44,6 +45,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     domainCodecs: Set<@JvmSuppressWildcards LocalSessionDomainCodec>,
     private val currentSnapshotProvider: LocalCurrentSessionSnapshotProvider,
     private val pendingSessions: LocalPendingSessionRegistry,
+    private val studioProvider: javax.inject.Provider<LocalMediaStore>,
 ) {
     private val sessionsRoot = File(context.filesDir, "local-harness/sessions").apply { mkdirs() }
     private val scope = CoroutineScope(
@@ -62,6 +64,8 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     private val storageManager = SqliteSessionStorageManager(
         context, sqliteSnapshots, requireNotNull(eventLogs.sqliteDatabase),
         legacyDomainCodecs = orderedCodecs,
+        studioJson = json,
+        stageStudioSnapshot = { target -> studioProvider.get().stageMediaStudioBackup(target) },
     )
     internal val coordinator: LocalSessionCoordinator
     internal val projectionRegistry = SessionProjectionRegistry()
@@ -161,6 +165,9 @@ class LocalSessionStorageRuntime @Inject internal constructor(
 
     internal suspend fun exportStorage(output: OutputStream): Long =
         withContext(Dispatchers.IO) { storageManager.exportAll(output) }
+
+    internal suspend fun exportCompleteStorage(output: OutputStream): Long =
+        withContext(Dispatchers.IO) { storageManager.exportAll(output, includeMediaStudio = true) }
 
     internal suspend fun writeCurrentSnapshotNow(expectedSessionId: String): Boolean {
         val snapshot = currentSnapshot(expectedSessionId) ?: return false
