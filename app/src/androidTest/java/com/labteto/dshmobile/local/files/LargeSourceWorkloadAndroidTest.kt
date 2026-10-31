@@ -39,9 +39,11 @@ class LargeSourceWorkloadAndroidTest {
             workspace.write("module.kt", "previous stable version")
             val prefix = header + comment.repeat(1_024)
             var offset = 0L
+            var sessionId: String? = null
             report.step("chunk_start") {
                 val result = workspace.writeChunk("module.kt", prefix, offset, false)
                 offset = offsetFrom(result)
+                sessionId = sessionFrom(result)
                 assertEquals("previous stable version", File(root, "module.kt").readText())
             }
             val repeatChunk = comment.repeat(20_000)
@@ -49,10 +51,10 @@ class LargeSourceWorkloadAndroidTest {
             val restarted = LocalWorkspace(root)
             report.step("chunk_resume_32m") {
                 while (offset < expected) {
-                    val result = restarted.writeChunk("module.kt", repeatChunk, offset, false)
+                    val result = restarted.writeChunk("module.kt", repeatChunk, offset, false, sessionId)
                     offset = offsetFrom(result)
                 }
-                val final = restarted.writeChunk("module.kt", footer, offset, true)
+                val final = restarted.writeChunk("module.kt", footer, offset, true, sessionId)
                 offset = offsetFrom(final)
                 assertTrue(final.contains("complete=true"))
             }
@@ -71,7 +73,7 @@ class LargeSourceWorkloadAndroidTest {
             report.step("chunk_integrity_32m") {
                 assertEquals(offset, file.length())
                 assertTrue(restarted.readRawPage("module.kt", offset - 64, 64).isNotEmpty())
-                assertFalse(root.listFiles().orEmpty().any { it.name.endsWith(".write-in-progress") })
+                assertFalse(root.listFiles().orEmpty().any { it.name.contains(".write-in-progress-") })
             }
         }
     }
@@ -164,6 +166,10 @@ class LargeSourceWorkloadAndroidTest {
             }
         }
     }
+
+    private fun sessionFrom(reply: String): String =
+        Regex("session_id=([0-9a-f-]+)").find(reply)?.groupValues?.get(1)
+            ?: error("续写没有返回会话标识：" + reply)
 
     private fun offsetFrom(reply: String): Long =
         Regex("next_byte=([0-9]+)").find(reply)?.groupValues?.get(1)?.toLong()
