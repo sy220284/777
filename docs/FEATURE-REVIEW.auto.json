@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "6bd01db5c41c",
+  "snapshot": "6dc73410e3ba",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1879,
   "production_sources_scanned": 1108,
@@ -9703,10 +9703,12 @@
   "followup_production_or_compatibility": 12,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "cf7c1f680b12",
+    "baseline": "6bd01db5c41c",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],

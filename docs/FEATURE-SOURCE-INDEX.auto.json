@@ -2520,7 +2520,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt",
-      "sha256": "559daf3f27a29f48"
+      "sha256": "2787d6c5c686c916"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/vision/VisionClient.kt",
@@ -4496,12 +4496,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "6bd01db5c41c",
+  "source_snapshot": "6dc73410e3ba",
   "observed_delta": {
-    "baseline": "cf7c1f680b12",
+    "baseline": "6bd01db5c41c",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
