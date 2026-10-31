@@ -2,6 +2,9 @@ package com.labteto.dshmobile.local.session
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import com.labteto.dshmobile.local.model.LocalMediaStudioBackupInstaller
+import com.labteto.dshmobile.local.model.LocalMediaStudioBackupSnapshot
+import com.labteto.dshmobile.local.model.LocalMediaStudioZipEntries
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStream
@@ -32,6 +35,8 @@ internal class SqliteSessionStorageManager(
     private val eventDatabaseName: String = "local_session_events_v1.db",
     private val restoreKey: String = "default",
     private val legacyDomainCodecs: List<LocalSessionDomainCodec> = emptyList(),
+    private val studioJson: Json = Json,
+    private val stageStudioSnapshot: ((File) -> LocalMediaStudioBackupSnapshot.Prepared)? = null,
 ) {
     private val pendingRoot get() = File(context.filesDir, "local-harness/.sqlite-restore-pending-$restoreKey")
     private val snapshotFile get() = context.getDatabasePath(snapshotDatabaseName)
@@ -84,7 +89,7 @@ internal class SqliteSessionStorageManager(
         } finally { maintenance.unlock() }
     }
 
-    fun exportAll(output: OutputStream): Long {
+    fun exportAll(output: OutputStream, includeMediaStudio: Boolean = false): Long {
         val staging = File(context.cacheDir, "sqlite-session-export-${UUID.randomUUID()}")
         check(staging.mkdirs()) { "无法创建 SQLite 备份工作目录" }
         val snapshotCopy = File(staging, SNAPSHOT_ENTRY)
@@ -100,6 +105,13 @@ internal class SqliteSessionStorageManager(
                 archiveLease.unlock()
             }
             validateSnapshotEventCursors(snapshotCopy, eventCopy)
+            // Freeze Media Studio database and its originals through the Studio owner.
+            // Complete export must fail rather than silently omit paid media.
+            val studio = if (includeMediaStudio) {
+                requireNotNull(stageStudioSnapshot) { "当前运行环境未接入媒体工作室备份" }(
+                    File(staging, STUDIO_STAGE_DIR),
+                )
+            } else null
             var written = 0L
             // ZIP bytes stream to the destination; no whole-archive memory buffer.
             ZipOutputStream(output.buffered()).use { zip ->
@@ -111,10 +123,12 @@ internal class SqliteSessionStorageManager(
                     zip.closeEntry()
                 }
                 written += mediaBackup.export(zip, eventCopy)
-                // The archive is an intentionally scoped Session backup. Make the
-                // missing Media Studio owner explicit to importers and tooling.
+                if (studio != null) {
+                    written += LocalMediaStudioZipEntries(context, studioJson).writeInto(zip, studio)
+                }
                 zip.putNextEntry(ZipEntry(SCOPE_ENTRY))
-                val scopeBytes = SCOPE_PAYLOAD.toByteArray(Charsets.UTF_8)
+                val scopeBytes = (if (studio != null) FULL_SCOPE_PAYLOAD else SCOPE_PAYLOAD)
+                    .toByteArray(Charsets.UTF_8)
                 zip.write(scopeBytes)
                 zip.closeEntry()
                 written += scopeBytes.size
@@ -227,11 +241,19 @@ internal class SqliteSessionStorageManager(
         check(staging.mkdirs()) { "无法建立 SQLite 恢复隔离目录" }
         try {
             val names = linkedSetOf<String>()
+            var studioReceiver: LocalMediaStudioZipEntries.Receiver? = null
             var bytes = 0L
             var lastFreeSpaceCheck = 0L
             ZipInputStream(archive).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
+                    if (entry.name.startsWith(LocalMediaStudioZipEntries.PREFIX)) {
+                        val receiver = studioReceiver ?: LocalMediaStudioZipEntries(context, studioJson)
+                            .Receiver(File(staging, STUDIO_STAGE_DIR)).also { studioReceiver = it }
+                        receiver.accept(entry, zip)
+                        zip.closeEntry()
+                        continue
+                    }
                     val mediaEntry = entry.name.startsWith(SqliteSessionMediaArchive.MEDIA_PREFIX) &&
                         SqliteSessionMediaArchive.validFilename(
                             entry.name.removePrefix(SqliteSessionMediaArchive.MEDIA_PREFIX))
@@ -275,14 +297,20 @@ internal class SqliteSessionStorageManager(
             require(SqliteSessionMediaArchive.MANIFEST_ENTRY in names) {
                 "旧 SQLite 备份不含图片原文件；请导出完整媒体备份"
             }
-            validateArchiveScope(staging, names)
+            val completeStudio = validateArchiveScope(staging, names)
+            if (completeStudio) {
+                requireNotNull(studioReceiver) { "完整备份缺少媒体工作室数据库与文件清单" }
+                    .validateStaged()
+            } else {
+                require(studioReceiver == null) { "会话备份范围声明不包含媒体工作室，但归档含媒体数据" }
+            }
             mediaBackup.validateStaged(staging, names)
             validateTables(File(staging, SNAPSHOT_ENTRY), "session_snapshots")
             validateTables(File(staging, EVENT_ENTRY), "session_events")
             validateSnapshotEventCursors(
                 File(staging, SNAPSHOT_ENTRY), File(staging, EVENT_ENTRY),
             )
-            File(staging, "READY").writeText("sqlite-v2-media")
+            File(staging, "READY").writeText(if (completeStudio) "sqlite-v3-studio" else "sqlite-v2-media")
             check(staging.renameTo(pendingRoot)) { "SQLite 备份无法提交恢复计划" }
             return countRows(File(pendingRoot, SNAPSHOT_ENTRY), "session_snapshots")
         } finally {
@@ -319,7 +347,9 @@ internal class SqliteSessionStorageManager(
     fun applyPendingRestore(): Int {
         val ready = File(pendingRoot, "READY")
         if (!ready.isFile) return 0
-        check(ready.readText() == "sqlite-v2-media") { "未知的 SQLite 恢复版本" }
+        val restoreVersion = ready.readText()
+        check(restoreVersion in setOf("sqlite-v2-media", "sqlite-v3-studio")) { "未知的 SQLite 恢复版本" }
+        val completeStudio = restoreVersion == "sqlite-v3-studio"
         val sources = listOf(
             File(pendingRoot, SNAPSHOT_ENTRY) to snapshotFile,
             File(pendingRoot, EVENT_ENTRY) to eventFile,
@@ -345,7 +375,14 @@ internal class SqliteSessionStorageManager(
             File(pendingRoot, SqliteSessionMediaArchive.STAGED_MEDIA_DIR)
                 .listFiles().orEmpty().forEach { add(SqliteSessionMediaArchive.MEDIA_PREFIX + it.name) }
         }
-        validateArchiveScope(pendingRoot, mediaNames)
+        check(validateArchiveScope(pendingRoot, mediaNames) == completeStudio) {
+            "SQLite 恢复计划与完整备份范围不一致"
+        }
+        if (completeStudio) {
+            LocalMediaStudioBackupSnapshot(context, studioJson).validate(
+                File(pendingRoot, STUDIO_STAGE_DIR),
+            )
+        }
         mediaBackup.validateStaged(pendingRoot, mediaNames)
         // Durable fence: never allow UI cancellation after any installed media/DB bytes.
         val installing = File(pendingRoot, "INSTALLING")
@@ -354,6 +391,13 @@ internal class SqliteSessionStorageManager(
                 stream.write(byteArrayOf(1))
                 stream.fd.sync()
             }
+        }
+        // Preserve Studio staging until Session DBs commit. A process death
+        // replays only the same verified bytes, with no duplicated side effects.
+        if (completeStudio) {
+            LocalMediaStudioBackupInstaller(context, studioJson).install(
+                File(pendingRoot, STUDIO_STAGE_DIR), retainStaging = true,
+            )
         }
         // Install and hash-verify all attachments before committing a SQLite DB
         // that may reference them. Retrying after process death is idempotent.
@@ -527,17 +571,22 @@ internal class SqliteSessionStorageManager(
         return digest(a).contentEquals(digest(b))
     }
 
-    private fun validateArchiveScope(staging: File, names: Set<String>) {
-        if (SCOPE_ENTRY !in names) return // Pre-scope SQLite v2 archives remain importable.
+    private fun validateArchiveScope(staging: File, names: Set<String>): Boolean {
+        if (SCOPE_ENTRY !in names) return false // Pre-scope SQLite v2 remains session-only.
         val scope = File(staging, SCOPE_ENTRY)
-        require(scope.isFile && scope.length() <= SCOPE_PAYLOAD.length * 2L &&
-            scope.readText(Charsets.UTF_8) == SCOPE_PAYLOAD) {
-            "会话备份范围声明不兼容或损坏；已拒绝恢复以避免误认媒体工作室成果已包含"
+        require(scope.isFile && scope.length() <= MAX_SCOPE_BYTES) { "会话备份范围声明缺失或超限" }
+        val payload = scope.readText(Charsets.UTF_8)
+        require(payload == SCOPE_PAYLOAD || payload == FULL_SCOPE_PAYLOAD) {
+            "会话备份范围声明不兼容或损坏，拒绝不明确的数据恢复"
         }
+        return payload == FULL_SCOPE_PAYLOAD
     }
 
     private companion object {
         const val SCOPE_ENTRY = "backup.scope.json"
+        const val MAX_SCOPE_BYTES = 1024L
+        const val STUDIO_STAGE_DIR = "media-studio-stage"
+        const val FULL_SCOPE_PAYLOAD = """{"version":2,"scope":"sessions-attachments-and-media-studio","mediaStudio":true}"""
         const val SCOPE_PAYLOAD = """{"version":1,"scope":"sessions-and-attachments","mediaStudio":false}"""
         const val SNAPSHOT_ENTRY = "snapshot.sqlite"
         const val EVENT_ENTRY = "events.sqlite"
