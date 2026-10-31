@@ -411,6 +411,15 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: 上传 Android 16 源码大文件长任务耗时与内存数据
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android16-large-source-workloads
+          path: .ci/large-source-benchmarks/results.csv
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload Work timeline screenshots
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -492,6 +501,15 @@ jobs:
           path: .ci/android17-ten-rounds/
           if-no-files-found: error
           retention-days: 7
+
+      - name: 上传 Android 17 源码大文件长任务耗时与内存数据
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android17-large-source-workloads
+          path: .ci/large-source-benchmarks/results.csv
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload Work timeline screenshots
         if: always()

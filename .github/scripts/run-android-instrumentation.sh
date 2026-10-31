@@ -50,6 +50,12 @@ if adb shell test -d "$evidence_path"; then
   mkdir -p .ci/work-timeline-review
   adb pull "$evidence_path/." .ci/work-timeline-review/
 fi
+# Copy actual device-side source workload timings and memory evidence before AVD teardown.
+source_bench="/sdcard/Android/data/com.sy220284.dshmobile.debug/files/large-source-benchmarks"
+if adb shell test -d "$source_bench"; then
+  mkdir -p .ci/large-source-benchmarks
+  adb pull "$source_bench/." .ci/large-source-benchmarks/
+fi
 if ! validate_result "$result_file"; then
   echo '::error::Android instrumentation did not report a non-empty successful test result'
   exit 1
