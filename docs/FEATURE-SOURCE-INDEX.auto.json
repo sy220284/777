@@ -4528,14 +4528,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "ff2625255a7f",
+  "source_snapshot": "fe8357b73baf",
   "observed_delta": {
-    "baseline": "d4346b5b7acc",
+    "baseline": "ff2625255a7f",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/resource/HarnessResourceScheduler.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
