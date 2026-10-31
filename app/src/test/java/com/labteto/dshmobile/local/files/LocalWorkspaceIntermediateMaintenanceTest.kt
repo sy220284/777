@@ -25,8 +25,9 @@ class LocalWorkspaceIntermediateMaintenanceTest {
                 ".index-12345678-1234-1234-1234-123456789abc.tmp", 3)
             val staleImport = fixture(".dsh/attachments/.incoming-12345678-1234-1234-1234-123456789abc", 3)
             val publishedAttachment = fixture(".dsh/attachments/attachment.jpg", 365)
-            val nestedTemp = fixture("repository/src/.write-abcd1234567890.tmp", 3)
-            val activeTemp = fixture("repository/src/.write-123abc7890.tmp", 0)
+            val nestedTemp = fixture(".dsh/write-temp/.write-abcd1234567890.tmp", 3)
+            val activeTemp = fixture(".dsh/write-temp/.write-123abc7890.tmp", 0)
+            val userLookalike = fixture("repository/src/.write-unsafe123.tmp", 200)
             val pendingResume = fixture("repository/src/.module.kt.write-in-progress", 400)
             val userSource = fixture("repository/src/module.kt", 500)
             val output = fixture("repository/src/notes.tmp", 500)
@@ -34,7 +35,7 @@ class LocalWorkspaceIntermediateMaintenanceTest {
             assertEquals(4, report.deletedFiles)
             listOf(staleIndex, staleIndexTemp, staleImport, nestedTemp).forEach { assertFalse(it.exists()) }
             listOf(recentIndex, publishedAttachment, activeTemp, pendingResume,
-                userSource, output).forEach { assertTrue(it.exists()) }
+                userSource, output, userLookalike).forEach { assertTrue(it.exists()) }
             assertTrue(report.deletedBytes > 0)
             assertEquals(recentIndex.length(), report.remainingCacheBytes)
             assertEquals(0, LocalWorkspaceIntermediateMaintenance(root).cleanup(now).deletedFiles)
