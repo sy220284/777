@@ -1,0 +1,31 @@
+name: 源码长任务测试官方索引一次性同步
+on:
+  push:
+    branches: [fix/large-file-stability-20261031]
+    paths:
+      - .github/workflows/_source-large-sync-once.yml
+permissions:
+  contents: write
+jobs:
+  synchronize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 检出完整分支
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: fix/large-file-stability-20261031
+          persist-credentials: true
+      - name: 删除临时工作流并同步索引
+        run: |
+          set -euo pipefail
+          rm .github/workflows/_source-large-sync-once.yml
+          python3 .github/scripts/sync-feature-tree.py
+          python3 .github/scripts/check-feature-tree-sync.py
+          python3 .github/scripts/sync-feature-tree.py --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html docs/FEATURE-SOURCE-INDEX.auto.json docs/FEATURE-REVIEW.auto.json
+          git add -u .github/workflows/_source-large-sync-once.yml
+          git commit -m '同步Android源码长任务测试索引并清理一次性工作流'
+          git push origin HEAD:fix/large-file-stability-20261031
