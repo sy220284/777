@@ -4528,14 +4528,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "cca9db868b04",
+  "source_snapshot": "16f4f2c788bf",
   "observed_delta": {
-    "baseline": "a69b52bedb0a",
+    "baseline": "cca9db868b04",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionStorageManager.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
