@@ -43,7 +43,7 @@ internal class LocalMediaStudioBackupInstaller(
             return count
         }
         val archive = LocalMediaStudioBackupSnapshot(context, json).validate(staging)
-        val (targetMedia, pairs) = preflightTargets(archive)
+        val (targetMedia, pairs) = preflightTargets(archive, staging)
         check(database.parentFile?.let { it.isDirectory || it.mkdirs() } == true) {
             "无法建立媒体 SQLite 恢复目录"
         }
@@ -123,11 +123,12 @@ internal class LocalMediaStudioBackupInstaller(
      */
     fun validateDestination(staging: File) {
         val archive = LocalMediaStudioBackupSnapshot(context, json).validate(staging)
-        preflightTargets(archive)
+        preflightTargets(archive, staging)
     }
 
     private fun preflightTargets(
         archive: LocalMediaStudioBackupSnapshot.Prepared,
+        staging: File,
     ): Pair<File, List<Pair<File, File>>> {
         val database = context.getDatabasePath("local_media_v1.db")
         val targetMedia = File(context.filesDir, "media-studio")
