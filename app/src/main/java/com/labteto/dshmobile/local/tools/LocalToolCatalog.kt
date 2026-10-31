@@ -33,12 +33,14 @@ object LocalToolCatalog {
             "start_byte" to integerRange("起始字节偏移，默认 0", min = 0),
             "max_bytes" to integerRange("读取字节数，最大 49152", 1, 49152),
         ), listOf("path")))
-        add(tool("write_chunk", "分块写入任意大小文件，按 next_byte 追加，finish=true 时原子发布", properties(
+        add(tool("write_chunk", "文本或 Base64 二进制分块续写；续写时必须提供返回的 session_id，完成后原子提交", properties(
             "path" to string("工作区目标文件路径"),
-            "content" to string("当前分块 UTF-8 文本"),
+            "content" to string("当前分块 UTF-8 文本（与 content_base64 二选一）"),
+            "content_base64" to string("二进制分块的 Base64 编码（与 content 二选一，解码后最多 256 KiB）"),
+            "session_id" to string("续写会话令牌；首次 offset=0 不填写，后续必须使用首次返回的值"),
             "offset" to integerRange("必须等于上次返回的 next_byte，首次 0", min = 0),
             "finish" to boolean("是否提交完整文件，默认 false"),
-        ), listOf("path", "content", "offset")))
+        ), listOf("path", "offset")))
         add(tool("edit", "唯一字面量替换；修改前必须先用 read 读取包含待替换内容的目标区域，write 创建或覆盖不算读取", properties(
             "path" to string("相对工作区的路径"),
             "old_text" to string("必须只出现一次的原文"),
