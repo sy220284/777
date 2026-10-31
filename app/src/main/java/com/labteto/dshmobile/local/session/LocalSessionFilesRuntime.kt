@@ -79,7 +79,7 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     )
 
     internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment =
-        withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
+        withContext(Dispatchers.IO) { resourceScheduler.withResource(
             HarnessResourceKind.FILE_IO, "file:import"
         ) { attachmentImporter.import(uri) } }
 

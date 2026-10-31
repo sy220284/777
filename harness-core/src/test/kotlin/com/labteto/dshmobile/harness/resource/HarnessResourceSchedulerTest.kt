@@ -234,6 +234,8 @@ class HarnessResourceSchedulerTest {
                 maxTerminals = 1,
                 maxVirtualDisplays = 1,
                 maxLanguageServers = 1,
+                maxFileIo = 1,
+                maxMediaDecode = 1,
             ),
         )
         val kinds = HarnessResourceKind.values().toList()
