@@ -214,10 +214,21 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
                     HarnessResourceKind.FILE_IO, "tool:write_chunk"
                 ) {
-                    runInterruptible(Dispatchers.IO) { workspace.writeChunk(
-                        args.string("path"), args.string("content"),
-                        args.long("offset", 0L), args.boolean("finish", false),
-                    ) }
+                    runInterruptible(Dispatchers.IO) {
+                        val text = args.optionalString("content")
+                        val encoded = args.optionalString("content_base64")
+                        require((text == null) != (encoded == null)) {
+                            "content 和 content_base64 必须且只能提供一种"
+                        }
+                        // Keep model tool input bounded; repeat calls for arbitrarily large files.
+                        val bytes = if (encoded != null) java.util.Base64.getDecoder().decode(encoded)
+                            else requireNotNull(text).toByteArray(Charsets.UTF_8)
+                        require(bytes.size <= 256 * 1024) { "单个续写分块不能超过 256 KiB" }
+                        workspace.writeChunkBytes(
+                            args.string("path"), bytes, args.long("offset", 0L),
+                            args.boolean("finish", false), args.optionalString("session_id"),
+                        )
+                    }
                 } }
             }
             "edit", "edit_file" -> {
