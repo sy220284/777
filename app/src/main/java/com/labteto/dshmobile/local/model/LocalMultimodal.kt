@@ -259,12 +259,11 @@ internal suspend fun prepareLocalMultimodalMessages(
                         activeFileBytes + file.length() <= MAX_NATIVE_FILES_TOTAL_BYTES
                     if (nativeFileAllowed) {
                         activeFileBytes += file.length()
-                        val bytes = readLocalImageBytesBounded(file, MAX_NATIVE_FILES_TOTAL_BYTES)
+                        val dataUrl = encodeLocalFileDataUrl(file, nativeMime, MAX_NATIVE_FILES_TOTAL_BYTES)
                         add(buildJsonObject {
                             put("type", "input_file")
                             put("filename", name.substringAfterLast('/').substringAfterLast('\\'))
-                            put("file_data", "data:" + nativeMime + ";base64," +
-                                Base64.getEncoder().encodeToString(bytes))
+                            put("file_data", dataUrl)
                         })
                         return@forEach
                     }
@@ -283,11 +282,11 @@ internal suspend fun prepareLocalMultimodalMessages(
                         activeVideoBytes += file.length()
                         // Bytes are only materialized for the live model request. Durable history
                         // keeps local_file_ref and never stores Base64 media or replay payload.
-                        val bytes = readLocalImageBytesBounded(file, MAX_KIMI_VIDEO_BYTES)
+                        val dataUrl = encodeLocalFileDataUrl(file, videoMime, MAX_KIMI_VIDEO_BYTES)
                         add(buildJsonObject {
                             put("type", "video_url")
                             put("video_url", buildJsonObject {
-                                put("url", "data:$videoMime;base64,${Base64.getEncoder().encodeToString(bytes)}")
+                                put("url", dataUrl)
                             })
                         })
                         return@forEach
@@ -408,11 +407,11 @@ internal suspend fun prepareLocalMultimodalMessages(
                 require(storedMediaType == null || storedMediaType == actualMediaType) {
                     "图片附件内容与记录格式不一致：$relative"
                 }
-                val bytes = readLocalImageBytesBounded(
+                add(modelImageDataUrl(encodeLocalFileDataUrl(
                     file,
+                    actualMediaType,
                     minOf(maxImageBytes, MAX_NATIVE_IMAGE_BYTES),
-                )
-                add(modelImageUrl(actualMediaType, bytes))
+                )))
             }
         }
         JsonObject(message.toMutableMap().apply { put("content", converted) })
@@ -480,15 +479,15 @@ private fun openAiNativeFileMime(name: String): String? = when (name.substringAf
     else -> null
 }
 
-private fun modelImageUrl(mediaType: String, bytes: ByteArray): JsonObject {
-    val data = Base64.getEncoder().encodeToString(bytes)
-    return buildJsonObject {
-        put("type", "image_url")
-        put("image_url", buildJsonObject {
-            put("url", "data:$mediaType;base64,$data")
-            put("detail", "high")
-        })
-    }
+private fun modelImageUrl(mediaType: String, bytes: ByteArray): JsonObject =
+    modelImageDataUrl("data:$mediaType;base64,${Base64.getEncoder().encodeToString(bytes)}")
+
+private fun modelImageDataUrl(dataUrl: String): JsonObject = buildJsonObject {
+    put("type", "image_url")
+    put("image_url", buildJsonObject {
+        put("url", dataUrl)
+        put("detail", "high")
+    })
 }
 
 private fun historicalImageReference(image: JsonObject): JsonObject {
