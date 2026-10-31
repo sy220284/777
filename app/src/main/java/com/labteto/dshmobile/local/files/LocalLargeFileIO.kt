@@ -13,6 +13,8 @@ import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
+import java.nio.file.attribute.BasicFileAttributes
+import java.security.MessageDigest
 import java.util.UUID
 
 /**
@@ -22,6 +24,7 @@ import java.util.UUID
 internal object LocalLargeFileIO {
     private const val BUFFER_CHARS = 32 * 1024
     private const val BUFFER_BYTES = 64 * 1024
+    private val publishMonitors = Array(64) { Any() }
 
     fun writeText(target: File, content: String, workspaceRoot: File? = null): Long =
         commit(target, workspaceRoot = workspaceRoot) { output ->
@@ -110,7 +113,7 @@ internal object LocalLargeFileIO {
      * after byte zero, so an unrelated task cannot silently inherit a same-sized stage.
      * An OS file lock serializes multiple LocalWorkspace instances and processes.
      */
-    fun writeChunk(target: File, content: ByteArray, offset: Long, finish: Boolean, sessionId: String?): ChunkWriteResult {
+    fun writeChunk(target: File, content: ByteArray, offset: Long, finish: Boolean, sessionId: String?, workspaceRoot: File? = null): ChunkWriteResult {
         require(offset >= 0L) { "写入字节偏移不能为负数" }
         val directory = target.parentFile ?: error("文件缺少父目录")
         require(directory.isDirectory || directory.mkdirs()) { "无法创建文件目录" }
@@ -125,9 +128,25 @@ internal object LocalLargeFileIO {
             token
         }
         val staged = File(directory, "." + target.name + ".write-in-progress-" + id)
-        if (offset == 0L) Files.createFile(staged.toPath())
-        require(Files.isRegularFile(staged.toPath(), LinkOption.NOFOLLOW_LINKS)) {
-            "续写暂存文件不存在或不安全"
+        val baseline = File(directory, "." + target.name + ".write-baseline-" + id)
+        if (offset == 0L) {
+            val identity = withPublishLock(target, workspaceRoot) { targetIdentity(target) }
+            Files.createFile(staged.toPath())
+            try {
+                Files.createFile(baseline.toPath())
+                FileOutputStream(baseline).use { output ->
+                    output.write(identity.toByteArray(Charsets.UTF_8))
+                    output.fd.sync()
+                }
+            } catch (error: Throwable) {
+                Files.deleteIfExists(staged.toPath())
+                Files.deleteIfExists(baseline.toPath())
+                throw error
+            }
+        }
+        require(Files.isRegularFile(staged.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+            Files.isRegularFile(baseline.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            "续写会话文件不存在或不安全"
         }
         FileChannel.open(staged.toPath(), StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS).use { channel ->
             channel.lock().use {
@@ -145,8 +164,14 @@ internal object LocalLargeFileIO {
                 }
                 channel.force(true)
                 if (finish) {
-                    preserveExecutable(target, staged)
-                    moveAtomic(staged, target)
+                    withPublishLock(target, workspaceRoot) {
+                        require(baseline.readText(Charsets.UTF_8) == targetIdentity(target)) {
+                            "文件已被另一任务修改，拒绝覆盖；请重新读取并发起新续写"
+                        }
+                        preserveExecutable(target, staged)
+                        moveAtomic(staged, target)
+                        Files.deleteIfExists(baseline.toPath())
+                    }
                 }
             }
         }
@@ -177,12 +202,65 @@ internal object LocalLargeFileIO {
                 write(output)
                 output.fd.sync()
             }
-            beforePublish()
-            preserveExecutable(target, temporary.toFile())
-            moveAtomic(temporary.toFile(), target)
-            return target.length()
+            return withPublishLock(target, workspaceRoot) {
+                beforePublish()
+                preserveExecutable(target, temporary.toFile())
+                moveAtomic(temporary.toFile(), target)
+                target.length()
+            }
         } finally {
             Files.deleteIfExists(temporary)
+        }
+    }
+
+    /** Bind a resumed upload to the original committed file version. */
+    private fun targetIdentity(target: File): String {
+        if (!Files.exists(target.toPath(), LinkOption.NOFOLLOW_LINKS)) return "absent"
+        require(Files.isRegularFile(target.toPath(), LinkOption.NOFOLLOW_LINKS)) { "目标文件类型已变化" }
+        val attrs = Files.readAttributes(target.toPath(), BasicFileAttributes::class.java,
+            LinkOption.NOFOLLOW_LINKS)
+        val change = runCatching {
+            Files.getAttribute(target.toPath(), "unix:ctime", LinkOption.NOFOLLOW_LINKS).toString()
+        }.getOrElse {
+            val checksum = MessageDigest.getInstance("SHA-256")
+            target.inputStream().use { source ->
+                val bytes = ByteArray(BUFFER_BYTES)
+                while (true) {
+                    checkInterrupted()
+                    val n = source.read(bytes)
+                    if (n < 0) break
+                    checksum.update(bytes, 0, n)
+                }
+            }
+            checksum.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+        }
+        return attrs.fileKey().toString() + "|" + attrs.size() + "|" +
+            attrs.lastModifiedTime() + "|" + change
+    }
+
+    /**
+     * Shared publish lock covers plain write/edit and chunk finalization, including
+     * distinct LocalWorkspace objects. Locks live in app-private storage, never
+     * beside user files in shared storage.
+     */
+    private fun <T> withPublishLock(target: File, workspaceRoot: File?, action: () -> T): T {
+        val dir = File(workspaceRoot?.canonicalFile ?: requireNotNull(target.parentFile), ".dsh/write-locks")
+        require(dir.isDirectory || dir.mkdirs()) { "无法创建提交锁目录" }
+        val root = workspaceRoot?.canonicalFile
+        if (root != null) {
+            require(!Files.isSymbolicLink(dir.toPath()) &&
+                dir.canonicalFile.toPath().startsWith(root.toPath())) { "提交锁目录不安全" }
+        }
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(target.canonicalPath.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it.toInt() and 255) }
+        val lockPath = File(dir, "$digest.lck").toPath()
+        val monitor = publishMonitors[(digest.hashCode() and Int.MAX_VALUE) % publishMonitors.size]
+        return synchronized(monitor) {
+            FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE,
+                LinkOption.NOFOLLOW_LINKS).use { channel ->
+                channel.lock().use { action() }
+            }
         }
     }
 
