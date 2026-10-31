@@ -166,6 +166,7 @@ internal object LocalToolPolicy {
             "http_request" -> setOf("http", "https", "api", "接口请求")
             "download_file" -> setOf("下载", "文件下载", "download", "url")
             "archive_list", "archive_read" -> setOf("压缩包", "归档", "tar.gz", "tgz", "zip", "源码包", "archive")
+            "read_chunk", "write_chunk" -> setOf("大文件", "分块", "续传", "字节读取", "write chunk", "read chunk")
             "network_diagnose" -> setOf("网络诊断", "连通性", "dns", "tls", "vpn", "代理")
             "job_list", "job_output", "job_kill" -> setOf("后台", "后台任务", "进程", "job", "process")
             "json_query" -> setOf("json", "json查询", "结构化数据")
@@ -209,10 +210,10 @@ internal object LocalToolPolicy {
         }
         return ToolMetadata(
             family = family,
-            finishesOnCancellation = canonical in setOf("write", "edit", "apply_patch"),
+            finishesOnCancellation = canonical in setOf("write", "edit", "write_chunk", "apply_patch"),
             workspaceAccess = when (canonical) {
-                "read", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "skill", "json_query", "update_goal", "extension_inspect" -> ToolWorkspaceAccess.READ
-                "write", "edit", "apply_patch", "download_file", "present", "bash",
+                "read", "read_chunk", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "skill", "json_query", "update_goal", "extension_inspect" -> ToolWorkspaceAccess.READ
+                "write", "edit", "write_chunk", "apply_patch", "download_file", "present", "bash",
                 "skill_create", "skill_update", "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local" -> ToolWorkspaceAccess.WRITE
                 else -> ToolWorkspaceAccess.NONE
             },
@@ -221,7 +222,7 @@ internal object LocalToolPolicy {
             // Audited native queries: no workspace/session mutation, network side effect or
             // approval interaction. New external/plugin tools must explicitly opt in.
             parallelReadSafe = canonical in setOf(
-                "read", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "json_query",
+                "read", "read_chunk", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "json_query",
             ),
         )
     }
@@ -234,7 +235,7 @@ internal object LocalToolPolicy {
      * [autoApprovalScope] below only classifies lower-risk operations; it is not a global allowlist.
      */
     fun approval(name: String): ToolApprovalPolicy = when (canonical(name)) {
-        "write", "edit", "apply_patch", "download_file", "skill_create", "skill_update",
+        "write", "edit", "write_chunk", "apply_patch", "download_file", "skill_create", "skill_update",
         "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local", "bash", "job_kill", "send_message", "interrupt_agent", "agent_resume", "agent_close", "team_task_review",
         "team_send_message", "team_interrupt", "team_disable_member", "team_dismiss_member", "team_stop_all",
         "http_request", "media_image_create", "session_event_search", "session_trace", "session_event_trace", "session_event_read",
@@ -252,7 +253,7 @@ internal object LocalToolPolicy {
      *   as a workspace-bounded operation.
      */
     fun autoApprovalScope(name: String): LocalAutoApprovalScope = when (canonical(name)) {
-        "write", "edit", "apply_patch", "download_file", "skill_create", "skill_update",
+        "write", "edit", "write_chunk", "apply_patch", "download_file", "skill_create", "skill_update",
         "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local" -> LocalAutoApprovalScope.WORKSPACE
         // A shell can leave cwd and reach same-UID app-private state; keep it outside low-risk classification.
         "bash" -> LocalAutoApprovalScope.NONE
