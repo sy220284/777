@@ -2300,7 +2300,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionStorageManager.kt",
-      "sha256": "f6ef29bf9bafe283"
+      "sha256": "5a67292b76ab3f20"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt",
@@ -4528,12 +4528,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "a69b52bedb0a",
+  "source_snapshot": "cca9db868b04",
   "observed_delta": {
-    "baseline": "d1c6b5ef0ec2",
+    "baseline": "a69b52bedb0a",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionStorageManager.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
