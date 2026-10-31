@@ -6,6 +6,7 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.RandomAccessFile
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Base64
@@ -205,8 +206,26 @@ internal class LocalArchiveReader(private val root: File) {
                 if (last > 0) digest.update(sample, 0, last)
             }
         }
+        // In-place changes that restore the original mtime must invalidate the catalog.
+        // The fallback full hash is used only on filesystems without a change-time attribute.
+        val changeToken = runCatching {
+            Files.getAttribute(file.toPath(), "unix:ctime", LinkOption.NOFOLLOW_LINKS).toString()
+        }.getOrElse {
+            val full = MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { stream ->
+                val chunk = ByteArray(64 * 1024)
+                while (true) {
+                    if (Thread.currentThread().isInterrupted)
+                        throw java.io.InterruptedIOException("归档校验已取消")
+                    val n = stream.read(chunk)
+                    if (n < 0) break
+                    full.update(chunk, 0, n)
+                }
+            }
+            full.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+        }
         return listOf(file.canonicalPath, attributes.size().toString(),
-            attributes.lastModifiedTime().toString(), attributes.fileKey().toString(),
+            attributes.lastModifiedTime().toString(), attributes.fileKey().toString(), changeToken,
             digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }).joinToString("|")
     }
 
