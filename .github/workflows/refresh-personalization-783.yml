@@ -1,0 +1,30 @@
+name: 一次性同步个性化修复功能索引
+on:
+  push:
+    branches:
+      - fix/783-personalization-ui-lifecycle-regression
+    paths:
+      - .github/workflows/refresh-personalization-783.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync-index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: true
+      - name: 用仓库权威生成器更新索引并清理一次性任务
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/refresh-personalization-783.yml
+          python3 .github/scripts/sync-feature-tree.py
+          python3 .github/scripts/check-feature-tree-sync.py
+          git add docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html docs/FEATURE-SOURCE-INDEX.auto.json docs/FEATURE-REVIEW.auto.json docs/ACCEPTANCE-MATRIX.json docs/FEATURE-TREE-SOURCE-REGISTRY.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "同步个性化保存修复对应源码索引并清理临时工作流"
+          git push origin HEAD:fix/783-personalization-ui-lifecycle-regression
