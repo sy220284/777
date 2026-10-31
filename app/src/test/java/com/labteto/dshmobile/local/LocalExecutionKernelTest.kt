@@ -56,6 +56,23 @@ class LocalExecutionKernelTest {
     }
 
     @Test
+    fun largeFileAndMediaAdmissionScalesWithDeviceMemoryAndThermalPressure() {
+        val healthy = LocalDeviceMemorySnapshot(15_100, 4_096)
+        val initial = localResourceBudgetForMemoryClass(512, healthy)
+        assertEquals(2, initial.maxFileIo)
+        assertEquals(2, initial.maxMediaDecode)
+        val memoryPressure = localResourceBudgetForMemoryClass(512, healthy.copy(availableRamMb = 400))
+        assertEquals(1, memoryPressure.maxFileIo)
+        assertEquals(1, memoryPressure.maxMediaDecode)
+        val overheating = localAdaptiveResourceBudget(
+            512, initial, healthy, cpuHeadroomPercent = 10f,
+            thermalStatus = 4, powerSave = true,
+        )
+        assertEquals(1, overheating.maxFileIo)
+        assertEquals(1, overheating.maxMediaDecode)
+    }
+
+    @Test
     fun adaptiveContextBudgetShrinksUnderPressure() {
         val low = localHistoryBudgetFor(512, HarnessResourcePressure.LOW)
         val medium = localHistoryBudgetFor(512, HarnessResourcePressure.MEDIUM)

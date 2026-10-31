@@ -8,6 +8,8 @@ import java.io.File
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
+import com.labteto.dshmobile.harness.resource.HarnessResourceKind
+import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -207,6 +209,7 @@ internal suspend fun prepareLocalMultimodalMessages(
     model: String? = null,
     baseUrl: String? = null,
     planSharing: Boolean = false,
+    resourceScheduler: HarnessResourceScheduler? = null,
 ): List<JsonObject> = withContext(Dispatchers.IO) {
     val messages = expandToolImageMessages(messages, toolImageMode = mode == LocalImageInputMode.TOOL)
     val activeImageMessageIndices = activeImageMessageIndices(messages, mode)
@@ -328,10 +331,15 @@ internal suspend fun prepareLocalMultimodalMessages(
                         pdfPageSlots > 0 &&
                         (!extracted.parsed || extracted.text.length < MIN_RELIABLE_PDF_TEXT_CHARS)
                     if (shouldRenderPdf) {
-                        val rendered = renderLocalPdfForModel(
-                            file = file,
-                            maxPages = minOf(pdfPageSlots, MAX_LOCAL_PDF_RENDER_PAGES),
-                        )
+                        val render = {
+                            renderLocalPdfForModel(
+                                file = file,
+                                maxPages = minOf(pdfPageSlots, MAX_LOCAL_PDF_RENDER_PAGES),
+                            )
+                        }
+                        val rendered = if (resourceScheduler == null) render() else
+                            resourceScheduler.withResource(HarnessResourceKind.MEDIA_DECODE,
+                                "model:pdf-pages") { render() }
                         add(buildJsonObject {
                             put("type", "text")
                             put(
