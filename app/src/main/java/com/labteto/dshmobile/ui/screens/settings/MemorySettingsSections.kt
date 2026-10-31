@@ -159,7 +159,8 @@ internal fun LocalMemorySettingsCard(
                 checked = local.autoRecall,
                 onCheckedChange = { next ->
                     viewModel.changeLocalMemoryRecall(
-                        local.userRules, local.autoRecall, local.autoMemory, next,
+                        if (rules.saving) rules.text else local.userRules,
+                        local.autoRecall, local.autoMemory, next,
                         notifyCurrentPage,
                     )
                 },
@@ -178,7 +179,8 @@ internal fun LocalMemorySettingsCard(
                 checked = local.autoMemory,
                 onCheckedChange = { next ->
                     viewModel.changeLocalMemoryAutoMemory(
-                        local.userRules, local.autoRecall, local.autoMemory, next,
+                        if (rules.saving) rules.text else local.userRules,
+                        local.autoRecall, local.autoMemory, next,
                         notifyCurrentPage,
                     )
                 },
