@@ -346,6 +346,7 @@ internal fun LocalConversationSurface(
     LocalConversationSurfaceBody(args)
 }
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @Composable
 private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val state = args.state
