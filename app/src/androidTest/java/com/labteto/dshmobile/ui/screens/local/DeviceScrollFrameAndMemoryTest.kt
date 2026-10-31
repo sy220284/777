@@ -6,6 +6,9 @@ import android.os.Bundle
 import android.os.Debug
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
+import android.view.InputDevice
+import android.view.MotionEvent
 import android.view.FrameMetrics
 import android.view.Window
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,9 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeDown
-import androidx.compose.ui.test.swipeUp
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
@@ -108,13 +108,34 @@ class DeviceScrollFrameAndMemoryTest {
         var peakJavaKb = (heap.totalMemory() - heap.freeMemory()) / 1024L
         var maxVisibleIndex = 0
         fun realSwipe(downwards: Boolean) {
-            // Inject through the tested Compose root so the gesture reaches the
-            // LazyColumn, rather than another emulator window or system overlay.
-            // The listener below still measures real Android Window frame metrics.
-            compose.onNodeWithTag("perf-real-work-timeline").performTouchInput {
-                if (downwards) swipeDown(durationMillis = 480)
-                else swipeUp(durationMillis = 480)
+            // Compose performTouchInput advances its virtual test clock: in CI it can
+            // scroll hundreds of rows while generating almost no actual VSYNC frames.
+            // Inject 480 ms of wall-clock touchscreen input into the visible Activity
+            // instead, so Window FrameMetrics captures the renderer under real load.
+            val x = (viewport.left + viewport.right) / 2f
+            val upperY = viewport.top + viewport.height * 0.22f
+            val lowerY = viewport.top + viewport.height * 0.80f
+            val fromY = if (downwards) upperY else lowerY
+            val toY = if (downwards) lowerY else upperY
+            val downTime = SystemClock.uptimeMillis()
+            fun sendPointer(action: Int, y: Float) {
+                val event = MotionEvent.obtain(
+                    downTime, SystemClock.uptimeMillis(), action, x, y, 0,
+                )
+                event.source = InputDevice.SOURCE_TOUCHSCREEN
+                try {
+                    instrumentation.sendPointerSync(event)
+                } finally {
+                    event.recycle()
+                }
             }
+            sendPointer(MotionEvent.ACTION_DOWN, fromY)
+            repeat(30) { index ->
+                Thread.sleep(16)
+                val fraction = (index + 1) / 30f
+                sendPointer(MotionEvent.ACTION_MOVE, fromY + (toY - fromY) * fraction)
+            }
+            sendPointer(MotionEvent.ACTION_UP, toY)
         }
         try {
             repeat(16) { index ->
@@ -133,9 +154,9 @@ class DeviceScrollFrameAndMemoryTest {
         }
         val frames = synchronized(metrics) { metrics.toList() }
         assertTrue("Real scrolling never advanced the Work list: viewport=$viewport maxVisibleIndex=$maxVisibleIndex", maxVisibleIndex > 2)
-        // Compose's test clock drives synthetic swipes independently of the emulator's
-        // hardware renderer. A functional scroll is mandatory, but <60 real Window frames
-        // must NOT be reported as an FPS or jank measurement (nor fail a functional test).
+        // Wall-clock input generates real frame opportunities. Even then an emulator can
+        // drop FrameMetrics callbacks under host contention: never fabricate FPS/jank
+        // from fewer than 60 real frames and 40 valid VSYNC intervals.
         // A physical-device performance gate must require sample_quality=valid separately.
         val timing = frames.map { it.second }.filter { it > 0L }.sorted()
         val intervals = timing.zipWithNext { a, b -> b - a }
