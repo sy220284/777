@@ -237,7 +237,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - **落盘确认**：`LocalHarnessSettingsCoordinatorTest` 必须核对写盘前无成功确认、单写盘队列覆盖的请求不悬挂、并发阻塞写入时只有最后一代返回成功，失败后重试可恢复。
 - **状态契约**：`SettingsUiPortReceiptTest` 必须区分异步受理的 `Submitted` 与真正执行完成的 `Applied`；失败不得被包装成成功。
 - **草稿与生命周期**：`PersonalizationRulesEditorTest` 及 `PersonalizationRulesSheetAndroidTest` 必须验证失败留草稿、重试、页面卸载再进入、显式取消时忽略迟到结果；切换页面不应把成功提示投递到旧界面。
-- **平台验收**：变更 `androidTest` 必须从同一提交执行 Android 16 与 Android 17 仪器测试；跳过或仅完成编译均不算设备回归通过。
+- **平台验收**：先由 `:app:compileDebugAndroidTestKotlin` 证明新增仪器测试真实可编译，再从同一提交执行 Android 16 与 Android 17 仪器测试；跳过或仅完成编译均不算设备回归通过。
 
 ## 功能专项验证
 
