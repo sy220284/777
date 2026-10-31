@@ -5,6 +5,7 @@ import java.io.FileInputStream
 import java.io.InterruptedIOException
 import java.io.RandomAccessFile
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
@@ -13,7 +14,10 @@ import java.util.UUID
 internal data class LocalTextCheckpoint(val line: Int, val offset: Long, val digest: String)
 
 /** Persist sparse line offsets and full source SHA-256 with bounded 64 KiB buffers. */
-internal class LocalTextLineIndex(private val workspaceRoot: File) {
+internal class LocalTextLineIndex(
+    private val workspaceRoot: File,
+    private val isAllowedSource: (File) -> Boolean = { it.toPath().startsWith(workspaceRoot.canonicalFile.toPath()) },
+) {
     private companion object {
         const val VERSION = "text-lines-v1"
         const val STRIDE = 1024L
@@ -22,7 +26,7 @@ internal class LocalTextLineIndex(private val workspaceRoot: File) {
     fun checkpoint(file: File, startLine: Int): LocalTextCheckpoint {
         val root = workspaceRoot.canonicalFile
         val source = file.canonicalFile
-        require(source.isFile && source.toPath().startsWith(root.toPath())) { "文本路径越界" }
+        require(source.isFile && isAllowedSource(source)) { "文本路径越界" }
         val directory = File(root, ".dsh/text-index")
         require(directory.isDirectory || directory.mkdirs()) { "无法创建文本索引目录" }
         require(!Files.isSymbolicLink(directory.toPath()) &&
@@ -115,8 +119,25 @@ internal class LocalTextLineIndex(private val workspaceRoot: File) {
                 if (last > 0) sampleHash.update(data, 0, last)
             }
         }
+        // ctime detects in-place writes even when callers restore size and mtime.
+        // On providers without unix:ctime, hash the entire source rather than trusting samples.
+        val changeToken = runCatching {
+            Files.getAttribute(file.toPath(), "unix:ctime", LinkOption.NOFOLLOW_LINKS).toString()
+        }.getOrElse {
+            val full = MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { input ->
+                val chunk = ByteArray(64 * 1024)
+                while (true) {
+                    if (Thread.currentThread().isInterrupted) throw InterruptedIOException("索引校验已取消")
+                    val count = input.read(chunk)
+                    if (count < 0) break
+                    full.update(chunk, 0, count)
+                }
+            }
+            full.digest().hex()
+        }
         return sha((file.canonicalPath + "|" + info.size() + "|" + info.lastModifiedTime() +
-            "|" + info.fileKey() + "|" + sampleHash.digest().hex()).toByteArray(Charsets.UTF_8))
+            "|" + info.fileKey() + "|" + changeToken + "|" + sampleHash.digest().hex()).toByteArray(Charsets.UTF_8))
     }
 
     private fun sha(data: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(data).hex()
