@@ -26,7 +26,7 @@ jobs:
           rm .github/workflows/_large-file-sync-once.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.html docs/FEATURE-SOURCE-INDEX.auto.json docs/FEATURE-REVIEW.auto.json
+          git add -A docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html docs/FEATURE-SOURCE-INDEX.auto.json docs/FEATURE-REVIEW.auto.json
           git add -u .github/workflows/_large-file-sync-once.yml
           git commit -m '同步大文件性能重构后的功能索引并清理一次性工作流'
           git push origin HEAD:fix/large-file-stability-20261031
