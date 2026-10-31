@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.files
 import java.io.File
 import java.io.InputStream
 import java.nio.file.Files
+import com.labteto.dshmobile.local.tools.LocalSandboxBoundary
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -126,6 +127,26 @@ class LocalLargeFileOperationsTest {
         val finished = LocalWorkspace(root).writeChunkBytes("data.bin", byteArrayOf(0, -7), bytes.size.toLong(), true, id)
         assertTrue(finished.contains("complete=true"))
         assertArrayEquals(byteArrayOf(0, -1, -2, 3, 10, 0, -7), root.resolve("data.bin").readBytes())
+    }
+
+    @Test fun largeExternalSharedFileUsesExistingSandboxPermissionAndPrivateIndexCache() {
+        val shared = Files.createTempDirectory("allowed-shared-source").toFile()
+        try {
+            val source = File(shared, "large-source.kt")
+            source.bufferedWriter().use { writer ->
+                repeat(220_000) { writer.write("val sourceLine = \"sample content\"\n") }
+                writer.write("val finalSymbol = 42\n")
+            }
+            assertTrue(source.length() > 8L * 1024 * 1024)
+            val allowed = LocalWorkspace(root, boundary = LocalSandboxBoundary(root, listOf(shared)))
+            assertTrue(allowed.read(source.absolutePath, 220_001, 220_001).contains("finalSymbol"))
+            assertTrue(File(root, ".dsh/text-index").listFiles().orEmpty().isNotEmpty())
+            assertThrows(IllegalArgumentException::class.java) {
+                workspace.read(source.absolutePath, 220_001, 220_001)
+            }
+        } finally {
+            shared.deleteRecursively()
+        }
     }
 
     @Test fun previewCanNavigateBeyondFormer512KiBWithoutRetainingEarlierPages() {
