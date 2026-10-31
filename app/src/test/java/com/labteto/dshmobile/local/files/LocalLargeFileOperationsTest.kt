@@ -92,13 +92,40 @@ class LocalLargeFileOperationsTest {
         val first = workspace.writeChunk("saved.txt", "a😀", 0, false)
         assertTrue(first.contains("next_byte=5"))
         assertEquals("old content", root.resolve("saved.txt").readText())
+        val sessionId = Regex("session_id=([0-9a-f-]+)").find(first)!!.groupValues[1]
         val restarted = LocalWorkspace(root)
-        val result = restarted.writeChunk("saved.txt", "第二段", 5, true)
+        val result = restarted.writeChunk("saved.txt", "第二段", 5, true, sessionId)
         assertTrue(result.contains("complete=true"))
         assertEquals("a😀第二段", root.resolve("saved.txt").readText())
         assertThrows(IllegalArgumentException::class.java) {
-            restarted.writeChunk("saved.txt", "unexpected", 5, true)
+            restarted.writeChunk("saved.txt", "unexpected", 5, true, sessionId)
         }
+    }
+
+    @Test fun concurrentSessionsNeverMixDataWithMatchingOffsets() {
+        val first = workspace.writeChunk("collision.bin", "AAAA", 0, false)
+        val second = workspace.writeChunk("collision.bin", "BBBB", 0, false)
+        val a = Regex("session_id=([0-9a-f-]+)").find(first)!!.groupValues[1]
+        val b = Regex("session_id=([0-9a-f-]+)").find(second)!!.groupValues[1]
+        assertTrue(a != b)
+        assertEquals("BBBBCCCC", run {
+            workspace.writeChunk("collision.bin", "CCCC", 4, true, b)
+            root.resolve("collision.bin").readText()
+        })
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.writeChunk("collision.bin", "WRONG", 4, true, "00000000-0000-0000-0000-000000000000")
+        }
+        workspace.writeChunk("collision.bin", "DDDD", 4, true, a)
+        assertEquals("AAAADDDD", root.resolve("collision.bin").readText())
+    }
+
+    @Test fun binaryChunksRoundTripAfterRestartWithoutTextDecoding() {
+        val bytes = byteArrayOf(0, -1, -2, 3, 10)
+        val first = workspace.writeChunkBytes("data.bin", bytes, 0L, false)
+        val id = Regex("session_id=([0-9a-f-]+)").find(first)!!.groupValues[1]
+        val finished = LocalWorkspace(root).writeChunkBytes("data.bin", byteArrayOf(0, -7), bytes.size.toLong(), true, id)
+        assertTrue(finished.contains("complete=true"))
+        assertArrayEquals(byteArrayOf(0, -1, -2, 3, 10, 0, -7), root.resolve("data.bin").readBytes())
     }
 
     @Test fun previewCanNavigateBeyondFormer512KiBWithoutRetainingEarlierPages() {
