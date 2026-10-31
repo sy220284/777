@@ -27,6 +27,7 @@ internal fun LocalSessionStorageCard(
     busy: Boolean,
     onCompact: () -> Unit,
     onExport: () -> Unit,
+    onExportFull: () -> Unit,
     onRestore: () -> Unit,
     onLegacyRestore: () -> Unit,
     onCancelRestore: () -> Unit,
@@ -118,8 +119,14 @@ internal fun LocalSessionStorageCard(
                 modifier = Modifier.weight(1f),
             )
         }
-        // Session archive and Media Studio have separate persistence owners.
-        // This disclosure must be visible beside export/import, even when status is loading.
+        SyButton(
+            text = "导出完整备份（会话＋媒体创作原件）",
+            onClick = onExportFull,
+            enabled = !busy && status != null,
+            variant = SyButtonVariant.Outline,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        // Explicitly distinguish session-only and complete backup scopes.
         Text(
             text = stringResource(R.string.settings_local_session_storage_backup_scope),
             style = DsType.caption11.withReadingWeight(),
