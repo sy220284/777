@@ -30,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +39,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
@@ -76,6 +78,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
@@ -124,17 +127,24 @@ internal fun LocalMemorySettingsCard(
 ) {
     val memorySavedMessage = stringResource(R.string.advanced_memory_saved)
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    var userRules by remember(local.userRules) { mutableStateOf(local.userRules) }
-    var showRulesEditor by remember { mutableStateOf(false) }
-    var savingRules by remember { mutableStateOf(false) }
-    var rulesSaveError by remember { mutableStateOf<String?>(null) }
+    val editor = viewModel.personalizationRulesEditor
+    val rules by editor.state.collectAsState()
+    // A completed disk write may outlive this page. Never emit a toast on a different page.
+    val pageActive = remember { AtomicBoolean(true) }
+    DisposableEffect(Unit) { onDispose { pageActive.set(false) } }
+    val notifyCurrentPage: (Boolean, String?) -> Unit = { saved, error ->
+        if (pageActive.get()) {
+            if (saved) report(memorySavedMessage)
+            else if (error != null) report(error)
+        }
+    }
 
     SettingsCard(stringResource(R.string.advanced_memory_settings)) {
         SyValueRow(
             label = stringResource(R.string.advanced_user_rules),
-            value = stringResource(R.string.advanced_user_rules_count, userRules.length, 6_000),
+            value = stringResource(R.string.advanced_user_rules_count, local.userRules.length, 6_000),
             hint = stringResource(R.string.advanced_user_rules_hint),
-            onClick = { showRulesEditor = true },
+            onClick = { editor.open(local.userRules) },
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -148,10 +158,10 @@ internal fun LocalMemorySettingsCard(
             SySwitchControl(
                 checked = local.autoRecall,
                 onCheckedChange = { next ->
-                    viewModel.configureLocalMemory(userRules, next, local.autoMemory) { saved, error ->
-                        if (saved) report(memorySavedMessage)
-                        else if (error != null) report(error)
-                    }
+                    viewModel.changeLocalMemoryRecall(
+                        local.userRules, local.autoRecall, local.autoMemory, next,
+                        notifyCurrentPage,
+                    )
                 },
             )
         }
@@ -167,60 +177,69 @@ internal fun LocalMemorySettingsCard(
             SySwitchControl(
                 checked = local.autoMemory,
                 onCheckedChange = { next ->
-                    viewModel.configureLocalMemory(userRules, local.autoRecall, next) { saved, error ->
-                        if (saved) report(memorySavedMessage)
-                        else if (error != null) report(error)
-                    }
+                    viewModel.changeLocalMemoryAutoMemory(
+                        local.userRules, local.autoRecall, local.autoMemory, next,
+                        notifyCurrentPage,
+                    )
                 },
             )
         }
     }
 
-    if (showRulesEditor) {
-        SyResponsiveSheet(
-            title = stringResource(R.string.advanced_user_rules),
-            subtitle = stringResource(R.string.advanced_user_rules_hint),
-            onDismiss = { showRulesEditor = false },
-            scrollable = true,
-            footer = {
-                SyButton(
-                    text = stringResource(R.string.common_save),
-                    onClick = {
-                        savingRules = true
-                        rulesSaveError = null
-                        viewModel.configureLocalMemory(userRules, local.autoRecall, local.autoMemory) { saved, error ->
-                            savingRules = false
-                            if (saved) {
-                                report(memorySavedMessage)
-                                showRulesEditor = false
-                            } else {
-                                rulesSaveError = error ?: "设置已被后续修改替代，请确认后重新保存"
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    size = SyButtonSize.Large,
-                    enabled = !savingRules,
-                    loading = savingRules,
-                )
-            },
-        ) {
-            rulesSaveError?.let { error ->
-                Text(error, color = MaterialTheme.colorScheme.error, style = DsType.caption11.withReadingWeight())
-            }
-            SyTextField(
-                value = userRules,
-                onValueChange = { userRules = it.take(6_000); rulesSaveError = null },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 5,
-                maxLines = 10,
-                label = { Text(stringResource(R.string.advanced_user_rules)) },
-                supportingText = {
-                    Text(stringResource(R.string.advanced_user_rules_count, userRules.length, 6_000))
+    PersonalizationRulesSheet(
+        rules = rules,
+        onDismiss = editor::cancel,
+        onDraftChange = editor::edit,
+        onSave = {
+            editor.save(
+                submit = { text, complete ->
+                    viewModel.configureLocalMemory(text, local.autoRecall, local.autoMemory, complete)
                 },
+                onSaved = { if (pageActive.get()) report(memorySavedMessage) },
             )
+        },
+    )
+}
 
+@Composable
+internal fun PersonalizationRulesSheet(
+    rules: PersonalizationRulesEditState,
+    onDismiss: () -> Unit,
+    onDraftChange: (String) -> Unit,
+    onSave: () -> Unit,
+) {
+    if (!rules.open) return
+    SyResponsiveSheet(
+        title = stringResource(R.string.advanced_user_rules),
+        subtitle = stringResource(R.string.advanced_user_rules_hint),
+        onDismiss = onDismiss,
+        scrollable = true,
+        footer = {
+            SyButton(
+                text = stringResource(R.string.common_save),
+                onClick = onSave,
+                modifier = Modifier.fillMaxWidth().testTag("personalizationRulesSave"),
+                size = SyButtonSize.Large,
+                enabled = !rules.saving,
+                loading = rules.saving,
+            )
+        },
+    ) {
+        rules.error?.let { error ->
+            Text(error, color = MaterialTheme.colorScheme.error, style = DsType.caption11.withReadingWeight())
         }
+        SyTextField(
+            value = rules.text,
+            onValueChange = onDraftChange,
+            modifier = Modifier.fillMaxWidth().testTag("personalizationRulesInput"),
+            minLines = 5,
+            maxLines = 10,
+            enabled = !rules.saving,
+            label = { Text(stringResource(R.string.advanced_user_rules)) },
+            supportingText = {
+                Text(stringResource(R.string.advanced_user_rules_count, rules.text.length, 6_000))
+            },
+        )
     }
 }
 
