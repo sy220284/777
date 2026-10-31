@@ -57,6 +57,7 @@ class SettingsViewModel @Inject constructor(
     private val deviceCapabilitiesController = DeviceCapabilitiesController(appContext)
     private val memorySettingsController = MemorySettingsController(viewModelScope, localHarness::memoryContext, settingsData::memoryPage, settingsData::updateMemory, settingsData::forgetMemory)
     internal val personalizationRulesEditor = PersonalizationRulesEditor()
+    private var desiredUserRules: String? = null
     private var desiredAutoRecall: Boolean? = null
     private var desiredAutoMemory: Boolean? = null
     private var latestPersonalizationRequest = 0L
@@ -312,7 +313,7 @@ class SettingsViewModel @Inject constructor(
         onDone: (saved: Boolean, error: String?) -> Unit,
     ) {
         desiredAutoRecall = next
-        configureLocalMemory(userRules, autoRecall, autoMemory, onDone)
+        submitLocalMemory(userRules, autoRecall, autoMemory, onDone)
     }
 
     fun changeLocalMemoryAutoMemory(
@@ -323,7 +324,7 @@ class SettingsViewModel @Inject constructor(
         onDone: (saved: Boolean, error: String?) -> Unit,
     ) {
         desiredAutoMemory = next
-        configureLocalMemory(userRules, autoRecall, autoMemory, onDone)
+        submitLocalMemory(userRules, autoRecall, autoMemory, onDone)
     }
 
     fun configureLocalMemory(
@@ -332,28 +333,43 @@ class SettingsViewModel @Inject constructor(
         autoMemory: Boolean,
         onDone: (saved: Boolean, error: String?) -> Unit,
     ) {
+        // A rules Save explicitly changes the intended rules. Toggle requests must
+        // reuse that intent until its last generation has completed.
+        desiredUserRules = userRules
+        submitLocalMemory(userRules, autoRecall, autoMemory, onDone)
+    }
+
+    private fun submitLocalMemory(
+        userRules: String,
+        autoRecall: Boolean,
+        autoMemory: Boolean,
+        onDone: (saved: Boolean, error: String?) -> Unit,
+    ) {
         val request = ++latestPersonalizationRequest
+        val rules = desiredUserRules ?: userRules
         val recall = desiredAutoRecall ?: autoRecall
         val memory = desiredAutoMemory ?: autoMemory
         viewModelScope.launch {
             try {
-                val saved = localHarness.savePersonalization(userRules, recall, memory)
+                val saved = localHarness.savePersonalization(rules, recall, memory)
                 val current = request == latestPersonalizationRequest
-                if (saved && current) {
-                    desiredAutoRecall = null
-                    desiredAutoMemory = null
-                }
+                if (current) clearPersonalizationIntent()
                 // Even an already-written older request must not toast after a newer tap.
                 onDone(saved && current, null)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
-                onDone(
-                    false,
-                    if (request == latestPersonalizationRequest) failure.message ?: "个性化设置保存失败" else null,
-                )
+                val current = request == latestPersonalizationRequest
+                if (current) clearPersonalizationIntent()
+                onDone(false, if (current) failure.message ?: "个性化设置保存失败" else null)
             }
         }
+    }
+
+    private fun clearPersonalizationIntent() {
+        desiredUserRules = null
+        desiredAutoRecall = null
+        desiredAutoMemory = null
     }
 
     fun refreshMemories() = memorySettingsController.refresh()
