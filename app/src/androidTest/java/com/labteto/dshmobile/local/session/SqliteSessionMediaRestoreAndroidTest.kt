@@ -339,4 +339,26 @@ class SqliteSessionMediaRestoreAndroidTest {
             }
         } finally { root.deleteRecursively() }
     }
+
+    @Test fun interruptedCleanupOfCommittedRestoreNeverReplaysInstalledDatabases() {
+        val base = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(base.cacheDir, "committed-cleanup-" + UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val context = isolatedContext(base, File(root, "destination").apply { mkdirs() })
+            val committed = File(context.filesDir, "local-harness/.sqlite-restore-committed-default")
+            check(committed.mkdirs())
+            File(committed, "READY").writeText("sqlite-v3-studio")
+            File(committed, "incomplete-garbage").writeText("already-installed")
+            SqliteSessionSnapshotStore(context, Json).use { snapshots ->
+                SqliteSessionEventDatabase(context, Json).use { events ->
+                    events.append("preserve", "user/message", buildJsonObject { put("value", "existing") })
+                    val manager = SqliteSessionStorageManager(context, snapshots, events)
+                    assertEquals(0, manager.applyPendingRestore())
+                    assertTrue(!committed.exists())
+                    assertEquals(0L, events.latestSequence("preserve"))
+                    assertTrue(!manager.status().pendingRestore)
+                }
+            }
+        } finally { root.deleteRecursively() }
+    }
 }
