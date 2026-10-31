@@ -16,7 +16,7 @@ internal suspend fun <T> withLocalSubagentAgentSlot(
     block: suspend () -> T,
 ): T {
     if (waitMillis == null) {
-        return scheduler.withResource(HarnessResourceKind.AGENT, owner, block)
+        return scheduler.withResource(HarnessResourceKind.AGENT, owner, block = block)
     }
     require(waitMillis in 1L..60_000L) { "SUBAGENT_AGENT_SLOT_WAIT_INVALID" }
     val lease = withTimeoutOrNull(waitMillis) {
