@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1874,
-  "production_source_count": 1107,
-  "test_code_file_count": 627,
+  "repository_code_file_count": 1878,
+  "production_source_count": 1108,
+  "test_code_file_count": 630,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -472,7 +472,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentImporter.kt",
-      "sha256": "e20ee54a5749033b"
+      "sha256": "787bdeff002d9b15"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentInspection.kt",
@@ -1144,7 +1144,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextReadPage.kt",
-      "sha256": "9fa84467caee550e"
+      "sha256": "947ce06288d4ae51"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
@@ -1329,6 +1329,10 @@
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalImageInputMode.kt",
       "sha256": "7dadcc6d6feccca3"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalInlineFileEncoding.kt",
+      "sha256": "ab0a051281d8e7fc"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalInstructionScope.kt",
@@ -1548,7 +1552,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMultimodal.kt",
-      "sha256": "ced9224610e8f9e5"
+      "sha256": "bd71618025160411"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalNativeModelTools.kt",
@@ -2516,7 +2520,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt",
-      "sha256": "b5ca59f6038dfdad"
+      "sha256": "559daf3f27a29f48"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/vision/VisionClient.kt",
@@ -3528,7 +3532,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt",
-      "sha256": "d0205ce0d1a3bf5b"
+      "sha256": "d1a219c9372c56c4"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceShare.kt",
@@ -4492,12 +4496,20 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "10dc7f24d7ba",
+  "source_snapshot": "cf7c1f680b12",
   "observed_delta": {
-    "baseline": "32420a9838e3",
-    "added_production_files": [],
+    "baseline": "10dc7f24d7ba",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalInlineFileEncoding.kt"
+    ],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentImporter.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalTextReadPage.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMultimodal.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
