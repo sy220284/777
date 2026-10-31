@@ -95,7 +95,7 @@ class LocalHarnessSettingsCoordinatorTest {
         val worker = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         try {
             val settings = LocalHarnessSettingsCoordinator(
-                preferences, store, runtime, worker,
+                preferences, store, localSettingsStatePort(runtime), worker,
                 writeProfile = { profile ->
                     if (profile.customRules == "first") {
                         started.countDown()
@@ -137,7 +137,7 @@ class LocalHarnessSettingsCoordinatorTest {
         val worker = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         try {
             val settings = LocalHarnessSettingsCoordinator(
-                preferences, store, runtime, worker,
+                preferences, store, localSettingsStatePort(runtime), worker,
                 writeProfile = { profile ->
                     if (profile.customRules == "fails") {
                         started.countDown()
