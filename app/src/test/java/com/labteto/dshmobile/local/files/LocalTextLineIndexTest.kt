@@ -12,7 +12,7 @@ class LocalTextLineIndexTest {
             val target = root.resolve("large.txt")
             target.bufferedWriter(Charsets.UTF_8).use { out ->
                 repeat(580_000) { n ->
-                    out.write("第$n行😀：")
+                    out.write("第${n}行😀：")
                     out.write("abc中文".repeat(3))
                     out.write("\n")
                 }
