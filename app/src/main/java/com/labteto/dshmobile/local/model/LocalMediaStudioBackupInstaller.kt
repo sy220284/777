@@ -28,7 +28,7 @@ internal class LocalMediaStudioBackupInstaller(
     private val context: Context,
     private val json: Json,
 ) {
-    fun install(staging: File): Int {
+    fun install(staging: File, retainStaging: Boolean = false): Int {
         val database = context.getDatabasePath("local_media_v1.db")
         val cleanup = File(staging.parentFile, ".installed-${staging.name}")
         // Renaming a fully installed stage is the commit boundary. After that,
@@ -131,6 +131,9 @@ internal class LocalMediaStudioBackupInstaller(
         }
         DurableFileCommit.syncDirectory(requireNotNull(database.parentFile))
         val restoredCount = installedCount(database)
+        // Combined archive owns the outer durable marker: retain all verified
+        // source bytes until its Session databases also commit successfully.
+        if (retainStaging) return restoredCount
         Files.move(staging.toPath(), cleanup.toPath(), StandardCopyOption.ATOMIC_MOVE)
         DurableFileCommit.syncDirectory(requireNotNull(cleanup.parentFile))
         check(cleanup.deleteRecursively()) { "媒体已恢复，残留目录清理未完成，可再次清理" }
