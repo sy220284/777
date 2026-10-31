@@ -406,11 +406,14 @@ class LocalWorkspace(
             pageEntries++
             if (!file.isFile || !isInsideWorkspace(file)) continue
             try {
-                file.bufferedReader().use { reader ->
-                    var lineNumber = 0
-                    // Resume-line replay does not consume this page's matching budget.
-                    // Otherwise a late cursor in a long file can repeatedly time out
-                    // before reading a single new line.
+                // Resume by exact sparse byte checkpoint rather than replaying a
+                // 256 MiB source from its first line for every search page.
+                val checkpoint = if (entry == resumeEntry && resumeLine > 0)
+                    textIndex.checkpoint(file, resumeLine + 1) else null
+                java.io.FileInputStream(file).use { source ->
+                    if (checkpoint != null) source.channel.position(checkpoint.offset)
+                    source.bufferedReader(Charsets.UTF_8).use { reader ->
+                    var lineNumber = (checkpoint?.line ?: 1) - 1
                     if (entry == resumeEntry && resumeLine > 0) {
                         while (lineNumber < resumeLine &&
                             readBoundedLine(reader, MAX_SEARCH_LINE_CHARS) != null) {
@@ -437,6 +440,7 @@ class LocalWorkspace(
                             matches += row
                             outputChars += row.length
                         }
+                    }
                     }
                 }
             } catch (error: Exception) {
