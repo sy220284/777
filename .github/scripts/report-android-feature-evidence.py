@@ -124,6 +124,10 @@ def report(root: Path, text: str, sha: str, android_api: int, phase_logs=None):
             key = test_identity(root, ref)
             if key is not None:
                 receipts.append({"test": ref, "result": results.get(key, "not_observed")})
+        missing_group = [item["test"] for item in receipts if item["result"] != "passed"]
+        if missing_group:
+            raise ValueError("Agent package " + group["id"] +
+                             " lacks actual passed Android receipts: " + ", ".join(missing_group))
         packages.append({"id": group["id"], "device_proofs": receipts, "full_acceptance": False})
     return {
         "version": 1, "commit": sha, "android_api": android_api,

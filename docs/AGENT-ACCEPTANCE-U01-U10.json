@@ -15,7 +15,11 @@
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/agent/LocalAgentSubtreeAdmissionTest.kt#acceptsTwoAndThreeLevelReadOnlyChildren",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#admittedTeamSpawnCommitsDurableMembershipAndSurvivesColdReplay",
-        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#cancelledBeforeSpawnCommitRollsBackDurableChildAndCannotColdRecoverAsActive"
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#cancelledBeforeSpawnCommitRollsBackDurableChildAndCannotColdRecoverAsActive",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/work/LocalRecursiveSubagentRunnerAndroidTest.kt#threeRunnerLevelsPersistParentLinksAndReturnRealFileEvidence",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/work/LocalRecursiveSubagentRunnerAndroidTest.kt#parentCancellationReleasesEveryDescendantAgentAndModelLease",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTreeProjectionTest.kt#corruptedOrCyclicParentLinksCannotHangRendering",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTreeProjectionTest.kt#truncatedHistoryExposesMissingParentAndPartialFlag"
       ],
       "open_requirements": "所有代理类型的同一根身份、代际撤权及混合子树热冷恢复待验收",
       "full_acceptance": false
@@ -26,7 +30,9 @@
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/agent/LocalAgentSkillBindingTest.kt#selectedLocalSkillIsFrozenAndNeverGrantsWritableTools",
         "app/src/test/java/com/labteto/dshmobile/local/agent/LocalAgentSkillBindingTest.kt#disabledMissingOrInvalidSkillsCannotEnterDelegatedModelPrompt",
-        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlanTest.kt#agentMessageDoesNotSupersedeUserAuthorizationButNewUserDoes"
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlanTest.kt#agentMessageDoesNotSupersedeUserAuthorizationButNewUserDoes",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentRootDirectiveSnapshotTest.kt#onlyNewUserEpochRevokesOldDelegatedAuthorization",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentRootDirectiveSnapshotTest.kt#sessionMismatchAndMalformedRevisionDoNotBecomePermissions"
       ],
       "open_requirements": "完整角色注册、上下文过滤矩阵、分层记忆和全部后端授权传播待验收",
       "full_acceptance": false
@@ -48,7 +54,10 @@
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#memberAcknowledgesOnlyPreviouslyObservedOwnMessageAndReplayIsIdempotent",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#forgedRecipientAckFailsProjectionBeforeClaimingAnyHandling",
-        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#trustedMembersSendPeerLeadAndReadOwnDurableMailbox"
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#trustedMembersSendPeerLeadAndReadOwnDurableMailbox",
+        "app/src/test/java/com/labteto/dshmobile/local/agent/LocalTeamInboxOrderingTest.kt#leadMessagesPrecedePeerMessagesWhileEachClassRemainsFifo",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentMessageDeliveryModeTest.kt#duplicateAcceptanceIsNotASecondProcessingAcknowledgement",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentMessageDeliveryModeTest.kt#queueOnlyReceiptMustNotPromiseDeliveryOrFutureActivation"
       ],
       "open_requirements": "跨全部代理类型的 accepted/claimed/model-replied/acked 及断线补偿待验收",
       "full_acceptance": false
@@ -59,7 +68,10 @@
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidenceTest.kt#modelClaimCannotFabricatePositiveToolEvents",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidenceTest.kt#sourceChangeOrDeletionMakesEarlierVerificationStale",
-        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#completedMemberResultDoesNotCompleteTaskWithoutLeadVerification"
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#completedMemberResultDoesNotCompleteTaskWithoutLeadVerification",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkIntegrationDecisionTest.kt#reviewApprovalCannotLaunderMissingOrFailedMachineEvidence",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkIntegrationDecisionTest.kt#reviewRejectionAndMissingReviewBlockEvenWithGoodFileAndTestResults",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkIntegrationDecisionTest.kt#goalDiagnosticUsesExactlyTheSameDecisionAsGoalDriver"
       ],
       "open_requirements": "独立 VerifierRecord、同文件冲突合并与最终 IntegrationDecision 到 Goal 完整验收待完成",
       "full_acceptance": false
@@ -73,7 +85,10 @@
         "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#wrongCertificateOrConnectorTokenCannotContactTheModel",
         "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt#twoRemoteActivationsCannotBothEditTheSameObservedVersion",
         "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt#anObservedRemoteWriteMustNotOverwriteAnotherAgentsCommit",
-        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt#anUnobservedRemoteWriteCannotOverwriteExistingFile"
+        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt#anUnobservedRemoteWriteCannotOverwriteExistingFile",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/work/LocalRecursiveSubagentRunnerAndroidTest.kt#recursiveLeafCannotExecuteAnUnexposedWriteTool",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/agent/IsolatedAgentBackendAndroidTest.kt#independentUidCannotReadHostPrivateFileAndUsesHostToolReceipts",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalPersistentAgentWorkspaceTest.kt#copiedInputMustMatchTheAdmittedGraphVersionBeforeExecutionAndMerge"
       ],
       "open_requirements": "所有工具执行端强权限及跨 Team/Fork 的独立工作树冲突回滚待验收",
       "full_acceptance": false
@@ -83,7 +98,9 @@
       "title": "多模型与资源公平调度",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/agent/LocalAgentSubtreeAdmissionTest.kt#concurrentDescendantBudgetHasFixedHardCap",
-        "app/src/test/java/com/labteto/dshmobile/local/agent/LocalAgentSubtreeAdmissionTest.kt#exhaustedSubtreeCannotForgetEarlierAdmissionOrUseAnotherIdentity"
+        "app/src/test/java/com/labteto/dshmobile/local/agent/LocalAgentSubtreeAdmissionTest.kt#exhaustedSubtreeCannotForgetEarlierAdmissionOrUseAnotherIdentity",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamQuotaPolicyTest.kt#historicalTerminatedMembersDoNotOccupyLiveSlots",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamQuotaPolicyTest.kt#completedAndDeletedTasksAreHistoryNotActiveCapacity"
       ],
       "open_requirements": "真实多模型 Token/成本/延迟/P95/公平性、抢占与熔断对照缺失",
       "full_acceptance": false
@@ -106,7 +123,9 @@
         "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#tlsToolEffectWritesOnlyTheServerWorkspaceAfterHostApproval",
         "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#wrongCertificateOrConnectorTokenCannotContactTheModel",
         "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#remoteWorkspaceOptInDoesNotFallBackToHostWhenServerHasNoEnvironment",
-        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt#twoRemoteActivationsCannotBothEditTheSameObservedVersion"
+        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt#twoRemoteActivationsCannotBothEditTheSameObservedVersion",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/agent/IsolatedAgentBackendAndroidTest.kt#independentUidCannotReadHostPrivateFileAndUsesHostToolReceipts",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/agent/IsolatedAgentBackendAndroidTest.kt#cancellingOneActivationDoesNotKillAnotherIsolatedInstance"
       ],
       "open_requirements": "设备授权、租约 fencing、断线未知副作用及恢复真实闭环待完成",
       "full_acceptance": false
