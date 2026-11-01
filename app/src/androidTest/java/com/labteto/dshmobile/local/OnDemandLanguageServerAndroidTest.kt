@@ -4,6 +4,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.interop.lsp.LspProcessClient
 import com.labteto.dshmobile.local.files.LocalWorkspaceToolGuide
 import com.labteto.dshmobile.local.runtime.BundledNodeRuntime
+import com.labteto.dshmobile.local.runtime.BundledPythonRuntime
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
 import java.io.File
 import kotlinx.coroutines.runBlocking
@@ -105,11 +106,24 @@ class OnDemandLanguageServerAndroidTest {
         withTimeout(240_000L) {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             val nodeRuntime = BundledNodeRuntime(context)
+            val pythonRuntime = BundledPythonRuntime(context)
             nodeRuntime.prepare()
+            pythonRuntime.prepare()
+            // Pyright probes a real Python interpreter for interpreter paths.
+            // Its child must inherit the exact app-merged library search path;
+            // Node-only smoke environments launch Python without its required
+            // Termux libandroid-support.so and hide the linker crash in logcat.
             val runtime = AndroidProcessRuntime(
-                dynamicSearchPaths = nodeRuntime::searchPaths,
-                baseEnvironment = nodeRuntime::environment,
+                dynamicSearchPaths = { nodeRuntime.searchPaths() + pythonRuntime.searchPaths() },
+                baseEnvironment = {
+                    nodeRuntime.environment() + pythonRuntime.environment()
+                },
             )
+            val libraryPaths = runtime.processEnvironment().getValue("LD_LIBRARY_PATH")
+            assertTrue("Pyright Python runtime must resolve its Termux libraries",
+                libraryPaths.split(File.pathSeparator).any { dir ->
+                    File(dir, "libandroid-support.so").isFile
+                })
             val home = File(context.noBackupFilesDir, "pyright-android-smoke")
             if (home.exists()) check(home.deleteRecursively())
             val manager = OnDemandLanguageServerManager(
