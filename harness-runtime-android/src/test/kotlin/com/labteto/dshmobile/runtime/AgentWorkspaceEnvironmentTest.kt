@@ -60,6 +60,8 @@ class AgentWorkspaceEnvironmentTest {
             assertEquals("only one observed version may commit", 1, results.count { it.isSuccess })
             assertEquals("stale concurrent edit must be rejected", 1, results.count { it.isFailure })
             assertTrue(file.readText() in setOf("first", "second"))
+            assertEquals("locking must leave no untracked files in a shared worktree",
+                listOf("shared.txt"), root.listFiles().orEmpty().map { it.name }.sorted())
         } finally {
             first.close()
             second.close()

@@ -33,10 +33,10 @@ def operate(request):
         # Shared-root mutations across independent agent activations/processes
         # must serialize their read/verify/commit sequences.
         if operation in ('write', 'edit'):
-            lock_descriptor = os.open('.agent-file-effects.lock',
-                os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600, dir_fd=parent)
-            if not stat.S_ISREG(os.fstat(lock_descriptor).st_mode):
-                raise ValueError('Invalid remote workspace mutation lock')
+            # Lock the root directory inode directly: a persistent lock-file
+            # would dirty a Git workspace and could be overwritten by an agent.
+            # dup keeps the root inode lock alive while traversing nested dirs.
+            lock_descriptor = os.dup(parent)
             fcntl.flock(lock_descriptor, fcntl.LOCK_EX)
         for part in parts[:-1]:
             if operation == 'write':
