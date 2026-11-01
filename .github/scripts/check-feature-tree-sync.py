@@ -259,8 +259,18 @@ def inspect():
             })
         if review_item.get("explicit_test_candidates", []) != registered_tests:
             raise ValueError("人工仪表测试真实来源和复核报告不一致")
-        if registered_tests and review_item.get("verification") != "具名源码及仪表测试声明存在（静态，未执行）":
-            raise ValueError("具名仪表测试未单独区分已执行和未执行")
+        if registered_tests:
+            mapped_tests = {
+                evidence for record in matrix["items"] if record["path"] == name
+                for evidence in record["evidence"]
+            }
+            registered_refs = {test["path"] + "#" + test["method"] for test in registered_tests}
+            if registered_refs.issubset(mapped_tests):
+                expected_grade = "真实测试映射及具名源码声明（静态）"
+            else:
+                expected_grade = "具名源码及仪表测试声明存在（静态，未执行）"
+            if review_item.get("verification") != expected_grade:
+                raise ValueError("人工测试已纳入可执行映射后证据等级未同步调整：" + name)
     if {r["path"] for r in reported if r.get("explicit_source_anchor")} != explicit_keys:
         raise ValueError("存在没有真实人工源文件依据的强化证据等级")
     # 工程工作流证据独立从真实YAML job段重算，不能仅凭全文件出现相同词语提升级别。
