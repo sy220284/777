@@ -70,7 +70,8 @@
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentWorkspaceScopePolicyTest.kt#nativeWritesRequireExplicitTaskScopeAndRejectSiblingOrParentEscapes",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentWorkspaceScopePolicyTest.kt#workScopeRejectsSymlinkAncestorAndUnscopableProcessCommands",
-        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#wrongCertificateOrConnectorTokenCannotContactTheModel"
+        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#wrongCertificateOrConnectorTokenCannotContactTheModel",
+        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt#twoRemoteActivationsCannotBothEditTheSameObservedVersion"
       ],
       "open_requirements": "所有工具执行端强权限及跨 Team/Fork 的独立工作树冲突回滚待验收",
       "full_acceptance": false
@@ -102,7 +103,8 @@
       "evidence": [
         "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#tlsToolEffectWritesOnlyTheServerWorkspaceAfterHostApproval",
         "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#wrongCertificateOrConnectorTokenCannotContactTheModel",
-        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#remoteWorkspaceOptInDoesNotFallBackToHostWhenServerHasNoEnvironment"
+        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#remoteWorkspaceOptInDoesNotFallBackToHostWhenServerHasNoEnvironment",
+        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt#twoRemoteActivationsCannotBothEditTheSameObservedVersion"
       ],
       "open_requirements": "设备授权、租约 fencing、断线未知副作用及恢复真实闭环待完成",
       "full_acceptance": false
