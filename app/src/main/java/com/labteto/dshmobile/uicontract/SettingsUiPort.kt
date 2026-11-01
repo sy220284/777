@@ -72,6 +72,8 @@ interface SettingsUiPort {
     suspend fun sessionStorageStatus(): LocalSessionStorageStatus
     suspend fun compactSessionStorage(): LocalSessionStorageStatus
     suspend fun exportSessionStorage(output: OutputStream): Long
+    /** Session SQLite, managed attachments and Media Studio DB plus verified originals. */
+    suspend fun exportCompleteSessionStorage(output: OutputStream): Long
     /** Validated missing sessions are restored at next app launch, never over live event logs. */
     suspend fun stageRestoreSessionStorage(archive: java.io.InputStream): Int
     suspend fun cancelStagedSessionRestore(): Boolean

@@ -15,6 +15,7 @@ import kotlinx.coroutines.*
 class AgentTlsBackend(
     private val host: String, private val port: Int, private val peerSha256: String,
     private val credential: String,
+    private val remoteTools: Boolean = false,
     private val requireGrantCurrent: suspend () -> Unit,
 ) : AgentTurnBackend {
     init {
@@ -66,7 +67,7 @@ class AgentTlsBackend(
                 events = services.events,
                 extend = services.extend,
             )
-            return AgentBackendProtocol.host(connection, request, checked)
+            return AgentBackendProtocol.host(connection, request.copy(remoteTools = remoteTools), checked, requireGrantCurrent)
         } finally { channel?.close(); socket.close(); connecting.cancel() }
     }
 }

@@ -269,9 +269,11 @@ internal fun WorkPendingToolRow(activity: com.labteto.dshmobile.local.presentati
 }
 
 @Composable
-internal fun WorkToolStatusNotice() {
+internal fun WorkToolStatusNotice(
+    message: String = "工具状态同步暂不可用，正在自动恢复；已保存的回复仍可查看",
+) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    Text("工具状态同步暂不可用，正在自动恢复；已保存的回复仍可查看",
+    Text(message,
         modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd),
         style = DsType.std14.withReadingWeight(), color = colors.warningInk)
 }

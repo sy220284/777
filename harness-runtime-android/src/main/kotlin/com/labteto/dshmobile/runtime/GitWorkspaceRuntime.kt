@@ -90,7 +90,7 @@ class GitWorkspaceRuntime(
                 access = if (mutates) ToolAccess.WORKSPACE_WRITE else ToolAccess.READ_ONLY,
                 approvalPolicy = if (mutates) ToolApprovalPolicy.ALWAYS else ToolApprovalPolicy.NEVER,
                 exposure = ToolExposure.OPTIONAL, timeoutMillis = 125_000L,
-                metadata = ToolMetadata(family = "文件", discoveryKeywords = setOf("worktree", "工作区", "隔离", "合并", "git"),
+                metadata = ToolMetadata(family = "文件", environmentBound = true, discoveryKeywords = setOf("worktree", "工作区", "隔离", "合并", "git"),
                     workspaceAccess = if (mutates) ToolWorkspaceAccess.WRITE else ToolWorkspaceAccess.READ),
                 executor = HarnessToolExecutor { toolContext, input, _ ->
                     currentCoroutineContext()[com.labteto.dshmobile.harness.capability.WorkspaceExecutionContext]?.let { scope ->

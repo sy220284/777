@@ -241,7 +241,7 @@ class LocalRuntimeStateStore internal constructor(
         resourceScheduler.withResource(
             HarnessResourceKind.MODEL_REQUEST,
             label,
-            block,
+            block = block,
         )
 
     @Synchronized

@@ -6,6 +6,9 @@ import android.os.Bundle
 import android.os.Debug
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
+import android.view.InputDevice
+import android.view.MotionEvent
 import android.view.FrameMetrics
 import android.view.Window
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,10 +22,6 @@ import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeDown
-import androidx.compose.ui.test.swipeUp
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
@@ -108,13 +107,35 @@ class DeviceScrollFrameAndMemoryTest {
         var peakJavaKb = (heap.totalMemory() - heap.freeMemory()) / 1024L
         var maxVisibleIndex = 0
         fun realSwipe(downwards: Boolean) {
-            // Inject through the tested Compose root so the gesture reaches the
-            // LazyColumn, rather than another emulator window or system overlay.
-            // The listener below still measures real Android Window frame metrics.
-            compose.onNodeWithTag("perf-real-work-timeline").performTouchInput {
-                if (downwards) swipeDown(durationMillis = 480)
-                else swipeUp(durationMillis = 480)
+            // Inject wall-clock paced touchscreen MotionEvents into Android's
+            // actual input dispatcher. Unlike a shell command returning EOF,
+            // each event has a synchronous acceptance receipt.
+            val x = (viewport.left + viewport.right) / 2f
+            val topY = viewport.top + viewport.height * 0.22f
+            val bottomY = viewport.top + viewport.height * 0.80f
+            val fromY = if (downwards) topY else bottomY
+            val toY = if (downwards) bottomY else topY
+            val downTime = SystemClock.uptimeMillis()
+            fun send(action: Int, y: Float) {
+                val event = MotionEvent.obtain(
+                    downTime, SystemClock.uptimeMillis(), action, x, y, 0,
+                ).apply { source = InputDevice.SOURCE_TOUCHSCREEN }
+                try {
+                    check(instrumentation.uiAutomation.injectInputEvent(event, true)) {
+                        "Android input dispatcher rejected real Work scroll action=$action"
+                    }
+                } finally {
+                    event.recycle()
+                }
             }
+            send(MotionEvent.ACTION_DOWN, fromY)
+            repeat(24) { step ->
+                SystemClock.sleep(20)
+                val fraction = (step + 1) / 24f
+                send(MotionEvent.ACTION_MOVE, fromY + (toY - fromY) * fraction)
+            }
+            SystemClock.sleep(20)
+            send(MotionEvent.ACTION_UP, toY)
         }
         try {
             repeat(16) { index ->
@@ -133,9 +154,9 @@ class DeviceScrollFrameAndMemoryTest {
         }
         val frames = synchronized(metrics) { metrics.toList() }
         assertTrue("Real scrolling never advanced the Work list: viewport=$viewport maxVisibleIndex=$maxVisibleIndex", maxVisibleIndex > 2)
-        // Compose's test clock drives synthetic swipes independently of the emulator's
-        // hardware renderer. A functional scroll is mandatory, but <60 real Window frames
-        // must NOT be reported as an FPS or jank measurement (nor fail a functional test).
+        // Wall-clock input generates real frame opportunities. Even then an emulator can
+        // drop FrameMetrics callbacks under host contention: never fabricate FPS/jank
+        // from fewer than 60 real frames and 40 valid VSYNC intervals.
         // A physical-device performance gate must require sample_quality=valid separately.
         val timing = frames.map { it.second }.filter { it > 0L }.sorted()
         val intervals = timing.zipWithNext { a, b -> b - a }
@@ -152,7 +173,8 @@ class DeviceScrollFrameAndMemoryTest {
         val output = String.format(Locale.US,
             "ANDROID_PERF api=%d scenario=work_timeline_scroll_frames samples=%d " +
                 "refresh_hz=%.1f observed_fps_p50=%s jank_pct=%s " +
-                "sample_quality=%s valid_vsync_intervals=%d max_visible_index=%d " +
+                "sample_quality=%s gesture_source=android_ui_automation_verified_touch " +
+                "valid_vsync_intervals=%d max_visible_index=%d " +
                 "peak_pss_kib=%d peak_java_used_kib=%d",
             Build.VERSION.SDK_INT, frames.size, refreshRate, observedFps, jankPct,
             if (validSample) "valid" else "insufficient", intervals.size, maxVisibleIndex,

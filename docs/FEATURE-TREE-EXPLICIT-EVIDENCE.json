@@ -652,10 +652,22 @@
           "symbols": [
             "projectLocalWorkHistoryPage"
           ]
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt",
+          "symbols": [
+            "LocalWorkEvidenceSheet"
+          ]
         }
       ],
-      "scope": "保留现行业务数据与端口，V6 原生页面消费；此处仅证明对应声明存在。",
-      "tests": []
+      "scope": "已核对 WorkReadUiPort、Work 历史投影、实际 LocalWorkEvidenceSheet 页面入口以及设备测试方法；设备结果、历史翻页和未知副作用展示仍须按当前 HEAD 实测。",
+      "tests": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheetTest.kt",
+          "method": "olderPageIsReachableAndUnknownOutcomeKeepsItsMeaning",
+          "references": "LocalWorkEvidenceSheet"
+        }
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 交付要求与真实成果事件来源绑定",

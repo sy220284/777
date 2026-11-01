@@ -34,3 +34,10 @@ for phase in stage resume; do
   fi
 done
 echo "CROSS_PROCESS_RESTORE_OK fresh_process_activated_pending_restore=true"
+
+# Pair the two genuine separately executed phases with the original all-suite
+# instrumentation receipts; preserve assumption-skip semantics until both pass.
+api="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
+python3 .github/scripts/report-android-feature-evidence.py \
+  .ci/android-instrumentation-result.txt "$api" \
+  --cross-process-restore-dir "$root"

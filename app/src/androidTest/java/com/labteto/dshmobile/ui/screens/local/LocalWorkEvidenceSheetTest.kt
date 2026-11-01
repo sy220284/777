@@ -14,6 +14,7 @@ import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 import com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi
+import com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor
 import com.labteto.dshmobile.local.presentation.LocalWorkHistoryRecord
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
 import com.labteto.dshmobile.ui.theme.DshTheme
@@ -80,6 +81,42 @@ class LocalWorkEvidenceSheetTest {
         }
     }
 
+    @Test fun olderPageIsReachableAndUnknownOutcomeKeepsItsMeaning() {
+        val older = LocalWorkHistoryCursor("archive-identity", 1L, 90L)
+        val current = LocalWorkHistoryRecord(
+            sequence = 90L, type = "tool/result", name = "read",
+            content = "副作用结果未知", callId = "unknown-90", artifacts = emptyList(),
+            phase = LocalToolUiPhase.OUTCOME_UNKNOWN,
+        )
+        val historical = LocalWorkHistoryRecord(
+            sequence = 20L, type = "tool/result", name = "write",
+            content = "更早的结果未知", callId = "unknown-20", artifacts = emptyList(),
+            phase = LocalToolUiPhase.OUTCOME_UNKNOWN,
+        )
+        val pages = AtomicInteger(0)
+        openFromMenu(actions(historyPages = { cursor ->
+            pages.incrementAndGet()
+            if (cursor == null) LocalWorkHistoryPageUi(listOf(current), older)
+            else {
+                assertEquals(older, cursor)
+                LocalWorkHistoryPageUi(listOf(historical), null)
+            }
+        }))
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithTag("work_evidence_older").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("work_evidence_older").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("#20 · write").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.runOnIdle { assertEquals(2, pages.get()) }
+        val unknown = InstrumentationRegistry.getInstrumentation().targetContext
+            .getString(R.string.work_tool_unknown)
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText(unknown).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     private fun openFromMenu(actions: LocalWorkFeatureUiActions) {
         val opened = mutableStateOf(false)
         compose.setContent {
@@ -109,6 +146,9 @@ class LocalWorkEvidenceSheetTest {
         records: List<LocalWorkHistoryRecord> = emptyList(),
         activities: List<LocalToolActivityUiItem> = emptyList(),
         previewReads: AtomicInteger = AtomicInteger(),
+        historyPages: (LocalWorkHistoryCursor?) -> LocalWorkHistoryPageUi = {
+            LocalWorkHistoryPageUi(records, null)
+        },
     ) = LocalWorkFeatureUiActions(
         workState = MutableStateFlow(LocalWorkUiState(sessionId = "work-1")),
         workspaceFiles = { emptyList() },
@@ -119,10 +159,12 @@ class LocalWorkEvidenceSheetTest {
         artifactRevision = { null },
         refreshArtifactFiles = { _, files -> files },
         inspectArtifact = { _, artifact -> artifact },
-        historyPage = { _, _ -> LocalWorkHistoryPageUi(records, null) },
+        historyPage = { _, cursor -> historyPages(cursor) },
         toolActivities = { activities },
         toolEvidence = { _, _, _ -> null },
         requirementEvidence = { emptyList() },
         linkRequirementEvidence = { _, _, _ -> true },
+        eventChanges = { MutableStateFlow(0L) },
+        artifactFileChanges = { _, _ -> kotlinx.coroutines.flow.emptyFlow() },
     )
 }

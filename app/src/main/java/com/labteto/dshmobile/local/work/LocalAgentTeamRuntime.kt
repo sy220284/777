@@ -729,6 +729,32 @@ internal class LocalAgentTeamRuntime(
         messageBus.sendMessage(sessionId, member.name, message)
     }
 
+    /** Shared AgentControl addresses the original Job, while Team retains all membership effects. */
+    // FEATURE_TREE: {"id":"work.agent-control.team-stop","path":"第一层｜产品功能与界面 / 工作功能 / 团队协作 / 按原 Job 身份统一中断与关闭 Team 成员（PR #874）","entry":"stopOwnedAgentJob","owner":"WORK","test":"app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#genericTeamStopUsesExactJobAndPreservesInterruptVersusClose"}
+    internal suspend fun stopOwnedAgentJob(sessionId: String, agentId: String, permanently: Boolean): String {
+        val caller = requireNotNull(currentCoroutineContext()[com.labteto.dshmobile.harness.agent.AgentRunExecutionContext]) {
+            "AGENT_CONTROL_CALLER_REQUIRED"
+        }
+        caller.requireCurrent(sessionId)
+        val parent = com.labteto.dshmobile.local.agent.captureLocalAgentParentLink()
+        awaitProjection(sessionId)
+        currentCoroutineContext().ensureActive()
+        return caller.commitCurrent(sessionId) {
+            synchronized(commandLock) {
+                val registration = requireAgentRegistration(jobs.agentRegistrations(sessionId), sessionId, agentId)
+                validateImmediateAgentParentForLoad(projectLocalAgentResidency(registration).recordedParent, parent, sessionId)
+                synchronizeTeamRuntime(sessionId)
+                val member = project(sessionId).members.singleOrNull { it.jobId == agentId }
+                    ?: error("TEAM_MEMBER_EXPIRED：原成员执行身份已改变")
+                if (permanently) memberLifecycle.dismissMember(sessionId, member.name)
+                else {
+                    require(member.phase == LocalTeamMemberPhase.ACTIVE) { "TEAM_MEMBER_NOT_ACTIVE" }
+                    jobs.interruptContinuableAgent(agentId, sessionId)
+                }
+            }
+        }
+    }
+
     internal fun interruptUiMember(sessionId: String, memberId: String, expectedJobId: String? = null): String = synchronized(commandLock) {
         synchronizeTeamRuntime(sessionId)
         val member = project(sessionId).members.singleOrNull {

@@ -245,7 +245,9 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 val path = args.string("path")
                 workspace.requireFreshObservation(path)
                 withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
-                    HarnessResourceKind.FILE_IO, "tool:edit"
+                    HarnessResourceKind.FILE_IO, "tool:edit",
+                    units = com.labteto.dshmobile.harness.resource.harnessFileIoUnitsForBytes(
+                        workspace.fileSizeForResourceBudget(path)),
                 ) {
                     runInterruptible(Dispatchers.IO) {
                         workspace.edit(path, args.string("old_text"), args.string("new_text"))

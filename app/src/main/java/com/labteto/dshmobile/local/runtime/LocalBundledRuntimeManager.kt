@@ -23,26 +23,32 @@ class LocalBundledRuntimeManager @Inject internal constructor(
         (node.searchPaths() + python.searchPaths() + git.searchPaths())
             .distinctBy { it.path }
 
-    fun environment(): Map<String, String> {
-        val environments = listOf(python.environment(), node.environment(), git.environment())
-        val libraryPaths = environments
-            .mapNotNull { it["LD_LIBRARY_PATH"] }
-            .flatMap { value -> value.split(File.pathSeparatorChar) }
-            .filter(String::isNotBlank)
-            .distinct()
-        return buildMap {
-            environments.forEach { environment ->
-                environment.forEach { (key, value) ->
-                    if (key != "LD_LIBRARY_PATH") put(key, value)
-                }
-            }
-            if (libraryPaths.isNotEmpty()) {
-                put("LD_LIBRARY_PATH", libraryPaths.joinToString(File.pathSeparator))
-            }
-        }
-    }
+    fun environment(): Map<String, String> = mergeBundledRuntimeEnvironments(
+        listOf(python.environment(), node.environment(), git.environment()),
+    )
 
     fun statuses(): List<String> = listOf(node.status(), python.status(), git.status())
+}
+
+
+/** Keep every bundled ELF dependency search root, without dropping higher-priority env keys. */
+internal fun mergeBundledRuntimeEnvironments(environments: List<Map<String, String>>): Map<String, String> {
+    val libraryPaths = environments.asSequence()
+        .mapNotNull { it["LD_LIBRARY_PATH"] }
+        .flatMap { value -> value.split(File.pathSeparatorChar).asSequence() }
+        .filter(String::isNotBlank)
+        .distinct()
+        .toList()
+    return buildMap {
+        environments.forEach { environment ->
+            environment.forEach { (key, value) ->
+                if (key != "LD_LIBRARY_PATH") put(key, value)
+            }
+        }
+        if (libraryPaths.isNotEmpty()) {
+            put("LD_LIBRARY_PATH", libraryPaths.joinToString(File.pathSeparator))
+        }
+    }
 }
 
 internal fun localSharedStorageRoots(): List<File> = listOfNotNull(

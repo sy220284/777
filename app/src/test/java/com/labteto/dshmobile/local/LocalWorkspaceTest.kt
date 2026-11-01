@@ -13,6 +13,15 @@ import org.junit.Before
 import org.junit.Test
 
 class LocalWorkspaceTest {
+    @Test
+    fun resourceSizeUsesSandboxIdentityAndRejectsOutsideFiles() {
+        val target = root.resolve("large-budget.txt").apply { writeText("abc") }
+        assertEquals(target.length(), workspace.fileSizeForResourceBudget("large-budget.txt"))
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.fileSizeForResourceBudget("../outside-file")
+        }
+    }
+
     private lateinit var root: java.io.File
     private var external: java.io.File? = null
     private lateinit var workspace: LocalWorkspace

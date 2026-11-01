@@ -28,7 +28,7 @@ internal class LocalMediaStudioBackupInstaller(
     private val context: Context,
     private val json: Json,
 ) {
-    fun install(staging: File): Int {
+    fun install(staging: File, retainStaging: Boolean = false): Int {
         val database = context.getDatabasePath("local_media_v1.db")
         val cleanup = File(staging.parentFile, ".installed-${staging.name}")
         // Renaming a fully installed stage is the commit boundary. After that,
@@ -43,33 +43,7 @@ internal class LocalMediaStudioBackupInstaller(
             return count
         }
         val archive = LocalMediaStudioBackupSnapshot(context, json).validate(staging)
-        val targetMedia = File(context.filesDir, "media-studio")
-        check(!Files.isSymbolicLink(staging.toPath()) &&
-            !Files.isSymbolicLink(context.filesDir.toPath()) &&
-            !Files.isSymbolicLink(database.parentFile.toPath()) &&
-            !Files.isSymbolicLink(targetMedia.toPath())) {
-            "媒体恢复目标目录不安全"
-        }
-        // A normal Studio database may contain uncheckpointed WAL business receipts.
-        // Never open/checkpoint/discard them as part of a destructive restore attempt.
-        check(!File(database.path + "-wal").exists() &&
-            !File(database.path + "-shm").exists()) {
-            "目标媒体数据库仍有 WAL/SHM，拒绝覆盖已有创作事实"
-        }
-        if (Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)) check(
-            Files.isRegularFile(database.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-                sameBytes(database, archive.database)
-        ) { "目标媒体数据库已有不同创作记录，禁止恢复覆盖" }
-
-        val pairs = archive.mediaFiles.map { it to File(targetMedia, it.name) }
-        // Before writing anything, reject every conflicting original. No partial
-        // installation can follow from a known conflict in a later item.
-        pairs.forEach { (original, destination) ->
-            if (Files.exists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) check(
-                Files.isRegularFile(destination.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-                    sameBytes(original, destination)
-            ) { "目标已有不同内容的付费成果：${destination.name}" }
-        }
+        val (targetMedia, pairs) = preflightTargets(archive, staging)
         check(database.parentFile?.let { it.isDirectory || it.mkdirs() } == true) {
             "无法建立媒体 SQLite 恢复目录"
         }
@@ -107,7 +81,8 @@ internal class LocalMediaStudioBackupInstaller(
             }
         }
         DurableFileCommit.syncDirectory(targetMedia)
-        if (!Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+        if (!sameBytes(database, archive.database)) {
+            val replacingEmpty = Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)
             val temp = File(database.parentFile, database.name + ".restore-${UUID.randomUUID()}")
             try {
                 archive.database.inputStream().buffered().use { input ->
@@ -119,11 +94,17 @@ internal class LocalMediaStudioBackupInstaller(
                 check(sameBytes(archive.database, temp)) {
                     "媒体数据库恢复临时文件校验失败"
                 }
-                check(!Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-                    !File(database.path + "-wal").exists()) {
-                    "媒体数据库恢复期间出现已有数据，停止覆盖"
+                // A user may have opened an otherwise empty Media Studio before importing.
+                // Replace that strictly empty, migrated database only at the startup
+                // restore boundary; any intervening creation must block replacement.
+                check(!File(database.path + "-wal").exists() &&
+                    !File(database.path + "-shm").exists() &&
+                    if (replacingEmpty) isPristineEmptyDatabase(database)
+                    else !Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                    "媒体数据库恢复期间出现已有创作数据，停止覆盖"
                 }
-                Files.move(temp.toPath(), database.toPath())
+                Files.move(temp.toPath(), database.toPath(), StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING)
             } finally { if (temp.exists()) temp.delete() }
         }
         check(sameBytes(database, archive.database)) {
@@ -131,12 +112,83 @@ internal class LocalMediaStudioBackupInstaller(
         }
         DurableFileCommit.syncDirectory(requireNotNull(database.parentFile))
         val restoredCount = installedCount(database)
+        // Combined archive owns the outer durable marker: retain all verified
+        // source bytes until its Session databases also commit successfully.
+        if (retainStaging) return restoredCount
         Files.move(staging.toPath(), cleanup.toPath(), StandardCopyOption.ATOMIC_MOVE)
         DurableFileCommit.syncDirectory(requireNotNull(cleanup.parentFile))
         check(cleanup.deleteRecursively()) { "媒体已恢复，残留目录清理未完成，可再次清理" }
         DurableFileCommit.syncDirectory(requireNotNull(cleanup.parentFile))
         return restoredCount
     }
+
+
+    /**
+     * Validate live targets before accepting a full restore plan. Import staging must
+     * reject a conflicting Studio database or paid original now, rather than
+     * making the next process startup fail after the user has already rebooted.
+     */
+    fun validateDestination(staging: File) {
+        val archive = LocalMediaStudioBackupSnapshot(context, json).validate(staging)
+        preflightTargets(archive, staging)
+    }
+
+    private fun preflightTargets(
+        archive: LocalMediaStudioBackupSnapshot.Prepared,
+        staging: File,
+    ): Pair<File, List<Pair<File, File>>> {
+        val database = context.getDatabasePath("local_media_v1.db")
+        val targetMedia = File(context.filesDir, "media-studio")
+        check(!Files.isSymbolicLink(staging.toPath()) &&
+            !Files.isSymbolicLink(context.filesDir.toPath()) &&
+            !Files.isSymbolicLink(database.parentFile.toPath()) &&
+            !Files.isSymbolicLink(targetMedia.toPath())) {
+            "媒体恢复目标目录不安全"
+        }
+        // A normal Studio database may contain uncheckpointed WAL business receipts.
+        // Never open/checkpoint/discard them as part of a destructive restore attempt.
+        check(!File(database.path + "-wal").exists() &&
+            !File(database.path + "-shm").exists()) {
+            "目标媒体数据库仍有 WAL/SHM，拒绝覆盖已有创作事实"
+        }
+        if (Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            check(Files.isRegularFile(database.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+                (sameBytes(database, archive.database) || isPristineEmptyDatabase(database))) {
+                "目标媒体数据库已有不同创作记录，禁止恢复覆盖"
+            }
+        }
+
+        val pairs = archive.mediaFiles.map { it to File(targetMedia, it.name) }
+        // Before writing anything, reject every conflicting original. No partial
+        // installation can follow from a known conflict in a later item.
+        pairs.forEach { (original, destination) ->
+            if (Files.exists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) check(
+                Files.isRegularFile(destination.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+                    sameBytes(original, destination)
+            ) { "目标已有不同内容的付费成果：${destination.name}" }
+        }
+        return targetMedia to pairs
+    }
+
+    /** A first-launch Media Store may already own an empty migrated SQLite file.
+     * The metadata and full table must be pristine; never erase a single user receipt.
+     * Called only when WAL/SHM are absent, so no hidden committed rows are overlooked.
+     */
+    private fun isPristineEmptyDatabase(database: File): Boolean =
+        SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            LocalMediaDatabase.validateBackupStructure(db)
+            val healthy = db.rawQuery("PRAGMA quick_check", null).use { rows ->
+                rows.moveToFirst() && rows.getString(0) == "ok"
+            }
+            check(healthy) { "现有媒体数据库完整性校验失败，禁止覆盖" }
+            val migratedOnly = db.rawQuery("SELECT id,value FROM metadata", null).use { rows ->
+                rows.moveToFirst() && rows.getString(0) == "migrated" &&
+                    rows.getString(1) == "1" && !rows.moveToNext()
+            }
+            migratedOnly && db.rawQuery("SELECT 1 FROM media LIMIT 1", null).use { rows ->
+                !rows.moveToFirst()
+            }
+        }
 
     private fun installedCount(database: File): Int = SQLiteDatabase.openDatabase(
         database.path, null, SQLiteDatabase.OPEN_READONLY,

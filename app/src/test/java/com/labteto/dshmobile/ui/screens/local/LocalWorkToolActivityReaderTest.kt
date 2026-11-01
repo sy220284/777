@@ -5,10 +5,45 @@ import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.cancelAndJoin
 import org.junit.Assert.*
 import org.junit.Test
 
 class LocalWorkToolActivityReaderTest {
+    @Test fun committedRevisionsWakeReadersWithoutTimerPolling() = runBlocking {
+        val revisions = MutableStateFlow(0L)
+        val observed = Channel<Long>(Channel.UNLIMITED)
+        var sequence = 10L
+        var reads = 0
+        val reader = LocalWorkToolActivityReader(
+            sequence = { sequence },
+            activities = { reads++; emptyList() },
+        )
+        val collector = launch(start = CoroutineStart.UNDISPATCHED) {
+            observeWorkToolActivityChanges(revisions, reader) { result ->
+                if (result is LocalWorkToolActivityRead.Available) observed.send(sequence)
+            }
+        }
+        try {
+            withTimeout(5_000) { assertEquals(10L, observed.receive()) }
+            assertEquals(1, reads)
+            sequence = 11L
+            revisions.value = 1L
+            withTimeout(5_000) { assertEquals(11L, observed.receive()) }
+            assertEquals(2, reads)
+            // There is no periodic wake-up between EventLog commits.
+        } finally {
+            collector.cancelAndJoin()
+            observed.close()
+        }
+    }
+
     @Test fun workToolReaderWaitsForStartupRestoreAndValidSession() {
         assertFalse(shouldReadWorkToolStatus(LocalUsageMode.WORK, loading = true, sessionId = "fresh-session"))
         assertFalse(shouldReadWorkToolStatus(LocalUsageMode.WORK, loading = false, sessionId = ""))

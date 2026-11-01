@@ -19,6 +19,47 @@ import org.junit.Test
 
 class HarnessResourceSchedulerTest {
     @Test
+    fun weightedLargeFileReservesCapacityAndReleasesItExactlyOnce() = runTest {
+        val scheduler = HarnessResourceScheduler(
+            HarnessResourceBudget(maxModelRequests = 2, maxAgents = 2, maxFileIo = 2),
+        )
+        val heavy = scheduler.acquire(HarnessResourceKind.FILE_IO, "large-export", units = 2)
+        assertEquals(1, scheduler.snapshot().activeFileIo)
+        assertEquals(2, scheduler.snapshot().activeUnits[HarnessResourceKind.FILE_IO])
+        assertEquals(HarnessResourcePressure.HIGH, scheduler.snapshot().pressure)
+
+        val pending = async { scheduler.acquire(HarnessResourceKind.FILE_IO, "small-preview") }
+        runCurrent()
+        assertFalse(pending.isCompleted)
+        heavy.close()
+        heavy.close()
+        val small = pending.await()
+        assertEquals(1, scheduler.snapshot().activeUnits[HarnessResourceKind.FILE_IO])
+        small.close()
+        assertEquals(0, scheduler.snapshot().activeUnits[HarnessResourceKind.FILE_IO])
+        assertTrue(scheduler.snapshot().leases.isEmpty())
+    }
+
+    @Test
+    fun adaptiveDownsizingDoesNotDeadlockHeavyFileRequests() = runTest {
+        val scheduler = HarnessResourceScheduler(
+            HarnessResourceBudget(maxModelRequests = 2, maxAgents = 2, maxFileIo = 2),
+        )
+        scheduler.updateBudget(HarnessResourceBudget(maxModelRequests = 1, maxAgents = 1, maxFileIo = 1))
+        val acquired = scheduler.acquire(HarnessResourceKind.FILE_IO, "large-import", units = 2)
+        assertEquals(1, acquired.info.units)
+        assertEquals(1, scheduler.snapshot().activeUnits[HarnessResourceKind.FILE_IO])
+        acquired.close()
+    }
+
+    @Test
+    fun sizeClassChangesOnlyAtTheLargeTransferThreshold() {
+        assertEquals(1, harnessFileIoUnitsForBytes(0))
+        assertEquals(1, harnessFileIoUnitsForBytes(64L * 1024 * 1024 - 1))
+        assertEquals(2, harnessFileIoUnitsForBytes(64L * 1024 * 1024))
+    }
+
+    @Test
     fun fileAndMediaAdmissionUseIndependentBoundedLeases() = runTest {
         val scheduler = HarnessResourceScheduler(
             HarnessResourceBudget(maxModelRequests = 2, maxAgents = 2, maxFileIo = 1, maxMediaDecode = 1),
@@ -308,6 +349,59 @@ class HarnessResourceSchedulerTest {
         granted.forEach { it.close() }
         held.close()
         assertEquals(0, scheduler.snapshot().activeAgents)
+    }
+
+
+    @Test
+    fun interactiveFilePreviewOvertakesQueuedExportWithoutLosingBackgroundWork() = runTest {
+        val scheduler = HarnessResourceScheduler(
+            HarnessResourceBudget(maxModelRequests = 1, maxAgents = 1, maxFileIo = 1),
+        )
+        val held = scheduler.acquire(HarnessResourceKind.FILE_IO, "holder")
+        val order = mutableListOf<String>()
+        val export = async {
+            scheduler.withResource(HarnessResourceKind.FILE_IO, "large-export",
+                priority = HarnessResourcePriority.BACKGROUND) { order += "export" }
+        }
+        runCurrent()
+        val preview = async {
+            scheduler.withResource(HarnessResourceKind.FILE_IO, "file-preview",
+                priority = HarnessResourcePriority.INTERACTIVE) { order += "preview" }
+        }
+        runCurrent()
+        assertEquals(2, scheduler.snapshot().queuedByKind[HarnessResourceKind.FILE_IO])
+        held.close()
+        preview.await()
+        export.await()
+        assertEquals(listOf("preview", "export"), order)
+        assertTrue(scheduler.snapshot().leases.isEmpty())
+    }
+
+    @Test
+    fun backgroundQueueHeadCannotBeStarvedByContinuousInteractiveAdmissions() = runTest {
+        val scheduler = HarnessResourceScheduler(
+            HarnessResourceBudget(maxModelRequests = 1, maxAgents = 1),
+        )
+        val held = scheduler.acquire(HarnessResourceKind.MODEL_REQUEST, "holder")
+        val order = mutableListOf<String>()
+        val background = async {
+            scheduler.withResource(HarnessResourceKind.MODEL_REQUEST, "background",
+                priority = HarnessResourcePriority.BACKGROUND) { order += "background" }
+        }
+        runCurrent()
+        val interactive = (0..9).map { id ->
+            async {
+                scheduler.withResource(HarnessResourceKind.MODEL_REQUEST, "interactive-$id",
+                    priority = HarnessResourcePriority.INTERACTIVE) { order += "interactive-$id" }
+            }
+        }
+        runCurrent()
+        held.close()
+        background.await()
+        interactive.forEach { it.await() }
+        assertEquals(3, order.indexOf("background"))
+        assertEquals(11, order.size)
+        assertTrue(scheduler.snapshot().leases.isEmpty())
     }
 
     @Test

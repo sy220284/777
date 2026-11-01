@@ -23,7 +23,8 @@ class SqliteSessionEventDatabase(
     private val json: Json,
     name: String = "local_session_events_v1.db",
     private val clock: () -> Long = System::currentTimeMillis,
-) : SQLiteOpenHelper(context, name, null, 4) {
+) : SQLiteOpenHelper(context, name, null, 5) {
+    private val searchBlockIndex = SqliteSessionSearchBlockIndex(json)
     init { setWriteAheadLoggingEnabled(true) }
 
     override fun onConfigure(db: SQLiteDatabase) {
@@ -53,10 +54,11 @@ class SqliteSessionEventDatabase(
         createCheckpointTable(db)
         createVisibleEventIndex(db)
         SqliteLocalAssetCatalog.createSchema(db)
+        searchBlockIndex.createSchema(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        require(oldVersion in 1..3 && newVersion == 4) {
+        require(oldVersion in 1..4 && newVersion == 5) {
             "不支持的会话事件数据库版本：$oldVersion -> $newVersion"
         }
         // Idempotent even if an older pilot schema omitted this table.
@@ -83,6 +85,7 @@ class SqliteSessionEventDatabase(
         }
         createVisibleEventIndex(db)
         SqliteLocalAssetCatalog.createSchema(db)
+        searchBlockIndex.createSchema(db)
     }
 
     private fun createVisibleEventIndex(db: SQLiteDatabase) {
@@ -171,6 +174,9 @@ class SqliteSessionEventDatabase(
                 )
                 SessionEvent(sequence, type, createdAt, payload)
             }
+            // The block index is derived and commits with its EventLog sequence.
+            // A killed process can never publish indexed content without its facts.
+            searchBlockIndex.appended(database, sessionId, startSequence, written)
             database.setTransactionSuccessful()
             return written
         } finally {
@@ -629,20 +635,32 @@ class SqliteSessionEventDatabase(
 
     fun search(sessionId: String, query: String, limit: Int, afterSequence: Long): String {
         require(query.isNotBlank()) { "搜索内容不能为空" }
+        validateSessionId(sessionId)
+        // Historical v4 events are indexed once on demand; new writes index in
+        // the EventLog transaction. This index can be discarded and rebuilt.
+        val mutation = SqliteSessionConsistencyGate.acquireMutation()
+        try {
+            searchBlockIndex.ensureIndexed(writableDatabase, sessionId)
+        } finally { mutation.unlock() }
+        val fallback = {
+            readableDatabase.rawQuery(
+                "SELECT sequence,event_type,created_at,schema_version,payload " +
+                    "FROM session_events WHERE session_id=? AND sequence>? ORDER BY sequence ASC",
+                arrayOf(sessionId, afterSequence.toString()),
+            )
+        }
         val matches = mutableListOf<String>()
         val budget = 32 * 1024
         var used = 0
         var lastSequence = afterSequence
         var more = false
-        validateSessionId(sessionId)
-        readableDatabase.rawQuery(
-            "SELECT sequence,event_type,created_at,schema_version,payload " +
-                "FROM session_events WHERE session_id=? AND sequence>? ORDER BY sequence ASC",
-            arrayOf(sessionId, afterSequence.toString()),
-        ).use { rows ->
+        (searchBlockIndex.candidates(readableDatabase, sessionId, query, afterSequence)
+            ?: fallback()).use { rows ->
             while (rows.moveToNext()) {
                 val event = readEvent(rows)
                 val encoded = json.encodeToString(SessionEvent.serializer(), event)
+                // Grams are only an accelerator. Verify the exact existing
+                // substring semantics, including case-folding and JSON escaping.
                 if (!encoded.contains(query, ignoreCase = true)) continue
                 if (matches.size >= limit.coerceIn(1, 200) || used >= budget) {
                     more = true
@@ -662,6 +680,14 @@ class SqliteSessionEventDatabase(
         if (matches.isEmpty()) return "未找到会话事件"
         return matches.joinToString("\n") +
             if (more) "\n[结果已分页；继续调用 session_event_search，并传 after_sequence=$lastSequence]" else ""
+    }
+
+    /** Maintenance-only: discard and rebuild the derivative, never touch facts. */
+    internal fun rebuildSearchIndex(sessionId: String) {
+        validateSessionId(sessionId)
+        val mutation = SqliteSessionConsistencyGate.acquireMutation()
+        try { searchBlockIndex.rebuild(writableDatabase, sessionId) }
+        finally { mutation.unlock() }
     }
 
     fun tail(sessionId: String, limit: Int): String {

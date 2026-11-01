@@ -2440,6 +2440,46 @@ class LocalAgentTeamRuntimeTest {
         assertEquals("result-end", second.messages.single().id)
     }
 
+    @Test fun genericTeamStopUsesExactJobAndPreservesInterruptVersusClose() = runBlocking {
+        val session = "generic-team-control"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        startLiveChild(f, session)
+        val owners = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
+        val identity = com.labteto.dshmobile.harness.agent.AgentRunIdentity(session, "work", "root-run")
+        owners.claim(identity) { }
+        kotlinx.coroutines.withContext(owners.executionContext(identity)) {
+            f.runtime.stopOwnedAgentJob(session, "job-team-1", permanently = false)
+            assertEquals("interrupted", f.jobs.snapshotInfos().single { it.id == "job-team-1" }.status)
+            assertEquals(LocalTeamMemberPhase.ACTIVE, f.runtime.project(session).members.single().phase)
+            f.runtime.stopOwnedAgentJob(session, "job-team-1", permanently = true)
+        }
+        assertEquals(LocalTeamMemberPhase.DISMISSED, f.runtime.project(session).members.single().phase)
+        assertTrue(f.jobs.snapshotInfos().single { it.id == "job-team-1" }.status in setOf("cancelled", "killed"))
+    }
+
+    @Test fun genericTeamStopRejectsForeignAndDisplacedParentBeforeEffects() = runBlocking {
+        val session = "generic-team-fence"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        startLiveChild(f, session)
+        val owners = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
+        val identity = com.labteto.dshmobile.harness.agent.AgentRunIdentity(session, "work", "root-old")
+        owners.claim(identity) { }
+        owners.claim(identity.copy(runId = "root-new")) { }
+        val stale = runCatching { kotlinx.coroutines.withContext(owners.executionContext(identity)) {
+            f.runtime.stopOwnedAgentJob(session, "job-team-1", permanently = true)
+        } }
+        assertTrue(stale.isFailure)
+        val foreign = identity.copy(sessionId = "foreign")
+        owners.claim(foreign) { }
+        assertTrue(runCatching { kotlinx.coroutines.withContext(owners.executionContext(foreign)) {
+            f.runtime.stopOwnedAgentJob(session, "job-team-1", permanently = false)
+        } }.isFailure)
+        assertEquals("running", f.jobs.snapshotInfos().single { it.id == "job-team-1" }.status)
+        assertEquals(LocalTeamMemberPhase.ACTIVE, f.runtime.project(session).members.single().phase)
+    }
+
     private fun teamBinding(fixture: Fixture, session: String) = LocalWorkRunBinding(
         sessionId = session,
         initialState = LocalHarnessState(sessionId = session, usageMode = LocalUsageMode.WORK).toLocalWorkRunState(),

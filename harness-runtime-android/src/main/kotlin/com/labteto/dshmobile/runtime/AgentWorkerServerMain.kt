@@ -21,7 +21,12 @@ suspend fun main(args: Array<String>) {
     val port = environment["DSH_AGENT_PORT"]?.toInt() ?: 8443
     val address = InetAddress.getByName(environment["DSH_AGENT_BIND"] ?: "127.0.0.1")
     val socket = context.serverSocketFactory.createServerSocket(port, 50, address) as SSLServerSocket
-    val server = AgentTlsWorkerServer(socket, credential, environment["DSH_AGENT_MAX_ACTIVATIONS"]?.toInt() ?: 8)
+    val workspace = environment["DSH_AGENT_WORKSPACE"]?.let { java.io.File(it) }
+    val environmentFactory: (suspend (com.labteto.dshmobile.harness.agent.AgentBackendRequest) ->
+        com.labteto.dshmobile.harness.agent.AgentEnvironmentTools)? =
+        if (workspace == null) null else { _ -> AgentWorkspaceEnvironment.create(workspace) }
+    val server = AgentTlsWorkerServer(socket, credential, environment["DSH_AGENT_MAX_ACTIVATIONS"]?.toInt() ?: 8,
+        environmentFactory = environmentFactory)
     val identity = keys.aliases().toList().filter { keys.isKeyEntry(it) }.single()
     val pin = MessageDigest.getInstance("SHA-256").digest(keys.getCertificateChain(identity).first().encoded)
         .joinToString("") { "%02x".format(it) }

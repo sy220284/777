@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "snapshot": "970b41ada267",
+  "snapshot": "14e718b478ab",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1893,
-  "production_sources_scanned": 1113,
-  "feature_nodes": 549,
-  "functional_leaves": 453,
-  "existing_executable_test_mappings": 121,
+  "code_files_scanned": 1910,
+  "production_sources_scanned": 1117,
+  "feature_nodes": 553,
+  "functional_leaves": 456,
+  "existing_executable_test_mappings": 271,
   "leaf_evidence": [
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 本机聊天／工作模式切换",
@@ -43,8 +43,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生首页：唯一新建入口，未开始编辑器不生成正式会话记录，未发送草稿独立保留与恢复",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -59,6 +59,7 @@
         "separate_product_entry": false,
         "production_sources_confirmed": 2,
         "test_methods_confirmed": 1,
+        "unavailable_test_sources": [],
         "explanation": "恢复到 V6 原生输入器的会话级草稿、附件恢复与隔离机制已有生产源码和单测；空白会话是否产生正式记录及全流程冷启动效果还需要设备验收，不能以静态入口作为通过证明。"
       }
     },
@@ -106,8 +107,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 加号统一能力入口",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "源码入口及处理分支已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
@@ -158,8 +159,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生功能路由与页面恢复校验",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -167,15 +168,7 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": [],
-      "followup": {
-        "kind": "native_v6_route_invariant",
-        "availability": "code_and_tests_present_execution_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 1,
-        "test_methods_confirmed": 1,
-        "explanation": "原 UI 3.0 的场景包兼容检查已退役；目前由 V6 原生 LocalFeatureCatalog 确认每个功能路由与模块归属，已有源码与单测。真实页面操作、系统返回和导航恢复需独立设备验证。"
-      }
+      "workflow_evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 新建、切换与搜索会话",
@@ -274,8 +267,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 运行中、排队中、拒绝发送的反馈",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "源码入口及处理分支已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
@@ -321,8 +314,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 会话列表和历史读取按单会话故障隔离",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"
@@ -336,8 +329,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送、分支与交互端口（迁移中）",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -345,20 +338,12 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": [],
-      "followup": {
-        "kind": "ui_contract_migration_slice",
-        "availability": "code_and_tests_present_execution_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 1,
-        "test_methods_confirmed": 1,
-        "explanation": "生产端口接入 V6/Next 的文本与附件发送、编辑、重生成、停止、Chat 分支及 Work 审批/提问；业务准入仍由原 Owner 执行。完整 Feature 端口及真实双包旅程尚未完成。"
-      }
+      "workflow_evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -366,20 +351,12 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": [],
-      "followup": {
-        "kind": "ui_contract_migration_slice",
-        "availability": "code_and_tests_present_execution_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 2,
-        "test_methods_confirmed": 1,
-        "explanation": "本地交互模板构造器已迁入 App 并由 V6 原生交互文档控制器接入；现有测试验证文档 Owner 的来源身份，模型不具备覆盖权。完整设备交互与每类模板内容仍需进一步验收。"
-      }
+      "workflow_evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 原回复内交互卡片（迁移中）",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -387,15 +364,7 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": [],
-      "followup": {
-        "kind": "ui_contract_migration_slice",
-        "availability": "code_and_tests_present_execution_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 3,
-        "test_methods_confirmed": 1,
-        "explanation": "Chat单聊/群聊与Work从原回复抽取封闭卡片，经原Session日志存储和恢复；原生确认文本后交原会话Owner发送。自动卡不增加模型调用，不授予工具/支付/审批权限。实际设备和完整跨包恢复仍待验收。"
-      }
+      "workflow_evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 主题颜色、圆角、字体与间距",
@@ -699,8 +668,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4事实字段规范与旧消费者一致性校验",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaCanonicalV4.kt"
@@ -1118,8 +1087,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 明确点名与一般提及分离，允许成员自然沉默",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChat.kt"
@@ -1133,8 +1102,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 当前场景、情绪与关系状态及来源",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatStateObservations.kt",
@@ -1197,8 +1166,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 关系推进、阶段与变化",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterEvolution.kt"
@@ -1217,8 +1186,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物生活状态与主动性",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterEvolution.kt"
@@ -1264,8 +1233,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 模型温度独立采样",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -1279,14 +1248,17 @@
         "availability": "code_and_tests_present_execution_unverified",
         "separate_product_entry": false,
         "production_sources_confirmed": 2,
-        "test_methods_confirmed": 2,
-        "explanation": "采样温度使用独立存储字段，人物编辑与聊天共用；属于正在使用的模型设置，能否被每一种模型接受需要连接真实模型验证。"
+        "test_methods_confirmed": 1,
+        "unavailable_test_sources": [
+          "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterBehaviorTuningDialogTest.kt#expressionVariationDisplaysMappedChatTemperature"
+        ],
+        "explanation": "采样温度使用独立存储字段，人物编辑与聊天共用；属于正在使用的模型设置，能否被每一种模型接受需要连接真实模型验证。 源码树复核：原界面测试文件已不存在，原测试引用保留在 unavailable_test_sources，不计入可执行证据；界面行为仍需重建并做设备验收。"
       }
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 历史调参兼容读取，退出反应控制",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 2,
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -1301,13 +1273,14 @@
         "separate_product_entry": false,
         "production_sources_confirmed": 2,
         "test_methods_confirmed": 2,
+        "unavailable_test_sources": [],
         "explanation": "历史控制轴仍能反序列化；旧反应控制已退出主动功能，只保留数据兼容。功能树应标注退役兼容，不能计作独立活跃控制器。"
       }
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与采样设置分离",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 2,
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -1322,6 +1295,7 @@
         "separate_product_entry": false,
         "production_sources_confirmed": 2,
         "test_methods_confirmed": 2,
+        "unavailable_test_sources": [],
         "explanation": "角色记忆归属与温度字段由不同组件维护，是隔离性质，不存在专门可点击的单项功能。"
       }
     },
@@ -1353,8 +1327,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 人物日记生成和管理",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt"
@@ -1373,8 +1347,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记条目合并与取代",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt"
@@ -1393,8 +1367,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记相关性召回",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt"
@@ -1441,8 +1415,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记纠正、停用与当前状态同步",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt"
@@ -1501,8 +1475,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 上下文和人物事实组装",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatContextAssembler.kt"
@@ -1523,8 +1497,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 角色沉浸感与原设约束",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatReplyImmersionGuard.kt"
@@ -1545,8 +1519,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 用户与作者表达偏好及重复诊断",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -1561,13 +1535,14 @@
         "separate_product_entry": false,
         "production_sources_confirmed": 3,
         "test_methods_confirmed": 1,
+        "unavailable_test_sources": [],
         "explanation": "偏好提示注入及答复诊断链路存在；不能据此证明作者偏好拥有独立设置入口，亦无法证明重复诊断覆盖所有语境。回复后不执行硬删文本。"
       }
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 人物身份与背景连续性检查",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatSceneRuntime.kt",
@@ -1595,8 +1570,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 聊天后状态及关系更新",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPostTurnCommit.kt"
@@ -1617,8 +1592,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 网页背景信息引入",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatWebContextProvider.kt"
@@ -1639,8 +1614,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 回复质量补救与修订预算",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatReplyRepairBudget.kt"
@@ -1676,8 +1651,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 人物主动发起互动",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatProactivePolicy.kt"
@@ -1696,8 +1671,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 与自动化任务联动",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatProactivePolicy.kt"
@@ -1716,8 +1691,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 用户活跃情况判断",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatProactivePolicy.kt"
@@ -1738,8 +1713,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 主动消息归属与恢复",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatProactivePolicy.kt"
@@ -1835,8 +1810,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 任务执行模式与续轮",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt"
@@ -1879,8 +1854,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 自主选择公开历史对话和消息来源",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterials.kt"
@@ -1894,8 +1869,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 加载更早分页、筛选并保留已选消息",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterials.kt"
@@ -1909,8 +1884,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 交接摘要携带来源会话、消息编号与节选",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterials.kt"
@@ -1924,8 +1899,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 选中附件使用受限路径和 SHA-256 引用",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterials.kt"
@@ -1939,8 +1914,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 模型、MCP、插件和设备当前能力提示",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTaskCapabilityReadiness.kt"
@@ -1954,8 +1929,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 计划模式 / 方案生成与阶段拆解",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkPlanModeCoordinator.kt"
@@ -1976,8 +1951,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 计划模式 / 计划展示和人工审阅",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkPlanModeCoordinator.kt"
@@ -2011,8 +1986,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 目标管理 / 当前目标与目标状态更新",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalTransitionPolicy.kt"
@@ -2033,8 +2008,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 目标管理 / 目标结果核验",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalTransitionPolicy.kt",
@@ -2085,8 +2060,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 待办事项 / 完成状态和执行关联",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionClaimGuard.kt"
@@ -2105,8 +2080,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 阶段推进 / 任务进度与阶段状态投影",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt"
@@ -2127,8 +2102,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 阶段推进 / 关键决定、失败尝试和未完事项",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryCheckpoint.kt"
@@ -2187,8 +2162,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 用户提问与答案继续",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/interaction/LocalInteractionCoordinator.kt"
@@ -2261,8 +2236,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 团队未结消息和失败成员的完成声明复核",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionClaimGuard.kt"
@@ -2442,8 +2417,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 持久任务图与节点验收（未合并）",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlan.kt",
@@ -2478,8 +2453,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 创建团队和启动助手",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
@@ -2500,8 +2475,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队负责人编排与任务分配",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
@@ -2520,8 +2495,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员招募、职责和生命周期",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
@@ -2542,8 +2517,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员启动、停用、解散与停止全部",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
@@ -2564,8 +2539,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务创建、领取、修改与分配",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
@@ -2586,8 +2561,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务依赖与阻塞关系",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
@@ -2608,8 +2583,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务重开、删除和完成确认",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamReducer.kt"
@@ -2630,8 +2605,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 并发文件修改范围冲突提示",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
@@ -2665,8 +2640,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 持久邮箱和重启后补投",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
@@ -2685,8 +2660,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 助手执行结果回收",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
@@ -2707,8 +2682,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 主智能体核验结果后结算",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
@@ -2751,8 +2726,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 集群运行状态条与任务进度",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
@@ -2773,8 +2748,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 成员列表及当前任务",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
@@ -2793,8 +2768,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 成员执行输出展开",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
@@ -2815,8 +2790,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 给运行中助手追加消息",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
@@ -2835,8 +2810,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 停止单个和全部助手",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
@@ -2855,8 +2830,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 恢复与停止状态反馈",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
@@ -2897,8 +2872,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 任务负责人、依赖、冲突、完整说明",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
@@ -2919,8 +2894,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 继续处理与异常接管草稿",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
@@ -2939,8 +2914,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 不能收消息时禁用发送并保留草稿",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt"
@@ -2959,8 +2934,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 团队事件记录及任务板重建",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
@@ -2981,8 +2956,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 成员状态与子任务运行事实关联",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamActivityProjection.kt"
@@ -3003,8 +2978,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 失败、停用和失联任务重新释放",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
@@ -3025,8 +3000,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 团队冷恢复与批量投影",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamProjectionRuntime.kt"
@@ -3047,8 +3022,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 恢复时任务邮箱续投",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
@@ -3067,8 +3042,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 未完成任务阻止错误完成声明",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionClaimGuard.kt"
@@ -3112,12 +3087,13 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/uicontract/WorkReadUiPort.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjection.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjection.kt",
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt"
       ],
       "missing_production_sources": [],
       "named_symbols": [
@@ -3128,11 +3104,22 @@
         {
           "symbol": "projectLocalWorkHistoryPage",
           "declaration_found": true
+        },
+        {
+          "symbol": "LocalWorkEvidenceSheet",
+          "declaration_found": true
         }
       ],
       "explicit_source_anchor": true,
-      "explicit_static_scope": "保留现行业务数据与端口，V6 原生页面消费；此处仅证明对应声明存在。",
-      "explicit_test_candidates": [],
+      "explicit_static_scope": "已核对 WorkReadUiPort、Work 历史投影、实际 LocalWorkEvidenceSheet 页面入口以及设备测试方法；设备结果、历史翻页和未知副作用展示仍须按当前 HEAD 实测。",
+      "explicit_test_candidates": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheetTest.kt",
+          "method": "olderPageIsReachableAndUnknownOutcomeKeepsItsMeaning",
+          "references": "LocalWorkEvidenceSheet",
+          "status": "仅发现测试源码，未验证CI是否执行通过"
+        }
+      ],
       "workflow_evidence": []
     },
     {
@@ -3196,8 +3183,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 交付成果当前版本及证据变化提示",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkArtifactVersion.kt"
@@ -3220,8 +3207,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 工作目录与文件浏览",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
@@ -3235,8 +3222,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 文件预览和分享",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
@@ -3250,8 +3237,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 文件修改与补丁应用",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
@@ -3265,8 +3252,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 从真实成功工具调用识别成果",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
@@ -3313,8 +3300,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果来源调用与事件序号可追溯",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkArtifactProjection.kt"
@@ -3328,8 +3315,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果首次创建和当前内容哈希对照",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkArtifactVersion.kt"
@@ -3343,8 +3330,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 目标事实增量判断与恢复（未合并）",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalFactsProjection.kt"
@@ -3370,8 +3357,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 可选模型背景摘要（未合并）",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSemanticSummary.kt"
@@ -3527,8 +3514,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/uicontract/AutomationUiPort.kt"
@@ -4019,8 +4006,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 预置技能目录",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt"
@@ -4123,8 +4110,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能文档和元数据解析",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/files/LocalSkillMetadata.kt"
@@ -4145,8 +4132,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能调用标记识别",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivation.kt"
@@ -4165,8 +4152,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能使用范围和提示词预算",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivation.kt"
@@ -4185,8 +4172,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 大技能完整读取与损坏隔离",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
@@ -4306,8 +4293,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 全目录发现与运行中变更感知（未合并）",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivation.kt"
@@ -4400,8 +4387,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 长输出分页读取",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
@@ -4415,8 +4402,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / Git 仓库操作",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledGitRuntime.kt",
@@ -4566,8 +4553,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 诊断与重命名预览",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
@@ -4657,8 +4644,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 外部调用中断和卸载",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
@@ -4685,8 +4672,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 高权限调用审批",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt"
@@ -4700,8 +4687,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 浏览器登录与授权刷新撤销（未合并）",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalMcpOAuthProtocol.kt"
@@ -4807,8 +4794,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 图片理解和视觉模型调用",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt"
@@ -4822,8 +4809,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 截图和媒体附件处理",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt"
@@ -4864,8 +4851,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 图像分析缓存",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionAnalysisCache.kt"
@@ -4879,8 +4866,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体档案分页与会话隔离",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStore.kt"
@@ -4906,8 +4893,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体创作回执与成果恢复",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStore.kt"
@@ -4933,8 +4920,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 持久终端会话",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
@@ -4974,8 +4961,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Node.js 执行",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledNodeRuntime.kt",
@@ -5018,8 +5005,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Python 执行",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledPythonRuntime.kt",
@@ -5062,8 +5049,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Git 命令行",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledGitRuntime.kt",
@@ -5161,8 +5148,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 通知内容读取",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
@@ -5190,8 +5177,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 屏幕截图和动作执行",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
@@ -5215,8 +5202,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 隔离虚拟屏",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "harness-device-android/src/main/java/com/labteto/dshmobile/device/vscreen/VirtualDisplayController.kt",
@@ -5252,8 +5239,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 虚拟屏资源归属和权限",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
@@ -5294,8 +5281,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 副作用识别",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt"
@@ -5309,8 +5296,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 自动、手动和默认审批",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt"
@@ -5337,8 +5324,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 工具执行轨迹和失败状态",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolActivityProjection.kt"
@@ -5413,8 +5400,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / ChatGPT 套餐模型目录与账号状态",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名源码入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptModelCatalog.kt"
@@ -5500,8 +5487,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 聊天与工作用量切换",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
@@ -5522,8 +5509,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 7／30／90 天消耗趋势",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
@@ -5544,8 +5531,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 按会话、任务和请求追溯",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
@@ -5566,8 +5553,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 主代理／子代理消耗区分",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
@@ -5588,8 +5575,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 缓存命中及费用分解",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
@@ -5610,8 +5597,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 模型价格和未知价格提示",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
@@ -5632,8 +5619,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MiniMaxQuotaPage.kt"
@@ -5652,8 +5639,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆空间和分类浏览",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt"
@@ -5728,8 +5715,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 长期事实修改后的来源失效待办",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt"
@@ -5915,8 +5902,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 任务相关配置状态与执行授权分开提示",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTaskCapabilityReadiness.kt"
@@ -5945,8 +5932,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 屏幕共享和录制逐次系统授权提示",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTaskCapabilityReadiness.kt"
@@ -6044,8 +6031,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 真实成员身份与窄授权协作（未合并）",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -6053,20 +6040,25 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": [],
-      "followup": {
-        "kind": "unmerged_member_collaboration",
-        "availability": "code_and_tests_present_execution_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 1,
-        "test_methods_confirmed": 1,
-        "explanation": "未合并：复用Team Owner与持久Jobs，真实运行身份约束成员消息和任务CAS；测试源码存在，按用户要求未执行工具链。"
-      }
+      "workflow_evidence": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 按原 Job 身份统一中断与关闭 Team 成员（PR #874）",
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
+      "historical_grade": null,
+      "existing_production_sources": [],
+      "missing_production_sources": [],
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "explicit_test_candidates": [],
+      "workflow_evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 工作区长期记录与用户备注保护",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkImprovementArchive.kt"
@@ -6092,8 +6084,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / Work 完成证据驱动的经验／提示词候选",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyLearning.kt"
@@ -6119,8 +6111,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 同 Goal 契约的动态指导与长任务试用",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkImprovementGuidance.kt"
@@ -6146,8 +6138,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 独立测试回执／Token 对照及窄范围采纳",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyEvaluation.kt"
@@ -6173,8 +6165,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 技能改进草案与 App 问题迭代记录",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/work/improvement/LocalWorkImprovementArchive.kt"
@@ -6200,8 +6192,8 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话创建、读写、删除和归档",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": "测试方法已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"
@@ -6348,8 +6340,8 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 消息／工具／上下文表面记录",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名源码入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt"
@@ -6363,8 +6355,8 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 请求证据重建与摘要校验",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名源码入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/model/LocalRequestReconstruction.kt"
@@ -6406,8 +6398,8 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 工具活动只读投影",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名源码入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolActivityProjection.kt"
@@ -6445,8 +6437,8 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 持久会话登记与摘要投影索引分工",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"
@@ -6551,8 +6543,8 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 单个会话备份损坏不阻断其他会话",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"
@@ -6603,8 +6595,8 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 供应商与协议 / Anthropic 消息协议",
-      "verification": "历史生产文件仍存在（待入口复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "具名源码入口已核（静态）",
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/model/AnthropicMessagesClient.kt"
@@ -6951,6 +6943,19 @@
       "workflow_evidence": []
     },
     {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型部分输出与终态结算",
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
+      "historical_grade": null,
+      "existing_production_sources": [],
+      "missing_production_sources": [],
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "explicit_test_candidates": [],
+      "workflow_evidence": []
+    },
+    {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 推理－工具－结果多步循环",
       "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
@@ -7281,8 +7286,8 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具输出格式和结构化验证",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 2,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -7297,6 +7302,7 @@
         "separate_product_entry": false,
         "production_sources_confirmed": 2,
         "test_methods_confirmed": 2,
+        "unavailable_test_sources": [],
         "explanation": "工具输出留存与工具调用参数验证各有实际代码和测试，是共享工具执行链路中的两个能力；没有专用独立产品页面。"
       }
     },
@@ -7337,8 +7343,8 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / MCP资源分页与完整内容",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
-      "test_reference_count": 0,
+      "verification": "真实测试映射及具名源码声明（静态）",
+      "test_reference_count": 1,
       "historical_grade": null,
       "existing_production_sources": [
         "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpClient.kt",
@@ -7899,8 +7905,8 @@
     },
     {
       "path": "第三层｜平台与工程保障 / Android 本机运行时 / Node／Python／Git 工具运行环境",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 3,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -7920,6 +7926,7 @@
         "separate_product_entry": false,
         "production_sources_confirmed": 4,
         "test_methods_confirmed": 3,
+        "unavailable_test_sources": [],
         "explanation": "Node/Python/Git有各自运行时安装代码，通过共享运行时管理器组合供工具链使用；拥有三项Android设备测试源码，但目前无此PR对应设备通过证据。"
       }
     },
@@ -8383,8 +8390,8 @@
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 团队任务与 UI 回归",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -8399,34 +8406,14 @@
         "separate_product_entry": false,
         "production_sources_confirmed": 0,
         "test_methods_confirmed": 1,
+        "unavailable_test_sources": [],
         "explanation": "这是团队工作界面的回归测试描述，不构成单独提供给用户的一项功能；测试方法存在，是否实际通过取决于CI设备任务。"
       }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 技能中文名称和编辑回归",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
-      "historical_grade": "仅定位候选源码",
-      "existing_production_sources": [],
-      "missing_production_sources": [],
-      "named_symbols": [],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
-      "explicit_test_candidates": [],
-      "workflow_evidence": [],
-      "followup": {
-        "kind": "test_suite_not_product_feature",
-        "availability": "test_cases_declared_not_verified_executed",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 0,
-        "test_methods_confirmed": 2,
-        "explanation": "技能编辑属于已有技能能力，本条对应回归验证。测试代码存在，无法当成新增的独立产品功能。"
-      }
-    },
-    {
-      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 官方语义样本差分验证",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -8441,6 +8428,31 @@
         "separate_product_entry": false,
         "production_sources_confirmed": 0,
         "test_methods_confirmed": 1,
+        "unavailable_test_sources": [
+          "app/src/test/java/com/labteto/dshmobile/ui/screens/tools/LocalSkillDisplayNameDocumentTest.kt#editingExistingSkillUpdatesOnlyDisplayNameInItsSourceFile"
+        ],
+        "explanation": "技能编辑属于已有技能能力，本条对应回归验证。测试代码存在，无法当成新增的独立产品功能。 源码树复核：原界面测试文件已不存在，原测试引用保留在 unavailable_test_sources，不计入可执行证据；界面行为仍需重建并做设备验收。"
+      }
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 官方语义样本差分验证",
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
+      "historical_grade": "仅定位候选源码",
+      "existing_production_sources": [],
+      "missing_production_sources": [],
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "explicit_test_candidates": [],
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 1,
+        "unavailable_test_sources": [],
         "explanation": "官方固定样本比对用例存在，归属工程验证；具体金样本来源、测试执行结果应另查，不能作为单独业务功能。"
       }
     },
@@ -8467,8 +8479,8 @@
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 会话登记升级、备份损坏和并发写入回归",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 2,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -8483,13 +8495,14 @@
         "separate_product_entry": false,
         "production_sources_confirmed": 0,
         "test_methods_confirmed": 2,
+        "unavailable_test_sources": [],
         "explanation": "持久会话属于共享能力；本条是其兼容/损坏/并发回归集合，测试代码存在但需要对应CI任务实际通过。"
       }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 单聊群聊工作共存及历史读取隔离回归",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 2,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -8504,13 +8517,14 @@
         "separate_product_entry": false,
         "production_sources_confirmed": 0,
         "test_methods_confirmed": 2,
+        "unavailable_test_sources": [],
         "explanation": "多类型会话与历史隔离测试存在；本条为跨模块回归集合，不能计作独立产品入口。"
       }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 人物日记纠正与能力状态界面回归",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 1,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -8524,14 +8538,17 @@
         "availability": "test_cases_declared_not_verified_executed",
         "separate_product_entry": false,
         "production_sources_confirmed": 0,
-        "test_methods_confirmed": 2,
-        "explanation": "日记纠正与工具能力状态分属两个现有界面，本条是合并的设备回归范围，必须单独核查两个UI。"
+        "test_methods_confirmed": 1,
+        "unavailable_test_sources": [
+          "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryCorrectionRegressionTest.kt#editingDiaryRequiresExplicitSaveAndRefreshesCurrentCharacter"
+        ],
+        "explanation": "日记纠正与工具能力状态分属两个现有界面，本条是合并的设备回归范围，必须单独核查两个UI。 源码树复核：原界面测试文件已不存在，原测试引用保留在 unavailable_test_sources，不计入可执行证据；界面行为仍需重建并做设备验收。"
       }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 交付要求、成果版本和记忆来源证据回归",
-      "verification": "没有可确认的现行入口证据",
-      "test_reference_count": 0,
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 3,
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
@@ -8546,6 +8563,7 @@
         "separate_product_entry": false,
         "production_sources_confirmed": 0,
         "test_methods_confirmed": 3,
+        "unavailable_test_sources": [],
         "explanation": "对应交付要求、成果版本和记忆来源三个既有能力的跨模块回归集合；独立测试源码存在，执行成功待确认。"
       }
     },
@@ -8637,20 +8655,31 @@
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
       "workflow_evidence": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 代理执行后端 / 受审批的远端文件与原生进程执行（PR #874，完整环境仍待补齐）",
+      "verification": "真实测试映射（仅局部）",
+      "test_reference_count": 4,
+      "historical_grade": null,
+      "existing_production_sources": [],
+      "missing_production_sources": [],
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "explicit_test_candidates": [],
+      "workflow_evidence": []
     }
   ],
   "evidence_grade_summary": {
-    "真实测试映射（仅局部）": 120,
-    "具名源码声明存在（静态，待调用链复核）": 194,
-    "没有可确认的现行入口证据": 19,
-    "历史生产文件仍存在（待入口复核）": 87,
-    "具名源码及仪表测试声明存在（静态，未执行）": 15,
-    "真实测试映射及具名源码声明（静态）": 1,
+    "真实测试映射（仅局部）": 190,
+    "具名源码声明存在（静态，待调用链复核）": 129,
+    "真实测试映射及具名源码声明（静态）": 81,
+    "历史生产文件仍存在（待入口复核）": 39,
     "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）": 14,
     "候选生产文件仍存在（不足以证明功能）": 3
   },
   "workflow_evidence_features": 14,
-  "declared_unexecuted_test_methods": 15,
+  "declared_unexecuted_test_methods": 16,
   "tracked_legacy_identities": 117,
   "stale_legacy_identities": [
     {
@@ -9292,418 +9321,12 @@
       ]
     }
   ],
-  "unproven_feature_triage": [
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生首页：唯一新建入口，未开始编辑器不生成正式会话记录，未发送草稿独立保留与恢复",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "共享工具或其他能力",
-      "inspect": "按用户实际功能入口检查共享工具模块",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
-        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "native_v6_session_and_draft_binding",
-        "availability": "code_and_tests_present_execution_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 2,
-        "test_methods_confirmed": 1,
-        "explanation": "恢复到 V6 原生输入器的会话级草稿、附件恢复与隔离机制已有生产源码和单测；空白会话是否产生正式记录及全流程冷启动效果还需要设备验收，不能以静态入口作为通过证明。"
-      }
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生功能路由与页面恢复校验",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "共享工具或其他能力",
-      "inspect": "按用户实际功能入口检查共享工具模块",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
-        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "native_v6_route_invariant",
-        "availability": "code_and_tests_present_execution_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 1,
-        "test_methods_confirmed": 1,
-        "explanation": "原 UI 3.0 的场景包兼容检查已退役；目前由 V6 原生 LocalFeatureCatalog 确认每个功能路由与模块归属，已有源码与单测。真实页面操作、系统返回和导航恢复需独立设备验证。"
-      }
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送、分支与交互端口（迁移中）",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "共享工具或其他能力",
-      "inspect": "按用户实际功能入口检查共享工具模块",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
-        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "ui_contract_migration_slice",
-        "availability": "code_and_tests_present_execution_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 1,
-        "test_methods_confirmed": 1,
-        "explanation": "生产端口接入 V6/Next 的文本与附件发送、编辑、重生成、停止、Chat 分支及 Work 审批/提问；业务准入仍由原 Owner 执行。完整 Feature 端口及真实双包旅程尚未完成。"
-      }
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "共享工具或其他能力",
-      "inspect": "按用户实际功能入口检查共享工具模块",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
-        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "ui_contract_migration_slice",
-        "availability": "code_and_tests_present_execution_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 2,
-        "test_methods_confirmed": 1,
-        "explanation": "本地交互模板构造器已迁入 App 并由 V6 原生交互文档控制器接入；现有测试验证文档 Owner 的来源身份，模型不具备覆盖权。完整设备交互与每类模板内容仍需进一步验收。"
-      }
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 原回复内交互卡片（迁移中）",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "共享工具或其他能力",
-      "inspect": "按用户实际功能入口检查共享工具模块",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
-        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "ui_contract_migration_slice",
-        "availability": "code_and_tests_present_execution_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 3,
-        "test_methods_confirmed": 1,
-        "explanation": "Chat单聊/群聊与Work从原回复抽取封闭卡片，经原Session日志存储和恢复；原生确认文本后交原会话Owner发送。自动卡不增加模型调用，不授予工具/支付/审批权限。实际设备和完整跨包恢复仍待验收。"
-      }
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 模型温度独立采样",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "聊天人物与连续性",
-      "inspect": "app/local/chat",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningPersistence.kt"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "active_sampling_subfeature",
-        "availability": "code_and_tests_present_execution_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 2,
-        "test_methods_confirmed": 2,
-        "explanation": "采样温度使用独立存储字段，人物编辑与聊天共用；属于正在使用的模型设置，能否被每一种模型接受需要连接真实模型验证。"
-      }
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 历史调参兼容读取，退出反应控制",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "聊天人物与连续性",
-      "inspect": "app/local/chat",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningPersistence.kt"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "retired_controller_compatibility",
-        "availability": "legacy_fields_decodable_active_controls_retired",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 2,
-        "test_methods_confirmed": 2,
-        "explanation": "历史控制轴仍能反序列化；旧反应控制已退出主动功能，只保留数据兼容。功能树应标注退役兼容，不能计作独立活跃控制器。"
-      }
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与采样设置分离",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "聊天人物与连续性",
-      "inspect": "app/local/chat",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatMemoryBinding.kt"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "cross_component_invariant",
-        "availability": "code_and_tests_present_execution_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 2,
-        "test_methods_confirmed": 2,
-        "explanation": "角色记忆归属与温度字段由不同组件维护，是隔离性质，不存在专门可点击的单项功能。"
-      }
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 用户与作者表达偏好及重复诊断",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "聊天人物与连续性",
-      "inspect": "app/local/chat",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExpressionPreferences.kt"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "partial_expression_guidance",
-        "availability": "partial_scope_code_and_tests_present",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 3,
-        "test_methods_confirmed": 1,
-        "explanation": "偏好提示注入及答复诊断链路存在；不能据此证明作者偏好拥有独立设置入口，亦无法证明重复诊断覆盖所有语境。回复后不执行硬删文本。"
-      }
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 真实成员身份与窄授权协作（未合并）",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "共享工具或其他能力",
-      "inspect": "按用户实际功能入口检查共享工具模块",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
-        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "unmerged_member_collaboration",
-        "availability": "code_and_tests_present_execution_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 1,
-        "test_methods_confirmed": 1,
-        "explanation": "未合并：复用Team Owner与持久Jobs，真实运行身份约束成员消息和任务CAS；测试源码存在，按用户要求未执行工具链。"
-      }
-    },
-    {
-      "path": "第二层｜共享运行能力 / 共享工具执行 / 工具输出格式和结构化验证",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "共享工具或其他能力",
-      "inspect": "按用户实际功能入口检查共享工具模块",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
-        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "shared_tool_pipeline",
-        "availability": "code_and_tests_present_execution_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 2,
-        "test_methods_confirmed": 2,
-        "explanation": "工具输出留存与工具调用参数验证各有实际代码和测试，是共享工具执行链路中的两个能力；没有专用独立产品页面。"
-      }
-    },
-    {
-      "path": "第三层｜平台与工程保障 / Android 本机运行时 / Node／Python／Git 工具运行环境",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "本机终端与执行环境",
-      "inspect": "harness-runtime-android/src/main",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
-        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [
-        "AndroidRuntimePlugin"
-      ],
-      "followup": {
-        "kind": "composite_bundled_runtimes",
-        "availability": "code_and_instrumentation_sources_present_device_unverified",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 4,
-        "test_methods_confirmed": 3,
-        "explanation": "Node/Python/Git有各自运行时安装代码，通过共享运行时管理器组合供工具链使用；拥有三项Android设备测试源码，但目前无此PR对应设备通过证据。"
-      }
-    },
-    {
-      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 团队任务与 UI 回归",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "持续集成与测试",
-      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        ".github/workflows/ci.yml",
-        ".github/scripts/check-local-architecture-boundaries.py",
-        ".github/scripts/check-test-quality.py"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "test_suite_not_product_feature",
-        "availability": "test_cases_declared_not_verified_executed",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 0,
-        "test_methods_confirmed": 1,
-        "explanation": "这是团队工作界面的回归测试描述，不构成单独提供给用户的一项功能；测试方法存在，是否实际通过取决于CI设备任务。"
-      }
-    },
-    {
-      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 技能中文名称和编辑回归",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "持续集成与测试",
-      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        ".github/workflows/ci.yml",
-        ".github/scripts/check-local-architecture-boundaries.py",
-        ".github/scripts/check-test-quality.py"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "test_suite_not_product_feature",
-        "availability": "test_cases_declared_not_verified_executed",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 0,
-        "test_methods_confirmed": 2,
-        "explanation": "技能编辑属于已有技能能力，本条对应回归验证。测试代码存在，无法当成新增的独立产品功能。"
-      }
-    },
-    {
-      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 官方语义样本差分验证",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "持续集成与测试",
-      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        ".github/workflows/ci.yml",
-        ".github/scripts/check-local-architecture-boundaries.py",
-        ".github/scripts/check-test-quality.py"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "test_suite_not_product_feature",
-        "availability": "test_cases_declared_not_verified_executed",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 0,
-        "test_methods_confirmed": 1,
-        "explanation": "官方固定样本比对用例存在，归属工程验证；具体金样本来源、测试执行结果应另查，不能作为单独业务功能。"
-      }
-    },
-    {
-      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 会话登记升级、备份损坏和并发写入回归",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "持续集成与测试",
-      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        ".github/workflows/ci.yml",
-        ".github/scripts/check-local-architecture-boundaries.py",
-        ".github/scripts/check-test-quality.py"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "test_suite_not_product_feature",
-        "availability": "test_cases_declared_not_verified_executed",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 0,
-        "test_methods_confirmed": 2,
-        "explanation": "持久会话属于共享能力；本条是其兼容/损坏/并发回归集合，测试代码存在但需要对应CI任务实际通过。"
-      }
-    },
-    {
-      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 单聊群聊工作共存及历史读取隔离回归",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "持续集成与测试",
-      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        ".github/workflows/ci.yml",
-        ".github/scripts/check-local-architecture-boundaries.py",
-        ".github/scripts/check-test-quality.py"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "test_suite_not_product_feature",
-        "availability": "test_cases_declared_not_verified_executed",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 0,
-        "test_methods_confirmed": 2,
-        "explanation": "多类型会话与历史隔离测试存在；本条为跨模块回归集合，不能计作独立产品入口。"
-      }
-    },
-    {
-      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 人物日记纠正与能力状态界面回归",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "持续集成与测试",
-      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        ".github/workflows/ci.yml",
-        ".github/scripts/check-local-architecture-boundaries.py",
-        ".github/scripts/check-test-quality.py"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "test_suite_not_product_feature",
-        "availability": "test_cases_declared_not_verified_executed",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 0,
-        "test_methods_confirmed": 2,
-        "explanation": "日记纠正与工具能力状态分属两个现有界面，本条是合并的设备回归范围，必须单独核查两个UI。"
-      }
-    },
-    {
-      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 交付要求、成果版本和记忆来源证据回归",
-      "issue": "缺少可确认的现行源码入口",
-      "domain": "持续集成与测试",
-      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
-      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-      "candidate_files": [
-        ".github/workflows/ci.yml",
-        ".github/scripts/check-local-architecture-boundaries.py",
-        ".github/scripts/check-test-quality.py"
-      ],
-      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": [],
-      "followup": {
-        "kind": "test_suite_not_product_feature",
-        "availability": "test_cases_declared_not_verified_executed",
-        "separate_product_entry": false,
-        "production_sources_confirmed": 0,
-        "test_methods_confirmed": 3,
-        "explanation": "对应交付要求、成果版本和记忆来源三个既有能力的跨模块回归集合；独立测试源码存在，执行成功待确认。"
-      }
-    }
-  ],
-  "followup_investigated_descriptions": 19,
-  "followup_production_or_compatibility": 12,
+  "unproven_feature_triage": [],
+  "followup_investigated_descriptions": 14,
+  "followup_production_or_compatibility": 7,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "eae935bdde60",
+    "baseline": "93706e473de1",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [],
@@ -9713,47 +9336,10 @@
     "added_ui": [],
     "removed_ui": []
   },
-  "source_verified_registrations": 17,
+  "source_verified_registrations": 21,
   "explicit_retirements": 0,
   "changes_applied": [],
-  "pending_changes": [
-    {
-      "id": "automation.management-receipts",
-      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
-      "status": "待复核，未写入功能树",
-      "reason": "指定测试文件不存在"
-    },
-    {
-      "id": "settings.minimax.quota",
-      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度",
-      "status": "待复核，未写入功能树",
-      "reason": "指定测试文件不存在"
-    },
-    {
-      "id": "shared.model.partial-terminal",
-      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型部分输出与终态结算",
-      "status": "待复核，未写入功能树",
-      "reason": "功能归属不是架构登记的七个所有权模块"
-    },
-    {
-      "id": "ui.document.local_builder",
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
-      "status": "待复核，未写入功能树",
-      "reason": "指定测试文件不存在"
-    },
-    {
-      "id": "ui.zhaoxi.e817",
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 朝夕 E8.17 独立界面接入（PR #740，未合并）",
-      "status": "待复核，未写入功能树",
-      "reason": "退役项必须对应已登记功能的原完整路径"
-    },
-    {
-      "id": "work.history-evidence-ui",
-      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
-      "status": "待复核，未写入功能树",
-      "reason": "不存在该 @Test 方法"
-    }
-  ],
+  "pending_changes": [],
   "obsolete_historical_evidence_count": 20,
   "obsolete_historical_evidence": [
     {

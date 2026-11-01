@@ -4,6 +4,10 @@ import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.session.ToolAttemptLedger
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 
+private val TOOL_ATTEMPT_EVENT_TYPES = setOf(
+    "assistant/message", "tool/call", "tool/execution-started", "tool/result",
+)
+
 internal data class LocalPendingToolSettlement(
     val call: AgentToolCall,
     val started: Boolean,
@@ -19,7 +23,12 @@ internal fun pendingToolSettlements(
 ): List<LocalPendingToolSettlement> {
     val stepStart = eventLog.latest("step/start") ?: return emptyList()
     val ledger = ToolAttemptLedger()
-    eventLog.forEachAfter(stepStart.sequence) { ledger.observe(it.type, it.data) }
+    // Only these four facts change a ToolAttemptLedger. Native SQLite uses its
+    // (session_id,event_type,sequence) index instead of decoding all model,
+    // progress, telemetry and transcript events after the last Step boundary.
+    eventLog.forEachOfTypesAfter(stepStart.sequence, TOOL_ATTEMPT_EVENT_TYPES) {
+        ledger.observe(it.type, it.data)
+    }
     val attempts = ledger.snapshot().associateBy { it.id }
     return calls.filterNot { it.id in completedCallIds }.mapNotNull { call ->
         val attempt = attempts[call.id]

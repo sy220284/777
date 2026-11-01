@@ -16,6 +16,8 @@ class AndroidProcessRuntime(
     private val extraSearchPaths: List<File> = emptyList(),
     private val dynamicSearchPaths: () -> List<File> = { emptyList() },
     private val baseEnvironment: () -> Map<String, String> = { emptyMap() },
+    private val inheritEnvironment: Boolean = true,
+    private val trustedReadRoots: List<File> = emptyList(),
 ) : HarnessProcessRuntime {
 
     override fun isCommandAvailable(command: String): Boolean {
@@ -39,9 +41,12 @@ class AndroidProcessRuntime(
         val resolvedCommand = resolveCommand(request.command)
         executeManagedProcess(
             builder = ProcessBuilder(resolvedCommand).directory(workingDirectory)
-                .apply { environment().putAll(processEnvironment(request.environment)) }
+                .apply {
+                    if (!inheritEnvironment) environment().clear()
+                    environment().putAll(processEnvironment(request.environment))
+                }
                 .let { builder -> if (sandbox) secureIsolatedProcessBuilder(builder,
-                    extraSearchPaths + dynamicSearchPaths(), baseEnvironment()) else builder },
+                    extraSearchPaths + dynamicSearchPaths(), baseEnvironment(), trustedReadRoots) else builder },
             stdin = request.stdin,
             timeoutMillis = request.timeoutMillis,
         )

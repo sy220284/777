@@ -278,6 +278,26 @@ fun SettingsScreen(
         }
     }
 
+    val fullStorageExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            localSessionStorageBusy = true
+            try {
+                viewModel.exportCompleteLocalSessionStorage(uri)
+                localSessionStorageStatus = viewModel.localSessionStorageStatus()
+                toast.second("完整备份已导出：包含会话、附件和媒体工作室创作原件")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                AppLog.failure("Settings", "export_complete_archive", error)
+                toast.second(error.message ?: "完整备份导出失败")
+            } finally {
+                localSessionStorageBusy = false
+            }
+        }
+    }
+
     val sessionStorageImporter = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -286,7 +306,7 @@ fun SettingsScreen(
             try {
                 val sessions = viewModel.importLocalSessionStorage(uri)
                 localSessionStorageStatus = viewModel.localSessionStorageStatus()
-                toast.second("已验证并安排恢复 $sessions 个会话，重启应用后生效")
+                toast.second("备份已验证并安排恢复 $sessions 个会话；如包含媒体工作室成果，将一并于重启后恢复")
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -1005,6 +1025,7 @@ fun SettingsScreen(
                                 }
                             },
                             onExport = { sessionStorageExporter.launch("777-local-sessions.zip") },
+                            onExportFull = { fullStorageExporter.launch("777-complete-sessions-and-media.zip") },
                             onRestore = { sessionStorageImporter.launch(arrayOf("application/zip", "application/octet-stream")) },
                             onLegacyRestore = {
                                 legacyStorageImporter.launch(arrayOf("application/zip", "application/octet-stream"))

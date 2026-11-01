@@ -26,6 +26,8 @@ data class ToolMetadata(
     val workspaceAccess: ToolWorkspaceAccess = ToolWorkspaceAccess.NONE,
     /** Audited short commit handlers must return their real receipt after caller cancellation. */
     val finishesOnCancellation: Boolean = false,
+    /** Files/processes of the selected execution environment; device/accounts remain host-owned. */
+    val environmentBound: Boolean = false,
 ) {
     init {
         require(family.isNotBlank()) { "工具能力族不能为空" }

@@ -67,24 +67,17 @@ internal fun watchLocalWorkEvidenceFiles(
     val flags = FileObserver.MODIFY or FileObserver.CLOSE_WRITE or
         FileObserver.MOVED_TO or FileObserver.MOVED_FROM or FileObserver.DELETE or
         FileObserver.CREATE or FileObserver.ATTRIB or FileObserver.DELETE_SELF
-    val observers = targets.flatMap { (directory, names) ->
-        val parentWatch = object : FileObserver(directory.absolutePath, flags) {
+    // A parent-directory inotify watch reports changes to its named children,
+    // including in-place writes (MODIFY/CLOSE_WRITE), not only renames. Register
+    // exactly one watch per distinct directory. Registering an additional inode
+    // watch for every evidence file exhausts Android's inotify budget on large
+    // Work deliveries and can silently stop notifications after the first N.
+    val observers = targets.map { (directory, names) ->
+        object : FileObserver(directory.absolutePath, flags) {
             override fun onEvent(event: Int, path: String?) {
                 if (path == null || path in names) trySend(Unit)
             }
         }.also(FileObserver::startWatching)
-        val inodeWatches = names.mapNotNull { name ->
-            val file = File(directory, name)
-            if (!file.isFile || file.canonicalFile != file.absoluteFile) return@mapNotNull null
-            object : FileObserver(file.absolutePath, FileObserver.MODIFY or
-                FileObserver.CLOSE_WRITE or FileObserver.ATTRIB or
-                FileObserver.MOVE_SELF or FileObserver.DELETE_SELF) {
-                override fun onEvent(event: Int, path: String?) {
-                    trySend(Unit)
-                }
-            }.also(FileObserver::startWatching)
-        }
-        listOf(parentWatch) + inodeWatches
     }
     awaitClose { observers.forEach(FileObserver::stopWatching) }
 }

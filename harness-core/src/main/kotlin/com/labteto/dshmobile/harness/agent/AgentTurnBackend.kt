@@ -9,6 +9,8 @@ data class AgentBackendRequest(
     val input: String,
     val history: List<AgentMessage>,
     val maxSteps: Int,
+    /** Explicit user-selected remote workspace execution; old workers never silently fall back. */
+    val remoteTools: Boolean = false,
 )
 
 class AgentBackendServices(

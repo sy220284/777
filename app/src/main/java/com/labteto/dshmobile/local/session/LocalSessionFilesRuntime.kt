@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalog
 import com.labteto.dshmobile.local.attachment.inspectImportedAttachmentFile
 import com.labteto.dshmobile.uicontract.UiAttachmentInspectionReceipt
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
+import com.labteto.dshmobile.harness.resource.HarnessResourcePriority
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
@@ -81,10 +82,10 @@ class LocalSessionFilesRuntime @Inject internal constructor(
 
     internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment =
         withContext(Dispatchers.IO) { resourceScheduler.withResource(
-            HarnessResourceKind.FILE_IO, "file:import"
+            HarnessResourceKind.FILE_IO, "file:import", priority = HarnessResourcePriority.INTERACTIVE
         ) {
             if (context.contentResolver.getType(uri)?.startsWith("image/") == true) {
-                resourceScheduler.withResource(HarnessResourceKind.MEDIA_DECODE, "file:import_image") {
+                resourceScheduler.withResource(HarnessResourceKind.MEDIA_DECODE, "file:import_image", priority = HarnessResourcePriority.INTERACTIVE) {
                     attachmentImporter.import(uri)
                 }
             } else attachmentImporter.import(uri)
@@ -127,18 +128,23 @@ class LocalSessionFilesRuntime @Inject internal constructor(
 
     override suspend fun previewWorkspaceFile(path: String): LocalWorkspaceFilePreview =
         withContext(Dispatchers.IO) { resourceScheduler.withResource(
-            HarnessResourceKind.FILE_IO, "file:preview"
+            HarnessResourceKind.FILE_IO, "file:preview", priority = HarnessResourcePriority.INTERACTIVE
         ) { coordinator.preview(path) } }
 
     override suspend fun previewWorkspaceFilePage(path: String, offset: Long): LocalWorkspaceFilePreview =
         withContext(Dispatchers.IO) { resourceScheduler.withResource(
-            HarnessResourceKind.FILE_IO, "file:preview_page"
+            HarnessResourceKind.FILE_IO, "file:preview_page", priority = HarnessResourcePriority.INTERACTIVE
         ) { workspace.preview(path, offset = offset) } }
 
     override suspend fun exportWorkspaceFile(path: String, output: java.io.OutputStream): Long =
-        withContext(Dispatchers.IO) { resourceScheduler.withResource(
-            HarnessResourceKind.FILE_IO, "file:export"
-        ) { workspace.exportFileForUi(path, output) } }
+        withContext(Dispatchers.IO) {
+            val units = com.labteto.dshmobile.harness.resource.harnessFileIoUnitsForBytes(
+                workspace.fileSizeForResourceBudget(path))
+            resourceScheduler.withResource(HarnessResourceKind.FILE_IO, "file:export", units = units,
+                priority = HarnessResourcePriority.BACKGROUND) {
+                workspace.exportFileForUi(path, output)
+            }
+        }
 }
 
 @dagger.Module

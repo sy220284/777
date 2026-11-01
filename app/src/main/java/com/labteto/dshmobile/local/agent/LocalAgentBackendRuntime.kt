@@ -75,7 +75,7 @@ internal class LocalAgentBackendRuntime @Inject constructor(
                 check(peer()?.revision == expected) { "远端授权已变更或撤销" }
                 currentCoroutineContext()[AgentRunExecutionContext]?.requireCurrent()
             }
-            val driver = AgentTlsBackend(selected.host, selected.port, selected.pin, selected.token, checkGrant)
+            val driver = AgentTlsBackend(selected.host, selected.port, selected.pin, selected.token, requireGrantCurrent = checkGrant)
             AgentTurnBackend { request, services ->
                 withContext(AgentBackendExecutionContext(checkGrant) + com.labteto.dshmobile.runtime.ProcessIsolationContext() + LocalAgentBackendSelectionContext(capabilities)) {
                     coroutineScope {

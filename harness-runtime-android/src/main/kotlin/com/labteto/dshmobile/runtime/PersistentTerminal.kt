@@ -26,6 +26,8 @@ class PersistentPipeTerminalProvider(
     private val defaultWorkingDirectory: File? = null,
     private val extraSearchPaths: () -> List<File> = { emptyList() },
     private val baseEnvironment: () -> Map<String, String> = { emptyMap() },
+    private val inheritEnvironment: Boolean = true,
+    private val trustedReadRoots: List<File> = emptyList(),
 ) : HarnessTerminalProvider {
     private data class Session(
         val managed: ManagedProcess,
@@ -69,9 +71,10 @@ class PersistentPipeTerminalProvider(
                 val directory = workingDirectory?.let(::File) ?: defaultWorkingDirectory
                 if (directory != null) require(directory.isDirectory) { "工作目录不存在：${directory.path}" }
                 val childBuilder = secureIsolatedProcessBuilder(ProcessBuilder(resolveCommand(command)).directory(directory).apply {
+                    if (!inheritEnvironment) environment().clear()
                     environment()["PATH"] = searchPaths().joinToString(File.pathSeparator) { it.path }
                     environment().putAll(baseEnvironment())
-                }, extraSearchPaths(), baseEnvironment())
+                }, extraSearchPaths(), baseEnvironment(), trustedReadRoots)
                 val process = ManagedProcess.start(ProcessBuilder(
                     python.path, "-P", "-s", "-u", "-c", script,
                     JsonArray(childBuilder.command().map(::JsonPrimitive)).toString(),
@@ -138,9 +141,10 @@ class PersistentPipeTerminalProvider(
                         .directory(directory)
                         .redirectErrorStream(true)
                         .apply {
+                            if (!inheritEnvironment) environment().clear()
                             environment()["PATH"] = searchPaths().joinToString(File.pathSeparator) { it.path }
                             environment().putAll(baseEnvironment())
-                        }, extraSearchPaths(), baseEnvironment()),
+                        }, extraSearchPaths(), baseEnvironment(), trustedReadRoots),
                 )
                 val process = managed.process
                 owned = managed

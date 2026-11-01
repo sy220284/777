@@ -9,6 +9,8 @@ import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.model.LocalToolCall
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -110,8 +112,17 @@ internal class LocalWorkAgentControlRuntime(
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
     private val teams: LocalAgentTeamRuntime,
 ) : LocalAgentControlPort {
-    override suspend fun executeTeam(binding: LocalWorkRunBinding, call: LocalToolCall): String? =
-        teams.execute(call, binding)
+    // Team stop remains an AgentControl adapter; Team owns the durable stop fact.
+    override suspend fun executeTeam(binding: LocalWorkRunBinding, call: LocalToolCall): String? {
+        if (call.name in setOf("interrupt_agent", "agent_close")) {
+            val agentId = call.arguments["agent_id"]?.jsonPrimitive?.contentOrNull
+            if (agentId != null && LocalAgentTeamContract.isTeamJobId(agentId)) {
+                registry.resolveOwned(binding.sessionId, agentId)
+                return teams.stopOwnedAgentJob(binding.sessionId, agentId, permanently = call.name == "agent_close")
+            }
+        }
+        return teams.execute(call, binding)
+    }
 
     private val spawns = LocalAgentSpawnController(subagents, persistentJobs)
 

@@ -244,8 +244,13 @@ def proof(root, marker, earlier):
         return "操作类型无效"
     if not CHINESE.search(parts(marker["path"])[-1]):
         return "功能末级名称必须为中文"
-    if marker.get("owner") not in OWNER_IDS:
-        return "功能归属不是架构登记的七个所有权模块"
+    owner = marker.get("owner")
+    # A shared runtime capability is not a product Feature owner. Permit SHARED
+    # only beneath the explicit shared-capability tree, without broadening the
+    # seven exclusive Feature-owner identifiers.
+    shared_runtime = parts(marker["path"])[0] == "第二层｜共享运行能力"
+    if owner not in OWNER_IDS and not (owner == "SHARED" and shared_runtime):
+        return "功能归属不符合七个业务所有权模块或共享能力范围"
     symbol = marker.get("entry", "")
     if not isinstance(symbol, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", symbol):
         return "缺少明确的生产入口符号 entry"
@@ -973,10 +978,30 @@ def generate(root):
             historic_removed, historic_current = historical_code_evidence(root, [])
             historical_match = [x for x in historic_removed + historic_current
                                 if x["path"] == item["path"]]
+        # Existing product leaves may acquire a newly registered source owner only
+        # when an independently reviewed exact-path evidence anchor proves both
+        # the declared production symbol and its real test method. Never infer
+        # compatibility merely from a matching Chinese display name.
+        proven_current = False
+        if not was and exists is not None:
+            explicit_file = root / EXPLICIT_EVIDENCE
+            if explicit_file.is_file():
+                explicit_items = json.loads(explicit_file.read_text(encoding="utf-8"))["items"]
+                exact = next((x for x in explicit_items if x["path"] == item["path"]), None)
+                if exact:
+                    source_proven = any(s["path"] == item["source"] and
+                                        item["entry"] in s.get("symbols", [])
+                                        for s in exact.get("sources", []))
+                    test_proven = any(t["path"] == item["test"].rsplit("#", 1)[0] and
+                                      t["method"] == item["test"].rsplit("#", 1)[1] and
+                                      t.get("references") == item["entry"]
+                                      for t in exact.get("tests", []))
+                    proven_current = source_proven and test_proven
         allowed_adoption = (not was and exists is not None and
                             not exists["children"] and
-                            any(item["source"] in x["historical_production_sources"]
-                                for x in historical_match))
+                            (proven_current or any(
+                                item["source"] in x["historical_production_sources"]
+                                for x in historical_match)))
         if exists is not None and not allowed_adoption and target != source_path and (
             not was or target != parts(was["path"])
         ):
@@ -1085,20 +1110,33 @@ def generate(root):
         if followup_json.get("version") != 1 or not isinstance(followup_json.get("items"), list):
             raise ValueError("功能存在性专项核查登记格式错误")
         expected = {x["path"] for x in unresolved_features}
+        mapped_tests = {item["path"]: set(item["evidence"]) for item in matrix["items"]}
         for entry in followup_json["items"]:
             key = entry.get("path")
-            if not isinstance(key, str) or key in followup or key not in expected:
-                raise ValueError("存在性核查记录重复或不在源证据待核清单")
+            if not isinstance(key, str) or key in followup or key not in all_leaves:
+                raise ValueError("存在性核查记录重复或不属于现行功能树")
+            confirmed = {test["path"] + "#" + test["method"] for test in entry["test"]}
+            unavailable = set(entry.get("unavailable_test_sources", []))
+            if confirmed & unavailable:
+                raise ValueError("存在性核查把已失效测试当成可执行证据")
+            # A reviewed leaf may gain an executable test mapping without losing
+            # the broader source/existence analysis. Its partial test evidence
+            # must be indexed, otherwise stale triage may hide coverage regressions.
+            if key not in expected and (
+                not confirmed or not confirmed.issubset(mapped_tests.get(key, set()))
+            ):
+                raise ValueError("已映射功能的存在性记录没有相应可执行证据: " + key)
             followup[key] = {
                 "kind": entry["kind"],
                 "availability": entry["availability"],
                 "separate_product_entry": entry["independent"],
                 "production_sources_confirmed": len(entry["source"]),
                 "test_methods_confirmed": len(entry["test"]),
+                "unavailable_test_sources": sorted(unavailable),
                 "explanation": entry["conclusion"],
             }
-        if set(followup) != expected:
-            raise ValueError(f"存在性核查未对齐现行证据：新增待核={sorted(expected - set(followup))}; 不再待核={sorted(set(followup) - expected)}")
+        if not expected.issubset(followup):
+            raise ValueError(f"存在性核查未覆盖尚无入口证据的功能：{sorted(expected - set(followup))}")
         for item in unresolved_features:
             item["followup"] = followup[item["path"]]
     for record in evidence:

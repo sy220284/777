@@ -568,6 +568,8 @@ fun LocalHarnessScreen(
         previewWorkspaceFilePage = viewModel::previewWorkspaceFilePage,
         artifactsForUi = viewModel::artifactsForUi,
         eventSequenceForUi = viewModel::eventSequenceForUi,
+        eventChanges = viewModel::workEventChangesForUi,
+        artifactFileChanges = viewModel::workArtifactFileChangesForUi,
         artifactRevision = viewModel::artifactRevisionForUi,
         refreshArtifactFiles = viewModel::refreshArtifactFilesForUi,
         inspectArtifact = viewModel::inspectArtifactForUi,
