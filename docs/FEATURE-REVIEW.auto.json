@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "snapshot": "7b8facdfd2db",
+  "snapshot": "1ffd1d4e731a",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1908,
   "production_sources_scanned": 1117,
-  "feature_nodes": 552,
-  "functional_leaves": 455,
+  "feature_nodes": 553,
+  "functional_leaves": 456,
   "existing_executable_test_mappings": 121,
   "leaf_evidence": [
     {
@@ -3112,12 +3112,13 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
       "test_reference_count": 0,
       "historical_grade": null,
       "existing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/uicontract/WorkReadUiPort.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjection.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjection.kt",
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt"
       ],
       "missing_production_sources": [],
       "named_symbols": [
@@ -3128,11 +3129,22 @@
         {
           "symbol": "projectLocalWorkHistoryPage",
           "declaration_found": true
+        },
+        {
+          "symbol": "LocalWorkEvidenceSheet",
+          "declaration_found": true
         }
       ],
       "explicit_source_anchor": true,
-      "explicit_static_scope": "保留现行业务数据与端口，V6 原生页面消费；此处仅证明对应声明存在。",
-      "explicit_test_candidates": [],
+      "explicit_static_scope": "已核对 WorkReadUiPort、Work 历史投影、实际 LocalWorkEvidenceSheet 页面入口以及设备测试方法；设备结果、历史翻页和未知副作用展示仍须按当前 HEAD 实测。",
+      "explicit_test_candidates": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheetTest.kt",
+          "method": "olderPageIsReachableAndUnknownOutcomeKeepsItsMeaning",
+          "references": "LocalWorkEvidenceSheet",
+          "status": "仅发现测试源码，未验证CI是否执行通过"
+        }
+      ],
       "workflow_evidence": []
     },
     {
@@ -6064,6 +6076,27 @@
       }
     },
     {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 按原 Job 身份统一中断与关闭 Team 成员（PR #874）",
+      "verification": "没有可确认的现行入口证据",
+      "test_reference_count": 0,
+      "historical_grade": null,
+      "existing_production_sources": [],
+      "missing_production_sources": [],
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "explicit_test_candidates": [],
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "team_control_via_existing_job_owner",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 2,
+        "explanation": "现行 Team Owner 使用真实持久 Job 身份执行中断/关闭，保留成员身份与取消后的可恢复差异；AgentControl 仅作为调用入口。已有正反 JVM 测试源码，跨模式调用、进程死亡及 Android 设备行为仍待最新提交验收，不计作独立产品页面。"
+      }
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工作功能 / 自我改进与工作区档案 / 工作区长期记录与用户备注保护",
       "verification": "具名源码及仪表测试声明存在（静态，未执行）",
       "test_reference_count": 0,
@@ -8683,16 +8716,16 @@
   ],
   "evidence_grade_summary": {
     "真实测试映射（仅局部）": 120,
-    "具名源码声明存在（静态，待调用链复核）": 194,
-    "没有可确认的现行入口证据": 21,
+    "具名源码声明存在（静态，待调用链复核）": 193,
+    "没有可确认的现行入口证据": 22,
     "历史生产文件仍存在（待入口复核）": 87,
-    "具名源码及仪表测试声明存在（静态，未执行）": 15,
+    "具名源码及仪表测试声明存在（静态，未执行）": 16,
     "真实测试映射及具名源码声明（静态）": 1,
     "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）": 14,
     "候选生产文件仍存在（不足以证明功能）": 3
   },
   "workflow_evidence_features": 14,
-  "declared_unexecuted_test_methods": 15,
+  "declared_unexecuted_test_methods": 16,
   "tracked_legacy_identities": 117,
   "stale_legacy_identities": [
     {
@@ -9543,6 +9576,27 @@
       }
     },
     {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 按原 Job 身份统一中断与关闭 Team 成员（PR #874）",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "共享工具或其他能力",
+      "inspect": "按用户实际功能入口检查共享工具模块",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "team_control_via_existing_job_owner",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 2,
+        "explanation": "现行 Team Owner 使用真实持久 Job 身份执行中断/关闭，保留成员身份与取消后的可恢复差异；AgentControl 仅作为调用入口。已有正反 JVM 测试源码，跨模式调用、进程死亡及 Android 设备行为仍待最新提交验收，不计作独立产品页面。"
+      }
+    },
+    {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型部分输出与终态结算",
       "issue": "缺少可确认的现行源码入口",
       "domain": "共享工具或其他能力",
@@ -9783,43 +9837,28 @@
       }
     }
   ],
-  "followup_investigated_descriptions": 21,
-  "followup_production_or_compatibility": 14,
+  "followup_investigated_descriptions": 22,
+  "followup_production_or_compatibility": 15,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "20ee31512f33",
+    "baseline": "7b8facdfd2db",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/MainActivity.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentControlPort.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
     "added_ui": [],
     "removed_ui": []
   },
-  "source_verified_registrations": 19,
+  "source_verified_registrations": 21,
   "explicit_retirements": 0,
   "changes_applied": [],
-  "pending_changes": [
-    {
-      "id": "ui.zhaoxi.e817",
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 朝夕 E8.17 独立界面接入（PR #740，未合并）",
-      "status": "待复核，未写入功能树",
-      "reason": "退役项必须对应已登记功能的原完整路径"
-    },
-    {
-      "id": "work.agent-control.team-stop",
-      "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 按原 Job 身份统一中断与关闭 Team 成员（PR #874）",
-      "status": "待复核，未写入功能树",
-      "reason": "测试源码没有直接引用所登记的生产入口符号"
-    },
-    {
-      "id": "work.history-evidence-ui",
-      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
-      "status": "拒绝自动合并现有节点",
-      "reason": "目标功能路径已经存在；请先逐项核实合并/拆分及测试归属"
-    }
-  ],
+  "pending_changes": [],
   "obsolete_historical_evidence_count": 20,
   "obsolete_historical_evidence": [
     {

@@ -60,7 +60,7 @@
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt"
     }
   ],
-  "semantic_registration_count": 22,
+  "semantic_registration_count": 21,
   "production_file_fingerprints": [
     {
       "path": "app/src/main/java/com/github/sisong/HPatch.kt",
@@ -72,7 +72,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/MainActivity.kt",
-      "sha256": "6dccb4773d58fc7e"
+      "sha256": "4f5c332f5077beed"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/automation/AutomationCommandSchedule.kt",
@@ -2588,7 +2588,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentControlPort.kt",
-      "sha256": "8a6935d7125e6c83"
+      "sha256": "d246c1332379b19e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentLifecycleController.kt",
@@ -2656,7 +2656,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
-      "sha256": "51a6dcd2962b871c"
+      "sha256": "eb421a2445c14677"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTreeProjection.kt",
@@ -4532,12 +4532,16 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "7b8facdfd2db",
+  "source_snapshot": "1ffd1d4e731a",
   "observed_delta": {
-    "baseline": "20ee31512f33",
+    "baseline": "7b8facdfd2db",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/MainActivity.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentControlPort.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
@@ -4545,10 +4549,10 @@
     "removed_ui": []
   },
   "tracked_legacy_identities": 117,
-  "unproven_feature_count": 21,
-  "followup_investigated_descriptions": 21,
+  "unproven_feature_count": 22,
+  "followup_investigated_descriptions": 22,
   "workflow_evidence_features": 14,
-  "declared_unexecuted_test_methods": 15,
+  "declared_unexecuted_test_methods": 16,
   "verified_registrations": [
     "automation.management-receipts",
     "runtime.agent-remote.environment",
@@ -4565,12 +4569,14 @@
     "ui.document.inline_reply",
     "ui.document.local_builder",
     "ui.scene.catalog",
+    "work.agent-control.team-stop",
     "work.agent-team.member-collaboration",
     "work.goal.incremental-facts",
+    "work.history-evidence-ui",
     "work.history.semantic-background",
     "work.taskgraph.durable-acceptance"
   ],
-  "unverified_changes_count": 3,
+  "unverified_changes_count": 0,
   "obsolete_historical_evidence_count": 20,
   "current_tree_outdated_source_count": 0
 }

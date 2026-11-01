@@ -122,6 +122,14 @@
       "test": "app/src/test/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalogTest.kt#everyRouteHasExactlyOneStableOwnerAndModuleRouteList"
     },
     {
+      "id": "work.agent-control.team-stop",
+      "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 按原 Job 身份统一中断与关闭 Team 成员（PR #874）",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "stopOwnedAgentJob",
+      "owner": "WORK",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#genericTeamStopUsesExactJobAndPreservesInterruptVersusClose"
+    },
+    {
       "id": "work.agent-team.member-collaboration",
       "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 真实成员身份与窄授权协作（未合并）",
       "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
@@ -136,6 +144,14 @@
       "entry": "LocalWorkGoalFactsProjection",
       "owner": "WORK",
       "test": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalFactsProjectionTest.kt#repeatedAssessmentAppliesOnlyNewEventsAndMatchesFullRebuild"
+    },
+    {
+      "id": "work.history-evidence-ui",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheet.kt",
+      "entry": "LocalWorkEvidenceSheet",
+      "owner": "WORK",
+      "test": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkEvidenceSheetTest.kt#olderPageIsReachableAndUnknownOutcomeKeepsItsMeaning"
     },
     {
       "id": "work.history.semantic-background",
