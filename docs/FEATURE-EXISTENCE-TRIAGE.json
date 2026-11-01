@@ -238,6 +238,33 @@
       "conclusion": "Node/Python/Git有各自运行时安装代码，通过共享运行时管理器组合供工具链使用；拥有三项Android设备测试源码，但目前无此PR对应设备通过证据。"
     },
     {
+      "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 按原 Job 身份统一中断与关闭 Team 成员（PR #874）",
+      "kind": "team_control_via_existing_job_owner",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+          "symbol": "stopOwnedAgentJob"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentControlPort.kt",
+          "symbol": "executeTeam"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt",
+          "method": "genericTeamStopUsesExactJobAndPreservesInterruptVersusClose"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt",
+          "method": "genericTeamStopRejectsForeignAndDisplacedParentBeforeEffects"
+        }
+      ],
+      "conclusion": "现行 Team Owner 使用真实持久 Job 身份执行中断/关闭，保留成员身份与取消后的可恢复差异；AgentControl 仅作为调用入口。已有正反 JVM 测试源码，跨模式调用、进程死亡及 Android 设备行为仍待最新提交验收，不计作独立产品页面。"
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 真实成员身份与窄授权协作（未合并）",
       "kind": "unmerged_member_collaboration",
       "independent": false,
