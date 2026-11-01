@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "6ef4e5971a1f",
+  "snapshot": "e1880a6f6557",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1910,
   "production_sources_scanned": 1117,
@@ -9608,7 +9608,7 @@
   "followup_production_or_compatibility": 7,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "4d7a4ccca778",
+    "baseline": "6ef4e5971a1f",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [],
