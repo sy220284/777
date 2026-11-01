@@ -244,8 +244,13 @@ def proof(root, marker, earlier):
         return "操作类型无效"
     if not CHINESE.search(parts(marker["path"])[-1]):
         return "功能末级名称必须为中文"
-    if marker.get("owner") not in OWNER_IDS:
-        return "功能归属不是架构登记的七个所有权模块"
+    owner = marker.get("owner")
+    # A shared runtime capability is not a product Feature owner. Permit SHARED
+    # only beneath the explicit shared-capability tree, without broadening the
+    # seven exclusive Feature-owner identifiers.
+    shared_runtime = parts(marker["path"])[0] == "第二层｜共享运行能力"
+    if owner not in OWNER_IDS and not (owner == "SHARED" and shared_runtime):
+        return "功能归属不符合七个业务所有权模块或共享能力范围"
     symbol = marker.get("entry", "")
     if not isinstance(symbol, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", symbol):
         return "缺少明确的生产入口符号 entry"
