@@ -6,6 +6,13 @@ import com.labteto.dshmobile.local.profile.UserProfile
 import com.labteto.dshmobile.local.profile.UserProfileStore
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import java.lang.reflect.Proxy
@@ -77,6 +84,86 @@ class LocalHarnessSettingsCoordinatorTest {
         assertEquals(UserProfile("edit-99", false, true), store.read())
         // The recovery generation remains the baseline, proving pending edits did not all hit disk.
         assertEquals(baseline, UserProfileStore(File(file.parentFile, "user.json.bak"), Json).read())
+    }
+
+    @Test fun inFlightWriteWithRapidSuccessorsAcknowledgesOnlyFinalGeneration() = runBlocking {
+        val file = File(temporary.root, "profile/concurrent.json")
+        val store = UserProfileStore(file, Json)
+        val runtime = LocalRuntimeStateStore().apply { initialize(LocalHarnessState(sessionId = "concurrent")) }
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val worker = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            val settings = LocalHarnessSettingsCoordinator(
+                preferences, store, localSettingsStatePort(runtime), worker,
+                writeProfile = { profile ->
+                    if (profile.customRules == "first") {
+                        started.countDown()
+                        check(release.await(5, TimeUnit.SECONDS)) { "Timed out awaiting the second edit" }
+                    }
+                    store.write(profile)
+                },
+            )
+            val first = async(start = CoroutineStart.UNDISPATCHED) {
+                settings.savePersonalization("first", true, true)
+            }
+            assertTrue("Writer did not enter the first disk operation", started.await(5, TimeUnit.SECONDS))
+            val superseded = async(start = CoroutineStart.UNDISPATCHED) {
+                settings.savePersonalization("middle", true, false)
+            }
+            val newest = async(start = CoroutineStart.UNDISPATCHED) {
+                settings.savePersonalization("latest", false, false)
+            }
+            assertFalse(superseded.await())
+            assertFalse(newest.isCompleted)
+            assertEquals("", runtime.state.value.userRules)
+            release.countDown()
+            assertFalse(first.await())
+            assertTrue(newest.await())
+            assertEquals(UserProfile("latest", false, false), store.read())
+            assertEquals("latest", runtime.state.value.userRules)
+        } finally {
+            release.countDown()
+            worker.cancel()
+        }
+    }
+
+    @Test fun staleDiskFailureCannotOverrideNewerSuccessfulGeneration() = runBlocking {
+        val file = File(temporary.root, "profile/recovery.json")
+        val store = UserProfileStore(file, Json)
+        val runtime = LocalRuntimeStateStore().apply { initialize(LocalHarnessState(sessionId = "failure")) }
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val worker = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            val settings = LocalHarnessSettingsCoordinator(
+                preferences, store, localSettingsStatePort(runtime), worker,
+                writeProfile = { profile ->
+                    if (profile.customRules == "fails") {
+                        started.countDown()
+                        check(release.await(5, TimeUnit.SECONDS)) { "Timed out awaiting recovery" }
+                        error("simulated disk failure")
+                    }
+                    store.write(profile)
+                },
+            )
+            val failed = async(start = CoroutineStart.UNDISPATCHED) {
+                runCatching { settings.savePersonalization("fails", true, true) }
+            }
+            assertTrue(started.await(5, TimeUnit.SECONDS))
+            val recovered = async(start = CoroutineStart.UNDISPATCHED) {
+                settings.savePersonalization("recovered", false, true)
+            }
+            release.countDown()
+            assertTrue(failed.await().isFailure)
+            assertTrue(recovered.await())
+            assertEquals(UserProfile("recovered", false, true), store.read())
+            assertEquals("recovered", runtime.state.value.userRules)
+            assertNull("Stale failure must not leak into the latest save", runtime.state.value.error)
+        } finally {
+            release.countDown()
+            worker.cancel()
+        }
     }
 
     @Test
