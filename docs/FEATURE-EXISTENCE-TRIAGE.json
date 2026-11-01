@@ -31,25 +31,6 @@
       "conclusion": "工具输出留存与工具调用参数验证各有实际代码和测试，是共享工具执行链路中的两个能力；没有专用独立产品页面。"
     },
     {
-      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型部分输出与终态结算",
-      "kind": "shared_model_completion_contract",
-      "independent": false,
-      "availability": "code_and_tests_present_execution_unverified",
-      "source": [
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalCanonicalModel.kt",
-          "symbol": "toHistoryMessage"
-        }
-      ],
-      "test": [
-        {
-          "path": "app/src/test/java/com/labteto/dshmobile/local/model/LocalCanonicalModelCodecTest.kt",
-          "method": "partialCompletionRoundTripsLocallyAndNeverLeaksOntoWire"
-        }
-      ],
-      "conclusion": "模型部分输出及终态结算有共享运行层的生产源码和历史消息编解码测试；这是跨模型请求的内部运行语义，不存在独立用户页面。真实供应商流式中断、工具续轮和 Android 终态恢复仍需执行验收。"
-    },
-    {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 单聊群聊工作共存及历史读取隔离回归",
       "kind": "test_suite_not_product_feature",
       "independent": false,
@@ -172,33 +153,6 @@
       "conclusion": "这是团队工作界面的回归测试描述，不构成单独提供给用户的一项功能；测试方法存在，是否实际通过取决于CI设备任务。"
     },
     {
-      "path": "第三层｜平台与工程保障 / 代理执行后端 / 受审批的远端文件与原生进程执行（PR #874，完整环境仍待补齐）",
-      "kind": "partial_remote_workspace_environment",
-      "independent": false,
-      "availability": "code_and_tests_present_execution_unverified",
-      "source": [
-        {
-          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironment.kt",
-          "symbol": "AgentWorkspaceEnvironment"
-        },
-        {
-          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentEnvironmentTools.kt",
-          "symbol": "AgentEnvironmentToolRequest"
-        }
-      ],
-      "test": [
-        {
-          "path": "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt",
-          "method": "fileEffectsAndFreshObservationBelongToTheRemoteRoot"
-        },
-        {
-          "path": "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt",
-          "method": "nativeProcessReturnsRealExitCodeAndRemoteWorkingDirectory"
-        }
-      ],
-      "conclusion": "远端文件读写、文件版本校验与原生进程在指定工作区有生产实现及JVM测试源码；Android产品设置授权、完整工具契约、工件回收、Goal证据接纳与跨模式冷恢复仍待实证，不能标记为完整交付。"
-    },
-    {
       "path": "第三层｜平台与工程保障 / Android 本机运行时 / Node／Python／Git 工具运行环境",
       "kind": "composite_bundled_runtimes",
       "independent": false,
@@ -236,52 +190,6 @@
         }
       ],
       "conclusion": "Node/Python/Git有各自运行时安装代码，通过共享运行时管理器组合供工具链使用；拥有三项Android设备测试源码，但目前无此PR对应设备通过证据。"
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 按原 Job 身份统一中断与关闭 Team 成员（PR #874）",
-      "kind": "team_control_via_existing_job_owner",
-      "independent": false,
-      "availability": "code_and_tests_present_execution_unverified",
-      "source": [
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
-          "symbol": "stopOwnedAgentJob"
-        },
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentControlPort.kt",
-          "symbol": "executeTeam"
-        }
-      ],
-      "test": [
-        {
-          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt",
-          "method": "genericTeamStopUsesExactJobAndPreservesInterruptVersusClose"
-        },
-        {
-          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt",
-          "method": "genericTeamStopRejectsForeignAndDisplacedParentBeforeEffects"
-        }
-      ],
-      "conclusion": "现行 Team Owner 使用真实持久 Job 身份执行中断/关闭，保留成员身份与取消后的可恢复差异；AgentControl 仅作为调用入口。已有正反 JVM 测试源码，跨模式调用、进程死亡及 Android 设备行为仍待最新提交验收，不计作独立产品页面。"
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 工作功能 / 团队协作 / 真实成员身份与窄授权协作（未合并）",
-      "kind": "unmerged_member_collaboration",
-      "independent": false,
-      "availability": "code_and_tests_present_execution_unverified",
-      "source": [
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
-          "symbol": "executeMember"
-        }
-      ],
-      "test": [
-        {
-          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt",
-          "method": "trustedMembersSendPeerLeadAndReadOwnDurableMailbox"
-        }
-      ],
-      "conclusion": "未合并：复用Team Owner与持久Jobs，真实运行身份约束成员消息和任务CAS；测试源码存在，按用户要求未执行工具链。"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 用户与作者表达偏好及重复诊断",
@@ -390,94 +298,6 @@
         }
       ],
       "conclusion": "采样温度使用独立存储字段，人物编辑与聊天共用；属于正在使用的模型设置，能否被每一种模型接受需要连接真实模型验证。"
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
-      "kind": "ui_contract_migration_slice",
-      "independent": false,
-      "availability": "code_and_tests_present_execution_unverified",
-      "source": [
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilder.kt",
-          "symbol": "LocalUiDocumentBuilder"
-        },
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiDocumentUiAdapter.kt",
-          "symbol": "LocalUiDocumentUiAdapter"
-        }
-      ],
-      "test": [
-        {
-          "path": "app/src/test/java/com/labteto/dshmobile/local/presentation/document/LocalUiDocumentCodecTest.kt",
-          "method": "sourceIdentityComesFromTheOwnerAndModelCannotReplaceIt"
-        }
-      ],
-      "conclusion": "本地交互模板构造器已迁入 App 并由 V6 原生交互文档控制器接入；现有测试验证文档 Owner 的来源身份，模型不具备覆盖权。完整设备交互与每类模板内容仍需进一步验收。"
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 强类型会话发送、分支与交互端口（迁移中）",
-      "kind": "ui_contract_migration_slice",
-      "independent": false,
-      "availability": "code_and_tests_present_execution_unverified",
-      "source": [
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
-          "symbol": "LocalConversationUiPortComposition"
-        }
-      ],
-      "test": [
-        {
-          "path": "app/src/test/java/com/labteto/dshmobile/local/LocalConversationUiPortTest.kt",
-          "method": "staleActivationTransitionAndModeCannotInvokeEitherOwner"
-        }
-      ],
-      "conclusion": "生产端口接入 V6/Next 的文本与附件发送、编辑、重生成、停止、Chat 分支及 Work 审批/提问；业务准入仍由原 Owner 执行。完整 Feature 端口及真实双包旅程尚未完成。"
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 原回复内交互卡片（迁移中）",
-      "kind": "ui_contract_migration_slice",
-      "independent": false,
-      "availability": "code_and_tests_present_execution_unverified",
-      "source": [
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/document/LocalReplyUiDocument.kt",
-          "symbol": "LocalReplyUiDocumentPublisher"
-        },
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt",
-          "symbol": "LocalChatDirectTurnExecutor"
-        },
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-          "symbol": "LocalWorkAgentTurnExecutor"
-        }
-      ],
-      "test": [
-        {
-          "path": "app/src/test/java/com/labteto/dshmobile/local/presentation/document/LocalReplyUiDocumentTest.kt",
-          "method": "automaticCardRestoresExactOwnerSourceAndCannotReviveAfterDeletion"
-        }
-      ],
-      "conclusion": "Chat单聊/群聊与Work从原回复抽取封闭卡片，经原Session日志存储和恢复；原生确认文本后交原会话Owner发送。自动卡不增加模型调用，不授予工具/支付/审批权限。实际设备和完整跨包恢复仍待验收。"
-    },
-    {
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生功能路由与页面恢复校验",
-      "kind": "native_v6_route_invariant",
-      "independent": false,
-      "availability": "code_and_tests_present_execution_unverified",
-      "source": [
-        {
-          "path": "app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt",
-          "symbol": "LocalFeatureCatalog"
-        }
-      ],
-      "test": [
-        {
-          "path": "app/src/test/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalogTest.kt",
-          "method": "everyRouteHasExactlyOneStableOwnerAndModuleRouteList"
-        }
-      ],
-      "conclusion": "原 UI 3.0 的场景包兼容检查已退役；目前由 V6 原生 LocalFeatureCatalog 确认每个功能路由与模块归属，已有源码与单测。真实页面操作、系统返回和导航恢复需独立设备验证。"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生首页：唯一新建入口，未开始编辑器不生成正式会话记录，未发送草稿独立保留与恢复",
