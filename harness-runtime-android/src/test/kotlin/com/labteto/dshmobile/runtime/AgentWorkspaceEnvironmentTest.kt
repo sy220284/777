@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.runtime
 
 import com.labteto.dshmobile.harness.agent.AgentEnvironmentToolRequest
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
@@ -45,13 +47,13 @@ class AgentWorkspaceEnvironmentTest {
         try {
             assertEquals("1: original", first.execute(invocation("read", false, "path" to "shared.txt")).content)
             assertEquals("1: original", second.execute(invocation("read", false, "path" to "shared.txt")).content)
-            val results = kotlinx.coroutines.coroutineScope {
+            val results = coroutineScope {
                 listOf(
-                    kotlinx.coroutines.async {
+                    async {
                         runCatching { first.execute(invocation("edit", true,
                             "path" to "shared.txt", "old_text" to "original", "new_text" to "first")) }
                     },
-                    kotlinx.coroutines.async {
+                    async {
                         runCatching { second.execute(invocation("edit", true,
                             "path" to "shared.txt", "old_text" to "original", "new_text" to "second")) }
                     },
