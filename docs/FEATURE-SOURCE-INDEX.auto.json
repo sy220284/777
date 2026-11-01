@@ -4532,9 +4532,9 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "c7a268a80e3b",
+  "source_snapshot": "4467f011742a",
   "observed_delta": {
-    "baseline": "0f8117c6e5f0",
+    "baseline": "c7a268a80e3b",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [],
@@ -4545,7 +4545,7 @@
     "removed_ui": []
   },
   "tracked_legacy_identities": 117,
-  "unproven_feature_count": 14,
+  "unproven_feature_count": 0,
   "followup_investigated_descriptions": 14,
   "workflow_evidence_features": 14,
   "declared_unexecuted_test_methods": 16,
