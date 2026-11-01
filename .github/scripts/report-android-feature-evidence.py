@@ -73,8 +73,27 @@ def test_identity(root: Path, reference: str):
     return package.group(1) + "." + path.stem, method
 
 
-def report(root: Path, text: str, sha: str, android_api: int):
+def report(root: Path, text: str, sha: str, android_api: int, phase_logs=None):
     results, reported, named_receipts = parse_instrumentation(text)
+    restored = []
+    if phase_logs is not None:
+        suite = "com.labteto.dshmobile.local.session.SqliteCrossProcessRestoreAcceptanceAndroidTest"
+        methods = {
+            "stage": "stageRestoreForExternalProcessRestart",
+            "resume": "resumeRestoreAfterExternalProcessDeath",
+        }
+        for phase, method in methods.items():
+            receipts, count, named = parse_instrumentation(phase_logs[phase])
+            expected = {(suite, method): "passed"}
+            if count != 1 or named != 1 or receipts != expected:
+                raise ValueError(f"external process restore phase lacks exact passing receipt: {phase}")
+            # These phases need independent AndroidJUnitRunner executions and an
+            # externally initiated force-stop between them; the initial suite skips.
+            prior = results.get((suite, method), "not_observed")
+            if prior != "skipped":
+                raise ValueError(f"cross-process phase lacks initial assumption skip: {phase}")
+            results[(suite, method)] = "passed"
+            restored.append(method)
     matrix = json.loads((root / "docs/ACCEPTANCE-MATRIX.json").read_text(encoding="utf-8"))
     review = json.loads((root / "docs/FEATURE-REVIEW.auto.json").read_text(encoding="utf-8"))
     groups = json.loads((root / "docs/AGENT-ACCEPTANCE-U01-U10.json").read_text(encoding="utf-8"))
@@ -112,6 +131,7 @@ def report(root: Path, text: str, sha: str, android_api: int):
         "junit_testcases_reported": reported,
         "named_test_receipts_observed": named_receipts,
         "unobserved_test_receipts": reported - named_receipts,
+        "cross_process_restored_methods": restored,
         "assumption_skipped_tests": sum(x == "skipped" for x in results.values()),
         "junit_testcases_observed": len(results),
         "functional_leaves": len(leaves),
@@ -135,6 +155,12 @@ def self_test():
     assert skipped == {("demo.RealTest", "works"): "skipped"} and total == count == 1
     partial, total, count = parse_instrumentation(sample.replace("OK (1 test)", "OK (2 tests)"))
     assert partial[("demo.RealTest", "works")] == "passed" and total == 2 and count == 1
+    for method in ("stageRestoreForExternalProcessRestart", "resumeRestoreAfterExternalProcessDeath"):
+        phase = sample.replace("demo.RealTest",
+            "com.labteto.dshmobile.local.session.SqliteCrossProcessRestoreAcceptanceAndroidTest").replace("works", method)
+        assert parse_instrumentation(phase)[0] == {
+            ("com.labteto.dshmobile.local.session.SqliteCrossProcessRestoreAcceptanceAndroidTest", method): "passed"
+        }
     for candidate in (sample.replace("INSTRUMENTATION_STATUS_CODE: 0", "INSTRUMENTATION_STATUS_CODE: -2"),
                       sample.replace("OK (1 test)", "OK (0 tests)"),
                       sample.replace("INSTRUMENTATION_CODE: -1", "INSTRUMENTATION_CODE: 0")):
@@ -150,6 +176,7 @@ def main():
     parser.add_argument("instrumentation_log", nargs="?")
     parser.add_argument("android_api", type=int, nargs="?")
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--cross-process-restore-dir", default=None)
     args = parser.parse_args()
     self_test()
     if args.self_test:
@@ -159,7 +186,12 @@ def main():
         raise ValueError("An actual Android 16/17 instrumentation log and API level are required")
     log = Path(args.instrumentation_log)
     sha = os.environ.get("GITHUB_SHA") or os.popen("git rev-parse HEAD").read().strip()
-    result = report(ROOT, log.read_text(encoding="utf-8"), sha, args.android_api)
+    phase_logs = None
+    if args.cross_process_restore_dir:
+        directory = Path(args.cross_process_restore_dir)
+        phase_logs = {phase: (directory / (phase + ".log")).read_text(encoding="utf-8")
+                      for phase in ("stage", "resume")}
+    result = report(ROOT, log.read_text(encoding="utf-8"), sha, args.android_api, phase_logs=phase_logs)
     dest = ROOT / f".ci/executed-android{args.android_api}-feature-evidence.json"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
