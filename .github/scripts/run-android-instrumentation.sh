@@ -61,6 +61,8 @@ if ! validate_result "$result_file"; then
   exit 1
 fi
 
-# A successful suite alone never proves which mapped device tests actually ran.
-api="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
-python3 .github/scripts/report-android-feature-evidence.py "$result_file" "$api"
+# Keep the successful full-suite log intact for the subsequent independent
+# stage -> ADB force-stop -> resume cross-process run. The final evidence gate
+# executes in run-cross-process-session-restore.sh after both phases complete;
+# running it here rejects the two deliberately skipped suite-only methods.
+# Never mark U08 as passed without the two fresh-process receipts.
