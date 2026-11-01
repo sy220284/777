@@ -37,6 +37,35 @@ class AgentWorkspaceEnvironmentTest {
         } finally { environment.close() }
     }
 
+    @Test fun twoRemoteActivationsCannotBothEditTheSameObservedVersion() = runBlocking {
+        val root = temporary.newFolder("competing-remote")
+        val file = java.io.File(root, "shared.txt").apply { writeText("original") }
+        val first = AgentWorkspaceEnvironment.create(root)
+        val second = AgentWorkspaceEnvironment.create(root)
+        try {
+            assertEquals("1: original", first.execute(invocation("read", false, "path" to "shared.txt")).content)
+            assertEquals("1: original", second.execute(invocation("read", false, "path" to "shared.txt")).content)
+            val results = kotlinx.coroutines.coroutineScope {
+                listOf(
+                    kotlinx.coroutines.async {
+                        runCatching { first.execute(invocation("edit", true,
+                            "path" to "shared.txt", "old_text" to "original", "new_text" to "first")) }
+                    },
+                    kotlinx.coroutines.async {
+                        runCatching { second.execute(invocation("edit", true,
+                            "path" to "shared.txt", "old_text" to "original", "new_text" to "second")) }
+                    },
+                ).map { it.await() }
+            }
+            assertEquals("only one observed version may commit", 1, results.count { it.isSuccess })
+            assertEquals("stale concurrent edit must be rejected", 1, results.count { it.isFailure })
+            assertTrue(file.readText() in setOf("first", "second"))
+        } finally {
+            first.close()
+            second.close()
+        }
+    }
+
     @Test fun editingAnExecutablePreservesItsExecutionPermission() = runBlocking {
         val root = temporary.newFolder("remote")
         val file = java.io.File(root, "script.sh").apply {

@@ -7,6 +7,8 @@ import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolInvocationContext
 import com.labteto.dshmobile.harness.tools.ToolResult
 import java.io.File
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
@@ -20,6 +22,7 @@ class AgentWorkspaceEnvironment private constructor(
     private val process: AndroidProcessRuntime,
 ) : AgentEnvironmentTools {
     private val observations = mutableMapOf<String, String>()
+    private val fileMutex = Mutex()
 
     override suspend fun execute(request: AgentEnvironmentToolRequest): ToolResult =
         withContext(Dispatchers.IO + ProcessIsolationContext() + ToolInvocationContext(request.sessionId.orEmpty(), request.callId, request.executionId)) {
@@ -43,7 +46,7 @@ class AgentWorkspaceEnvironment private constructor(
         return candidate
     }
 
-    private suspend fun executeFile(request: AgentEnvironmentToolRequest): ToolResult {
+    private suspend fun executeFile(request: AgentEnvironmentToolRequest): ToolResult = fileMutex.withLock {
         val operation = request.name.removeSuffix("_file")
         require(operation == "read" || request.allowMutation) { "该任务没有写入权限" }
         val original = request.input.text("path")
@@ -65,7 +68,7 @@ class AgentWorkspaceEnvironment private constructor(
         if (result.isError) error(result.content)
         if (operation == "write") observations.remove(file.path)
         else result.fileVersions[original]?.let { observations[file.path] = it }
-        return result
+        result
     }
 
     override suspend fun close() { plugin.uninstall(context); observations.clear() }

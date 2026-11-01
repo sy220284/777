@@ -1,4 +1,5 @@
 """Descriptor-relative file effects; the runtime also applies its existing OS sandbox."""
+import fcntl
 import hashlib
 import io
 import itertools
@@ -27,7 +28,16 @@ def operate(request):
     operation = request['operation']
     parent = os.open('.', os.O_RDONLY | os.O_DIRECTORY)
     staged = None
+    lock_descriptor = None
     try:
+        # Shared-root mutations across independent agent activations/processes
+        # must serialize their read/verify/commit sequences.
+        if operation in ('write', 'edit'):
+            lock_descriptor = os.open('.agent-file-effects.lock',
+                os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600, dir_fd=parent)
+            if not stat.S_ISREG(os.fstat(lock_descriptor).st_mode):
+                raise ValueError('Invalid remote workspace mutation lock')
+            fcntl.flock(lock_descriptor, fcntl.LOCK_EX)
         for part in parts[:-1]:
             if operation == 'write':
                 try:
@@ -86,6 +96,18 @@ def operate(request):
             if mode is not None:
                 os.fchmod(output.fileno(), mode)
             os.fsync(output.fileno())
+        if operation == 'edit':
+            # Reopen the current path: the earlier descriptor can point to an
+            # unlinked inode after another writer replaces the target.
+            current = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+            try:
+                current_info = os.fstat(current)
+                if (not stat.S_ISREG(current_info.st_mode)
+                        or (current_info.st_dev, current_info.st_ino) != (info.st_dev, info.st_ino)
+                        or fingerprint(current) != before):
+                    raise ValueError('Remote file changed after observation; read it again')
+            finally:
+                os.close(current)
         os.replace(staged, name, src_dir_fd=parent, dst_dir_fd=parent)
         staged = None
         os.fsync(parent)
@@ -96,6 +118,8 @@ def operate(request):
         if staged is not None:
             os.unlink(staged, dir_fd=parent)
         os.close(parent)
+        if lock_descriptor is not None:
+            os.close(lock_descriptor)
 
 
 if __name__ == '__main__':
