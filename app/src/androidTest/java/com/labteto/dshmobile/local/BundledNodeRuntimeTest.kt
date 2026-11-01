@@ -46,7 +46,11 @@ class BundledNodeRuntimeTest {
         val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
 
         assertEquals(0, process.exitValue())
-        assertTrue("unexpected Node version: $output", output.startsWith("v26.12.1|"))
+        val expectedNodeVersion = context.assets.open("runtime/node/node-version.txt")
+            .bufferedReader().use { it.readText().trim() }
+        assertTrue("invalid verified Node version: $expectedNodeVersion",
+            Regex("^26\\.[0-9]+\\.[0-9]+$").matches(expectedNodeVersion))
+        assertTrue("unexpected Node version: $output", output.startsWith("v$expectedNodeVersion|"))
         assertTrue("Node child_process shell failed: $output", output.endsWith("shell-ok"))
     }
 }
