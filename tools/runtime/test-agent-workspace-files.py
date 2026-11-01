@@ -56,6 +56,15 @@ class WorkspaceFilesTest(unittest.TestCase):
         self.call('write', content='fresh-unobserved')
         self.assertEqual(Path('script.sh').read_text(), 'fresh-unobserved')
 
+    def test_unobserved_write_cannot_overwrite_existing_file(self):
+        self.call('write', content='created')
+        with self.assertRaisesRegex(ValueError, 'Read the existing remote file'):
+            self.call('write', content='silent-overwrite')
+        self.assertEqual(Path('script.sh').read_text(), 'created')
+        observed = self.call('read')['fileVersions']['script.sh']
+        self.call('write', content='safe-replacement', observed=observed)
+        self.assertEqual(Path('script.sh').read_text(), 'safe-replacement')
+
     def test_parent_replacement_cannot_redirect_write_outside_workspace(self):
         Path('nested').mkdir()
         outside = Path(self.external.name)

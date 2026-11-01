@@ -85,6 +85,8 @@ def operate(request):
                 info = os.stat(name, dir_fd=parent, follow_symlinks=False)
                 if not stat.S_ISREG(info.st_mode):
                     raise ValueError('Target must be a regular file')
+                if observed is None:
+                    raise ValueError('Read the existing remote file before overwriting it')
                 mode = stat.S_IMODE(info.st_mode) & 0o777
             except FileNotFoundError:
                 if observed is not None:

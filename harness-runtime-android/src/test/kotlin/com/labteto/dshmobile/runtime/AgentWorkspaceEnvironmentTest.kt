@@ -89,6 +89,21 @@ class AgentWorkspaceEnvironmentTest {
         }
     }
 
+    @Test fun anUnobservedRemoteWriteCannotOverwriteExistingFile() = runBlocking {
+        val root = temporary.newFolder("unobserved-writer")
+        val file = java.io.File(root, "shared.txt").apply { writeText("existing") }
+        val environment = AgentWorkspaceEnvironment.create(root)
+        try {
+            assertTrue(runCatching {
+                environment.execute(invocation("write", true, "path" to "shared.txt", "content" to "lost"))
+            }.isFailure)
+            assertEquals("existing", file.readText())
+            environment.execute(invocation("read", false, "path" to "shared.txt"))
+            environment.execute(invocation("write", true, "path" to "shared.txt", "content" to "safe"))
+            assertEquals("safe", file.readText())
+        } finally { environment.close() }
+    }
+
     @Test fun editingAnExecutablePreservesItsExecutionPermission() = runBlocking {
         val root = temporary.newFolder("remote")
         val file = java.io.File(root, "script.sh").apply {
