@@ -1240,7 +1240,8 @@
       "state": "automated_partial",
       "evidence": [
         "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#tlsToolEffectWritesOnlyTheServerWorkspaceAfterHostApproval",
-        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt#twoRemoteActivationsCannotBothEditTheSameObservedVersion"
+        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt#twoRemoteActivationsCannotBothEditTheSameObservedVersion",
+        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentWorkspaceEnvironmentTest.kt#anObservedRemoteWriteMustNotOverwriteAnotherAgentsCommit"
       ]
     }
   ],
