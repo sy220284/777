@@ -62,27 +62,7 @@ jobs:
           sha256sum .ci/device-apks/*.apk | tee .ci/device-apks/sha256.txt
           echo 'Benchmark APK Node runtime version:'
           unzip -p .ci/device-apks/app-debug.apk assets/runtime/node/node-version.txt | tee .ci/device-apks/node-version.txt
-          grep -Eq '^26\.[0-9]+\.[0-9]+
-      - name: Execute Android16/17 x 4KB/16KB on one runner
-        run: |
-          set -euo pipefail
-          bash .github/scripts/run-android-page-matrix.sh --local-apks
-      - name: Upload all matrix evidence, including failures
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: android16-17-four-way-raw
-          path: |
-            .ci/android-page-matrix/
-            .ci/android16-4k-ten-rounds/
-            .ci/android16-16k-ten-rounds/
-            .ci/android17-4k-ten-rounds/
-            .ci/android17-16k-ten-rounds/
-            .ci/device-apks/sha256.txt
-            .ci/device-apks/node-version.txt
-          if-no-files-found: warn
-          retention-days: 14
- .ci/device-apks/node-version.txt
+          grep -Eq '^26\.[0-9]+\.[0-9]+$' .ci/device-apks/node-version.txt
       - name: Execute Android16/17 x 4KB/16KB on one runner
         run: |
           set -euo pipefail
