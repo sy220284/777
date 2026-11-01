@@ -4532,14 +4532,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "5e5d4aed30d3",
+  "source_snapshot": "c95e3aef6b48",
   "observed_delta": {
-    "baseline": "bd2316178ac6",
+    "baseline": "5e5d4aed30d3",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/session/SqliteSessionSearchBlockIndex.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
