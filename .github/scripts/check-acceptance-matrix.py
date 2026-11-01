@@ -33,6 +33,47 @@ def leaves_from_tree(text):
     return [path for i, (depth, path) in enumerate(nodes)
             if i + 1 == len(nodes) or nodes[i + 1][0] <= depth]
 
+def expected_open_gaps(root, leaves, items):
+    review = json.loads((root / "docs/FEATURE-REVIEW.auto.json").read_text(encoding="utf-8"))
+    groups = json.loads((root / "docs/AGENT-ACCEPTANCE-U01-U10.json").read_text(encoding="utf-8"))
+    if [item["path"] for item in review["leaf_evidence"]] != leaves:
+        raise ValueError("functional review and authoritative feature tree differ")
+    indexed = {item["path"] for item in items}
+    pending = [item for item in review["leaf_evidence"] if item["path"] not in indexed]
+    return {
+        "version": 1,
+        "scope": "all_unmapped_feature_leaves_and_multi_agent_open_requirements",
+        "feature_tree_total": review["functional_leaves"],
+        "mapped_partial": len(items),
+        "pending_feature_count": len(pending),
+        "full_signed_off": 0,
+        "original_differential": {
+            "required_count": groups["scenario_baseline"]["required_count"],
+            "original_cases_recorded": groups["scenario_baseline"]["original_cases_recorded"],
+            "status": "原始84条同题差分定义尚未入仓；禁止以派生测试代替",
+        },
+        "agent_groups": [
+            {"id": group["id"], "full_acceptance": group["full_acceptance"],
+             "existing_test_references": len(group["evidence"]),
+             "open_requirements": group["open_requirements"]}
+            for group in groups["groups"]
+        ],
+        "items": [
+            {"path": item["path"], "status": "open_unverified",
+             "source_evidence_grade": item["verification"],
+             "production_sources": item.get("existing_production_sources", []),
+             "named_symbols": [symbol["symbol"] for symbol in item.get("named_symbols", [])
+                               if symbol.get("declaration_found")],
+             "next_validation": (
+                 "补充对应命令的真实运行回执及行为验收" if "CI或发布工作流" in item["verification"]
+                 else "确认真实生产入口、补充独立测试和运行回执" if "候选生产文件" in item["verification"]
+                 else "复核入口到结果的调用链、补充独立测试和运行回执" if "历史生产文件" in item["verification"]
+                 else "补充与功能语义对应的独立测试、当次运行回执及必要设备端到端验收")}
+            for item in pending
+        ],
+    }
+
+
 def validate(root=ROOT):
     leaves = leaves_from_tree((root / "docs/FEATURE-TREE.zh-CN.md").read_text(encoding="utf-8"))
     matrix = json.loads((root / "docs/ACCEPTANCE-MATRIX.json").read_text(encoding="utf-8"))
@@ -75,6 +116,12 @@ def validate(root=ROOT):
             if method not in methods:
                 raise ValueError(f"missing @Test method: {ref}")
         partial += item["state"] == "automated_partial"
+    expected_gaps = expected_open_gaps(root, leaves, items)
+    observed_gaps = json.loads((root / "docs/ACCEPTANCE-OPEN-GAPS.json").read_text(encoding="utf-8"))
+    if observed_gaps != expected_gaps:
+        raise ValueError("open-gap registry stale: run check-acceptance-matrix.py --sync-open-gaps")
+    if len(items) + expected_gaps["pending_feature_count"] != len(leaves):
+        raise ValueError("feature tree coverage has omitted leaves")
     # Never let an already-reviewed test fall out of the executable index.
     registry = json.loads((root / "docs/FEATURE-TREE-SOURCE-REGISTRY.json").read_text(encoding="utf-8"))
     explicit = json.loads((root / "docs/FEATURE-TREE-EXPLICIT-EVIDENCE.json").read_text(encoding="utf-8"))
@@ -130,7 +177,14 @@ def self_test():
 if __name__ == "__main__":
     try:
         self_test()
-        if "--self-test" not in sys.argv:
+        if "--sync-open-gaps" in sys.argv:
+            leaves = leaves_from_tree(TREE.read_text(encoding="utf-8"))
+            matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
+            expected = expected_open_gaps(ROOT, leaves, matrix["items"])
+            (ROOT / "docs/ACCEPTANCE-OPEN-GAPS.json").write_text(
+                json.dumps(expected, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            print("已更新全部未映射功能及多代理缺口:", expected["pending_feature_count"])
+        elif "--self-test" not in sys.argv:
             validate()
     except (ValueError, AssertionError, KeyError, OSError) as error:
         print(f"Acceptance evidence gate FAILED: {error}", file=sys.stderr)
