@@ -41,6 +41,7 @@ internal fun localWorkFeatureUiContribution(
             loadSearchPage = actions.searchWorkspacePage,
             loadConversation = actions.conversationFiles,
             loadPreview = actions.previewWorkspaceFile,
+            loadPreviewPage = actions.previewWorkspaceFilePage,
             onDismiss = onPopFeature,
             initialFilePath = requestedFilePath,
             entryRequest = entryRequest,

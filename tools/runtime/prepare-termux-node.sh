@@ -14,10 +14,10 @@ fi
 TERMUX_KEY_COMMIT="93c8e0b136bf39e2eb1735f9187f43d7e029bb2e"
 TERMUX_KEY_FINGERPRINT="CC72CF8BA7DBFA0182877D045A897D96E57CF20C"
 NODE_PACKAGE="nodejs"
-# Both supported ABIs use the same exact signed Termux snapshot version.
-# The upstream repository retired 26.4.0-2; do not disable package SHA checks.
-NODE_PACKAGE_VERSION="26.12.1"
-NODE_RUNTIME_VERSION="26.12.1"
+# Use the exact signed Termux package index while keeping the verified Node major 26.
+# All requested Android ABIs must use one matching package version.
+NODE_PACKAGE_VERSION=""
+NODE_RUNTIME_VERSION=""
 RUNTIME_PACKAGES=(nodejs libc++ openssl c-ares libicu libsqlite zlib libffi)
 SYSTEM_LIBS=(
   libc.so libdl.so libm.so liblog.so libandroid.so libpthread.so librt.so
@@ -259,9 +259,18 @@ prepare_arch() {
       echo "Termux 包索引字段缺失：$pkg ($apt_arch)" >&2
       exit 1
     }
-    if [ "$pkg" = "$NODE_PACKAGE" ] && [ "$version" != "$NODE_PACKAGE_VERSION" ]; then
-      echo "Node 版本漂移：期望 $NODE_PACKAGE_VERSION，实际 $version" >&2
-      exit 1
+    if [ "$pkg" = "$NODE_PACKAGE" ]; then
+      local runtime_version="${version%%-*}"
+      if ! [[ "$runtime_version" =~ ^26\.[0-9]+\.[0-9]+$ ]]; then
+        echo "Node 主版本不符合 26.x 兼容范围：$version" >&2
+        exit 1
+      fi
+      if [ -n "$NODE_PACKAGE_VERSION" ] && [ "$version" != "$NODE_PACKAGE_VERSION" ]; then
+        echo "Node 双架构包版本不一致：$NODE_PACKAGE_VERSION / $version" >&2
+        exit 1
+      fi
+      NODE_PACKAGE_VERSION="$version"
+      NODE_RUNTIME_VERSION="$runtime_version"
     fi
 
     local deb="$CACHE_DIR/debs/$apt_arch/$(basename "$filename")"

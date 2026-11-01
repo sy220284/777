@@ -12,6 +12,8 @@ enum class HarnessResourceKind {
     TERMINAL,
     VIRTUAL_DISPLAY,
     LANGUAGE_SERVER,
+    FILE_IO,
+    MEDIA_DECODE,
 }
 
 enum class HarnessResourcePressure {
@@ -26,6 +28,8 @@ data class HarnessResourceBudget(
     val maxTerminals: Int = 3,
     val maxVirtualDisplays: Int = 2,
     val maxLanguageServers: Int = 3,
+    val maxFileIo: Int = 2,
+    val maxMediaDecode: Int = 1,
 ) {
     init {
         require(maxModelRequests in 1..16) { "模型并发预算必须在 1..16 之间" }
@@ -33,6 +37,7 @@ data class HarnessResourceBudget(
         require(maxTerminals in 1..16) { "终端预算必须在 1..16 之间" }
         require(maxVirtualDisplays in 1..8) { "虚拟屏预算必须在 1..8 之间" }
         require(maxLanguageServers in 1..16) { "语言服务预算必须在 1..16 之间" }
+        require(maxFileIo in 1..8 && maxMediaDecode in 1..4) { "大文件并发预算无效" }
     }
 
     fun limit(kind: HarnessResourceKind): Int = when (kind) {
@@ -41,6 +46,8 @@ data class HarnessResourceBudget(
         HarnessResourceKind.TERMINAL -> maxTerminals
         HarnessResourceKind.VIRTUAL_DISPLAY -> maxVirtualDisplays
         HarnessResourceKind.LANGUAGE_SERVER -> maxLanguageServers
+        HarnessResourceKind.FILE_IO -> maxFileIo
+        HarnessResourceKind.MEDIA_DECODE -> maxMediaDecode
     }
 }
 
@@ -57,6 +64,8 @@ data class HarnessResourceSnapshot(
     val activeTerminals: Int,
     val activeVirtualDisplays: Int,
     val activeLanguageServers: Int,
+    val activeFileIo: Int = 0,
+    val activeMediaDecode: Int = 0,
     val budget: HarnessResourceBudget,
     val leases: List<HarnessResourceLeaseInfo> = emptyList(),
 ) {
@@ -68,6 +77,8 @@ data class HarnessResourceSnapshot(
                 activeTerminals.toDouble() / budget.maxTerminals,
                 activeVirtualDisplays.toDouble() / budget.maxVirtualDisplays,
                 activeLanguageServers.toDouble() / budget.maxLanguageServers,
+                activeFileIo.toDouble() / budget.maxFileIo,
+                activeMediaDecode.toDouble() / budget.maxMediaDecode,
             )
             val ratio = ratios.maxOrNull() ?: 0.0
             return when {
@@ -118,6 +129,8 @@ class HarnessResourceScheduler(
     private val activeTerminals = AtomicInteger()
     private val activeVirtualDisplays = AtomicInteger()
     private val activeLanguageServers = AtomicInteger()
+    private val activeFileIo = AtomicInteger()
+    private val activeMediaDecode = AtomicInteger()
     // Counters and the lease registry are one state projection: reports must never see
     // a changed count with a stale lease list (or vice versa).
     private val leaseStateLock = Any()
@@ -214,6 +227,8 @@ class HarnessResourceScheduler(
         activeTerminals = activeTerminals.get(),
         activeVirtualDisplays = activeVirtualDisplays.get(),
         activeLanguageServers = activeLanguageServers.get(),
+        activeFileIo = activeFileIo.get(),
+        activeMediaDecode = activeMediaDecode.get(),
         budget = currentBudget,
         leases = leases.values.sortedBy(HarnessResourceLeaseInfo::acquiredAt),
     ) }
@@ -232,6 +247,8 @@ class HarnessResourceScheduler(
         HarnessResourceKind.TERMINAL -> activeTerminals
         HarnessResourceKind.VIRTUAL_DISPLAY -> activeVirtualDisplays
         HarnessResourceKind.LANGUAGE_SERVER -> activeLanguageServers
+        HarnessResourceKind.FILE_IO -> activeFileIo
+        HarnessResourceKind.MEDIA_DECODE -> activeMediaDecode
     }
 
     private fun publish() = synchronized(publicationLock) {

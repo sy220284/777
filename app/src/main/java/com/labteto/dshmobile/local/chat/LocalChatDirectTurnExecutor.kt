@@ -277,6 +277,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 baseUrl = snapshot.modelState.baseUrl,
                 planSharing = snapshot.modelState.modelSelection.activeProfile?.authKind ==
                     com.labteto.dshmobile.local.model.LocalModelAuthKind.CHATGPT_PLAN,
+                resourceScheduler = runtimeStateStore.resourceScheduler,
             )
             val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
 

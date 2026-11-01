@@ -219,8 +219,8 @@ class LocalAttachmentImporterTest {
     }
 
     @Test
-    fun attachmentLargerThanOldTwentyMegabyteLimitCopiesWithoutRejection() = runBlocking {
-        val size = 21L * 1024L * 1024L
+    fun attachmentOfOneHundredTwentyEightMegabytesCopiesWithoutWholeFileAllocation() = runBlocking {
+        val size = 128L * 1024L * 1024L
         val source = object : InputStream() {
             var remaining = size
             override fun read(): Int = if (remaining > 0L) {

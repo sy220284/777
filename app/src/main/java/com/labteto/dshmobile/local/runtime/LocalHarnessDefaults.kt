@@ -56,7 +56,7 @@ internal val SUBAGENT_EXCLUDED_TOOLS = setOf(
 internal val PARALLEL_SUBAGENT_TOOLS = setOf("subagent", "spawn_subagent")
 
 internal val PLAN_MODE_BLOCKED_TOOLS = setOf(
-    "write", "write_file", "edit", "edit_file", "apply_patch", "download_file", "http_request",
+    "write", "write_file", "write_chunk", "edit", "edit_file", "apply_patch", "download_file", "http_request",
     "bash", "run_shell", "job_kill", "todo_write",
     "create_goal", "update_goal", "subagent", "spawn_subagent", "subagent_fork", "fork_subagent",
     "workflow", "present", "send_message", "interrupt_agent", "agent_resume", "agent_close",

@@ -26,7 +26,7 @@ jobs:
   android-16-17-four-way:
     runs-on: ubuntu-latest
     timeout-minutes: 100
-    # The same pinned Node 26.12.1 runtime now builds production and benchmark
+    # The same signed, major-26 Node runtime builds production and benchmark
     # APKs, with signed index and package SHA verification in both ABIs.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -61,7 +61,7 @@ jobs:
           sha256sum .ci/device-apks/*.apk | tee .ci/device-apks/sha256.txt
           echo 'Benchmark APK Node runtime version:'
           unzip -p .ci/device-apks/app-debug.apk assets/runtime/node/node-version.txt | tee .ci/device-apks/node-version.txt
-          grep -qx '26.12.1' .ci/device-apks/node-version.txt
+          grep -Eq '^26\.[0-9]+\.[0-9]+$' .ci/device-apks/node-version.txt
       - name: Execute Android16/17 x 4KB/16KB on one runner
         run: |
           set -euo pipefail

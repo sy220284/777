@@ -11,10 +11,12 @@ permissions:
   actions: read
 
 concurrency:
-  # Validate each main commit independently; later merges cannot queue-block its full matrix.
-  # Keep PR runs replaceable, and separate manual CI from the publish-authorizing main push.
-  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Main push and explicit main verification retain immutable SHA-specific runs.
+  # Auto-dispatched verification on a feature branch is replaceable: a newer
+  # index-generated HEAD supersedes its predecessor instead of multiplying runners.
+  # PR checks remain isolated from workflow_dispatch by event name.
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.event_name == 'workflow_dispatch' && github.ref_name != 'main' && github.ref_name || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref_name != 'main') }}
 
 jobs:
   scope:
@@ -411,6 +413,15 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: 上传 Android 16 源码大文件长任务耗时与内存数据
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android16-large-source-workloads
+          path: .ci/large-source-benchmarks/results.csv
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload Work timeline screenshots
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -492,6 +503,15 @@ jobs:
           path: .ci/android17-ten-rounds/
           if-no-files-found: error
           retention-days: 7
+
+      - name: 上传 Android 17 源码大文件长任务耗时与内存数据
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android17-large-source-workloads
+          path: .ci/large-source-benchmarks/results.csv
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload Work timeline screenshots
         if: always()

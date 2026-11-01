@@ -565,6 +565,7 @@ fun LocalHarnessScreen(
         searchWorkspacePage = viewModel::searchWorkspacePage,
         conversationFiles = viewModel::conversationFiles,
         previewWorkspaceFile = viewModel::previewWorkspaceFile,
+        previewWorkspaceFilePage = viewModel::previewWorkspaceFilePage,
         artifactsForUi = viewModel::artifactsForUi,
         eventSequenceForUi = viewModel::eventSequenceForUi,
         artifactRevision = viewModel::artifactRevisionForUi,
