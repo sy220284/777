@@ -26,6 +26,7 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
     private val userProfileStore: UserProfileStore,
     private val statePort: LocalSettingsStatePort,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    private val writeProfile: (UserProfile) -> Unit = userProfileStore::write,
 ) {
     internal constructor(
         preferences: SharedPreferences,
@@ -72,30 +73,36 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
             // value. Runtime state is committed only after durable storage succeeds.
             for ((generation, profile, receipt) in personalizationWrites) {
                 try {
-                    userProfileStore.write(profile)
+                    writeProfile(profile)
                     committedProfile = profile
-                    val latest = personalizationGeneration.get() == generation
-                    if (latest) {
-                        statePort.updatePersonalization(
-                            userRules = profile.customRules,
-                            autoRecall = profile.autoRecall,
-                            autoMemory = profile.autoMemory,
-                        )
+                    // Serialise the final generation check, projection and acknowledgement
+                    // with new submissions; a newer edit cannot race an older success.
+                    synchronized(this@LocalHarnessSettingsCoordinator) {
+                        val latest = personalizationGeneration.get() == generation
+                        if (latest) {
+                            statePort.updatePersonalization(
+                                userRules = profile.customRules,
+                                autoRecall = profile.autoRecall,
+                                autoMemory = profile.autoMemory,
+                            )
+                        }
+                        receipt?.complete(latest)
                     }
-                    receipt?.complete(latest)
                 } catch (cancelled: CancellationException) {
                     receipt?.completeExceptionally(cancelled)
                     throw cancelled
                 } catch (error: Exception) {
-                    if (personalizationGeneration.get() == generation) {
-                        statePort.updatePersonalization(
-                            userRules = committedProfile.customRules,
-                            autoRecall = committedProfile.autoRecall,
-                            autoMemory = committedProfile.autoMemory,
-                        )
-                        statePort.publishError(error.message ?: "个性化设置保存失败")
+                    synchronized(this@LocalHarnessSettingsCoordinator) {
+                        if (personalizationGeneration.get() == generation) {
+                            statePort.updatePersonalization(
+                                userRules = committedProfile.customRules,
+                                autoRecall = committedProfile.autoRecall,
+                                autoMemory = committedProfile.autoMemory,
+                            )
+                            statePort.publishError(error.message ?: "个性化设置保存失败")
+                        }
+                        receipt?.completeExceptionally(error)
                     }
-                    receipt?.completeExceptionally(error)
                 }
             }
         }

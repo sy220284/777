@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1874,
-  "production_source_count": 1107,
-  "test_code_file_count": 627,
+  "repository_code_file_count": 1878,
+  "production_source_count": 1108,
+  "test_code_file_count": 630,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -2284,7 +2284,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt",
-      "sha256": "168f4d4fe950d119"
+      "sha256": "f87f1c35c3fdea0b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/settings/LocalSettingsStatePort.kt",
@@ -3660,7 +3660,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsSections.kt",
-      "sha256": "606dfa033c489b79"
+      "sha256": "d7c9cc2f5e9930f9"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MiniMaxQuotaPage.kt",
@@ -3669,6 +3669,10 @@
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/ModelPerformanceSettings.kt",
       "sha256": "28bf32a8137c7995"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PersonalizationRulesEditor.kt",
+      "sha256": "dcca8b5d08f4682f"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/RuntimeDiagnosticsDialogs.kt",
@@ -3688,7 +3692,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
-      "sha256": "f0704c211b543323"
+      "sha256": "986fdb7f3ed461f8"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationComponents.kt",
@@ -4492,9 +4496,9 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "10dc7f24d7ba",
+  "source_snapshot": "c289d67fa26c",
   "observed_delta": {
-    "baseline": "32420a9838e3",
+    "baseline": "4a6cebe5606b",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [],
