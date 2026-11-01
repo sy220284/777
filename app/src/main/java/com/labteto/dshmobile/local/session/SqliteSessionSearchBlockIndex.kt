@@ -99,11 +99,13 @@ internal class SqliteSessionSearchBlockIndex(private val json: Json) {
         val keys = grams(query).take(MAX_FILTER_GRAMS)
         if (keys.isEmpty()) return null
         val placeholders = List(keys.size) { "?" }.joinToString(",")
+        // rawQuery binds values as TEXT. COUNT(*) has no column affinity, so a plain
+        // COUNT(*)=? comparison never matches the textual bound count on Android SQLite.
         return db.rawQuery(
             "SELECT e.sequence,e.event_type,e.created_at,e.schema_version,e.payload " +
                 "FROM (SELECT block FROM session_search_blocks " +
                 "WHERE session_id=? AND gram IN ($placeholders) " +
-                "GROUP BY block HAVING COUNT(*)=?) AS b " +
+                "GROUP BY block HAVING COUNT(*)=CAST(? AS INTEGER)) AS b " +
                 "JOIN session_events AS e ON e.session_id=? " +
                 "AND e.sequence BETWEEN b.block*$BLOCK_SIZE AND b.block*$BLOCK_SIZE+63 " +
                 "WHERE e.sequence>? ORDER BY e.sequence ASC",
