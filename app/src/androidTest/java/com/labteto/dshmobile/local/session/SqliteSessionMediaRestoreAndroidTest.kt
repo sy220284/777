@@ -344,6 +344,38 @@ class SqliteSessionMediaRestoreAndroidTest {
         } finally { root.deleteRecursively() }
     }
 
+    @Test fun stagedPristineStudioRestoreRefusesReceiptsCreatedBeforeInstallation() {
+        val base = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(base.cacheDir, "late-media-conflict-" + UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val source = isolatedContext(base, File(root, "source").apply { mkdirs() })
+            val destination = isolatedContext(base, File(root, "destination").apply { mkdirs() })
+            LocalMediaDatabase(source, Json).use { db ->
+                db.migrate(listOf(LocalMediaRecord(id = "backed-up",
+                    result = LocalMediaResult("backed-up", "test", "test", "TRANSCRIBE", 1L,
+                        textOutput = "from backup", sessionId = "archived"))))
+            }
+            val stage = File(root, "staged")
+            LocalMediaStore(source, Json).stageMediaStudioBackup(stage)
+            LocalMediaDatabase(destination, Json).use { it.migrate(emptyList()) }
+            val installer = LocalMediaStudioBackupInstaller(destination, Json)
+            installer.validateDestination(stage)
+            // A receipt added after staging is not disposable or authorized to overwrite.
+            LocalMediaDatabase(destination, Json).use { db ->
+                db.put(LocalMediaRecord(id = "created-later",
+                    result = LocalMediaResult("created-later", "test", "test",
+                        "TRANSCRIBE", 2L, textOutput = "must survive", sessionId = "current")))
+            }
+            org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+                installer.install(stage)
+            }
+            LocalMediaDatabase(destination, Json).use { db ->
+                assertEquals("must survive", db.get("created-later")?.result?.textOutput)
+                assertEquals(null, db.get("backed-up"))
+            }
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun completeBackupRejectsExistingStudioDataBeforeStagingAnyRestore() {
         val base = InstrumentationRegistry.getInstrumentation().targetContext
         val root = File(base.cacheDir, "complete-backup-conflict-" + UUID.randomUUID()).apply { mkdirs() }
