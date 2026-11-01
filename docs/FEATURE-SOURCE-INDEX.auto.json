@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1908,
+  "repository_code_file_count": 1909,
   "production_source_count": 1117,
-  "test_code_file_count": 648,
+  "test_code_file_count": 649,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -2000,7 +2000,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalBundledRuntimeManager.kt",
-      "sha256": "46924ee4fdafba7c"
+      "sha256": "d3acbee42c4fd962"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalConcurrency.kt",
@@ -4532,12 +4532,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "010efb92d9e7",
+  "source_snapshot": "dd91f8803395",
   "observed_delta": {
-    "baseline": "787636fb926d",
+    "baseline": "010efb92d9e7",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalBundledRuntimeManager.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
