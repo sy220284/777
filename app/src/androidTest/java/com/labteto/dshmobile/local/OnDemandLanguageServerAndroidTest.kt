@@ -116,14 +116,18 @@ class OnDemandLanguageServerAndroidTest {
             val runtime = AndroidProcessRuntime(
                 dynamicSearchPaths = { nodeRuntime.searchPaths() + pythonRuntime.searchPaths() },
                 baseEnvironment = {
-                    nodeRuntime.environment() + pythonRuntime.environment()
+                    com.labteto.dshmobile.local.runtime.mergeBundledRuntimeEnvironments(
+                        listOf(pythonRuntime.environment(), nodeRuntime.environment()),
+                    )
                 },
             )
             val libraryPaths = runtime.processEnvironment().getValue("LD_LIBRARY_PATH")
-            assertTrue("Pyright Python runtime must resolve its Termux libraries",
-                libraryPaths.split(File.pathSeparator).any { dir ->
-                    File(dir, "libandroid-support.so").isFile
-                })
+            for (library in listOf("libandroid-support.so", "libcares.so")) {
+                assertTrue("Pyright must resolve both bundled Python and Node libraries: $library",
+                    libraryPaths.split(File.pathSeparator).any { dir ->
+                        File(dir, library).isFile
+                    })
+            }
             val home = File(context.noBackupFilesDir, "pyright-android-smoke")
             if (home.exists()) check(home.deleteRecursively())
             val manager = OnDemandLanguageServerManager(
