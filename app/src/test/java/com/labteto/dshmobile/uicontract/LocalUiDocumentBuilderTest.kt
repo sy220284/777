@@ -15,7 +15,7 @@ class LocalUiDocumentBuilderTest {
             budget, emptySet(),
         ).getOrThrow()
         assertTrue("free text must never grant an action", card.actions.isEmpty())
-        assertTrue(card.fallback.contains(untrusted))
+        assertTrue(card.fallbackText.contains(untrusted))
         assertEquals(source, card.source)
         assertTrue(card.nodes.any { it is UiDocumentNode.Text })
         val structured = LocalUiDocumentBuilder.build(
