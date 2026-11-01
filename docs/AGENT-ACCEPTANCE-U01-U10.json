@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "source": "docs/audits/agent-pr864-unified-delivery-checklist.md",
+  "scope": "每条测试仅证明其命名断言；真实环境、完整交付包和三方差分须另行验收",
+  "scenario_baseline": {
+    "required_count": 84,
+    "original_cases_recorded": 0,
+    "reference": "《777-Codex-Claude-多代理全域扩展蓝图-20261024.md》24+60",
+    "status": "原始84条任务定义未入仓；不得发明原始编号或用局部测试冒充三方同题差分"
+  },
+  "groups": [
+    {
+      "id": "U01",
+      "title": "身份与生命周期",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/agent/LocalAgentSubtreeAdmissionTest.kt#acceptsTwoAndThreeLevelReadOnlyChildren",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#admittedTeamSpawnCommitsDurableMembershipAndSurvivesColdReplay",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#cancelledBeforeSpawnCommitRollsBackDurableChildAndCannotColdRecoverAsActive"
+      ],
+      "open_requirements": "所有代理类型的同一根身份、代际撤权及混合子树热冷恢复待验收",
+      "full_acceptance": false
+    },
+    {
+      "id": "U02",
+      "title": "专业角色、技能、上下文及记忆",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/agent/LocalAgentSkillBindingTest.kt#selectedLocalSkillIsFrozenAndNeverGrantsWritableTools",
+        "app/src/test/java/com/labteto/dshmobile/local/agent/LocalAgentSkillBindingTest.kt#disabledMissingOrInvalidSkillsCannotEnterDelegatedModelPrompt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlanTest.kt#agentMessageDoesNotSupersedeUserAuthorizationButNewUserDoes"
+      ],
+      "open_requirements": "完整角色注册、上下文过滤矩阵、分层记忆和全部后端授权传播待验收",
+      "full_acceptance": false
+    },
+    {
+      "id": "U03",
+      "title": "动态规划、TaskGraph 与 Team 调度",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#taskDagRejectsCycleAndFreezesAtLastValidState",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlanTest.kt#coldRestoreReusesCompletedNodeAndContinuesRemainingNode",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlanTest.kt#changedReadonlyInputReexecutesNewVersionThroughDagAndJobs"
+      ],
+      "open_requirements": "Goal 驱动自动 DAG 与 Team 混合调度、持久重规划、跨代理结算待验收",
+      "full_acceptance": false
+    },
+    {
+      "id": "U04",
+      "title": "消息协议与关闭回执",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#memberAcknowledgesOnlyPreviouslyObservedOwnMessageAndReplayIsIdempotent",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#forgedRecipientAckFailsProjectionBeforeClaimingAnyHandling",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#trustedMembersSendPeerLeadAndReadOwnDurableMailbox"
+      ],
+      "open_requirements": "跨全部代理类型的 accepted/claimed/model-replied/acked 及断线补偿待验收",
+      "full_acceptance": false
+    },
+    {
+      "id": "U05",
+      "title": "独立验证、成果合并与 Goal 结算",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidenceTest.kt#modelClaimCannotFabricatePositiveToolEvents",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidenceTest.kt#sourceChangeOrDeletionMakesEarlierVerificationStale",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#completedMemberResultDoesNotCompleteTaskWithoutLeadVerification"
+      ],
+      "open_requirements": "独立 VerifierRecord、同文件冲突合并与最终 IntegrationDecision 到 Goal 完整验收待完成",
+      "full_acceptance": false
+    },
+    {
+      "id": "U06",
+      "title": "强权限与工作区隔离",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentWorkspaceScopePolicyTest.kt#nativeWritesRequireExplicitTaskScopeAndRejectSiblingOrParentEscapes",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentWorkspaceScopePolicyTest.kt#workScopeRejectsSymlinkAncestorAndUnscopableProcessCommands",
+        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#wrongCertificateOrConnectorTokenCannotContactTheModel"
+      ],
+      "open_requirements": "所有工具执行端强权限及跨 Team/Fork 的独立工作树冲突回滚待验收",
+      "full_acceptance": false
+    },
+    {
+      "id": "U07",
+      "title": "多模型与资源公平调度",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/agent/LocalAgentSubtreeAdmissionTest.kt#concurrentDescendantBudgetHasFixedHardCap",
+        "app/src/test/java/com/labteto/dshmobile/local/agent/LocalAgentSubtreeAdmissionTest.kt#exhaustedSubtreeCannotForgetEarlierAdmissionOrUseAnotherIdentity"
+      ],
+      "open_requirements": "真实多模型 Token/成本/延迟/P95/公平性、抢占与熔断对照缺失",
+      "full_acceptance": false
+    },
+    {
+      "id": "U08",
+      "title": "故障、跨进程与跨版本恢复",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlanTest.kt#unknownWriteSideEffectCannotBeReplayedAndSafeSliceMayContinue",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/session/SqliteCrossProcessRestoreAcceptanceAndroidTest.kt#stageRestoreForExternalProcessRestart",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/session/SqliteCrossProcessRestoreAcceptanceAndroidTest.kt#resumeRestoreAfterExternalProcessDeath"
+      ],
+      "open_requirements": "实际 SIGKILL/OOM/断网/审批撤销和跨版本完整故障矩阵缺失",
+      "full_acceptance": false
+    },
+    {
+      "id": "U09",
+      "title": "远端和隔离进程执行",
+      "evidence": [
+        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#tlsToolEffectWritesOnlyTheServerWorkspaceAfterHostApproval",
+        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#wrongCertificateOrConnectorTokenCannotContactTheModel",
+        "harness-runtime-android/src/test/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackendTest.kt#remoteWorkspaceOptInDoesNotFallBackToHostWhenServerHasNoEnvironment"
+      ],
+      "open_requirements": "设备授权、租约 fencing、断线未知副作用及恢复真实闭环待完成",
+      "full_acceptance": false
+    },
+    {
+      "id": "U10",
+      "title": "UI、差分评测及自优化",
+      "evidence": [
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUiRegressionTest.kt#rebuildingStatusDoesNotPretendToRecruitMembers",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUiRegressionTest.kt#inactiveMemberDisablesSendingAndOffersLeadHandoff",
+        "app/src/test/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyLearningTest.kt#activeAdviceRetiresWhenVerifiedQualityRegresses"
+      ],
+      "open_requirements": "物理设备性能、84 项三方同题差分、受约束灰度回滚待完成",
+      "full_acceptance": false
+    }
+  ]
+}

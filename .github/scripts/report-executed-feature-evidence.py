@@ -81,6 +81,46 @@ def evidence_report(root: Path, sha: str) -> dict:
             "path": item["path"], "observed_result": result,
             "signed_off": False, "evidence": proofs,
         })
+    # Always report ALL leaves, including leaves with no runnable evidence.
+    review_path = root / "docs/FEATURE-REVIEW.auto.json"
+    all_leaves = []
+    coverage_counts = {"mapped": len(rows), "unmapped": 0, "fully_signed_off": 0}
+    if review_path.is_file():
+        review = json.loads(review_path.read_text(encoding="utf-8"))
+        by_path = {row["path"]: row for row in rows}
+        for leaf in review["leaf_evidence"]:
+            proof = by_path.get(leaf["path"])
+            all_leaves.append({
+                "path": leaf["path"],
+                "source_grade": leaf["verification"],
+                "executable_state": proof["observed_result"] if proof else "no_executable_mapping",
+                "mapped_proofs": proof["evidence"] if proof else [],
+                "signed_off": False,
+            })
+        if len(all_leaves) != review["functional_leaves"] or len(set(x["path"] for x in all_leaves)) != len(all_leaves):
+            raise ValueError("functional leaf evidence does not cover unique full tree")
+        coverage_counts["unmapped"] = sum(x["executable_state"] == "no_executable_mapping" for x in all_leaves)
+        if coverage_counts["mapped"] + coverage_counts["unmapped"] != len(all_leaves):
+            raise ValueError("executable coverage counts inconsistent with feature tree")
+
+    # U01-U10 share real JUnit facts, but no partial assertion may be promoted to complete.
+    agent_groups = []
+    group_path = root / "docs/AGENT-ACCEPTANCE-U01-U10.json"
+    if group_path.is_file():
+        groups = json.loads(group_path.read_text(encoding="utf-8"))
+        if [g["id"] for g in groups["groups"]] != [f"U{i:02d}" for i in range(1, 11)]:
+            raise ValueError("missing or duplicated agent delivery package")
+        for group in groups["groups"]:
+            proofs = []
+            for ref in group["evidence"]:
+                cls, method, mode = source_identity(root, ref)
+                status = "android_needed" if mode == "android" else executed.get((cls, method), "not_observed")
+                proofs.append({"test": ref, "source": mode, "result": status})
+            agent_groups.append({
+                "id": group["id"], "title": group["title"], "proofs": proofs,
+                "open_requirements": group["open_requirements"], "full_acceptance": False,
+            })
+
     return {
         "version": 1,
         "commit": sha,
@@ -89,6 +129,11 @@ def evidence_report(root: Path, sha: str) -> dict:
         "mapped_features": len(rows),
         "counts": counters,
         "fully_signed_off": 0,
+        "functional_leaves": len(all_leaves),
+        "coverage_counts": coverage_counts,
+        "all_feature_leaves": all_leaves,
+        "agent_groups": agent_groups,
+        "original_differential_cases_executed": 0,
         "items": rows,
     }
 

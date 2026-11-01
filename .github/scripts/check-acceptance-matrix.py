@@ -75,6 +75,37 @@ def validate(root=ROOT):
             if method not in methods:
                 raise ValueError(f"missing @Test method: {ref}")
         partial += item["state"] == "automated_partial"
+    # Never let an already-reviewed test fall out of the executable index.
+    registry = json.loads((root / "docs/FEATURE-TREE-SOURCE-REGISTRY.json").read_text(encoding="utf-8"))
+    explicit = json.loads((root / "docs/FEATURE-TREE-EXPLICIT-EVIDENCE.json").read_text(encoding="utf-8"))
+    required = {}
+    for node in registry["nodes"]:
+        required.setdefault(node["path"], set()).add(node["test"])
+    for node in explicit["items"]:
+        for test in node.get("tests", []):
+            required.setdefault(node["path"], set()).add(test["path"] + "#" + test["method"])
+    indexed = {item["path"]: set(item["evidence"]) for item in items}
+    for path, tests in required.items():
+        if not tests.issubset(indexed.get(path, set())):
+            raise ValueError(f"confirmed feature tests missing from acceptance index: {path} {sorted(tests - indexed.get(path, set()))}")
+    groups = json.loads((root / "docs/AGENT-ACCEPTANCE-U01-U10.json").read_text(encoding="utf-8"))
+    if groups.get("version") != 1 or groups.get("scenario_baseline", {}).get("required_count") != 84:
+        raise ValueError("original 84 differential cases requirement was lost")
+    if [g.get("id") for g in groups["groups"]] != [f"U{i:02d}" for i in range(1, 11)]:
+        raise ValueError("U01-U10 delivery package ids missing, duplicated or reordered")
+    for group in groups["groups"]:
+        if not group["evidence"] or not group.get("open_requirements") or group.get("full_acceptance") is not False:
+            raise ValueError("agent delivery scope or unsigned status was changed")
+        for ref in group["evidence"]:
+            if "#" not in ref:
+                raise ValueError(f"invalid agent test reference: {ref}")
+            path, method = ref.rsplit("#", 1)
+            file = root / path
+            if not file.is_file() or "/src/" not in path or not path.endswith(".kt"):
+                raise ValueError(f"agent test source missing: {ref}")
+            if method not in set(re.findall(TEST_RE, file.read_text(encoding="utf-8"))):
+                raise ValueError(f"agent test method missing: {ref}")
+
     print(f"Repository executable evidence index checked: {len(items)} mapped leaves "
           f"of {len(leaves)} functional leaves; external-only validation excluded; "
           "ZERO fully signed-off leaves.")
