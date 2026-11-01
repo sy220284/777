@@ -1110,20 +1110,33 @@ def generate(root):
         if followup_json.get("version") != 1 or not isinstance(followup_json.get("items"), list):
             raise ValueError("功能存在性专项核查登记格式错误")
         expected = {x["path"] for x in unresolved_features}
+        mapped_tests = {item["path"]: set(item["evidence"]) for item in matrix["items"]}
         for entry in followup_json["items"]:
             key = entry.get("path")
-            if not isinstance(key, str) or key in followup or key not in expected:
-                raise ValueError("存在性核查记录重复或不在源证据待核清单")
+            if not isinstance(key, str) or key in followup or key not in all_leaves:
+                raise ValueError("存在性核查记录重复或不属于现行功能树")
+            confirmed = {test["path"] + "#" + test["method"] for test in entry["test"]}
+            unavailable = set(entry.get("unavailable_test_sources", []))
+            if confirmed & unavailable:
+                raise ValueError("存在性核查把已失效测试当成可执行证据")
+            # A reviewed leaf may gain an executable test mapping without losing
+            # the broader source/existence analysis. Its partial test evidence
+            # must be indexed, otherwise stale triage may hide coverage regressions.
+            if key not in expected and (
+                not confirmed or not confirmed.issubset(mapped_tests.get(key, set()))
+            ):
+                raise ValueError("已映射功能的存在性记录没有相应可执行证据: " + key)
             followup[key] = {
                 "kind": entry["kind"],
                 "availability": entry["availability"],
                 "separate_product_entry": entry["independent"],
                 "production_sources_confirmed": len(entry["source"]),
                 "test_methods_confirmed": len(entry["test"]),
+                "unavailable_test_sources": sorted(unavailable),
                 "explanation": entry["conclusion"],
             }
-        if set(followup) != expected:
-            raise ValueError(f"存在性核查未对齐现行证据：新增待核={sorted(expected - set(followup))}; 不再待核={sorted(set(followup) - expected)}")
+        if not expected.issubset(followup):
+            raise ValueError(f"存在性核查未覆盖尚无入口证据的功能：{sorted(expected - set(followup))}")
         for item in unresolved_features:
             item["followup"] = followup[item["path"]]
     for record in evidence:
