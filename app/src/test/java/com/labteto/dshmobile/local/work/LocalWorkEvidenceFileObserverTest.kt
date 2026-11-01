@@ -24,6 +24,15 @@ class LocalWorkEvidenceFileObserverTest {
         assertTrue(workEvidenceWatchTargets(root, emptyList(), listOf("../outside.txt")).isEmpty())
     }
 
+    @Test fun artifactAfterTheFirstHundredStillHasAnEventWatchTarget() {
+        val root = files.newFolder("large-artifact-set")
+        val reports = File(root, "reports").apply { mkdirs() }
+        val paths = (0..100).map { "reports/artifact-$it.txt" }
+        val targets = workEvidenceWatchTargets(root, emptyList(), paths)
+        assertEquals(paths.size, targets.getValue(reports.canonicalFile).size)
+        assertTrue("artifact-100.txt" in targets.getValue(reports.canonicalFile))
+    }
+
     @Test fun onlyActualWorkspaceFileParentsCanBeObserved() {
         val root = files.newFolder("project")
         val reports = File(root, "reports").apply { mkdirs() }
