@@ -27,27 +27,27 @@ class SqliteEventSearchBlockIndexAndroidTest {
                             else "ordinary progress $index")
                     })
                 }
-                val expected = db.search("needle-WORK", 10, -1L)
+                val expected = db.search("work", "needle-WORK", 10, -1L)
                 assertTrue(expected.contains("73: "))
                 assertFalse(expected.contains("72: "))
-                assertEquals(expected, db.search("needle-work", 10, -1L))
-                assertTrue(db.search("特殊字符", 10, -1L).contains("73: "))
-                assertEquals("未找到会话事件", db.search("not-present", 10, -1L))
+                assertEquals(expected, db.search("work", "needle-work", 10, -1L))
+                assertTrue(db.search("work", "特殊字符", 10, -1L).contains("73: "))
+                assertEquals("未找到会话事件", db.search("work", "not-present", 10, -1L))
                 // The event type and numeric sequence are part of the full
                 // serialized event contract, not merely its JSON payload.
-                assertTrue(db.search("work/progress", 2, -1L).contains("结果已分页"))
-                assertTrue(db.search("ordinary progress", 1, 2L)
+                assertTrue(db.search("work", "work/progress", 2, -1L).contains("结果已分页"))
+                assertTrue(db.search("work", "ordinary progress", 1, 2L)
                     .contains("after_sequence="))
                 db.rebuildSearchIndex("work")
-                assertEquals(expected, db.search("needle-WORK", 10, -1L))
+                assertEquals(expected, db.search("work", "needle-WORK", 10, -1L))
                 db.append("work", "assistant/message", buildJsonObject {
                     put("content", "newly indexed content")
                 })
-                assertTrue(db.search("newly indexed", 10, 100L).contains("150: "))
+                assertTrue(db.search("work", "newly indexed", 10, 100L).contains("150: "))
             }
             SqliteSessionEventDatabase(context, Json, name).use { reopened ->
-                assertTrue(reopened.search("特殊字符", 10, -1L).contains("73: "))
-                assertTrue(reopened.search("newly indexed", 10, -1L).contains("150: "))
+                assertTrue(reopened.search("work", "特殊字符", 10, -1L).contains("73: "))
+                assertTrue(reopened.search("work", "newly indexed", 10, -1L).contains("150: "))
             }
         } finally { context.deleteDatabase(name) }
     }
@@ -65,13 +65,13 @@ class SqliteEventSearchBlockIndexAndroidTest {
                 sqlite.version = 4
             }
             SqliteSessionEventDatabase(context, Json, name).use { restored ->
-                assertTrue(restored.search("legacy needle", 10, -1L).contains("0: "))
+                assertTrue(restored.search("legacy", "legacy needle", 10, -1L).contains("0: "))
                 assertEquals(0L, restored.latestSequence("legacy"))
-                assertTrue(restored.search("user/message", 10, -1L).contains("0: "))
+                assertTrue(restored.search("legacy", "user/message", 10, -1L).contains("0: "))
                 restored.append("legacy", "user/message", buildJsonObject {
                     put("content", "post-upgrade remains searchable")
                 })
-                assertTrue(restored.search("post-upgrade", 10, -1L).contains("1: "))
+                assertTrue(restored.search("legacy", "post-upgrade", 10, -1L).contains("1: "))
             }
         } finally { context.deleteDatabase(name) }
     }
