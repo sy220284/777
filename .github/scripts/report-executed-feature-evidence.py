@@ -190,6 +190,14 @@ def main():
         raise ValueError("未发现任何 JUnit XML，拒绝声称已执行单元测试")
     if report["counts"]["jvm_failed"] != 0:
         raise ValueError("已登记功能的 JVM 证据实际失败")
+    if report["counts"]["jvm_not_observed"] != 0:
+        raise ValueError("已登记功能的 JVM 测试缺少实际执行回执")
+    for group in report["agent_groups"]:
+        missing = [item["test"] for item in group["proofs"]
+                   if item["source"] == "jvm" and item["result"] != "passed"]
+        if missing:
+            raise ValueError("多代理交付包 " + group["id"] +
+                             " 缺少已执行的 JVM 证据：" + ", ".join(missing))
 
 
 if __name__ == "__main__":
