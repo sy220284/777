@@ -175,7 +175,7 @@ class LocalWorkRuntime @Inject internal constructor(
             val rearm = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
             merge(kotlinx.coroutines.flow.flowOf(Unit), rearm).collectLatest {
                 watchLocalWorkEvidenceFiles(
-                    File(sessionFiles.workspace.path), emptyList(), paths.take(100),
+                    File(sessionFiles.workspace.path), emptyList(), paths,
                 ).collect {
                     send(Unit)
                     rearm.tryEmit(Unit)
