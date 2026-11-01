@@ -155,6 +155,27 @@
       ]
     },
     {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 任务执行模式与续轮",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuationTest.kt#realToolProgressWithOpenGoalCanScheduleOneMoreTurn"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 计划模式 / 方案生成与阶段拆解",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkPlanModeCoordinatorTest.kt#regeneratingAPlanContinuesTheSameWorkQuestionWithoutApprovingOrStartingNewTask"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 计划模式 / 计划展示和人工审阅",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkPlanModeCoordinatorTest.kt#restoredPendingPlanReviewOrApprovalCannotReleaseReadOnlyMode"
+      ]
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 计划模式 / 只读规划与修改权限边界",
       "state": "automated_partial",
       "evidence": [
@@ -162,10 +183,31 @@
       ]
     },
     {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 目标管理 / 当前目标与目标状态更新",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalDriverTest.kt#verifiedGoalSettlesThroughTheExistingWorkCommandAndReplaysCompleted"
+      ]
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 目标管理 / 目标结果核验",
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidenceTest.kt#sourceChangeOrDeletionMakesEarlierVerificationStale"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 阶段推进 / 任务进度与阶段状态投影",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuationTest.kt#coldGraphProjectionReconstructsPerNodeProgressWithoutInventingCompletion"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 阶段推进 / 关键决定、失败尝试和未完事项",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuationTest.kt#taskGraphWithoutTerminalEventBlocksAutomaticGoalReplayAfterRecovery"
       ]
     },
     {
@@ -218,11 +260,123 @@
       ]
     },
     {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 创建团队和启动助手",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#admittedTeamSpawnCommitsDurableMembershipAndSurvivesColdReplay"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队负责人编排与任务分配",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#idleTeammateAutoClaimsTaskOnceAndColdRecoveryRepairsUndeliveredReservation"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员招募、职责和生命周期",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#rosterRequiresProvisioningBeforeActive"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员启动、停用、解散与停止全部",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#memberLifecycleSupportsCreateDisableRestartAndDismiss"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务创建、领取、修改与分配",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#memberClaimsUseCasAndRejectForeignTaskAndForgedCaller"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务依赖与阻塞关系",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#taskDagRejectsCycleAndFreezesAtLastValidState"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务重开、删除和完成确认",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#completedTaskCanReopenAndBeReassignedToActiveMember"
+      ]
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 发消息、收消息、等待消息",
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#waitWithoutCursorIgnoresHistoricalResultAndReturnsNextNewResult",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#waitForMessageReturnsEarliestResultAfterCursorWithoutSkippingLaterResult"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 持久邮箱和重启后补投",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#rosterAndPendingMailboxRebuildFromSameEventLogAfterRuntimeRecreation"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 助手执行结果回收",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#terminalCheckpointBecomesAgentMessageWithoutFabricatingGoalProgress"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 主智能体核验结果后结算",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#completedMemberResultDoesNotCompleteTaskWithoutLeadVerification"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 团队事件记录及任务板重建",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#rosterAndPendingMailboxRebuildFromSameEventLogAfterRuntimeRecreation"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 成员状态与子任务运行事实关联",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamActivityProjectionTest.kt#derivesRuntimeActivityWithoutChangingDurableMemberPhase"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 失败、停用和失联任务重新释放",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#failedMemberReleasesOwnedTaskAndMovesToFailedPhase"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 团队冷恢复与批量投影",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#coldProjectionCompletionResumesMailboxRecoveryWithoutAnotherUserAction"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 恢复时任务邮箱续投",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#coldProjectionCompletionResumesMailboxRecoveryWithoutAnotherUserAction"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 未完成任务阻止错误完成声明",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#completedMemberResultDoesNotCompleteTaskWithoutLeadVerification"
       ]
     },
     {
@@ -255,6 +409,20 @@
       ]
     },
     {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 交付成果当前版本及证据变化提示",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidenceTest.kt#sourceChangeOrDeletionMakesEarlierVerificationStale"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 从真实成功工具调用识别成果",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidenceTest.kt#artifactOutputWithoutMatchingInvocationInCurrentGoalCannotPassAcceptance"
+      ]
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果当前可用性和安全路径核对",
       "state": "automated_partial",
       "evidence": [
@@ -266,6 +434,20 @@
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/LocalHistoryCompactorTest.kt#workCompactionPersistsTypedCheckpointForResume"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果来源调用与事件序号可追溯",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidenceTest.kt#invocationStartedBeforeNewGoalCannotBecomeItsLateEvidence"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果首次创建和当前内容哈希对照",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidenceTest.kt#sourceChangeOrDeletionMakesEarlierVerificationStale"
       ]
     },
     {
