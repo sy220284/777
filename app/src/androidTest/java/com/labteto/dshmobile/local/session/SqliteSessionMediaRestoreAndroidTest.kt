@@ -295,6 +295,55 @@ class SqliteSessionMediaRestoreAndroidTest {
         } finally { root.deleteRecursively() }
     }
 
+    @Test fun completeBackupRestoresOntoInitializedEmptyStudioWithoutErasingReceipts() {
+        val base = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(base.cacheDir, "complete-empty-studio-" + UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val source = isolatedContext(base, File(root, "source").apply { mkdirs() })
+            val destination = isolatedContext(base, File(root, "destination").apply { mkdirs() })
+            val bytes = byteArrayOf(5, 8, 13, 21)
+            val paid = File(source.filesDir, "media-studio/paid.png")
+            check(paid.parentFile!!.mkdirs())
+            paid.writeBytes(bytes)
+            LocalMediaDatabase(source, Json).use { db ->
+                db.migrate(listOf(LocalMediaRecord(id = "paid",
+                    result = LocalMediaResult("paid", "test", "test", "IMAGE", 1L,
+                        fileName = "paid.png", sessionId = "archived"))))
+            }
+            val archive = ByteArrayOutputStream()
+            SqliteSessionSnapshotStore(source, Json).use { snapshots ->
+                SqliteSessionEventDatabase(source, Json).use { events ->
+                    events.append("archived", "user/message", buildJsonObject { put("content", "archived") })
+                    SqliteSessionStorageManager(source, snapshots, events,
+                        studioJson = Json,
+                        stageStudioSnapshot = { LocalMediaStore(source, Json).stageMediaStudioBackup(it) },
+                    ).exportAll(archive, includeMediaStudio = true)
+                }
+            }
+            LocalMediaDatabase(destination, Json).use { db ->
+                db.migrate(emptyList())
+                assertEquals(null, db.get("paid"))
+            }
+            SqliteSessionSnapshotStore(destination, Json).use { snapshots ->
+                SqliteSessionEventDatabase(destination, Json).use { events ->
+                    val manager = SqliteSessionStorageManager(destination, snapshots, events,
+                        studioJson = Json)
+                    manager.stageRestore(ByteArrayInputStream(archive.toByteArray()))
+                    assertTrue(manager.status().pendingRestore)
+                    assertEquals(0, manager.applyPendingRestore())
+                }
+            }
+            LocalMediaDatabase(destination, Json).use { db ->
+                assertEquals("paid.png", db.get("paid")?.result?.fileName)
+            }
+            assertEquals(bytes.toList(),
+                File(destination.filesDir, "media-studio/paid.png").readBytes().toList())
+            SqliteSessionEventDatabase(destination, Json).use { events ->
+                assertEquals(0L, events.latestSequence("archived"))
+            }
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun completeBackupRejectsExistingStudioDataBeforeStagingAnyRestore() {
         val base = InstrumentationRegistry.getInstrumentation().targetContext
         val root = File(base.cacheDir, "complete-backup-conflict-" + UUID.randomUUID()).apply { mkdirs() }
