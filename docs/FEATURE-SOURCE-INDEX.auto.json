@@ -1392,7 +1392,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStudioBackupInstaller.kt",
-      "sha256": "dca8987f34b68c7b"
+      "sha256": "3b64b2ff4f6a2272"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStudioBackupSnapshot.kt",
@@ -4532,14 +4532,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "974f6192b8b6",
+  "source_snapshot": "5fc2c0b2cf76",
   "observed_delta": {
-    "baseline": "c95e3aef6b48",
+    "baseline": "974f6192b8b6",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStudioBackupInstaller.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
