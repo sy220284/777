@@ -222,22 +222,30 @@ class SqliteSessionMediaRestoreAndroidTest {
             assertTrue("media-studio/media-studio.sqlite" in zipNames(archive.toByteArray()))
             assertTrue("media-studio/media/paid.png" in zipNames(archive.toByteArray()))
 
+            val pending = File(destination.filesDir, "local-harness/.sqlite-restore-pending-default")
             SqliteSessionSnapshotStore(destination, Json).use { snapshots ->
                 SqliteSessionEventDatabase(destination, Json).use { events ->
-                    val installer = SqliteSessionStorageManager(destination, snapshots, events,
+                    val manager = SqliteSessionStorageManager(destination, snapshots, events,
                         studioJson = Json)
-                    assertEquals(0, installer.stageRestore(ByteArrayInputStream(archive.toByteArray())))
-                    val pending = File(destination.filesDir, "local-harness/.sqlite-restore-pending-default")
+                    assertEquals(0, manager.stageRestore(ByteArrayInputStream(archive.toByteArray())))
                     assertEquals("sqlite-v3-studio", File(pending, "READY").readText())
-                    // Simulate process termination after the Media Studio install but before Session DBs.
-                    assertEquals(1, LocalMediaStudioBackupInstaller(destination, Json).install(
-                        File(pending, "media-studio-stage"), retainStaging = true,
-                    ))
-                    assertTrue(pending.isDirectory)
-                    assertEquals(0, installer.applyPendingRestore())
-                    assertTrue(!pending.exists())
                 }
             }
+            // A real restart closes all SQLite owners before startup installation.
+            // Installing while test-owned connections remain open leaves a live WAL
+            // reader and correctly triggers SQLITE_BUSY during checkpoint.
+            assertEquals(1, LocalMediaStudioBackupInstaller(destination, Json).install(
+                File(pending, "media-studio-stage"), retainStaging = true,
+            ))
+            assertTrue(pending.isDirectory)
+            SqliteSessionSnapshotStore(destination, Json).use { snapshots ->
+                SqliteSessionEventDatabase(destination, Json).use { events ->
+                    val restarted = SqliteSessionStorageManager(destination, snapshots, events,
+                        studioJson = Json)
+                    assertEquals(0, restarted.applyPendingRestore())
+                }
+            }
+            assertTrue(!pending.exists())
             LocalMediaDatabase(destination, Json).use { db ->
                 assertEquals("paid.png", db.get("paid-result")?.result?.fileName)
             }
@@ -330,7 +338,13 @@ class SqliteSessionMediaRestoreAndroidTest {
                         studioJson = Json)
                     manager.stageRestore(ByteArrayInputStream(archive.toByteArray()))
                     assertTrue(manager.status().pendingRestore)
-                    assertEquals(0, manager.applyPendingRestore())
+                }
+            }
+            SqliteSessionSnapshotStore(destination, Json).use { snapshots ->
+                SqliteSessionEventDatabase(destination, Json).use { events ->
+                    val restarted = SqliteSessionStorageManager(destination, snapshots, events,
+                        studioJson = Json)
+                    assertEquals(0, restarted.applyPendingRestore())
                 }
             }
             LocalMediaDatabase(destination, Json).use { db ->
