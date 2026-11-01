@@ -200,6 +200,7 @@ jobs:
           python3 .github/scripts/check-build-baseline.py
           python3 .github/scripts/check-test-quality.py
           python3 .github/scripts/check-acceptance-matrix.py
+          python3 .github/scripts/report-android-feature-evidence.py --self-test
           python3 .github/scripts/sync-feature-tree.py --check
           python3 .github/scripts/check-feature-tree-sync.py
           python3 .github/scripts/check-v3-refactor-ledger.py --self-test
@@ -416,6 +417,15 @@ jobs:
             adb install -r .ci/device-apks/app-optimized.apk
             bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
 
+      - name: Upload Android 16 executed feature and U01-U10 evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: executed-android36-feature-evidence
+          path: .ci/executed-android36-feature-evidence.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload Android 16 ten-round performance data
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -506,6 +516,15 @@ jobs:
           adb shell am force-stop com.sy220284.dshmobile.debug || true
           adb install -r .ci/device-apks/app-optimized.apk
           bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
+
+      - name: Upload Android 17 executed feature and U01-U10 evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: executed-android37-feature-evidence
+          path: .ci/executed-android37-feature-evidence.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload Android 17 ten-round performance data
         if: always()
