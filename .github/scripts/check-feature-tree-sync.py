@@ -398,21 +398,30 @@ def inspect():
         if followup_data.get("version") != 1 or not isinstance(followup_data.get("items"), list):
             raise ValueError("存在性核查文件不是指定结构")
         lookup = {item["path"]: item for item in followup_data["items"]}
-        if len(lookup) != len(followup_data["items"]) or set(lookup) != set(missing):
-            raise ValueError("存在性核查未逐条覆盖历史待确认入口")
+        if len(lookup) != len(followup_data["items"]) or not set(missing).issubset(lookup):
+            raise ValueError("存在性核查未逐条覆盖尚无入口证据的功能")
         byname = {x["path"]: x for x in reported}
+        mapped = {x["path"]: set(x["evidence"]) for x in matrix["items"]}
         for path, record in lookup.items():
+            if path not in byname:
+                raise ValueError("存在性核查引用了已移出功能树的节点")
+            tests = {x["path"] + "#" + x["method"] for x in record["test"]}
+            if path not in missing and (
+                not tests or not tests.issubset(mapped.get(path, set()))
+            ):
+                raise ValueError("已取得测试映射的存在性记录与可执行证据不一致")
             expected = {
                 "kind": record["kind"],
                 "availability": record["availability"],
                 "separate_product_entry": record["independent"],
                 "production_sources_confirmed": len(record["source"]),
                 "test_methods_confirmed": len(record["test"]),
+                "unavailable_test_sources": sorted(record.get("unavailable_test_sources", [])),
                 "explanation": record["conclusion"],
             }
             if byname[path].get("followup") != expected:
                 raise ValueError("逐项功能的核实结论与手工代码证据不一致")
-            if next(x for x in pending if x["path"] == path).get("followup") != expected:
+            if path in missing and next(x for x in pending if x["path"] == path).get("followup") != expected:
                 raise ValueError("待核报告遗漏已完成的独立性核实")
         if (review.get("followup_investigated_descriptions") != len(lookup)
             or index.get("followup_investigated_descriptions") != len(lookup)
