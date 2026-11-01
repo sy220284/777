@@ -4,10 +4,10 @@
     {
       "id": "automation.management-receipts",
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
-      "source": "app/src/main/java/com/labteto/dshmobile/local/LocalAutomationUiPortComposition.kt",
-      "entry": "submit",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperation.kt",
+      "entry": "runTaskManagementOperation",
       "owner": "AUTOMATION",
-      "test": "app/src/test/java/com/labteto/dshmobile/automation/AutomationReceiptTest.kt#keepsNewestTwoHundredReceipts"
+      "test": "app/src/test/java/com/labteto/dshmobile/ui/screens/tasks/TaskManagementOperationTest.kt#failedAcknowledgementReadsCurrentFactsWithoutReplayingMutation"
     },
     {
       "id": "runtime.agent-remote.environment",
@@ -28,10 +28,18 @@
     {
       "id": "settings.minimax.quota",
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度",
-      "source": "app/src/main/java/com/labteto/dshmobile/local/model/MiniMaxProviderQuota.kt",
-      "entry": "MiniMaxProviderQuotaParser",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSettingsUiContribution.kt",
+      "entry": "localSettingsFeatureUiContribution",
       "owner": "SETTINGS",
-      "test": "app/src/test/java/com/labteto/dshmobile/local/model/MiniMaxProviderQuotaTest.kt#legacyRemainingCountAndNewUsedCountAreResolvedByProviderPercent"
+      "test": "app/src/test/java/com/labteto/dshmobile/ui/screens/local/MiniMaxQuotaNavigationTest.kt#quotaDrawerOpensQuotaDirectlyAndClosesDrawer"
+    },
+    {
+      "id": "shared.model.partial-terminal",
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型部分输出与终态结算",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/model/LocalCanonicalModel.kt",
+      "entry": "toHistoryMessage",
+      "owner": "SHARED",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/model/LocalCanonicalModelCodecTest.kt#partialCompletionRoundTripsLocallyAndNeverLeaksOntoWire"
     },
     {
       "id": "shared.tools.mcp-resources",
@@ -103,7 +111,7 @@
       "source": "app/src/main/java/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilder.kt",
       "entry": "LocalUiDocumentBuilder",
       "owner": "SHELL",
-      "test": "app/src/test/java/com/labteto/dshmobile/local/presentation/document/LocalUiDocumentCodecTest.kt#sourceIdentityComesFromTheOwnerAndModelCannotReplaceIt"
+      "test": "app/src/test/java/com/labteto/dshmobile/uicontract/LocalUiDocumentBuilderTest.kt#freeTextCannotAcquireActionsOrBecomeACompletionFact"
     },
     {
       "id": "ui.scene.catalog",

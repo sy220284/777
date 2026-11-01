@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "snapshot": "20ee31512f33",
+  "snapshot": "7b8facdfd2db",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1905,
+  "code_files_scanned": 1908,
   "production_sources_scanned": 1117,
-  "feature_nodes": 551,
-  "functional_leaves": 454,
+  "feature_nodes": 552,
+  "functional_leaves": 455,
   "existing_executable_test_mappings": 121,
   "leaf_evidence": [
     {
@@ -6951,6 +6951,27 @@
       "workflow_evidence": []
     },
     {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型部分输出与终态结算",
+      "verification": "没有可确认的现行入口证据",
+      "test_reference_count": 0,
+      "historical_grade": null,
+      "existing_production_sources": [],
+      "missing_production_sources": [],
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "explicit_test_candidates": [],
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "shared_model_completion_contract",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 1,
+        "test_methods_confirmed": 1,
+        "explanation": "模型部分输出及终态结算有共享运行层的生产源码和历史消息编解码测试；这是跨模型请求的内部运行语义，不存在独立用户页面。真实供应商流式中断、工具续轮和 Android 终态恢复仍需执行验收。"
+      }
+    },
+    {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 推理－工具－结果多步循环",
       "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
@@ -8663,7 +8684,7 @@
   "evidence_grade_summary": {
     "真实测试映射（仅局部）": 120,
     "具名源码声明存在（静态，待调用链复核）": 194,
-    "没有可确认的现行入口证据": 20,
+    "没有可确认的现行入口证据": 21,
     "历史生产文件仍存在（待入口复核）": 87,
     "具名源码及仪表测试声明存在（静态，未执行）": 15,
     "真实测试映射及具名源码声明（静态）": 1,
@@ -9522,6 +9543,27 @@
       }
     },
     {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型部分输出与终态结算",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "共享工具或其他能力",
+      "inspect": "按用户实际功能入口检查共享工具模块",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "shared_model_completion_contract",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 1,
+        "test_methods_confirmed": 1,
+        "explanation": "模型部分输出及终态结算有共享运行层的生产源码和历史消息编解码测试；这是跨模型请求的内部运行语义，不存在独立用户页面。真实供应商流式中断、工具续轮和 Android 终态恢复仍需执行验收。"
+      }
+    },
+    {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具输出格式和结构化验证",
       "issue": "缺少可确认的现行源码入口",
       "domain": "共享工具或其他能力",
@@ -9741,50 +9783,24 @@
       }
     }
   ],
-  "followup_investigated_descriptions": 20,
-  "followup_production_or_compatibility": 13,
+  "followup_investigated_descriptions": 21,
+  "followup_production_or_compatibility": 14,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "1d1f057dbbb8",
+    "baseline": "20ee31512f33",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkEvidenceFileObserver.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
     "added_ui": [],
     "removed_ui": []
   },
-  "source_verified_registrations": 18,
+  "source_verified_registrations": 19,
   "explicit_retirements": 0,
   "changes_applied": [],
   "pending_changes": [
-    {
-      "id": "automation.management-receipts",
-      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务操作异常与受理回执",
-      "status": "待复核，未写入功能树",
-      "reason": "指定测试文件不存在"
-    },
-    {
-      "id": "settings.minimax.quota",
-      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度",
-      "status": "待复核，未写入功能树",
-      "reason": "指定测试文件不存在"
-    },
-    {
-      "id": "shared.model.partial-terminal",
-      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型部分输出与终态结算",
-      "status": "待复核，未写入功能树",
-      "reason": "功能归属不是架构登记的七个所有权模块"
-    },
-    {
-      "id": "ui.document.local_builder",
-      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 本地交互文档模板生成（迁移中）",
-      "status": "待复核，未写入功能树",
-      "reason": "指定测试文件不存在"
-    },
     {
       "id": "ui.zhaoxi.e817",
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 朝夕 E8.17 独立界面接入（PR #740，未合并）",
@@ -9800,8 +9816,8 @@
     {
       "id": "work.history-evidence-ui",
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 会话内工作过程与成果 / 工具调用活动时间线",
-      "status": "待复核，未写入功能树",
-      "reason": "不存在该 @Test 方法"
+      "status": "拒绝自动合并现有节点",
+      "reason": "目标功能路径已经存在；请先逐项核实合并/拆分及测试归属"
     }
   ],
   "obsolete_historical_evidence_count": 20,

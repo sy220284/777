@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1905,
+  "repository_code_file_count": 1908,
   "production_source_count": 1117,
-  "test_code_file_count": 645,
+  "test_code_file_count": 648,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -4532,14 +4532,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "20ee31512f33",
+  "source_snapshot": "7b8facdfd2db",
   "observed_delta": {
-    "baseline": "1d1f057dbbb8",
+    "baseline": "20ee31512f33",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkEvidenceFileObserver.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
@@ -4547,8 +4545,8 @@
     "removed_ui": []
   },
   "tracked_legacy_identities": 117,
-  "unproven_feature_count": 20,
-  "followup_investigated_descriptions": 20,
+  "unproven_feature_count": 21,
+  "followup_investigated_descriptions": 21,
   "workflow_evidence_features": 14,
   "declared_unexecuted_test_methods": 15,
   "verified_registrations": [
@@ -4556,6 +4554,7 @@
     "runtime.agent-remote.environment",
     "settings.memory.management-query",
     "settings.minimax.quota",
+    "shared.model.partial-terminal",
     "shared.tools.mcp-resources",
     "skills.minimax-official-bundles",
     "tools.mcp.oauth-login",
@@ -4571,7 +4570,7 @@
     "work.history.semantic-background",
     "work.taskgraph.durable-acceptance"
   ],
-  "unverified_changes_count": 7,
+  "unverified_changes_count": 3,
   "obsolete_historical_evidence_count": 20,
   "current_tree_outdated_source_count": 0
 }
