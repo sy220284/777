@@ -78,13 +78,17 @@ def operate(request):
                 mode = stat.S_IMODE(info.st_mode) & 0o777
         elif operation == 'write':
             content = request['content']
+            # Once this activation has observed a file, a subsequent write
+            # must not silently overwrite a newer commit from another agent.
+            observed = request.get('observed')
             try:
                 info = os.stat(name, dir_fd=parent, follow_symlinks=False)
                 if not stat.S_ISREG(info.st_mode):
                     raise ValueError('Target must be a regular file')
                 mode = stat.S_IMODE(info.st_mode) & 0o777
             except FileNotFoundError:
-                pass
+                if observed is not None:
+                    raise ValueError('Observed remote file was removed; read it again')
         else:
             raise ValueError('Unknown file operation')
         staged = '.agent-write-' + uuid.uuid4().hex
@@ -96,15 +100,16 @@ def operate(request):
             if mode is not None:
                 os.fchmod(output.fileno(), mode)
             os.fsync(output.fileno())
-        if operation == 'edit':
-            # Reopen the current path: the earlier descriptor can point to an
-            # unlinked inode after another writer replaces the target.
+        if operation == 'edit' or (operation == 'write' and observed is not None):
+            # Verify the live descriptor immediately before commit, inside
+            # the shared-root lock. Path metadata alone is insufficient.
             current = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
             try:
                 current_info = os.fstat(current)
+                expected = before if operation == 'edit' else observed
                 if (not stat.S_ISREG(current_info.st_mode)
                         or (current_info.st_dev, current_info.st_ino) != (info.st_dev, info.st_ino)
-                        or fingerprint(current) != before):
+                        or fingerprint(current) != expected):
                     raise ValueError('Remote file changed after observation; read it again')
             finally:
                 os.close(current)

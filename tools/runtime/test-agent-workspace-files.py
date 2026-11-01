@@ -42,6 +42,20 @@ class WorkspaceFilesTest(unittest.TestCase):
             self.call('edit', observed=observed, old_text='new', new_text='stale')
         self.assertEqual(Path('script.sh').read_text(), 'new')
 
+    def test_stale_observed_write_cannot_erase_another_agents_commit(self):
+        self.call('write', content='initial')
+        observed = self.call('read')['fileVersions']['script.sh']
+        self.call('write', content='first', observed=observed)
+        with self.assertRaisesRegex(ValueError, 'changed after observation'):
+            self.call('write', content='stale-second', observed=observed)
+        self.assertEqual(Path('script.sh').read_text(), 'first')
+        Path('script.sh').unlink()
+        with self.assertRaisesRegex(ValueError, 'removed'):
+            self.call('write', content='lost', observed=observed)
+        self.assertFalse(Path('script.sh').exists())
+        self.call('write', content='fresh-unobserved')
+        self.assertEqual(Path('script.sh').read_text(), 'fresh-unobserved')
+
     def test_parent_replacement_cannot_redirect_write_outside_workspace(self):
         Path('nested').mkdir()
         outside = Path(self.external.name)

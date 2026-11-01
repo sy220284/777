@@ -70,6 +70,25 @@ class AgentWorkspaceEnvironmentTest {
         }
     }
 
+    @Test fun anObservedRemoteWriteMustNotOverwriteAnotherAgentsCommit() = runBlocking {
+        val root = temporary.newFolder("competing-writers")
+        val file = java.io.File(root, "shared.txt").apply { writeText("original") }
+        val first = AgentWorkspaceEnvironment.create(root)
+        val second = AgentWorkspaceEnvironment.create(root)
+        try {
+            assertEquals("1: original", first.execute(invocation("read", false, "path" to "shared.txt")).content)
+            assertEquals("1: original", second.execute(invocation("read", false, "path" to "shared.txt")).content)
+            first.execute(invocation("write", true, "path" to "shared.txt", "content" to "first"))
+            assertTrue(runCatching {
+                second.execute(invocation("write", true, "path" to "shared.txt", "content" to "stale"))
+            }.isFailure)
+            assertEquals("first", file.readText())
+        } finally {
+            first.close()
+            second.close()
+        }
+    }
+
     @Test fun editingAnExecutablePreservesItsExecutionPermission() = runBlocking {
         val root = temporary.newFolder("remote")
         val file = java.io.File(root, "script.sh").apply {
