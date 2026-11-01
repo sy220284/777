@@ -43,7 +43,11 @@
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#taskDagRejectsCycleAndFreezesAtLastValidState",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlanTest.kt#coldRestoreReusesCompletedNodeAndContinuesRemainingNode",
-        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlanTest.kt#changedReadonlyInputReexecutesNewVersionThroughDagAndJobs"
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlanTest.kt#changedReadonlyInputReexecutesNewVersionThroughDagAndJobs",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalTaskGraphReplanPolicyTest.kt#changedDAGInvalidatesEveryPriorAcceptanceAndCreatesNewPlanIdentity",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalTaskGraphReplanPolicyTest.kt#writableSideEffectsRequireSeparateVerificationBeforeReplanning",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalTaskGraphReplanPolicyTest.kt#coldRecoveryRecognizesDurablyStartedSuccessorBeforeOldEndEvent",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuationTest.kt#taskGraphWithoutTerminalEventBlocksAutomaticGoalReplayAfterRecovery"
       ],
       "open_requirements": "Goal 驱动自动 DAG 与 Team 混合调度、持久重规划、跨代理结算待验收",
       "full_acceptance": false
@@ -71,7 +75,9 @@
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#completedMemberResultDoesNotCompleteTaskWithoutLeadVerification",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkIntegrationDecisionTest.kt#reviewApprovalCannotLaunderMissingOrFailedMachineEvidence",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkIntegrationDecisionTest.kt#reviewRejectionAndMissingReviewBlockEvenWithGoodFileAndTestResults",
-        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkIntegrationDecisionTest.kt#goalDiagnosticUsesExactlyTheSameDecisionAsGoalDriver"
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkIntegrationDecisionTest.kt#goalDiagnosticUsesExactlyTheSameDecisionAsGoalDriver",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalDriverTest.kt#sameIntegrationGateProtectsManualAndAutomaticGoalCompletion",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalDriverTest.kt#verifiedGoalSettlesThroughTheExistingWorkCommandAndReplaysCompleted"
       ],
       "open_requirements": "独立 VerifierRecord、同文件冲突合并与最终 IntegrationDecision 到 Goal 完整验收待完成",
       "full_acceptance": false
@@ -100,7 +106,10 @@
         "app/src/test/java/com/labteto/dshmobile/local/agent/LocalAgentSubtreeAdmissionTest.kt#concurrentDescendantBudgetHasFixedHardCap",
         "app/src/test/java/com/labteto/dshmobile/local/agent/LocalAgentSubtreeAdmissionTest.kt#exhaustedSubtreeCannotForgetEarlierAdmissionOrUseAnotherIdentity",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamQuotaPolicyTest.kt#historicalTerminatedMembersDoNotOccupyLiveSlots",
-        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamQuotaPolicyTest.kt#completedAndDeletedTasksAreHistoryNotActiveCapacity"
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamQuotaPolicyTest.kt#completedAndDeletedTasksAreHistoryNotActiveCapacity",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/resource/HarnessResourceSchedulerTest.kt#cancelledWaiterStormDoesNotLeakPermitsOrActiveCounters",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/resource/HarnessResourceSchedulerTest.kt#backgroundQueueHeadCannotBeStarvedByContinuousInteractiveAdmissions",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/resource/HarnessResourceSchedulerTest.kt#liveCapacityReductionWaitsForExistingLeasesWithoutRevokingThem"
       ],
       "open_requirements": "真实多模型 Token/成本/延迟/P95/公平性、抢占与熔断对照缺失",
       "full_acceptance": false
@@ -111,7 +120,11 @@
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlanTest.kt#unknownWriteSideEffectCannotBeReplayedAndSafeSliceMayContinue",
         "app/src/androidTest/java/com/labteto/dshmobile/local/session/SqliteCrossProcessRestoreAcceptanceAndroidTest.kt#stageRestoreForExternalProcessRestart",
-        "app/src/androidTest/java/com/labteto/dshmobile/local/session/SqliteCrossProcessRestoreAcceptanceAndroidTest.kt#resumeRestoreAfterExternalProcessDeath"
+        "app/src/androidTest/java/com/labteto/dshmobile/local/session/SqliteCrossProcessRestoreAcceptanceAndroidTest.kt#resumeRestoreAfterExternalProcessDeath",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalPersistentJobRecoveryPolicyTest.kt#interruptedExternalOutcomeMustNotBecomeDefiniteFailure",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalTeamStartRecoveryTest.kt#cancelledStartWithDurableChildCannotClaimFailure",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalTaskGraphReplanPolicyTest.kt#crashRecoveryRejectsForgedOrIncompleteSuccessorRecords",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkGoalContinuationTest.kt#newUserInputAndStaleCheckpointAreDiscardedBeforeModelHistoryCommit"
       ],
       "open_requirements": "实际 SIGKILL/OOM/断网/审批撤销和跨版本完整故障矩阵缺失",
       "full_acceptance": false
@@ -136,7 +149,9 @@
       "evidence": [
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUiRegressionTest.kt#rebuildingStatusDoesNotPretendToRecruitMembers",
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUiRegressionTest.kt#inactiveMemberDisablesSendingAndOffersLeadHandoff",
-        "app/src/test/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyLearningTest.kt#activeAdviceRetiresWhenVerifiedQualityRegresses"
+        "app/src/test/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyLearningTest.kt#activeAdviceRetiresWhenVerifiedQualityRegresses",
+        "app/src/test/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyLearningTest.kt#missingOrInventedSourceEvidenceIsRejected",
+        "app/src/test/java/com/labteto/dshmobile/local/work/improvement/LocalWorkStrategyLearningTest.kt#activeAdviceRetiresWhenBothToolsAndTokensAreWorse"
       ],
       "open_requirements": "物理设备性能、84 项三方同题差分、受约束灰度回滚待完成",
       "full_acceptance": false
