@@ -10,12 +10,11 @@ import os
 from pathlib import Path
 import re
 import sys
-from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[2]
 STATUS = re.compile(r"^INSTRUMENTATION_STATUS: (class|test|numtests)=(.*)$")
-CODE = re.compile(r"^INSTRUMENTATION_STATUS_CODE: (-?\\d+)$")
-OK = re.compile(r"^OK \\(([1-9]\\d*) tests?\\)$")
+CODE = re.compile(r"^INSTRUMENTATION_STATUS_CODE: (-?\d+)$")
+OK = re.compile(r"^OK \(([1-9]\d*) tests?\)$")
 
 
 def parse_instrumentation(text: str) -> dict:
@@ -63,7 +62,7 @@ def test_identity(root: Path, reference: str):
     if "/src/androidTest/" not in "/" + source:
         return None
     path = root / source
-    package = re.search(r"(?m)^package\\s+([\\w.]+)", path.read_text(encoding="utf-8"))
+    package = re.search(r"(?m)^package\s+([\w.]+)", path.read_text(encoding="utf-8"))
     if not package:
         raise ValueError(f"Android test source lacks a package: {reference}")
     return package.group(1) + "." + path.stem, method
@@ -115,13 +114,13 @@ def report(root: Path, text: str, sha: str, android_api: int):
 
 
 def self_test():
-    sample = ("INSTRUMENTATION_STATUS: class=demo.RealTest\\n"
-              "INSTRUMENTATION_STATUS: test=works\\n"
-              "INSTRUMENTATION_STATUS_CODE: 1\\n"
-              "INSTRUMENTATION_STATUS: class=demo.RealTest\\n"
-              "INSTRUMENTATION_STATUS: test=works\\n"
-              "INSTRUMENTATION_STATUS_CODE: 0\\n"
-              "OK (1 test)\\nINSTRUMENTATION_CODE: -1\\n")
+    sample = ("INSTRUMENTATION_STATUS: class=demo.RealTest\n"
+              "INSTRUMENTATION_STATUS: test=works\n"
+              "INSTRUMENTATION_STATUS_CODE: 1\n"
+              "INSTRUMENTATION_STATUS: class=demo.RealTest\n"
+              "INSTRUMENTATION_STATUS: test=works\n"
+              "INSTRUMENTATION_STATUS_CODE: 0\n"
+              "OK (1 test)\nINSTRUMENTATION_CODE: -1\n")
     assert parse_instrumentation(sample) == {("demo.RealTest", "works"): "passed"}
     for candidate in (sample.replace("INSTRUMENTATION_STATUS_CODE: 0", "INSTRUMENTATION_STATUS_CODE: -2"),
                       sample.replace("OK (1 test)", "OK (2 tests)"),
@@ -151,7 +150,7 @@ def main():
     result = report(ROOT, log.read_text(encoding="utf-8"), sha, args.android_api)
     dest = ROOT / f".ci/executed-android{args.android_api}-feature-evidence.json"
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
+    dest.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"Android {args.android_api} executed {result['junit_testcases_observed']} tests; "
           f"{result['mapped_android_test_references_passed']} mapped Android proofs, "
           f"{result['functional_leaves']} enumerated leaves, 0 fully signed off")

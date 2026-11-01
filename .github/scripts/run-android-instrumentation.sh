@@ -62,5 +62,5 @@ if ! validate_result "$result_file"; then
 fi
 
 # A successful suite alone never proves which mapped device tests actually ran.
-api="$(adb shell getprop ro.build.version.sdk | tr -d '\\r')"
+api="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
 python3 .github/scripts/report-android-feature-evidence.py "$result_file" "$api"
