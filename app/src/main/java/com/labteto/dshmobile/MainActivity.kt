@@ -18,7 +18,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// FEATURE_TREE: {"id":"ui.zhaoxi.e817","path":"第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 朝夕 E8.17 独立界面接入（PR #740，未合并）","action":"retire","reason":"朝夕独立界面已整体退役，V6原生页面与AppRoot接管入口"}
+// 朝夕 E8.17 独立界面未进入现行功能树；当前唯一启动入口由 V6 原生页面接管。
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 

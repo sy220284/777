@@ -730,6 +730,7 @@ internal class LocalAgentTeamRuntime(
     }
 
     /** Shared AgentControl addresses the original Job, while Team retains all membership effects. */
+    // FEATURE_TREE: {"id":"work.agent-control.team-stop","path":"第一层｜产品功能与界面 / 工作功能 / 团队协作 / 按原 Job 身份统一中断与关闭 Team 成员（PR #874）","entry":"stopOwnedAgentJob","owner":"WORK","test":"app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#genericTeamStopUsesExactJobAndPreservesInterruptVersusClose"}
     internal suspend fun stopOwnedAgentJob(sessionId: String, agentId: String, permanently: Boolean): String {
         val caller = requireNotNull(currentCoroutineContext()[com.labteto.dshmobile.harness.agent.AgentRunExecutionContext]) {
             "AGENT_CONTROL_CALLER_REQUIRED"

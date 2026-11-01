@@ -978,10 +978,30 @@ def generate(root):
             historic_removed, historic_current = historical_code_evidence(root, [])
             historical_match = [x for x in historic_removed + historic_current
                                 if x["path"] == item["path"]]
+        # Existing product leaves may acquire a newly registered source owner only
+        # when an independently reviewed exact-path evidence anchor proves both
+        # the declared production symbol and its real test method. Never infer
+        # compatibility merely from a matching Chinese display name.
+        proven_current = False
+        if not was and exists is not None:
+            explicit_file = root / EXPLICIT_EVIDENCE
+            if explicit_file.is_file():
+                explicit_items = json.loads(explicit_file.read_text(encoding="utf-8"))["items"]
+                exact = next((x for x in explicit_items if x["path"] == item["path"]), None)
+                if exact:
+                    source_proven = any(s["path"] == item["source"] and
+                                        item["entry"] in s.get("symbols", [])
+                                        for s in exact.get("sources", []))
+                    test_proven = any(t["path"] == item["test"].rsplit("#", 1)[0] and
+                                      t["method"] == item["test"].rsplit("#", 1)[1] and
+                                      t.get("references") == item["entry"]
+                                      for t in exact.get("tests", []))
+                    proven_current = source_proven and test_proven
         allowed_adoption = (not was and exists is not None and
                             not exists["children"] and
-                            any(item["source"] in x["historical_production_sources"]
-                                for x in historical_match))
+                            (proven_current or any(
+                                item["source"] in x["historical_production_sources"]
+                                for x in historical_match)))
         if exists is not None and not allowed_adoption and target != source_path and (
             not was or target != parts(was["path"])
         ):
