@@ -4532,14 +4532,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "dd91f8803395",
+  "source_snapshot": "8c2fc01e9ef4",
   "observed_delta": {
-    "baseline": "010efb92d9e7",
+    "baseline": "dd91f8803395",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalBundledRuntimeManager.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
@@ -4547,8 +4545,8 @@
     "removed_ui": []
   },
   "tracked_legacy_identities": 117,
-  "unproven_feature_count": 22,
-  "followup_investigated_descriptions": 22,
+  "unproven_feature_count": 14,
+  "followup_investigated_descriptions": 14,
   "workflow_evidence_features": 14,
   "declared_unexecuted_test_methods": 16,
   "verified_registrations": [
