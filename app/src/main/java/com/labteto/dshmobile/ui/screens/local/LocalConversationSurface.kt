@@ -567,7 +567,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 val fileUpdates = snapshotFlow {
                     workArtifacts.asSequence()
                         .filter { it.category == "file" }
-                        .map { it.reference }.distinct().take(100).toList()
+                        .map { it.reference }.distinct().toList()
                 }.distinctUntilChanged().flatMapLatest { paths ->
                     workActions.artifactFileChanges(state.sessionId, paths)
                 }
