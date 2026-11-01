@@ -11,6 +11,13 @@
       ]
     },
     {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生首页：唯一新建入口，未开始编辑器不生成正式会话记录，未发送草稿独立保留与恢复",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/ui/screens/local/LocalSessionAttachmentDraftCacheTest.kt#savedStateRestoresValidAttachmentDraftsOnly"
+      ]
+    },
+    {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生功能路由与页面恢复校验",
       "state": "automated_partial",
       "evidence": [
@@ -116,6 +123,29 @@
       ]
     },
     {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 模型温度独立采样",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningTest.kt#composerAndPersonaShareOneStoredTemperaturePosition"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 历史调参兼容读取，退出反应控制",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningTest.kt#legacyBehaviorAxesNoLongerRepresentAnActiveSetting",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningTest.kt#retiredParametersDoNotChangeTheActiveSamplingSignature"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与采样设置分离",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatMemoryBindingTest.kt#boundRelationshipMemoryOnlyMatchesItsCharacter",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningTest.kt#oldTuningCannotOverwriteCharacterContext"
+      ]
+    },
+    {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 人物／图集身份隔离",
       "state": "automated_partial",
       "evidence": [
@@ -145,6 +175,13 @@
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt#messageProvenanceRollsBackOnlyDiscardedTurnEvenWithBroadTimeBoundary"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 用户与作者表达偏好及重复诊断",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/ChatStyleGuardTest.kt#explicitPreferencesEnterGenerationAndMissesRemainDiagnostic"
       ]
     },
     {
@@ -1006,6 +1043,14 @@
       ]
     },
     {
+      "path": "第二层｜共享运行能力 / 共享工具执行 / 工具输出格式和结构化验证",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolOutputStoreTest.kt#storesAndPagesSingleLineOutputByUtf8ByteRange",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalModelToolCallContractTest.kt#nonStreamingAndHistoryRejectAbsentOrMalformedArgumentsAndIdentity"
+      ]
+    },
+    {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 错误、超时、取消与结果恢复",
       "state": "automated_partial",
       "evidence": [
@@ -1166,6 +1211,15 @@
       ]
     },
     {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / Node／Python／Git 工具运行环境",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/androidTest/java/com/labteto/dshmobile/local/BundledNodeRuntimeTest.kt#bundledNodeRunsJavaScriptAndChildProcessOnAndroid16",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/BundledPythonRuntimeTest.kt#bundledPythonRunsStdlibAndAndroidShellOnAndroid16",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/BundledGitRuntimeTest.kt#bundledGitRunsCoreRepositoryWorkflowOnAndroid16"
+      ]
+    },
+    {
       "path": "第三层｜平台与工程保障 / Android 本机运行时 / 运行时文件安装、校验与修复",
       "state": "automated_partial",
       "evidence": [
@@ -1233,6 +1287,59 @@
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#unknownToolOutcomeBlocksAutomaticResume"
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 团队任务与 UI 回归",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUiRegressionTest.kt#rebuildingStatusDoesNotPretendToRecruitMembers"
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 技能中文名称和编辑回归",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/tools/LocalSkillStoreTest.kt#existingCustomSkillReadsChineseHeadingAndRefreshesAfterRename"
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 官方语义样本差分验证",
+      "state": "automated_partial",
+      "evidence": [
+        "reference-validation/src/test/kotlin/com/labteto/dshmobile/reference/ReferenceConformanceTest.kt#nativeCoreMatchesPinnedOfficialGoldenCases"
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 会话登记升级、备份损坏和并发写入回归",
+      "state": "automated_partial",
+      "evidence": [
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/VersionedSessionStoreCorruptionTest.kt#registrySurvivesDeletionAndCanRecoverFromCorruptionWithoutLosingSessions",
+        "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/VersionedSessionStoreConcurrencyTest.kt#backupRecoveryCannotOverwriteAConcurrentNewerWrite"
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 单聊群聊工作共存及历史读取隔离回归",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt#agentTeamProjectionInWorkSessionDoesNotHideOtherChatGroupOrWorkSessions",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt#reopenedSessionAndHistoryAuthorizationIgnoreNestedAgentTeamProjectionFiles"
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 人物日记纠正与能力状态界面回归",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowserRegressionTest.kt#installedPluginDetailsOpenAndCanReturnToConversation"
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 交付要求、成果版本和记忆来源证据回归",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalRequirementEvidenceProjectionTest.kt#requirementLinkMustMatchSameTaskPositionAndText",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkArtifactVersionTest.kt#eventTimeHashTracksExactFileVersionAndDetectsLaterEdit",
+        "app/src/test/java/com/labteto/dshmobile/local/V4DeliveryMemoryOfflineAcceptanceTest.kt#userFactCorrectionInvalidatesOnlyRelatedGeneratedDiaryAfterColdRestart"
       ]
     },
     {

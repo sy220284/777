@@ -88,15 +88,14 @@
       "source": [],
       "test": [
         {
-          "path": "app/src/test/java/com/labteto/dshmobile/ui/screens/tools/LocalSkillDisplayNameDocumentTest.kt",
-          "method": "editingExistingSkillUpdatesOnlyDisplayNameInItsSourceFile"
-        },
-        {
           "path": "app/src/test/java/com/labteto/dshmobile/local/tools/LocalSkillStoreTest.kt",
           "method": "existingCustomSkillReadsChineseHeadingAndRefreshesAfterRename"
         }
       ],
-      "conclusion": "技能编辑属于已有技能能力，本条对应回归验证。测试代码存在，无法当成新增的独立产品功能。"
+      "conclusion": "技能编辑属于已有技能能力，本条对应回归验证。测试代码存在，无法当成新增的独立产品功能。 源码树复核：原界面测试文件已不存在，原测试引用保留在 unavailable_test_sources，不计入可执行证据；界面行为仍需重建并做设备验收。",
+      "unavailable_test_sources": [
+        "app/src/test/java/com/labteto/dshmobile/ui/screens/tools/LocalSkillDisplayNameDocumentTest.kt#editingExistingSkillUpdatesOnlyDisplayNameInItsSourceFile"
+      ]
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 交付要求、成果版本和记忆来源证据回归",
@@ -128,15 +127,14 @@
       "source": [],
       "test": [
         {
-          "path": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryCorrectionRegressionTest.kt",
-          "method": "editingDiaryRequiresExplicitSaveAndRefreshesCurrentCharacter"
-        },
-        {
           "path": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowserRegressionTest.kt",
           "method": "installedPluginDetailsOpenAndCanReturnToConversation"
         }
       ],
-      "conclusion": "日记纠正与工具能力状态分属两个现有界面，本条是合并的设备回归范围，必须单独核查两个UI。"
+      "conclusion": "日记纠正与工具能力状态分属两个现有界面，本条是合并的设备回归范围，必须单独核查两个UI。 源码树复核：原界面测试文件已不存在，原测试引用保留在 unavailable_test_sources，不计入可执行证据；界面行为仍需重建并做设备验收。",
+      "unavailable_test_sources": [
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryCorrectionRegressionTest.kt#editingDiaryRequiresExplicitSaveAndRefreshesCurrentCharacter"
+      ]
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 团队任务与 UI 回归",
@@ -291,13 +289,12 @@
         {
           "path": "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningTest.kt",
           "method": "composerAndPersonaShareOneStoredTemperaturePosition"
-        },
-        {
-          "path": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterBehaviorTuningDialogTest.kt",
-          "method": "expressionVariationDisplaysMappedChatTemperature"
         }
       ],
-      "conclusion": "采样温度使用独立存储字段，人物编辑与聊天共用；属于正在使用的模型设置，能否被每一种模型接受需要连接真实模型验证。"
+      "conclusion": "采样温度使用独立存储字段，人物编辑与聊天共用；属于正在使用的模型设置，能否被每一种模型接受需要连接真实模型验证。 源码树复核：原界面测试文件已不存在，原测试引用保留在 unavailable_test_sources，不计入可执行证据；界面行为仍需重建并做设备验收。",
+      "unavailable_test_sources": [
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterBehaviorTuningDialogTest.kt#expressionVariationDisplaysMappedChatTemperature"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / V6 原生首页：唯一新建入口，未开始编辑器不生成正式会话记录，未发送草稿独立保留与恢复",

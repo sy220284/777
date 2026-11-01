@@ -84,6 +84,12 @@ def validate(root=ROOT):
     for node in explicit["items"]:
         for test in node.get("tests", []):
             required.setdefault(node["path"], set()).add(test["path"] + "#" + test["method"])
+    # Previously reviewed triage tests become durable evidence obligations.
+    # An unavailable UI test is recorded separately, never as executable evidence.
+    triage = json.loads((root / "docs/FEATURE-EXISTENCE-TRIAGE.json").read_text(encoding="utf-8"))
+    for node in triage["items"]:
+        for test in node.get("test", []):
+            required.setdefault(node["path"], set()).add(test["path"] + "#" + test["method"])
     indexed = {item["path"]: set(item["evidence"]) for item in items}
     for path, tests in required.items():
         if not tests.issubset(indexed.get(path, set())):
