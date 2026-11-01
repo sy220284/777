@@ -81,7 +81,8 @@ internal class LocalMediaStudioBackupInstaller(
             }
         }
         DurableFileCommit.syncDirectory(targetMedia)
-        if (!Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+        if (!sameBytes(database, archive.database)) {
+            val replacingEmpty = Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)
             val temp = File(database.parentFile, database.name + ".restore-${UUID.randomUUID()}")
             try {
                 archive.database.inputStream().buffered().use { input ->
@@ -93,11 +94,17 @@ internal class LocalMediaStudioBackupInstaller(
                 check(sameBytes(archive.database, temp)) {
                     "媒体数据库恢复临时文件校验失败"
                 }
-                check(!Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-                    !File(database.path + "-wal").exists()) {
-                    "媒体数据库恢复期间出现已有数据，停止覆盖"
+                // A user may have opened an otherwise empty Media Studio before importing.
+                // Replace that strictly empty, migrated database only at the startup
+                // restore boundary; any intervening creation must block replacement.
+                check(!File(database.path + "-wal").exists() &&
+                    !File(database.path + "-shm").exists() &&
+                    if (replacingEmpty) isPristineEmptyDatabase(database)
+                    else !Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                    "媒体数据库恢复期间出现已有创作数据，停止覆盖"
                 }
-                Files.move(temp.toPath(), database.toPath())
+                Files.move(temp.toPath(), database.toPath(), StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING)
             } finally { if (temp.exists()) temp.delete() }
         }
         check(sameBytes(database, archive.database)) {
@@ -144,10 +151,12 @@ internal class LocalMediaStudioBackupInstaller(
             !File(database.path + "-shm").exists()) {
             "目标媒体数据库仍有 WAL/SHM，拒绝覆盖已有创作事实"
         }
-        if (Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)) check(
-            Files.isRegularFile(database.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-                sameBytes(database, archive.database)
-        ) { "目标媒体数据库已有不同创作记录，禁止恢复覆盖" }
+        if (Files.exists(database.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            check(Files.isRegularFile(database.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+                (sameBytes(database, archive.database) || isPristineEmptyDatabase(database))) {
+                "目标媒体数据库已有不同创作记录，禁止恢复覆盖"
+            }
+        }
 
         val pairs = archive.mediaFiles.map { it to File(targetMedia, it.name) }
         // Before writing anything, reject every conflicting original. No partial
@@ -160,6 +169,26 @@ internal class LocalMediaStudioBackupInstaller(
         }
         return targetMedia to pairs
     }
+
+    /** A first-launch Media Store may already own an empty migrated SQLite file.
+     * The metadata and full table must be pristine; never erase a single user receipt.
+     * Called only when WAL/SHM are absent, so no hidden committed rows are overlooked.
+     */
+    private fun isPristineEmptyDatabase(database: File): Boolean =
+        SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            LocalMediaDatabase.validateBackupStructure(db)
+            val healthy = db.rawQuery("PRAGMA quick_check", null).use { rows ->
+                rows.moveToFirst() && rows.getString(0) == "ok"
+            }
+            check(healthy) { "现有媒体数据库完整性校验失败，禁止覆盖" }
+            val migratedOnly = db.rawQuery("SELECT id,value FROM metadata", null).use { rows ->
+                rows.moveToFirst() && rows.getString(0) == "migrated" &&
+                    rows.getString(1) == "1" && !rows.moveToNext()
+            }
+            migratedOnly && db.rawQuery("SELECT 1 FROM media LIMIT 1", null).use { rows ->
+                !rows.moveToFirst()
+            }
+        }
 
     private fun installedCount(database: File): Int = SQLiteDatabase.openDatabase(
         database.path, null, SQLiteDatabase.OPEN_READONLY,
