@@ -4532,9 +4532,9 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "787636fb926d",
+  "source_snapshot": "010efb92d9e7",
   "observed_delta": {
-    "baseline": "1ffd1d4e731a",
+    "baseline": "787636fb926d",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [],
