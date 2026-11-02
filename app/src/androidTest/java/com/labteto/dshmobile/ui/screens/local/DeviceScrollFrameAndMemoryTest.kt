@@ -82,6 +82,25 @@ class DeviceScrollFrameAndMemoryTest {
             activity = ActivityLifecycleMonitorRegistry.getInstance()
                 .getActivitiesInStage(Stage.RESUMED).first()
         }
+        // UIAutomation can accept events even when another Android window owns
+        // focus. Establish the actual Compose host as the input target before
+        // timing real gestures; never substitute a programmatic list scroll.
+        instrumentation.runOnMainSync {
+            activity.window.decorView.requestFocus()
+        }
+        compose.waitUntil(timeoutMillis = 15_000) {
+            var ownsInput = false
+            instrumentation.runOnMainSync {
+                ownsInput = activity.hasWindowFocus() && activity.window.decorView.isShown
+            }
+            ownsInput
+        }
+        compose.runOnIdle {
+            assertTrue(
+                "Real Work gestures require a visible focused Activity window",
+                activity.hasWindowFocus() && activity.window.decorView.isShown,
+            )
+        }
         var refreshRate = 60f
         instrumentation.runOnMainSync {
             refreshRate = (activity.display?.refreshRate ?: 60f).coerceAtLeast(30f)
