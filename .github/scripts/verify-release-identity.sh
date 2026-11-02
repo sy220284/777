@@ -29,9 +29,10 @@ IFS=$'\t' read -r new_package new_code actual_version new_cert < <(identity "$ne
 [[ "$actual_version" == "$new_version" ]] || {
   echo "::error::Release APK version differs from selected GitHub version" >&2; exit 1;
 }
-old_tag="$(gh api --paginate "repos/$repo/releases?per_page=100" \
+releases="$(gh api --paginate "repos/$repo/releases?per_page=100" \
   --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' |
-  grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$' | sort -V | tail -n 1 || true)"
+  sed -n '/^v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*-777\.[0-9][0-9]*$/p')"
+old_tag="$(printf '%s\n' "$releases" | sort -V | tail -n 1)"
 if [[ -z "$old_tag" ]]; then
   echo "First formal release: signature and version checked; no previous APK"
   exit 0
