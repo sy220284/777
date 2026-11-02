@@ -3,7 +3,7 @@ name: Release APK
 'on':
   # GitHub schedule 可能漏发：完整 main CI 成功时及时检查，半小时定时兜底。
   workflow_run:
-    workflows: [CI]
+    workflows: [CI, Android Page Size Matrix]
     types: [completed]
     branches: [main]
   schedule:
@@ -106,6 +106,26 @@ jobs:
             return 1
           }
 
+          # 4 KB and 16 KB on both Android 16 and 17, same immutable main SHA.
+          has_main_four_way_validation() {
+            candidate_sha="$1"
+            ids="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$candidate_sha&status=success&per_page=100" \
+              --jq '.workflow_runs[] | select(.name == "Android Page Size Matrix" and .event == "push" and .head_branch == "main" and .conclusion == "success") | .id')"
+            [ -n "$ids" ] || return 1
+            while IFS= read -r run_id; do
+              [ -n "$run_id" ] || continue
+              jobs="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")"
+              if printf '%s' "$jobs" | jq -e 'any(.jobs[]; .name == "android-16-17-four-way" and .conclusion == "success")' >/dev/null; then
+                return 0
+              fi
+            done <<< "$ids"
+            return 1
+          }
+
+          has_complete_release_validation() {
+            has_full_main_validation "$1" && has_main_four_way_validation "$1"
+          }
+
           # 比对目标固定为本次触发快照，绝不追随发布期间变化的 main。
           cp .github/scripts/classify-ci-scope.py "$RUNNER_TEMP/classify-ci-scope.py"
 
@@ -131,13 +151,13 @@ jobs:
             done < .github/scripts/retired-releases.txt
           fi
 
-          if ! has_full_main_validation "$RELEASE_SHA"; then
+          if ! has_complete_release_validation "$RELEASE_SHA"; then
             echo "本批次提交未完成主线完整 CI；寻找与本批次产物等价的已验证候选。"
             FOUND_CANDIDATE=false
             while IFS= read -r candidate_sha; do
               [ -n "$candidate_sha" ] || continue
               if release_equivalent_to_batch "$candidate_sha" "$BATCH_SHA" &&
-                 has_full_main_validation "$candidate_sha"; then
+                 has_complete_release_validation "$candidate_sha"; then
                 RELEASE_SHA="$candidate_sha"
                 FOUND_CANDIDATE=true
                 echo "找到本批次等价的完整验证候选：$RELEASE_SHA -> $BATCH_SHA"
@@ -195,8 +215,8 @@ jobs:
             fi
           fi
 
-          if ! has_full_main_validation "$RELEASE_SHA"; then
-            echo "缺少与发布提交一致的完整 main CI 验收（双模拟器、ARM64、x86），拒绝发布。"
+          if ! has_complete_release_validation "$RELEASE_SHA"; then
+            echo "缺少与发布 SHA 一致的完整 main CI 或 Android 四组合成功记录，拒绝发布。"
             skip_release
             exit 0
           fi
@@ -357,6 +377,14 @@ jobs:
           APK="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
           .github/scripts/verify-android16-apk.sh "$APK"
 
+      - name: Verify release signing continuity and upgrade version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          NEW_APK="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          bash .github/scripts/verify-release-identity.sh "$NEW_APK" "$DSH_VERSION_NAME"
+
       - name: Prepare incremental update assets
         env:
           GH_TOKEN: ${{ github.token }}
@@ -505,3 +533,7 @@ jobs:
           files: |
             .release-assets/*
           generate_release_notes: true
+      - name: Independently verify published Release downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/verify-published-release.sh "${{ steps.version.outputs.tag }}" "${{ needs.check-release.outputs.release_sha }}" "$DSH_VERSION_NAME"

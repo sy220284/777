@@ -148,7 +148,7 @@ if '.event == "push"' not in RELEASE or '.conclusion == "success"' not in RELEAS
 triggers = RELEASE.split("'on':\n", 1)[1].split("\npermissions:", 1)[0]
 if "cron: '13,43 * * * *'" not in triggers:
     fail("release must retain the half-hour fallback away from the busy hour boundary")
-if not re.search(r"(?m)^  workflow_run:\n    workflows: \[CI\]\n    types: \[completed\]\n    branches: \[main\]$", triggers):
+if not re.search(r"(?m)^  workflow_run:\n    workflows: \[CI, Android Page Size Matrix\]\n    types: \[completed\]\n    branches: \[main\]$", triggers):
     fail("release must respond only to completed CI workflows on main")
 if re.search(r"(?m)^  (?:push|pull_request|pull_request_target|release):", triggers):
     fail("release must not bypass complete main CI validation via push/PR/tag events")
@@ -179,4 +179,12 @@ if "if: steps.freshness" in RELEASE:
 if "target_commitish: ${{ needs.check-release.outputs.release_sha }}" not in RELEASE:
     fail("publication is not pinned to the validated candidate")
 
-print("Release-eligibility evidence, CI completion trigger, half-hour fallback and immutable batch regression passed")
+if "has_main_four_way_validation()" not in RELEASE or 'has_complete_release_validation "$RELEASE_SHA"' not in RELEASE:
+    fail("release is not gated by an independently passing four-cell Android main-push run")
+if not re.search(r"(?m)^  push:\n    branches: \[main\]", matrix):
+    fail("four-cell matrix must run on the main branch for release-impacting changes")
+if "Verify release signing continuity and upgrade version" not in RELEASE:
+    fail("formal APK signing continuity check was removed")
+if "Independently verify published Release downloads" not in RELEASE:
+    fail("post-publication artifact integrity verification was removed")
+print("Release, Android matrix, signing continuity, published asset, and immutable SHA gates passed")

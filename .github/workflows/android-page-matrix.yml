@@ -1,8 +1,27 @@
 name: Android Page Size Matrix
 
 on:
+  push:
+    branches: [main]
+    # Unknown/new source directories also get matrix validation; doc-only
+    # changes do not consume four emulator environments.
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'AGENTS.md'
   pull_request:
     paths:
+      - '.github/release-version'
+      - '.github/workflows/release.yml'
+      - '.github/actions/**'
+      - 'app/src/main/**'
+      - 'ui-*/src/main/**'
+      - 'core/src/main/**'
+      - 'harness-*/src/main/**'
+      - 'tools/runtime/**'
+      - 'gradle/**'
+      - '**/*.gradle.kts'
       - '.github/workflows/android-page-matrix.yml'
       - '.github/workflows/ci.yml'
       - '.github/scripts/run-android-page-matrix.sh'
