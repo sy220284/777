@@ -236,6 +236,8 @@ for lane, dependencies in ci_dag.items():
 
 
 merge_gate = CI.split("\n  merge-gate:\n", 1)[1] if "\n  merge-gate:\n" in CI else ""
+if "if: ${{ !cancelled() }}" not in merge_gate.split("    needs:", 1)[0]:
+    violations.append("merge-gate must aggregate failed jobs but exit on cancellation to release the CI queue")
 # A high-risk PR must not report a green merge-gate while its selected
 # Android lanes were skipped. Risk classification (not the GitHub event type)
 # decides whether a device lane is required; unused lanes remain skippable.

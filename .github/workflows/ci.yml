@@ -554,7 +554,8 @@ jobs:
           retention-days: 2
 
   merge-gate:
-    if: always()
+    # Still summarize failed tests; release the branch queue when a run is cancelled.
+    if: ${{ !cancelled() }}
     needs:
       - scope
       - static-gates
