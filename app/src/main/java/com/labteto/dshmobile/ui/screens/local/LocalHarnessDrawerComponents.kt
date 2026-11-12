@@ -134,8 +134,6 @@ internal fun DrawerQuickActions(
     onTasks: () -> Unit,
     onWorkspaceFiles: () -> Unit,
     onTools: () -> Unit,
-    onMiniMaxQuota: (() -> Unit)? = null,
-    onUsage: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -179,20 +177,6 @@ internal fun DrawerQuickActions(
                     onClick = onTools,
                 )
             }
-        onUsage?.let { openUsage ->
-            DrawerQuickAction(
-                icon = SyEntryIcons.Usage,
-                title = stringResource(R.string.usage_calculation_title),
-                onClick = openUsage,
-            )
-        }
-        onMiniMaxQuota?.let { openQuota ->
-            DrawerQuickAction(
-                icon = SyEntryIcons.Quota,
-                title = stringResource(R.string.minimax_quota_title),
-                onClick = openQuota,
-            )
-        }
     }
 }
 

@@ -82,7 +82,6 @@ class LocalDrawerEntryVisibilityRegressionTest {
                     onTasks = { opened += "tasks" },
                     onWorkspaceFiles = { opened += "workspace" },
                     onTools = { opened += "tools" },
-                    onUsage = { opened += "usage" },
                 )
             }
         }
@@ -90,12 +89,13 @@ class LocalDrawerEntryVisibilityRegressionTest {
             R.string.chatlist_workspace_files to "workspace",
             R.string.tasks_title to "tasks",
             R.string.tools_title to "tools",
-            R.string.usage_calculation_title to "usage",
         ).forEach { (label, action) ->
             compose.onNodeWithText(context.getString(label)).performClick()
             compose.runOnIdle { assertEquals(action, opened.last()) }
         }
-        compose.runOnIdle { assertEquals(4, opened.size) }
+        compose.runOnIdle { assertEquals(3, opened.size) }
+        compose.onNodeWithText(context.getString(R.string.usage_calculation_title)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.minimax_quota_title)).assertDoesNotExist()
         compose.onNodeWithText("沉浸阅读").assertDoesNotExist()
     }
 
@@ -128,27 +128,25 @@ class LocalDrawerEntryVisibilityRegressionTest {
     }
 
     @Test
-    fun quotaEntryAppearsInBothModesAndDisappearsWithoutMiniMaxAction() {
-        var opens = 0
+    fun modelUsageEntriesStayOutsideChatAndWorkQuickActions() {
         val mode = androidx.compose.runtime.mutableStateOf(LocalUsageMode.WORK)
-        val available = androidx.compose.runtime.mutableStateOf(true)
         compose.setContent {
             DshTheme {
                 DrawerQuickActions(
                     usageMode = mode.value,
                     onOpenGroupChat = {}, onOpenPersonaGallery = {}, onOpenDiary = {},
-                    onTasks = {}, onWorkspaceFiles = {}, onTools = {}, onMiniMaxQuota = if (available.value) { { opens++ } } else null,
+                    onTasks = {}, onWorkspaceFiles = {}, onTools = {},
                 )
             }
         }
-        val title = context.getString(R.string.minimax_quota_title)
-        compose.onNodeWithText(title).performClick()
+        val usage = context.getString(R.string.usage_calculation_title)
+        val quota = context.getString(R.string.minimax_quota_title)
+        compose.onNodeWithText(usage).assertDoesNotExist()
+        compose.onNodeWithText(quota).assertDoesNotExist()
         compose.runOnIdle { mode.value = LocalUsageMode.CHAT }
-        compose.onNodeWithText(title).performClick()
-        compose.runOnIdle { assertEquals(2, opens); available.value = false }
-        compose.onNodeWithText(title).assertDoesNotExist()
+        compose.onNodeWithText(usage).assertDoesNotExist()
+        compose.onNodeWithText(quota).assertDoesNotExist()
     }
-
 
     @Test
     fun sessionCannotBeDeletedBySwipeButLongPressOffersDelete() {
