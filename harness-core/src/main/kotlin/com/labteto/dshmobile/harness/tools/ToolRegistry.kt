@@ -5,6 +5,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -83,8 +84,9 @@ data class HarnessTool(
 class ToolRegistry private constructor(
     private val tools: RegistryEntries<HarnessTool>,
     private val admission: ToolLifecycleAdmission,
+    private val hooks: ToolHookRegistry,
 ) {
-    constructor() : this(RegistryEntries(), ToolLifecycleAdmission())
+    constructor() : this(RegistryEntries(), ToolLifecycleAdmission(), ToolHookRegistry())
     fun register(tool: HarnessTool, replace: Boolean = false) {
         validateToolRegistration(tool)
         val normalized = tool.withContractDescription()
@@ -93,6 +95,9 @@ class ToolRegistry private constructor(
     fun unregister(name: String): HarnessTool? = tools.remove(name)
     fun get(name: String): HarnessTool? = tools.get(name)
     fun names(): List<String> = tools.snapshot().keys.toList()
+    fun registerHook(subscription: ToolHookSubscription) = hooks.register(subscription)
+    fun unregisterHook(id: String): Boolean = hooks.unregister(id)
+    fun hookIds(): List<String> = hooks.ids()
     /** Capture once before sending schemas, using one coherent registry view. */
     fun captureBindings(schemas: JsonArray): ToolBindingSnapshot {
         val registered = tools.snapshot()
@@ -109,7 +114,7 @@ class ToolRegistry private constructor(
     )
     internal fun snapshot(): Map<String, HarnessTool> = tools.snapshot()
     internal fun restore(snapshot: Map<String, HarnessTool>) = tools.restore(snapshot)
-    internal fun fork(): ToolRegistry = ToolRegistry(tools.fork(), admission)
+    internal fun fork(): ToolRegistry = ToolRegistry(tools.fork(), admission, hooks)
     internal fun publishTo(destination: ToolRegistry) = tools.publishTo(destination.tools)
     internal fun markLifecycleSafe(safe: Boolean) = admission.markSafe(safe)
     internal suspend fun <T> lifecycleTransition(block: suspend () -> T): T = admission.transition(block)
@@ -191,6 +196,37 @@ class ToolRegistry private constructor(
                 executionStarted = false,
             )
         }
+        // Hooks run after contract validation and mutation scope admission; they cannot grant
+        // permissions or replace an approval. Every denial occurs before any executor entry.
+        val hookSnapshot = hooks.snapshot(name)
+        for (subscription in hookSnapshot.subscriptions) {
+            val decision = try {
+                subscription.hook.beforeUse(ToolPreUseRequest(context.sessionId, tool, input))
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (failure: Exception) {
+                return ToolInvocationResult(
+                    result = ToolResult(
+                        content = "工具前置 Hook 执行失败：" + subscription.id,
+                        isError = true,
+                        errorCode = "TOOL_PRE_HOOK_FAILED",
+                        recoveryHint = "检查此 Hook 的配置与运行日志后再尝试。",
+                    ),
+                    executionStarted = false,
+                )
+            }
+            if (decision is ToolPreUseDecision.Deny) {
+                return ToolInvocationResult(
+                    result = ToolResult(
+                        content = "工具被安全策略阻止：" + decision.reason,
+                        isError = true,
+                        errorCode = "TOOL_HOOK_BLOCKED",
+                        recoveryHint = "根据 Hook 拒绝原因调整本次操作或取得授权。",
+                    ),
+                    executionStarted = false,
+                )
+            }
+        }
         val needsApproval = when (tool.approvalPolicy) {
             ToolApprovalPolicy.NEVER -> false
             ToolApprovalPolicy.ALWAYS -> true
@@ -221,6 +257,17 @@ class ToolRegistry private constructor(
         // A plugin may be replaced or uninstalled while the user is reading its approval prompt.
         // Never execute a handler other than the one whose contract was admitted.
         if (tools.get(name) !== tool) return registrationChanged(name)
+        if (!hooks.isCurrent(hookSnapshot)) {
+            return ToolInvocationResult(
+                result = ToolResult(
+                    content = "工具执行规则在审批期间已更新，本次调用未执行。",
+                    isError = true,
+                    errorCode = "TOOL_HOOKS_CHANGED",
+                    recoveryHint = "重新检查当前安全策略与工具权限后再调用。",
+                ),
+                executionStarted = false,
+            )
+        }
         currentCoroutineContext().ensureActive()
         context.onExecutionStarted?.invoke(tool)
         currentCoroutineContext().ensureActive()
@@ -228,8 +275,8 @@ class ToolRegistry private constructor(
         // owns a finish-on-cancellation region, including its terminal receipt. Other tools
         // retain cooperative cancellation and unknown-effect recovery.
         return if (tool.metadata.finishesOnCancellation) {
-            withContext(NonCancellable) { executeHandler(tool, input, rawArguments, context) }
-        } else executeHandler(tool, input, rawArguments, context)
+            withContext(NonCancellable) { executeHandler(tool, input, rawArguments, context, hookSnapshot) }
+        } else executeHandler(tool, input, rawArguments, context, hookSnapshot)
     }
 
     private suspend fun executeHandler(
@@ -237,16 +284,26 @@ class ToolRegistry private constructor(
         input: JsonObject,
         rawArguments: String,
         context: ToolContext,
+        hookSnapshot: ToolHookSnapshot,
     ): ToolInvocationResult {
         val environment = currentCoroutineContext()[ToolExecutionEnvironmentContext]
         suspend fun executeActual(): ToolResult =
             if (tool.metadata.environmentBound && environment != null) {
                 environment.execute(tool, context, input, rawArguments)
             } else tool.executor.execute(context, input, rawArguments)
+
+        suspend fun deliverReceiptAndHooks(result: ToolResult) {
+            // Persist the tool's real outcome before any plugin runs; a post-hook failure must
+            // never erase the side-effect provenance or create a false "not started" receipt.
+            context.onExecutionFinished?.invoke(tool, result)
+            for (subscription in hookSnapshot.subscriptions) {
+                subscription.hook.afterUse(ToolPostUseEvent(context.sessionId, tool, result))
+            }
+        }
         val timeoutMillis = tool.timeoutMillis
         if (timeoutMillis == null) {
             val result = executeActual()
-            context.onExecutionFinished?.invoke(tool, result)
+            deliverReceiptAndHooks(result)
             return ToolInvocationResult(
                 result = result,
                 executionStarted = true,
@@ -267,7 +324,7 @@ class ToolRegistry private constructor(
                     "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
                 },
             )
-        context.onExecutionFinished?.invoke(tool, settled)
+        deliverReceiptAndHooks(settled)
         return ToolInvocationResult(
             result = settled,
             executionStarted = true,
