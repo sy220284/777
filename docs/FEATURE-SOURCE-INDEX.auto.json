@@ -204,7 +204,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
-      "sha256": "ff542f4ef9593989"
+      "sha256": "08c7ed2cd82b5627"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalCurrentSessionSnapshotComposition.kt",
@@ -3376,7 +3376,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "sha256": "d12268a25f80056d"
+      "sha256": "04e6aed5eb238df2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationTemperatureUi.kt",
@@ -3480,7 +3480,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalQueuedUserQueueSheet.kt",
-      "sha256": "ac950414e4486e8d"
+      "sha256": "ca7fec48835c85fc"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSettingsUiContribution.kt",
@@ -3920,7 +3920,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/uicontract/ConversationUiPort.kt",
-      "sha256": "824a14eecb037eab"
+      "sha256": "57764ddbfada59a7"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/uicontract/CurrentPersonaUiPort.kt",
@@ -4560,12 +4560,17 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "8fa2e120df66",
+  "source_snapshot": "413defa6fab1",
   "observed_delta": {
-    "baseline": "451af4173685",
+    "baseline": "8fa2e120df66",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalQueuedUserQueueSheet.kt",
+      "app/src/main/java/com/labteto/dshmobile/uicontract/ConversationUiPort.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
