@@ -142,6 +142,35 @@ class AgentInputQueue(
         }
     }
 
+    /**
+     * Compare-and-swap a complete user message, including the model-visible envelope.
+     * Work/Chat owners must reconstruct image/file blocks before calling this; preserving the
+     * original ID keeps the admission receipt and user-visible message identity consistent.
+     */
+    fun replaceUserCommitted(
+        expected: QueuedAgentInput,
+        replacement: QueuedAgentInput,
+        commit: (List<QueuedAgentInput>) -> Unit,
+    ): Boolean = synchronized(lock) {
+        require(expected.kind == QueuedAgentInputKind.USER && expected.id.isNotBlank())
+        require(replacement.kind == QueuedAgentInputKind.USER && replacement.id == expected.id)
+        require(replacement.content.isNotBlank() && replacement.continuation == null &&
+            replacement.agentSource == null) { "只能替换完整的用户队列消息" }
+        require(replacement.modelMessage == null ||
+            (replacement.modelMessage["role"] as? kotlinx.serialization.json.JsonPrimitive)?.content ==
+                "user") { "模型消息必须维持用户身份" }
+        val index = items.indexOfFirst { it.id == expected.id && it.kind == QueuedAgentInputKind.USER }
+        if (index < 0 || items[index] != expected) return@synchronized false
+        items[index] = replacement
+        try {
+            commit(items.toList())
+            true
+        } catch (failure: Throwable) {
+            items[index] = expected
+            throw failure
+        }
+    }
+
     /** Cancel a queued user input, never a system continuation or another agent's message. */
     fun removeUserCommitted(
         id: String,
