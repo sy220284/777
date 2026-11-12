@@ -132,7 +132,7 @@ class LocalWorkspaceTest {
         val first = workspace.searchWorkspacePage("mcp", 0, 1)
         assertEquals("功能/mcp.kt", first.files.single().path)
         val second = workspace.searchWorkspacePage("mcp", requireNotNull(first.nextOffset), 1)
-        assertEquals("功能/ModelContextProvider.kt", second.files.single().path)
+        assertEquals("功能/ModuleControlPlan.kt", second.files.single().path)
         assertTrue(first.files.first().path != second.files.first().path)
         assertTrue(workspace.stopWorkspaceSearch("mcp"))
         assertTrue(runCatching { workspace.searchWorkspacePage("mcp", 1, 1) }.isFailure)
