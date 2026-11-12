@@ -4504,7 +4504,7 @@
     },
     {
       "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/GitRemoteDiff.kt",
-      "sha256": "e8e27e3ef9555d43"
+      "sha256": "53afe64a55029f51"
     },
     {
       "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/GitWorkspaceRuntime.kt",
@@ -4548,13 +4548,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "1711c060f963",
+  "source_snapshot": "bbbd451f03cc",
   "observed_delta": {
-    "baseline": "f66009303905",
+    "baseline": "1711c060f963",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt"
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/GitRemoteDiff.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
