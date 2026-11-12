@@ -66,6 +66,8 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -103,6 +105,7 @@ internal fun LocalWorkspaceFilesDialog(
         if (offset == 0) LocalWorkspaceSearchPage(loadSearch(search), null)
         else LocalWorkspaceSearchPage(emptyList(), null)
     },
+    stopSearch: suspend (String) -> Boolean = { false },
     loadConversation: suspend (String) -> LocalConversationFiles,
     loadPreview: suspend (String) -> LocalWorkspaceFilePreview,
     loadPreviewPage: suspend (String, Long) -> LocalWorkspaceFilePreview = { path, _ -> loadPreview(path) },
@@ -380,11 +383,21 @@ internal fun LocalWorkspaceFilesDialog(
         }
     }
 
-    // Search is debounced; folder navigation and rendering never wait on a global search.
+    // Search is debounced and its ranked snapshot belongs to this exact visible query.
+    // Cancelling the effect on query change or closing the dialog releases that snapshot.
     LaunchedEffect(mode, sessionId, query) {
-        if (mode == LocalFilesMode.WORKSPACE && loadedForEntry && query.trim() != lastLoadedSearch) {
-            if (query.isNotBlank()) kotlinx.coroutines.delay(280)
-            reload()
+        val activeQuery = query.trim()
+        try {
+            if (mode == LocalFilesMode.WORKSPACE && loadedForEntry &&
+                activeQuery != lastLoadedSearch) {
+                if (activeQuery.isNotEmpty()) kotlinx.coroutines.delay(280)
+                reload()
+            }
+            if (mode == LocalFilesMode.WORKSPACE && activeQuery.isNotEmpty()) awaitCancellation()
+        } finally {
+            if (mode == LocalFilesMode.WORKSPACE && activeQuery.isNotEmpty()) {
+                withContext(NonCancellable + Dispatchers.IO) { stopSearch(activeQuery) }
+            }
         }
     }
 
