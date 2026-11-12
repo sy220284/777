@@ -61,11 +61,14 @@ internal fun syResolveMaterialFill(
         listOf(sample) + scene.regionExtremes.getOrNull(index).orEmpty()
             .map { scene.veil?.compositeOver(it) ?: it }
     } else listOf(sample)
-    fun contrast(background: Color): Float = listOf(
+    // Resolve semantic ink once; the adaptive-alpha search may call contrast repeatedly.
+    val readingInks = listOf(
         colors.text, colors.textSecondary, colors.textTertiary,
         colors.successInk, colors.warningInk, colors.dangerInk,
         colors.linkInk, colors.personaInk,
-    ).minOf { syContrastRatio(it, background) }
+    )
+    fun contrast(background: Color): Float =
+        readingInks.minOf { syContrastRatio(it, background) }
 
     // Keep the sampled hue. Simply reducing saturation toward a pale neutral makes every
     // colourful wallpaper look white and can erase the difference between screen regions.

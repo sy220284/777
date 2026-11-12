@@ -185,7 +185,9 @@ internal fun WorkSurfaceHeader(
             Text(
                 statusText,
                 style = DsType.caption11.withReadingWeight(),
-                color = if (statusText.startsWith("执行状态读取异常")) colors.dangerInk else colors.textSecondary,
+                color = if (statusText.startsWith("执行异常") ||
+                    statusText.startsWith("执行状态读取异常") ||
+                    statusText.startsWith("任务步骤失败")) colors.dangerInk else colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

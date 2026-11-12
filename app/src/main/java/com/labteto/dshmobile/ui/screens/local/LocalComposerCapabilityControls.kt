@@ -103,9 +103,9 @@ internal fun LocalComposerCapabilityActions(
                 ),
                 onClick = { onSelectPanel(if (openPanel == "reasoning") null else "reasoning") },
                 enabled = !running,
-                tint = colors.primaryPressed,
+                tint = colors.linkInk,
                 containerColor = colors.primary.copy(alpha = 0.18f),
-                disabledTint = colors.primaryPressed,
+                disabledTint = colors.linkInk,
                 disabledContainerColor = colors.primary.copy(alpha = 0.18f),
             )
             if (showLabels) {
