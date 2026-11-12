@@ -5,6 +5,7 @@ on:
       - refactor/restore-native-v63-remove-ui3-zhaoxi-20261019
       - fix/large-file-stability-20261031
       - feat/architecture-31-20261031
+      - feat/ui-reading-flow-accessibility-20261112
     # The source fingerprint scans repository-wide Kotlin, Python, shell, Gradle and
     # workflow files. A partial path allowlist made some code changes invisible here.
     # Only machine-written outputs are excluded; mixed source+generated pushes still run.
