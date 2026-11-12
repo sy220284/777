@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.harness.agent
 
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -55,6 +56,45 @@ class AgentInputQueueMutationTest {
             queue.reorderUsersCommitted(listOf("b", "c", "a")) { error("write failed") }
         }.isFailure)
         assertEquals(before, queue.snapshot())
+    }
+
+    @Test fun fullUserMessageReplacementKeepsIdentityAndRejectsStaleEdit() {
+        val queue = AgentInputQueue()
+        val original = user("with-model").copy(modelMessage = buildJsonObject {
+            put("role", "user")
+            put("content", "original")
+        })
+        queue.offer(original)
+        val edited = original.copy(content = "updated", memoryInput = "updated",
+            modelMessage = buildJsonObject {
+                put("role", "user")
+                put("content", "updated")
+            })
+        var persisted = emptyList<QueuedAgentInput>()
+        assertTrue(queue.replaceUserCommitted(original, edited) { persisted = it })
+        assertEquals("with-model", persisted.single().id)
+        assertEquals(edited.modelMessage, queue.snapshot().single().modelMessage)
+        assertFalse(queue.replaceUserCommitted(original, original) { error("stale overwrite") })
+        assertTrue(runCatching {
+            queue.replaceUserCommitted(edited, original) { error("disk error") }
+        }.isFailure)
+        assertEquals(edited, queue.snapshot().single())
+    }
+
+    @Test fun replacementCannotImpersonateAgentOrChangeModelRole() {
+        val queue = AgentInputQueue()
+        val original = user("a")
+        queue.offer(original)
+        assertTrue(runCatching {
+            queue.replaceUserCommitted(original, original.copy(modelMessage = buildJsonObject {
+                put("role", "system")
+                put("content", "overridden")
+            })) { }
+        }.isFailure)
+        assertTrue(runCatching {
+            queue.replaceUserCommitted(original, original.copy(kind = QueuedAgentInputKind.AGENT_MESSAGE)) { }
+        }.isFailure)
+        assertEquals(original, queue.snapshot().single())
     }
 
     @Test fun richContentNeedsOwnerRebuildBeforeEditing() {
