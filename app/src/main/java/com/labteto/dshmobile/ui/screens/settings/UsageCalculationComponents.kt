@@ -385,7 +385,7 @@ internal fun PromptBreakdownCard(breakdown: TokenPromptBreakdown) {
             Text(
                 stringResource(R.string.usage_estimated_badge),
                 style = DsType.caption11.withReadingWeight(),
-                color = colors.lilac,
+                color = colors.personaInk,
             )
             PromptLine(stringResource(R.string.usage_prompt_system), breakdown.systemBaseTokens)
             PromptLine(stringResource(R.string.usage_prompt_persona), breakdown.personaStateTokens)
@@ -437,7 +437,7 @@ internal fun UsageAggregateHero(
                     overflow = TextOverflow.Ellipsis,
                 )
                 badge?.let {
-                    Text(it, style = DsType.caption11.withReadingWeight(), color = colors.primary)
+                    Text(it, style = DsType.caption11.withReadingWeight(), color = colors.linkInk)
                 }
             }
             Text(formatTokens(aggregate.totalTokens), style = DsType.display24.withReadingWeight(), color = colors.text)

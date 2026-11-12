@@ -60,7 +60,7 @@ internal fun GroupAnnouncementCard(
                     Text(
                         stringResource(R.string.local_group_announcement_active_short),
                         style = DsType.caption11.withReadingWeight(),
-                        color = colors.primary,
+                        color = colors.linkInk,
                     )
                 }
             }
