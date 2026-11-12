@@ -23,6 +23,9 @@ class LocalWorkAutomationExecutionAdapterTest {
             ): com.labteto.dshmobile.local.session.LocalUserMessageEditResult =
                 com.labteto.dshmobile.local.session.LocalUserMessageEditResult.UNAVAILABLE
 
+            override fun queuedUserInputs() = emptyList<com.labteto.dshmobile.local.agent.LocalQueuedUserPreview>()
+            override fun removeQueuedUserInput(messageId: String) = false
+            override fun reorderQueuedUserInputs(orderedIds: List<String>) = false
             override fun regenerateReply(messageId: String): Boolean = false
 
             override suspend fun prepareSession(

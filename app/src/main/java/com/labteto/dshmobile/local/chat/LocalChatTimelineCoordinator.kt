@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.chat
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
 import com.labteto.dshmobile.local.agent.LocalQueuedUserMessageEditor
+import com.labteto.dshmobile.local.agent.LocalQueuedUserPreview
+import com.labteto.dshmobile.local.agent.userPreviews
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.LocalForegroundModelHistoryRuntime
 import com.labteto.dshmobile.local.model.chatSystemPrompt
@@ -51,6 +53,55 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
     private val directTurn: LocalChatDirectTurnExecutor,
     private val json: Json,
 ) {
+    internal fun queuedUserInputs(): List<LocalQueuedUserPreview> =
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            val state = runtimeStateStore.state.value
+            if (state.usageMode != LocalUsageMode.CHAT || state.loading ||
+                runtimeStateStore.sessionTransitioning) emptyList()
+            else runtimeStateStore.foregroundRunHandle.pendingInputs.userPreviews()
+        }
+
+    internal fun removeQueuedUserInput(messageId: String): Boolean =
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            val state = runtimeStateStore.state.value
+            if (state.usageMode != LocalUsageMode.CHAT || state.loading ||
+                runtimeStateStore.sessionTransitioning) return@synchronized false
+            val handle = runtimeStateStore.foregroundRunHandle
+            val update = LocalQueuedUserMessageEditor(
+                sessionStorage.eventLogs.get(state.sessionId), handle.pendingInputs,
+            ).remove(messageId) ?: return@synchronized false
+            handle.transcriptProjectionCursor = maxOf(handle.transcriptProjectionCursor ?: -1L, update.eventSequence)
+            runtimeStateStore.projection.update { current ->
+                if (current.sessionId != state.sessionId || current.usageMode != LocalUsageMode.CHAT) current
+                else current.copy(
+                    messages = update.hotMessages(),
+                    transcriptIndex = update.transcriptIndex,
+                    kernel = current.kernel.copy(queuedInputCount = update.pendingCount),
+                )
+            }
+            if (!sessionStorage.enqueueCurrentSnapshot(state.sessionId)) {
+                runtimeStateStore.projection.publishError(
+                    "排队消息已移除并写入事件记录，快照保存排队失败；重新打开会话可恢复",
+                )
+            }
+            true
+        }
+
+    internal fun reorderQueuedUserInputs(orderedIds: List<String>): Boolean =
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            val state = runtimeStateStore.state.value
+            if (state.usageMode != LocalUsageMode.CHAT || state.loading ||
+                runtimeStateStore.sessionTransitioning) return@synchronized false
+            val changed = LocalQueuedUserMessageEditor(
+                sessionStorage.eventLogs.get(state.sessionId),
+                runtimeStateStore.foregroundRunHandle.pendingInputs,
+            ).reorder(orderedIds)
+            if (changed && !sessionStorage.enqueueCurrentSnapshot(state.sessionId)) {
+                runtimeStateStore.projection.publishError("排队顺序已持久化，快照保存失败；可从事件记录恢复")
+            }
+            changed
+        }
+
     internal fun editAndResendUserMessage(
         messageId: String,
         replacement: String,

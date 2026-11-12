@@ -79,7 +79,10 @@ class LocalConversationUiPortTest {
         }
         override fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = error("unused")
         override fun selectMessageVariant(messageId: String, targetIndex: Int) = false
-        override fun regenerateReply(messageId: String) = false
+        override fun queuedUserInputs() = emptyList<com.labteto.dshmobile.local.agent.LocalQueuedUserPreview>()
+            override fun removeQueuedUserInput(messageId: String) = false
+            override fun reorderQueuedUserInputs(orderedIds: List<String>) = false
+            override fun regenerateReply(messageId: String) = false
         override suspend fun execute(request: LocalChatExecutionRequest): LocalChatExecutionResult = error("unused")
         override fun cancel(sessionId: String) = false
         override suspend fun cancelAndJoin(sessionId: String) = false
@@ -91,7 +94,10 @@ class LocalConversationUiPortTest {
             return LocalSendResult.Queued
         }
         override fun editAndResendUserMessage(messageId: String, replacement: String): LocalUserMessageEditResult = error("unused")
-        override fun regenerateReply(messageId: String) = false
+        override fun queuedUserInputs() = emptyList<com.labteto.dshmobile.local.agent.LocalQueuedUserPreview>()
+            override fun removeQueuedUserInput(messageId: String) = false
+            override fun reorderQueuedUserInputs(orderedIds: List<String>) = false
+            override fun regenerateReply(messageId: String) = false
         override suspend fun prepareSession(text: String, preferredSessionId: String?): String = error("unused")
         override suspend fun execute(request: LocalWorkExecutionRequest): LocalWorkExecutionResult = error("unused")
         override fun cancel(sessionId: String) = false

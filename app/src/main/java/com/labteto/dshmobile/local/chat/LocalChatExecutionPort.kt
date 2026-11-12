@@ -54,6 +54,10 @@ internal interface LocalChatExecutionPort {
 
     fun selectMessageVariant(messageId: String, targetIndex: Int): Boolean
 
+    fun queuedUserInputs(): List<com.labteto.dshmobile.local.agent.LocalQueuedUserPreview>
+    fun removeQueuedUserInput(messageId: String): Boolean
+    fun reorderQueuedUserInputs(orderedIds: List<String>): Boolean
+
     fun regenerateReply(messageId: String): Boolean
 
     suspend fun execute(request: LocalChatExecutionRequest): LocalChatExecutionResult
