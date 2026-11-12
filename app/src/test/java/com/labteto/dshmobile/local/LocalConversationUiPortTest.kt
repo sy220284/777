@@ -79,10 +79,24 @@ class LocalConversationUiPortTest {
         }
         override fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = error("unused")
         override fun selectMessageVariant(messageId: String, targetIndex: Int) = false
-        override fun queuedUserInputs() = emptyList<com.labteto.dshmobile.local.agent.LocalQueuedUserPreview>()
-            override fun removeQueuedUserInput(messageId: String) = false
-            override fun reorderQueuedUserInputs(orderedIds: List<String>) = false
-            override fun regenerateReply(messageId: String) = false
+        val queued = mutableListOf<com.labteto.dshmobile.local.agent.LocalQueuedUserPreview>()
+        val removedIds = mutableListOf<String>()
+        var latestOrder: List<String>? = null
+        override fun queuedUserInputs() = queued.toList()
+        override fun removeQueuedUserInput(messageId: String): Boolean {
+            removedIds += messageId
+            return queued.removeAll { it.id == messageId }
+        }
+        override fun reorderQueuedUserInputs(orderedIds: List<String>): Boolean {
+            latestOrder = orderedIds
+            if (orderedIds.toSet() != queued.map { it.id }.toSet() ||
+                orderedIds.size != queued.size) return false
+            val previous = queued.associateBy { it.id }
+            queued.clear()
+            queued += orderedIds.map(previous::getValue)
+            return true
+        }
+        override fun regenerateReply(messageId: String) = false
         override suspend fun execute(request: LocalChatExecutionRequest): LocalChatExecutionResult = error("unused")
         override fun cancel(sessionId: String) = false
         override suspend fun cancelAndJoin(sessionId: String) = false
@@ -94,10 +108,24 @@ class LocalConversationUiPortTest {
             return LocalSendResult.Queued
         }
         override fun editAndResendUserMessage(messageId: String, replacement: String): LocalUserMessageEditResult = error("unused")
-        override fun queuedUserInputs() = emptyList<com.labteto.dshmobile.local.agent.LocalQueuedUserPreview>()
-            override fun removeQueuedUserInput(messageId: String) = false
-            override fun reorderQueuedUserInputs(orderedIds: List<String>) = false
-            override fun regenerateReply(messageId: String) = false
+        val queued = mutableListOf<com.labteto.dshmobile.local.agent.LocalQueuedUserPreview>()
+        val removedIds = mutableListOf<String>()
+        var latestOrder: List<String>? = null
+        override fun queuedUserInputs() = queued.toList()
+        override fun removeQueuedUserInput(messageId: String): Boolean {
+            removedIds += messageId
+            return queued.removeAll { it.id == messageId }
+        }
+        override fun reorderQueuedUserInputs(orderedIds: List<String>): Boolean {
+            latestOrder = orderedIds
+            if (orderedIds.toSet() != queued.map { it.id }.toSet() ||
+                orderedIds.size != queued.size) return false
+            val previous = queued.associateBy { it.id }
+            queued.clear()
+            queued += orderedIds.map(previous::getValue)
+            return true
+        }
+        override fun regenerateReply(messageId: String) = false
         override suspend fun prepareSession(text: String, preferredSessionId: String?): String = error("unused")
         override suspend fun execute(request: LocalWorkExecutionRequest): LocalWorkExecutionResult = error("unused")
         override fun cancel(sessionId: String) = false
@@ -208,6 +236,51 @@ class LocalConversationUiPortTest {
                 assertEquals(null, chat.identity)
             }
         }
+    }
+
+    @Test fun queueActionsRequireExactSessionIdentityAndDispatchToCurrentFeature() {
+        val fixture = Fixture(LocalUsageMode.CHAT)
+        fixture.chat.queued += com.labteto.dshmobile.local.agent.LocalQueuedUserPreview("chat-1", "准备执行的消息")
+        fixture.chat.queued += com.labteto.dshmobile.local.agent.LocalQueuedUserPreview("chat-2", "下一个消息")
+        fixture.work.queued += com.labteto.dshmobile.local.agent.LocalQueuedUserPreview("work-1", "工作任务")
+        val chatIdentity = requireNotNull(fixture.port.queuedUsers.snapshot().identity)
+        assertEquals(listOf("chat-1", "chat-2"), fixture.port.queuedUsers.snapshot().inputs.map { it.id })
+        assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY),
+            fixture.port.queuedUsers.remove(chatIdentity.copy(activationId = "expired"), "chat-1"))
+        assertTrue(fixture.chat.removedIds.isEmpty())
+
+        assertEquals(UiCommandReceipt.Accepted,
+            fixture.port.queuedUsers.reorder(chatIdentity, listOf("chat-2", "chat-1")))
+        assertEquals(listOf("chat-2", "chat-1"), fixture.chat.latestOrder)
+        assertEquals(UiCommandReceipt.Accepted,
+            fixture.port.queuedUsers.remove(chatIdentity, "chat-1"))
+        assertEquals(listOf("chat-2"), fixture.port.queuedUsers.snapshot().inputs.map { it.id })
+
+        fixture.state.value = fixture.state.value.copy(usageMode = LocalUsageMode.WORK)
+        assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY),
+            fixture.port.queuedUsers.remove(chatIdentity, "work-1"))
+        val workIdentity = requireNotNull(fixture.port.queuedUsers.snapshot().identity)
+        assertEquals(listOf("work-1"), fixture.port.queuedUsers.snapshot().inputs.map { it.id })
+        assertEquals(UiCommandReceipt.Accepted,
+            fixture.port.queuedUsers.remove(workIdentity, "work-1"))
+        assertEquals(listOf("chat-1"), fixture.chat.removedIds)
+        assertEquals(listOf("work-1"), fixture.work.removedIds)
+    }
+
+    @Test fun queueRequestsCannotMutateDuringSessionTransition() {
+        val fixture = Fixture(LocalUsageMode.WORK)
+        fixture.work.queued += com.labteto.dshmobile.local.agent.LocalQueuedUserPreview("pending", "queued")
+        val identity = requireNotNull(fixture.port.queuedUsers.snapshot().identity)
+        assertTrue(fixture.store.beginSessionTransition())
+        try {
+            assertNull(fixture.port.queuedUsers.snapshot().identity)
+            assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.SESSION_TRANSITION),
+                fixture.port.queuedUsers.remove(identity, "pending"))
+            assertTrue(fixture.work.removedIds.isEmpty())
+        } finally {
+            fixture.store.endSessionTransition()
+        }
+        assertEquals(listOf("pending"), fixture.port.queuedUsers.snapshot().inputs.map { it.id })
     }
 
     @Test fun staleTimelineAndStopCommandsCannotReachAnOwner() {
