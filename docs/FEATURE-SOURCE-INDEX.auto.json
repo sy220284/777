@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1923,
-  "production_source_count": 1124,
-  "test_code_file_count": 655,
+  "repository_code_file_count": 1925,
+  "production_source_count": 1125,
+  "test_code_file_count": 656,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -1175,6 +1175,10 @@
       "sha256": "1d5b06a8ff84943a"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceFileChanges.kt",
+      "sha256": "46e4460313cfa71c"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceFuzzyMatcher.kt",
       "sha256": "0b2b658fdf164fe2"
     },
@@ -2220,7 +2224,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
-      "sha256": "f69e2a1d3b5b7376"
+      "sha256": "f544924d7d8af72b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionLifecyclePort.kt",
@@ -2896,7 +2900,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkEvidenceFileObserver.kt",
-      "sha256": "657fefa4350998e5"
+      "sha256": "a2d039d112446232"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionBudget.kt",
@@ -3932,7 +3936,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/uicontract/FilesUiPort.kt",
-      "sha256": "8f96b67d5918e02a"
+      "sha256": "7a074efa6fefeec1"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/uicontract/HostPreferencesUiPort.kt",
@@ -4560,16 +4564,17 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "413defa6fab1",
+  "source_snapshot": "c95531b43102",
   "observed_delta": {
-    "baseline": "8fa2e120df66",
-    "added_production_files": [],
+    "baseline": "413defa6fab1",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceFileChanges.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalQueuedUserQueueSheet.kt",
-      "app/src/main/java/com/labteto/dshmobile/uicontract/ConversationUiPort.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkEvidenceFileObserver.kt",
+      "app/src/main/java/com/labteto/dshmobile/uicontract/FilesUiPort.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
