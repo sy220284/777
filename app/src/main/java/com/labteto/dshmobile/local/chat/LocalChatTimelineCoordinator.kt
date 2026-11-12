@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
+import com.labteto.dshmobile.local.agent.LocalQueuedUserMessageEditor
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.LocalForegroundModelHistoryRuntime
 import com.labteto.dshmobile.local.model.chatSystemPrompt
@@ -64,6 +66,44 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
             }
             if (!before.modelState.configured) {
                 return@synchronized LocalChatUserEditResult.UNCONFIGURED
+            }
+            if (!before.loading && !runtimeStateStore.sessionTransitioning &&
+                handle.pendingInputs.snapshot().any {
+                    it.id == messageId && it.kind == QueuedAgentInputKind.USER
+                }) {
+                var committedQueueEdit = false
+                try {
+                    val edited = LocalQueuedUserMessageEditor(
+                        sessionStorage.eventLogs.get(before.sessionId), handle.pendingInputs,
+                    ).edit(messageId, requestedText)
+                        ?: return@synchronized LocalChatUserEditResult.UNCHANGED
+                    committedQueueEdit = true
+                    handle.transcriptProjectionCursor =
+                        maxOf(handle.transcriptProjectionCursor ?: -1L, edited.eventSequence)
+                    runtimeStateStore.projection.update { current ->
+                        if (current.sessionId != before.sessionId ||
+                            current.usageMode != LocalUsageMode.CHAT) current
+                        else current.copy(
+                            messages = edited.hotMessages(),
+                            transcriptIndex = edited.transcriptIndex,
+                            kernel = current.kernel.copy(queuedInputCount = edited.pendingCount),
+                            error = null,
+                        )
+                    }
+                    if (!sessionStorage.enqueueCurrentSnapshot(before.sessionId)) {
+                        runtimeStateStore.projection.publishError(
+                            "排队修改已保存，快照未及时写入；重新进入会话时将从事件恢复",
+                        )
+                    }
+                    return@synchronized LocalChatUserEditResult.SENT
+                } catch (error: Exception) {
+                    runtimeStateStore.projection.publishError(
+                        "排队消息编辑失败：" + (error.message ?: error::class.java.simpleName),
+                    )
+                    return@synchronized if (committedQueueEdit)
+                        LocalChatUserEditResult.COMMITTED_NOT_STARTED
+                    else LocalChatUserEditResult.FAILED
+                }
             }
             if (
                 before.loading ||
