@@ -6,12 +6,54 @@ import java.net.URI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.TimeoutCancellationException
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ChatGptOAuthCallbackServerTest {
+    @Test
+    fun waitingForBrowserHasAnActualDeadline() = runBlocking {
+        val listener = ChatGptOAuthCallbackServer().open()
+        try {
+            val error = runCatching { listener.await(timeoutMillis = 600L) }.exceptionOrNull()
+            assertTrue(error is TimeoutCancellationException)
+        } finally {
+            listener.close()
+        }
+    }
+
+    @Test
+    fun browserProbeDoesNotUseUpTheOAuthCallback() = runBlocking {
+        val listener = ChatGptOAuthCallbackServer().open()
+        try {
+            val port = URI(listener.redirectUri).port
+            val waiting = async(Dispatchers.IO) { listener.await(5_000L) }
+            Socket("127.0.0.1", port).use { socket ->
+                socket.getOutputStream().write(
+                    "GET /favicon.ico HTTP/1.1\\r\\nHost: 127.0.0.1\\r\\n\\r\\n".toByteArray(),
+                )
+                socket.getOutputStream().flush()
+            }
+            Socket("127.0.0.1", port).use { socket ->
+                socket.getOutputStream().write(
+                    "GET /auth/callback?code=valid%2Bcode&state=valid-state HTTP/1.1\\r\\nHost: 127.0.0.1\\r\\n\\r\\n".toByteArray(),
+                )
+                socket.getOutputStream().flush()
+                assertTrue(socket.getInputStream().bufferedReader().readLine().startsWith("HTTP/1.1 200"))
+            }
+            val callback = waiting.await()
+            assertEquals("valid+code", callback.code)
+            assertEquals("valid-state", callback.state)
+            assertFalse(callback.error != null)
+        } finally {
+            listener.close()
+        }
+    }
+
+
     @Test
     fun rejectsOversizedSocketRequestBeforeMaterializingWholeLine() = runBlocking {
         val listener = ChatGptOAuthCallbackServer().open()
