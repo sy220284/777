@@ -150,6 +150,7 @@ internal fun LocalMessageRow(
     onSelectVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
     streaming: Boolean = false,
+    isLatestAssistant: Boolean = false,
     skillDisplayNames: Map<String, String> = emptyMap(),
     onLocateSourceMemory: ((LocalHarnessMessage) -> Unit)? = null,
     onCreateMedia: ((LocalHarnessMessage, LocalMediaKind) -> Unit)? = null,
@@ -302,6 +303,7 @@ internal fun LocalMessageRow(
 
         else -> {
             var actionsOpen by remember(message.id) { mutableStateOf(false) }
+            var actionsExpanded by remember(message.id) { mutableStateOf(false) }
             val readingLayer = chatMode
             val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
             val copyableContent = if (chatMode) extractLocalCharacterThought(visibleContent, streaming).second else visibleContent
@@ -330,18 +332,8 @@ internal fun LocalMessageRow(
                 }
             }
             val readingModifier = if (readingLayer) {
-                Modifier
-                    .fillMaxWidth(0.91f)
-                    .background(
-                        com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L3_CARD),
-                        DsShapes.characterBubble,
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = colors.border,
-                        shape = DsShapes.characterBubble,
-                    )
-                    .padding(horizontal = 16.dp, vertical = 13.dp)
+                // Full-width text restores the continuous reading rhythm in character chat.
+                Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd)
             } else {
                 Modifier.fillMaxWidth()
             }
@@ -351,10 +343,12 @@ internal fun LocalMessageRow(
             ) {
                 Column(
                     readingModifier.testTag("messageActionSurface:${message.id}").combinedClickable(
-                        onClick = {},
-                        onLongClick = if (secondaryActions.isNotEmpty()) {
-                            { pulse(); actionsOpen = true }
-                        } else null,
+                        onClick = { actionsExpanded = !actionsExpanded },
+                         onLongClick = {
+                             pulse()
+                             actionsExpanded = true
+                             if (secondaryActions.isNotEmpty()) actionsOpen = true
+                         },
                     ),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 ) {
@@ -363,7 +357,7 @@ internal fun LocalMessageRow(
                         Text(
                             speaker,
                             style = DsType.small13Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                            color = colors.lilac,
+                            color = colors.personaInk,
                         )
                     }
                 }
@@ -375,7 +369,7 @@ internal fun LocalMessageRow(
                     chatMode = chatMode,
                 )
                 }
-                FlowRow(
+                if (!chatMode || (isLatestAssistant && !streaming) || actionsExpanded) FlowRow(
                     modifier = Modifier.fillMaxWidth().testTag("messageActionToolbar:${message.id}"),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -414,7 +408,7 @@ internal fun LocalMessageRow(
                         },
                     )
                     // 创作是独立的明确入口；正文长按继续保留原生选词能力。
-                    onCreateMedia?.takeIf { !streaming && copyableContent.isNotBlank() }?.let { create ->
+                    onCreateMedia?.takeIf { (!chatMode || actionsExpanded) && !streaming && copyableContent.isNotBlank() }?.let { create ->
                         SyButton(
                             text = stringResource(R.string.fluid_message_create),
                             icon = FeatherIcons.Sparkles,
@@ -425,7 +419,7 @@ internal fun LocalMessageRow(
                         )
                     }
                     // Shared anchored menu for both long press and the visible overflow.
-                    if (secondaryActions.isNotEmpty()) {
+                    if (secondaryActions.isNotEmpty() && (!chatMode || actionsExpanded)) {
                         Box {
                             CompactMessageAction(
                                 icon = FeatherIcons.MoreVertical,

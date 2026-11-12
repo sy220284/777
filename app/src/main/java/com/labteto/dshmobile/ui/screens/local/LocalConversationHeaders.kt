@@ -50,18 +50,13 @@ internal fun ChatSurfaceHeader(
     groupMembers: List<LocalGroupChatMember>,
     activeSpeakerName: String?,
     running: Boolean,
-    behaviorTuningCustomized: Boolean,
     onContextClick: () -> Unit,
-    onOpenCharacterTuning: () -> Unit,
     onExitGroupChat: () -> Unit,
     onNewSession: () -> Unit,
     sessionPinned: Boolean,
     onTogglePin: () -> Unit,
     onRenameSession: () -> Unit,
     onDeleteSession: () -> Unit,
-    tuningEnabled: Boolean = true,
-    modelLabel: String = "",
-    onModelClick: () -> Unit = {},
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
@@ -133,24 +128,7 @@ internal fun ChatSurfaceHeader(
                     modifier = Modifier.size(16.dp),
                 )
             }
-            if (!groupEnabled && tuningEnabled) {
-                SyIconButton(
-                    icon = SyEntryIcons.Persona,
-                    contentDescription = stringResource(R.string.local_character_tuning_open),
-                    onClick = onOpenCharacterTuning,
-                    enabled = !running,
-                    tint = if (behaviorTuningCustomized) colors.primary else colors.textSecondary,
-                    iconSize = 18.dp,
-                    selected = behaviorTuningCustomized,
-                )
-            }
         }
-        SyIconButton(
-            icon = SyEntryIcons.Models,
-            contentDescription = stringResource(R.string.models_title) + "：" + modelLabel,
-            onClick = onModelClick,
-            tint = colors.textSecondary,
-        )
         if (groupEnabled) {
             SyButton(
                 text = stringResource(R.string.local_group_chat_leave),
@@ -178,10 +156,8 @@ internal fun ChatSurfaceHeader(
 
 @Composable
 internal fun WorkSurfaceHeader(
-    modelLabel: String,
-    configured: Boolean,
-    running: Boolean,
-    onModelClick: () -> Unit,
+    sessionTitle: String,
+    statusText: String,
     onNewSession: () -> Unit,
     sessionPinned: Boolean,
     onTogglePin: () -> Unit,
@@ -195,36 +171,24 @@ internal fun WorkSurfaceHeader(
         Modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier
-                .widthIn(max = 168.dp)
-                .heightIn(min = SyMetric.touch)
-                .clip(DsShapes.row)
-                .clickable(role = Role.Button, onClick = onModelClick)
-                .semantics(mergeDescendants = true) { }
-                .padding(horizontal = SyMetric.gapMd),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+        Column(
+            modifier = Modifier.weight(1f).padding(horizontal = SyMetric.gapMd),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                if (configured) modelLabel else stringResource(R.string.local_model_setup),
+                sessionTitle.ifBlank { "工作会话" },
                 style = DsType.base16Strong.withReadingWeight(),
                 color = colors.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
             )
-            Icon(
-                FeatherIcons.ChevronDown,
-                contentDescription = null,
-                tint = colors.textSecondary,
-                modifier = Modifier.size(16.dp),
+            Text(
+                statusText,
+                style = DsType.caption11.withReadingWeight(),
+                color = if (statusText.startsWith("执行状态读取异常")) colors.dangerInk else colors.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-        }
-        Spacer(Modifier.weight(1f))
-        if (running) {
-            StateDot(StateDotState.Running, size = 8.dp)
-            Spacer(Modifier.width(SyMetric.gapSm))
         }
         SyIconButton(
             icon = SyEntryIcons.NewSession,

@@ -100,6 +100,7 @@ internal fun LocalConversationComposer(
     onRemoveAttachment: (Int) -> Unit,
     onClearAttachments: () -> Unit,
     onOpenAttachmentPicker: () -> Unit,
+    onOpenModelPicker: () -> Unit = {},
     onShowReplySuggestions: () -> Unit,
     onGenerateReplySuggestions: suspend () -> Boolean,
     onSend: (String, List<LocalImportedAttachment>) -> LocalSendResult,
@@ -234,7 +235,19 @@ internal fun LocalConversationComposer(
                 onOpenAttachmentPicker()
             },
             tint = colors.text,
-            containerColor = colors.selected,
+            containerColor = Color.Transparent,
+        )
+    }
+
+    @Composable
+    fun ModelControl() {
+        SyComposerAction(
+            icon = com.labteto.dshmobile.ui.components.SyEntryIcons.Models,
+            contentDescription = stringResource(R.string.models_title),
+            onClick = onOpenModelPicker,
+            enabled = !state.loading,
+            tint = colors.textSecondary,
+            containerColor = Color.Transparent,
         )
     }
 
@@ -433,6 +446,7 @@ internal fun LocalConversationComposer(
         LocalConversationComposerExpandedRow(
             visible = expanded,
             menuControl = { AttachmentControl() },
+            modelControl = { ModelControl() },
             replySuggestionsControl = { ReplySuggestionsControl() },
             planControl = {
                 if (state.usageMode == LocalUsageMode.WORK) {

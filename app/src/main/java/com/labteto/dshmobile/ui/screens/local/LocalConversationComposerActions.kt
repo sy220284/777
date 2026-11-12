@@ -8,10 +8,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
@@ -26,6 +24,7 @@ import com.labteto.dshmobile.ui.theme.DsAnimations
 internal fun LocalConversationComposerExpandedRow(
     visible: Boolean,
     menuControl: @Composable () -> Unit,
+    modelControl: @Composable () -> Unit,
     replySuggestionsControl: @Composable () -> Unit,
     planControl: @Composable () -> Unit,
     capabilityControls: @Composable (showLabels: Boolean) -> Unit,
@@ -47,19 +46,20 @@ internal fun LocalConversationComposerExpandedRow(
             shrinkTowards = Alignment.Top,
         ) + fadeOut(fade),
     ) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val showLabels = maxWidth >= 290.dp
+        Box(Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
             ) {
                 Row(
-                    modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
                 ) {
                     menuControl()
-                    capabilityControls(showLabels)
+                    modelControl()
+                    capabilityControls(false)
                     planControl()
                     replySuggestionsControl()
                 }

@@ -174,4 +174,27 @@ class V6SeamlessNavigationInteractionTest {
         compose.runOnIdle { assertEquals("assistant-doc-1", selectedId) }
     }
 
+    @Test fun historicalAssistantActionsAppearOnTapAndNewestCanStayVisible() {
+        val message = LocalHarnessMessage(
+            id = "chat-history-actions", role = "assistant",
+            content = "一条较早的回复", createdAt = 1L,
+        )
+        compose.setContent {
+            DshTheme {
+                LocalMessageRow(
+                    message = message, chatMode = true, groupMode = false,
+                    canEdit = false, canRegenerate = true, canSelectVariant = false,
+                    branchInfo = null, onEdit = {}, onSelectVariant = { _, _ -> false },
+                    onRegenerate = { true },
+                )
+            }
+        }
+        compose.onNodeWithTag("messageActionToolbar:chat-history-actions").assertDoesNotExist()
+        compose.onNodeWithTag("messageActionSurface:chat-history-actions").performClick()
+        compose.onNodeWithTag("messageActionToolbar:chat-history-actions").assertExists()
+        compose.onNodeWithTag("messageActionSurface:chat-history-actions").performClick()
+        compose.onNodeWithTag("messageActionToolbar:chat-history-actions").assertDoesNotExist()
+    }
+
+
 }

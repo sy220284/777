@@ -145,6 +145,7 @@ internal fun ChatPersonaPickerDialog(
     canSwitchPersona: Boolean,
     onSelect: (String) -> Boolean,
     onEditCurrent: () -> Unit,
+    onOpenTuning: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
@@ -166,6 +167,15 @@ internal fun ChatPersonaPickerDialog(
             )
         },
     ) {
+        onOpenTuning?.let { openTuning ->
+            SyButton(
+                text = stringResource(R.string.local_character_tuning_open),
+                onClick = openTuning,
+                modifier = Modifier.fillMaxWidth(),
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
+            )
+        }
         if (!canSwitchPersona) {
             Text(
                 stringResource(R.string.local_persona_picker_switch_requires_new_chat),
