@@ -113,9 +113,13 @@ class ChatGptIdTokenVerifier @Inject constructor(
         require(verifier.verify(decodeBase64Url(parts[2]))) { "OpenAI ID Token 签名验证失败" }
     }
 
-    private fun decodeJson(part: String): JsonObject =
+    private fun decodeJson(part: String): JsonObject = try {
         (json.parseToJsonElement(String(decodeBase64Url(part), Charsets.UTF_8)) as? JsonObject)
             ?: error("OpenAI ID Token JSON 类型无效")
+    } catch (_: Exception) {
+        // Do not attach decoder exceptions that may contain decoded identity claims.
+        error("OpenAI ID Token JSON 内容无效")
+    }
 
     private fun decodeBase64Url(value: String): ByteArray =
         Base64.getUrlDecoder().decode(value.padEnd(value.length + ((4 - value.length % 4) % 4), '='))
