@@ -53,31 +53,96 @@ data class ToolHookSnapshot internal constructor(
     val subscriptions: List<ToolHookSubscription>,
 )
 
-/** Copy-on-write catalog shared by forked ToolRegistry instances. */
+/**
+ * Plugins install against staged HarnessContext instances. Hook changes follow the same
+ * publish/rollback lifecycle as tool registrations; a failed plugin never changes live policy.
+ * After successful publish the staged registry is rebound so retained contexts see the live view.
+ */
 class ToolHookRegistry {
-    private val lock = Any()
-    private val subscriptions = linkedMapOf<String, ToolHookSubscription>()
-    private var generation = 0L
-
-    fun register(subscription: ToolHookSubscription) = synchronized(lock) {
-        require(subscription.id !in subscriptions) { "Hook 已注册：" + subscription.id }
-        subscriptions[subscription.id] = subscription
-        generation++
+    private class State(
+        val subscriptions: LinkedHashMap<String, ToolHookSubscription> = linkedMapOf(),
+        var generation: Long = 0L,
+    ) {
+        val lock = Any()
     }
 
-    fun unregister(id: String): Boolean = synchronized(lock) {
-        if (subscriptions.remove(id) == null) return@synchronized false
-        generation++
-        true
+    @Volatile private var state = State()
+
+    fun register(subscription: ToolHookSubscription) {
+        val current = state
+        synchronized(current.lock) {
+            require(subscription.id !in current.subscriptions) { "Hook 已注册：" + subscription.id }
+            current.subscriptions[subscription.id] = subscription
+            current.generation++
+        }
     }
 
-    fun ids(): List<String> = synchronized(lock) { subscriptions.keys.toList() }
-
-    fun snapshot(toolName: String): ToolHookSnapshot = synchronized(lock) {
-        ToolHookSnapshot(generation, subscriptions.values.filter { it.matches(toolName) })
+    fun unregister(id: String): Boolean {
+        val current = state
+        return synchronized(current.lock) {
+            if (current.subscriptions.remove(id) == null) return@synchronized false
+            current.generation++
+            true
+        }
     }
 
-    fun isCurrent(snapshot: ToolHookSnapshot): Boolean = synchronized(lock) {
-        generation == snapshot.generation
+    fun ids(): List<String> {
+        val current = state
+        return synchronized(current.lock) { current.subscriptions.keys.toList() }
+    }
+
+    fun subscriptions(): List<ToolHookSubscription> {
+        val current = state
+        return synchronized(current.lock) { current.subscriptions.values.toList() }
+    }
+
+    fun snapshot(toolName: String): ToolHookSnapshot {
+        val current = state
+        return synchronized(current.lock) {
+            ToolHookSnapshot(current.generation, current.subscriptions.values.filter {
+                it.matches(toolName)
+            })
+        }
+    }
+
+    fun isCurrent(snapshot: ToolHookSnapshot): Boolean {
+        val current = state
+        return synchronized(current.lock) { current.generation == snapshot.generation }
+    }
+
+    fun fork(): ToolHookRegistry {
+        val original = state
+        return synchronized(original.lock) {
+            ToolHookRegistry().also { copy ->
+                copy.state = State(
+                    linkedMapOf<String, ToolHookSubscription>().apply {
+                        putAll(original.subscriptions)
+                    },
+                    original.generation,
+                )
+            }
+        }
+    }
+
+    fun restore(snapshot: List<ToolHookSubscription>) {
+        require(snapshot.map { it.id }.distinct().size == snapshot.size) {
+            "Hook 快照存在重复规则"
+        }
+        val current = state
+        synchronized(current.lock) {
+            val proposed = snapshot.associateBy(ToolHookSubscription::id)
+            if (current.subscriptions == proposed) return@synchronized
+            current.subscriptions.clear()
+            current.subscriptions.putAll(proposed)
+            current.generation++
+        }
+    }
+
+    fun publishTo(destination: ToolHookRegistry) {
+        val outgoing = subscriptions()
+        destination.restore(outgoing)
+        // A retained install context must continue to modify the committed registry, not a
+        // stale staged copy. All subsequent actions see the same version-fenced policy state.
+        state = destination.state
     }
 }

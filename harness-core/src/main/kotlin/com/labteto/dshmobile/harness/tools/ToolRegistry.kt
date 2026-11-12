@@ -115,8 +115,13 @@ class ToolRegistry private constructor(
     )
     internal fun snapshot(): Map<String, HarnessTool> = tools.snapshot()
     internal fun restore(snapshot: Map<String, HarnessTool>) = tools.restore(snapshot)
-    internal fun fork(): ToolRegistry = ToolRegistry(tools.fork(), admission, hooks)
-    internal fun publishTo(destination: ToolRegistry) = tools.publishTo(destination.tools)
+    internal fun snapshotHookSubscriptions(): List<ToolHookSubscription> = hooks.subscriptions()
+    internal fun restoreHookSubscriptions(snapshot: List<ToolHookSubscription>) = hooks.restore(snapshot)
+    internal fun fork(): ToolRegistry = ToolRegistry(tools.fork(), admission, hooks.fork())
+    internal fun publishTo(destination: ToolRegistry) {
+        tools.publishTo(destination.tools)
+        hooks.publishTo(destination.hooks)
+    }
     internal fun markLifecycleSafe(safe: Boolean) = admission.markSafe(safe)
     internal suspend fun <T> lifecycleTransition(block: suspend () -> T): T = admission.transition(block)
 
