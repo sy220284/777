@@ -14,6 +14,7 @@ interface FilesUiPort {
     suspend fun workspaceDirectoryPage(path: String, offset: Int): LocalWorkspaceDirectoryPage
     suspend fun searchWorkspaceFiles(query: String): List<LocalWorkspaceFile>
     suspend fun searchWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage
+    suspend fun stopWorkspaceSearch(query: String): Boolean
     suspend fun conversationFiles(sessionId: String): LocalConversationFiles
     suspend fun previewWorkspaceFile(path: String): LocalWorkspaceFilePreview
     suspend fun previewWorkspaceFilePage(path: String, offset: Long): LocalWorkspaceFilePreview =
