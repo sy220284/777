@@ -44,7 +44,7 @@ sdkmanager="$(command -v sdkmanager)"
 for attempt in 1 2 3 4; do
   echo "PREPARE_ANDROID16_EMULATOR attempt=$attempt"
   if "$sdkmanager" --channel=0 --install emulator "$image_package" && ready; then
-    "$emulator_dir/emulator" -version | head -n 2
+    "$emulator_dir/emulator" -version
     echo "Android 16 emulator and x86_64 Google APIs image verified"
     exit 0
   fi
