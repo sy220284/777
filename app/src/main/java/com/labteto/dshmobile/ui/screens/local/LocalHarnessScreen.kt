@@ -963,8 +963,6 @@ fun LocalHarnessScreen(
                 onTasks = { openDrawerEntry(LocalFeatureDrawerEntry.TASKS) },
                 onTools = { openDrawerEntry(LocalFeatureDrawerEntry.TOOLS) },
                 onSettings = { openDrawerEntry(LocalFeatureDrawerEntry.SETTINGS) },
-                    { openDrawerEntry(LocalFeatureDrawerEntry.MINIMAX_QUOTA) }
-                } else null,
             )
     }
     val sySceneContent: @Composable () -> Unit = {
