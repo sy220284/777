@@ -1,0 +1,58 @@
+# Codex → 777 功能缺口整改追踪台账
+
+基准：Codex 上传快照与 777 main `b383cc7fbb2fdf5842909caa4741d3626c060abc`。开发分支：`feat/codex-capability-alignment-20261112`，PR [#895](https://github.com/sy220284/777/pull/895)。
+
+**真实状态约定**：已接入源码 ≠ CI 通过 ≠ Android 端到端验收。只通过现有生产入口、执行证据和验收测试联合关闭。保持单一 Session/EventLog、ToolRegistry、Work Run 和 Feature 所有权。
+
+本表精确追踪 11 项缺口与 21 项深度差异；Codex 桌面/云专用运行方式适配 Android 本机架构，不把仅适于桌面系统的机制照搬至端侧。
+
+| 原分类 | 能力 | 所有权 | 当前真实状态 | 完成验收标准 |
+|---|---|---|---|---|
+| 缺少 | 会话分区管理 | Chat / Session | 尚未实施 | 分区创建/编辑/移动/删除；重启后恢复、会话隔离、UI 可见 |
+| 缺少 | 会话预测与示例采样 | Shared Model / Chat | 尚未实施 | 模型选路固定；独立请求、取消、费用计量及可见结果 |
+| 缺少 | 项目管理完整生命周期 | Project Feature | 尚未实施 | 建项目/导入/更新/移动/删除/会话绑定；文件引用与恢复一致 |
+| 缺少 | 外部编码代理历史与配置迁移 | Work / Import | 尚未实施 | 校验来源、格式兼容、冲突处理和可追溯导入 |
+| 缺少 | 插件市场、搜索、升级、分享 | Tools Feature | 尚未实施 | 签名与来源、安装/回滚、依赖权限、失败恢复和 UI |
+| 缺少 | 工具生命周期 Hooks | Shared ToolRegistry | 核心钩子已接入，产品配置未接入 | 受信登记、前置拒绝/审批后代次栅栏、后置回执、插件装配与安全策略 |
+| 缺少 | Code Mode 受控脚本编排 | Work / Tools | 尚未实施 | 受限脚本引擎、工具授权桥接、等待/超时/取消、完整审计 |
+| 缺少 | 实时双向语音 | Chat / Media | 尚未实施 | 音频输入输出、会话中断/降级、运行权限、音频状态 UI |
+| 缺少 | 用户身份验证与撤销 | Shared Security | 尚未实施 | Android 身份认证、授权周期、撤销及敏感工具验收 |
+| 缺少 | 对外类型化 App Server | Shared API | 尚未实施 | 稳定协议、鉴权、权限边界、会话唯一所有权、外部客户端测试 |
+| 缺少 | 远程配对与客户端撤销 | Shared API / Security | 尚未实施 | 经授权配对、设备列表、吊销及审计；Android 后台可靠性 |
+| 部分 | 队列编辑删除重排主动开始 | Shared AgentQueue / Work / Chat | 核心事务已接入，Feature/UI 未接入 | 完整 ModelMessage 重建、历史投影、所有者/代次、队列 UI、重启恢复 |
+| 部分 | 运行中轮次调整 steer | Work Feature | 已有真实前台路径，待等效验收 | 运行中模型采样中断与新输入交付时序、取消和恢复 |
+| 部分 | 独立代码审查和审核会话 | Work / Reviewer | 尚未进一步修改 | 真实文件差异+测试事实、独立 Reviewer、人工接纳记录 |
+| 部分 | 多环境执行与远端 Agent 协同 | Work / Runtime | 尚未进一步修改 | 环境指纹、能力授权、代理状态、网络异常和任务重启 |
+| 部分 | 增量模糊文件搜索 | Workspace / Files | 现有文件搜索已接入模糊评分；搜索 Session 未接入 | 多次关键词更新、取消、文件变化、排名、性能及 UI |
+| 部分 | 远端 Git 分支差异 API | Android Runtime | 已接入可发现工具，CI 待验收 | 已跟踪分支比较、无网络副作用、快照/补丁限制、调用验证 |
+| 部分 | 统一文件读写与变化订阅 | Workspace / Files | 尚未进一步修改 | 订阅令牌、实时变更和断线恢复、Android 文件权限 |
+| 部分 | 对外完整文件 API | Shared API / Files | 尚未实施 | 文件读写权限、并发/版本约束、外部鉴权和订阅 |
+| 部分 | 技能热发现与精排 | Tools / Skills | 尚未进一步修改 | 目录增量、依赖安全、技能效果归因与 UI |
+| 部分 | MCP elicitation | Interop / MCP | 尚未实施 | 远端请求会话双向身份、用户答复/取消、重试去重 |
+| 部分 | 插件宿主与安装来源追踪 | Tools / Interop | 尚未实施 | 独立宿主、包校验、版本升级、权限及崩溃重启 |
+| 部分 | 多供应商凭据及能力目录 | Shared Model | 尚未进一步修改 | 独立供应商配置、账户权限、刷新与选择一致 |
+| 部分 | 供应商额度及费率信息 | Usage / Model | 尚未进一步修改 | 真实服务商读数、价格变化、明确未支持提示 |
+| 部分 | 浏览器/Computer Use 配置控制 | Android Device | 尚未进一步修改 | 安卓虚拟屏操作流程、服务状态、权限与会话隔离 |
+| 部分 | 执行前后细粒度审计 | Shared ToolRegistry | Hooks 核心已接入，审计产品层未接入 | 权限边界、审计回执关联、运行代次、系统级失败归因 |
+| 部分 | 独立 Agent 强隔离 | Android Runtime | 尚未进一步修改 | 独立服务/UID、工作区与命令边界，真实 Android 设备验证 |
+| 部分 | 统一网络代理与秘密替换 | Shared Security / Network | 尚未进一步修改 | 所有 HTTP/MCP/进程访问策略与真实脱敏回归 |
+| 部分 | 独立安全审核及人工放行 | Work / Reviewer | 尚未进一步修改 | 审查证据/冲突、审批权、结果版本与 Goal 最终接纳 |
+| 部分 | 用户反馈上传/诊断 | Settings / Diagnostics | 尚未进一步修改 | 用户同意、脱敏、网络传输、可追溯服务回执 |
+| 部分 | 双阶段长期记忆整合 | Shared Memory | 尚未进一步修改 | 来源链接、冲突/过期规则、回滚及实际记忆召回 |
+| 部分 | 配置多层合并及应用约束 | Shared Configuration | 尚未进一步修改 | 策略优先级、锁定理由、回滚、权限完整一致 |
+
+## 已提交的代码级变更
+
+- 工具执行前后 Hooks：`harness-core/.../ToolHookRegistry.kt`、`ToolRegistry.kt`；有拒绝、审批时版本失效、真实回执与失败回归。产品钩子配置尚未实现。
+- 输入队列原子操作：`harness-core/.../AgentInputQueue.kt`；具编辑/删除/重排及回滚。现阶段的纯文本编辑对含 modelMessage 的队列项拒绝执行；还须由 Work/Chat Feature 建立完整用户入口和模型消息重建。
+- 模糊文件检索：`app/.../LocalWorkspaceFuzzyMatcher.kt`、`LocalWorkspace.kt`；现有文件搜索入口使用可复现的路径评分，不建立第二数据库。仍缺增量会话接口。
+- 远端差异：`harness-runtime-android/.../GitRemoteDiff.kt`；由 AndroidRuntimePlugin 注册 `git_diff_remote` 可发现工具，仅基于本地远端跟踪引用，限制路径、ref 和补丁长度，不执行隐式远端拉取。
+
+## 工程验收门槛
+
+1. 每项必须有真实 Feature/Tool/协议入口，以及输入→Owner→执行→持久回执→UI 的完整调用链。
+2. 执行安全链遵守 Android 权限与工具审批；用户/代理变更时需能够拒绝失效请求，并核实取消/恢复、未知副作用。
+3. JVM 测试只能证明局部逻辑，Android 16/17 编译与设备验证、真实 Git/MCP/账户回执按具体能力分别完成。
+4. 修改生产源码后运行 `.github/scripts/sync-feature-tree.py` 同步功能树、可视化视图和代码证据索引；禁止人为把未完能力标成验收完成。
+5. 32 项逐项证据关闭之后才能将 PR #895 从草稿转为可合并状态。
+
