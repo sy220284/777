@@ -207,6 +207,7 @@ jobs:
           python3 .github/scripts/check-v3-refactor-ledger.py
           bash .github/scripts/run-android-instrumentation.sh --self-test
           bash .github/scripts/wait-android-device-artifacts.sh --self-test
+          bash .github/scripts/prepare-android16-emulator.sh --self-test
           python3 tools/runtime/compact-runtime-assets.py --self-test
       - name: Validate release version format
         run: |
@@ -386,6 +387,8 @@ jobs:
       - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools'
+      - name: Preinstall complete Android 16 emulator and image with verified retries
+        run: bash .github/scripts/prepare-android16-emulator.sh
       - name: Enable KVM acceleration
         run: |
           if [ -e /dev/kvm ]; then
