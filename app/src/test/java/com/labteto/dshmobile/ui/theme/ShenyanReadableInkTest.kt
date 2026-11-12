@@ -16,7 +16,10 @@ class ShenyanReadableInkTest {
     }
 
     @Test fun selectedDecorativeAccentsAreReadableWhenUsedAsText() {
-        val surfaces = listOf(Color(0xFFF1E8DC), Color(0xFF35312D), Color(0xFF29292B))
+        val surfaces = listOf(
+            Color(0xFFF1E8DC), Color(0xFF35312D), Color(0xFF29292B),
+            Color(0xFF777777), Color(0xFF999999), Color(0xFFB0B0B0),
+        )
         AccentPalettes.ALL.forEach { accent ->
             surfaces.forEach { surface ->
                 val text = syReadableInk(accent.lightAccent, surface)

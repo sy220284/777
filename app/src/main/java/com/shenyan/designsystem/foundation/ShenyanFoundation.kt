@@ -71,7 +71,9 @@ fun syReadableInk(accent: Color, background: Color, minimumRatio: Float = 4.5f):
     val solid = background.copy(alpha = 1f)
     val source = accent.copy(alpha = 1f)
     if (syInkContrastRatio(source, solid) >= minimumRatio) return source
-    val target = if (solid.luminance() >= .5f) Color.Black else Color.White
+    // Mid-tone backgrounds often favour black text even when their luminance is below .5.
+    val target = if (syInkContrastRatio(Color.Black, solid) >= syInkContrastRatio(Color.White, solid))
+        Color.Black else Color.White
     var low = 0f
     var high = 1f
     repeat(14) {

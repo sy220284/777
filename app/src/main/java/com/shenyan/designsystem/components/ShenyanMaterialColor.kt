@@ -64,6 +64,7 @@ internal fun syResolveMaterialFill(
     fun contrast(background: Color): Float = listOf(
         colors.text, colors.textSecondary, colors.textTertiary,
         colors.successInk, colors.warningInk, colors.dangerInk,
+        colors.linkInk, colors.personaInk,
     ).minOf { syContrastRatio(it, background) }
 
     // Keep the sampled hue. Simply reducing saturation toward a pale neutral makes every
