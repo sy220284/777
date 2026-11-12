@@ -80,7 +80,8 @@ class BundledGitRuntimeTest {
 
         val (versionCode, version) = gitCommand("--version")
         assertEquals("git --version failed: $version", 0, versionCode)
-        assertTrue("unexpected Git version: $version", version.contains("2.56.0"))
+        val expected = context.assets.open("runtime/git/git-version.txt").bufferedReader().use { it.readText().trim() }
+        assertTrue("unexpected Git version: $version, expected $expected", version.contains(expected))
 
         val (initCode, initOutput) = gitCommand("init")
         assertEquals("git init failed: $initOutput", 0, initCode)

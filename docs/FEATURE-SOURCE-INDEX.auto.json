@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1910,
-  "production_source_count": 1117,
-  "test_code_file_count": 649,
+  "repository_code_file_count": 1912,
+  "production_source_count": 1118,
+  "test_code_file_count": 650,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -1712,7 +1712,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthCoordinator.kt",
-      "sha256": "bc34fbf3b41e2e02"
+      "sha256": "ca24424824a6e052"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthorizationContract.kt",
@@ -1724,7 +1724,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptIdTokenVerifier.kt",
-      "sha256": "44118a91c479049f"
+      "sha256": "c4fb05bf47ff367c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptModelCatalog.kt",
@@ -1740,7 +1740,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptOAuthCallbackServer.kt",
-      "sha256": "033816ac16b8461b"
+      "sha256": "f2c0029bf6bc4f52"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptPlanAuthorizationEvents.kt",
@@ -1752,7 +1752,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptSessionManager.kt",
-      "sha256": "1a370fc056bbca9a"
+      "sha256": "60d22fc3c100f396"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptTokenProtocol.kt",
+      "sha256": "3118be1d1fb34355"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptUiValues.kt",
@@ -1788,7 +1792,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/ChatGptSettingsController.kt",
-      "sha256": "5cfc8c35319d0ca3"
+      "sha256": "e040432fe1e9c640"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalArtifactUiItemBusinessValues.kt",
@@ -3712,7 +3716,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "sha256": "53dc98d98b80d591"
+      "sha256": "185c5119c7c05b59"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
@@ -4532,9 +4536,9 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "e3da0381f8b6",
+  "source_snapshot": "77c34d3ec26e",
   "observed_delta": {
-    "baseline": "436d934215f7",
+    "baseline": "1523f1cc02da",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [],

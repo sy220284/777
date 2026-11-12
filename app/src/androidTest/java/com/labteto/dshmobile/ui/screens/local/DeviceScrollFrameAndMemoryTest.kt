@@ -79,8 +79,12 @@ class DeviceScrollFrameAndMemoryTest {
 
         lateinit var activity: Activity
         instrumentation.runOnMainSync {
+            // Android 16 may keep multiple activities RESUMED. Frame metrics and
+            // real touch input must target the Compose host with window focus.
             activity = ActivityLifecycleMonitorRegistry.getInstance()
-                .getActivitiesInStage(Stage.RESUMED).first()
+                .getActivitiesInStage(Stage.RESUMED)
+                .firstOrNull { it.hasWindowFocus() }
+                ?: error("Work timeline test activity has no focused window")
         }
         var refreshRate = 60f
         instrumentation.runOnMainSync {
@@ -107,9 +111,10 @@ class DeviceScrollFrameAndMemoryTest {
         var peakJavaKb = (heap.totalMemory() - heap.freeMemory()) / 1024L
         var maxVisibleIndex = 0
         fun realSwipe(downwards: Boolean) {
-            // Inject wall-clock paced touchscreen MotionEvents into Android's
-            // actual input dispatcher. Unlike a shell command returning EOF,
-            // each event has a synchronous acceptance receipt.
+            // Inject wall-clock paced touchscreen MotionEvents into the instrumented
+            // application's focused window. UiAutomation can acknowledge a global
+            // injection that another foreground window actually receives on API 36.
+            // Instrumentation.sendPointerSync dispatches to our app and waits for handling.
             val x = (viewport.left + viewport.right) / 2f
             val topY = viewport.top + viewport.height * 0.22f
             val bottomY = viewport.top + viewport.height * 0.80f
@@ -121,9 +126,7 @@ class DeviceScrollFrameAndMemoryTest {
                     downTime, SystemClock.uptimeMillis(), action, x, y, 0,
                 ).apply { source = InputDevice.SOURCE_TOUCHSCREEN }
                 try {
-                    check(instrumentation.uiAutomation.injectInputEvent(event, true)) {
-                        "Android input dispatcher rejected real Work scroll action=$action"
-                    }
+                    instrumentation.sendPointerSync(event)
                 } finally {
                     event.recycle()
                 }
@@ -173,7 +176,7 @@ class DeviceScrollFrameAndMemoryTest {
         val output = String.format(Locale.US,
             "ANDROID_PERF api=%d scenario=work_timeline_scroll_frames samples=%d " +
                 "refresh_hz=%.1f observed_fps_p50=%s jank_pct=%s " +
-                "sample_quality=%s gesture_source=android_ui_automation_verified_touch " +
+                "sample_quality=%s gesture_source=android_instrumentation_verified_touch " +
                 "valid_vsync_intervals=%d max_visible_index=%d " +
                 "peak_pss_kib=%d peak_java_used_kib=%d",
             Build.VERSION.SDK_INT, frames.size, refreshRate, observedFps, jankPct,

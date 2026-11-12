@@ -348,7 +348,11 @@ fun SettingsScreen(
     }
 
     BackHandler(enabled = handleRootSystemBack || page != SettingsDestination.ROOT) { navigateBack() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (page == SettingsDestination.ACCOUNT) viewModel.refreshChatGpt()
+    }
     LaunchedEffect(page) {
+        if (page == SettingsDestination.ACCOUNT) viewModel.refreshChatGpt()
         if (page == SettingsDestination.PERMISSIONS || page == SettingsDestination.NOTIFICATIONS) {
             viewModel.refreshDeviceCapabilities()
         }

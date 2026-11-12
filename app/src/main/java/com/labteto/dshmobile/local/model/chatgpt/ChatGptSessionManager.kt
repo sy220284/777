@@ -13,11 +13,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -165,7 +163,8 @@ class ChatGptSessionManager @Inject constructor(
             val grantedScopes = if (token.scopes.isEmpty()) current.scopes else token.scopes
             val replacement = current.copy(
                 accessToken = token.accessToken,
-                refreshToken = token.refreshToken ?: current.refreshToken,
+                refreshToken = token.refreshToken?.takeIf(String::isNotBlank)
+                    ?: throw IOException("ChatGPT 刷新令牌响应缺少新的 refresh_token"),
                 idToken = current.idToken,
                 tokenType = token.tokenType,
                 scopes = grantedScopes,
@@ -199,49 +198,18 @@ class ChatGptSessionManager @Inject constructor(
             .build()
         withCancellableHttpResponse(http.newCall(request)) { response ->
             val body = readBoundedBody(response.body, MAX_AUTH_RESPONSE_BYTES)
-            val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
             if (!response.isSuccessful) {
-                val code = root?.get("error")?.jsonPrimitive?.contentOrNull
-                val detail = root?.get("error_description")?.jsonPrimitive?.contentOrNull
-                throw ChatGptOAuthTokenException(
-                    oauthCode = code,
-                    message = listOfNotNull(
-                        "ChatGPT OAuth token 请求失败（HTTP ${response.code}）",
-                        code,
-                        detail,
-                    ).joinToString("："),
+                throw parseChatGptTokenFailure(
+                    json = json,
+                    body = body,
+                    status = response.code,
+                    requestId = response.header("x-request-id"),
                 )
             }
-            val access = root?.get("access_token")?.jsonPrimitive?.contentOrNull
-                ?.takeIf(String::isNotBlank)
-                ?: error("ChatGPT OAuth 响应缺少 access_token")
-            val expires = root["expires_in"]?.jsonPrimitive?.longOrNull ?: 3_600L
-            val token = ChatGptTokenResponse(
-                accessToken = access,
-                refreshToken = root["refresh_token"]?.jsonPrimitive?.contentOrNull,
-                idToken = root["id_token"]?.jsonPrimitive?.contentOrNull,
-                tokenType = root["token_type"]?.jsonPrimitive?.contentOrNull ?: "Bearer",
-                expiresInSeconds = expires.coerceAtLeast(60L),
-                earliestRefreshAtEpochSeconds = parseEarliestRefreshAt(root),
-                scopes = root["scope"]?.jsonPrimitive?.contentOrNull
-                    .orEmpty()
-                    .split(' ')
-                    .map(String::trim)
-                    .filter(String::isNotBlank)
-                    .toSet(),
-            )
+            val token = parseChatGptTokenResponse(json, body)
             onToken(token)
             token
         }
-    }
-
-    private fun parseEarliestRefreshAt(root: JsonObject): Long? {
-        val raw = root["earliest_refresh_at"]?.jsonPrimitive?.contentOrNull ?: return null
-        val parsed = raw.toLongOrNull()
-            ?: runCatching { java.time.Instant.parse(raw).epochSecond }.getOrNull()
-            ?: return null
-        val seconds = if (parsed > 1_000_000_000_000L) parsed / 1_000L else parsed
-        return seconds.takeIf { it > 0L }
     }
 
     private fun requirePlanAccess(record: ChatGptAccountRecord) {
