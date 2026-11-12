@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.model.chatgpt
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.labteto.dshmobile.observability.AppLog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -10,6 +11,7 @@ import java.util.Base64
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +33,7 @@ class ChatGptAuthCoordinator @Inject constructor(
     @Volatile private var activeListener: ChatGptOAuthCallbackServer.Listener? = null
     @Volatile private var cancellationRequested = false
     @Volatile private var authorizationInProgress = false
+    internal val isAuthorizationInProgress: Boolean get() = authorizationInProgress
     private val _state = MutableStateFlow(ChatGptUiState())
     val state: StateFlow<ChatGptUiState> = _state.asStateFlow()
 
@@ -190,7 +193,11 @@ class ChatGptAuthCoordinator @Inject constructor(
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )
 
-            val callback = listener.await()
+            val callback = try {
+                listener.await()
+            } catch (_: TimeoutCancellationException) {
+                error("等待 ChatGPT 浏览器授权超时，请重新发起连接")
+            }
             require(callback.state == stateValue) { "ChatGPT OAuth state 校验失败" }
             if (callback.error != null) {
                 val detail = callback.errorDescription?.takeIf(String::isNotBlank)
@@ -315,6 +322,8 @@ class ChatGptAuthCoordinator @Inject constructor(
                 restoreAfterCancelledAuthorization()
                 throw CancellationException("ChatGPT 授权已取消")
             }
+            // This owner still records failures when the Settings ViewModel has gone away.
+            AppLog.failure("ChatGptAuth", "connect_chatgpt", error)
             _state.value = currentState(
                 phase = ChatGptAuthPhase.ERROR,
                 selectedAccountId = existingAccountId ?: _state.value.selectedAccountId,

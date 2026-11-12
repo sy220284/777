@@ -110,6 +110,7 @@ class ChatGptRefreshLifecycleAndroidTest {
             assertNotNull(accounts.get(original.id))
             assertEquals(other.id, accounts.selectedId())
             assertEquals("refreshed", accounts.get(original.id)!!.accessToken)
+            assertEquals("rotated-refresh", accounts.get(original.id)!!.refreshToken)
         }
     }
 
@@ -200,7 +201,7 @@ class ChatGptRefreshLifecycleAndroidTest {
         OkHttpClient.Builder().addInterceptor { chain ->
             entered.countDown()
             check(release.await(3, TimeUnit.SECONDS))
-            val body = if (status == 200) """{"access_token":"refreshed","expires_in":3600}"""
+            val body = if (status == 200) """{"access_token":"refreshed","refresh_token":"rotated-refresh","expires_in":3600}"""
                 else """{"error":"invalid_grant"}"""
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
                 .code(status).message("test").body(body.toResponseBody()).build()

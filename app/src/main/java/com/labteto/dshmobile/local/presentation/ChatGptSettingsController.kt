@@ -3,12 +3,17 @@ package com.labteto.dshmobile.local.presentation
 import com.labteto.dshmobile.local.model.LocalModelRuntime
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountSummary
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanConnectionTester
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.observability.AppLog
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
@@ -26,12 +31,17 @@ class ChatGptSettingsController @Inject constructor(
     private val planTester: ChatGptPlanConnectionTester,
 ) {
     val state: StateFlow<ChatGptUiState> = auth.state
+    // The account owner outlives the Settings scene while the system browser is open.
+    private val authorizationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val accountMutationMutex = Mutex()
     @Volatile private var latestSelectedAccountId: String? = null
 
     suspend fun refresh() {
         // Background resume/refresh must not commit over an in-progress account switch.
-        if (!accountMutationMutex.tryLock()) return
+        // A failed OAuth attempt remains actionable on return from the browser.
+        // Only a new explicit authorization attempt clears its error state.
+        if (auth.isAuthorizationInProgress || state.value.phase == ChatGptAuthPhase.ERROR ||
+            !accountMutationMutex.tryLock()) return
         try {
             auth.refresh()
             reconcilePlanProfiles()
@@ -48,18 +58,22 @@ class ChatGptSettingsController @Inject constructor(
         // OAuth can stay open while awaiting the browser; never hold the account
         // switch mutex across it, or Restart could not cancel the old authorization.
         modelRuntime.requireChatGptAccountSelectionAllowed()
-        val account = auth.connect(existingAccountId, requestPlanConsent)
-        accountMutationMutex.withLock {
-            reconcilePlanProfiles(selectFirstAccountId = account.id)
-        }
+        authorizationScope.async {
+            val account = auth.connect(existingAccountId, requestPlanConsent)
+            accountMutationMutex.withLock {
+                reconcilePlanProfiles(selectFirstAccountId = account.id)
+            }
+        }.await()
     }
 
     suspend fun restart(existingAccountId: String? = null) {
         modelRuntime.requireChatGptAccountSelectionAllowed()
-        val account = auth.restartAuthorization(existingAccountId)
-        accountMutationMutex.withLock {
-            reconcilePlanProfiles(selectFirstAccountId = account.id)
-        }
+        authorizationScope.async {
+            val account = auth.restartAuthorization(existingAccountId)
+            accountMutationMutex.withLock {
+                reconcilePlanProfiles(selectFirstAccountId = account.id)
+            }
+        }.await()
     }
 
     suspend fun cancelAuthorization() = auth.cancelPendingAuthorization()

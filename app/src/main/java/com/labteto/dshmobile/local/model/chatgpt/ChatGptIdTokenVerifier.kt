@@ -20,7 +20,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -43,29 +42,29 @@ class ChatGptIdTokenVerifier @Inject constructor(
         val parts = idToken.split('.')
         require(parts.size == 3) { "OpenAI ID Token 格式无效" }
         val header = decodeJson(parts[0])
-        require(header["alg"]?.jsonPrimitive?.contentOrNull == "RS256") {
+        require(header.stringClaim("alg") == "RS256") {
             "OpenAI ID Token 签名算法不受支持"
         }
-        val kid = header["kid"]?.jsonPrimitive?.contentOrNull
+        val kid = header.stringClaim("kid")
             ?: error("OpenAI ID Token 缺少 kid")
         val jwk = signingKey(kid)
         verifySignature(parts, jwk)
 
         val claims = decodeJson(parts[1])
-        val issuer = claims["iss"]?.jsonPrimitive?.contentOrNull
+        val issuer = claims.stringClaim("iss")
         require(issuer == CHATGPT_ISSUER) { "OpenAI ID Token issuer 不匹配" }
         require(audienceContains(claims["aud"], clientId)) { "OpenAI ID Token audience 不匹配" }
-        val expiresAt = claims["exp"]?.jsonPrimitive?.longOrNull
+        val expiresAt = (claims["exp"] as? JsonPrimitive)?.takeUnless { it.isString }?.longOrNull
             ?: error("OpenAI ID Token 缺少 exp")
         require(expiresAt > nowEpochSeconds - CLOCK_SKEW_SECONDS) { "OpenAI ID Token 已过期" }
-        require(claims["nonce"]?.jsonPrimitive?.contentOrNull == nonce) { "OpenAI ID Token nonce 不匹配" }
-        val subject = claims["sub"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+        require(claims.stringClaim("nonce") == nonce) { "OpenAI ID Token nonce 不匹配" }
+        val subject = claims.stringClaim("sub")?.takeIf(String::isNotBlank)
             ?: error("OpenAI ID Token 缺少 subject")
         return VerifiedChatGptIdentity(
             issuer = issuer,
             subject = subject,
-            email = claims["email"]?.jsonPrimitive?.contentOrNull,
-            displayName = claims["name"]?.jsonPrimitive?.contentOrNull,
+            email = claims.stringClaim("email"),
+            displayName = claims.stringClaim("name"),
         )
     }
 
@@ -99,12 +98,12 @@ class ChatGptIdTokenVerifier @Inject constructor(
     private fun findKey(jwks: JsonObject, kid: String): JsonObject? =
         (jwks["keys"] as? JsonArray)
             ?.mapNotNull { it as? JsonObject }
-            ?.firstOrNull { it["kid"]?.jsonPrimitive?.contentOrNull == kid }
+            ?.firstOrNull { it.stringClaim("kid") == kid }
 
     private fun verifySignature(parts: List<String>, jwk: JsonObject) {
-        require(jwk["kty"]?.jsonPrimitive?.contentOrNull == "RSA") { "OpenAI JWKS 密钥类型无效" }
-        val n = jwk["n"]?.jsonPrimitive?.contentOrNull ?: error("OpenAI JWKS 缺少 n")
-        val e = jwk["e"]?.jsonPrimitive?.contentOrNull ?: error("OpenAI JWKS 缺少 e")
+        require(jwk.stringClaim("kty") == "RSA") { "OpenAI JWKS 密钥类型无效" }
+        val n = jwk.stringClaim("n") ?: error("OpenAI JWKS 缺少 n")
+        val e = jwk.stringClaim("e") ?: error("OpenAI JWKS 缺少 e")
         val modulus = BigInteger(1, decodeBase64Url(n))
         val exponent = BigInteger(1, decodeBase64Url(e))
         val publicKey = KeyFactory.getInstance("RSA").generatePublic(RSAPublicKeySpec(modulus, exponent))
@@ -114,16 +113,26 @@ class ChatGptIdTokenVerifier @Inject constructor(
         require(verifier.verify(decodeBase64Url(parts[2]))) { "OpenAI ID Token 签名验证失败" }
     }
 
-    private fun decodeJson(part: String): JsonObject =
-        json.parseToJsonElement(String(decodeBase64Url(part), Charsets.UTF_8)).jsonObject
+    private fun decodeJson(part: String): JsonObject = try {
+        (json.parseToJsonElement(String(decodeBase64Url(part), Charsets.UTF_8)) as? JsonObject)
+            ?: error("OpenAI ID Token JSON 类型无效")
+    } catch (_: Exception) {
+        // Do not attach decoder exceptions that may contain decoded identity claims.
+        error("OpenAI ID Token JSON 内容无效")
+    }
 
     private fun decodeBase64Url(value: String): ByteArray =
         Base64.getUrlDecoder().decode(value.padEnd(value.length + ((4 - value.length % 4) % 4), '='))
 
+    private fun JsonObject.stringClaim(name: String): String? =
+        (this[name] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
+
     private fun audienceContains(value: kotlinx.serialization.json.JsonElement?, clientId: String): Boolean =
         when (value) {
-            is JsonPrimitive -> value.contentOrNull == clientId
-            is JsonArray -> value.any { (it as? JsonPrimitive)?.contentOrNull == clientId }
+            is JsonPrimitive -> value.isString && value.contentOrNull == clientId
+            is JsonArray -> value.any { (it as? JsonPrimitive)?.let { item ->
+                item.isString && item.contentOrNull == clientId
+            } == true }
             else -> false
         }
 
