@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.model.chatgpt
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.labteto.dshmobile.observability.AppLog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -321,6 +322,8 @@ class ChatGptAuthCoordinator @Inject constructor(
                 restoreAfterCancelledAuthorization()
                 throw CancellationException("ChatGPT 授权已取消")
             }
+            // This owner still records failures when the Settings ViewModel has gone away.
+            AppLog.failure("ChatGptAuth", "connect_chatgpt", error)
             _state.value = currentState(
                 phase = ChatGptAuthPhase.ERROR,
                 selectedAccountId = existingAccountId ?: _state.value.selectedAccountId,
