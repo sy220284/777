@@ -73,8 +73,9 @@ internal fun parseChatGptTokenFailure(
         else -> null
     }
     val shape = when {
-        element == null -> "invalid-json"
-        root == null -> "non-object"
+        // OAuth error responses must be JSON objects. Primitive/array bodies are
+        // malformed protocol responses even if the JSON parser accepts them.
+        root == null -> "invalid-json"
         errorField is JsonObject -> "object-error"
         errorField is JsonPrimitive -> "scalar-error"
         errorField == null -> "other-object"
