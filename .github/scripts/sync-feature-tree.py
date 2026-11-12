@@ -873,8 +873,11 @@ def snapshot(root):
     for file in sorted(root.rglob("*")):
         if not file.is_file() or any(x in skips for x in file.relative_to(root).parts):
             continue
-        if file.relative_to(root).as_posix() == ".github/workflows/feature-tree-auto.yml":
-            continue  # 工作流控制脚本自身的文档提交不改变实际功能源码指纹。
+        # CI/workflow automation belongs to the independently validated control
+        # plane, not to the product feature inventory. Excluding .github avoids
+        # regenerating four product indices after every workflow-only change.
+        if file.relative_to(root).parts[0] == ".github":
+            continue
         if file.suffix not in suffixes and file.name != "gradlew":
             continue
         digest.update(file.relative_to(root).as_posix().encode("utf-8"))
@@ -1298,6 +1301,24 @@ def generate(root):
 
 
 def test():
+    # A CI-only change must not rewrite product indexes; actual application
+    # source changes must still change the fingerprint deterministically.
+    from tempfile import TemporaryDirectory
+    with TemporaryDirectory() as directory:
+        root = Path(directory)
+        product = root / "app/src/main/java/sample/Feature.kt"
+        product.parent.mkdir(parents=True)
+        product.write_text("class Feature", encoding="utf-8")
+        first = snapshot(root)
+        workflow = root / ".github/workflows/ci.yml"
+        workflow.parent.mkdir(parents=True)
+        workflow.write_text("name: CI", encoding="utf-8")
+        assert snapshot(root) == first
+        workflow.write_text("name: Updated CI", encoding="utf-8")
+        assert snapshot(root) == first
+        product.write_text("class UpdatedFeature", encoding="utf-8")
+        assert snapshot(root) != first
+
     fence = chr(96) * 3
     text = fence + "text\n ROOT\n├─ A\n│  ├─ 甲\n│  └─ 乙\n└─ B\n   └─ 丙\n" + fence
     model, _ = parse(text)
