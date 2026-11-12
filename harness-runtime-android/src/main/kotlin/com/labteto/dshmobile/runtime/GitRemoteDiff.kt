@@ -1,0 +1,122 @@
+package com.labteto.dshmobile.runtime
+
+import com.labteto.dshmobile.harness.capability.ProcessRequest
+import com.labteto.dshmobile.harness.plugin.HarnessContext
+import com.labteto.dshmobile.harness.tools.HarnessTool
+import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
+import com.labteto.dshmobile.harness.tools.ToolAccess
+import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
+import com.labteto.dshmobile.harness.tools.ToolMetadata
+import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.functionToolSchema
+import java.io.File
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+
+/**
+ * Diff against a locally verified remote-tracking branch. Never fetches remotely, modifies
+ * the index or runs user-supplied commands; all subprocess argument boundaries are explicit.
+ */
+internal class GitRemoteDiff(
+    private val workspaceRoot: File,
+    private val processRuntime: AndroidProcessRuntime,
+) {
+    internal fun install(context: HarnessContext) {
+        context.tools.register(
+            HarnessTool(
+                name = "git_diff_remote",
+                schema = functionToolSchema(
+                    "git_diff_remote",
+                    "对比已存在的远端跟踪分支与当前 Git 工作树的已跟踪文件；不联网、不修改暂存区",
+                    buildJsonObject {
+                        put("repository", buildJsonObject { put("type", "string") })
+                        put("remote", buildJsonObject { put("type", "string") })
+                        put("branch", buildJsonObject { put("type", "string") })
+                    },
+                ),
+                access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL,
+                timeoutMillis = 30_000L,
+                metadata = ToolMetadata(
+                    family = "文件",
+                    environmentBound = true,
+                    discoveryKeywords = setOf("git", "diff", "远端", "分支", "差异"),
+                ),
+                executor = HarnessToolExecutor { _, input, _ ->
+                    val repository = input["repository"]?.jsonPrimitive?.contentOrNull ?: "."
+                    val remote = input["remote"]?.jsonPrimitive?.contentOrNull ?: "origin"
+                    val branch = input["branch"]?.jsonPrimitive?.contentOrNull ?: "main"
+                    val result = compare(repository, remote, branch)
+                    ToolResult(result.toString())
+                },
+            ),
+        )
+    }
+
+    internal fun uninstall(context: HarnessContext) {
+        context.tools.unregister("git_diff_remote")
+    }
+
+    internal suspend fun compare(repository: String, remote: String, branch: String): JsonObject {
+        require(validGitDiffRemoteName(remote) && validGitDiffBranchName(branch)) {
+            "远端名称或分支包含无效字符"
+        }
+        require(repository.isNotBlank() && !File(repository).isAbsolute) { "仓库路径必须为工作区内的相对路径" }
+        val workspace = workspaceRoot.canonicalFile
+        val target = File(workspace, repository).canonicalFile
+        require(target == workspace || target.toPath().startsWith(workspace.toPath())) {
+            "拒绝访问工作区之外的 Git 仓库"
+        }
+        require(target.isDirectory) { "Git 仓库目录不存在" }
+        suspend fun run(vararg args: String): String {
+            val result = processRuntime.execute(ProcessRequest(
+                command = listOf("git", "-c", "core.fsmonitor=false", "-C", target.path) + args,
+                workingDirectory = target.path,
+                timeoutMillis = 20_000L,
+            ))
+            check(!result.timedOut) { "Git 查询超时" }
+            check(result.exitCode == 0) { "Git 查询失败：" + result.stderr.take(480) }
+            return result.stdout.trimEnd()
+        }
+
+        val root = File(run("rev-parse", "--show-toplevel")).canonicalFile
+        require(root == workspace || root.toPath().startsWith(workspace.toPath())) {
+            "Git 仓库根目录越过授权工作区"
+        }
+        val trackingRef = "refs/remotes/" + remote + "/" + branch
+        val trackedCommit = run("rev-parse", "--verify", "--end-of-options", trackingRef + "^{commit}").trim()
+        val headCommit = run("rev-parse", "--verify", "HEAD^{commit}").trim()
+        val base = run("merge-base", headCommit, trackedCommit).trim()
+        require(base.matches(Regex("[0-9a-f]{40,64}"))) { "Git 合并基线异常" }
+        val stat = run("diff", "--no-ext-diff", "--no-textconv", "--stat", base, "--")
+        val patch = run("diff", "--no-ext-diff", "--no-textconv", "--unified=3", base, "--")
+        val cap = 128 * 1024
+        return buildJsonObject {
+            put("repository", root.path)
+            put("tracking_ref", trackingRef)
+            put("tracking_commit", trackedCommit)
+            put("head_commit", headCommit)
+            put("merge_base", base)
+            put("stat", stat.take(12_000))
+            put("patch", patch.take(cap))
+            put("truncated", patch.length > cap)
+            put("includes_tracked_worktree_changes", true)
+            put("includes_untracked_files", false)
+            put("network_requested", false)
+        }
+    }
+}
+
+internal fun validGitDiffRemoteName(value: String): Boolean =
+    value.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,63}")) &&
+        !value.startsWith("-") && value != "." && value != ".."
+
+internal fun validGitDiffBranchName(value: String): Boolean =
+    value.length in 1..120 && value.matches(Regex("[A-Za-z0-9][A-Za-z0-9._/-]*")) &&
+        value.split('/').all { it.isNotEmpty() && it != "." && it != ".." } &&
+        !value.contains("..") && !value.endsWith('.') && !value.endsWith(".lock")
