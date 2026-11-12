@@ -932,7 +932,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTimelineCoordinator.kt",
-      "sha256": "ed8c69f45b23859b"
+      "sha256": "30f19ab986d45dc6"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTimelineRollback.kt",
@@ -4552,13 +4552,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "a963964c693e",
+  "source_snapshot": "d9c6fd12e3ff",
   "observed_delta": {
-    "baseline": "42d2905a0a86",
+    "baseline": "a963964c693e",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionCoordinator.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTimelineCoordinator.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
