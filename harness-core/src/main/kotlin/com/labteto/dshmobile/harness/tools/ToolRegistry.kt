@@ -6,6 +6,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -201,7 +202,9 @@ class ToolRegistry private constructor(
         val hookSnapshot = hooks.snapshot(name)
         for (subscription in hookSnapshot.subscriptions) {
             val decision = try {
-                subscription.hook.beforeUse(ToolPreUseRequest(context.sessionId, tool, input))
+                withTimeoutOrNull(5_000L) {
+                    subscription.hook.beforeUse(ToolPreUseRequest(context.sessionId, tool, input))
+                } ?: ToolPreUseDecision.Deny("Hook 超时：" + subscription.id)
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (failure: Exception) {
@@ -297,7 +300,11 @@ class ToolRegistry private constructor(
             // never erase the side-effect provenance or create a false "not started" receipt.
             context.onExecutionFinished?.invoke(tool, result)
             for (subscription in hookSnapshot.subscriptions) {
-                subscription.hook.afterUse(ToolPostUseEvent(context.sessionId, tool, result))
+                val completed = withTimeoutOrNull(5_000L) {
+                    subscription.hook.afterUse(ToolPostUseEvent(context.sessionId, tool, result))
+                    true
+                } ?: false
+                check(completed) { "工具后置 Hook 执行超时：" + subscription.id }
             }
         }
         val timeoutMillis = tool.timeoutMillis
