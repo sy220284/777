@@ -165,8 +165,11 @@ internal fun LocalWorkspaceFilesDialog(
             LocalFilesMode.CONVERSATION ->
                 (conversation.artifacts + conversation.involved).distinctBy { it.path }
         }
-        candidates.filter { isShareableWorkspacePath(it.path) &&
-            (normalizedQuery.isBlank() || it.path.contains(normalizedQuery, ignoreCase = true)) }
+        candidates.filter { file ->
+            isShareableWorkspacePath(file.path) &&
+                (mode == LocalFilesMode.WORKSPACE ||
+                    normalizedQuery.isBlank() || file.path.contains(normalizedQuery, ignoreCase = true))
+        }
     }
     val visibleSharePaths = remember(shareableFiles) {
         shareableFiles.map { it.path }.distinct()
