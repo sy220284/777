@@ -4,6 +4,9 @@ import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
+import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
+import com.labteto.dshmobile.local.agent.LocalQueuedUserMessageEditor
+import kotlinx.coroutines.flow.update
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.model.buildLocalUserModelMessage
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -380,6 +383,46 @@ internal class LocalWorkExecutionCoordinator internal constructor(
     ): LocalUserMessageEditResult = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
         var committed = false
         try {
+            val state = runtimeStateStore.state.value
+            if (state.usageMode == LocalUsageMode.WORK && !state.loading &&
+                !runtimeStateStore.sessionTransitioning) {
+                val binding = workRunRegistry[state.sessionId]
+                val runHandle = binding?.runHandle ?: runtimeStateStore.foregroundRunHandle
+                if (runHandle.pendingInputs.snapshot().any {
+                    it.id == messageId && it.kind == QueuedAgentInputKind.USER
+                }) {
+                    val edited = LocalQueuedUserMessageEditor(
+                        eventLogFor(state.sessionId), runHandle.pendingInputs,
+                    ).edit(messageId, replacement)
+                        ?: return@synchronized LocalUserMessageEditResult.UNCHANGED
+                    committed = true
+                    runHandle.transcriptProjectionCursor =
+                        maxOf(runHandle.transcriptProjectionCursor ?: -1L, edited.eventSequence)
+                    binding?.state?.update { running ->
+                        running.copy(
+                            messages = edited.hotMessages(),
+                            transcriptIndex = edited.transcriptIndex,
+                            kernel = running.kernel.copy(queuedInputCount = edited.pendingCount),
+                        )
+                    }
+                    runtimeStateStore.projection.update { visible ->
+                        if (visible.sessionId != state.sessionId || visible.usageMode != LocalUsageMode.WORK)
+                            visible
+                        else visible.copy(
+                            messages = edited.hotMessages(),
+                            transcriptIndex = edited.transcriptIndex,
+                            kernel = visible.kernel.copy(queuedInputCount = edited.pendingCount),
+                            error = null,
+                        )
+                    }
+                    if (!enqueueSnapshot(state.sessionId)) {
+                        runtimeStateStore.projection.publishError(
+                            "排队消息已持久保存，当前快照保存失败；重新打开会话可从事件记录恢复",
+                        )
+                    }
+                    return@synchronized LocalUserMessageEditResult.SENT
+                }
+            }
             when (val edit = prepareEditedTurn(messageId, replacement)) {
                 is LocalWorkMessageEditPreparation.Rejected -> edit.reason
                 is LocalWorkMessageEditPreparation.Ready -> {
