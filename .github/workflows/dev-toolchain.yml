@@ -98,6 +98,16 @@ jobs:
           tar -xzf "$RUNNER_TEMP/$ARCHIVE" -C "$RUNNER_TEMP/actionlint-bin"
           "$RUNNER_TEMP/actionlint-bin/actionlint" -version
 
+      - name: 恢复已校验的 Gradle 依赖缓存
+        id: toolchain-gradle-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            .gradle-toolchain-home/caches/modules-2
+            .gradle-toolchain-home/caches/transforms-*
+            .gradle-toolchain-home/wrapper/dists
+          key: toolchain-deps-${{ runner.os }}-jdk27-v1-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml', 'gradle/verification-metadata.xml', '**/gradle.lockfile') }}
+
       # Keep app JVM tests isolated from R8/lint resource contention. The existing
       # 2-minute :app:testDebugUnitTest task timeout remains in place and fails closed.
       - name: 预热应用 JVM 测试（独立 Gradle 执行）
@@ -126,6 +136,18 @@ jobs:
             :app:assembleDebugAndroidTest \
             :app:assembleOptimized \
             --stacktrace --console=plain
+
+      # Save verified dependencies before Artifact splitting and the installer test.
+      # A packaging failure must not discard a completed download/verification.
+      - name: 保存已校验的 Gradle 依赖缓存
+        if: steps.toolchain-gradle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            .gradle-toolchain-home/caches/modules-2
+            .gradle-toolchain-home/caches/transforms-*
+            .gradle-toolchain-home/wrapper/dists
+          key: toolchain-deps-${{ runner.os }}-jdk27-v1-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml', 'gradle/verification-metadata.xml', '**/gradle.lockfile') }}
 
       - name: 拆分并校验组件包
         run: |
