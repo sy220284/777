@@ -246,6 +246,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ needs.check-release.outputs.release_sha }}
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 27
       - name: Validate release signing material
         env:
           KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE }}
@@ -317,10 +321,6 @@ jobs:
 
           echo "DSH_RELEASE_PASSWORD=$PASSWORD_VALUE" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
-        with:
-          distribution: temurin
-          java-version: 27
       - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
