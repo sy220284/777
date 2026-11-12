@@ -609,22 +609,22 @@ class LocalWorkspace(
         }
     }
 
-    /** Search by path/name without truncating before matching files are considered. */
+    /** Match and rank bounded filesystem entries, preserving complete filename-first results. */
     fun searchWorkspaceFileNames(query: String, limit: Int = 500): List<LocalWorkspaceFile> {
         val needle = query.trim()
-        require(needle.isNotBlank()) { "搜索关键词不能为空" }
+        require(needle.isNotBlank() && needle.length <= 128) { "搜索关键词不能为空且最多 128 字" }
+        val top = limit.coerceIn(1, 500)
         return safeWalk(canonicalRoot, maxVisited = 50_000, maxMillis = 5_000L)
             .filter { it.isFile && isInsideWorkspace(it) }
-            .filter { it.relativeTo(canonicalRoot).invariantSeparatorsPath.contains(needle, ignoreCase = true) }
-            .take(limit.coerceIn(1, 500))
-            .map { file ->
-                LocalWorkspaceFile(
-                    path = file.relativeTo(canonicalRoot).invariantSeparatorsPath,
-                    bytes = file.length(),
-                    modifiedAt = file.lastModified(),
-                )
+            .mapNotNull { file ->
+                val path = file.relativeTo(canonicalRoot).invariantSeparatorsPath
+                val score = scoreWorkspaceFileMatch(needle, path) ?: return@mapNotNull null
+                score to LocalWorkspaceFile(path, file.length(), file.lastModified())
             }
-            .sortedBy(LocalWorkspaceFile::path)
+            .sortedWith(compareByDescending<Pair<Int, LocalWorkspaceFile>> { it.first }
+                .thenBy { it.second.path })
+            .take(top)
+            .map { it.second }
             .toList()
     }
 
