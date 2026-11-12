@@ -53,6 +53,11 @@ if [[ "${1:-}" == "--self-test" ]]; then
   exit 0
 fi
 
+if [[ "${1:-}" == "--verify" ]]; then
+  verify_apks "${2:-.ci/device-apks}" "${GITHUB_SHA:-}" "${3:-}"
+  exit
+fi
+
 : "${GITHUB_REPOSITORY:?GitHub repository required}"
 : "${GH_TOKEN:?Read-only GitHub Actions token required}"
 command -v gh >/dev/null || { echo "::error::GitHub CLI missing" >&2; exit 1; }
