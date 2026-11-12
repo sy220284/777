@@ -306,6 +306,7 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun workspaceDirectoryPage(path: String, offset: Int) = runtime.session.workspaceDirectoryPageForUi(path, offset)
     suspend fun searchWorkspaceFiles(query: String) = runtime.session.searchWorkspaceFilesForUi(query)
     suspend fun searchWorkspacePage(query: String, offset: Int) = runtime.session.searchWorkspacePageForUi(query, offset)
+    suspend fun stopWorkspaceSearch(query: String) = runtime.session.stopWorkspaceSearchForUi(query)
     suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)
     suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
     suspend fun previewWorkspaceFilePage(path: String, offset: Long) =
