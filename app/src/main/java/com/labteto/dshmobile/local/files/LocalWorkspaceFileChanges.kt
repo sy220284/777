@@ -15,7 +15,7 @@ internal data class LocalWorkspaceFileChange(
     val kind: LocalWorkspaceChangeKind,
 )
 
-private const val OBSERVED_MASK = FileObserver.MODIFY or FileObserver.CLOSE_WRITE or
+private val OBSERVED_MASK = FileObserver.MODIFY or FileObserver.CLOSE_WRITE or
     FileObserver.MOVED_TO or FileObserver.MOVED_FROM or FileObserver.DELETE or
     FileObserver.CREATE or FileObserver.ATTRIB or FileObserver.DELETE_SELF
 
@@ -24,7 +24,6 @@ internal fun workspaceFileWatchTargets(
     workspace: File,
     paths: List<String>,
 ): Map<File, Set<String>> {
-    require(paths.size <= 128) { "单次文件观察路径不能超过 128 个" }
     val root = workspace.canonicalFile
     if (!root.isDirectory) return emptyMap()
     val rootPath = root.toPath()
@@ -57,6 +56,7 @@ internal fun workspaceFileWatchTargets(
             watchers.getOrPut(current.canonicalFile) { linkedSetOf() } += "*"
         }
     }
+    require(watchers.size <= 128) { "单次文件观察目录不能超过 128 个" }
     return watchers.mapValues { (_, names) -> names.toSet() }
 }
 
@@ -68,7 +68,6 @@ internal fun watchWorkspaceFileChanges(
     workspace: File,
     paths: List<String>,
 ): Flow<LocalWorkspaceFileChange> = callbackFlow {
-    require(paths.size <= 128)
     val root = workspace.canonicalFile
     val lock = Any()
     val active = linkedMapOf<File, FileObserver>()

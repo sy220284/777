@@ -50,8 +50,15 @@ class LocalWorkspaceFileChangesTest {
             val workspace = dir.resolve("root").apply { mkdirs() }
             assertEquals(setOf("*"), workspaceFileWatchTargets(workspace, listOf("."))
                 .getValue(workspace.canonicalFile))
+            // Hundreds of files in one directory share one native observer.
+            assertEquals(129, workspaceFileWatchTargets(workspace,
+                List(129) { "f-$it.txt" }).getValue(workspace.canonicalFile).size)
+            val directories = List(129) { index ->
+                workspace.resolve("directory-$index").apply { mkdirs() }
+                "directory-$index/file.txt"
+            }
             assertTrue(runCatching {
-                workspaceFileWatchTargets(workspace, List(129) { "f-$it.txt" })
+                workspaceFileWatchTargets(workspace, directories)
             }.isFailure)
         } finally { dir.deleteRecursively() }
     }
