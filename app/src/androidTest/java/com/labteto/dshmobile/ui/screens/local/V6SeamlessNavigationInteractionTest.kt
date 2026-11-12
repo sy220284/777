@@ -197,4 +197,25 @@ class V6SeamlessNavigationInteractionTest {
     }
 
 
+    @Test fun latestAssistantShowsPrimaryToolsWithoutExtraTap() {
+        val message = LocalHarnessMessage(
+            id = "chat-latest-tools", role = "assistant",
+            content = "最新回复", createdAt = 1L,
+        )
+        compose.setContent {
+            DshTheme {
+                LocalMessageRow(
+                    message = message, chatMode = true, groupMode = false,
+                    isLatestAssistant = true, canEdit = false, canRegenerate = true,
+                    canSelectVariant = false, branchInfo = null,
+                    onEdit = {}, onSelectVariant = { _, _ -> false },
+                    onRegenerate = { true },
+                )
+            }
+        }
+        compose.onNodeWithTag("messageActionToolbar:chat-latest-tools").assertExists()
+        compose.onNodeWithTag("messageActionSurface:chat-latest-tools").performClick()
+        compose.onNodeWithTag("messageActionToolbar:chat-latest-tools").assertExists()
+    }
+
 }

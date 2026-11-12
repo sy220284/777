@@ -157,11 +157,15 @@ internal fun LocalMessageRow(
     onEditGeneratedImage: ((LocalHarnessMessage) -> Unit)? = null,
     onConvertToWork: ((LocalHarnessMessage) -> Unit)? = null,
     onCreateDocument: ((LocalHarnessMessage) -> Unit)? = null,
+    onFeedback: ((String) -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val pulse = rememberHapticPulse()
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
+    val showFeedback = onFeedback ?: { text: String ->
+        Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+    }
     val copiedMessage = stringResource(R.string.chat_copy_success)
     val regenerateFailedMessage = stringResource(R.string.local_regenerate_reply_failed)
     val variantSelectionFailedMessage = stringResource(R.string.local_select_variant_failed)
@@ -181,7 +185,7 @@ internal fun LocalMessageRow(
                 try {
                     val selected = onSelectVariant(id, index)
                     if (!selected) {
-                        Toast.makeText(context, variantSelectionFailedMessage, Toast.LENGTH_SHORT).show()
+                        showFeedback(variantSelectionFailedMessage)
                     }
                 } finally {
                     selectingVariant = false
@@ -227,7 +231,7 @@ internal fun LocalMessageRow(
                                         icon = FeatherIcons.Copy,
                                         onClick = {
                                             clipboard.setText(AnnotatedString(copyText))
-                                            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                                            showFeedback(copiedMessage)
                                         },
                                     ),
                                 )
@@ -393,7 +397,7 @@ internal fun LocalMessageRow(
                             onClick = {
                                 clipboard.setText(AnnotatedString(copyableContent))
                                 copied = true
-                                Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                                showFeedback(copiedMessage)
                             },
                         )
                     }
@@ -403,7 +407,7 @@ internal fun LocalMessageRow(
                         contentDescription = stringResource(R.string.local_regenerate_reply),
                         onClick = {
                             if (!onRegenerate(message.id)) {
-                                Toast.makeText(context, regenerateFailedMessage, Toast.LENGTH_SHORT).show()
+                                showFeedback(regenerateFailedMessage)
                             }
                         },
                     )

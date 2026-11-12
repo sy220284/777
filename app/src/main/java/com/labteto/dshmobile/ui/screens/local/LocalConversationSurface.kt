@@ -941,6 +941,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         }
     }
 
+    val toastFeedback = com.labteto.dshmobile.ui.shenyan.rememberSyToast()
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().background(rootSurfaceColor).safeDrawingPadding().imePadding()) {
         Column(
             Modifier.fillMaxWidth()
@@ -989,6 +991,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         WorkSurfaceHeader(
                             sessionTitle = sessionTitle,
                             statusText = when {
+                                state.pendingApproval != null -> "等待工具授权"
                                 state.pendingQuestion != null -> "等待确认"
                                 workToolReadFailures > 0 -> "执行状态读取异常"
                                 state.running -> workToolActivities.lastOrNull {
@@ -996,6 +999,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                         it.phase == com.labteto.dshmobile.local.presentation.LocalToolUiPhase.DECLARED
                                 }?.let { "正在执行 · " + (userFacingWorkToolAction(it.name) ?: "当前步骤") } ?: "正在执行"
                                 state.loading -> "正在加载"
+                                !state.error.isNullOrBlank() -> "执行异常 · " + state.error
+                                workToolActivities.lastOrNull()?.phase ==
+                                    com.labteto.dshmobile.local.presentation.LocalToolUiPhase.FAILED ->
+                                        "任务步骤失败 · 可查看工作记录"
                                 !state.configured -> "未配置模型"
                                 else -> "就绪"
                             },
@@ -1230,6 +1237,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 isLatestAssistant = transcriptItem.message.role == "assistant" &&
                                     state.messages.lastOrNull { it.role == "assistant" }?.id == transcriptItem.message.id,
                                 workspacePath = state.workspacePath,
+                                onFeedback = toastFeedback.second,
                                 skillDisplayNames = skillDisplayNames,
                                 groupMode = state.groupChat.enabled,
                                 canEdit = messageEditingEnabled &&
@@ -1672,6 +1680,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             },
         )
 
+    }
+    com.labteto.dshmobile.ui.shenyan.SyToastHost(
+        toastFeedback,
+        modifier = Modifier.align(Alignment.TopCenter).safeDrawingPadding(),
+    )
     }
 
     if (state.usageMode == LocalUsageMode.WORK) {
