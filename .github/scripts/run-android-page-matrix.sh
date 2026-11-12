@@ -159,8 +159,9 @@ if [[ "${1:-}" == "--cell" ]]; then
   exit 0
 fi
 
-# The independent matrix workflow builds all three APKs on this same runner.
-# Keep the previous same-run artifact mode for explicit backward compatibility.
+# The matrix compares four device environments on one runner using the
+# identical verified x86_64 APKs from the same checkout as the main CI.
+# The default mode also supports downloading current-run APKs.
 if [[ "${1:-}" != "--local-apks" ]]; then
   bash .github/scripts/wait-android-device-artifacts.sh
 fi
