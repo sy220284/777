@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1922,
-  "production_source_count": 1123,
+  "repository_code_file_count": 1923,
+  "production_source_count": 1124,
   "test_code_file_count": 655,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
@@ -3376,7 +3376,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "sha256": "2c0190f2f31fd218"
+      "sha256": "d12268a25f80056d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationTemperatureUi.kt",
@@ -3477,6 +3477,10 @@
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPlanReviewCard.kt",
       "sha256": "16b2bffbaaaf23e3"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalQueuedUserQueueSheet.kt",
+      "sha256": "ac950414e4486e8d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSettingsUiContribution.kt",
@@ -4556,17 +4560,15 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "ead14d46cd3f",
+  "source_snapshot": "451af4173685",
   "observed_delta": {
-    "baseline": "6d3b56db1914",
-    "added_production_files": [],
+    "baseline": "ead14d46cd3f",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalQueuedUserQueueSheet.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalConversationUiPortComposition.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureUiActions.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/uicontract/ConversationUiPort.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
