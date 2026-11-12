@@ -125,7 +125,7 @@ jobs:
                 require_true "$RUN_STATIC" "static-gates" "$path"
                 require_true "$RUN_ARCHITECTURE" "architecture-3-gates" "$path"
                 ;;
-              .github/scripts/verify-android16-apk.sh|.github/scripts/run-android-instrumentation.sh|.github/scripts/smoke-test-android-startup.sh|.github/scripts/check-apk-runtime-layout.py|.github/scripts/wait-android-device-artifacts.sh)
+              .github/scripts/verify-android16-apk.sh|.github/scripts/run-android-instrumentation.sh|.github/scripts/prepare-android16-emulator.sh|.github/scripts/smoke-test-android-startup.sh|.github/scripts/check-apk-runtime-layout.py|.github/scripts/wait-android-device-artifacts.sh)
                 require_true "$RUN_STATIC" "static-gates" "$path"
                 require_true "$RUN_ARCHITECTURE" "architecture-3-gates" "$path"
                 require_true "$RUN_UNIT" "unit-tests" "$path"
