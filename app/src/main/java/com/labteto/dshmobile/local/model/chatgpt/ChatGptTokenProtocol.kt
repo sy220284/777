@@ -19,8 +19,9 @@ import kotlinx.serialization.json.longOrNull
 internal fun parseChatGptTokenResponse(json: Json, body: String): ChatGptTokenResponse {
     val root = try {
         json.parseToJsonElement(body) as? JsonObject
-    } catch (error: Exception) {
-        throw IOException("ChatGPT OAuth 令牌响应不是合法 JSON", error)
+    } catch (_: Exception) {
+        // JSON decoder exceptions can quote portions of a token payload; keep them out of logs.
+        throw IOException("ChatGPT OAuth 令牌响应不是合法 JSON")
     } ?: throw IOException("ChatGPT OAuth 令牌响应必须是 JSON 对象")
 
     val accessToken = root.optionalString("access_token")?.takeIf(String::isNotBlank)
