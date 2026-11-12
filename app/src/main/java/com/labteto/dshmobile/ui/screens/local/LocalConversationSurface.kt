@@ -351,6 +351,7 @@ internal fun LocalConversationSurface(
 private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val state = args.state
     val workActions = args.workActions
+    var queuedMessagesOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     val nativeDocuments = args.nativeDocuments
     val nativeDocumentSnapshot by (nativeDocuments?.snapshots ?: kotlinx.coroutines.flow.flowOf(
         com.labteto.dshmobile.uicontract.UiDocumentsSceneSnapshot(null, emptyList(), false, null)
@@ -1588,6 +1589,20 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             ),
         )
 
+        if (state.queuedInputCount > 0 && workActions?.queuedUserPort != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                SyButton(
+                    text = "待执行消息 · " + state.queuedInputCount,
+                    onClick = { queuedMessagesOpen = true },
+                    size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Outline,
+                )
+            }
+        }
+
         LocalConversationComposer(
             state = state,
             skillDisplayNames = skillDisplayNames,
@@ -1784,6 +1799,16 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             },
         )
     }
+    if (queuedMessagesOpen && workActions?.queuedUserPort != null) {
+        LocalQueuedUserQueueSheet(
+            port = workActions.queuedUserPort,
+            sessionId = state.sessionId,
+            queuedCount = state.queuedInputCount,
+            onEditQueued = onEditAndResend,
+            onDismiss = { queuedMessagesOpen = false },
+        )
+    }
+
     editingUserMessage?.let { message ->
         LocalChatEditMessageSheet(
             message = message,
