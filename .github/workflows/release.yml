@@ -256,7 +256,8 @@ jobs:
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .gradle/runtime-cache
-          key: runtime-${{ runner.os }}-arm64-v8a-${{ hashFiles('tools/runtime/prepare-termux-*.sh', 'tools/runtime/prepare-hdiffpatch.sh') }}
+          # Exact key shared with setup-runtime-cached in full CI (verified signed packages).
+          key: runtime-${{ runner.os }}-arm64-v8a-v2-${{ hashFiles('tools/runtime/prepare-termux-*.sh', 'tools/runtime/prepare-hdiffpatch.sh', 'tools/runtime/runtime-download.sh', 'tools/runtime/verify-termux-signature.sh') }}
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
 
       - name: Validate release signing material
