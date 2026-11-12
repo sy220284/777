@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.session
 
+import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.agent.LOCAL_QUEUED_USER_TIMELINE_ACTION
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -57,7 +59,10 @@ internal fun projectLocalTranscriptRuntimeIndexTail(
         .sortedBy(LocalSessionEventLog.Event::sequence)
         .forEach { event ->
             val decoded = decodeTranscriptMessages(event.data) ?: return@forEach
-            if (event.type == "chat/active-transcript" || event.type == "work/active-transcript") {
+            if (event.type == "chat/active-transcript" || event.type == "work/active-transcript" ||
+                (event.type == LOCAL_AGENT_INBOX_EVENT_TYPE &&
+                    (event.data["action"] as? JsonPrimitive)?.contentOrNull == LOCAL_QUEUED_USER_TIMELINE_ACTION)
+            ) {
                 current = buildLocalTranscriptRuntimeIndex(decoded)
                 return@forEach
             }
