@@ -50,6 +50,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
 import com.labteto.dshmobile.local.files.LocalWorkspaceSearchPage
+import com.labteto.dshmobile.local.files.LocalWorkspaceFileChange
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
@@ -75,6 +76,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.delay
 
 internal enum class LocalFilesMode { WORKSPACE, CONVERSATION }
 
@@ -106,6 +109,8 @@ internal fun LocalWorkspaceFilesDialog(
         else LocalWorkspaceSearchPage(emptyList(), null)
     },
     stopSearch: suspend (String) -> Boolean = { false },
+    observeChanges: (List<String>) -> kotlinx.coroutines.flow.Flow<LocalWorkspaceFileChange> =
+        { kotlinx.coroutines.flow.emptyFlow() },
     loadConversation: suspend (String) -> LocalConversationFiles,
     loadPreview: suspend (String) -> LocalWorkspaceFilePreview,
     loadPreviewPage: suspend (String, Long) -> LocalWorkspaceFilePreview = { path, _ -> loadPreview(path) },
@@ -379,6 +384,31 @@ internal fun LocalWorkspaceFilesDialog(
                 if (loadEpoch == epoch) searchPageError = failure.message ?: readFilesFailed
             } finally {
                 if (loadEpoch == epoch) loadingNextSearchPage = false
+            }
+        }
+    }
+
+    // Watch only the selected directory or the bounded paths visible in search results.
+    // Changes trigger a fresh Owner query; the file watcher is never a second file catalog.
+    val observedPaths = if (mode != LocalFilesMode.WORKSPACE || section < 0 && query.isBlank()) {
+        emptyList()
+    } else if (query.isNotBlank()) {
+        listOf(".") + workspace.take(64).map(LocalWorkspaceFile::path)
+    } else {
+        listOf(directory.ifBlank { "." })
+    }
+    LaunchedEffect(mode, sessionId, directory, query, observedPaths) {
+        if (observedPaths.isEmpty()) return@LaunchedEffect
+        try {
+            observeChanges(observedPaths).collectLatest {
+                delay(300)
+                if (previewPath == null && !loading) reload()
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            if (mode == LocalFilesMode.WORKSPACE) {
+                pageReadError = failure.message ?: "文件变化监听失败，请手动刷新"
             }
         }
     }

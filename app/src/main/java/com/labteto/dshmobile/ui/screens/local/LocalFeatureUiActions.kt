@@ -112,6 +112,8 @@ internal data class LocalWorkFeatureUiActions(
         LocalWorkspaceSearchPage(emptyList(), null)
     },
     val stopWorkspaceSearch: suspend (String) -> Boolean = { false },
+    val observeWorkspaceFiles: (List<String>) -> kotlinx.coroutines.flow.Flow<com.labteto.dshmobile.local.files.LocalWorkspaceFileChange> =
+        { kotlinx.coroutines.flow.emptyFlow() },
     val conversationFiles: suspend (String) -> LocalConversationFiles,
     val previewWorkspaceFile: suspend (String) -> LocalWorkspaceFilePreview,
     val previewWorkspaceFilePage: suspend (String, Long) -> LocalWorkspaceFilePreview = { path, _ -> previewWorkspaceFile(path) },
