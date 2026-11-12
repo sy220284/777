@@ -33,13 +33,13 @@ class ChatGptOAuthCallbackServerTest {
             val waiting = async(Dispatchers.IO) { listener.await(5_000L) }
             Socket("127.0.0.1", port).use { socket ->
                 socket.getOutputStream().write(
-                    "GET /favicon.ico HTTP/1.1\\r\\nHost: 127.0.0.1\\r\\n\\r\\n".toByteArray(),
+                    "GET /favicon.ico HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n".toByteArray(),
                 )
                 socket.getOutputStream().flush()
             }
             Socket("127.0.0.1", port).use { socket ->
                 socket.getOutputStream().write(
-                    "GET /auth/callback?code=valid%2Bcode&state=valid-state HTTP/1.1\\r\\nHost: 127.0.0.1\\r\\n\\r\\n".toByteArray(),
+                    "GET /auth/callback?code=valid%2Bcode&state=valid-state HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n".toByteArray(),
                 )
                 socket.getOutputStream().flush()
                 assertTrue(socket.getInputStream().bufferedReader().readLine().startsWith("HTTP/1.1 200"))
