@@ -13,6 +13,8 @@ import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
 import com.labteto.dshmobile.local.files.LocalWorkspaceSearchPage
+import com.labteto.dshmobile.local.files.LocalWorkspaceFileChange
+import com.labteto.dshmobile.local.files.watchWorkspaceFileChanges
 import com.labteto.dshmobile.local.files.LocalWorkspaceToolGuide
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.runtime.LocalBundledRuntimeManager
@@ -122,6 +124,9 @@ class LocalSessionFilesRuntime @Inject internal constructor(
 
     override suspend fun searchWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage =
         withContext(Dispatchers.IO) { workspace.searchWorkspacePage(query, offset) }
+
+    override fun observeWorkspaceFiles(paths: List<String>): kotlinx.coroutines.flow.Flow<LocalWorkspaceFileChange> =
+        watchWorkspaceFileChanges(File(workspace.path), paths)
 
     override suspend fun stopWorkspaceSearch(query: String): Boolean =
         withContext(Dispatchers.IO) { workspace.stopWorkspaceSearch(query) }
