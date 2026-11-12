@@ -1160,7 +1160,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
-      "sha256": "a529c847aba3a025"
+      "sha256": "9811ca3a772bf238"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceExecutionContext.kt",
@@ -4548,19 +4548,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "ace962fc3beb",
+  "source_snapshot": "f66009303905",
   "observed_delta": {
-    "baseline": "aa623571a7fd",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceFuzzyMatcher.kt",
-      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/GitRemoteDiff.kt"
-    ],
+    "baseline": "ace962fc3beb",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentInputQueue.kt",
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolRegistry.kt",
-      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
