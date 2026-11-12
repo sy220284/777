@@ -4548,14 +4548,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "bbbd451f03cc",
+  "source_snapshot": "03d79a2a05bf",
   "observed_delta": {
-    "baseline": "1711c060f963",
+    "baseline": "bbbd451f03cc",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/GitRemoteDiff.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
