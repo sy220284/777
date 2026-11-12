@@ -141,10 +141,6 @@ internal fun DrawerQuickActions(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-            onUsage?.let { openUsage ->
-                DrawerQuickAction(icon = SyEntryIcons.Usage,
-                    title = stringResource(R.string.usage_calculation_title), onClick = openUsage)
-            }
             if (usageMode == LocalUsageMode.CHAT) {
                 DrawerQuickAction(
                     icon = SyEntryIcons.Gallery,
@@ -157,14 +153,14 @@ internal fun DrawerQuickActions(
                     onClick = onOpenGroupChat,
                 )
                 DrawerQuickAction(
-                    icon = SyEntryIcons.Tasks,
-                    title = stringResource(R.string.tasks_chat_title),
-                    onClick = onTasks,
-                )
-                DrawerQuickAction(
                     icon = SyEntryIcons.Diary,
                     title = stringResource(R.string.chat_diary_title),
                     onClick = onOpenDiary,
+                )
+                DrawerQuickAction(
+                    icon = SyEntryIcons.Tasks,
+                    title = stringResource(R.string.tasks_chat_title),
+                    onClick = onTasks,
                 )
             } else {
                 DrawerQuickAction(
@@ -183,6 +179,13 @@ internal fun DrawerQuickActions(
                     onClick = onTools,
                 )
             }
+        onUsage?.let { openUsage ->
+            DrawerQuickAction(
+                icon = SyEntryIcons.Usage,
+                title = stringResource(R.string.usage_calculation_title),
+                onClick = openUsage,
+            )
+        }
         onMiniMaxQuota?.let { openQuota ->
             DrawerQuickAction(
                 icon = SyEntryIcons.Quota,

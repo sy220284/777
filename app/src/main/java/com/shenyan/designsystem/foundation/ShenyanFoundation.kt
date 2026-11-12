@@ -6,6 +6,8 @@ import kotlin.math.roundToInt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.IntOffset
@@ -45,9 +47,39 @@ data class SyColors(
     val overlay: Color,
 ) {
     // Decoration and small status text have different contrast requirements.
+    // Keep decorative accent fills independent from readable text colours.
+    val actionFill: Color get() = primary
+    val actionInk: Color get() = onPrimary
+    val linkInk: Color get() = syReadableInk(
+        if (primary == Color(0xFFE8A87C)) Color(0xFF44618C) else primary, materialL5)
+    val personaInk: Color get() = syReadableInk(lilac, materialL5)
     val successInk: Color get() = if (text.luminance() < .5f) Color(0xFF2E6755) else mint
     val warningInk: Color get() = if (text.luminance() < .5f) Color(0xFF80511F) else warning
     val dangerInk: Color get() = if (text.luminance() < .5f) Color(0xFF963B30) else Color(0xFFE89B8F)
+}
+
+/** Text foreground contrast over the opaque local reading surface. */
+fun syInkContrastRatio(ink: Color, background: Color): Float {
+    val solid = background.copy(alpha = 1f)
+    val foreground = ink.compositeOver(solid).luminance()
+    val backdrop = solid.luminance()
+    return (maxOf(foreground, backdrop) + .05f) / (minOf(foreground, backdrop) + .05f)
+}
+
+/** Preserve the selected hue and adjust brightness to meet readable text contrast. */
+fun syReadableInk(accent: Color, background: Color, minimumRatio: Float = 4.5f): Color {
+    val solid = background.copy(alpha = 1f)
+    val source = accent.copy(alpha = 1f)
+    if (syInkContrastRatio(source, solid) >= minimumRatio) return source
+    val target = if (solid.luminance() >= .5f) Color.Black else Color.White
+    var low = 0f
+    var high = 1f
+    repeat(14) {
+        val middle = (low + high) / 2f
+        if (syInkContrastRatio(lerp(source, target, middle), solid) < minimumRatio) low = middle
+        else high = middle
+    }
+    return lerp(source, target, high)
 }
 
 private val Light = SyColors(

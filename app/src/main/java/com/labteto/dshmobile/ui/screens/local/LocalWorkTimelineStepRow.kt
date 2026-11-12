@@ -231,7 +231,7 @@ private fun WorkToolStatusRow(
         onClickLabel = "查看工具回执", onClick = onClick) else Modifier
     Row(
         modifier = modifier.fillMaxWidth().then(clickable)
-            .heightIn(min = if (onClick == null) 30.dp else 40.dp)
+            .heightIn(min = if (onClick == null) 30.dp else SyMetric.touch)
             .semantics(mergeDescendants = true) {
                 stateDescription = if (provider != null) "$provider，$status" else status
             },

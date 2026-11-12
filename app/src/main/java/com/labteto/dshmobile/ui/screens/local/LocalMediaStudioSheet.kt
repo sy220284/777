@@ -227,7 +227,7 @@ internal fun LocalMediaStudioSheetContent(
         } else {
             // 模型仍可切换，但不再用整行大按钮和聊天模型名称挤占创作区。
             Row(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)
+                modifier = Modifier.fillMaxWidth().heightIn(min = SyMetric.touch)
                     .testTag("mediaStudioModelSelector")
                     .clickable(enabled = !busy) { showModelChoices = !showModelChoices },
                 verticalAlignment = Alignment.CenterVertically,
@@ -772,7 +772,7 @@ internal fun MediaStudioFlatTabs(
         labels.forEachIndexed { index, label ->
             val active = index == selected
             Column(
-                modifier = Modifier.weight(1f).heightIn(min = 44.dp)
+                modifier = Modifier.weight(1f).heightIn(min = SyMetric.touch)
                     .testTag("$tag:$index")
                     .selectable(
                         selected = active,
