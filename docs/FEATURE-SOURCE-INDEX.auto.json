@@ -3336,7 +3336,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalComposerCapabilityControls.kt",
-      "sha256": "5b2404758341bf1b"
+      "sha256": "cc656964f4cef911"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationActionsMenu.kt",
@@ -3360,7 +3360,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaders.kt",
-      "sha256": "dcb78a27c70e718b"
+      "sha256": "d45ae09e5bb42c4a"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
@@ -3420,7 +3420,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt",
-      "sha256": "8dc5b9c5cdb09165"
+      "sha256": "eccc6a7d91b7b244"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
@@ -4108,7 +4108,7 @@
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterialColor.kt",
-      "sha256": "43a0a44e20bbeeec"
+      "sha256": "168622180e5e1811"
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanMessage.kt",
@@ -4536,15 +4536,16 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "407a6651e038",
+  "source_snapshot": "0a65812630b7",
   "observed_delta": {
-    "baseline": "26428213d12f",
+    "baseline": "407a6651e038",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalComposerCapabilityControls.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaders.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt",
-      "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterialColor.kt",
-      "app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt"
+      "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterialColor.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
