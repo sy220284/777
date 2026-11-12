@@ -532,6 +532,14 @@ for token in ("gh run download", "GITHUB_RUN_ID", "GITHUB_REPOSITORY",
         violations.append(f"device artifact waiter lacks same-run safety control: {token}")
 if "actions: read" not in CI:
     violations.append("CI must explicitly allow read-only GitHub Actions artifacts")
+# Product indices exclude workflow-only changes; workflow and helper code
+# remain subject to independent security, syntax and contract validation.
+for feature_script in ("sync-feature-tree.py", "check-feature-tree-sync.py"):
+    source = (SCRIPTS / feature_script).read_text(encoding="utf-8")
+    if 'file.relative_to(root).parts[0] == ".github"' not in source and \
+            'path.relative_to(ROOT).parts[0] == ".github"' not in source:
+        violations.append(f"Feature fingerprint must exclude CI-only files: {feature_script}")
+
 # Prevent future workflow edits from silently recreating a second full APK build.
 matrix_file = WORKFLOWS / "android-page-matrix.yml"
 matrix_workflow = matrix_file.read_text(encoding="utf-8")
