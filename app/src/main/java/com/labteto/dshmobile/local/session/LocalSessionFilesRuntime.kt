@@ -123,6 +123,9 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     override suspend fun searchWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage =
         withContext(Dispatchers.IO) { workspace.searchWorkspacePage(query, offset) }
 
+    override suspend fun stopWorkspaceSearch(query: String): Boolean =
+        withContext(Dispatchers.IO) { workspace.stopWorkspaceSearch(query) }
+
     override suspend fun conversationFiles(sessionId: String): LocalConversationFiles =
         withContext(Dispatchers.IO) { coordinator.conversationFiles(sessionId) }
 
