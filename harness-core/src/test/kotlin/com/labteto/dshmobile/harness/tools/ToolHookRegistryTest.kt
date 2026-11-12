@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.harness.tools
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
@@ -112,6 +113,22 @@ class ToolHookRegistryTest {
         }.isFailure
         assertTrue(failed)
         assertEquals(listOf("side_effect", "receipt", "post"), sequence)
+    }
+
+    @Test fun preHookTimeoutBlocksToolWithoutStartingOrRequestingApproval() = runTest {
+        var executed = false
+        val registry = ToolRegistry()
+        registry.register(tool { executed = true; ToolResult("executed") })
+        registry.registerHook(ToolHookSubscription("stall", object : ToolLifecycleHook {
+            override suspend fun beforeUse(request: ToolPreUseRequest): ToolPreUseDecision {
+                delay(60_000)
+                return ToolPreUseDecision.Allow
+            }
+        }))
+        val result = registry.executeTracked("patch", JsonObject(emptyMap()))
+        assertEquals("TOOL_HOOK_BLOCKED", result.result.errorCode)
+        assertFalse(result.executionStarted)
+        assertFalse(executed)
     }
 
     @Test fun filterAndUnregisterOnlyAffectMatchingTools() = runTest {
