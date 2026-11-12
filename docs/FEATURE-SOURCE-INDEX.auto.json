@@ -1756,7 +1756,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptTokenProtocol.kt",
-      "sha256": "61fa55b8b1e58f88"
+      "sha256": "3118be1d1fb34355"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptUiValues.kt",
@@ -4536,12 +4536,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "9eef0807b5a7",
+  "source_snapshot": "366e9ac64020",
   "observed_delta": {
-    "baseline": "f81edb753c82",
+    "baseline": "9eef0807b5a7",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptTokenProtocol.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
