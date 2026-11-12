@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1912,
+  "repository_code_file_count": 1913,
   "production_source_count": 1118,
-  "test_code_file_count": 650,
+  "test_code_file_count": 651,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -3236,7 +3236,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/Markdown.kt",
-      "sha256": "5f3d9977c1682137"
+      "sha256": "04d12db43efe4a86"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/NavigationEntryState.kt",
@@ -3344,11 +3344,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
-      "sha256": "66803b0cc4450733"
+      "sha256": "21906b548cd9c1b5"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposerActions.kt",
-      "sha256": "1260fc082b7291d3"
+      "sha256": "a290c401ac2ad44d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationDraftCache.kt",
@@ -3360,11 +3360,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaders.kt",
-      "sha256": "9891bad35536d923"
+      "sha256": "dcb78a27c70e718b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "sha256": "2c0190f2f31fd218"
+      "sha256": "74342ca7bdf4d80b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationTemperatureUi.kt",
@@ -3408,7 +3408,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDialogs.kt",
-      "sha256": "d863ca30fd88dc1b"
+      "sha256": "c715156408179d98"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
@@ -3416,11 +3416,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawerComponents.kt",
-      "sha256": "b2b4c44b5c5c1a37"
+      "sha256": "7c87f6c06ab03c88"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt",
-      "sha256": "7ac043a0be59bbfa"
+      "sha256": "39eacfa0a21431ac"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
@@ -3440,7 +3440,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioSheet.kt",
-      "sha256": "656cb24f300e9592"
+      "sha256": "8f16d1aae3c2958a"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioViewModel.kt",
@@ -3540,7 +3540,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkTimelineStepRow.kt",
-      "sha256": "bfe367357458a30b"
+      "sha256": "026d0eefb9e9232c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkTimelineSupport.kt",
@@ -4072,7 +4072,7 @@
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanBasics.kt",
-      "sha256": "95fca2ff77a55b21"
+      "sha256": "315e32b7b3092b27"
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanChrome.kt",
@@ -4104,7 +4104,7 @@
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterial.kt",
-      "sha256": "65bec552ef1e959e"
+      "sha256": "ca8069f292e9c8f9"
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterialColor.kt",
@@ -4132,7 +4132,7 @@
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt",
-      "sha256": "62eb317d3647d799"
+      "sha256": "65a0e94d16df6bc3"
     },
     {
       "path": "core/src/main/kotlin/com/labteto/dshmobile/core/net/CancellableHttpResponse.kt",
@@ -4536,12 +4536,26 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "77c34d3ec26e",
+  "source_snapshot": "6c937120d379",
   "observed_delta": {
-    "baseline": "1523f1cc02da",
+    "baseline": "77c34d3ec26e",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/components/Markdown.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposerActions.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaders.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDialogs.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawerComponents.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioSheet.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkTimelineStepRow.kt",
+      "app/src/main/java/com/shenyan/designsystem/components/ShenyanBasics.kt",
+      "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterial.kt",
+      "app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
