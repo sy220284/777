@@ -51,8 +51,26 @@ internal class GitRemoteDiff(
                     val repository = input["repository"]?.jsonPrimitive?.contentOrNull ?: "."
                     val remote = input["remote"]?.jsonPrimitive?.contentOrNull ?: "origin"
                     val branch = input["branch"]?.jsonPrimitive?.contentOrNull ?: "main"
-                    val result = compare(repository, remote, branch)
-                    ToolResult(result.toString())
+                    try {
+                        val result = compare(repository, remote, branch)
+                        ToolResult(result.toString())
+                    } catch (invalid: IllegalArgumentException) {
+                        ToolResult(
+                            content = "远端 Git 比较请求无效：" + invalid.message.orEmpty(),
+                            isError = true,
+                            errorCode = "INVALID_GIT_DIFF_REQUEST",
+                            retryable = false,
+                            recoveryHint = "检查仓库目录和已登记远端分支后重试。",
+                        )
+                    } catch (unavailable: IllegalStateException) {
+                        ToolResult(
+                            content = "远端 Git 比较失败：" + unavailable.message.orEmpty().take(512),
+                            isError = true,
+                            errorCode = "GIT_DIFF_UNAVAILABLE",
+                            retryable = false,
+                            recoveryHint = "先确认本地仓库与 refs/remotes/<远端>/<分支> 已存在。",
+                        )
+                    }
                 },
             ),
         )
