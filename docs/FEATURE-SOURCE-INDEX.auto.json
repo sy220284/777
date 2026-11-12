@@ -4336,7 +4336,7 @@
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/plugin/PluginRegistry.kt",
-      "sha256": "e5add7ef2bc6fd0e"
+      "sha256": "71d35d2dc7c0febe"
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/registry/NamedRegistry.kt",
@@ -4416,7 +4416,7 @@
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolHookRegistry.kt",
-      "sha256": "9fd03c979ef752da"
+      "sha256": "2518f61908105b67"
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolInvocationContext.kt",
@@ -4428,7 +4428,7 @@
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolRegistry.kt",
-      "sha256": "d118a3b3faf0dbea"
+      "sha256": "4244f16965a1b31d"
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolRichContent.kt",
@@ -4564,18 +4564,15 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "f5a755059abe",
+  "source_snapshot": "4586fb5753f8",
   "observed_delta": {
-    "baseline": "3200e5fe5976",
+    "baseline": "f5a755059abe",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureUiActions.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkUiContribution.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt"
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/plugin/PluginRegistry.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolHookRegistry.kt",
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolRegistry.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
