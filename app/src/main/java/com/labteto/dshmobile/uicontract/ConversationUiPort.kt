@@ -132,6 +132,20 @@ sealed interface WorkConversationUiCommand {
     ) : WorkConversationUiCommand
 }
 
+/** One active session's user-queued input, never an internal continuation or tool payload. */
+data class UiQueuedUserInput(val id: String, val preview: String)
+data class UiQueuedUserSnapshot(
+    val identity: UiSessionIdentity?,
+    val inputs: List<UiQueuedUserInput>,
+)
+
+/** Queue operations have owner identity checks and durable admission; UI receives only receipts. */
+interface UiQueuedUserPort {
+    fun snapshot(): UiQueuedUserSnapshot
+    fun remove(identity: UiSessionIdentity, messageId: String): UiCommandReceipt
+    fun reorder(identity: UiSessionIdentity, orderedIds: List<String>): UiCommandReceipt
+}
+
 interface WorkConversationUiPort {
     val snapshots: Flow<WorkConversationSceneSnapshot>
     fun snapshot(): WorkConversationSceneSnapshot

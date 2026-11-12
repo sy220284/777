@@ -28,6 +28,9 @@ import com.labteto.dshmobile.uicontract.UiMessageSnapshot
 import com.labteto.dshmobile.uicontract.UiQuestionSnapshot
 import com.labteto.dshmobile.uicontract.UiSceneStatus
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
+import com.labteto.dshmobile.uicontract.UiQueuedUserInput
+import com.labteto.dshmobile.uicontract.UiQueuedUserSnapshot
+import com.labteto.dshmobile.uicontract.UiQueuedUserPort
 import com.labteto.dshmobile.uicontract.WorkConversationSceneSnapshot
 import com.labteto.dshmobile.uicontract.WorkConversationUiCommand
 import com.labteto.dshmobile.uicontract.WorkConversationUiPort
@@ -113,6 +116,55 @@ class LocalConversationUiPortComposition @Inject internal constructor(
     /** Captured by a legacy frame without copying message bodies; admission still belongs to ports. */
     internal fun identitySnapshot(): UiSessionIdentity? = synchronized(stateStore.foregroundRunHandle.lock) {
         identity(stateStore.state.value)
+    }
+
+    val queuedUsers: UiQueuedUserPort = object : UiQueuedUserPort {
+        override fun snapshot(): UiQueuedUserSnapshot = synchronized(stateStore.foregroundRunHandle.lock) {
+            val current = stateStore.state.value
+            if (current.loading || stateStore.sessionTransitioning) {
+                UiQueuedUserSnapshot(null, emptyList())
+            } else {
+                val pending = when (current.usageMode) {
+                    LocalUsageMode.CHAT -> chatOwner.queuedUserInputs()
+                    LocalUsageMode.WORK -> workOwner.queuedUserInputs()
+                }
+                UiQueuedUserSnapshot(
+                    identity = identity(current),
+                    inputs = pending.map { UiQueuedUserInput(it.id, it.text) },
+                )
+            }
+        }
+
+        override fun remove(identity: UiSessionIdentity, messageId: String): UiCommandReceipt =
+            mutate(identity) {
+                when (it) {
+                    LocalUsageMode.CHAT -> chatOwner.removeQueuedUserInput(messageId)
+                    LocalUsageMode.WORK -> workOwner.removeQueuedUserInput(messageId)
+                }
+            }
+
+        override fun reorder(identity: UiSessionIdentity, orderedIds: List<String>): UiCommandReceipt =
+            mutate(identity) {
+                when (it) {
+                    LocalUsageMode.CHAT -> chatOwner.reorderQueuedUserInputs(orderedIds)
+                    LocalUsageMode.WORK -> workOwner.reorderQueuedUserInputs(orderedIds)
+                }
+            }
+
+        private fun mutate(identity: UiSessionIdentity, mutation: (LocalUsageMode) -> Boolean):
+            UiCommandReceipt = synchronized(stateStore.foregroundRunHandle.lock) {
+            val current = stateStore.state.value
+            admission(current, identity, current.usageMode)?.let { return@synchronized it }
+            if (current.loading) return@synchronized UiCommandReceipt.Rejected(UiCommandRejection.LOADING)
+            try {
+                if (mutation(current.usageMode)) UiCommandReceipt.Accepted
+                else UiCommandReceipt.NotAdmitted
+            } catch (failure: Exception) {
+                UiCommandReceipt.Failed(
+                    "排队操作失败：" + (failure.message ?: failure.javaClass.simpleName),
+                )
+            }
+        }
     }
 
     /** Live preview is strictly request/mode/session fenced and never written as a transcript item. */
