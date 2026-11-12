@@ -110,6 +110,7 @@ internal data class LocalWorkFeatureUiActions(
     val searchWorkspacePage: suspend (String, Int) -> LocalWorkspaceSearchPage = { _, _ ->
         LocalWorkspaceSearchPage(emptyList(), null)
     },
+    val stopWorkspaceSearch: suspend (String) -> Boolean = { false },
     val conversationFiles: suspend (String) -> LocalConversationFiles,
     val previewWorkspaceFile: suspend (String) -> LocalWorkspaceFilePreview,
     val previewWorkspaceFilePage: suspend (String, Long) -> LocalWorkspaceFilePreview = { path, _ -> previewWorkspaceFile(path) },
