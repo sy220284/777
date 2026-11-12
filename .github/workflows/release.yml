@@ -246,20 +246,6 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ needs.check-release.outputs.release_sha }}
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
-        with:
-          distribution: temurin
-          java-version: 27
-      - uses: ./.github/actions/setup-android-cached
-        with:
-          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: .gradle/runtime-cache
-          # Exact key shared with setup-runtime-cached in full CI (verified signed packages).
-          key: runtime-${{ runner.os }}-arm64-v8a-v2-${{ hashFiles('tools/runtime/prepare-termux-*.sh', 'tools/runtime/prepare-hdiffpatch.sh', 'tools/runtime/runtime-download.sh', 'tools/runtime/verify-termux-signature.sh') }}
-      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
-
       - name: Validate release signing material
         env:
           KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE }}
@@ -330,6 +316,20 @@ jobs:
           fi
 
           echo "DSH_RELEASE_PASSWORD=$PASSWORD_VALUE" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 27
+      - uses: ./.github/actions/setup-android-cached
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+      # CI and release must verify and cache exactly the same signed runtime packages.
+      # One shared action owns the cache key, ABI, signing and hash checks.
+      - uses: ./.github/actions/setup-runtime-cached
+        with:
+          abi: arm64-v8a
 
       - name: Derive release version
         id: version
