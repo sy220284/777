@@ -3420,7 +3420,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt",
-      "sha256": "d01e30259827ed41"
+      "sha256": "8dc5b9c5cdb09165"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
@@ -4108,7 +4108,7 @@
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterialColor.kt",
-      "sha256": "2e64bde2ecfda338"
+      "sha256": "43a0a44e20bbeeec"
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanMessage.kt",
@@ -4132,7 +4132,7 @@
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt",
-      "sha256": "65a0e94d16df6bc3"
+      "sha256": "de1ffbd030db5568"
     },
     {
       "path": "core/src/main/kotlin/com/labteto/dshmobile/core/net/CancellableHttpResponse.kt",
@@ -4536,14 +4536,15 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "26428213d12f",
+  "source_snapshot": "407a6651e038",
   "observed_delta": {
-    "baseline": "d64df4db15f8",
+    "baseline": "26428213d12f",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt",
+      "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterialColor.kt",
+      "app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
