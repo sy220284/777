@@ -168,6 +168,7 @@ fi
 for apk in app-debug.apk app-debug-androidTest.apk app-optimized.apk; do
   test -s ".ci/device-apks/$apk" || { echo "::error::Missing $apk" >&2; exit 1; }
 done
+bash .github/scripts/wait-android-device-artifacts.sh --verify .ci/device-apks
 test -e /dev/kvm || { echo "::error::KVM is unavailable" >&2; exit 1; }
 sudo chmod 666 /dev/kvm
 failures=0
