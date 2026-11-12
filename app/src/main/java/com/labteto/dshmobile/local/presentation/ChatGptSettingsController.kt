@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.presentation
 import com.labteto.dshmobile.local.model.LocalModelRuntime
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountSummary
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanConnectionTester
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.observability.AppLog
@@ -37,7 +38,10 @@ class ChatGptSettingsController @Inject constructor(
 
     suspend fun refresh() {
         // Background resume/refresh must not commit over an in-progress account switch.
-        if (auth.isAuthorizationInProgress || !accountMutationMutex.tryLock()) return
+        // A failed OAuth attempt remains actionable on return from the browser.
+        // Only a new explicit authorization attempt clears its error state.
+        if (auth.isAuthorizationInProgress || state.value.phase == ChatGptAuthPhase.ERROR ||
+            !accountMutationMutex.tryLock()) return
         try {
             auth.refresh()
             reconcilePlanProfiles()
