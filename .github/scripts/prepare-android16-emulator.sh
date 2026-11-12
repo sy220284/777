@@ -6,8 +6,8 @@ set -euo pipefail
 # and retry a clean package installation; never start an incomplete AVD.
 sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
 emulator_dir="$sdk_root/emulator"
-image_dir="$sdk_root/system-images/android-36/google_apis/x86_64"
-image_package='system-images;android-36;google_apis;x86_64'
+image_dir="$sdk_root/system-images/android-36/default/x86_64"
+image_package='system-images;android-36;default;x86_64'
 
 ready() {
   test -x "$emulator_dir/emulator" &&
@@ -22,7 +22,7 @@ if [[ "${1:-}" == "--self-test" ]]; then
   trap 'rm -rf "$tmp"' EXIT
   sdk_root="$tmp"
   emulator_dir="$sdk_root/emulator"
-  image_dir="$sdk_root/system-images/android-36/google_apis/x86_64"
+  image_dir="$sdk_root/system-images/android-36/default/x86_64"
   if ready; then echo "Incomplete emulator unexpectedly passed" >&2; exit 1; fi
   mkdir -p "$emulator_dir" "$image_dir"
   touch "$emulator_dir/emulator"
