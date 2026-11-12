@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1921,
-  "production_source_count": 1122,
+  "repository_code_file_count": 1922,
+  "production_source_count": 1123,
   "test_code_file_count": 655,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
@@ -401,6 +401,10 @@
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/agent/LocalQueuedUserMessageEditor.kt",
       "sha256": "577e7ab47cbbefad"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/agent/LocalQueuedUserPreview.kt",
+      "sha256": "d835236dba59b999"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/agent/LocalRecursiveReadOnlyToolScope.kt",
@@ -824,11 +828,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatExecutionCoordinator.kt",
-      "sha256": "95774bb65da8f5d3"
+      "sha256": "a9b43067b22de52f"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatExecutionPort.kt",
-      "sha256": "8059dda7cd14b07c"
+      "sha256": "3907bb651b1a4199"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatHistorySummaryStrategy.kt",
@@ -932,7 +936,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTimelineCoordinator.kt",
-      "sha256": "30f19ab986d45dc6"
+      "sha256": "1098bca2c800acf2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTimelineRollback.kt",
@@ -2900,7 +2904,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionCoordinator.kt",
-      "sha256": "7e733f1b0cc67b56"
+      "sha256": "55c30699bf1aeb4c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionMode.kt",
@@ -2908,7 +2912,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionPort.kt",
-      "sha256": "1b5978c1630c5f05"
+      "sha256": "98968a24cf038dda"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkFormContinuationPolicy.kt",
@@ -4552,12 +4556,20 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "7f0c0fea6d1c",
+  "source_snapshot": "6d3b56db1914",
   "observed_delta": {
-    "baseline": "d9c6fd12e3ff",
-    "added_production_files": [],
+    "baseline": "7f0c0fea6d1c",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalQueuedUserPreview.kt"
+    ],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatExecutionCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatExecutionPort.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTimelineCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionPort.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
