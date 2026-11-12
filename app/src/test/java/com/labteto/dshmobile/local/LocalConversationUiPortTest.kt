@@ -77,7 +77,12 @@ class LocalConversationUiPortTest {
             sent += text
             return result
         }
-        override fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = error("unused")
+        override fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult {
+            val pos = queued.indexOfFirst { it.id == messageId }
+            if (pos < 0) return LocalChatUserEditResult.MESSAGE_MISSING
+            queued[pos] = queued[pos].copy(text = replacement)
+            return LocalChatUserEditResult.SENT
+        }
         override fun selectMessageVariant(messageId: String, targetIndex: Int) = false
         val queued = mutableListOf<com.labteto.dshmobile.local.agent.LocalQueuedUserPreview>()
         val removedIds = mutableListOf<String>()
@@ -107,7 +112,12 @@ class LocalConversationUiPortTest {
             sent += text
             return LocalSendResult.Queued
         }
-        override fun editAndResendUserMessage(messageId: String, replacement: String): LocalUserMessageEditResult = error("unused")
+        override fun editAndResendUserMessage(messageId: String, replacement: String): LocalUserMessageEditResult {
+            val pos = queued.indexOfFirst { it.id == messageId }
+            if (pos < 0) return LocalUserMessageEditResult.MESSAGE_MISSING
+            queued[pos] = queued[pos].copy(text = replacement)
+            return LocalUserMessageEditResult.SENT
+        }
         val queued = mutableListOf<com.labteto.dshmobile.local.agent.LocalQueuedUserPreview>()
         val removedIds = mutableListOf<String>()
         var latestOrder: List<String>? = null
@@ -251,6 +261,12 @@ class LocalConversationUiPortTest {
 
         assertEquals(UiCommandReceipt.Accepted,
             fixture.port.queuedUsers.reorder(chatIdentity, listOf("chat-2", "chat-1")))
+        assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY),
+            fixture.port.queuedUsers.edit(chatIdentity.copy(activationId = "expired"), "chat-1", "stale"))
+        assertEquals(UiCommandReceipt.Accepted,
+            fixture.port.queuedUsers.edit(chatIdentity, "chat-1", "更新排队指令"))
+        assertEquals("更新排队指令",
+            fixture.port.queuedUsers.snapshot().inputs.first { it.id == "chat-1" }.preview)
         assertEquals(listOf("chat-2", "chat-1"), fixture.chat.latestOrder)
         assertEquals(UiCommandReceipt.Accepted,
             fixture.port.queuedUsers.remove(chatIdentity, "chat-1"))

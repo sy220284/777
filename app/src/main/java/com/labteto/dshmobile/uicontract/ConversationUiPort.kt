@@ -142,6 +142,7 @@ data class UiQueuedUserSnapshot(
 /** Queue operations have owner identity checks and durable admission; UI receives only receipts. */
 interface UiQueuedUserPort {
     fun snapshot(): UiQueuedUserSnapshot
+    fun edit(identity: UiSessionIdentity, messageId: String, replacement: String): UiCommandReceipt
     fun remove(identity: UiSessionIdentity, messageId: String): UiCommandReceipt
     fun reorder(identity: UiSessionIdentity, orderedIds: List<String>): UiCommandReceipt
 }

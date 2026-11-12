@@ -1804,7 +1804,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             port = workActions.queuedUserPort,
             sessionId = state.sessionId,
             queuedCount = state.queuedInputCount,
-            onEditQueued = onEditAndResend,
             onDismiss = { queuedMessagesOpen = false },
         )
     }

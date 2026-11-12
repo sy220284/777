@@ -15,7 +15,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiQueuedUserPort
 import com.labteto.dshmobile.uicontract.UiQueuedUserSnapshot
@@ -38,7 +37,6 @@ internal fun LocalQueuedUserQueueSheet(
     port: UiQueuedUserPort,
     sessionId: String,
     queuedCount: Int,
-    onEditQueued: suspend (String, String) -> LocalChatUserEditResult,
     onDismiss: () -> Unit,
 ) {
     var snapshot by remember(port, sessionId) {
@@ -202,15 +200,22 @@ internal fun LocalQueuedUserQueueSheet(
                                 scope.launch {
                                     try {
                                         val result = withContext(Dispatchers.IO) {
-                                            onEditQueued(input.id, nextText)
+                                            port.edit(identity, input.id, nextText)
                                         }
                                         when (result) {
-                                            LocalChatUserEditResult.SENT,
-                                            LocalChatUserEditResult.COMMITTED_NOT_STARTED -> {
+                                            UiCommandReceipt.Accepted -> {
                                                 editingId = null
                                                 refresh()
                                             }
-                                            else -> error = "消息修改未完成：" + result.name
+                                            UiCommandReceipt.OutcomeUnknown -> {
+                                                editingId = null
+                                                refresh()
+                                                error = "修改已持久保存，请核对恢复后的会话状态"
+                                            }
+                                            is UiCommandReceipt.Rejected ->
+                                                error = "会话已变化或消息正在执行，请刷新重试"
+                                            is UiCommandReceipt.Failed -> error = result.message
+                                            else -> error = "排队消息未被修改，请刷新列表"
                                         }
                                     } catch (cancelled: CancellationException) {
                                         throw cancelled

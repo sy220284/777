@@ -135,6 +135,40 @@ class LocalConversationUiPortComposition @Inject internal constructor(
             }
         }
 
+        override fun edit(
+            identity: UiSessionIdentity,
+            messageId: String,
+            replacement: String,
+        ): UiCommandReceipt = synchronized(stateStore.foregroundRunHandle.lock) {
+            val current = stateStore.state.value
+            admission(current, identity, current.usageMode)?.let { return@synchronized it }
+            if (current.loading) return@synchronized UiCommandReceipt.Rejected(UiCommandRejection.LOADING)
+            val outcome = try {
+                when (current.usageMode) {
+                    LocalUsageMode.CHAT -> chatOwner.editAndResendUserMessage(messageId, replacement)
+                    LocalUsageMode.WORK -> workOwner.editAndResendUserMessage(messageId, replacement)
+                }
+            } catch (failure: Exception) {
+                return@synchronized UiCommandReceipt.Failed(
+                    "排队消息修改失败：" + (failure.message ?: failure.javaClass.simpleName),
+                )
+            }
+            when (outcome) {
+                LocalUserMessageEditResult.SENT -> UiCommandReceipt.Accepted
+                LocalUserMessageEditResult.COMMITTED_NOT_STARTED -> UiCommandReceipt.OutcomeUnknown
+                LocalUserMessageEditResult.BUSY -> UiCommandReceipt.Rejected(UiCommandRejection.QUEUE_UNAVAILABLE)
+                LocalUserMessageEditResult.UNCONFIGURED -> UiCommandReceipt.Rejected(UiCommandRejection.UNCONFIGURED)
+                LocalUserMessageEditResult.EMPTY -> UiCommandReceipt.Rejected(UiCommandRejection.EMPTY_INPUT)
+                LocalUserMessageEditResult.WRONG_MODE -> UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY)
+                LocalUserMessageEditResult.MESSAGE_MISSING,
+                LocalUserMessageEditResult.UNCHANGED -> UiCommandReceipt.NotAdmitted
+                LocalUserMessageEditResult.UNAVAILABLE,
+                LocalUserMessageEditResult.HISTORY_UNAVAILABLE,
+                LocalUserMessageEditResult.FAILED ->
+                    UiCommandReceipt.Failed("排队消息修改没有完成：" + outcome.name)
+            }
+        }
+
         override fun remove(identity: UiSessionIdentity, messageId: String): UiCommandReceipt =
             mutate(identity) {
                 when (it) {
