@@ -559,11 +559,11 @@ class LocalWorkspace(
         return all
     }
 
-    private class SearchCursor(
-        val iterator: Iterator<File>,
+    /** Ranked file paths held for one bounded search view. */
+    private data class SearchCursor(
+        val matches: List<LocalWorkspaceFile>,
+        val pageSize: Int,
         var nextPage: Int = 0,
-        var emitted: Int = 0,
-        var exhausted: Boolean = false,
     )
     private val searchCursors = object : LinkedHashMap<String, SearchCursor>(4, .75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, SearchCursor>?): Boolean =
@@ -571,49 +571,47 @@ class LocalWorkspace(
     }
 
     /**
-     * A cursor advances once per scan batch, even when the batch finds zero matches.
-     * This is essential for sparse searches: an empty partial page must not rewind to page zero.
+     * Search results are materialized once per fresh query and paged in relevance order.
+     * A changed file invalidates the old view rather than mixing different file generations.
      */
     fun searchWorkspacePage(query: String, offset: Int = 0, pageSize: Int = 96): LocalWorkspaceSearchPage {
         val needle = query.trim()
-        require(needle.isNotEmpty() && offset >= 0 && pageSize in 1..256) { "搜索分页参数不合法" }
+        require(needle.isNotEmpty() && needle.length <= 128 &&
+            offset >= 0 && pageSize in 1..256) { "搜索分页参数不合法" }
         return synchronized(searchCursors) {
-            val scan = if (offset == 0) {
-                SearchCursor(safeWalk(canonicalRoot, maxVisited = 50_000,
-                    maxMillis = Long.MAX_VALUE).iterator()).also { searchCursors[needle] = it }
-            } else searchCursors[needle] ?: error("搜索会话已过期，请重新搜索")
-            require(offset == scan.nextPage) { "搜索游标已经失效，请重新搜索" }
-            val matched = ArrayList<LocalWorkspaceFile>(pageSize)
-            var visited = 0
-            while (matched.size < pageSize && !scan.exhausted &&
-                visited < 2_048 && scan.emitted < 10_000
-            ) {
-                if (!scan.iterator.hasNext()) {
-                    scan.exhausted = true
-                    break
+            val cursor = if (offset == 0) {
+                SearchCursor(searchWorkspaceFileNames(needle, limit = 10_000), pageSize).also {
+                    searchCursors[needle] = it
                 }
-                val file = scan.iterator.next()
-                visited++
-                if (!file.isFile || !isInsideWorkspace(file)) continue
-                val path = file.relativeTo(canonicalRoot).invariantSeparatorsPath
-                if (path.contains(needle, ignoreCase = true)) {
-                    matched += LocalWorkspaceFile(path, file.length(), file.lastModified())
-                    scan.emitted++
+            } else searchCursors[needle] ?: error("搜索会话已过期，请重新搜索")
+            require(cursor.pageSize == pageSize && cursor.nextPage == offset) {
+                "搜索游标已失效，请重新搜索"
+            }
+            val start = offset * pageSize
+            require(start <= cursor.matches.size) { "搜索游标已失效，请重新搜索" }
+            val end = minOf(start + pageSize, cursor.matches.size)
+            val page = cursor.matches.subList(start, end)
+            page.forEach { item ->
+                val observed = workspaceFileAt(item.path)
+                require(observed != null && observed.bytes == item.bytes &&
+                    observed.modifiedAt == item.modifiedAt) {
+                    "搜索结果中的文件发生变化，请刷新搜索"
                 }
             }
-            scan.nextPage++
-            LocalWorkspaceSearchPage(
-                files = matched,
-                nextOffset = scan.nextPage.takeIf { !scan.exhausted && scan.emitted < 10_000 },
-            )
+            cursor.nextPage++
+            LocalWorkspaceSearchPage(page.toList(), cursor.nextPage.takeIf { end < cursor.matches.size })
         }
+    }
+
+    fun stopWorkspaceSearch(query: String): Boolean = synchronized(searchCursors) {
+        searchCursors.remove(query.trim()) != null
     }
 
     /** Match and rank bounded filesystem entries, preserving complete filename-first results. */
     fun searchWorkspaceFileNames(query: String, limit: Int = 500): List<LocalWorkspaceFile> {
         val needle = query.trim()
         require(needle.isNotBlank() && needle.length <= 128) { "搜索关键词不能为空且最多 128 字" }
-        val top = limit.coerceIn(1, 500)
+        val top = limit.coerceIn(1, 10_000)
         return safeWalk(canonicalRoot, maxVisited = 50_000, maxMillis = 5_000L)
             .filter { it.isFile && isInsideWorkspace(it) }
             .mapNotNull { file ->
