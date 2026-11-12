@@ -39,6 +39,7 @@ internal fun localWorkFeatureUiContribution(
             loadDirectoryPage = actions.workspaceDirectoryPage,
             loadSearch = actions.searchWorkspaceFiles,
             loadSearchPage = actions.searchWorkspacePage,
+            stopSearch = actions.stopWorkspaceSearch,
             loadConversation = actions.conversationFiles,
             loadPreview = actions.previewWorkspaceFile,
             loadPreviewPage = actions.previewWorkspaceFilePage,
