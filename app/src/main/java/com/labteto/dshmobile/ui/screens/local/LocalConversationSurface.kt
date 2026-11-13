@@ -1740,7 +1740,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         ?.takeIf { state.usageMode == LocalUsageMode.WORK }
         ?.takeUnless { localPlanReviewOf(it) != null }
         ?.let { question ->
-        QuestionDialog(
+        if (question.mcpFormFields != null || question.mcpUrl != null) {
+            McpElicitationDialog(
+                question = question,
+                onAnswer = { answer -> onAnswerQuestion(question.callId, answer) },
+                onDismiss = { onCancelQuestion(question.callId) },
+            )
+        } else QuestionDialog(
             question = question.question,
             options = question.options,
             onAnswer = { answer -> onAnswerQuestion(question.callId, answer) },

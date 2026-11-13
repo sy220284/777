@@ -181,6 +181,11 @@ internal class LocalToolCompositionRoot @Inject constructor(
             usageContextProvider = { sessionId, callId ->
                 usageBridge.resolve(sessionId, callId, TokenUsageAction.VISION)
             },
+            onMcpElicitation = { sessionId, serverId, callId, prompt ->
+                com.labteto.dshmobile.local.tools.LocalMcpElicitationUiBridge.answer(
+                    workRunRegistry, sessionId, serverId, callId, prompt,
+                )
+            },
         )
     }
 
