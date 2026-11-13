@@ -76,6 +76,7 @@ class MemoryStore internal constructor(
                     incomingSource == null ||
                     mergedSources.truncated,
                 subjectKey = subjectKey ?: existing.subjectKey,
+                previousManualRevision = null,
                 disclosure = if (disclosureExplicit) disclosure else existing.disclosure,
                 disclosureExplicit = if (disclosureExplicit) true else existing.disclosureExplicit,
                 updatedAt = now,
@@ -157,19 +158,61 @@ class MemoryStore internal constructor(
         val clean = content?.trim() ?: current.content
         require(clean.length <= MAX_MEMORY_CONTENT_CHARS) { "记忆正文超过单条存储安全上限，原记录已保留；请拆分保存" }
         require(clean.isNotEmpty()) { "记忆内容不能为空" }
+        val nextKind = kind ?: current.kind
+        val nextImportance = (importance ?: current.importance).coerceIn(0, 100)
+        val nextPinned = pinned ?: current.pinned
+        val changed = clean != current.content || nextKind != current.kind ||
+            nextImportance != current.importance || nextPinned != current.pinned
         val updated = current.copy(
             content = clean,
             pendingSourceInvalidations = if (clean != current.content) {
                 (current.pendingSourceInvalidations + current.sourceMessages).distinct()
             } else current.pendingSourceInvalidations,
-            kind = kind ?: current.kind,
-            importance = (importance ?: current.importance).coerceIn(0, 100),
-            pinned = pinned ?: current.pinned,
+            kind = nextKind,
+            importance = nextImportance,
+            pinned = nextPinned,
+            previousManualRevision = if (changed) current.manualSnapshot() else current.previousManualRevision,
             updatedAt = nextUpdatedAt(records),
         )
         records[index] = updated
         documents.write(MemoryDocument(records = records))
         return updated
+    }
+
+    private fun MemoryRecord.manualSnapshot() = MemoryManualRevision(
+        content = content, kind = kind, importance = importance, pinned = pinned,
+    )
+
+    /**
+     * Explicit one-step user rollback. The expected revision rejects stale UI state.
+     * Source refs remain attached; restoring content queues the same derived-source
+     * invalidation obligation as an ordinary manual edit.
+     */
+    @Synchronized
+    fun restoreManualEdit(id: String, expectedUpdatedAt: Long): MemoryRecord {
+        val records = documents.read().records.toMutableList()
+        val index = records.indexOfFirst { it.id == id && it.active }
+        require(index >= 0) { "长期记忆不存在或已停用" }
+        val current = records[index]
+        require(current.updatedAt == expectedUpdatedAt) { "记忆已被其他操作更新，请刷新后重试" }
+        val previous = requireNotNull(current.previousManualRevision) { "没有可恢复的手动修改版本" }
+        require(previous.content.isNotBlank() && previous.content.length <= MAX_MEMORY_CONTENT_CHARS) {
+            "上一版本内容无效"
+        }
+        val restored = current.copy(
+            content = previous.content,
+            kind = previous.kind,
+            importance = previous.importance,
+            pinned = previous.pinned,
+            previousManualRevision = current.manualSnapshot(),
+            pendingSourceInvalidations = if (previous.content != current.content) {
+                (current.pendingSourceInvalidations + current.sourceMessages).distinct()
+            } else current.pendingSourceInvalidations,
+            updatedAt = nextUpdatedAt(records),
+        )
+        records[index] = restored
+        documents.write(MemoryDocument(records = records))
+        return restored
     }
 
     @Synchronized
