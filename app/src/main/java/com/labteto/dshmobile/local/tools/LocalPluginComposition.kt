@@ -21,6 +21,7 @@ import com.labteto.dshmobile.harness.plugin.PluginManager
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.tools.ToolRegistry
+import com.labteto.dshmobile.harness.tools.CodeModePlugin
 import com.labteto.dshmobile.interop.github.GitHubConnectorPlugin
 import com.labteto.dshmobile.interop.github.GitHubConnectorStatus
 import com.labteto.dshmobile.interop.lsp.LspPlugin
@@ -234,6 +235,7 @@ internal class LocalPluginComposition(
     private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
     private val webhookPlugin = WebhookPlugin(webhookController)
     private val builtinPlugin = LocalBuiltinPlugin(executeBuiltin)
+    private val codeModePlugin = CodeModePlugin(tools)
 
     val virtualDisplayProvider: HarnessVirtualDisplayProvider
         get() = registry.context.capabilities.require("android-device", HarnessVirtualDisplayProvider::class)
@@ -247,6 +249,11 @@ internal class LocalPluginComposition(
             pluginDefinition(
                 runtimePlugin,
                 capabilities = setOf("runtime.process", "runtime.terminal"),
+            ),
+            pluginDefinition(
+                codeModePlugin,
+                dependencies = listOf(PluginDependency("android-local-builtins")),
+                capabilities = setOf("workflow.code-mode"),
             ),
             pluginDefinition(
                 mcpPlugin,
