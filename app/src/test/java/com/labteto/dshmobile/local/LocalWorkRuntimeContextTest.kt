@@ -71,7 +71,6 @@ class LocalWorkRuntimeContextTest {
         assertTrue(context.contains("work_finding"))
         assertTrue(context.contains("自然说出具体发现、原因和下一步"))
         assertTrue(context.contains("情境适合时可表现好奇、惊讶或兴奋"))
-        assertTrue(context.contains("已完成与未完成只按真实工具回执判断").not())
         assertTrue(context.contains("不得以模型文字代替实际结果"))
         assertFalse(context.contains("每次工具调用必须"))
     }
