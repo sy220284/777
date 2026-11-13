@@ -552,7 +552,9 @@ internal fun composeLocalReplyAttachments(
         (listOf(row.message) + row.groupedMessages).map { it to row }
     }
     val toolOwners = allToolReceipts.filter { it.first.toolCallId != null }
-        .groupBy({ it.first.toolCallId }, { it.second })
+        .groupBy({ it.first.toolCallId }, { it.second }).mapValues { (_, rows) ->
+            rows.distinctBy { it.key }
+        }
     val executionOwners = allToolReceipts.filter { it.first.toolExecutionId != null }
         .associate { it.first.toolExecutionId!! to it.second.key }
     if (messageOwners.isEmpty() && toolOwners.isEmpty()) return timeline
