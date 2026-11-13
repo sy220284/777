@@ -212,6 +212,7 @@ class LocalSessionFilesRuntime @Inject internal constructor(
         }
         val locations = ArrayList<String>()
         for (path in finalPaths) {
+            val previous = downloadsPublisher.publishedWorkspace(path)
             val location = try {
                 saveWorkspaceFileToDownloads(path)
             } catch (error: Exception) {
@@ -222,11 +223,13 @@ class LocalSessionFilesRuntime @Inject internal constructor(
                     })
                 throw error
             }
-            eventLogs.get(sessionId).append("artifact/published",
-                kotlinx.serialization.json.buildJsonObject {
-                    put("path", path)
-                    put("location", location)
-                })
+            if (previous?.currentVersion != true || previous.location != location) {
+                eventLogs.get(sessionId).append("artifact/published",
+                    kotlinx.serialization.json.buildJsonObject {
+                        put("path", path)
+                        put("location", location)
+                    })
+            }
             locations += location
         }
         return locations
