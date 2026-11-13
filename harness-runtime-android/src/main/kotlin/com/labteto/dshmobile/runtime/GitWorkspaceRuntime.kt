@@ -85,6 +85,12 @@ class GitWorkspaceRuntime(
                 if (action in setOf("compare_merge", "preview_merge", "merge", "discard")) put("expected_tree", buildJsonObject {
                     put("type", "string"); put("description", "最近 workspace_status 返回的 tree；变化后必须重新审阅")
                 })
+                if (action == "preview_merge") {
+                    put("review_offset", buildJsonObject {
+                        put("type", "integer")
+                        put("description", "大补丁按 262144 字节分页审查；使用上一页 next_offset 继续，收齐全部 review_receipt")
+                    })
+                }
                 if (action in setOf("preview_merge", "merge")) {
                     put("resolution", buildJsonObject {
                         put("type", "string")
@@ -110,6 +116,11 @@ class GitWorkspaceRuntime(
                     put("quality_decision", buildJsonObject {
                         put("type", "object")
                         put("description", "本次择优依据：resolution、reason、criteria（correctness/experience/maintainability）、reviewed_both；测试另按真实工具回执验证")
+                    })
+                    put("review_receipts", buildJsonObject {
+                        put("type", "array")
+                        put("items", buildJsonObject { put("type", "string") })
+                        put("description", "只有超过 256 KiB 时需要：全部预览页面按偏移顺序返回的 review_receipt")
                     })
                 }
             }
