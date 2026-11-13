@@ -17,8 +17,6 @@ import android.media.MediaPlayer
 import android.os.Build
 import android.media.MediaMetadataRetriever
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
 import android.widget.MediaController
 import android.widget.VideoView
