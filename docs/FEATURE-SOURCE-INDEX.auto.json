@@ -1928,7 +1928,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
-      "sha256": "6a973780f0d2a2ad"
+      "sha256": "866598ae76b611a7"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTranscriptHistoryLoader.kt",
@@ -3816,11 +3816,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
-      "sha256": "aa878a681eb355ba"
+      "sha256": "f4259e469cf13536"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
-      "sha256": "2bd7b12ffbf7fd09"
+      "sha256": "8bd01858317cd253"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/shenyan/ShenyanTheme.kt",
@@ -4032,7 +4032,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/uicontract/ToolsUiPort.kt",
-      "sha256": "05c11021929281b1"
+      "sha256": "531a5428a28a60d9"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/uicontract/TranscriptUiPort.kt",
@@ -4588,16 +4588,16 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "b7a94f7bd93f",
+  "source_snapshot": "ebe5d7b6ddbf",
   "observed_delta": {
-    "baseline": "25d15dc3911e",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackageUpdater.kt"
-    ],
+    "baseline": "b7a94f7bd93f",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubSkillImporter.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/uicontract/ToolsUiPort.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
