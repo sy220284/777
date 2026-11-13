@@ -47,7 +47,7 @@ class GitWorkspaceRuntimeTest {
             java.io.File(admission.getValue("root").jsonPrimitive.content, "code.txt").writeText("child\n")
             val status = registry.context.tools.execute("workspace_status", buildJsonObject { put("workspace_id", id) }, context = context)
             val tree = Json.parseToJsonElement(status.content).jsonObject.getValue("tree").jsonPrimitive.content
-            fun preview() = registry.context.tools.execute("workspace_preview_merge", buildJsonObject {
+            suspend fun preview() = registry.context.tools.execute("workspace_preview_merge", buildJsonObject {
                 put("workspace_id", id)
                 put("expected_tree", tree)
             }, context = ToolContext(sessionId = "session"))
