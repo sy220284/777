@@ -29,12 +29,19 @@ class ManagedNetworkPolicyInterceptorsTest {
                         "未授权目标"
                     }
                 }.build()
-            val request = Request.Builder()
-                .url("http://127.0.0.1:${server.address.port}/pinned")
-                .header("Host", "allowed.example")
-                .tag(PinnedWebRequestOrigin::class.java, PinnedWebRequestOrigin(
-                    "http", "allowed.example", "127.0.0.1"))
-                .build()
+            val route = com.labteto.dshmobile.local.web.LocalWebTargetResolver.RequestRoute(
+                client, "http://127.0.0.1:${server.address.port}/pinned", "allowed.example",
+            )
+            val builder = Request.Builder().url(route.url)
+            route.attachValidatedOrigin(
+                builder,
+                com.labteto.dshmobile.local.web.LocalWebTargetResolver.ValidatedTarget(
+                    java.net.URI("http://allowed.example/pinned"),
+                    listOf(java.net.InetAddress.getLoopbackAddress()),
+                    false,
+                ),
+            )
+            val request = builder.build()
             client.newCall(request).execute().use { response ->
                 assertTrue(response.isSuccessful)
             }

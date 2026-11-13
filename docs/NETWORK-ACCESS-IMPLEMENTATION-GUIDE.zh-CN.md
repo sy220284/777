@@ -20,7 +20,7 @@
 
 - `LocalManagedExecutionPolicy` 是动态网络/模型管理要求的唯一事实来源；功能模块调用它，不再复制域名白黑名单合并规则。
 - 应用共享 OkHttp 负责初始 HTTP 请求与库内部跳转后的目的地管理检查。**初始请求与内部跳转分别有意义**，不要为减少行数破坏逐跳验证。
-- `LocalWebTargetResolver` 独占 URL 规范化、语法解析、DNS 解析、公网/SSRF 判断、DNS 固定和代理路由；策略回调在 DNS 前执行。用户跳转到新网址时重新调用 Resolver。
+- `LocalWebTargetResolver` 独占 URL 规范化、语法解析、DNS 解析、公网/SSRF 判断、DNS 固定和代理路由；策略回调在 DNS 前执行。代理 Host 与原始域名的请求标记也由 RequestRoute 统一提供给抓取、下载、诊断；跳转新网址时重新调用 Resolver。
 - `LocalWebDiagnostics` 复用同一个解析器与准入回调，诊断动作在探测之前获得当前策略，不另造一套网络准入规则。
 - 模型服务在配置选择和真正发出带凭据请求时执行职责清晰的检查，不对一个已验证的目标重复检查相同规则。
 - MCP 客户端建连时校验静态 URL；实际连接、工具调用和 Worker RPC 按真实网络行为复核。IPC 本地凭据更新、关闭等操作不做额外网络准入。

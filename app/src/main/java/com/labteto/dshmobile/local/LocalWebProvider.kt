@@ -7,7 +7,6 @@ import com.labteto.dshmobile.local.web.LOCAL_WEB_MAX_RESPONSE_BYTES
 import com.labteto.dshmobile.local.web.LOCAL_WEB_USER_AGENT
 import com.labteto.dshmobile.local.web.LocalWebDiagnostics
 import com.labteto.dshmobile.local.web.LocalWebSearchClient
-import com.labteto.dshmobile.local.web.PinnedWebRequestOrigin
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.web.LocalSearchUsageStore
 import com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy
@@ -69,7 +68,7 @@ class LocalWebProvider @Inject constructor(
                     .url(route.url)
                     .header("User-Agent", LOCAL_WEB_USER_AGENT)
                     .header("Accept", "text/html,text/plain,application/json,application/xml;q=0.9,*/*;q=0.5")
-                requestBuilder.bindValidatedRoute(route, current)
+                route.attachValidatedOrigin(requestBuilder, current)
                 val result = withCancellableHttpResponse(route.client.newCall(requestBuilder.build())) { response ->
                     if (response.isRedirect) {
                         if (redirectCount >= MAX_REDIRECTS) {
@@ -167,7 +166,7 @@ class LocalWebProvider @Inject constructor(
                 .header("User-Agent", LOCAL_WEB_USER_AGENT)
                 .method(verb, requestBody)
             safeHeaders.forEach { (name, value) -> builder.header(name, value) }
-            builder.bindValidatedRoute(route, current)
+            route.attachValidatedOrigin(builder, current)
             val result = executeWithTransientRetry(
                 client = if (verb in SAFE_RETRY_METHODS) route.client else route.client.newBuilder()
                     .retryOnConnectionFailure(false).followRedirects(false)
@@ -226,7 +225,7 @@ class LocalWebProvider @Inject constructor(
                 .url(route.url)
                 .header("User-Agent", LOCAL_WEB_USER_AGENT)
                 .get()
-            builder.bindValidatedRoute(route, current)
+            route.attachValidatedOrigin(builder, current)
             val result = withCancellableHttpResponse(route.client.newCall(builder.build())) { response ->
                 if (response.isRedirect) {
                     if (redirectCount >= MAX_REDIRECTS) {
@@ -391,21 +390,6 @@ class LocalWebProvider @Inject constructor(
         }.mapValues { (_, value) ->
             require(value.length <= 4_096 && '\n' !in value && '\r' !in value) { "HTTP 请求头值无效" }
             value
-        }
-    }
-
-    /** Attach the original approved hostname when the HTTPS proxy route pins a public IP. */
-    private fun Request.Builder.bindValidatedRoute(
-        route: com.labteto.dshmobile.local.web.LocalWebTargetResolver.RequestRoute,
-        target: com.labteto.dshmobile.local.web.LocalWebTargetResolver.ValidatedTarget,
-    ) {
-        route.hostHeader?.let { originalHostHeader ->
-            header("Host", originalHostHeader)
-            tag(PinnedWebRequestOrigin::class.java, PinnedWebRequestOrigin(
-                scheme = target.uri.scheme,
-                host = target.uri.host,
-                pinnedHost = java.net.URI(route.url).host,
-            ))
         }
     }
 

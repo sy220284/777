@@ -91,7 +91,7 @@ internal class LocalWebDiagnostics(
                 .url(route.url)
                 .header("User-Agent", LOCAL_WEB_USER_AGENT)
                 .head()
-            route.hostHeader?.let { builder.header("Host", it) }
+            route.attachValidatedOrigin(builder, target)
             withCancellableHttpResponse(route.client.newCall(builder.build())) { response ->
                 val classification = classifyProbeStatus(response.code)
                 ConnectivityProbe(

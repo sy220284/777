@@ -17,6 +17,7 @@ import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLSocketFactory
 import okhttp3.Dns
 import okhttp3.OkHttpClient
+import okhttp3.Request
 
 /** The network allowlist applies to this already-validated origin, not the pinned proxy IP. */
 internal data class PinnedWebRequestOrigin(
@@ -223,7 +224,22 @@ internal class LocalWebTargetResolver(
         val client: OkHttpClient,
         val url: String,
         val hostHeader: String?,
-    )
+    ) {
+        /** One owner for proxy Host + validated-origin tagging, used by fetch and diagnostics. */
+        fun attachValidatedOrigin(builder: Request.Builder, target: ValidatedTarget) {
+            hostHeader?.let { originalHostHeader ->
+                builder.header("Host", originalHostHeader)
+                builder.tag(
+                    PinnedWebRequestOrigin::class.java,
+                    PinnedWebRequestOrigin(
+                        scheme = target.uri.scheme,
+                        host = target.uri.host,
+                        pinnedHost = URI(url).host,
+                    ),
+                )
+            }
+        }
+    }
 
     internal data class ValidatedTarget(
         val uri: URI,
