@@ -21,6 +21,7 @@ internal interface LocalToolsManagementPort {
     suspend fun remoteGitBranches(repository: String): List<String>
     suspend fun compareLocalGit(repository: String, includeUntracked: Boolean = false): kotlinx.serialization.json.JsonObject
     suspend fun compareRemoteGit(repository: String, remote: String, branch: String): kotlinx.serialization.json.JsonObject
+    suspend fun compareCommitGit(repository: String, commit: String): kotlinx.serialization.json.JsonObject
 
     fun installedPluginIds(): List<String>
     fun capabilityCatalogue(): List<LocalToolCatalogueEntry>
