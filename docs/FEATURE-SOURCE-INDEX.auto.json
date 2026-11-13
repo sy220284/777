@@ -2600,7 +2600,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalKeylessWebSearchClient.kt",
-      "sha256": "d98444a35797828a"
+      "sha256": "189daab8e6834de6"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalSearchUsageStore.kt",
@@ -2620,7 +2620,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebSearchClient.kt",
-      "sha256": "889bbdc93bdffcf1"
+      "sha256": "05fab6d350c7d01f"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTargetResolver.kt",
@@ -4624,13 +4624,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "b1bb13c4221f",
+  "source_snapshot": "f121ad1e9e7f",
   "observed_delta": {
-    "baseline": "b45b1ef563f4",
+    "baseline": "b1bb13c4221f",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalKeylessWebSearchClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebSearchClient.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
