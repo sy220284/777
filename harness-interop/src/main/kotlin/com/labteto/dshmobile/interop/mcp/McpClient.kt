@@ -179,6 +179,21 @@ class McpClient(
             },
         ).requireResult()
 
+    /**
+     * MCP 2026 multi-round-trip tool invocation. Retrying is allowed only after the
+     * server explicitly returned input_required; a lost HTTP/stdio reply is never replayed.
+     */
+    suspend fun callToolWithElicitation(
+        name: String,
+        arguments: JsonObject,
+        onElicitation: suspend (McpElicitationRequest) -> McpElicitationReply,
+    ): JsonObject = mcpCallWithInputRequired(
+        request = { params -> transport.request("tools/call", params).requireResult() },
+        name = name,
+        arguments = arguments,
+        onElicitation = onElicitation,
+    )
+
     /** One page per call: preserve opaque cursors and all server extension fields. */
     // FEATURE_TREE: {"id":"shared.tools.mcp-resources","path":"第二层｜共享运行能力 / 共享工具执行 / MCP资源分页与完整内容","owner":"TOOLS","entry":"listResources","test":"harness-interop/src/test/kotlin/com/labteto/dshmobile/interop/mcp/McpClientTest.kt#resourceRequestsPreservePagesAndContents"}
     suspend fun listResources(cursor: String? = null): JsonObject =
