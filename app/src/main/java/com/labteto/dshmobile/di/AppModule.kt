@@ -29,18 +29,8 @@ object AppModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(policy: com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy): OkHttpClient = OkHttpClient.Builder()
-        // Application checks also cover cache hits and requests before any connection is opened.
-        .addInterceptor { chain ->
-            val target = chain.request().url
-            policy.current().requireNetworkDestination(target.scheme, target.host)
-            chain.proceed(chain.request())
-        }
-        // OkHttp follows redirects and performs route retries inside the application interceptor.
-        // The network interceptor rechecks every *actual destination* before sending credentials.
-        .addNetworkInterceptor { chain ->
-            val target = chain.request().url
-            policy.current().requireNetworkDestination(target.scheme, target.host)
-            chain.proceed(chain.request())
+        .enforceManagedNetworkDestinations { scheme, host ->
+            policy.current().requireNetworkDestination(scheme, host)
         }
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
