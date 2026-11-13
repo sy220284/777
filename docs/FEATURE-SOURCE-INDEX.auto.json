@@ -4660,15 +4660,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "fcabf3e0d0b6",
+  "source_snapshot": "34332d91ed84",
   "observed_delta": {
-    "baseline": "8dc8703a7e2d",
+    "baseline": "fcabf3e0d0b6",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkProjectsSheet.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
