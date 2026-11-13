@@ -228,6 +228,23 @@ class GitWorkspaceTest(unittest.TestCase):
         self.assertFalse((self.root / "child-only.txt").exists())
         self.assertFalse((self.root / "parent-only.txt").exists())
 
+    def test_quality_choice_cannot_revert_parent_files_outside_declared_outputs(self):
+        child = self.fork()
+        (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
+        (self.root / "outside.txt").write_text("user-owned change")
+        tree = self.call("status")["tree"]
+        choices = {"outside.txt": "child"}
+        preview = self.call("preview_merge", expected_tree=tree, resolution="select",
+                            path_choices=choices)
+        self.assertEqual("ready", preview["state"])
+        with self.assertRaisesRegex(ValueError, "chosen integration changes outside declared outputs"):
+            self.call("merge", expected_tree=tree, resolution="select",
+                      path_choices=choices, allowed_paths=["code.txt"],
+                      expected_source_tree=preview["source_tree"],
+                      expected_merged_tree=preview["merged_tree"])
+        self.assertEqual("user-owned change", (self.root / "outside.txt").read_text())
+        self.assertEqual("first\nsecond\nthird\n", (self.root / "code.txt").read_text())
+
     def test_large_diff_requires_every_page_before_quality_merge(self):
         child = self.fork()
         (child / "large.txt").write_text("X" * 270000)
