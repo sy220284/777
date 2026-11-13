@@ -66,9 +66,13 @@ class LocalWorkRuntimeContextTest {
             context = "", workspacePath = "/workspace", model = "test-model",
             baseUrl = "", profile = null, task = "检查界面代码与测试",
         )
-        assertTrue(context.contains("关键阶段可以先公开说明"))
-        assertTrue(context.contains("用户语言自然表达"))
-        assertTrue(context.contains("未完成只按真实工具回执判断"))
+        assertTrue(context.contains("保持连续的自主调查"))
+        assertTrue(context.contains("需要据此下结论时应继续读取相关原文"))
+        assertTrue(context.contains("work_finding"))
+        assertTrue(context.contains("自然说出具体发现、原因和下一步"))
+        assertTrue(context.contains("情境适合时可表现好奇、惊讶或兴奋"))
+        assertTrue(context.contains("已完成与未完成只按真实工具回执判断").not())
+        assertTrue(context.contains("不得以模型文字代替实际结果"))
         assertFalse(context.contains("每次工具调用必须"))
     }
 
