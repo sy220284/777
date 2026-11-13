@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1917,
+  "repository_code_file_count": 1918,
   "production_source_count": 1120,
-  "test_code_file_count": 652,
+  "test_code_file_count": 653,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -4544,20 +4544,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "51447ab5cab8",
+  "source_snapshot": "2a604cb1ed2c",
   "observed_delta": {
-    "baseline": "47ab379f7681",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupFlow.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupModel.kt"
-    ],
+    "baseline": "51447ab5cab8",
+    "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/FirstLaunchOnboarding.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AgentDeviceSettingsSections.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
