@@ -132,17 +132,20 @@ internal class LocalToolCompositionRoot @Inject constructor(
         val initial = agentWorkspaces.operate(sessionId, "preview_merge", buildJsonObject {
             put("workspace_id", identity); put("expected_tree", tree)
         })
-        val overlap = comparison.getValue("comparison").jsonObject
-            .getValue("overlap_paths").jsonArray
-        if (overlap.isEmpty() && initial["state"]?.jsonPrimitive?.content != "ready") return initial
-        val decision = if (overlap.isEmpty()) buildJsonObject {
+        val fileChanges = comparison.getValue("comparison").jsonObject
+        val overlap = fileChanges.getValue("overlap_paths").jsonArray
+        val parentChanges = overlap.isNotEmpty() || fileChanges.getValue("parent_only_paths").jsonArray.isNotEmpty()
+        val childChanges = overlap.isNotEmpty() || fileChanges.getValue("child_only_paths").jsonArray.isNotEmpty()
+        val competingChanges = parentChanges && childChanges
+        if (!competingChanges && initial["state"]?.jsonPrimitive?.content != "ready") return initial
+        val decision = if (!competingChanges) buildJsonObject {
             put("resolution", "auto")
             put("path_choices", buildJsonObject {})
-            put("reason", "父子工作区未同时改动同一个文件；保留双方独立修改，并以最终合并树及后续实际测试验证。")
+            put("reason", "仅一方工作区有相对基线的实际变化；保持另一方原状并按最终结果验收。")
             put("criteria", buildJsonObject {
-                put("correctness", "独立修改路径，没有共同文件版本需要取舍")
-                put("experience", "无共享界面文件冲突；实际体验仍需按任务验收")
-                put("maintainability", "保留各自独立文件，避免无依据地覆盖")
+                put("correctness", "没有两组竞争实现，可直接采用当前单方变更")
+                put("experience", "单方变更的实际设备体验仍按任务验收")
+                put("maintainability", "不制造额外的代码重复和新路径覆盖")
             })
             put("reviewed_both", true)
         } else mergeQualityReviewer.review(
