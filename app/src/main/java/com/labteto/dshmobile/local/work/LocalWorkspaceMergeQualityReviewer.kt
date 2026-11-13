@@ -65,7 +65,9 @@ internal class LocalWorkspaceMergeQualityReviewer @Inject constructor(
             .map { it.jsonPrimitive.content }.toSet()
         val childOnly = changes.getValue("child_only_paths").jsonArray
             .map { it.jsonPrimitive.content }.toSet()
-        require(overlap.isNotEmpty()) { "没有共同改动时直接采用确定性三方合并" }
+        require(overlap.isNotEmpty() || (parentOnly.isNotEmpty() && childOnly.isNotEmpty())) {
+            "需要两组实际父子变化才能比较竞争实现"
+        }
         val profile = model.profileForRun()
         val parentPatch = comparison.getValue("parent_diff").jsonPrimitive.content
         val childPatch = comparison.getValue("child_diff").jsonPrimitive.content
@@ -77,7 +79,8 @@ internal class LocalWorkspaceMergeQualityReviewer @Inject constructor(
                     put("role", "system")
                     put("content", """
 你是独立的实现质量比较审查员。比较基线、父工作区修改、子工作区修改，先判断正确性和功能完整性，再判断使用体验、性能及可维护性。
-同一功能的实现可以整体保留一方或逐文件覆盖；如果两版各有可取之处且无法安全逐文件保留，说明需重做，切勿拼凑看似能合并的代码。
+即使父子新增了完全不同的文件，也可能实现同一功能、产生重复入口或互斥依赖；必须比较功能职责、调用关系与界面体验，必要时舍弃一侧的独有文件。
+同一功能可整体保留优胜实现或逐文件覆盖；若两版各有可取之处但逐文件无法正确组合，则要求重构，不得拼凑成表面能合并的代码。
 质量以具体代码和验证证据为依据。没有运行测试、截图或设备证据时必须在体验判断中说明尚未实测；不能声称已完成测试。
 仅返回严格 JSON 对象，字段为：
 {"resolution":"auto|prefer_parent|prefer_child|select","path_choices":{},"reason":"至少12字的具体比较与选择依据","criteria":{"correctness":"正确性比较","experience":"体验比较及证据边界","maintainability":"可维护性比较"},"reviewed_both":true}
