@@ -899,7 +899,11 @@ fun ToolsScreen(
     BackHandler(enabled = showGitHubBrowser || showGitHubConfig || showAgentSettings || handleRootSystemBack) {
         when {
             showGitHubBrowser -> showGitHubBrowser = false
-            showGitHubConfig -> showGitHubConfig = false
+            showGitHubConfig -> {
+                showGitHubConfig = false
+                editGitHubCredentials = false
+                githubToken = ""
+            }
             showAgentSettings -> showAgentSettings = false
             else -> onClose()
         }
@@ -1190,6 +1194,8 @@ fun ToolsScreen(
                     text = "浏览 GitHub 仓库",
                     onClick = {
                         showGitHubConfig = false
+                        editGitHubCredentials = false
+                        githubToken = ""
                         showGitHubBrowser = true
                         viewModel.loadGitHubRepositories()
                     },
