@@ -30,6 +30,7 @@ internal class GitRemoteDiff(
 ) {
     internal fun install(context: HarnessContext) {
         installLocalDiff(context)
+        installCommitDiff(context)
         context.tools.register(
             HarnessTool(
                 name = "git_diff_remote",
@@ -116,6 +117,84 @@ internal class GitRemoteDiff(
     internal fun uninstall(context: HarnessContext) {
         context.tools.unregister("git_diff_remote")
         context.tools.unregister("git_diff_uncommitted")
+        context.tools.unregister("git_diff_commit")
+    }
+
+
+    /** Read-only review of one immutable commit, including a root commit. */
+    internal fun installCommitDiff(context: HarnessContext) {
+        context.tools.register(HarnessTool(
+            name = "git_diff_commit",
+            schema = functionToolSchema("git_diff_commit",
+                "审查指定 Git 提交的改动；只接受提交哈希，不联网、不修改工作树或暂存区",
+                buildJsonObject {
+                    put("repository", buildJsonObject { put("type", "string") })
+                    put("commit", buildJsonObject {
+                        put("type", "string")
+                        put("description", "提交的完整哈希或可唯一定位的十六进制前缀")
+                    })
+                }),
+            access = ToolAccess.READ_ONLY,
+            approvalPolicy = ToolApprovalPolicy.NEVER,
+            exposure = ToolExposure.OPTIONAL,
+            timeoutMillis = 30_000L,
+            metadata = ToolMetadata(family = "文件", environmentBound = true,
+                discoveryKeywords = setOf("git", "commit", "提交", "差异", "代码审查")),
+            executor = HarnessToolExecutor { _, input, _ ->
+                val repository = input["repository"]?.jsonPrimitive?.contentOrNull ?: "."
+                val commit = input["commit"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                try {
+                    ToolResult(compareCommit(repository, commit).toString())
+                } catch (failure: IllegalArgumentException) {
+                    ToolResult("指定提交无效：" + failure.message.orEmpty(),
+                        isError = true, errorCode = "INVALID_GIT_COMMIT_REQUEST",
+                        retryable = false, recoveryHint = "请输入当前仓库存在的 Git 提交哈希。")
+                } catch (failure: IllegalStateException) {
+                    ToolResult("提交差异读取失败：" + failure.message.orEmpty().take(512),
+                        isError = true, errorCode = "GIT_DIFF_UNAVAILABLE",
+                        retryable = false, recoveryHint = "确认该提交已经存在于本地仓库后重试。")
+                }
+            },
+        ))
+    }
+
+    /**
+     * Commit targets resolve to immutable object IDs before diffing.
+     * Merge commits are compared to their first parent; root commits use an empty tree.
+     */
+    internal suspend fun compareCommit(repository: String, revision: String): JsonObject {
+        require(revision.matches(Regex("[0-9a-fA-F]{7,64}"))) {
+            "提交哈希必须是 7–64 位十六进制字符"
+        }
+        val target = repositoryDirectory(repository)
+        val root = verifiedRepositoryRoot(target)
+        val commit = runGit(target, "rev-parse", "--verify", "--end-of-options", revision + "^{commit}").trim()
+        require(commit.matches(Regex("[0-9a-f]{40,64}"))) { "无法确认 Git 提交身份" }
+        val family = runGit(target, "rev-list", "--parents", "-n", "1", commit)
+            .trim().split(Regex("\\s+"))
+        require(family.firstOrNull() == commit) { "提交父级查询结果不匹配" }
+        val parents = family.drop(1)
+        val firstParent = parents.firstOrNull()
+        fun args(mode: String): Array<String> =
+            if (firstParent == null) arrayOf("diff-tree", "--root", "-r", "--no-commit-id",
+                "--no-ext-diff", "--no-textconv", mode, commit, "--")
+            else arrayOf("diff", "--no-ext-diff", "--no-textconv", mode, firstParent, commit, "--")
+        val stat = runGit(target, *args("--stat"))
+        val patch = runGit(target, *args("--unified=3"))
+        val cap = 128 * 1024
+        return buildJsonObject {
+            put("repository", root.path)
+            put("tracking_ref", "commit/" + commit)
+            put("commit", commit)
+            put("first_parent", firstParent ?: "")
+            put("parent_count", parents.size)
+            put("stat", stat.take(12_000))
+            put("patch", patch.take(cap))
+            put("truncated", patch.length > cap || stat.length > 12_000)
+            put("includes_tracked_worktree_changes", false)
+            put("includes_untracked_files", false)
+            put("network_requested", false)
+        }
     }
 
     /** Return only genuine local tracking refs; no implicit network requests. */
