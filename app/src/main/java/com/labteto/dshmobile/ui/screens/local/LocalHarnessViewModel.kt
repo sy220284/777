@@ -356,8 +356,9 @@ class LocalHarnessViewModel @Inject constructor(
         if (runtime.state.value.sessionId != sessionId ||
             runtime.state.value.usageMode != LocalUsageMode.WORK) return false
         val ref = diff.trackingRef
-        val current = toolsUi.compareRemoteGitForUi(repository,
-            ref.substringBefore('/'), ref.substringAfter('/'))
+        val current = if (ref.startsWith("worktree/")) toolsUi.compareLocalGitForUi(repository)
+            else toolsUi.compareRemoteGitForUi(repository,
+                ref.substringBefore('/'), ref.substringAfter('/'))
         return independentCodeReview.accept(sessionId, review.id, review.evidenceSequence,
             repository, current.trackingRef, current.statistics, current.patch, current.truncated)
     }
