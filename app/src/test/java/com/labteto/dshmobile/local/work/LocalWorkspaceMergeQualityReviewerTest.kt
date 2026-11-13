@@ -51,6 +51,21 @@ class LocalWorkspaceMergeQualityReviewerTest {
             put("data/repo.kt", "child")
         }), overlap, autoConflict = true)
         assertEquals("select", complete.getValue("resolution").jsonPrimitive.content)
+        val withDiscard = parseWorkspaceMergeQualityDecision(proposal("select", buildJsonObject {
+            put("ui/screen.kt", "parent")
+            put("data/repo.kt", "child")
+            put("ui/child-widget.kt", "parent")
+        }), overlap, autoConflict = true, availablePaths = overlap + "ui/child-widget.kt")
+        assertEquals("parent", withDiscard.getValue("path_choices").let {
+            it as JsonObject
+        }.getValue("ui/child-widget.kt").jsonPrimitive.content)
+        assertTrue(runCatching {
+            parseWorkspaceMergeQualityDecision(proposal("select", buildJsonObject {
+                put("ui/screen.kt", "parent")
+                put("data/repo.kt", "child")
+                put("secrets/unrelated.kt", "child")
+            }), overlap, autoConflict = true)
+        }.isFailure)
     }
 
     @Test fun reviewMustCompareBothAndRequestReworkWhenNeeded() {
