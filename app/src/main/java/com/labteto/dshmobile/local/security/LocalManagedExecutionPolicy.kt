@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.security
 
 import android.content.Context
-import android.net.Uri
+import java.net.URI
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.nio.file.Files
@@ -55,7 +55,7 @@ internal data class LocalEffectiveExecutionPolicy(
     }
 
     fun requireModelProvider(provider: String, baseUrl: String) {
-        val uri = Uri.parse(baseUrl)
+        val uri = URI(baseUrl)
         requireNetworkDestination(uri.scheme.orEmpty(), uri.host.orEmpty())
         val allowed = allowedModelProviders ?: return
         check(provider.lowercase(Locale.ROOT) in allowed) {
@@ -89,12 +89,14 @@ internal fun mergeLocalExecutionPolicy(
         layers.asReversed().firstNotNullOfOrNull(field)
     // A mandatory deny remains effective even when the workspace/user previously allowed a host.
     val blocked = layers.flatMap { it.deniedHosts.orEmpty() }.toSet()
-    val allowed = chosen { it.allowedHosts }
+    val allowed = layers.mapNotNull { it.allowedHosts }
+        .takeIf { it.isNotEmpty() }?.reduce { left, right -> left intersect right }
     return LocalEffectiveExecutionPolicy(
         networkEnabled = chosen { it.networkEnabled } ?: true,
         allowedHosts = allowed,
         deniedHosts = blocked,
-        allowedModelProviders = chosen { it.allowedModelProviders },
+        allowedModelProviders = layers.mapNotNull { it.allowedModelProviders }
+            .takeIf { it.isNotEmpty() }?.reduce { left, right -> left intersect right },
         browserHistoryAllowed = chosen { it.browserHistoryAllowed } ?: false,
         browserUploadAllowed = chosen { it.browserUploadAllowed } ?: false,
         browserDownloadAllowed = chosen { it.browserDownloadAllowed } ?: false,
@@ -115,7 +117,8 @@ internal fun mergeLocalExecutionPolicy(
 private fun normalizePolicyHost(host: String): String {
     val normalized = host.trim().lowercase(Locale.ROOT).trimEnd('.')
     require(normalized.isNotEmpty() && normalized.length <= 253 &&
-        normalized.none { it.isWhitespace() || it in "/\\@?#:" }) {
+        normalized.none { it.isWhitespace() || it in "/\\@?#" } &&
+        (':' !in normalized || normalized.matches(Regex("[0-9a-f:]+")))) {
         "策略中的网络主机名无效"
     }
     return normalized
