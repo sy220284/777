@@ -160,8 +160,10 @@ def validate_quality_decision(decision, resolution, comparison):
             isinstance(criteria.get(key), str) and criteria[key].strip()
             for key in ("correctness", "experience", "maintainability")):
         raise ValueError("merge quality decision must compare correctness, experience and maintainability")
-    if comparison["overlap_paths"] and not decision.get("reviewed_both"):
-        raise ValueError("overlapping implementations require explicit comparison of both sides")
+    both_changed = (bool(comparison["overlap_paths"] or comparison["parent_only_paths"]) and
+                    bool(comparison["overlap_paths"] or comparison["child_only_paths"]))
+    if both_changed and not decision.get("reviewed_both"):
+        raise ValueError("competing implementations require explicit comparison of both sides")
 
 
 def save(path, value):
