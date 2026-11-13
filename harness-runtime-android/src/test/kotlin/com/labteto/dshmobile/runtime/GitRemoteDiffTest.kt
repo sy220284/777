@@ -124,6 +124,59 @@ class GitRemoteDiffTest {
         }
     }
 
+    @Test fun reviewImmutableCommitSupportsRootAndDoesNotReadWorkingTree() = runBlocking {
+        val home = kotlin.io.path.createTempDirectory("commit-review-").toFile()
+        val root = home.resolve("source").apply { mkdirs() }
+        val process = AndroidProcessRuntime(defaultWorkingDirectory = root)
+        suspend fun git(vararg command: String): String {
+            val result = process.execute(ProcessRequest(
+                command = listOf("git") + command, timeoutMillis = 10_000,
+            ))
+            assertEquals(result.stderr, 0, result.exitCode)
+            return result.stdout.trim()
+        }
+        try {
+            git("init", "-q")
+            git("config", "user.name", "Test")
+            git("config", "user.email", "test@localhost")
+            root.resolve("file.txt").writeText("baseline\\n")
+            git("add", ".")
+            git("commit", "-qm", "first")
+            val first = git("rev-parse", "HEAD")
+            root.resolve("file.txt").writeText("after\\n")
+            git("commit", "-am", "second", "-q")
+            val second = git("rev-parse", "HEAD")
+            root.resolve("file.txt").writeText("uncommitted secret\\n")
+            root.resolve("private.txt").writeText("untracked secret\\n")
+            val indexBefore = git("diff", "--cached", "--name-only")
+
+            val registry = PluginRegistry()
+            registry.install(AndroidRuntimePlugin(root, processRuntime = process))
+            val rootDiff = GitRemoteDiff(root, process).compareCommit(".", first)
+            assertTrue(rootDiff.getValue("patch").jsonPrimitive.content.contains("+baseline"))
+            assertEquals("0", rootDiff.getValue("parent_count").jsonPrimitive.content)
+            val result = registry.context.tools.execute("git_diff_commit",
+                buildJsonObject { put("commit", second.take(12)) },
+                context = ToolContext(sessionId = "commit-review"))
+            assertFalse(result.content, result.isError)
+            val review = Json.parseToJsonElement(result.content).jsonObject
+            assertEquals("commit/" + second, review.getValue("tracking_ref").jsonPrimitive.content)
+            assertTrue(review.getValue("patch").jsonPrimitive.content.contains("+after"))
+            assertFalse(review.getValue("patch").jsonPrimitive.content.contains("uncommitted secret"))
+            assertFalse(review.getValue("patch").jsonPrimitive.content.contains("untracked secret"))
+            assertEquals("false", review.getValue("network_requested").jsonPrimitive.content)
+            assertEquals(indexBefore, git("diff", "--cached", "--name-only"))
+            assertEquals("uncommitted secret\\n", root.resolve("file.txt").readText())
+            val rejected = registry.context.tools.execute("git_diff_commit",
+                buildJsonObject { put("commit", "--exec=/tmp/unsafe") },
+                context = ToolContext(sessionId = "commit-review"))
+            assertTrue(rejected.isError)
+            assertEquals("INVALID_GIT_COMMIT_REQUEST", rejected.errorCode)
+        } finally {
+            home.deleteRecursively()
+        }
+    }
+
     @Test fun remoteTrackingRefMustExist() = runBlocking {
         val home = kotlin.io.path.createTempDirectory("remote-diff-missing-").toFile()
         val root = home.resolve("source").apply { mkdirs() }
