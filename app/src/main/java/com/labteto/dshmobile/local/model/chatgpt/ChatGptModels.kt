@@ -1,0 +1,105 @@
+package com.labteto.dshmobile.local.model.chatgpt
+
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class ChatGptAccountRecord(
+    val id: String,
+    val clientId: String,
+    val issuer: String,
+    val subject: String,
+    val email: String? = null,
+    val displayName: String? = null,
+    val hostId: String,
+    val idToken: String,
+    val accessToken: String,
+    val refreshToken: String,
+    val tokenType: String = "Bearer",
+    val scopes: Set<String> = emptySet(),
+    val accessTokenExpiresAtEpochSeconds: Long,
+    val savedAtEpochSeconds: Long,
+    val earliestRefreshAtEpochSeconds: Long? = null,
+) {
+    val sharingEnabled: Boolean
+        get() = CHATGPT_PLAN_SCOPE in scopes && CHATGPT_RESOURCE_INVOKE_SCOPE in scopes
+
+    override fun toString(): String =
+        "ChatGptAccountRecord(id=$id, clientId=$clientId, issuer=$issuer, subject=$subject, " +
+            "email=$email, displayName=$displayName, hostId=$hostId, tokenType=$tokenType, " +
+            "scopes=$scopes, accessTokenExpiresAtEpochSeconds=$accessTokenExpiresAtEpochSeconds, " +
+            "savedAtEpochSeconds=$savedAtEpochSeconds, credentials=<redacted>)"
+}
+
+
+internal fun shouldRetryChatGptAuthorization(oauthCode: String?, allowed: Boolean): Boolean =
+    allowed && oauthCode == "invalid_grant"
+
+internal fun chatGptAuthorizationPrompt(requestPlanConsent: Boolean): String? =
+    if (requestPlanConsent) "consent" else null
+
+internal fun shouldRequestChatGptPlanConsent(account: ChatGptAccountSummary): Boolean =
+    account.signedIn && !account.sharingEnabled
+
+internal fun shouldInvalidateChatGptRefreshToken(oauthCode: String?): Boolean =
+    oauthCode in setOf(
+        "invalid_grant",
+        "invalid_refresh_token",
+        "token_expired",
+        "refresh_token_expired",
+        "refresh_token_invalidated",
+        "refresh_token_reused",
+    )
+
+internal data class ChatGptTokenResponse(
+    val accessToken: String,
+    val refreshToken: String?,
+    val idToken: String?,
+    val tokenType: String,
+    val expiresInSeconds: Long,
+    val scopes: Set<String>,
+    val earliestRefreshAtEpochSeconds: Long? = null,
+)
+
+/** Preserve a still-valid token until the server's earliest permitted refresh time. */
+internal fun shouldRefreshChatGptToken(record: ChatGptAccountRecord, now: Long): Boolean {
+    if (record.accessTokenExpiresAtEpochSeconds > now + 90L) return false
+    val earliest = record.earliestRefreshAtEpochSeconds
+    if (earliest != null && now < earliest &&
+        record.accessTokenExpiresAtEpochSeconds > now + 5L) return false
+    return true
+}
+
+internal data class VerifiedChatGptIdentity(
+    val issuer: String,
+    val subject: String,
+    val email: String?,
+    val displayName: String?,
+)
+
+internal data class ChatGptOAuthCallback(
+    val code: String?,
+    val state: String?,
+    val clientId: String?,
+    val scope: String?,
+    val error: String?,
+    val errorDescription: String?,
+)
+
+internal const val CHATGPT_PLAN_SCOPE = "chatgpt.tokens.use.direct"
+internal const val CHATGPT_RESOURCE = "https://api.openai.com/v1"
+internal const val CHATGPT_ISSUER = "https://auth.openai.com"
+internal const val CHATGPT_AUTHORIZE_URL = "https://auth.openai.com/api/accounts/authorize"
+internal const val CHATGPT_TOKEN_URL = "https://auth.openai.com/api/accounts/oauth/token"
+internal const val CHATGPT_JWKS_URL = "https://auth.openai.com/.well-known/jwks.json"
+internal const val CHATGPT_OPENID_CONFIGURATION_URL = "https://auth.openai.com/.well-known/openid-configuration"
+internal const val CHATGPT_MODELS_URL = "https://api.openai.com/v1/models"
+internal const val CHATGPT_RESPONSES_URL = "https://api.openai.com/v1/responses"
+internal const val CHATGPT_USAGE_URL = "https://chatgpt.com/#settings/Usage"
+internal const val CHATGPT_DYNAMIC_CLIENT_ID = "dynamic_agent_client"
+internal const val CHATGPT_AGENT_NAME = "神言神语"
+internal const val CHATGPT_SCOPES = "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct"
+
+internal class ChatGptOAuthTokenException(
+    val oauthCode: String?,
+    message: String,
+) : java.io.IOException(message)

@@ -1,0 +1,98 @@
+package com.labteto.dshmobile.local
+
+import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
+import com.labteto.dshmobile.local.tools.latestUserTurnHasArchive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class LocalToolCapabilityIntentTest {
+    @Test
+    fun followUpKeepsRecentGithubIntentWithoutReadingSyntheticCheckpoints() {
+        val history = listOf(
+            message("user", "检查 GitHub PR 394 的 CI 并处理失败"),
+            message("assistant", "正在处理"),
+            message("user", "<work-checkpoint>GitHub 不应由检查点触发</work-checkpoint>"),
+        )
+
+        val followUp = LocalToolCapabilityIntent.from("继续", history)
+        val unrelated = LocalToolCapabilityIntent.from(
+            "继续修改本地页面",
+            listOf(message("user", "只改本地布局，不涉及远程仓库")),
+        )
+
+        assertTrue(followUp.requestsGitHub)
+        assertFalse(unrelated.requestsGitHub)
+        assertFalse(followUp.context.contains("<work-checkpoint>"))
+    }
+
+    @Test
+    fun resumedWorkIgnoresSyntheticCheckpointsForDynamicToolSelection() {
+        val history = listOf(
+            message("user", "检查当前 Android 页面"),
+            message("assistant", "检查中"),
+            message("user", "<compacted-summary>错误提示：MCP 已授权</compacted-summary>"),
+            message("user", "<work-checkpoint>不应触发权限工具</work-checkpoint>"),
+        )
+        assertTrue(LocalToolCapabilityIntent.latestUserInput(history) == "检查当前 Android 页面")
+        assertTrue(LocalToolCapabilityIntent.latestUserInput(
+            listOf(message("user", "<chat-continuity>only synthetic</chat-continuity>"))) == null)
+    }
+
+    @Test
+    fun explicitPrIntentIsDetectedWithoutRequiringGithubWord() {
+        assertTrue(LocalToolCapabilityIntent.from("把 PR #42 的冲突处理掉", emptyList()).requestsGitHub)
+        assertTrue(LocalToolCapabilityIntent.from("检查 pull request 42", emptyList()).requestsGitHub)
+        assertFalse(LocalToolCapabilityIntent.from("修复 process 调度", emptyList()).requestsGitHub)
+        assertTrue(
+            LocalToolCapabilityIntent.from(
+                "现在改为处理 GitHub PR 42",
+                listOf(message("user", "之前不用 GitHub")),
+            ).requestsGitHub,
+        )
+    }
+
+    @Test
+    fun newestUserArchiveAutomaticallyQualifiesButOlderArchiveDoesNot() {
+        val archive = buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", "text")
+                    put("text", "帮我检查")
+                })
+                add(buildJsonObject {
+                    put("type", "local_file_ref")
+                    put("name", "release.tar.gz")
+                    put("path", ".dsh/attachments/sha.gz")
+                    put("mediaType", "application/gzip")
+                })
+            })
+        }
+        assertTrue(latestUserTurnHasArchive(listOf(message("assistant", "before"), archive)))
+        assertFalse(latestUserTurnHasArchive(listOf(archive, message("user", "继续普通话题"))))
+        assertFalse(latestUserTurnHasArchive(listOf(message("user", "仅包含压缩包三个字"))))
+    }
+
+    @Test
+    fun imageAndPlainDocumentsDoNotActivateArchiveTools() {
+        val onlyImage = buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", "local_image_ref")
+                    put("name", "a.zip")
+                })
+            })
+        }
+        assertFalse(latestUserTurnHasArchive(listOf(onlyImage)))
+    }
+
+    private fun message(role: String, content: String) = buildJsonObject {
+        put("role", role)
+        put("content", content)
+    }
+}

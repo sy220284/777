@@ -1,0 +1,110 @@
+package com.labteto.dshmobile.local.presentation
+
+import android.content.Context
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalReasoningMode
+import com.labteto.dshmobile.local.model.LocalEffectiveModelContracts
+import com.labteto.dshmobile.local.model.LocalReasoningModeStore
+import com.labteto.dshmobile.local.model.LocalModelPerformanceStore
+import com.labteto.dshmobile.local.model.ModelReasoningCeiling
+
+/**
+ * Narrow presentation façade for the conversation's native reasoning-mode switch.
+ * UI doesn't own model provider policy or preference persistence.
+ */
+internal enum class LocalReasoningUiMode { DEFAULT, FAST, LOW, DEEP, MAX }
+
+/** Presentation boundary for Work sampling; UI never imports the persistence implementation. */
+internal object LocalWorkTemperatureControls {
+    fun attach(context: Context) =
+        com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.attach(context)
+
+    fun level(
+        sessionId: String,
+        range: com.labteto.dshmobile.local.model.LocalModelTemperatureRange? = null,
+    ): Int = com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.level(sessionId, range)
+
+    fun setLevel(sessionId: String, level: Int) =
+        com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.setLevel(sessionId, level)
+}
+
+internal object LocalReasoningControls {
+    fun mode(sessionId: String, usageMode: LocalUsageMode? = null): LocalReasoningUiMode =
+        when (LocalReasoningModeStore.mode(sessionId, defaultChatFast = usageMode == LocalUsageMode.CHAT)) {
+            LocalReasoningMode.DEFAULT -> LocalReasoningUiMode.DEFAULT
+            LocalReasoningMode.FAST -> LocalReasoningUiMode.FAST
+            LocalReasoningMode.LOW -> LocalReasoningUiMode.LOW
+            LocalReasoningMode.DEEP -> LocalReasoningUiMode.DEEP
+            LocalReasoningMode.MAX -> LocalReasoningUiMode.MAX
+        }
+
+    fun availableModes(
+        profile: LocalModelProfile?,
+        mode: LocalUsageMode,
+        ceiling: ModelReasoningCeiling = LocalModelPerformanceStore.current().reasoningCeiling,
+    ): List<LocalReasoningUiMode> {
+        val supported = profile ?: return emptyList()
+        val policy = LocalEffectiveModelContracts.forProfile(supported, mode == LocalUsageMode.WORK).reasoning
+            ?: return emptyList()
+        return buildList {
+            // Default means no request override, independently of the provider's current default.
+            add(LocalReasoningUiMode.DEFAULT)
+            add(LocalReasoningUiMode.FAST)
+            if (policy.lowEffort != null && policy.lowEffort != policy.disabledEffort) add(LocalReasoningUiMode.LOW)
+            add(LocalReasoningUiMode.DEEP)
+            if (policy.maxEffort != null) add(LocalReasoningUiMode.MAX)
+        }.filter { selection ->
+            when (ceiling) {
+                ModelReasoningCeiling.CUSTOM, ModelReasoningCeiling.MAX -> true
+                ModelReasoningCeiling.DEEP -> selection != LocalReasoningUiMode.MAX
+                ModelReasoningCeiling.LOW -> selection in setOf(
+                    LocalReasoningUiMode.DEFAULT, LocalReasoningUiMode.FAST, LocalReasoningUiMode.LOW,
+                )
+                ModelReasoningCeiling.DEFAULT, ModelReasoningCeiling.FAST ->
+                    selection in setOf(LocalReasoningUiMode.DEFAULT, LocalReasoningUiMode.FAST)
+            }
+        }
+    }
+
+    /** Project unsupported saved choices to the same default used by effortFor, without rewriting them. */
+    fun effectiveMode(
+        mode: LocalReasoningUiMode,
+        availableModes: List<LocalReasoningUiMode>,
+        needsBasicReasoning: Boolean = false,
+    ): LocalReasoningUiMode = when {
+        mode in availableModes -> mode
+        // Mandatory-reasoning routes expose LOW through their FAST/basic position.
+        mode == LocalReasoningUiMode.LOW && needsBasicReasoning && LocalReasoningUiMode.FAST in availableModes ->
+            LocalReasoningUiMode.FAST
+        mode == LocalReasoningUiMode.DEFAULT ||
+            LocalModelPerformanceStore.current().reasoningCeiling == ModelReasoningCeiling.DEFAULT ->
+            LocalReasoningUiMode.DEFAULT
+        else -> availableModes.lastOrNull() ?: LocalReasoningUiMode.DEFAULT
+    }
+
+    fun setMode(sessionId: String, mode: LocalReasoningUiMode) =
+        LocalReasoningModeStore.setMode(sessionId, when (mode) {
+            LocalReasoningUiMode.DEFAULT -> LocalReasoningMode.DEFAULT
+            LocalReasoningUiMode.FAST -> LocalReasoningMode.FAST
+            LocalReasoningUiMode.LOW -> LocalReasoningMode.LOW
+            LocalReasoningUiMode.DEEP -> LocalReasoningMode.DEEP
+            LocalReasoningUiMode.MAX -> LocalReasoningMode.MAX
+        })
+
+    fun restoreDefault(sessionId: String) = LocalReasoningModeStore.setMode(sessionId, LocalReasoningMode.DEFAULT)
+
+    fun requiresBasicReasoning(profile: LocalModelProfile?, mode: LocalUsageMode): Boolean =
+        profile?.let {
+            LocalEffectiveModelContracts.forProfile(it, mode == LocalUsageMode.WORK).reasoning?.disabledEffort == "low"
+        } ?: false
+    fun attach(context: Context) = LocalReasoningModeStore.attach(context)
+
+    fun enabled(sessionId: String): Boolean = LocalReasoningModeStore.enabled(sessionId)
+
+    fun isSupported(profile: LocalModelProfile?, mode: LocalUsageMode): Boolean =
+        LocalReasoningModeStore.isSupported(profile, withTools = mode == LocalUsageMode.WORK)
+
+    fun setEnabled(sessionId: String, enabled: Boolean) =
+        LocalReasoningModeStore.setEnabled(sessionId, enabled)
+}

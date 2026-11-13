@@ -1,0 +1,230 @@
+{
+  "version": 1,
+  "policy": "只证明CI或发布工作流中存在具体作业及命令；不代表该作业本次成功运行",
+  "items": [
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / Kotlin／Gradle 多模块构建",
+      "grade": "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）",
+      "sources": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "job": "unit-tests",
+          "literals": [
+            "./gradlew",
+            ":harness-core:test"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 代码格式与静态检查",
+      "grade": "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）",
+      "sources": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "job": "static-gates",
+          "literals": [
+            "check-test-quality.py"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 架构 3.0 所有权门禁",
+      "grade": "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）",
+      "sources": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "job": "architecture-3-gates",
+          "literals": [
+            "check-local-architecture-boundaries.py"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 性能、资源和安全门禁",
+      "grade": "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）",
+      "sources": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "job": "static-gates",
+          "literals": [
+            "check-android-security-boundaries.py"
+          ]
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "job": "architecture-3-gates",
+          "literals": [
+            "check-local-performance-invariants.py"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / ARM64／x86_64 运行时与安装包构建",
+      "grade": "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）",
+      "sources": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "job": "build-arm64",
+          "literals": [
+            "arm64-v8a",
+            "assembleOptimized"
+          ]
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "job": "device-artifacts-x86",
+          "literals": [
+            "x86_64",
+            "assembleDebugAndroidTest"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / Android 16／17 设备回归",
+      "grade": "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）",
+      "sources": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "job": "android-16-instrumented",
+          "literals": [
+            "Android 16 instrumentation"
+          ]
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "job": "android-17-instrumented",
+          "literals": [
+            "Android 17 instrumentation"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 运行时缓存的构建前校验保存",
+      "grade": "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）",
+      "sources": [
+        {
+          "path": ".github/workflows/dev-toolchain.yml",
+          "job": "package",
+          "literals": [
+            "Runtime Cache Artifact"
+          ]
+        },
+        {
+          "path": ".github/workflows/dev-toolchain.yml",
+          "job": "verify-install",
+          "literals": [
+            "Runtime Cache"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 缓存命中与构建耗时汇总",
+      "grade": "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）",
+      "sources": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "job": "build-arm64",
+          "literals": [
+            "GITHUB_STEP_SUMMARY"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 安装包大小、签名和运行时完整性",
+      "grade": "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）",
+      "sources": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "job": "build-arm64",
+          "literals": [
+            "Enforce APK size budget",
+            "verify-android16-apk.sh"
+          ]
+        },
+        {
+          "path": ".github/workflows/release.yml",
+          "job": "release",
+          "literals": [
+            "Verify Android 16 APK"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 合并前多阶段门禁",
+      "grade": "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）",
+      "sources": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "job": "merge-gate",
+          "literals": [
+            "fixture-provenance"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 会话、工具、模型与恢复测试",
+      "grade": "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）",
+      "sources": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "job": "unit-tests",
+          "literals": [
+            ":harness-core:test",
+            ":app:testDebugUnitTest"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 测试数据来源与固定版本校验",
+      "grade": "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）",
+      "sources": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "job": "fixture-provenance",
+          "literals": [
+            "Verify official golden fixture provenance"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 发布与升级 / 发行版本和变更记录",
+      "grade": "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）",
+      "sources": [
+        {
+          "path": ".github/workflows/release.yml",
+          "job": "release",
+          "literals": [
+            "Derive release version",
+            "Publish GitHub Release"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 发布与升级 / 构建安装包与签名校验",
+      "grade": "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）",
+      "sources": [
+        {
+          "path": ".github/workflows/release.yml",
+          "job": "release",
+          "literals": [
+            "Validate release signing material",
+            "Build release APK"
+          ]
+        }
+      ]
+    }
+  ]
+}

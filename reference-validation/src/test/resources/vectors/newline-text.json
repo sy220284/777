@@ -1,0 +1,10 @@
+{
+  "id": "newline-text",
+  "input": "换行文本",
+  "modelReplies": [
+    {
+      "content": "line1\nline2\nline3"
+    }
+  ],
+  "toolOutputs": {}
+}

@@ -1,0 +1,10 @@
+{
+  "id": "empty-text",
+  "input": "返回空文本",
+  "modelReplies": [
+    {
+      "content": ""
+    }
+  ],
+  "toolOutputs": {}
+}

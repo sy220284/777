@@ -1,0 +1,34 @@
+name: "准备并缓存已验证的 Android Runtime"
+description: "构建前按 ABI 校验并缓存 Node/Python/Git/HDiffPatch 原始运行时包；即使后续 APK 构建失败，缓存也已保存"
+inputs:
+  abi:
+    description: "运行时 ABI（arm64-v8a 或 x86_64）"
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: 恢复 ABI 与运行时版本隔离的缓存
+      id: runtime-cache
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: .gradle/runtime-cache
+        key: runtime-${{ runner.os }}-${{ inputs.abi }}-v2-${{ hashFiles('tools/runtime/prepare-termux-*.sh', 'tools/runtime/prepare-hdiffpatch.sh', 'tools/runtime/runtime-download.sh', 'tools/runtime/verify-termux-signature.sh') }}
+
+    - name: 校验并准备内置 Runtime
+      shell: bash
+      env:
+        DSH_RUNTIME_ABIS: ${{ inputs.abi }}
+        CACHE_HIT: ${{ steps.runtime-cache.outputs.cache-hit }}
+      run: |
+        set -euo pipefail
+        start=$SECONDS
+        ./gradlew :app:prepareBundledNodeRuntime :app:prepareBundledPythonRuntime :app:prepareBundledGitRuntime :app:prepareUpdatePatcher --stacktrace --console=plain
+        elapsed=$((SECONDS - start))
+        printf "| Runtime ABI | 缓存命中 | 下载校验与解包耗时 |\n|---|---|---|\n| %s | %s | %s 秒 |\n" "$DSH_RUNTIME_ABIS" "${CACHE_HIT:-false}" "$elapsed" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: 在 APK 长构建前保存已校验 Runtime 缓存
+      if: steps.runtime-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: .gradle/runtime-cache
+        key: runtime-${{ runner.os }}-${{ inputs.abi }}-v2-${{ hashFiles('tools/runtime/prepare-termux-*.sh', 'tools/runtime/prepare-hdiffpatch.sh', 'tools/runtime/runtime-download.sh', 'tools/runtime/verify-termux-signature.sh') }}

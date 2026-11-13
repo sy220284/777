@@ -1,0 +1,23 @@
+{
+  "id": "final-unicode",
+  "input": "最终中文",
+  "modelReplies": [
+    {
+      "toolCalls": [
+        {
+          "id": "c1",
+          "name": "echo",
+          "arguments": {
+            "text": "x"
+          }
+        }
+      ]
+    },
+    {
+      "content": "任务已经完成。"
+    }
+  ],
+  "toolOutputs": {
+    "echo": "x"
+  }
+}

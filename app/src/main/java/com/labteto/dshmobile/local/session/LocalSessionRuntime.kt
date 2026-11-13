@@ -1,0 +1,62 @@
+package com.labteto.dshmobile.local.session
+
+import android.net.Uri
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
+import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/** Session/file capability boundary for the local UI. */
+@Singleton
+class LocalSessionRuntime @Inject internal constructor(
+    private val lifecycle: LocalSessionLifecyclePort,
+    private val sessionFiles: LocalSessionFilesRuntime,
+    private val sessionRead: LocalSessionReadRuntime,
+) {
+    internal fun createSession(
+        mode: LocalConversationMode,
+        usageMode: LocalUsageMode,
+        domainSpec: LocalSessionDomainCreateSpec? = null,
+        handoffSummaryOverride: String? = null,
+    ) = lifecycle.createSession(
+        mode = mode,
+        usageMode = usageMode,
+        domainSpec = domainSpec,
+        handoffSummaryOverride = handoffSummaryOverride,
+    )
+
+    internal fun currentHandoffSummary() = lifecycle.currentHandoffSummary()
+
+    internal fun switchDomainMode(command: LocalSessionDomainModeCommand) =
+        lifecycle.switchDomainMode(command)
+    internal fun switchUsageMode(mode: LocalUsageMode) = lifecycle.switchUsageMode(mode)
+    internal fun switchSession(sessionId: String) = lifecycle.switchSession(sessionId)
+    internal suspend fun deleteSessions(ids: Set<String>): Int = lifecycle.deleteSessions(ids)
+    internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment = sessionFiles.importAttachment(uri)
+    internal suspend fun saveWorkspaceFileToDownloadsForUi(path: String): String =
+        sessionFiles.saveWorkspaceFileToDownloads(path)
+    internal suspend fun workspaceFilesForUi(): List<LocalWorkspaceFile> = sessionFiles.workspaceFiles()
+    internal suspend fun workspaceDirectoryForUi(path: String) = sessionFiles.workspaceDirectory(path)
+    internal suspend fun workspaceDirectoryPageForUi(path: String, offset: Int) = sessionFiles.workspaceDirectoryPage(path, offset)
+    internal suspend fun searchWorkspaceFilesForUi(query: String) = sessionFiles.searchWorkspaceFiles(query)
+    internal suspend fun searchWorkspacePageForUi(query: String, offset: Int) = sessionFiles.searchWorkspacePage(query, offset)
+    internal suspend fun stopWorkspaceSearchForUi(query: String) = sessionFiles.stopWorkspaceSearch(query)
+    internal fun observeWorkspaceFilesForUi(paths: List<String>) = sessionFiles.observeWorkspaceFiles(paths)
+    internal suspend fun conversationFilesForUi(sessionId: String): LocalConversationFiles =
+        sessionFiles.conversationFiles(sessionId)
+    internal suspend fun previewWorkspaceFileForUi(path: String): LocalWorkspaceFilePreview =
+        sessionFiles.previewWorkspaceFile(path)
+    internal suspend fun previewWorkspaceFilePageForUi(path: String, offset: Long): LocalWorkspaceFilePreview =
+        sessionFiles.previewWorkspaceFilePage(path, offset)
+    internal fun transcriptPageForUi(
+        sessionId: String,
+        cursor: LocalTranscriptPageCursor? = null,
+        limit: Int = 200,
+    ): LocalTranscriptPage = sessionRead.transcriptPage(sessionId, cursor, limit)
+    internal fun transcriptTailForUi(sessionId: String, limit: Int) =
+        sessionRead.transcriptTail(sessionId, limit)
+    internal fun completeTranscriptForUi(sessionId: String) =
+        sessionRead.completeTranscript(sessionId)
+}

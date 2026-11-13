@@ -1,0 +1,912 @@
+package com.labteto.dshmobile.local.memory
+
+import java.io.File
+import kotlinx.serialization.json.Json
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+
+class MemoryStoreTest {
+    @Test fun metadataEditDoesNotQueueInvalidationAndCleanupCannotAcknowledgeANewerCorrection() {
+        val memory = store()
+        val original = memory.remember("周末去海边", MemoryScope.GLOBAL,
+            sourceSessionId = "s", sourceMessageId = "u")
+        memory.update(original.id, pinned = true)
+        assertTrue(memory.pendingSourceInvalidations().isEmpty())
+        val corrected = memory.update(original.id, content = "周末去山上")
+        assertEquals(listOf(MemorySourceRef("s", "u")), store().pendingSourceInvalidations().single().pendingSourceInvalidations)
+        memory.update(original.id, content = "周末去书店")
+        assertFalse(memory.acknowledgeSourceInvalidation(corrected))
+        val latest = memory.pendingSourceInvalidations().single()
+        assertTrue(memory.acknowledgeSourceInvalidation(latest))
+        assertTrue(store().pendingSourceInvalidations().isEmpty())
+        assertEquals("周末去书店", all(store()).single().content)
+    }
+
+    @Test fun disabledPendingCleanupSurvivesCompactionAndConsolidation() {
+        val memory = store()
+        val original = memory.remember("周末去海边", MemoryScope.GLOBAL,
+            sourceSessionId = "s", sourceMessageId = "u")
+        memory.forget(original.id)
+        val pending = memory.pendingSourceInvalidations().single()
+        val another = pending.copy(id = "another", active = true, pendingSourceInvalidations = emptyList())
+        assertTrue(compactMemoryRecords(listOf(pending, another), 1).any { it.id == pending.id })
+        assertEquals(setOf(pending.id, another.id),
+            compactMemoryRecords(listOf(pending, another), 1, setOf(another.id)).map { it.id }.toSet())
+        val duplicate = pending.copy(id = "duplicate", active = true)
+        val combined = consolidateMemoryRecords(listOf(duplicate, another))
+        assertEquals(0, combined.mergedCount)
+        assertTrue(combined.records.any { it.pendingSourceInvalidations.isNotEmpty() })
+    }
+
+    @Test fun staleMessageLinkedMemoryEditCannotOverwriteNewerCorrectionOrDeactivateIt() {
+        val memory = store()
+        val original = memory.remember(
+            "周末原本约好去海边", MemoryScope.LINEAGE,
+            lineageId = "lineage", sourceSessionId = "chat-a", sourceMessageId = "user-1",
+        )
+        val corrected = memory.update(
+            original.id, content = "周末改去山上", expectedUpdatedAt = original.updatedAt,
+        )
+        assertTrue(corrected.updatedAt > original.updatedAt)
+        assertThrows(IllegalArgumentException::class.java) {
+            memory.update(original.id, content = "旧视图覆盖错误", expectedUpdatedAt = original.updatedAt)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            memory.forget(original.id, expectedUpdatedAt = original.updatedAt)
+        }
+        assertEquals("周末改去山上",
+            store().listActiveFromMessage("chat-a", "user-1").single().content)
+        assertTrue(memory.forget(original.id, expectedUpdatedAt = corrected.updatedAt))
+        assertTrue(store().listActiveFromMessage("chat-a", "user-1").isEmpty())
+    }
+
+    @Test fun exactMessageSourceLookupSpansScopedMemoriesWithoutUnrelatedOrInactiveRows() {
+        val memory = store()
+        val relatedGlobal = memory.remember(
+            "用户记得周末看海", MemoryScope.GLOBAL,
+            sourceSessionId = "chat-a", sourceMessageId = "user-1",
+        )
+        val relatedLineage = memory.remember(
+            "人物与用户约好去海边", MemoryScope.LINEAGE, lineageId = "lineage",
+            sourceSessionId = "chat-a", sourceMessageId = "user-1",
+        )
+        memory.remember("其他会话", MemoryScope.GLOBAL,
+            sourceSessionId = "chat-b", sourceMessageId = "user-1")
+        memory.remember("无法确认具体消息的旧记忆", MemoryScope.GLOBAL,
+            sourceSessionId = "chat-a")
+        assertEquals(
+            setOf(relatedGlobal.id, relatedLineage.id),
+            memory.listActiveFromMessage("chat-a", "user-1").map { it.id }.toSet(),
+        )
+        assertTrue(memory.listActiveFromMessage("chat-a", "unknown").isEmpty())
+        assertTrue(memory.listActiveFromMessage("", "user-1").isEmpty())
+        assertTrue(memory.forget(relatedLineage.id))
+        assertEquals(
+            listOf(relatedGlobal.id),
+            store().listActiveFromMessage("chat-a", "user-1").map { it.id },
+        )
+    }
+
+    @Test fun manualEditRestoreIsDurableRevisionBoundAndCanRedo() {
+        val memory = store()
+        val original = memory.remember("用户偏好简短回答", MemoryScope.GLOBAL)
+        val edited = memory.update(
+            original.id, content = "用户偏好完整回答", importance = 91, pinned = true,
+            expectedUpdatedAt = original.updatedAt,
+        )
+        assertEquals("用户偏好简短回答", edited.previousManualRevision?.content)
+        assertThrows(IllegalArgumentException::class.java) {
+            store().restoreManualEdit(original.id, original.updatedAt)
+        }
+        val restored = store().restoreManualEdit(original.id, edited.updatedAt)
+        assertEquals(original.content, restored.content)
+        assertEquals(original.importance, restored.importance)
+        assertEquals(original.pinned, restored.pinned)
+        assertEquals("用户偏好完整回答", restored.previousManualRevision?.content)
+        assertEquals(restored, all(store()).single())
+        val redone = store().restoreManualEdit(original.id, restored.updatedAt)
+        assertEquals(edited.content, redone.content)
+        assertEquals(edited.importance, redone.importance)
+        assertEquals(edited.pinned, redone.pinned)
+    }
+
+    @Test fun restoreEditedMemoryMaintainsSourceInvalidationAndRejectsDeactivatedRecords() {
+        val memory = store()
+        val initial = memory.remember(
+            "原始事实", MemoryScope.GLOBAL, sourceSessionId = "s", sourceMessageId = "m",
+        )
+        val edited = memory.update(initial.id, content = "修改事实")
+        assertTrue(memory.acknowledgeSourceInvalidation(edited))
+        val restored = store().restoreManualEdit(edited.id, edited.updatedAt)
+        assertEquals(initial.sourceMessages, restored.sourceMessages)
+        assertEquals(initial.content, restored.content)
+        assertEquals(initial.sourceMessages, restored.pendingSourceInvalidations)
+        assertTrue(store().forget(restored.id, restored.updatedAt))
+        assertThrows(IllegalArgumentException::class.java) {
+            store().restoreManualEdit(restored.id, restored.updatedAt)
+        }
+    }
+
+    @get:Rule val temporary = TemporaryFolder()
+    private fun store() = MemoryStore(temporary.root, Json)
+    private fun all(store: MemoryStore) = store.listActive(
+        MemoryScope.values().toSet(),
+        "project",
+        "lineage",
+        limit = 2_000,
+    )
+
+    @Test fun writesSurviveRestartAndLeaveNoTemporaryFile() {
+        val record = store().remember("remember apples", MemoryScope.GLOBAL)
+        assertEquals(record, all(store()).single())
+        assertTrue(File(temporary.root, "memories.json.bak").isFile)
+        assertFalse(File(temporary.root, "memories.json.tmp").exists())
+    }
+
+    @Test fun firstWriteBackupRecoversCorruptedPrimary() {
+        val memoryStore = store()
+        val record = memoryStore.remember("remember apples", MemoryScope.GLOBAL)
+        File(temporary.root, "memories.json").writeText("broken")
+        assertEquals(record, all(memoryStore).single())
+        assertTrue(temporary.root.listFiles()!!.any { it.name.contains(".corrupt-") && it.readText().startsWith("broken") })
+        assertEquals(record, all(memoryStore).single())
+    }
+
+    @Test fun missingPrimaryRecoversBackupAndCanWriteAgain() {
+        val record = store().remember("remember apples", MemoryScope.GLOBAL)
+        assertTrue(File(temporary.root, "memories.json").delete())
+        assertEquals(record, all(store()).single())
+        store().remember("remember oranges", MemoryScope.GLOBAL)
+        assertEquals(2, all(store()).size)
+    }
+
+    @Test fun bothCorruptFilesFailClosedAndPreserveDamagedData() {
+        store().remember("remember apples", MemoryScope.GLOBAL)
+        File(temporary.root, "memories.json").writeText("broken primary")
+        File(temporary.root, "memories.json.bak").writeText("broken backup")
+
+        val failure = runCatching { all(store()) }.exceptionOrNull()
+        assertTrue(failure is IllegalStateException)
+        assertTrue(File(temporary.root, "memories.json.recovery-required").isFile)
+        assertTrue(runCatching { all(store()) }.exceptionOrNull() is IllegalStateException)
+        assertTrue(temporary.root.listFiles().orEmpty().any { it.name.contains(".corrupt-") && it.readText().startsWith("broken") })
+    }
+
+    @Test fun tornJournalTailIsQuarantinedAndValidMutationsSurviveRestart() {
+        val memoryStore = store()
+        val first = memoryStore.remember("remember apples", MemoryScope.GLOBAL)
+        val second = memoryStore.remember("remember oranges", MemoryScope.GLOBAL)
+        val journal = File(temporary.root, "memories.wal.jsonl")
+        assertTrue(journal.isFile)
+        journal.appendText("{broken-tail")
+
+        val restarted = store()
+        assertEquals(setOf(first.id, second.id), all(restarted).map { it.id }.toSet())
+        assertTrue(
+            temporary.root.listFiles().orEmpty().any {
+                it.name.contains(".corrupt-") && it.readText().endsWith("{broken-tail")
+            },
+        )
+    }
+
+    @Test fun compactedSnapshotBackupUsesSameWalBaseAsPrimary() {
+        val memoryStore = store()
+        val expectedIds = linkedSetOf<String>()
+        repeat(132) { index ->
+            expectedIds += memoryStore.remember(
+                content = "durable memory $index",
+                scope = MemoryScope.GLOBAL,
+                importance = index % 100,
+            ).id
+        }
+        val journal = File(temporary.root, "memories.wal.jsonl")
+        assertTrue(journal.isFile)
+        assertTrue(File(temporary.root, "memories.json.bak").isFile)
+
+        File(temporary.root, "memories.json").writeText("broken primary after compaction")
+
+        val recoveredIds = all(store()).mapTo(linkedSetOf()) { it.id }
+        assertEquals(expectedIds, recoveredIds)
+    }
+
+    @Test fun lineageWriteRestartRecallIsIsolatedFromIndependentConversations() {
+        val record = store().remember("apples project decision", MemoryScope.LINEAGE, lineageId = "lineage")
+        val restarted = store()
+        assertEquals(listOf(record), restarted.search("apples", setOf(MemoryScope.LINEAGE), null, "lineage"))
+        assertTrue(restarted.search("apples", MemoryScope.values().toSet(), null, "other").isEmpty())
+        assertTrue(restarted.search("apples", setOf(MemoryScope.GLOBAL), null, "lineage").isEmpty())
+    }
+
+    @Test fun longRelevantMemoryDoesNotHideOtherMemoriesOrOverwriteDurableFacts() {
+        val memoryStore = store()
+        val long = memoryStore.remember(
+            "target " + "history ".repeat(180) + "relevant detail",
+            MemoryScope.GLOBAL,
+            importance = 95,
+        )
+        val short = memoryStore.remember(
+            "target important short fact",
+            MemoryScope.GLOBAL,
+            importance = 20,
+        )
+        val result = memoryStore.search(
+            query = "target",
+            allowedScopes = setOf(MemoryScope.GLOBAL),
+            projectId = null,
+            lineageId = null,
+            maxItems = 4,
+            maxChars = 256,
+        )
+        assertEquals(setOf(long.id, short.id), result.map { it.id }.toSet())
+        assertTrue(result.sumOf { it.content.length + 32 } <= 256)
+        assertEquals(long.content, all(memoryStore).first { it.id == long.id }.content)
+    }
+
+    @Test fun largeMemoryIsPersistedExactlyAndOversizeIsRejectedWithoutDataLoss() {
+        val memoryStore = store()
+        val original = "关键决策：" + "长期信息 ".repeat(450) + "收尾标记"
+        val record = memoryStore.remember(original, MemoryScope.GLOBAL)
+        assertEquals(original, all(memoryStore).single().content)
+        val revised = original + "，续写已完成"
+        memoryStore.update(record.id, content = revised)
+        assertEquals(revised, all(store()).single().content)
+        val failure = runCatching { memoryStore.update(record.id, content = "过长".repeat(20_000)) }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException)
+        assertEquals(revised, all(store()).single().content)
+    }
+
+    @Test fun searchCanExcludeRelationshipMemories() {
+        val memoryStore = store()
+        memoryStore.remember(
+            "关系对象：林晚｜女朋友",
+            MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_FACT,
+        )
+        val ordinary = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            kind = MemoryKind.PREFERENCE,
+        )
+
+        val allowedKinds = MemoryKind.values()
+            .filterNot {
+                it in setOf(
+                    MemoryKind.RELATIONSHIP_FACT,
+                    MemoryKind.RELATIONSHIP_STATE,
+                    MemoryKind.RELATIONSHIP_PREFERENCE,
+                )
+            }
+            .toSet()
+
+        assertTrue(
+            memoryStore.search(
+                query = "林晚女朋友",
+                allowedScopes = setOf(MemoryScope.GLOBAL),
+                projectId = null,
+                lineageId = null,
+                allowedKinds = allowedKinds,
+            ).isEmpty(),
+        )
+        assertEquals(
+            listOf(ordinary),
+            memoryStore.search(
+                query = "简洁回复",
+                allowedScopes = setOf(MemoryScope.GLOBAL),
+                projectId = null,
+                lineageId = null,
+                allowedKinds = allowedKinds,
+            ),
+        )
+    }
+
+    @Test fun identicalRelationshipTextForDifferentCharactersDoesNotDeduplicate() {
+        val memoryStore = store()
+        val first = memoryStore.remember(
+            "关系状态：我和同名角色｜在一起",
+            MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            subjectKey = "gallery:one",
+        )
+        val second = memoryStore.remember(
+            "关系状态：我和同名角色｜在一起",
+            MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            subjectKey = "gallery:two",
+        )
+
+        assertNotEquals(first.id, second.id)
+        assertEquals(setOf("gallery:one", "gallery:two"), all(memoryStore).mapNotNull { it.subjectKey }.toSet())
+        assertEquals(setOf("gallery:one", "gallery:two"), all(store()).mapNotNull { it.subjectKey }.toSet())
+    }
+
+    @Test fun replacementDoesNotResurrectSupersededMemoryAfterRestart() {
+        val old = store().remember("apples old", MemoryScope.GLOBAL)
+        val replacement = store().remember("apples new", MemoryScope.GLOBAL, replaceIds = setOf(old.id))
+        assertEquals(listOf(replacement), all(store()))
+    }
+
+    @Test fun duplicateRefreshMovesProvenanceToNewestSession() {
+        val memoryStore = store()
+        val first = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "old-session",
+        )
+        val refreshed = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "new-session",
+        )
+        assertEquals(first.id, refreshed.id)
+        assertEquals("new-session", all(memoryStore).single().sourceSessionId)
+    }
+
+    @Test fun deletingConversationSourceDetachesProvenanceButKeepsMemory() {
+        val memoryStore = store()
+        val sourced = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "deleted-session",
+        )
+        memoryStore.remember(
+            "另一个事实",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "kept-session",
+        )
+
+        assertEquals(1, memoryStore.detachSourceSessions(setOf("deleted-session")))
+        val remaining = all(store())
+        assertEquals(2, remaining.size)
+        assertNull(remaining.single { it.id == sourced.id }.sourceSessionId)
+        assertEquals("kept-session", remaining.single { it.id != sourced.id }.sourceSessionId)
+    }
+
+    @Test fun updateAndForgetPersistAcrossRestart() {
+        val original = store().remember("remember apples", MemoryScope.GLOBAL, importance = 50)
+        val updated = store().update(
+            id = original.id,
+            content = "remember oranges",
+            importance = 90,
+            pinned = true,
+        )
+        assertEquals(original.id, updated.id)
+        assertEquals("remember oranges", all(store()).single().content)
+        assertEquals(90, all(store()).single().importance)
+        assertTrue(all(store()).single().pinned)
+
+        assertTrue(store().forget(original.id))
+        assertTrue(all(store()).isEmpty())
+        assertFalse(store().forget(original.id))
+    }
+
+    @Test fun timelineRollbackDropsNewMemoriesAndReactivatesSupersededValidState() {
+        val memoryStore = store()
+        val valid = memoryStore.remember(
+            "关系状态：我和阿青｜熟悉",
+            MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            sourceSessionId = "older-session",
+        )
+        val discarded = memoryStore.remember(
+            "关系状态：我和阿青｜在一起",
+            MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            sourceSessionId = "edited-session",
+            replaceIds = setOf(valid.id),
+        )
+
+        assertEquals(discarded.id, all(memoryStore).single().id)
+        assertEquals(
+            1,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "edited-session",
+                createdAtInclusive = discarded.createdAt,
+            ),
+        )
+
+        val restored = all(store())
+        assertEquals(1, restored.size)
+        assertEquals(valid.id, restored.single().id)
+        assertEquals("关系状态：我和阿青｜熟悉", restored.single().content)
+    }
+
+
+    @Test fun messageProvenanceRollsBackOnlyDiscardedTurnEvenWithBroadTimeBoundary() {
+        val memoryStore = store()
+        val kept = memoryStore.remember(
+            "用户喜欢安静散步",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "session-a",
+            sourceMessageId = "u-kept",
+        )
+        val discarded = memoryStore.remember(
+            "用户喜欢夜游",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "session-a",
+            sourceMessageId = "u-discarded",
+        )
+
+        assertEquals(
+            1,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "session-a",
+                createdAtInclusive = 0L,
+                discardedMessageIds = setOf("u-discarded"),
+            ),
+        )
+
+        val remaining = all(memoryStore)
+        assertEquals(listOf(kept.id), remaining.map { it.id })
+        assertTrue(remaining.none { it.id == discarded.id })
+    }
+
+    @Test fun duplicateFactSurvivesWhenOnlyOneOfItsSourceTurnsIsDiscarded() {
+        val memoryStore = store()
+        val first = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "session-a",
+            sourceMessageId = "u1",
+        )
+        val repeated = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "session-a",
+            sourceMessageId = "u2",
+        )
+
+        assertEquals(first.id, repeated.id)
+        assertEquals(
+            setOf("u1", "u2"),
+            all(memoryStore).single().sourceMessages.map { it.messageId }.toSet(),
+        )
+
+        assertEquals(
+            0,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "session-a",
+                createdAtInclusive = 0L,
+                discardedMessageIds = setOf("u2"),
+            ),
+        )
+        val remaining = all(memoryStore).single()
+        assertEquals(first.id, remaining.id)
+        assertEquals(listOf("u1"), remaining.sourceMessages.map { it.messageId })
+    }
+
+
+    @Test fun laterExactConfirmationDoesNotEraseOlderUnboundFact() {
+        val memoryStore = store()
+        val legacy = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "legacy-session",
+        )
+        val repeated = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "session-a",
+            sourceMessageId = "u2",
+        )
+
+        assertEquals(legacy.id, repeated.id)
+        assertTrue(all(memoryStore).single().hasUnboundSource)
+
+        assertEquals(
+            0,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "session-a",
+                createdAtInclusive = 0L,
+                discardedMessageIds = setOf("u2"),
+            ),
+        )
+        val remaining = all(memoryStore).single()
+        assertEquals(legacy.id, remaining.id)
+        assertTrue(remaining.sourceMessages.isEmpty())
+        assertTrue(remaining.hasUnboundSource)
+    }
+
+
+    @Test fun laterUnboundConfirmationProtectsEarlierExactFactFromRollback() {
+        val memoryStore = store()
+        val exact = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "session-a",
+            sourceMessageId = "u1",
+        )
+        val repeated = memoryStore.remember(
+            "用户喜欢简洁回复",
+            MemoryScope.GLOBAL,
+            sourceSessionId = "legacy-session",
+        )
+
+        assertEquals(exact.id, repeated.id)
+        assertTrue(all(memoryStore).single().hasUnboundSource)
+
+        assertEquals(
+            0,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "session-a",
+                createdAtInclusive = 0L,
+                discardedMessageIds = setOf("u1"),
+            ),
+        )
+        val remaining = all(memoryStore).single()
+        assertEquals(exact.id, remaining.id)
+        assertTrue(remaining.hasUnboundSource)
+        assertTrue(remaining.sourceMessages.isEmpty())
+    }
+
+    @Test fun searchFiltersRelationshipOwnerBeforeResultLimit() {
+        val memoryStore = store()
+        repeat(6) { index ->
+            memoryStore.remember(
+                content = "关系状态：我和其他角色$index｜在一起",
+                scope = MemoryScope.GLOBAL,
+                kind = MemoryKind.RELATIONSHIP_STATE,
+                subjectKey = "gallery:other-$index",
+                importance = 100,
+            )
+        }
+        val target = memoryStore.remember(
+            content = "关系状态：我和目标角色｜在一起",
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            subjectKey = "gallery:target",
+            importance = 60,
+        )
+
+        val result = memoryStore.search(
+            query = "关系状态 在一起",
+            allowedScopes = setOf(MemoryScope.GLOBAL),
+            projectId = null,
+            lineageId = null,
+            allowedKinds = setOf(MemoryKind.RELATIONSHIP_STATE),
+            maxItems = 1,
+            recordFilter = { it.subjectKey == "gallery:target" },
+        )
+
+        assertEquals(listOf(target.id), result.map { it.id })
+    }
+
+    @Test fun storageCompactionKeepsActiveRollbackChainBeforeDiscardedNoise() {
+        fun record(
+            id: String,
+            active: Boolean,
+            supersededBy: String? = null,
+            pinned: Boolean = false,
+            importance: Int = 50,
+            updatedAt: Long,
+        ) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            content = id,
+            importance = importance,
+            pinned = pinned,
+            active = active,
+            supersededBy = supersededBy,
+            createdAt = updatedAt,
+            updatedAt = updatedAt,
+        )
+
+        val records = listOf(
+            record("forgotten", active = false, updatedAt = 100L),
+            record("old-valid", active = false, supersededBy = "current", updatedAt = 200L),
+            record("current", active = true, pinned = true, importance = 90, updatedAt = 300L),
+            record("other-active", active = true, importance = 40, updatedAt = 400L),
+        )
+
+        val compacted = compactMemoryRecords(records, maxRecords = 3)
+
+        assertEquals(setOf("old-valid", "current", "other-active"), compacted.map { it.id }.toSet())
+        assertFalse(compacted.any { it.id == "forgotten" })
+    }
+
+    @Test fun storageCompactionReservesCapacityForNearestRollbackPredecessor() {
+        fun record(
+            id: String,
+            active: Boolean,
+            supersededBy: String? = null,
+            importance: Int,
+        ) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.FACT,
+            content = id,
+            active = active,
+            supersededBy = supersededBy,
+            importance = importance,
+            createdAt = importance.toLong(),
+            updatedAt = importance.toLong(),
+        )
+
+        val compacted = compactMemoryRecords(
+            records = listOf(
+                record("old", active = false, supersededBy = "current", importance = 1),
+                record("current", active = true, importance = 100),
+                record("other", active = true, importance = 90),
+            ),
+            maxRecords = 2,
+        )
+
+        assertEquals(setOf("old", "current"), compacted.map { it.id }.toSet())
+    }
+
+    @Test fun storageCompactionPrioritizesPinnedAndImportantActiveRootsWhenOverCapacity() {
+        fun active(id: String, pinned: Boolean, importance: Int, updatedAt: Long) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.FACT,
+            content = id,
+            pinned = pinned,
+            importance = importance,
+            createdAt = updatedAt,
+            updatedAt = updatedAt,
+        )
+
+        val compacted = compactMemoryRecords(
+            records = listOf(
+                active("low-new", pinned = false, importance = 10, updatedAt = 400L),
+                active("important", pinned = false, importance = 95, updatedAt = 200L),
+                active("pinned", pinned = true, importance = 20, updatedAt = 100L),
+            ),
+            maxRecords = 2,
+        )
+
+        assertEquals(setOf("pinned", "important"), compacted.map { it.id }.toSet())
+    }
+
+
+    @Test fun storageCompactionNeverLetsOneLongChainEvictOtherActiveMemories() {
+        fun record(
+            id: String,
+            active: Boolean,
+            supersededBy: String? = null,
+            importance: Int = 50,
+            updatedAt: Long,
+        ) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.FACT,
+            content = id,
+            importance = importance,
+            active = active,
+            supersededBy = supersededBy,
+            createdAt = updatedAt,
+            updatedAt = updatedAt,
+        )
+
+        val records = listOf(
+            record("chain-1", active = false, supersededBy = "chain-2", updatedAt = 1L),
+            record("chain-2", active = false, supersededBy = "chain-3", updatedAt = 2L),
+            record("chain-3", active = false, supersededBy = "root-a", updatedAt = 3L),
+            record("root-a", active = true, importance = 100, updatedAt = 4L),
+            record("root-b", active = true, importance = 10, updatedAt = 5L),
+            record("root-c", active = true, importance = 10, updatedAt = 6L),
+        )
+
+        val compacted = compactMemoryRecords(records, maxRecords = 4)
+
+        assertTrue(compacted.any { it.id == "root-a" })
+        assertTrue(compacted.any { it.id == "root-b" })
+        assertTrue(compacted.any { it.id == "root-c" })
+        assertTrue(compacted.any { it.id == "chain-3" })
+        assertFalse(compacted.any { it.id == "chain-1" })
+    }
+
+    @Test fun protectedNewMemorySurvivesCapacityCompaction() {
+        fun active(id: String, importance: Int, updatedAt: Long) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.FACT,
+            content = id,
+            importance = importance,
+            createdAt = updatedAt,
+            updatedAt = updatedAt,
+        )
+
+        val compacted = compactMemoryRecords(
+            records = listOf(
+                active("old-high", importance = 100, updatedAt = 1L),
+                active("old-mid", importance = 80, updatedAt = 2L),
+                active("new-low", importance = 1, updatedAt = 3L),
+            ),
+            maxRecords = 2,
+            protectedIds = setOf("new-low"),
+        )
+
+        assertTrue(compacted.any { it.id == "new-low" })
+        assertEquals(2, compacted.size)
+    }
+
+
+    @Test fun explicitEpisodicRecallKeepsLowLexicalFactInCandidateSet() {
+        val memoryStore = store()
+        val episode = memoryStore.remember(
+            content = "关系对象稳定信息：她平时喜欢海边看日落",
+            scope = MemoryScope.LINEAGE,
+            kind = MemoryKind.RELATIONSHIP_FACT,
+            lineageId = "lineage",
+            importance = 80,
+        )
+        memoryStore.remember(
+            content = "关系状态：我和她｜在一起",
+            scope = MemoryScope.LINEAGE,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            lineageId = "lineage",
+            importance = 100,
+        )
+
+        val recalled = memoryStore.search(
+            query = "你还记得我们第一次出去那天吗",
+            allowedScopes = setOf(MemoryScope.LINEAGE),
+            projectId = null,
+            lineageId = "lineage",
+            allowedKinds = setOf(
+                MemoryKind.RELATIONSHIP_FACT,
+                MemoryKind.RELATIONSHIP_STATE,
+            ),
+            maxItems = 1,
+        )
+
+        assertEquals(listOf(episode.id), recalled.map { it.id })
+    }
+
+    @Test fun consolidationMergesFormattingVariantsAndPreservesAllSources() {
+        val memoryStore = store()
+        memoryStore.remember(
+            content = "用户喜欢简洁回复",
+            scope = MemoryScope.GLOBAL,
+            sourceSessionId = "s1",
+            sourceMessageId = "u1",
+            importance = 70,
+        )
+        memoryStore.remember(
+            content = "用户喜欢简洁回复。",
+            scope = MemoryScope.GLOBAL,
+            sourceSessionId = "s2",
+            sourceMessageId = "u2",
+            importance = 90,
+            pinned = true,
+        )
+
+        assertEquals(1, memoryStore.consolidateIfDue(force = true))
+        val active = all(memoryStore)
+        assertEquals(1, active.size)
+        assertTrue(active.single().pinned)
+        assertEquals(90, active.single().importance)
+        assertEquals(setOf("u1", "u2"), active.single().sourceMessages.map { it.messageId }.toSet())
+    }
+
+    @Test fun consolidationNeverMergesSameTextAcrossCharacterSubjects() {
+        val memoryStore = store()
+        memoryStore.remember(
+            content = "关系状态：我和同名角色｜在一起",
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            subjectKey = "gallery:one",
+        )
+        memoryStore.remember(
+            content = "关系状态：我和同名角色｜在一起。",
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.RELATIONSHIP_STATE,
+            subjectKey = "gallery:two",
+        )
+
+        assertEquals(0, memoryStore.consolidateIfDue(force = true))
+        assertEquals(setOf("gallery:one", "gallery:two"), all(memoryStore).mapNotNull { it.subjectKey }.toSet())
+    }
+
+
+    @Test fun consolidatedSourcesStillRollbackIndependentlyByMessage() {
+        val memoryStore = store()
+        memoryStore.remember(
+            content = "用户喜欢简洁回复",
+            scope = MemoryScope.GLOBAL,
+            sourceSessionId = "s",
+            sourceMessageId = "u1",
+        )
+        memoryStore.remember(
+            content = "用户喜欢简洁回复。",
+            scope = MemoryScope.GLOBAL,
+            sourceSessionId = "s",
+            sourceMessageId = "u2",
+        )
+        assertEquals(1, memoryStore.consolidateIfDue(force = true))
+
+        assertEquals(
+            0,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "s",
+                createdAtInclusive = Long.MIN_VALUE,
+                discardedMessageIds = setOf("u2"),
+            ),
+        )
+        var active = all(memoryStore)
+        assertEquals(1, active.size)
+        assertEquals(listOf("u1"), active.single().sourceMessages.map { it.messageId })
+
+        assertEquals(
+            1,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "s",
+                createdAtInclusive = Long.MIN_VALUE,
+                discardedMessageIds = setOf("u1"),
+            ),
+        )
+        active = all(memoryStore)
+        assertTrue(active.isEmpty())
+    }
+
+
+    @Test fun broadRecallDoesNotLoseLowLexicalEpisodeBehindHighImportanceDistractors() {
+        val memoryStore = store()
+        val episode = memoryStore.remember(
+            content = "关系对象稳定信息：她平时喜欢海边看日落",
+            scope = MemoryScope.LINEAGE,
+            kind = MemoryKind.RELATIONSHIP_FACT,
+            lineageId = "lineage",
+            importance = 80,
+        )
+        repeat(24) { index ->
+            memoryStore.remember(
+                content = "关系状态：我和她｜历史状态$index",
+                scope = MemoryScope.LINEAGE,
+                kind = MemoryKind.RELATIONSHIP_STATE,
+                lineageId = "lineage",
+                importance = 100,
+            )
+        }
+
+        val recalled = memoryStore.search(
+            query = "你还记得我们第一次出去那天吗",
+            allowedScopes = setOf(MemoryScope.LINEAGE),
+            projectId = null,
+            lineageId = "lineage",
+            allowedKinds = setOf(
+                MemoryKind.RELATIONSHIP_FACT,
+                MemoryKind.RELATIONSHIP_STATE,
+            ),
+            maxItems = 1,
+        )
+
+        assertEquals(listOf(episode.id), recalled.map { it.id })
+    }
+
+
+    @Test fun boundedSourceHistoryMarksOlderOmittedProvenanceAsUnbound() {
+        val memoryStore = store()
+        repeat(20) { index ->
+            memoryStore.remember(
+                content = "用户喜欢简洁回复",
+                scope = MemoryScope.GLOBAL,
+                sourceSessionId = "s",
+                sourceMessageId = "u$index",
+            )
+        }
+
+        var active = all(memoryStore)
+        assertEquals(1, active.size)
+        assertEquals(16, active.single().sourceMessages.size)
+        assertTrue(active.single().hasUnboundSource)
+
+        val trackedIds = active.single().sourceMessages.map { it.messageId }.toSet()
+        assertEquals(
+            0,
+            memoryStore.rollbackSourceSessionFrom(
+                sourceSessionId = "s",
+                createdAtInclusive = Long.MIN_VALUE,
+                discardedMessageIds = trackedIds,
+            ),
+        )
+        active = all(memoryStore)
+        assertEquals(1, active.size)
+        assertTrue(active.single().sourceMessages.isEmpty())
+        assertTrue(active.single().hasUnboundSource)
+    }
+
+}

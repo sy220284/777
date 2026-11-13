@@ -1,0 +1,32 @@
+{
+  "id": "mixed-json-arguments",
+  "input": "混合参数",
+  "modelReplies": [
+    {
+      "toolCalls": [
+        {
+          "id": "c1",
+          "name": "mix",
+          "arguments": {
+            "enabled": true,
+            "missing": null,
+            "items": [
+              1,
+              "two",
+              false
+            ],
+            "meta": {
+              "x": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "content": "done"
+    }
+  ],
+  "toolOutputs": {
+    "mix": "mixed"
+  }
+}

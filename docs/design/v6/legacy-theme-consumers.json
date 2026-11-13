@@ -1,0 +1,6 @@
+{
+  "description": "V6 frozen retired DsTheme.colors usage baseline (empty). Any new production UI consumer fails the design-system gate.",
+  "base": "PR #679 migrated production usage to zero",
+  "verifiedDate": "2026-10-13",
+  "remainingProductionFiles": []
+}

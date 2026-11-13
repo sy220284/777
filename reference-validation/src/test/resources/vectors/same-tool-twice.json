@@ -1,0 +1,30 @@
+{
+  "id": "same-tool-twice",
+  "input": "同名两次",
+  "modelReplies": [
+    {
+      "toolCalls": [
+        {
+          "id": "c1",
+          "name": "echo",
+          "arguments": {
+            "text": "first"
+          }
+        },
+        {
+          "id": "c2",
+          "name": "echo",
+          "arguments": {
+            "text": "second"
+          }
+        }
+      ]
+    },
+    {
+      "content": "done"
+    }
+  ],
+  "toolOutputs": {
+    "echo": "same-output"
+  }
+}

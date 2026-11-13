@@ -1,0 +1,21 @@
+{
+  "id": "empty-arguments",
+  "input": "空参数",
+  "modelReplies": [
+    {
+      "toolCalls": [
+        {
+          "id": "c1",
+          "name": "noop",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "content": "done"
+    }
+  ],
+  "toolOutputs": {
+    "noop": "ok"
+  }
+}

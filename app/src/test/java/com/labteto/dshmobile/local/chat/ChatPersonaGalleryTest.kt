@@ -1,0 +1,908 @@
+package com.labteto.dshmobile.local.chat
+
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import java.io.File
+import kotlinx.serialization.json.Json
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+
+class ChatPersonaGalleryTest {
+    @get:Rule val temporary = TemporaryFolder()
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
+    @Test
+    fun archivesFullHistoryButOnlyRecentDialogueEntersNewChat() {
+        val story = PersonaGalleryStory(
+            id = "story-1",
+            title = "雪夜",
+            notes = "雪夜在桥边重逢",
+            history = (1..30).map { index ->
+                LocalHarnessMessage(
+                    "$index",
+                    if (index % 2 == 0) "assistant" else "user",
+                    "对白$index",
+                    createdAt = index.toLong(),
+                )
+            },
+        )
+        val entry = PersonaGalleryEntry(
+            id = "gallery-1",
+            persona = PersonaProfile(name = "阿青"),
+            stories = listOf(story),
+        )
+
+        val context = entry.storyContext("story-1")
+        assertTrue(context.contains("雪夜在桥边重逢"))
+        assertTrue(context.contains("对白29"))
+        assertTrue(context.contains("对白30"))
+        assertFalse(context.contains("对白1\n"))
+        assertTrue(context.contains("角色历史表达只说明当时发生过的交流"))
+        assertEquals(30, story.history.size)
+    }
+
+    @Test
+    fun explicitlyEditedPersonaDeletionSurvivesGallerySaveAndReload() {
+        val file = File(temporary.newFolder("edited-persona"), "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val old = PersonaProfile(name = "阿青", coreIdentity = "画师", facts = listOf(
+            CharacterFact("keep", CharacterFactCategories.BIOGRAPHY, "曾在杭州求学"),
+            CharacterFact("remove", CharacterFactCategories.RELATIONSHIPS, "旧的关系设定"),
+        ))
+        val initial = gallery.save(
+            persona = old, sourceSessionId = "", history = emptyList(),
+            chatState = ChatCharacterState(), notes = "",
+        ).entry
+        val changed = old.copy(facts = old.facts.filterNot { it.id == "remove" })
+        val updated = gallery.save(
+            persona = changed, sourceSessionId = "", history = emptyList(),
+            chatState = ChatCharacterState(), notes = "", existingId = initial.id,
+        ).entry
+        assertEquals(listOf("keep"), updated.persona.facts.map(CharacterFact::id))
+        assertEquals(listOf("keep"),
+            ChatPersonaGalleryStore(file, json).findEntry(initial.id)!!.persona.facts.map(CharacterFact::id))
+    }
+
+    @Test
+    fun savedCharacterFactsAndWorldBookControlRuntimeAfterReloadAndStoryRewind() {
+        val file = File(temporary.newFolder("runtime-journey"), "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val person = PersonaProfile(
+            name = "叶澜", coreIdentity = "旧书店店主",
+            facts = listOf(
+                CharacterFact("early", CharacterFactCategories.BIOGRAPHY,
+                    "第一幕在旧书店认识阿宁", temporalScope = "opening",
+                    provenance = CharacterFactProvenance.CANON),
+                CharacterFact("later", CharacterFactCategories.BIOGRAPHY,
+                    "第二幕需要看守红伞中的密信", temporalScope = "reveal",
+                    provenance = CharacterFactProvenance.CANON),
+            ),
+            loreEntries = listOf(PersonaLoreEntry(
+                id = "secret", title = "密信背景", content = "密信藏在红伞底部",
+                temporalScope = "reveal", alwaysOn = true,
+            )),
+        )
+        val created = gallery.save(
+            persona = person, sourceSessionId = "journey",
+            history = listOf(LocalHarnessMessage("m1", "user", "故事开始", createdAt = 1L)),
+            chatState = ChatCharacterState(), notes = "旧书店的故事",
+            chatContext = ChatContextState().withStoryStageSelection("opening"),
+        )
+        val storyId = requireNotNull(created.storyId)
+        fun prompt(): String {
+            val loaded = ChatPersonaGalleryStore(file, json).findEntry(created.entry.id)!!
+            val context = loaded.story(storyId)!!.chatContext
+            val projected = CharacterRuntimeProjector(
+                ChatRelationshipEngine(), CharacterLoreEngine(),
+            ).project(loaded.persona, ChatCharacterState(), context,
+                "阿宁和密信的事情，你能不能告诉我？", null)
+            return projected.stablePrompt + projected.dynamicPrompt
+        }
+        val early = prompt()
+        assertTrue(early.contains("第一幕在旧书店认识阿宁"))
+        assertFalse(early.contains("第二幕需要看守红伞中的密信"))
+        assertFalse(early.contains("密信藏在红伞底部"))
+        assertFalse(early.contains("旧字段称她已经知道全部密信秘密"))
+        assertTrue(gallery.updateStoryDetails(created.entry.id, storyId, "旧书店的故事", "reveal"))
+        val later = prompt()
+        assertTrue(later.contains("第一幕在旧书店认识阿宁"))
+        assertTrue(later.contains("第二幕需要看守红伞中的密信"))
+        assertTrue(later.contains("密信藏在红伞底部"))
+        assertTrue(gallery.updateStoryDetails(created.entry.id, storyId, "旧书店的故事", "opening"))
+        assertFalse(prompt().contains("密信藏在红伞底部"))
+        assertEquals(2, ChatPersonaGalleryStore(file, json)
+            .findEntry(created.entry.id)!!.persona.facts.size)
+    }
+
+    @Test
+    fun archivedStoryStageRemainsAuthoritativeOverStaleSessionSnapshots() {
+        val file = File(temporary.newFolder("stage-owner"), "gallery.json")
+        val store = ChatPersonaGalleryStore(file, json)
+        val person = PersonaProfile(name = "阿青", coreIdentity = "学徒")
+        val created = store.save(
+            persona = person, sourceSessionId = "session",
+            history = listOf(LocalHarnessMessage("first", "user", "开始", createdAt = 1L)),
+            chatState = ChatCharacterState(), notes = "",
+            chatContext = ChatContextState(storyStage = "act-1"),
+        )
+        val storyId = requireNotNull(created.storyId)
+        assertTrue(store.updateStoryDetails(created.entry.id, storyId, "", ""))
+        store.save(
+            persona = person, sourceSessionId = "session",
+            history = listOf(LocalHarnessMessage("second", "user", "继续", createdAt = 2L)),
+            chatState = ChatCharacterState(), notes = "",
+            chatContext = ChatContextState(storyStage = "act-1"),
+            existingId = created.entry.id, existingStoryId = storyId,
+        )
+        assertEquals("", ChatPersonaGalleryStore(file, json).findEntry(created.entry.id)!!
+            .stories.single().chatContext.storyStage)
+        assertTrue(store.updateStoryDetails(created.entry.id, storyId, "", "act-2"))
+        store.save(
+            persona = person, sourceSessionId = "session", history = emptyList(),
+            chatState = ChatCharacterState(), notes = "",
+            chatContext = ChatContextState(storyStage = "act-1"),
+            existingId = created.entry.id, existingStoryId = storyId,
+        )
+        assertEquals("act-2", ChatPersonaGalleryStore(file, json).findEntry(created.entry.id)!!
+            .stories.single().chatContext.storyStage)
+    }
+
+    @Test
+    fun enrichmentCannotOverwriteVerifiedCanonByReusingFactId() {
+        val canon = CharacterFact(
+            id = "identity-1", category = CharacterFactCategories.BIOGRAPHY,
+            content = "原作明确的经历", provenance = CharacterFactProvenance.CANON,
+        )
+        val incoming = canon.copy(
+            content = "导入中误写的设定", provenance = CharacterFactProvenance.USER_CREATED,
+        )
+        assertEquals(listOf(canon), mergeCharacterFacts(listOf(canon), listOf(incoming)))
+        val extra = CharacterFact(
+            id = "new", category = CharacterFactCategories.BIOGRAPHY,
+            content = "明确补充的另一件事", provenance = CharacterFactProvenance.USER_CREATED,
+        )
+        assertEquals(2, mergeCharacterFacts(listOf(canon), listOf(extra)).size)
+    }
+
+    @Test
+    fun sameCharacterMergesIntoOneRicherProfileWithoutRepeatingShortVersion() {
+        val base = PersonaProfile(
+            id = "gallery-1",
+            name = "小岚",
+            coreIdentity = "花店店主",
+            facts = listOf(
+                CharacterFact("portrait", CharacterFactCategories.BIOGRAPHY, "花店店主"),
+                CharacterFact("trait", CharacterFactCategories.PERSONALITY, "嘴硬心软"),
+            ),
+            hardConstraints = listOf("不会无故失约"),
+        )
+        val incoming = PersonaProfile(
+            id = "temp",
+            name = "小岚",
+            coreIdentity = "花店店主",
+            facts = listOf(
+                CharacterFact("portrait", CharacterFactCategories.BIOGRAPHY, "经营街角花店的店主",
+                    provenance = CharacterFactProvenance.USER_CREATED),
+                CharacterFact("trait", CharacterFactCategories.PERSONALITY, "嘴硬心软"),
+                CharacterFact("trait-extra", CharacterFactCategories.PERSONALITY, "遇到重要的人会主动解释"),
+            ),
+            hardConstraints = listOf("不会无故失约", "不拿感情问题开恶意玩笑"),
+        )
+
+        assertTrue(samePersonaIdentity(base, incoming))
+        val merged = mergePersonaProfiles(base, incoming)
+
+        assertEquals("经营街角花店的店主", merged.factText(CharacterFactCategories.BIOGRAPHY))
+        assertEquals(listOf("嘴硬心软", "遇到重要的人会主动解释"),
+            merged.facts.filter { it.category == CharacterFactCategories.PERSONALITY }.map { it.content })
+        assertEquals("花店店主", merged.coreIdentity)
+        assertEquals(
+            listOf("不会无故失约", "不拿感情问题开恶意玩笑"),
+            merged.hardConstraints,
+        )
+    }
+
+    @Test
+    fun sameNameDifferentV4IdentityStaysSeparate() {
+        val teyvat = PersonaProfile(name = "神里绫华", franchise = "原神",
+            coreIdentity = "社奉行的大小姐")
+        val modern = PersonaProfile(name = "神里绫华", franchise = "原神",
+            coreIdentity = "现代都市的建筑师")
+
+        assertFalse(samePersonaIdentity(teyvat, modern))
+    }
+
+    @Test
+    fun sameNameSameWorldDifferentFranchisesStaySeparate() {
+        val first = PersonaProfile(
+            name = "阿岚",
+            franchise = "作品甲",
+        )
+        val second = PersonaProfile(
+            name = "阿岚",
+            franchise = "作品乙",
+        )
+
+        assertFalse(samePersonaIdentity(first, second))
+    }
+
+    @Test
+    fun galleryKnowledgePathSurvivesStaleSaveAndExplicitRewind() {
+        val file = File(temporary.newFolder("stage-knowledge-path"), "gallery.json")
+        val store = ChatPersonaGalleryStore(file, json)
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "旅行者")
+        val created = store.save(
+            persona = persona, sourceSessionId = "session",
+            history = listOf(LocalHarnessMessage("first", "user", "第一幕", createdAt = 1L)),
+            chatState = ChatCharacterState(), notes = "",
+            chatContext = ChatContextState().withStoryStageSelection("opening"),
+        )
+        val id = created.entry.id
+        val storyId = requireNotNull(created.storyId)
+        assertTrue(store.updateStoryDetails(id, storyId, "", "later"))
+        fun saved() = ChatPersonaGalleryStore(file, json).findEntry(id)!!.story(storyId)!!.chatContext
+        assertEquals(listOf("opening", "later"), saved().unlockedStoryStages)
+
+        // An in-flight snapshot created before the manual stage edit cannot rewrite authority.
+        store.save(
+            persona = persona, sourceSessionId = "session", history = emptyList(),
+            chatState = ChatCharacterState(), notes = "",
+            chatContext = ChatContextState(storyStage = "opening"),
+            existingId = id, existingStoryId = storyId,
+        )
+        assertEquals(listOf("opening", "later"), saved().unlockedStoryStages)
+        assertEquals("later", saved().storyStage)
+
+        assertTrue(store.updateStoryDetails(id, storyId, "", "opening"))
+        assertEquals(listOf("opening"), saved().unlockedStoryStages)
+        assertTrue(store.updateStoryDetails(id, storyId, "", ""))
+        store.save(
+            persona = persona, sourceSessionId = "session", history = emptyList(),
+            chatState = ChatCharacterState(), notes = "",
+            chatContext = ChatContextState(storyStage = "later"),
+            existingId = id, existingStoryId = storyId,
+        )
+        assertEquals("", saved().storyStage)
+        assertTrue(saved().unlockedStoryStages.isEmpty())
+    }
+
+    @Test
+    fun storyStageSurvivesGallerySaveReloadAndResave() {
+        val file = File(temporary.newFolder("stage-roundtrip"), "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "江湖游侠")
+        val first = gallery.save(
+            persona = persona,
+            sourceSessionId = "session-a",
+            history = listOf(LocalHarnessMessage("m1", "user", "开场", createdAt = 1L)),
+            chatState = ChatCharacterState(),
+            notes = "",
+        )
+        val storyId = requireNotNull(first.storyId)
+        assertTrue(gallery.updateStoryDetails(first.entry.id, storyId, "新的故事提要", "act-2"))
+        val restored = ChatPersonaGalleryStore(file, json).findEntry(first.entry.id)
+        assertEquals("act-2", restored?.story(storyId)?.chatContext?.storyStage)
+        assertEquals("新的故事提要", restored?.story(storyId)?.notes)
+
+        val savedAgain = gallery.save(
+            persona = persona,
+            sourceSessionId = "session-a",
+            history = emptyList(),
+            chatState = ChatCharacterState(),
+            notes = "新的故事提要",
+            chatContext = ChatContextState(),
+            existingId = first.entry.id,
+            existingStoryId = storyId,
+        )
+        assertEquals("act-2", savedAgain.entry.story(storyId)?.chatContext?.storyStage)
+    }
+
+    @Test
+    fun repeatedSaveDoesNotDuplicateArchivedMessagesInsideOneStory() {
+        val base = PersonaGalleryStory(
+            id = "story-1",
+            history = listOf(
+                LocalHarnessMessage("m1", "user", "你来了", createdAt = 1L),
+                LocalHarnessMessage("m2", "assistant", "嗯。", createdAt = 2L),
+            ),
+            updatedAt = 2L,
+        )
+        val incoming = PersonaGalleryStory(
+            id = "story-1",
+            history = listOf(
+                LocalHarnessMessage("m1", "user", "你来了", createdAt = 1L),
+                LocalHarnessMessage("m2", "assistant", "嗯。", createdAt = 2L),
+                LocalHarnessMessage("m3", "user", "一起走吧", createdAt = 3L),
+            ),
+            updatedAt = 3L,
+        )
+
+        val merged = mergeGalleryStories(base, incoming)
+
+        assertEquals(listOf("m1", "m2", "m3"), merged.history.map { it.id })
+    }
+
+    @Test
+    fun legacySameDialogueWithDifferentIdsIsStillDeduplicated() {
+        val base = PersonaGalleryStory(
+            id = "story-1",
+            history = listOf(
+                LocalHarnessMessage("old-id", "user", "同一句对白", createdAt = 10L),
+            ),
+        )
+        val incoming = PersonaGalleryStory(
+            id = "story-1",
+            history = listOf(
+                LocalHarnessMessage("new-id", "user", "同一句对白", createdAt = 10L),
+            ),
+        )
+
+        val merged = mergeGalleryStories(base, incoming)
+
+        assertEquals(1, merged.history.size)
+    }
+
+    @Test
+    fun interruptedPhysicalDeletionCompletesFromDurableTombstoneOnRestart() {
+        val root = temporary.newFolder("crash-after-gallery-tombstone")
+        val file = File(root, "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val first = LocalHarnessMessage("m1", "user", "敏感历史", createdAt = 1L)
+        val second = LocalHarnessMessage("m2", "assistant", "保留历史", createdAt = 2L)
+        val saved = gallery.save(
+            persona = PersonaProfile(name = "阿青"), sourceSessionId = "session",
+            history = listOf(first, second), chatState = ChatCharacterState(), notes = "",
+        )
+        val entry = saved.entry
+        val storyId = checkNotNull(saved.storyId)
+        val document = json.decodeFromString(GalleryDocument.serializer(), file.readText())
+        val updated = document.copy(entries = document.entries.map { item ->
+            if (item.id != entry.id) item else item.copy(
+                stories = item.stories.map { story ->
+                    if (story.id != storyId) story else story.copy(
+                        excludedMessageKeys = listOf(galleryMessageArchiveKey(first)),
+                    )
+                },
+            )
+        })
+        // Simulate a crash after the metadata transaction, before the archive rewrite.
+        file.writeText(json.encodeToString(GalleryDocument.serializer(), updated))
+        val recovered = ChatPersonaGalleryStore(file, json)
+        val page = recovered.loadStoryHistory(entry.id, storyId, 100)
+        assertEquals(listOf("m2"), page.messages.map { it.id })
+        assertEquals(1, page.totalCount)
+        val secondRestart = ChatPersonaGalleryStore(file, json)
+        assertEquals(listOf("m2"), secondRestart.loadStoryHistory(entry.id, storyId, 100).messages.map { it.id })
+    }
+
+    @Test
+    fun deleteJournalCleansOrphanOnlyAfterMetadataCommit() {
+        val root = temporary.newFolder("archive-delete-recovery")
+        val file = File(root, "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val saved = gallery.save(
+            persona = PersonaProfile(name = "阿青"), sourceSessionId = "session",
+            history = listOf(LocalHarnessMessage("m1", "assistant", "历史", createdAt = 1L)),
+            chatState = ChatCharacterState(), notes = "",
+        )
+        val storyId = checkNotNull(saved.storyId)
+        val archive = File(File(File(root, "persona-history-v6"), saved.entry.id), storyId + ".jsonl")
+        assertTrue(archive.isFile)
+        val pending = PersonaGalleryArchiveDeletionJournal(file, json)
+        pending.queue(saved.entry.id, storyId)
+        // A failed metadata commit must preserve referenced history.
+        val intact = ChatPersonaGalleryStore(file, json)
+        assertEquals(1, intact.loadStoryHistory(saved.entry.id, storyId, 10).totalCount)
+        assertTrue(archive.isFile)
+
+        pending.queue(saved.entry.id, storyId)
+        val document = json.decodeFromString(GalleryDocument.serializer(), file.readText())
+        file.writeText(json.encodeToString(GalleryDocument.serializer(),
+            document.copy(entries = document.entries.map { entry ->
+                if (entry.id != saved.entry.id) entry else entry.copy(stories = emptyList())
+            }),
+        ))
+        // Crash after the durable metadata commit; startup finishes the physical deletion.
+        val recovered = ChatPersonaGalleryStore(file, json)
+        assertTrue(recovered.list().single().stories.isEmpty())
+        assertTrue(!archive.exists())
+    }
+
+    @Test
+    fun deletingMissingMessageDoesNotReportSuccessOrLeaveTombstone() {
+        val file = File(temporary.newFolder("missing-message"), "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val existing = LocalHarnessMessage("existing", "assistant", "需要保留的历史", createdAt = 1L)
+        val saved = gallery.save(
+            persona = PersonaProfile(name = "阿青"), sourceSessionId = "session",
+            history = listOf(existing), chatState = ChatCharacterState(), notes = "",
+        )
+        val storyId = checkNotNull(saved.storyId)
+        val missingKey = galleryMessageArchiveKey(
+            LocalHarnessMessage("missing", "assistant", "从未存在", createdAt = 2L),
+        )
+
+        assertFalse(gallery.deleteHistoryMessage(saved.entry.id, storyId, missingKey))
+        val storyAfter = gallery.list().single().stories.single { it.id == storyId }
+        assertFalse(missingKey in storyAfter.excludedMessageKeys)
+        assertEquals(listOf("existing"), gallery.loadStoryHistory(saved.entry.id, storyId, 20).messages.map { it.id })
+
+        assertTrue(gallery.deleteHistoryMessage(saved.entry.id, storyId, galleryMessageArchiveKey(existing)))
+        assertTrue(gallery.loadStoryHistory(saved.entry.id, storyId, 20).messages.isEmpty())
+    }
+
+    @Test
+    fun archivedDialogueDeletionCreatesTombstoneSoLaterSaveCannotRestoreIt() {
+        val first = LocalHarnessMessage("m1", "user", "第一句", createdAt = 1L)
+        val second = LocalHarnessMessage("m2", "assistant", "第二句", createdAt = 2L)
+        val story = PersonaGalleryStory(id = "story-1", history = listOf(first, second))
+
+        val deleted = removeArchivedGalleryMessage(story, galleryMessageArchiveKey(first))!!
+        val resaved = mergeGalleryStories(
+            deleted,
+            PersonaGalleryStory(id = "story-1", history = listOf(first, second)),
+        )
+
+        assertEquals(listOf("m2"), resaved.history.map { it.id })
+        assertTrue(galleryMessageArchiveKey(first) in resaved.excludedMessageKeys)
+    }
+
+    @Test
+    fun savedStoryBecomesDirtyWhenNewDialogueArrives() {
+        val saved = LocalHarnessMessage("m1", "user", "早上好", createdAt = 1L)
+        val fresh = LocalHarnessMessage("m2", "assistant", "早上好。", createdAt = 2L)
+        val entry = PersonaGalleryEntry(
+            id = "gallery-1",
+            persona = PersonaProfile(id = "gallery-1", name = "阿青", coreIdentity = "剑客"),
+            stories = listOf(PersonaGalleryStory(id = "story-1", history = listOf(saved))),
+        )
+
+        assertFalse(
+            galleryEntryHasUnsavedChanges(
+                entry,
+                "story-1",
+                entry.persona,
+                listOf(saved),
+                ChatCharacterState(),
+            ),
+        )
+        assertTrue(
+            galleryEntryHasUnsavedChanges(
+                entry,
+                "story-1",
+                entry.persona,
+                listOf(saved, fresh),
+                ChatCharacterState(),
+            ),
+        )
+    }
+
+    @Test
+    fun selectedInspectionSuggestionAppendsOnceAndKeepsExistingPersona() {
+        val profile = PersonaProfile(
+            name = "小岚", coreIdentity = "设计师",
+            facts = listOf(
+                CharacterFact("belief", CharacterFactCategories.SUBJECTIVE_BELIEFS,
+                    "和用户是多年好友", provenance = CharacterFactProvenance.USER_CREATED),
+                CharacterFact("voice", CharacterFactCategories.VOICE_STYLE,
+                    "少来", provenance = CharacterFactProvenance.USER_CREATED),
+            ),
+        )
+        val suggestion = PersonaAppendSuggestion(
+            field = "subjectiveBeliefs",
+            value = "私下会叫用户小名",
+            evidence = "对话里多次使用小名",
+        )
+        val phrase = PersonaAppendSuggestion(
+            field = "voiceStyle",
+            value = "少来",
+            evidence = "已有内容，不应重复",
+        )
+
+        val merged = applyPersonaSuggestions(profile, listOf(suggestion, phrase, phrase))
+
+        assertTrue(merged.coreIdentity.isNotBlank())
+        assertTrue(merged.factText(CharacterFactCategories.SUBJECTIVE_BELIEFS)
+            .contains("和用户是多年好友"))
+        assertTrue(merged.factText(CharacterFactCategories.SUBJECTIVE_BELIEFS)
+            .contains("私下会叫用户小名"))
+        assertEquals("少来", merged.factText(CharacterFactCategories.VOICE_STYLE))
+        assertEquals(1, merged.facts.count {
+            it.category == CharacterFactCategories.VOICE_STYLE && it.content == "少来"
+        })
+    }
+
+    @Test
+    fun removedLegacySuggestionNamesAreIgnoredWhileNewFactsRemainEditable() {
+        val current = PersonaProfile(name = "小岚", coreIdentity = "设计师",
+            facts = listOf(CharacterFact("authored", CharacterFactCategories.PERSONALITY,
+                "平日沉稳", provenance = CharacterFactProvenance.USER_CREATED)))
+        val suggestions = listOf(
+            PersonaAppendSuggestion("stableTraits", "旧版自动性格", "旧资料"),
+            PersonaAppendSuggestion("lifeContext", "旧版生活描述", "旧资料"),
+            PersonaAppendSuggestion("personality", "熟人面前会开玩笑", "用户确认"),
+        )
+        val result = applyPersonaSuggestions(current, suggestions)
+        assertEquals(current.facts.first(), result.facts.first())
+        assertEquals(1, result.facts.count { it.content == "熟人面前会开玩笑" })
+        assertTrue(result.facts.none { it.content.startsWith("旧版") })
+        assertTrue(result.facts.none { it.category == "lifeContext" })
+    }
+
+    @Test
+    fun personaFileShareRoundTripsWithoutStoriesOrForeignIds() {
+        val source = ChatPersonaGalleryStore(File(temporary.root, "source.json"), Json)
+        val saved = source.save(
+            persona = PersonaProfile(
+                name = "小岚",
+                coreIdentity = "花店店主",
+                facts = listOf(CharacterFact("personality", CharacterFactCategories.PERSONALITY,
+                    "嘴硬心软", provenance = CharacterFactProvenance.USER_CREATED)),
+                bannedPhrases = listOf("客服腔"),
+            ),
+            sourceSessionId = "session-a",
+            history = listOf(LocalHarnessMessage("m1", "user", "你好", createdAt = 1L)),
+            chatState = ChatCharacterState(),
+            notes = "旧故事",
+        ).entry
+
+        val payload = source.exportPersona(saved.id)
+        val importedStore = ChatPersonaGalleryStore(File(temporary.root, "imported.json"), Json)
+        val imported = importedStore.importPersona(payload)
+
+        assertEquals("小岚", imported.persona.name)
+        assertEquals("花店店主", imported.persona.coreIdentity)
+        assertEquals("嘴硬心软", imported.persona.factText(CharacterFactCategories.PERSONALITY))
+        assertTrue(imported.persona.coreIdentity.isNotBlank())
+        assertEquals(listOf("客服腔"), imported.persona.bannedPhrases)
+        assertTrue(imported.stories.isEmpty())
+        assertFalse(imported.id == saved.id)
+    }
+
+    @Test
+    fun localPortraitPathPersistsAcrossReloadAndLaterStorySave() {
+        val file = File(temporary.root, "portrait-gallery.json")
+        val store = ChatPersonaGalleryStore(file, Json)
+        val saved = store.save(
+            persona = PersonaProfile(name = "阿青", coreIdentity = "剑客"),
+            sourceSessionId = "",
+            history = emptyList(),
+            chatState = ChatCharacterState(),
+            notes = "",
+        ).entry
+
+        val withPortrait = store.updatePortraitPath(saved.id, "/app/private/portrait.png")!!
+        assertEquals("/app/private/portrait.png", withPortrait.portraitPath)
+        assertEquals(
+            "/app/private/portrait.png",
+            ChatPersonaGalleryStore(file, Json).list().single().portraitPath,
+        )
+
+        val resaved = store.save(
+            persona = withPortrait.persona,
+            sourceSessionId = "session-a",
+            history = listOf(LocalHarnessMessage("m1", "user", "在吗", createdAt = 1L)),
+            chatState = ChatCharacterState(),
+            notes = "",
+            existingId = saved.id,
+        ).entry
+
+        assertEquals("/app/private/portrait.png", resaved.portraitPath)
+    }
+
+    @Test
+    fun groupChatStatePersistsSeparatelyFromSingleChatStories() {
+        val file = File(temporary.root, "group-state-gallery.json")
+        val store = ChatPersonaGalleryStore(file, Json)
+        val saved = store.save(
+            persona = PersonaProfile(name = "阿青", coreIdentity = "剑客"),
+            sourceSessionId = "single-session",
+            history = listOf(LocalHarnessMessage("m1", "user", "单聊故事", createdAt = 1L)),
+            chatState = ChatCharacterState(
+                relationshipState = "单聊熟悉中",
+                updatedAt = 10L,
+            ),
+            notes = "",
+        ).entry
+
+        val groupState = ChatCharacterState(
+            relationshipState = "群聊里已经很熟",
+            initiative = 72,
+            updatedAt = 20L,
+        )
+        val updated = store.updateGroupChatState(saved.id, groupState)!!
+
+        assertEquals("群聊里已经很熟", updated.groupChatState.relationshipState)
+        assertEquals(72, updated.groupChatState.initiative)
+        assertEquals("单聊熟悉中", updated.stories.single().chatState.relationshipState)
+
+        val reloaded = ChatPersonaGalleryStore(file, Json).list().single()
+        assertEquals("群聊里已经很熟", reloaded.groupChatState.relationshipState)
+        assertEquals("单聊熟悉中", reloaded.stories.single().chatState.relationshipState)
+    }
+
+    @Test
+    fun structuredRuntimeFieldsSurviveSaveExportAndImport() {
+        val source = ChatPersonaGalleryStore(File(temporary.root, "runtime-source.json"), Json)
+        val saved = source.save(
+            persona = PersonaProfile(
+                name = "神里绫华",
+                franchise = "原神",
+                timelinePosition = "无剧透阶段",
+                coreIdentity = "神里家大小姐",
+                facts = listOf(
+                    CharacterFact("values", CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                        "兼顾责任与真诚关系；家族责任",
+                        provenance = CharacterFactProvenance.USER_CREATED),
+                    CharacterFact("perception", CharacterFactCategories.SUBJECTIVE_BELIEFS,
+                        "先观察再表达", provenance = CharacterFactProvenance.USER_CREATED),
+                    CharacterFact("contrast", CharacterFactCategories.IDENTITY_GAP,
+                        "责任与普通生活的拉扯", provenance = CharacterFactProvenance.USER_CREATED),
+                ),
+                knowledgeBoundary = listOf("不知道未经历的后续剧情"),
+                loreEntries = listOf(
+                    PersonaLoreEntry(
+                        id = "thoma",
+                        title = "托马",
+                        content = "托马是神里家重要伙伴。",
+                        keywords = listOf("托马"),
+                        priority = 80,
+                    ),
+                ),
+                presetId = "genshin-kamisato-ayaka",
+            ),
+            sourceSessionId = "",
+            history = emptyList(),
+            chatState = ChatCharacterState(),
+            notes = "",
+        ).entry
+
+        assertTrue(saved.stories.isEmpty())
+        val payload = source.exportPersona(saved.id)
+        val imported = ChatPersonaGalleryStore(File(temporary.root, "runtime-imported.json"), Json)
+            .importPersona(payload)
+
+        assertEquals("原神", imported.persona.franchise)
+        assertEquals("无剧透阶段", imported.persona.timelinePosition)
+        assertEquals("兼顾责任与真诚关系；家族责任", imported.persona.factText(CharacterFactCategories.VALUES_AND_TRADEOFFS))
+        assertEquals("先观察再表达",
+            imported.persona.factText(CharacterFactCategories.SUBJECTIVE_BELIEFS))
+        assertEquals("神里家大小姐", imported.persona.coreIdentity)
+        assertEquals(listOf("不知道未经历的后续剧情"), imported.persona.knowledgeBoundary)
+        assertEquals("genshin-kamisato-ayaka", imported.persona.presetId)
+        assertEquals("thoma", imported.persona.loreEntries.single().id)
+        assertEquals(listOf("托马"), imported.persona.loreEntries.single().keywords)
+    }
+
+    @Test
+    fun structuredPersonaMergeKeepsDistinctLoreWithoutDuplicatingEntries() {
+        val base = PersonaProfile(
+            name = "卡芙卡",
+            franchise = "崩坏：星穹铁道",
+            coreIdentity = "星核猎手的成员",
+            facts = listOf(CharacterFact("first", CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                "保持选择权", provenance = CharacterFactProvenance.USER_CREATED)),
+            loreEntries = listOf(
+                PersonaLoreEntry(
+                    id = "hunters",
+                    title = "星核猎手",
+                    content = "长期合作组织。",
+                    keywords = listOf("星核猎手"),
+                    priority = 70,
+                ),
+            ),
+        )
+        val incoming = PersonaProfile(
+            name = "卡芙卡",
+            franchise = "崩坏：星穹铁道",
+            coreIdentity = "星核猎手的成员",
+            facts = listOf(CharacterFact("second", CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                "推动长期计划", provenance = CharacterFactProvenance.USER_CREATED)),
+            loreEntries = listOf(
+                PersonaLoreEntry(
+                    id = "hunters",
+                    title = "星核猎手",
+                    content = "长期合作组织，与她的行动密切相关。",
+                    keywords = listOf("星核猎手", "银狼"),
+                    priority = 90,
+                    spoilerLevel = 2,
+                ),
+                PersonaLoreEntry(
+                    id = "script",
+                    title = "剧本",
+                    content = "计划细节按剧情边界透露。",
+                    keywords = listOf("剧本"),
+                ),
+            ),
+        )
+
+        val merged = mergePersonaProfiles(base, incoming)
+
+        assertEquals(setOf("保持选择权", "推动长期计划"),
+            merged.facts.filter { it.category == CharacterFactCategories.VALUES_AND_TRADEOFFS }
+                .map { it.content }.toSet())
+        assertEquals("星核猎手的成员", merged.coreIdentity)
+        assertEquals(2, merged.loreEntries.size)
+        val hunters = merged.loreEntries.first { it.id == "hunters" }
+        assertEquals(90, hunters.priority)
+        assertEquals(2, hunters.spoilerLevel)
+        assertTrue("银狼" in hunters.keywords)
+        assertTrue(hunters.content.contains("密切相关"))
+    }
+
+    @Test
+    fun compactPersonaShareStaysQrSizedAndCanImport() {
+        val source = ChatPersonaGalleryStore(File(temporary.root, "qr-source.json"), Json)
+        val saved = source.save(
+            persona = PersonaProfile(
+                name = "阿青",
+                coreIdentity = "剑客".repeat(600),
+                facts = listOf(
+                    CharacterFact("bio", CharacterFactCategories.BIOGRAPHY,
+                        "剑客生活，背景悠长".repeat(100),
+                        provenance = CharacterFactProvenance.USER_CREATED),
+                    CharacterFact("trait", CharacterFactCategories.PERSONALITY,
+                        "克制".repeat(300), provenance = CharacterFactProvenance.USER_CREATED),
+                ),
+            ),
+            sourceSessionId = "session-a",
+            history = emptyList(),
+            chatState = ChatCharacterState(),
+            notes = "",
+        ).entry
+
+        val payload = source.exportPersona(saved.id, compact = true)
+        assertTrue(payload.length < 2_800)
+        val imported = ChatPersonaGalleryStore(File(temporary.root, "qr-imported.json"), Json)
+            .importPersona(payload)
+        assertEquals("阿青", imported.persona.name)
+        assertTrue(imported.persona.factText(CharacterFactCategories.BIOGRAPHY).startsWith("剑客"))
+        assertTrue(imported.persona.coreIdentity.startsWith("剑客"))
+        assertTrue(imported.persona.factText(CharacterFactCategories.PERSONALITY).startsWith("克制"))
+        assertTrue(imported.persona.coreIdentity.isNotBlank())
+    }
+
+    @Test
+    fun placeholderPersonaDoesNotTriggerNewCharacterPrompt() {
+        assertFalse(isMeaningfulGalleryPersona(PersonaProfile()))
+        assertTrue(
+            isMeaningfulGalleryPersona(
+                PersonaProfile(name = "小岚", coreIdentity = "花店店主"),
+            ),
+        )
+    }
+
+    @Test
+    fun timelineRewriteTombstonesDiscardedArchiveAndResetsDerivedStoryState() {
+        val store = ChatPersonaGalleryStore(File(temporary.root, "timeline-gallery.json"), Json)
+        val first = LocalHarnessMessage("m1", "user", "第一句", createdAt = 1L)
+        val discardedReply = LocalHarnessMessage("m2", "assistant", "旧回答", createdAt = 2L)
+        val discardedFuture = LocalHarnessMessage("m3", "user", "旧未来", createdAt = 3L)
+        val saved = store.save(
+            persona = PersonaProfile(name = "阿青", coreIdentity = "剑客"),
+            sourceSessionId = "session-a",
+            history = listOf(first, discardedReply, discardedFuture),
+            chatState = ChatCharacterState(mood = "旧未来状态", updatedAt = 3L),
+            notes = "",
+        )
+        val storyId = saved.storyId!!
+
+        assertEquals(
+            2,
+            store.excludeHistoryMessages(
+                id = saved.entry.id,
+                storyId = storyId,
+                messageKeys = listOf(discardedReply.id, discardedFuture.id),
+                replacementChatState = ChatCharacterState(mood = "保留前缀状态", updatedAt = 1L),
+            ),
+        )
+        val rewritten = store.list().single().story(storyId)!!
+        assertEquals(listOf("m1"), rewritten.history.map { it.id })
+        assertEquals("保留前缀状态", rewritten.chatState.mood)
+
+        val replacement = LocalHarnessMessage("m4", "user", "新时间线", createdAt = 4L)
+        val resaved = store.save(
+            persona = saved.entry.persona,
+            sourceSessionId = "session-a",
+            history = listOf(first, discardedReply, discardedFuture, replacement),
+            chatState = ChatCharacterState(mood = "新状态", updatedAt = 4L),
+            notes = "",
+            existingId = saved.entry.id,
+            existingStoryId = storyId,
+        ).entry.story(storyId)!!
+
+        assertEquals(listOf("m1", "m4"), resaved.history.map { it.id })
+        assertEquals("新状态", resaved.chatState.mood)
+    }
+
+
+    @Test
+    fun editingOnlyWorldBookStageMarksCharacterAsUnsaved() {
+        val lore = PersonaLoreEntry(
+            id = "one", title = "旧书店", content = "只在开篇出现",
+            temporalScope = "opening",
+        )
+        val saved = PersonaProfile(name = "阿青", coreIdentity = "店员", loreEntries = listOf(lore))
+        val entry = PersonaGalleryEntry(
+            id = "gallery", persona = saved,
+            stories = listOf(PersonaGalleryStory(id = "story")),
+        )
+        assertFalse(galleryEntryHasUnsavedChanges(
+            entry, "story", saved, emptyList(), ChatCharacterState(),
+        ))
+        assertTrue(galleryEntryHasUnsavedChanges(
+            entry, "story", saved.copy(loreEntries = listOf(lore.copy(temporalScope = "later"))),
+            emptyList(), ChatCharacterState(),
+        ))
+    }
+
+    @Test
+    fun sameLoreIdAcrossStagesSurvivesMergeSaveReloadAndRepeatedEnrichment() {
+        val opening = PersonaLoreEntry(
+            id = "shared", title = "档案", content = "开篇的公开记录",
+            temporalScope = "opening", keywords = listOf("档案"), spoilerLevel = 2,
+        )
+        val later = opening.copy(content = "后来的调查真相", temporalScope = "later",
+            spoilerLevel = 3)
+        val initial = PersonaProfile(id = "staged", name = "阿青", coreIdentity = "调查员",
+            loreEntries = listOf(opening))
+        val incoming = initial.copy(loreEntries = listOf(later))
+        val once = mergePersonaProfiles(initial, incoming)
+        val twice = mergePersonaProfiles(once, incoming)
+        assertEquals(2, twice.loreEntries.size)
+        assertEquals(setOf("opening", "later"),
+            twice.loreEntries.map(PersonaLoreEntry::temporalScope).toSet())
+        assertEquals(2, twice.loreEntries.map(PersonaLoreEntry::id).distinct().size)
+
+        val file = File(temporary.root, "staged-lore-personas.json")
+        ChatPersonaStore(file, json).upsert(twice)
+        val restored = ChatPersonaStore(file, json).get("staged")
+        assertEquals(2, restored.loreEntries.size)
+        assertEquals(2, restored.loreEntries.map(PersonaLoreEntry::id).distinct().size)
+        val engine = CharacterLoreEngine()
+        val early = engine.activated(restored, "档案", storyStage = "opening")
+        assertEquals(listOf("opening"), early.map(PersonaLoreEntry::temporalScope))
+        val late = engine.activated(restored, "档案", storyStage = "later")
+        assertEquals(listOf("later"), late.map(PersonaLoreEntry::temporalScope))
+    }
+
+    @Test
+    fun directPersonStoreDoesNotDropSameIdDifferentStages() {
+        val file = File(temporary.root, "raw-staged-lore.json")
+        val initial = PersonaProfile(id = "raw-lore", name = "阿青",
+            loreEntries = listOf(
+                PersonaLoreEntry(id = "same", content = "第一幕", temporalScope = "act-1"),
+                PersonaLoreEntry(id = "same", content = "第二幕", temporalScope = "act-2"),
+            ))
+        ChatPersonaStore(file, json).upsert(initial)
+        val loaded = ChatPersonaStore(file, json).get("raw-lore").loreEntries
+        assertEquals(2, loaded.size)
+        assertEquals(2, loaded.map(PersonaLoreEntry::id).toSet().size)
+        assertEquals(setOf("act-1", "act-2"),
+            loaded.map(PersonaLoreEntry::temporalScope).toSet())
+    }
+
+    @Test
+    fun galleryDirectSaveNormalizesDuplicateLoreIdsWithoutLosingStage() {
+        val file = File(temporary.root, "gallery-staged-lore.json")
+        val profile = PersonaProfile(name = "阿青", coreIdentity = "学者",
+            loreEntries = listOf(
+                PersonaLoreEntry(id = "same", title = "线索",
+                    content = "早期发现的线索", temporalScope = "opening"),
+                PersonaLoreEntry(id = "same", title = "线索",
+                    content = "后期查明的线索", temporalScope = "later"),
+            ))
+        val saved = ChatPersonaGalleryStore(file, json).save(
+            persona = profile, sourceSessionId = "", history = emptyList(),
+            chatState = ChatCharacterState(), notes = "",
+        ).entry
+        val loaded = ChatPersonaGalleryStore(file, json).findEntry(saved.id)!!.persona
+        assertEquals(2, loaded.loreEntries.size)
+        assertEquals(2, loaded.loreEntries.map(PersonaLoreEntry::id).toSet().size)
+        assertEquals(setOf("opening", "later"),
+            loaded.loreEntries.map(PersonaLoreEntry::temporalScope).toSet())
+    }
+}

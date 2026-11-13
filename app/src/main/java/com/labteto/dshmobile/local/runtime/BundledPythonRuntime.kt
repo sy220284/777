@@ -1,0 +1,114 @@
+package com.labteto.dshmobile.local.runtime
+
+import android.content.Context
+import android.os.Build
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/** Prepares the verified Python runtime bundled in the APK. */
+@Singleton
+class BundledPythonRuntime @Inject constructor(
+    @ApplicationContext private val context: Context,
+) {
+    private val runtimeHome = File(context.noBackupFilesDir, "runtime/python")
+    val binDir: File = File(context.noBackupFilesDir, "runtime/bin")
+
+    @Volatile
+    private var activeHomeDir: File? = null
+
+    @Volatile
+    private var activeLibraryDir: File? = null
+
+    @Volatile
+    private var runtimeVersion: String? = null
+
+    @Volatile
+    private var prepared = false
+
+    suspend fun prepare() = withContext(Dispatchers.IO) {
+        // Multiple runtime instances may be created by startup, instrumentation and recovery.
+        // Serialize the entire prepare/cleanup/link sequence, not only blob extraction.
+        prepareMutex.withLock {
+            val abi = Build.SUPPORTED_ABIS.firstOrNull(SUPPORTED_ABIS::contains)
+                ?: return@withLock
+            val version = context.assets.open(VERSION_ASSET).bufferedReader().use { it.readText().trim() }
+            require(version.isNotBlank()) { "内置 Python 版本信息为空" }
+
+            val versionRoot = File(runtimeHome, "$version/$abi")
+            val libraryDir = File(versionRoot, "lib")
+            val homeDir = File(versionRoot, "home")
+            BundledRuntimeInstallation.prepareVersion(context, "python", versionRoot, version, abi) {
+                homeDir.mkdirs()
+                BundledRuntimeInstallation.copyAssetDirectory(context, "$ASSET_ROOT/$abi/home", homeDir)
+            }
+
+            require(File(homeDir, "etc/tls/cert.pem").isFile) {
+                "内置 Python CA 证书未打包"
+            }
+            require(File(homeDir, "etc/tls/openssl.cnf").isFile) {
+                "内置 Python OpenSSL 配置未打包"
+            }
+
+            val nativePython = File(context.applicationInfo.nativeLibraryDir, NATIVE_PYTHON_NAME)
+            require(nativePython.isFile && nativePython.canExecute()) {
+                "内置 Python 可执行文件未从 APK 提取：${nativePython.path}"
+            }
+
+            PYTHON_COMMANDS.forEach { name ->
+                BundledRuntimeInstallation.linkExecutable(nativePython, File(binDir, name))
+            }
+            BundledRuntimeInstallation.removeOldVersions(runtimeHome, version)
+
+            activeHomeDir = homeDir
+            activeLibraryDir = libraryDir
+            runtimeVersion = version
+            prepared = true
+        }
+    }
+
+    fun searchPaths(): List<File> = if (prepared) listOf(binDir) else emptyList()
+
+    fun environment(): Map<String, String> {
+        val homeDir = activeHomeDir ?: return emptyMap()
+        val libraryDir = activeLibraryDir ?: return emptyMap()
+        val nativeDir = context.applicationInfo.nativeLibraryDir
+        val stdlib = File(homeDir, "lib/python$PYTHON_MAJOR_MINOR")
+        val certFile = File(homeDir, "etc/tls/cert.pem")
+        val opensslConfig = File(homeDir, "etc/tls/openssl.cnf")
+        return mapOf(
+            "LD_LIBRARY_PATH" to listOf(libraryDir.path, nativeDir).joinToString(File.pathSeparator),
+            "PYTHONHOME" to homeDir.path,
+            "PYTHONPATH" to listOf(stdlib.path, File(stdlib, "lib-dynload").path)
+                .joinToString(File.pathSeparator),
+            "PYTHONDONTWRITEBYTECODE" to "1",
+            "PYTHONNOUSERSITE" to "1",
+            "SSL_CERT_FILE" to certFile.path,
+            "OPENSSL_CONF" to opensslConfig.path,
+            "HOME" to context.filesDir.path,
+            "TMPDIR" to context.cacheDir.path,
+        )
+    }
+
+    fun status(): String = when {
+        prepared -> "Python ${runtimeVersion.orEmpty()} 已就绪"
+        Build.SUPPORTED_ABIS.none(SUPPORTED_ABIS::contains) ->
+            "当前 ABI 不支持内置 Python：${Build.SUPPORTED_ABIS.joinToString()}"
+        else -> "Python 尚未完成初始化"
+    }
+
+    private companion object {
+        private val prepareMutex = Mutex()
+        const val ASSET_ROOT = "runtime/python"
+        const val VERSION_ASSET = "$ASSET_ROOT/python-version.txt"
+        const val NATIVE_PYTHON_NAME = "libdsh_python.so"
+        const val PYTHON_MAJOR_MINOR = "3.14"
+        val PYTHON_COMMANDS = listOf("python", "python3", "python3.14")
+        val SUPPORTED_ABIS = setOf("arm64-v8a", "x86_64")
+    }
+}

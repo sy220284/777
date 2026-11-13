@@ -1,0 +1,4 @@
+# Retired published GitHub Releases; keep their Git tags and commit SHAs.
+# Format: <tag> <release-target-sha> <original-github-release-id>
+# Approved retirement removes only the visible release and its assets.
+v0.12.0-777.321 031a691d86e098b6d5d509413d5322c3fe6dede1 415841548

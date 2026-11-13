@@ -1,0 +1,47 @@
+[
+  {
+    "type": "turn/start"
+  },
+  {
+    "type": "step/start",
+    "step": 1
+  },
+  {
+    "type": "assistant/message",
+    "step": 1
+  },
+  {
+    "type": "tool/call",
+    "step": 1,
+    "callId": "c1",
+    "name": "echo",
+    "arguments": "{\"text\":\"x\"}"
+  },
+  {
+    "type": "tool/result",
+    "step": 1,
+    "callId": "c1",
+    "content": "x"
+  },
+  {
+    "type": "step/end",
+    "step": 1
+  },
+  {
+    "type": "step/start",
+    "step": 2
+  },
+  {
+    "type": "assistant/message",
+    "step": 2,
+    "content": "任务已经完成。"
+  },
+  {
+    "type": "step/end",
+    "step": 2
+  },
+  {
+    "type": "turn/end",
+    "reason": "completed"
+  }
+]

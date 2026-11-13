@@ -1,0 +1,221 @@
+package com.labteto.dshmobile.local.jobs
+
+import com.labteto.dshmobile.observability.AppLog
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.harness.jobs.JobInboxContract
+import com.labteto.dshmobile.harness.jobs.JobSnapshot
+import java.io.File
+import java.io.FileOutputStream
+import java.nio.charset.StandardCharsets
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
+
+/**
+ * Crash-safe snapshot store for background jobs.
+ *
+ * Persistent job APIs synchronously write recovery metadata before the job is launched. Writes use
+ * fsync + atomic replace when the filesystem supports it, and keep the previous valid snapshot as
+ * a backup. A corrupt primary is restored from that backup instead of silently becoming an empty
+ * job list.
+ */
+internal class LocalPersistentJobStore(
+    private val file: File,
+    private val json: Json,
+) {
+    private val lock = Any()
+    private val backup = File(file.parentFile, "${file.name}.bak")
+
+    fun read(): List<JobSnapshot> = synchronized(lock) {
+        if (!file.isFile) {
+            return@synchronized if (backup.isFile) readFrom(backup) else emptyList()
+        }
+        try {
+            readFrom(file)
+        } catch (primaryError: Exception) {
+            AppLog.error("LocalPersistentJobStore", "operation=read_primary_job_snapshot " +
+                "cause_type=${primaryError.javaClass.simpleName} status=corrupt_primary")
+            if (!backup.isFile) throw primaryError
+            val recovered = try {
+                readFrom(backup)
+            } catch (backupError: Exception) {
+                AppLog.error("LocalPersistentJobStore", "operation=read_backup_job_snapshot " +
+                    "cause_type=${backupError.javaClass.simpleName} status=corrupt_backup")
+                throw primaryError
+            }
+            runCatching {
+                File(file.parentFile, "${file.name}.corrupt-${System.currentTimeMillis()}").also { corrupt ->
+                    file.copyTo(corrupt, overwrite = true)
+                }
+            }.onFailure { AppLog.failure("LocalPersistentJobStore", "preserve_corrupt_job_snapshot", it) }
+            AppLog.warn("LocalPersistentJobStore", "operation=restore_job_snapshot_from_backup status=recovered")
+            atomicWrite(file, backup.readText())
+            recovered
+        }
+    }
+
+    fun write(snapshots: List<JobSnapshot>) = synchronized(lock) {
+        file.parentFile?.mkdirs()
+        val payload = buildJsonArray {
+            snapshots.takeLast(MAX_RECORDS).forEach { snapshot ->
+                add(buildJsonObject {
+                    put("id", snapshot.id)
+                    put("label", snapshot.label)
+                    put("status", snapshot.status)
+                    put("output", snapshot.output.takeLast(MAX_PERSISTED_OUTPUT_CHARS))
+                    snapshot.resumeKind?.let { put("resume_kind", it) }
+                    snapshot.resumePayload?.let { put("resume_payload", it) }
+                    snapshot.ownerId?.let { put("owner_session_id", it) }
+                    if (snapshot.continuable) put("continuable", true)
+                    if (snapshot.inbox.isNotEmpty()) {
+                        put("inbox", buildJsonArray {
+                            snapshot.inbox.also { require(it.size <= MAX_PERSISTED_INBOX_MESSAGES) { "后台代理消息队列超过容量" } }.map(JobInboxContract::normalize).forEach { message ->
+                                add(buildJsonObject {
+                                    put("id", message.id)
+                                    put("kind", message.kind.name)
+                                    message.agentSource?.let { put("agent_source", it) }
+                                    put("content", message.content)
+                                    put(
+                                        "memory_input",
+                                        message.memoryInput,
+                                    )
+                                    message.modelMessage?.let { put("model_message", it) }
+                                })
+                            }
+                        })
+                    }
+                    if (snapshot.startedAt > 0L) put("started_at", snapshot.startedAt)
+                    if (snapshot.deadlineAt > 0L) put("deadline_at", snapshot.deadlineAt)
+                    put("updated_at", snapshot.updatedAt)
+                })
+            }
+        }.toString()
+
+        // Preserve the last known-good generation before replacing the primary.
+        if (file.isFile) {
+            val existing = file.readText()
+            readFromText(existing)
+            atomicWrite(backup, existing)
+        }
+        atomicWrite(file, payload)
+        if (!backup.isFile) {
+            atomicWrite(backup, payload)
+        }
+    }
+
+    private fun readFrom(source: File): List<JobSnapshot> = readFromText(source.readText())
+
+    private fun readFromText(text: String): List<JobSnapshot> {
+        val ids = mutableSetOf<String>()
+        return json.parseToJsonElement(text).jsonArray.map { raw ->
+            val item = raw.jsonObject
+            // A valid JSON document is not necessarily a complete Job snapshot.
+            // Silently skipping an incomplete job permanently loses it on the next write.
+            val id = item["id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+                ?: error("后台任务快照缺少有效 id")
+            val label = item["label"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+                ?: error("后台任务快照缺少有效 label：$id")
+            val status = item["status"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+                ?: error("后台任务快照缺少有效 status：$id")
+            check(ids.add(id)) { "后台任务快照存在重复 id：$id" }
+            val resumeKind = item["resume_kind"]?.jsonPrimitive?.contentOrNull
+            val resumePayload = item["resume_payload"]?.jsonPrimitive?.contentOrNull
+            val inbox = item["inbox"]?.jsonArray?.map { rawMessage ->
+                val message = rawMessage.jsonObject
+                val messageId = message["id"]?.jsonPrimitive?.contentOrNull
+                    ?.takeIf(String::isNotBlank)
+                    ?: error("后台代理Inbox消息缺少 id")
+                val content = message["content"]?.jsonPrimitive?.contentOrNull
+                    ?.takeIf(String::isNotBlank)
+                    ?: error("后台代理Inbox消息缺少 content")
+                QueuedAgentInput(
+                    id = messageId,
+                    kind = message["kind"]?.jsonPrimitive?.contentOrNull?.let {
+                        com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.valueOf(it)
+                    } ?: com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.USER,
+                    agentSource = message["agent_source"] as? JsonObject,
+                    content = content,
+                    memoryInput = message["memory_input"]?.jsonPrimitive?.contentOrNull
+                        ?: content,
+                    modelMessage = message["model_message"] as? JsonObject,
+                )
+            }?.also { require(it.size <= MAX_PERSISTED_INBOX_MESSAGES) { "恢复的后台代理消息队列超过容量" } }?.map(JobInboxContract::normalize).orEmpty()
+            JobSnapshot(
+                id = id,
+                label = label,
+                status = status,
+                output = item["output"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                resumeKind = resumeKind,
+                resumePayload = resumePayload,
+                ownerId = item["owner_session_id"]?.jsonPrimitive?.contentOrNull
+                    ?: inferLegacyOwnerId(resumeKind, resumePayload),
+                startedAt = item["started_at"]?.jsonPrimitive?.longOrNull ?: 0L,
+                deadlineAt = item["deadline_at"]?.jsonPrimitive?.longOrNull ?: 0L,
+                updatedAt = item["updated_at"]?.jsonPrimitive?.longOrNull ?: 0L,
+                inbox = inbox,
+                continuable = item["continuable"]?.jsonPrimitive?.booleanOrNull ?: false,
+            )
+        }
+    }
+
+    private fun inferLegacyOwnerId(resumeKind: String?, resumePayload: String?): String? {
+        if (resumeKind !in LEGACY_OWNER_INFERENCE_KINDS || resumePayload.isNullOrBlank()) return null
+        return runCatching {
+            Json.parseToJsonElement(resumePayload).jsonObject
+                .stringValue("session_id")
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+        }.getOrNull()
+    }
+
+    private fun JsonObject.stringValue(key: String): String? =
+        this[key]?.jsonPrimitive?.contentOrNull
+
+    private fun atomicWrite(target: File, content: String) {
+        target.parentFile?.mkdirs()
+        val temporary = File(target.parentFile, "${target.name}.tmp")
+        val bytes = content.toByteArray(StandardCharsets.UTF_8)
+        FileOutputStream(temporary).use { output ->
+            output.write(bytes)
+            output.flush()
+            output.fd.sync()
+        }
+        try {
+            Files.move(
+                temporary.toPath(),
+                target.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(
+                temporary.toPath(),
+                target.toPath(),
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } finally {
+            if (temporary.exists()) temporary.delete()
+        }
+    }
+
+    private companion object {
+        const val MAX_RECORDS = 64
+        const val MAX_PERSISTED_OUTPUT_CHARS = 8_192
+        const val MAX_PERSISTED_INBOX_MESSAGES =
+            com.labteto.dshmobile.harness.agent.AgentInputQueue.DEFAULT_CAPACITY
+        const val MAX_PERSISTED_INBOX_ID_CHARS = JobInboxContract.MAX_ID_CHARS
+        const val MAX_PERSISTED_INBOX_MESSAGE_CHARS = JobInboxContract.MAX_MESSAGE_CHARS
+        val LEGACY_OWNER_INFERENCE_KINDS = setOf("web_fetch", "subagent_readonly")
+    }
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#FFFFFF</color>
+
+    <!-- Window/splash colours mirror the Compose canvas tokens exactly. -->
+    <color name="window_background_light">#EDE6DA</color>
+    <color name="window_background_dark">#24211E</color>
+    <color name="window_background_matte_black">#10100F</color>
+    <color name="window_background">#EDE6DA</color>
+</resources>

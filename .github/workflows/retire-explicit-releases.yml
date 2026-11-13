@@ -1,0 +1,60 @@
+name: Retire Explicit GitHub Releases
+
+'on':
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/retired-releases.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: retire-explicit-releases-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  remove-verified-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Delete only the release explicitly retired in the audited ledger
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          while read -r tag sha expected_id; do
+            [ -n "$tag" ] || continue
+            [[ "$tag" == \#* ]] && continue
+            if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]] ||
+               [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]] ||
+               [[ ! "$expected_id" =~ ^[0-9]+$ ]]; then
+              echo "::error::Invalid retired release ledger entry: $tag"
+              exit 1
+            fi
+            if ! info="$(gh api "repos/$GITHUB_REPOSITORY/releases/$expected_id" 2>/dev/null)"; then
+              echo "::notice::Release $tag (id=$expected_id) is already absent; tag remains."
+              continue
+            fi
+            actual_tag="$(jq -r '.tag_name' <<< "$info")"
+            actual_sha="$(jq -r '.target_commitish' <<< "$info")"
+            actual_id="$(jq -r '.id' <<< "$info")"
+            if [ "$actual_tag" != "$tag" ] || [ "$actual_sha" != "$sha" ] ||
+               [ "$actual_id" != "$expected_id" ]; then
+              echo "::error::Release identity changed; refusing to delete."
+              exit 1
+            fi
+            latest_id="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.id')"
+            if [ "$latest_id" != "$expected_id" ]; then
+              echo "::error::The audited release is no longer latest; refusing automatic deletion."
+              exit 1
+            fi
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$expected_id"
+            if gh api "repos/$GITHUB_REPOSITORY/releases/$expected_id" >/dev/null 2>&1; then
+              echo "::error::Deleted release is still available."
+              exit 1
+            fi
+            echo "::notice::Removed Release $tag (id=$expected_id); Git tag remains."
+          done < .github/scripts/retired-releases.txt

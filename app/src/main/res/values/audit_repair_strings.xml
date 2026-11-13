@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tasks_operation_failed">操作未能完整确认，当前进度已保留。请刷新任务状态后再决定下一步。</string>
+    <string name="tasks_operation_rejected">任务状态已变化，操作未受理。请查看最新状态。</string>
+    <string name="tasks_paused_notice">任务已暂停</string>
+    <string name="tasks_resumed_notice">任务已恢复排程</string>
+    <string name="tasks_operation_pending">正在更新任务…</string>
+    <string name="work_evidence_title">工作记录与交付</string>
+    <string name="work_evidence_history">工具记录与较早成果</string>
+    <string name="work_evidence_requirements">任务与交付要求</string>
+    <string name="work_evidence_refresh">刷新当前状态</string>
+    <string name="work_evidence_older">加载更早记录</string>
+    <string name="work_evidence_empty">当前没有工具记录</string>
+    <string name="work_evidence_failed">读取失败，已有内容保留，请重试</string>
+    <string name="work_evidence_invalidated">会话或历史已变化，请重新打开工作记录</string>
+    <string name="work_evidence_link">关联这份成果</string>
+    <string name="work_evidence_linked">已关联所选文件版本。此引用不表示测试或验收通过。</string>
+    <string name="work_evidence_link_failed">关联未完成：任务或文件版本可能已变化，请刷新后重新选择。</string>
+    <string name="work_evidence_reference_only">关联只记录你选择的来源与版本，不代表任务或测试通过。</string>
+    <string name="work_evidence_choose_requirement">选择这份成果对应的要求</string>
+    <string name="work_evidence_no_requirements">当前没有已记录的任务要求</string>
+    <string name="work_evidence_current_version">核验当前文件版本</string>
+    <string name="work_evidence_not_checked">尚未核验当前文件版本</string>
+    <string name="work_evidence_changed">文件已变化或当前不可用，请重新核验</string>
+    <string name="work_evidence_link_error">部分关联记录未能读取，请重试</string>
+    <string name="work_tool_declared">等待执行</string>
+    <string name="work_tool_running">执行中</string>
+    <string name="work_tool_completed">已完成</string>
+    <string name="work_tool_failed">失败</string>
+    <string name="work_tool_unknown">结果未知，请核实后再决定是否重试</string>
+    <string name="work_tool_cancelled">已取消</string>
+    <string name="work_tool_details">查看调用证据</string>
+    <string name="work_tool_arguments">调用参数</string>
+    <string name="work_tool_result">执行结果</string>
+    <string name="work_tool_detail_missing">这条记录已失效或不属于当前调用</string>
+    <string name="work_evidence_preview_limited">仅展示本次调用前 32000 个字符；完整事件保留在会话日志中。</string>
+</resources>

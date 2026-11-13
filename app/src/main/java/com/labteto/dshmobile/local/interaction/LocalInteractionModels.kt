@@ -1,0 +1,51 @@
+package com.labteto.dshmobile.local.interaction
+
+
+enum class LocalApprovalImpact {
+    LOW,
+    MEDIUM,
+    HIGH,
+    CRITICAL,
+}
+
+/** A tool call waiting for the operator because it crossed an approval boundary. */
+data class LocalApproval(
+    val callId: String,
+    val toolName: String,
+    val summary: String,
+    val arguments: String,
+    val access: String,
+    val impact: LocalApprovalImpact = LocalApprovalImpact.HIGH,
+    val canAutoApproveSafely: Boolean = false,
+    val canApproveDeviceTurn: Boolean = false,
+    /** Process-local identity of the actual waiter, issued when it starts; never a tool-call ID. */
+    val requestId: String? = null,
+)
+
+/** Flat primitive fields requested by a connected MCP server; UI owns only the draft. */
+data class LocalQuestionFormField(
+    val name: String,
+    val title: String,
+    val kind: String,
+    val required: Boolean,
+    val options: List<String> = emptyList(),
+    val defaultValue: String = "",
+    val minLength: Int? = null,
+    val maxLength: Int? = null,
+    val minimum: Double? = null,
+    val maximum: Double? = null,
+)
+
+const val LOCAL_MCP_QUESTION_DECLINE = "__MCP_QUESTION_DECLINED__"
+const val LOCAL_MCP_QUESTION_URL_ACCEPT = "__MCP_QUESTION_URL_ACCEPTED__"
+
+/** A model question that pauses the current turn until the user answers it. */
+data class LocalQuestion(
+    val callId: String,
+    val question: String,
+    val options: List<String> = emptyList(),
+    val mcpFormFields: List<LocalQuestionFormField>? = null,
+    val mcpUrl: String? = null,
+    /** Issued by the current waiter, never accepted from a model call. */
+    val requestId: String? = null,
+)

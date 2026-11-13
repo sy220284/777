@@ -1,0 +1,24 @@
+{
+  "id": "unicode-tool-arguments",
+  "input": "中文参数",
+  "modelReplies": [
+    {
+      "toolCalls": [
+        {
+          "id": "c1",
+          "name": "echo",
+          "arguments": {
+            "text": "你好，世界",
+            "emoji": "🔥"
+          }
+        }
+      ]
+    },
+    {
+      "content": "done"
+    }
+  ],
+  "toolOutputs": {
+    "echo": "收到"
+  }
+}

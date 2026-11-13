@@ -1,0 +1,33 @@
+{
+  "id": "text-on-each-tool-step",
+  "input": "工具步骤带正文",
+  "modelReplies": [
+    {
+      "content": "step-one",
+      "toolCalls": [
+        {
+          "id": "c1",
+          "name": "one",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "content": "step-two",
+      "toolCalls": [
+        {
+          "id": "c2",
+          "name": "two",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "content": "final"
+    }
+  ],
+  "toolOutputs": {
+    "one": "1",
+    "two": "2"
+  }
+}
