@@ -52,7 +52,8 @@ jobs:
           # Only code/build changes create a new APK. Documentation and governance edits do not.
           if [ -n "$MAX_RELEASE_TAG" ] && git fetch --no-tags origin "refs/tags/$MAX_RELEASE_TAG"; then
             published_sha="$(git rev-parse 'FETCH_HEAD^{commit}')"
-            if ! git diff --name-only "$published_sha" "$RELEASE_SHA" | grep -Eq '^(app/|core/|harness-|ui-|reference-validation/|tools/runtime/|gradle/|build-logic/|upstream/|settings\.gradle|build\.gradle|gradle\.properties|AndroidManifest)'; then
+            git diff --name-only "$published_sha" "$RELEASE_SHA" > "$RUNNER_TEMP/release-changed-files.txt"
+            if ! grep -Eq '^(app/|core/|harness-|ui-|reference-validation/|tools/runtime/|gradle/|build-logic/|upstream/|settings\.gradle|build\.gradle|gradle\.properties|AndroidManifest)' "$RUNNER_TEMP/release-changed-files.txt"; then
               echo "与上一正式包相比没有客户端或构建变化"
               skip_release
               exit 0
