@@ -70,12 +70,21 @@ def merge_comparison(source, admission, parent_tree, child_tree):
 def choose_file_versions(source, parent_tree, child_tree, comparison, resolution, choices):
     """Use the exact selected whole-file versions; unrelated parent edits remain intact."""
     overlap = set(comparison["overlap_paths"])
+    child_only = set(comparison["child_only_paths"])
+    parent_only = set(comparison["parent_only_paths"])
     if resolution == "select":
-        if set(choices) != overlap or any(choice not in ("parent", "child") for choice in choices.values()):
-            raise ValueError("select requires a parent/child choice for every overlapping path")
+        if (not overlap.issubset(choices) or
+                not set(choices).issubset(overlap | child_only | parent_only) or
+                any(choice not in ("parent", "child") for choice in choices.values())):
+            raise ValueError("select requires a parent/child choice for every overlapping path; "
+                             "optional choices may drop independent changes")
     elif choices:
         raise ValueError("path_choices are only valid for select resolution")
-    use_child = set(comparison["child_only_paths"])
+    # The default keeps independent changes, but select can explicitly drop a
+    # child-only addition or revert a parent-only edit when it depends on a worse
+    # implementation. No line-level Frankenstein merge is silently manufactured.
+    use_child = {path for path in child_only if choices.get(path, "child") == "child"}
+    use_child.update(path for path in parent_only if choices.get(path, "parent") == "child")
     use_child.update(path for path in overlap if
                      (resolution == "prefer_child" or
                       (resolution == "select" and choices[path] == "child")))
