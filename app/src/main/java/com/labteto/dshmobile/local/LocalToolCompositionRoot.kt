@@ -106,9 +106,17 @@ internal class LocalToolCompositionRoot @Inject constructor(
         val lease = workspaceGate.acquire(tool)
         try {
             check(registry.get("workspace_merge") === tool) { "工作区运行时已更新" }
+            // The admitted child tree is only half of the review. Pin the actual parent
+            // version and the exact three-way result before accepting a shared-workspace write.
+            val preview = agentWorkspaces.operate(sessionId, "preview_merge", buildJsonObject {
+                put("workspace_id", identity); put("expected_tree", tree)
+            })
+            if (preview["state"]?.jsonPrimitive?.content != "ready") return preview
             beforeCommit()
             return agentWorkspaces.operate(sessionId, "merge", buildJsonObject {
                 put("workspace_id", identity); put("expected_tree", tree)
+                put("expected_source_tree", preview.getValue("source_tree"))
+                put("expected_merged_tree", preview.getValue("merged_tree"))
                 put("allowed_paths", kotlinx.serialization.json.JsonArray(allowedPaths.map { kotlinx.serialization.json.JsonPrimitive(it) }))
             })
         } finally { lease?.close() }
