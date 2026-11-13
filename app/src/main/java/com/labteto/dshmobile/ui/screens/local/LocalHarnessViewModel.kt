@@ -29,6 +29,7 @@ import com.labteto.dshmobile.local.presentation.projectWorkState
 import com.labteto.dshmobile.local.presentation.projectWorkSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.session.LocalSessionSectionStore
 import com.labteto.dshmobile.ui.screens.settings.readDeviceCapabilityState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -57,6 +58,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val conversationPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val approvalPreferences: LocalApprovalPreferences,
     private val networkSearchSettings: LocalNetworkSearchSettings,
+    private val sectionStore: LocalSessionSectionStore,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -164,6 +166,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val conversationUiState = LocalConversationUiStateStore(appContext)
     val pinnedSessionIds = conversationUiState.pinnedSessionIds
     val sessionTitleOverrides = conversationUiState.sessionTitleOverrides
+    val sessionSections = sectionStore.snapshots
     suspend fun saveCurrentToGallery(
         notes: String,
         existingId: String? = null,
@@ -300,7 +303,19 @@ class LocalHarnessViewModel @Inject constructor(
     }
     fun toggleSessionPinned(sessionId: String) = conversationUiState.toggleSessionPinned(sessionId)
     fun renameSession(sessionId: String, title: String): Boolean = conversationUiState.renameSession(sessionId, title)
-    suspend fun deleteSessions(ids: Set<String>): Int = conversationUiState.deleteSessions(ids, runtime.session::deleteSessions)
+    fun createSessionSection(title: String) = sectionStore.create(title)
+    fun renameSessionSection(id: String, title: String) = sectionStore.rename(id, title)
+    fun deleteSessionSection(id: String) = sectionStore.delete(id)
+    fun moveSessionSection(id: String, targetIndex: Int) = sectionStore.move(id, targetIndex)
+    fun assignSessionSection(ids: Set<String>, sectionId: String?): Boolean {
+        if (ids.isEmpty() || !state.value.sessions.mapTo(hashSetOf()) { it.id }.containsAll(ids)) return false
+        return sectionStore.assign(ids, sectionId)
+    }
+    suspend fun deleteSessions(ids: Set<String>): Int {
+        val deleted = conversationUiState.deleteSessions(ids, runtime.session::deleteSessions)
+        if (deleted == ids.size) sectionStore.forgetDeletedSessions(ids)
+        return deleted
+    }
     suspend fun importAttachment(uri: Uri): LocalImportedAttachment = runtime.session.importAttachment(uri)
     suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
     suspend fun workspaceDirectory(path: String) = runtime.session.workspaceDirectoryForUi(path)
