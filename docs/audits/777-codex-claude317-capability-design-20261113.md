@@ -67,3 +67,33 @@
 - **最终验收**：逐条生产入口及 UI 操作成功、Android 16/17 模拟器/实机、完整 CI、异常恢复；缺乏真实账户的联网能力保留“未实测”，不等同已全部完成。
 
 资料来源：`openai/codex` 最新源码；资料库 Codex ZIP、Claude 317 提取包（行为归纳不复制代码）；777 main 与 PR #895 的真实生产文件。此文是本次源码依据、设计收敛与验收清单，不是所有后续能力已经交付的声明。
+
+
+## 2026-11-13 追加：五套编程/多模态 CLI 能力与原生 UI 复核
+
+本轮还对照了用户提出的 CLI 体系：Codex CLI、Claude Code CLI、Gemini CLI、OpenCode CLI、MiniMax CLI。相应上游可执行文件均不能因为 777 内置 Node/Python/Git 就视作已安装。这里把 CLI 产品入口和内置 Agent 引擎分开验收，不为每套 CLI 复制会话、权限或工具系统。
+
+| 功能体系 | Codex / Claude 317 与其他 CLI 借鉴点 | 777 现有实现更优之处 | 777 下一步实际验收点 | UI 归属 |
+|---|---|---|---|---|
+| 运行入口 | 独立 shell/headless CLI、结构化输入输出和退出码 | 777 原生 Android 任务可在 UI 查看会话、恢复及设备权限 | 独立 777 命令行、标准化 JSON/JSONL 结果，五套外部 CLI 逐一核 ABI/运行时/授权，失败有确切回执 | 工作区入口与工具详情 |
+| 项目与审查 | Codex 对未提交、分支、指定提交、首次提交、合并提交目标更完整 | 777 已有人工接纳版本栅栏、审查持久 EventLog 与原生差异 sheet | 本轮新增 git_diff_commit+真实工作区按钮，覆盖 root commit、普通/合并提交、无远端场景；CI/Android 验收需继续 | 工作 → 工作区 → 代码审查 |
+| 权限安全 | Codex 沙箱、Claude Hooks、外部 CLI 授权模式 | 777 现有工具审批、插件注册代次核验、未知副作用门禁适合 Android | 同一安全策略覆盖 Git/Shell/MCP/外部进程；重启/取消后的授权失效及真机测试 | 工作中的审批卡；高级设置显示原因 |
+| 扩展与生态 | Claude 命令+技能+Hook 配置；Codex 市场；Gemini 扩展；OpenCode 插件 | 777 已有原生 MCP、Skill、ToolRegistry 和独立插件管理链 | 安装→来源验真→注册→真实调用→升级/回滚→崩溃恢复，逐一保留回执 | 工具 → 技能/插件 → 详情 |
+| 模型与费用 | Codex 模型能力目录、Claude 账户授权、OpenCode 多供应商 | 777 可独立路由模型并通过原生设备账号展示 | 每供应商独立连接/能力检测、真实额度费率+时间、拒绝原因 | 设置 → 模型 |
+| 多模态与设备 | MiniMax CLI 服务工具，Claude 语音/终端交互 | 777 原生 Android 无障碍、通知、虚拟屏、媒体任务具备更自然的本机入口 | 操作成功回执；按需授权与修复；多模态任务对账、取消/恢复 | 工作及媒体当前任务 |
+| 多 Agent 与长任务 | Codex 子进程/工作区分离，Claude Team、长任务反馈 | 777 持久任务板、恢复水位、单一事件记录 | 每个独立写目录的强边界、跨进程权限/撤销、完整任务完成证据 | 当前任务状态与结果，后台管理隔离 |
+
+**专项生产改动（PR #895）**：
+- 在 `GitRemoteDiff` 注册可发现、只读的 `git_diff_commit`，输入仓库相对目录和十六进制提交哈希，转换为固定的 Git 对象 ID，首提使用空树、合并提交用第一父提交作为差异基线。
+- 保留 `repository` 工作区规范化边界、Git 参数数组调用、不联网、128 KiB 限制、完整性回执，拒绝选项注入；没有固定对象的旧审查报告不允许借用。
+- 通过 `GitWorkspaceRuntime → LocalToolCompositionRoot → LocalToolsRuntime → LocalToolsUiFacade → LocalHarnessViewModel → LocalWorkspaceFilesDialog` 接入 Android 工作页面；同一 sheet 上切换本地/远端/指定提交目标，无需进入开发配置表单。
+- `LocalIndependentCodeReviewUiFacade.currentDiff` 支持 `commit/<SHA>`，人工接纳前重取真实提交差异并核对审查摘要，复用独立安全审核和 EventLog。
+- 增加 `GitRemoteDiffTest.reviewImmutableCommitSupportsRootAndDoesNotReadWorkingTree`，测试根提交、普通提交、缩短 SHA 解析、未提交/未跟踪文件保密、Git index 未变、无网络以及拒绝非法提交字符串。
+
+**交互设计验证**：
+- Android UI 2.4 原则：首屏显示当前项目和下一项关键操作，进入代码审查后二级选择目标、三级差异预览/审查接纳；需要身份/敏感权限时就地出现解释及系统授权入口。减少一进页面大量字段。
+- 可交互演示 HTML 和两张截图由本轮制作，独立验证了三主入口、指定提交输入、差异预览及审查操作；所有模拟状态均显式标注“演示”。
+- Figma 新文件：https://www.figma.com/design/58aL1rx9pPm7ykjix96XPa 。文件成功创建；Starter 账户的 MCP 限额阻断后续画布写入，故目前无法给出真实 Figma 帧/组件审查证据。
+- 用户可操作的生产 Android 界面已写入 PR；实际设备、CI、工具端到端结果仍需另行验收，不把交互原型当作 APK 实测。
+
+**证据与边界**：Codex 来源 `/codex/codex-main-2.zip` 与可核验快照 `codex_verified_local_snapshot_2026-11-13.zip`；Claude 317 来源 `/反编译/Claude-Code-2.1.317-Linux-x64-完整反编译包.tar.zst`，包中独立核验记录版本与文件完整性已确认。借鉴协议与交互设计，不复制 Claude 反编译的专有代码。后续能力优先在原所有权链中增强，而非增加重复的 Agent 内核或重复 UI 配置页。
