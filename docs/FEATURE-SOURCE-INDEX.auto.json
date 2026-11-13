@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1969,
-  "production_source_count": 1145,
+  "repository_code_file_count": 1970,
+  "production_source_count": 1146,
   "test_code_file_count": 679,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
@@ -2735,6 +2735,10 @@
       "sha256": "9f4f4d6cccc2d478"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalIndependentSecurityReviewCoordinator.kt",
+      "sha256": "c320c4b55ac50325"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalNestedAgentDispatcher.kt",
       "sha256": "c3de213bb3250d47"
     },
@@ -4644,19 +4648,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "0127fef3ac37",
+  "source_snapshot": "5d427e324876",
   "observed_delta": {
-    "baseline": "98400c8ac7a0",
-    "added_production_files": [],
-    "removed_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/test/java/com/labteto/dshmobile/local/work/LocalWorkProjectCatalogTest.kt"
+    "baseline": "0127fef3ac37",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalIndependentSecurityReviewCoordinator.kt"
     ],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkProjectsUiFacade.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProjectCatalog.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkProjectsSheet.kt"
-    ],
+    "removed_production_files": [],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
