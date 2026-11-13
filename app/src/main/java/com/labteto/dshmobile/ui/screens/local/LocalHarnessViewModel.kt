@@ -346,6 +346,8 @@ class LocalHarnessViewModel @Inject constructor(
         toolsUi.compareLocalGitForUi(repository, includeUntracked)
     internal suspend fun compareRemoteGitForUi(repository: String, remote: String, branch: String) =
         toolsUi.compareRemoteGitForUi(repository, remote, branch)
+    internal suspend fun compareCommitGitForUi(repository: String, commit: String) =
+        toolsUi.compareCommitGitForUi(repository, commit)
     /** Recover an existing report for exactly this code snapshot without model billing. */
     internal suspend fun findIndependentCodeReviewForUi(
         sessionId: String, repository: String,
