@@ -602,6 +602,11 @@ def locked(root, store, owner, action, arguments):
     merged_tree = proposal["merged_tree"]
     if arguments["expected_merged_tree"] != merged_tree:
         raise ValueError("integration result changed since merge preview; inspect again")
+    if "allowed_paths" in arguments:
+        actual_paths = changed_paths(source, parent_tree, merged_tree)
+        if any(not any(path == scope or path.startswith(scope + "/") for scope in allowed)
+               for path in actual_paths):
+            raise ValueError("chosen integration changes outside declared outputs")
     if len(proposal["patch"]) > MAX_REVIEW_BYTES:
         patch_bytes = proposal["patch"]
         receipts = arguments.get("review_receipts")
