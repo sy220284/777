@@ -2,6 +2,8 @@ package com.labteto.dshmobile.harness.tools
 
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -140,4 +142,99 @@ class CodeModePluginTest {
         assertEquals("APPROVAL_REQUIRED", noApproval.result.errorCode)
         assertFalse(called)
     }
+    @Test fun priorDurableResultCanSupplyNestedArgumentsToNextTool() = runTest {
+        val registry = ToolRegistry()
+        var received: JsonObject? = null
+        register(registry, "produce") {
+            ToolResult("""{"file":{"path":"docs/demo.md","count":3}}""")
+        }
+        registry.register(HarnessTool(
+            "consume", functionToolSchema("consume", "使用结果"), ToolAccess.WORKSPACE_WRITE,
+            ToolApprovalPolicy.ALWAYS, ToolExposure.CORE, ToolMetadata("test"),
+            executor = HarnessToolExecutor { _, args, _ ->
+                received = args
+                ToolResult("saved")
+            },
+        ))
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val steps = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject { put("tool", "produce"); put("args", buildJsonObject {}) })
+                add(buildJsonObject {
+                    put("tool", "consume")
+                    put("args", buildJsonObject {
+                        put("path", buildJsonObject {
+                            put("\$step_result", 1)
+                            put("path", "file.path")
+                        })
+                        put("count", buildJsonObject {
+                            put("\$step_result", 1)
+                            put("path", "file.count")
+                        })
+                    })
+                })
+            })
+        }
+        val actual = registry.execute("code_mode_run", steps,
+            context = ToolContext(approval = { true }))
+        assertFalse(actual.isError)
+        assertEquals("docs/demo.md", (received?.get("path") as JsonPrimitive).content)
+        assertEquals("3", (received?.get("count") as JsonPrimitive).content)
+        assertTrue(actual.content.contains("completed_steps"))
+    }
+
+    @Test fun invalidForwardReferenceCannotTriggerAnEarlierWrite() = runTest {
+        val registry = ToolRegistry()
+        var writes = 0
+        register(registry, "write", ToolAccess.WORKSPACE_WRITE) {
+            writes++
+            ToolResult("saved")
+        }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val invalid = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject { put("tool", "write"); put("args", buildJsonObject {}) })
+                add(buildJsonObject {
+                    put("tool", "write")
+                    put("args", buildJsonObject {
+                        put("value", buildJsonObject { put("\$step_result", 2) })
+                    })
+                })
+            })
+        }
+        val actual = registry.execute("code_mode_run", invalid,
+            context = ToolContext(approval = { true }))
+        assertEquals("CODE_MODE_BAD_REFERENCE", actual.errorCode)
+        assertEquals(0, writes)
+    }
+
+    @Test fun ephemeralResultCannotFlowIntoLaterMutation() = runTest {
+        val registry = ToolRegistry()
+        var writes = 0
+        register(registry, "produce") {
+            ToolResult("private", retention = ToolResultRetention.EPHEMERAL)
+        }
+        register(registry, "write", ToolAccess.WORKSPACE_WRITE) {
+            writes++
+            ToolResult("saved")
+        }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val chained = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject { put("tool", "produce"); put("args", buildJsonObject {}) })
+                add(buildJsonObject {
+                    put("tool", "write")
+                    put("args", buildJsonObject {
+                        put("value", buildJsonObject { put("\$step_result", 1) })
+                    })
+                })
+            })
+        }
+        val actual = registry.execute("code_mode_run", chained,
+            context = ToolContext(approval = { true }))
+        assertEquals("CODE_MODE_REFERENCE_FAILED", actual.errorCode)
+        assertEquals(0, writes)
+        assertFalse(actual.content.contains("private"))
+    }
+
 }

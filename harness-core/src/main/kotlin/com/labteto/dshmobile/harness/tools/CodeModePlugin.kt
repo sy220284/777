@@ -3,6 +3,8 @@ package com.labteto.dshmobile.harness.tools
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -57,7 +59,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             metadata = ToolMetadata(
                 family = "workflow",
                 discoveryKeywords = setOf("code mode", "编排", "批量工具"),
-                usageNotes = listOf("只执行已经在本轮授权的 CORE 工具；逐步审批，失败即停止，不重试"),
+                usageNotes = listOf("CORE 工具按顺序逐步审批；可引用前序持久回执字段，失败停止且不自动重试"),
             ),
             executor = HarnessToolExecutor { originalContext, input, _ ->
                 executePlan(originalContext, input)
@@ -92,12 +94,27 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 return rejection("CODE_MODE_UNAUTHORIZED_TOOL", "步骤 ${index + 1} 未获工具发现授权：$name")
             val arguments = step["args"] as? JsonObject
                 ?: return rejection("CODE_MODE_BAD_PLAN", "步骤 ${index + 1} 缺少对象类型的参数")
+            validateReferencePlan(arguments, index + 1)?.let { problem ->
+                return rejection("CODE_MODE_BAD_REFERENCE", "步骤 ${index + 1} 的结果引用无效：$problem")
+            }
             validated += Triple(name, handler, arguments)
         }
 
         val observations = mutableListOf<JsonObject>()
+        val completedResults = mutableListOf<ToolResult>()
         for ((index, entry) in validated.withIndex()) {
             val (name, handler, arguments) = entry
+            val resolvedArguments = try {
+                resolveReferences(arguments, completedResults) as JsonObject
+            } catch (error: StepReferenceException) {
+                observations += buildJsonObject {
+                    put("index", index + 1)
+                    put("tool", name)
+                    put("status", "reference_failed")
+                    put("hint", error.message ?: "前序步骤没有可用的持久结果")
+                }
+                return receipt(observations, "stopped", "CODE_MODE_REFERENCE_FAILED")
+            }
             // The parent call receipt and each child tool receipt have different call identities.
             val attrs = original.attributes + (
                 "call_id" to (original.attributes["call_id"]?.toString().orEmpty()
@@ -106,7 +123,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             val child = original.copy(attributes = attrs, expectedRegistration = handler)
             val outcome = try {
                 withTimeoutOrNull(STEP_TIMEOUT_MILLIS) {
-                    liveTools.executeTracked(name, arguments, arguments.toString(), child)
+                    liveTools.executeTracked(name, resolvedArguments, resolvedArguments.toString(), child)
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
@@ -144,8 +161,63 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 }
             }
             if (result.isError) return receipt(observations, "stopped", "CODE_MODE_STEP_FAILED")
+            completedResults += result
         }
         return receipt(observations, "completed", null)
+    }
+
+
+    /** All references are checked before the first side-effecting tool is entered. */
+    private fun validateReferencePlan(node: JsonElement, stepNumber: Int): String? = when (node) {
+        is JsonObject -> if (RESULT_REFERENCE_KEY in node) {
+            val index = (node[RESULT_REFERENCE_KEY] as? JsonPrimitive)?.content?.toIntOrNull()
+            val path = node["path"]
+            when {
+                node.keys.any { it != RESULT_REFERENCE_KEY && it != "path" } -> "包含未知字段"
+                index == null || index !in 1 until stepNumber -> "只能引用更早的步骤"
+                path != null && (path !is JsonPrimitive || !path.isString ||
+                    (path.content.isNotEmpty() && !REFERENCE_PATH.matches(path.content))) ->
+                    "字段路径无效"
+                else -> null
+            }
+        } else node.values.firstNotNullOfOrNull { validateReferencePlan(it, stepNumber) }
+        is JsonArray -> node.firstNotNullOfOrNull { validateReferencePlan(it, stepNumber) }
+        else -> null
+    }
+
+    private class StepReferenceException(message: String) : IllegalArgumentException(message)
+
+    /** Only durable results can be reused. Resolved inputs pass through ToolRegistry again,
+     * retaining schema validation, approval, registration identity and Hooks. */
+    private fun resolveReferences(node: JsonElement, history: List<ToolResult>): JsonElement = when (node) {
+        is JsonObject -> if (RESULT_REFERENCE_KEY in node) {
+            val ordinal = (node[RESULT_REFERENCE_KEY] as JsonPrimitive).content.toInt()
+            val source = history.getOrNull(ordinal - 1)
+                ?: throw StepReferenceException("步骤 $ordinal 尚无执行回执")
+            if (source.retention != ToolResultRetention.DURABLE)
+                throw StepReferenceException("步骤 $ordinal 的临时结果不可传递")
+            if (source.content.length > MAX_REFERENCE_SOURCE_CHARS)
+                throw StepReferenceException("步骤 $ordinal 的结果过大")
+            val parsed = try {
+                Json.parseToJsonElement(source.content)
+            } catch (_: kotlinx.serialization.SerializationException) {
+                JsonPrimitive(source.content)
+            }
+            var selected: JsonElement = parsed
+            val path = (node["path"] as? JsonPrimitive)?.content.orEmpty()
+            if (path.isNotEmpty()) for (segment in path.split('.')) {
+                selected = when (val value = selected) {
+                    is JsonObject -> value[segment]
+                    is JsonArray -> segment.toIntOrNull()?.let { index -> value.getOrNull(index) }
+                    else -> null
+                } ?: throw StepReferenceException("步骤 $ordinal 的字段不存在：$path")
+            }
+            if (selected.toString().length > MAX_REFERENCE_VALUE_CHARS)
+                throw StepReferenceException("步骤 $ordinal 的字段超过传递长度限制")
+            selected
+        } else JsonObject(node.mapValues { (_, element) -> resolveReferences(element, history) })
+        is JsonArray -> JsonArray(node.map { resolveReferences(it, history) })
+        else -> node
     }
 
     private fun rejection(code: String, detail: String): ToolResult = ToolResult(
@@ -172,6 +244,10 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
         const val TOOL_NAME = "code_mode_run"
         const val MAX_STEPS = 8
         const val MAX_SCRIPT_CHARS = 32_000
+        const val MAX_REFERENCE_SOURCE_CHARS = 128_000
+        const val MAX_REFERENCE_VALUE_CHARS = 8_192
+        const val RESULT_REFERENCE_KEY = "\$step_result"
+        val REFERENCE_PATH = Regex("""[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*""")
         const val MAX_RESULT_CHARS = 4_000
         const val STEP_TIMEOUT_MILLIS = 90_000L
     }
