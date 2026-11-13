@@ -203,6 +203,17 @@ class WorkExperienceBootstrapTest {
             val prompt = WorkExperienceBootstrap.reviewPrompt("深入调查", signals, true, true)
             assertTrue(prompt.contains("finding_supported: 1"))
             assertFalse(prompt.contains("PRIVATE_DISCOVERY_TEXT"))
+            log.append("work/finding", buildJsonObject {
+                put("finding_id", "finding-one")
+                put("status", "rejected")
+            })
+            val revised = WorkExperienceBootstrap.collect(
+                log, LocalGoal("深入调查", status = "completed", id = "goal-finding",
+                    revision = 2, startedAtSequence = start),
+            )
+            // The completed Goal's event boundary is frozen. Edits after completion
+            // do not rewrite the settled evaluation; historical findings are versioned.
+            assertEquals(1, revised.supportedFindings)
         } finally {
             root.deleteRecursively()
         }
