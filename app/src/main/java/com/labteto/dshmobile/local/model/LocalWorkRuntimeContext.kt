@@ -53,6 +53,7 @@ internal fun withWorkRuntimeContext(
             appendLine("- 自检工具和插件以 capability_search 查询的实时注册表及实际连接状态为准；可发现不等于已授权或执行成功。")
         }
         if (asksCode) {
+            appendLine("- 工作区清点先用本轮已暴露的高效目录扫描能力（如受授权范围内的 bash/find）；使用 list_files/glob 时必须跟随分页游标直至完整，不凭截断结果推断文件总数。已知官方文档 URL 优先直接 web_fetch，缺少地址时再 web_search。")
             appendLine("- 需要本机工具操作流程时，先读取 .dsh/tools/777-runtime-guide.md；使用范围明确的文件与执行工具，以实际运行结果验证。")
         }
         if (asksHistory) {
