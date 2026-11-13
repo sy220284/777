@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import java.io.ByteArrayOutputStream
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,51 @@ internal data class GitDiffPreviewSummary(
     val omittedFiles: Int,
 )
 
+/** Git quotes paths with spaces/non-ASCII using C escapes and octal UTF-8 bytes. */
+internal fun gitDiffTargetPath(header: String): String? {
+    if (!header.startsWith("diff --git ")) return null
+    val quoted = header.lastIndexOf(" \"b/")
+    if (quoted >= 0 && header.endsWith('"')) {
+        val encoded = header.substring(quoted + 4, header.length - 1)
+        val bytes = ByteArrayOutputStream(encoded.length)
+        var index = 0
+        while (index < encoded.length) {
+            if (encoded[index] != '\\') {
+                val nextEscape = encoded.indexOf('\\', index).let {
+                    if (it < 0) encoded.length else it
+                }
+                bytes.write(encoded.substring(index, nextEscape).toByteArray(Charsets.UTF_8))
+                index = nextEscape
+                continue
+            }
+            if (index + 3 < encoded.length &&
+                encoded.substring(index + 1, index + 4).all { it in '0'..'7' }) {
+                bytes.write(encoded.substring(index + 1, index + 4).toInt(8))
+                index += 4
+                continue
+            }
+            val character = when (encoded.getOrNull(index + 1)) {
+                'a' -> '\u0007'
+                'b' -> '\b'
+                't' -> '\t'
+                'n' -> '\n'
+                'v' -> '\u000B'
+                'f' -> '\u000C'
+                'r' -> '\r'
+                '\\' -> '\\'
+                '"' -> '"'
+                null -> '\\'
+                else -> encoded[index + 1]
+            }
+            bytes.write(character.toString().toByteArray(Charsets.UTF_8))
+            index += if (index + 1 < encoded.length) 2 else 1
+        }
+        return bytes.toByteArray().toString(Charsets.UTF_8).takeIf(String::isNotEmpty)
+    }
+    return header.substringAfterLast(" b/", missingDelimiterValue = "")
+        .takeIf(String::isNotEmpty)
+}
+
 /** Parse Git unified diff as read-only data, with explicit bounds on UI rows. */
 internal fun parseGitDiffPreview(
     patch: String,
@@ -55,10 +101,9 @@ internal fun parseGitDiffPreview(
     var hiddenFiles = 0
     for (line in patch.lineSequence()) {
         if (line.startsWith("diff --git ")) {
-            val target = line.substringAfterLast(" b/", missingDelimiterValue = "")
-                .removeSuffix("\"")
+            val target = gitDiffTargetPath(line)
             if (drafts.size < maxFiles) {
-                active = Draft(target.ifEmpty { "未知文件" })
+                active = Draft(target ?: "未知文件")
                 drafts.add(active)
             } else {
                 active = null
