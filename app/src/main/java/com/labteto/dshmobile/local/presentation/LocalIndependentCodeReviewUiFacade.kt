@@ -20,17 +20,18 @@ internal class LocalIndependentCodeReviewUiFacade @Inject constructor(
     suspend fun find(sessionId: String, repository: String, diff: LocalRemoteGitDiffUi):
         LocalIndependentCodeReview? = withContext(Dispatchers.IO) {
         reviewer.findForDiff(sessionId, repository, diff.trackingRef,
-            diff.statistics, diff.patch, diff.truncated)
+            diff.statistics, diff.patch, diff.truncated, diff.evidenceRevision)
     }
 
     suspend fun review(sessionId: String, repository: String, diff: LocalRemoteGitDiffUi):
         LocalIndependentCodeReview {
         val report = reviewer.review(sessionId, repository, diff.trackingRef,
-            diff.statistics, diff.patch, diff.truncated)
+            diff.statistics, diff.patch, diff.truncated, diff.evidenceRevision)
         val current = currentDiff(repository, diff.trackingRef)
         // The original report is durable, but must not be displayed as a finding for newer code.
         check(!current.truncated && report.digest == codeReviewDigest(
             repository, current.trackingRef, current.statistics, current.patch,
+            current.evidenceRevision,
         )) { "审查期间代码修改已变化，旧报告已保存；请刷新差异重新审查。" }
         return report
     }
@@ -39,7 +40,8 @@ internal class LocalIndependentCodeReviewUiFacade @Inject constructor(
         review: LocalIndependentCodeReview, diff: LocalRemoteGitDiffUi): Boolean {
         val current = currentDiff(repository, diff.trackingRef)
         return reviewer.accept(sessionId, review.id, review.evidenceSequence,
-            repository, current.trackingRef, current.statistics, current.patch, current.truncated)
+            repository, current.trackingRef, current.statistics, current.patch, current.truncated,
+            current.evidenceRevision)
     }
 
     private suspend fun currentDiff(repository: String, ref: String): LocalRemoteGitDiffUi {
