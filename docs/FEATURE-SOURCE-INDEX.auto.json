@@ -1928,7 +1928,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
-      "sha256": "cc85cfe51196d883"
+      "sha256": "f9f3d3c0eda685a3"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTranscriptHistoryLoader.kt",
@@ -3844,7 +3844,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
-      "sha256": "fea8459ffd76ff87"
+      "sha256": "8763a86f017e4de1"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/shenyan/ShenyanTheme.kt",
@@ -4616,13 +4616,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "92b589d0548b",
+  "source_snapshot": "262bc6fe6062",
   "observed_delta": {
-    "baseline": "db29572ad4c2",
+    "baseline": "92b589d0548b",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentBackendRuntime.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
