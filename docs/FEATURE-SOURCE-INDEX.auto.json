@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1938,
-  "production_source_count": 1130,
-  "test_code_file_count": 663,
+  "repository_code_file_count": 1940,
+  "production_source_count": 1131,
+  "test_code_file_count": 664,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -2376,7 +2376,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubSkillImporter.kt",
-      "sha256": "5c8e2aa3f979f9e0"
+      "sha256": "41d383a694e1da2f"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalJsonQuery.kt",
@@ -2424,7 +2424,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
-      "sha256": "4c6e3a0e0c2f857c"
+      "sha256": "402c21e8e7a5dc07"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackage.kt",
@@ -2433,6 +2433,10 @@
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackageExporter.kt",
       "sha256": "0fa1e04c2c1e3fa3"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackageUpdater.kt",
+      "sha256": "90a201194de5968b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTaskCapabilityReadiness.kt",
@@ -4584,15 +4588,16 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "25d15dc3911e",
+  "source_snapshot": "b7a94f7bd93f",
   "observed_delta": {
-    "baseline": "574e87e220fe",
-    "added_production_files": [],
+    "baseline": "25d15dc3911e",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackageUpdater.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/CodeModePlugin.kt",
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolBindingSnapshot.kt",
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolRegistry.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubSkillImporter.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
