@@ -3432,7 +3432,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
-      "sha256": "84fb3a7d286bcb11"
+      "sha256": "319869e83ad51e40"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawerComponents.kt",
@@ -4568,9 +4568,9 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "a046946c5a2c",
+  "source_snapshot": "f42fc72479aa",
   "observed_delta": {
-    "baseline": "29a152b09004",
+    "baseline": "a046946c5a2c",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
