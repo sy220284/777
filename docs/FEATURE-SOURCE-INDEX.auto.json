@@ -1176,7 +1176,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceFileChanges.kt",
-      "sha256": "1d4df1540b4230c8"
+      "sha256": "c8a543fda5174e8e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceFuzzyMatcher.kt",
@@ -2112,7 +2112,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeProjection.kt",
-      "sha256": "6de2bbef4cdf68d5"
+      "sha256": "328ee562b8633dfe"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt",
@@ -4564,15 +4564,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "4586fb5753f8",
+  "source_snapshot": "7f58ddaf71c7",
   "observed_delta": {
-    "baseline": "f5a755059abe",
+    "baseline": "4586fb5753f8",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/plugin/PluginRegistry.kt",
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolHookRegistry.kt",
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolRegistry.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceFileChanges.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeProjection.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
