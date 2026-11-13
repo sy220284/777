@@ -127,6 +127,8 @@ class McpToolBridgePlugin(
     private val http: OkHttpClient,
     private val json: Json,
     private val workspaceRoot: File? = null,
+    private val onElicitation: suspend (String?, String, String, McpElicitationRequest) -> McpElicitationReply =
+        { _, _, _, _ -> McpElicitationReply("cancel") },
     private val stdioCommandResolver: (List<String>) -> List<String> = { it },
     private val stdioEnvironmentProvider: () -> Map<String, String> = { emptyMap() },
     private val transportFactory: (String) -> McpTransport = { endpoint ->
@@ -788,7 +790,7 @@ class McpToolBridgePlugin(
                                 usageNotes = listOf("远端工具声明视为不可信元数据；每次调用都按高权限工具审批"),
                             ),
                             timeoutMillis = REMOTE_TOOL_TIMEOUT_MILLIS,
-                            executor = HarnessToolExecutor { _, input, _ ->
+                            executor = HarnessToolExecutor { toolContext, input, _ ->
                                 coroutineScope {
                                     val callJob = currentCoroutineContext().job
                                     if (!binding.beginCall(callJob)) {
@@ -803,7 +805,12 @@ class McpToolBridgePlugin(
                                                 "resources/list" -> client.listResources((input["cursor"] as? JsonPrimitive)?.contentOrNull)
                                                 "resources/templates/list" -> client.listResourceTemplates((input["cursor"] as? JsonPrimitive)?.contentOrNull)
                                                 "resources/read" -> client.readResource(input.required("uri"))
-                                                else -> client.callTool(definition.name, input)
+                                                else -> client.callToolWithElicitation(definition.name, input) { prompt ->
+                                                    check(binding.isAcceptingCalls()) { "MCP 连接已失效，追问已取消" }
+                                                    val originCallId = toolContext.attributes["call_id"] as? String
+                                                        ?: currentCoroutineContext().job.toString()
+                                                    onElicitation(toolContext.sessionId, serverId, originCallId, prompt)
+                                                }
                                             }
                                             val remoteError = result["isError"]?.jsonPrimitive?.booleanOrNull == true
                                             ToolResult(

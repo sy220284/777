@@ -87,6 +87,8 @@ class LocalPluginCompositionFactory @Inject constructor(
         routeProvider: () -> LocalVisionRoute?,
         imageSupportProvider: (LocalVisionRoute) -> Boolean?,
         executeBuiltin: suspend (LocalToolCall, Boolean, String?) -> com.labteto.dshmobile.harness.tools.ToolResult,
+        onMcpElicitation: suspend (String?, String, String, com.labteto.dshmobile.interop.mcp.McpElicitationRequest) -> com.labteto.dshmobile.interop.mcp.McpElicitationReply =
+            { _, _, _, _ -> com.labteto.dshmobile.interop.mcp.McpElicitationReply("cancel") },
         usageContextProvider: (String?, String?) -> TokenUsageContext? = { _, _ -> null },
     ): LocalPluginComposition = LocalPluginComposition(
         context = context,
@@ -113,6 +115,7 @@ class LocalPluginCompositionFactory @Inject constructor(
         routeProvider = routeProvider,
         imageSupportProvider = imageSupportProvider,
         executeBuiltin = executeBuiltin,
+        onMcpElicitation = onMcpElicitation,
         usageContextProvider = usageContextProvider,
     )
 }
@@ -142,6 +145,8 @@ internal class LocalPluginComposition(
     routeProvider: () -> LocalVisionRoute?,
     imageSupportProvider: (LocalVisionRoute) -> Boolean?,
     executeBuiltin: suspend (LocalToolCall, Boolean, String?) -> com.labteto.dshmobile.harness.tools.ToolResult,
+    onMcpElicitation: suspend (String?, String, String, com.labteto.dshmobile.interop.mcp.McpElicitationRequest) -> com.labteto.dshmobile.interop.mcp.McpElicitationReply =
+        { _, _, _, _ -> com.labteto.dshmobile.interop.mcp.McpElicitationReply("cancel") },
     usageContextProvider: (String?, String?) -> TokenUsageContext? = { _, _ -> null },
 ) {
     val tools = ToolRegistry()
@@ -154,6 +159,7 @@ internal class LocalPluginComposition(
         resourceScheduler = resourceScheduler,
     )
     private val mcpPlugin = McpToolBridgePlugin(
+        onElicitation = onMcpElicitation,
         http = http,
         json = json,
         workspaceRoot = workspaceRoot,

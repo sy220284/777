@@ -372,6 +372,7 @@ class McpNegotiatingHttpTransport(
     endpoint: String,
     http: OkHttpClient,
     json: Json,
+    modernClientCapabilities: JsonObject = JsonObject(emptyMap()),
 ) : McpTransport, McpTerminationSource, McpResourceDiscovery {
     override suspend fun supportedResourceMethods(): Set<String> =
         selected?.let { discoverMcpResourceMethods(it) } ?: emptySet()
@@ -381,7 +382,9 @@ class McpNegotiatingHttpTransport(
     override val terminalEvents: Flow<Throwable> = flow {
         (selected as? McpTerminationSource)?.terminalEvents?.collect { emit(it) }
     }
-    private val modern = McpStreamableHttpTransport(endpoint, http, json)
+    private val modern = McpStreamableHttpTransport(
+        endpoint, http, json, clientCapabilities = modernClientCapabilities,
+    )
     private val legacy = McpLegacyStreamableHttpTransport(endpoint, http, json)
     private val legacySse = McpLegacyHttpSseTransport(endpoint, http, json)
     private val selectionMutex = Mutex()
@@ -430,6 +433,7 @@ class McpLegacyStdioTransport(
     private val protocolVersion: String = LEGACY_MCP_PROTOCOL_VERSION,
     private val commandResolver: (List<String>) -> List<String> = { it },
     private val environmentProvider: () -> Map<String, String> = { emptyMap() },
+    private val modernClientCapabilities: JsonObject = JsonObject(emptyMap()),
 ) : McpTransport, McpTerminationSource {
     private val ids = AtomicLong(1L)
     private val mutex = Mutex()
@@ -461,7 +465,8 @@ class McpLegacyStdioTransport(
             "initialize",
             buildJsonObject {
                 put("protocolVersion", protocolVersion)
-                put("capabilities", buildJsonObject { })
+                put("capabilities", if (protocolVersion == CURRENT_MCP_PROTOCOL_VERSION)
+                    modernClientCapabilities else buildJsonObject { })
                 put("clientInfo", buildJsonObject {
                     put("name", clientName)
                     put("version", clientVersion)
@@ -490,7 +495,12 @@ class McpLegacyStdioTransport(
                 put("jsonrpc", "2.0")
                 put("id", id)
                 put("method", method)
-                put("params", params)
+                put("params", if (protocolVersion == CURRENT_MCP_PROTOCOL_VERSION) buildJsonObject {
+                    params.forEach { (key, value) -> put(key, value) }
+                    put("_meta", buildJsonObject {
+                        put("io.modelcontextprotocol/clientCapabilities", modernClientCapabilities)
+                    })
+                } else params)
             },
         )
         while (true) {
@@ -517,6 +527,7 @@ class McpLegacyStdioTransport(
 class McpNegotiatingStdioTransport(
     command: List<String>,
     json: Json,
+    modernClientCapabilities: JsonObject = JsonObject(emptyMap()),
     workingDirectory: File? = null,
     commandResolver: (List<String>) -> List<String> = { it },
     environmentProvider: () -> Map<String, String> = { emptyMap() },
@@ -533,6 +544,7 @@ class McpNegotiatingStdioTransport(
         json = json,
         workingDirectory = workingDirectory,
         protocolVersion = CURRENT_MCP_PROTOCOL_VERSION,
+        modernClientCapabilities = modernClientCapabilities,
         commandResolver = commandResolver,
         environmentProvider = environmentProvider,
     )
