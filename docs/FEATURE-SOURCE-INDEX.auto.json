@@ -4508,7 +4508,7 @@
     },
     {
       "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpElicitationRoundTrips.kt",
-      "sha256": "0d9ea74161cfc1f5"
+      "sha256": "cb3aae97afaa1ac4"
     },
     {
       "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpLegacyTransports.kt",
@@ -4592,15 +4592,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "5652c16b4bec",
+  "source_snapshot": "01a74989c13e",
   "observed_delta": {
-    "baseline": "1118d8ab6db9",
-    "added_production_files": [
-      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpElicitationRoundTrips.kt"
-    ],
+    "baseline": "5652c16b4bec",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpClient.kt"
+      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpElicitationRoundTrips.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
