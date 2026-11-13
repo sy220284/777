@@ -3796,7 +3796,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "sha256": "3fb36dd3c16c6173"
+      "sha256": "e09fa20dc26dd91e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
@@ -4632,14 +4632,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "22ed6c45e454",
+  "source_snapshot": "910e1e9b92ce",
   "observed_delta": {
-    "baseline": "6da1829baeec",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeepSeekBalanceCard.kt"
-    ],
+    "baseline": "22ed6c45e454",
+    "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
