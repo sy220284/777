@@ -59,6 +59,11 @@ internal suspend fun mcpCallWithInputRequired(
         require(inputs.isNotEmpty() || opaqueState != null) {
             "MCP 追问缺少输入请求及延续状态"
         }
+        // Detect cycles without user prompts rather than imposing an arbitrary round cap.
+        check(inputs.isNotEmpty() ||
+            next["requestState"]?.jsonPrimitive?.contentOrNull != opaqueState) {
+            "MCP 追问没有新输入或状态变化，无法继续"
+        }
         val repliesByKey = linkedMapOf<String, JsonObject>()
         // The server can issue independent prompts in one round. There is exactly
         // one user interaction at a time through the existing Work owner.
