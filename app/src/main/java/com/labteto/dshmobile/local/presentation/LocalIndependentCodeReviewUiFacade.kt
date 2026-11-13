@@ -13,17 +13,17 @@ import kotlinx.coroutines.withContext
  * An already committed report is recovered without a model request; accepting never edits code.
  */
 @Singleton
-internal class LocalIndependentCodeReviewUiFacade @Inject constructor(
+class LocalIndependentCodeReviewUiFacade @Inject internal constructor(
     private val reviewer: LocalIndependentCodeReviewCoordinator,
     private val tools: LocalToolsUiFacade,
 ) {
-    suspend fun find(sessionId: String, repository: String, diff: LocalRemoteGitDiffUi):
+    internal suspend fun find(sessionId: String, repository: String, diff: LocalRemoteGitDiffUi):
         LocalIndependentCodeReview? = withContext(Dispatchers.IO) {
         reviewer.findForDiff(sessionId, repository, diff.trackingRef,
             diff.statistics, diff.patch, diff.truncated, diff.evidenceRevision)
     }
 
-    suspend fun review(sessionId: String, repository: String, diff: LocalRemoteGitDiffUi):
+    internal suspend fun review(sessionId: String, repository: String, diff: LocalRemoteGitDiffUi):
         LocalIndependentCodeReview {
         val report = reviewer.review(sessionId, repository, diff.trackingRef,
             diff.statistics, diff.patch, diff.truncated, diff.evidenceRevision)
@@ -36,7 +36,7 @@ internal class LocalIndependentCodeReviewUiFacade @Inject constructor(
         return report
     }
 
-    suspend fun accept(sessionId: String, repository: String,
+    internal suspend fun accept(sessionId: String, repository: String,
         review: LocalIndependentCodeReview, diff: LocalRemoteGitDiffUi): Boolean {
         val current = currentDiff(repository, diff.trackingRef)
         return reviewer.accept(sessionId, review.id, review.evidenceSequence,
