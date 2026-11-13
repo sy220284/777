@@ -2424,7 +2424,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
-      "sha256": "fcfa9c85f0ca6945"
+      "sha256": "5ec7c57ff6c1b5b5"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSandboxBoundary.kt",
@@ -4624,13 +4624,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "69adbb5fc950",
+  "source_snapshot": "b45b1ef563f4",
   "observed_delta": {
-    "baseline": "4dfda623f1bb",
+    "baseline": "69adbb5fc950",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
