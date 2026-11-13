@@ -1,6 +1,6 @@
 # V6 多模态聊天消息与自动创作 · 设计验收规格
 
-> 基准：777 Android Compose，2026-10-15。本文件仅记录本次实现约束，不代表 Figma 在线画板已经同步。
+> **专用设计历史基准：** 2026-10-15。现行功能以 2026-11-13 合并 Compose 为准；本文件保留图片/视频/声音等细化体验，需与 [V6.3 已实现交互契约](V6-IMPLEMENTED-INTERACTION-CONTRACT.zh-CN.md)及 [V6.4 目标规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)共同使用。Figma 画板同步尚未验收。
 
 ## 视觉结构
 
