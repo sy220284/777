@@ -75,22 +75,79 @@ class GitWorkspaceRuntime(
     }
 
     internal fun install(context: HarnessContext) {
-        for (action in listOf("fork", "list", "status", "merge", "discard")) {
+        for (action in listOf("fork", "list", "status", "compare_merge", "preview_merge", "merge", "recover_merge", "discard")) {
             val name = "workspace_$action"
-            val mutates = action !in setOf("status", "list")
+            val mutates = action !in setOf("status", "compare_merge", "preview_merge", "list")
             val properties = buildJsonObject {
                 if (action == "fork") put("repository", buildJsonObject {
                     put("type", "string"); put("description", "工作区内 Git 仓库根目录，默认 .；包含当前未提交及未跟踪文件作为起点")
                 }) else if (action != "list") put("workspace_id", buildJsonObject { put("type", "string") })
-                if (action in setOf("merge", "discard")) put("expected_tree", buildJsonObject {
+                if (action in setOf("compare_merge", "preview_merge", "merge", "recover_merge", "discard")) put("expected_tree", buildJsonObject {
                     put("type", "string"); put("description", "最近 workspace_status 返回的 tree；变化后必须重新审阅")
                 })
+                if (action == "compare_merge") {
+                    put("review_side", buildJsonObject {
+                        put("type", "string")
+                        put("enum", kotlinx.serialization.json.JsonArray(listOf("parent", "child").map { kotlinx.serialization.json.JsonPrimitive(it) }))
+                        put("description", "父子差异超出单页时，按 parent / child 分别读取每页 Base64 差异")
+                    })
+                    put("review_offset", buildJsonObject {
+                        put("type", "integer")
+                        put("description", "读取指定版本差异时的分页偏移；使用上一页 next_offset")
+                    })
+                }
+                if (action == "preview_merge") {
+                    put("review_offset", buildJsonObject {
+                        put("type", "integer")
+                        put("description", "大补丁按 262144 字节分页审查；使用上一页 next_offset 继续，收齐全部 review_receipt")
+                    })
+                }
+                if (action in setOf("preview_merge", "merge")) {
+                    put("resolution", buildJsonObject {
+                        put("type", "string")
+                        put("enum", kotlinx.serialization.json.JsonArray(listOf("auto", "prefer_parent", "prefer_child", "select").map { kotlinx.serialization.json.JsonPrimitive(it) }))
+                        put("description", "经质量比较选择自动合并、保留父实现、采用子实现或逐文件择优")
+                    })
+                    put("path_choices", buildJsonObject {
+                        put("type", "object")
+                        put("description", "select 模式必须明确选择全部共同改动路径；可额外选择单方改动路径以主动覆盖或舍弃有依赖冲突的实现")
+                        put("additionalProperties", buildJsonObject {
+                            put("type", "string")
+                            put("enum", kotlinx.serialization.json.JsonArray(listOf("parent", "child").map { kotlinx.serialization.json.JsonPrimitive(it) }))
+                        })
+                    })
+                }
+                if (action == "merge") {
+                    put("expected_source_tree", buildJsonObject {
+                        put("type", "string"); put("description", "workspace_preview_merge 返回的 source_tree，锁定父工作区版本")
+                    })
+                    put("expected_merged_tree", buildJsonObject {
+                        put("type", "string"); put("description", "workspace_preview_merge 返回的 merged_tree，锁定最终合并结果")
+                    })
+                    put("quality_decision", buildJsonObject {
+                        put("type", "object")
+                        put("description", "本次择优依据：resolution、reason、criteria（correctness/experience/maintainability）、reviewed_both；测试另按真实工具回执验证")
+                    })
+                    put("review_receipts", buildJsonObject {
+                        put("type", "array")
+                        put("items", buildJsonObject { put("type", "string") })
+                        put("description", "只有超过 256 KiB 时需要：全部预览页面按偏移顺序返回的 review_receipt")
+                    })
+                    put("required_outputs", buildJsonObject {
+                        put("type", "array")
+                        put("items", buildJsonObject { put("type", "string") })
+                        put("description", "必需交付文件或非空目录；目录按子文件路径判断，支持末尾 /；任务图自动传入")
+                    })
+                }
             }
             val description = when (action) {
                 "fork" -> "创建真实独立 Git worktree；保留父目录、HEAD 和暂存区，返回工作目录及基线。目录隔离不构成独立操作系统权限边界"
                 "status" -> "检查本会话工作区相对基线的全部变更及 tree 指纹，含未提交、未跟踪和二进制文件"
+                "compare_merge" -> "只读提供原始基线到父子实现的真实补丁、共同改动路径及各自独立修改，供功能质量与体验比较"
+                "preview_merge" -> "只读预览 Git 自动合并、父实现优先、子实现优先或逐文件择优的精确结果；冲突或超限须继续审查"
                 "list" -> "列出本会话工作区及创建/删除状态；找回取消或中断时未返回的 workspace_id 与基线"
-                "merge" -> "三方合并已审阅工作区与父目录后续变更；冲突时不改父目录，成功时保留父目录 HEAD 和暂存区"
+                "merge" -> "基于三方质量决策与精确预览执行择优合并；版本变化、缺少比较理由或超限则拒绝，保留父目录 HEAD 和暂存区"
+                "recover_merge" -> "从持久集成记录恢复中断的三方合并：完成已提交写入或只回滚本次变更，不重新执行未审查合并"
                 else -> "确认 tree 未变化后删除本会话独立 worktree；保留父目录和删除回执"
             }
             context.tools.register(HarnessTool(
@@ -98,7 +155,8 @@ class GitWorkspaceRuntime(
                 schema = functionToolSchema(name, description, properties, required = when (action) {
                     "fork", "list" -> emptySet()
                     "status" -> setOf("workspace_id")
-                    else -> setOf("workspace_id", "expected_tree")
+                    "compare_merge", "preview_merge", "recover_merge", "discard" -> setOf("workspace_id", "expected_tree")
+                    else -> setOf("workspace_id", "expected_tree", "expected_source_tree", "expected_merged_tree", "resolution", "quality_decision")
                 }),
                 access = if (mutates) ToolAccess.WORKSPACE_WRITE else ToolAccess.READ_ONLY,
                 approvalPolicy = if (mutates) ToolApprovalPolicy.ALWAYS else ToolApprovalPolicy.NEVER,
@@ -117,16 +175,25 @@ class GitWorkspaceRuntime(
                         input["repository"]?.jsonPrimitive?.contentOrNull ?: ".",
                     ) else operate(session, action, input)
                     val outcome = response["state"]?.jsonPrimitive?.contentOrNull
-                    val incomplete = outcome in setOf("conflict", "rolled_back", "needs_inspection", "not_started")
+                    val pagedReview = action == "preview_merge" && outcome == "needs_full_review" &&
+                        response["review_receipt"] != null
+                    val incomplete = (outcome in setOf("conflict", "rolled_back", "needs_inspection", "not_started", "needs_full_review")) &&
+                        !pagedReview
                     ToolResult(response.toString(), isError = incomplete,
                         errorCode = if (incomplete) "WORKSPACE_INTEGRATION_INCOMPLETE" else null,
-                        recoveryHint = if (incomplete) "检查 workspace_status 的 integration；已回滚不等于已合并，外部新修改会保留。" else null)
+                        recoveryHint = when (outcome) {
+                            "needs_full_review" -> if (pagedReview) "继续按 next_offset 分页审查，收齐全部页面回执后提交质量决策。" else "父子实现过大，需要完整审查后再决定修改。"
+                            "conflict" -> "父子工作区修改冲突；先解决冲突并重新生成预览。"
+                            "rolled_back", "needs_inspection", "not_started" ->
+                                "检查 workspace_status 的 integration；已回滚不等于已合并，外部新修改会保留。"
+                            else -> null
+                        })
                 },
             ))
         }
     }
 
     internal fun uninstall(context: HarnessContext) {
-        listOf("fork", "list", "status", "merge", "discard").forEach { context.tools.unregister("workspace_$it") }
+        listOf("fork", "list", "status", "compare_merge", "preview_merge", "merge", "recover_merge", "discard").forEach { context.tools.unregister("workspace_$it") }
     }
 }
