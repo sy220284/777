@@ -115,6 +115,42 @@ class LocalToolExecutionCoordinatorTest {
 
 
     @Test
+    fun exactMultiToolSelectionLoadsOnlyNamedRegisteredToolsInOneStep() {
+        val registry = ToolRegistry().apply {
+            listOf("mcp_lookup", "github_status", "unrelated_search").forEach { name ->
+                register(tool(name = name, access = ToolAccess.READ_ONLY,
+                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                    family = "扩展", keywords = setOf("公共搜索")) { ToolResult("ok") })
+            }
+        }
+        val coordinator = coordinator(registry)
+        val result = coordinator.searchCapabilities("select:github_status,mcp_lookup,not_installed")
+        assertTrue(result.contains("not_installed"))
+        val selected = coordinator.enabledOptionalSnapshot().toList()
+        assertEquals(listOf("github_status", "mcp_lookup"), selected)
+        assertTrue("github_status" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
+        assertTrue("mcp_lookup" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
+        assertFalse("unrelated_search" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
+        val again = coordinator.searchCapabilities("select:mcp_lookup")
+        assertTrue(again.contains("[已加载]"))
+    }
+
+    @Test
+    fun exactMultiToolSelectionRejectsInvalidNamesAndKeepsPreviousSelection() {
+        val registry = ToolRegistry().apply {
+            register(tool(name = "mcp_lookup", access = ToolAccess.READ_ONLY,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "扩展") { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry)
+        coordinator.searchCapabilities("select:mcp_lookup")
+        val before = coordinator.enabledOptionalSnapshot()
+        val error = runCatching { coordinator.searchCapabilities("select:../../private") }.exceptionOrNull()
+        assertTrue(error is IllegalArgumentException)
+        assertEquals(before, coordinator.enabledOptionalSnapshot())
+    }
+
+    @Test
     fun explicitlyDiscoveredCapabilitySurvivesLaterWorkStepHeuristicRefresh() {
         val registry = ToolRegistry().apply {
             register(tool(name = "process_exec", access = ToolAccess.PROCESS,

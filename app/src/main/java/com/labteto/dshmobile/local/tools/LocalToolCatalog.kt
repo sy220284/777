@@ -165,7 +165,7 @@ object LocalToolCatalog {
             "url" to string("要诊断的网址或域名"),
         ), listOf("url")))
         add(tool("environment_info", "查看安卓本机 Harness 的可用环境能力与限制", properties()))
-        add(tool("capability_search", "从实时注册表查看完整能力目录，或按自然语言、能力族、工具名发现并自动加载扩展。已连接 MCP 或新增插件的工具无需修改目录代码；如需总览可搜索『能力目录』。工具执行仍遵守连接、权限和审批要求", properties(
+        add(tool("capability_search", "从实时注册表发现扩展；已知精确名称优先用 select:工具名1,工具名2 一次选择最多 16 个，减少多轮搜索；也支持自然语言及『能力目录』。仅下一模型步骤提供的真实工具表可调用，始终遵守连接、权限和审批要求", properties(
             "query" to string("例如 能力目录、工具与能力检测、GitHub PR、Android 界面、视觉、MCP、LSP、下载或某项具体工具名"),
         ), listOf("query")))
         add(tool("update_plan", "记录任务执行方案的步骤顺序，不记录进行中/已完成状态；进度用 todo_write，长期目标用 create_goal。仅复杂任务需要维护计划，避免重复写同一内容", properties(
