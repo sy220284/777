@@ -117,6 +117,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
             val expectedHash = first.getValue("${side}_diff_sha256").jsonPrimitive.content
             val output = java.io.ByteArrayOutputStream()
             var offset = 0
+            var next: Int?
             do {
                 val page = agentWorkspaces.operate(sessionId, "compare_merge", buildJsonObject {
                     put("workspace_id", identity); put("expected_tree", tree)
@@ -135,7 +136,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
                     page.getValue("diff_base64").jsonPrimitive.content, android.util.Base64.DEFAULT,
                 )
                 output.write(bytes)
-                val next = page["next_offset"]?.jsonPrimitive?.content?.toIntOrNull()
+                next = page["next_offset"]?.jsonPrimitive?.content?.toIntOrNull()
                 check(output.size() <= expectedLength &&
                     page["last_page"]?.jsonPrimitive?.content == (next == null).toString() &&
                     (next == null || (next == output.size() && next > offset))) {
