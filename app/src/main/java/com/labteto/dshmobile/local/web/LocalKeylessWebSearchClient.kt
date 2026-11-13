@@ -21,6 +21,7 @@ import org.xml.sax.InputSource
 internal class LocalKeylessWebSearchClient(
     private val http: OkHttpClient,
     private val onSearchCompleted: () -> Unit = {},
+    private val verifyEndpoint: (String) -> Unit = {},
 ) {
     suspend fun search(queries: List<String>): String = withContext(Dispatchers.IO) {
         val clean = queries.map(String::trim).filter(String::isNotBlank).distinct().take(4)
@@ -40,6 +41,7 @@ internal class LocalKeylessWebSearchClient(
             .get()
             .build()
         return try {
+            verifyEndpoint(url.toString())
             withCancellableHttpResponse(http.newCall(request)) { response ->
                 if (!response.isSuccessful) {
                     throw LocalWebException("SEARCH_HTTP", "公共网页搜索返回 HTTP " + response.code)
