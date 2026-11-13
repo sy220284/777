@@ -7,6 +7,13 @@ internal enum class PermissionSetupFeature {
     TASK_ALERTS,
 }
 
+internal enum class NotificationGrantAction { REQUEST_RUNTIME, OPEN_APP_SETTINGS }
+
+/** After one attempt, system settings are a reliable route even when Android suppresses the dialog. */
+internal fun notificationGrantAction(apiLevel: Int, attempted: Boolean): NotificationGrantAction =
+    if (apiLevel >= 33 && !attempted) NotificationGrantAction.REQUEST_RUNTIME
+    else NotificationGrantAction.OPEN_APP_SETTINGS
+
 internal enum class PermissionSetupStatus {
     READY,
     AUTHORIZED_WAITING,

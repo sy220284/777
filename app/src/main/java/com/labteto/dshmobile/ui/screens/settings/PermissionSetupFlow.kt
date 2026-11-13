@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -45,6 +47,7 @@ import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.SyMetric
 import android.Manifest
 import android.os.Build
+import kotlinx.coroutines.delay
 
 /**
  * Same permission journey from first launch and Settings. Only the user's selected capabilities
@@ -75,14 +78,15 @@ internal fun PermissionSetupFlow(
     LaunchedEffect(controller) { controller.refresh() }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { controller.refresh() }
 
-    fun open(feature: PermissionSetupFeature) {
+    fun open(feature: PermissionSetupFeature, forceAppSettings: Boolean = false) {
         openError = null
         try {
             when (feature) {
                 PermissionSetupFeature.SCREEN_CONTROL -> controller.openAccessibilitySettings()
                 PermissionSetupFeature.NOTIFICATION_READ -> controller.openNotificationAccessSettings()
                 PermissionSetupFeature.TASK_ALERTS -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    if (!forceAppSettings && notificationGrantAction(Build.VERSION.SDK_INT, feature in visited) ==
+                        NotificationGrantAction.REQUEST_RUNTIME) {
                         notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     } else controller.openAppNotificationSettings()
                 }
@@ -116,6 +120,20 @@ internal fun PermissionSetupFlow(
         }
     }
 
+    // Re-check for a short window when Android has granted permission but service binding lags.
+    LaunchedEffect(page, currentIndex, state.accessibilityGranted, state.notificationAccessGranted) {
+        if (page != 1) return@LaunchedEffect
+        val feature = chosen.getOrNull(currentIndex) ?: return@LaunchedEffect
+        if (permissionSetupStatus(feature, state) != PermissionSetupStatus.AUTHORIZED_WAITING) return@LaunchedEffect
+        repeat(12) {
+            delay(1_000)
+            controller.refresh()
+            if (permissionSetupStatus(feature, controller.state.value) != PermissionSetupStatus.AUTHORIZED_WAITING) {
+                return@LaunchedEffect
+            }
+        }
+    }
+
     BackHandler {
         when (page) {
             2 -> if (chosen.isEmpty()) onBack() else startWalk(0)
@@ -140,13 +158,14 @@ internal fun PermissionSetupFlow(
                     for (feature in PermissionSetupFeature.entries) {
                         Row(
                             modifier = Modifier.fillMaxWidth().testTag("permissionFeature_" + feature.name)
-                                .clickable {
-                                    chosenNames = if (feature.name in chosenNames) {
-                                        chosenNames - feature.name
-                                    } else {
-                                        chosenNames + feature.name
-                                    }
-                                }.padding(vertical = 10.dp),
+                                .toggleable(
+                                    value = feature.name in chosenNames,
+                                    role = Role.Checkbox,
+                                    onValueChange = { checked ->
+                                        chosenNames = if (checked) (chosenNames + feature.name).distinct()
+                                            else chosenNames - feature.name
+                                    },
+                                ).padding(vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
@@ -159,11 +178,13 @@ internal fun PermissionSetupFlow(
                         }
                     }
                     Spacer(Modifier.height(24.dp))
-                    SyButton(text = stringResource(R.string.permission_setup_begin), onClick = {
-                        visitedNames = emptyList()
-                        skippedNames = emptyList()
-                        startWalk(skippedForWalk = emptySet())
-                    }, modifier = Modifier.fillMaxWidth())
+                    if (chosen.isNotEmpty()) {
+                        SyButton(text = stringResource(R.string.permission_setup_begin), onClick = {
+                            visitedNames = emptyList()
+                            skippedNames = emptyList()
+                            startWalk(skippedForWalk = emptySet())
+                        }, modifier = Modifier.fillMaxWidth())
+                    }
                     SyButton(text = stringResource(R.string.permission_setup_later), onClick = onFinished,
                         variant = SyButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
                 }
@@ -179,7 +200,7 @@ internal fun PermissionSetupFlow(
                         Text(stringResource(feature.reasonRes()),
                             style = DsType.std14.withReadingWeight(), color = colors.textSecondary)
                         Spacer(Modifier.height(20.dp))
-                        Text(stringResource(status.labelRes()), modifier = Modifier.testTag("permissionSetupStatus"),
+                        Text(stringResource(status.labelRes(feature)), modifier = Modifier.testTag("permissionSetupStatus"),
                             style = DsType.std14.withReadingWeight(),
                             color = if (status == PermissionSetupStatus.READY) colors.successInk else colors.textSecondary)
                         if (status == PermissionSetupStatus.AUTHORIZED_WAITING) {
@@ -200,8 +221,12 @@ internal fun PermissionSetupFlow(
                         }
                         Spacer(Modifier.height(24.dp))
                         SyButton(
-                            text = stringResource(if (feature in visited)
-                                R.string.permission_setup_open_again else R.string.permission_setup_open),
+                            text = stringResource(when {
+                                feature == PermissionSetupFeature.TASK_ALERTS && feature in visited ->
+                                    R.string.permission_setup_open_notifications
+                                feature in visited -> R.string.permission_setup_open_again
+                                else -> R.string.permission_setup_open
+                            }),
                             onClick = { open(feature) },
                             modifier = Modifier.fillMaxWidth().testTag("permissionSetupOpen"),
                         )
@@ -221,8 +246,17 @@ internal fun PermissionSetupFlow(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
+                        if (feature == PermissionSetupFeature.TASK_ALERTS && feature !in visited &&
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            SyButton(
+                                text = stringResource(R.string.permission_setup_open_notifications),
+                                onClick = { open(PermissionSetupFeature.TASK_ALERTS, forceAppSettings = true) },
+                                variant = SyButtonVariant.Outline,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                         SyButton(text = stringResource(R.string.permission_setup_refresh),
-                            onClick = controller::refresh, variant = SyButtonVariant.Outline,
+                            onClick = controller::refresh, variant = SyButtonVariant.Ghost,
                             modifier = Modifier.fillMaxWidth())
                         SyButton(text = stringResource(R.string.permission_setup_skip),
                             onClick = {
@@ -239,13 +273,16 @@ internal fun PermissionSetupFlow(
                     Spacer(Modifier.height(16.dp))
                     for ((index, feature) in chosen.withIndex()) {
                         val status = permissionSetupStatus(feature, state, feature in visited)
-                        Row(modifier = Modifier.fillMaxWidth().clickable {
-                            currentIndex = index
-                            page = 1
-                        }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(modifier = Modifier.fillMaxWidth()
+                            .testTag("permissionSummary_" + feature.name)
+                            .clickable(enabled = status != PermissionSetupStatus.READY) {
+                                skippedNames = skippedNames - feature.name
+                                currentIndex = index
+                                page = 1
+                            }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(feature.titleRes()), modifier = Modifier.weight(1f),
                                 style = DsType.std14.withReadingWeight())
-                            Text(stringResource(status.labelRes()),
+                            Text(stringResource(status.labelRes(feature)),
                                 style = DsType.small13.withReadingWeight(),
                                 color = if (status == PermissionSetupStatus.READY) colors.successInk
                                     else colors.textSecondary)
@@ -256,7 +293,10 @@ internal fun PermissionSetupFlow(
                         modifier = Modifier.fillMaxWidth())
                     if (chosen.any { permissionSetupStatus(it, state) != PermissionSetupStatus.READY }) {
                         SyButton(text = stringResource(R.string.permission_setup_retry),
-                            onClick = { startWalk() }, variant = SyButtonVariant.Ghost,
+                            onClick = {
+                                skippedNames = emptyList()
+                                startWalk(skippedForWalk = emptySet())
+                            }, variant = SyButtonVariant.Ghost,
                             modifier = Modifier.fillMaxWidth())
                     }
                 }
@@ -277,9 +317,14 @@ private fun PermissionSetupFeature.reasonRes(): Int = when (this) {
     PermissionSetupFeature.TASK_ALERTS -> R.string.permission_setup_task_alerts_hint
 }
 
-private fun PermissionSetupStatus.labelRes(): Int = when (this) {
-    PermissionSetupStatus.READY -> R.string.permission_setup_ready
-    PermissionSetupStatus.AUTHORIZED_WAITING -> R.string.permission_setup_waiting
-    PermissionSetupStatus.VISITED_NOT_GRANTED -> R.string.permission_setup_visited
-    PermissionSetupStatus.NOT_GRANTED -> R.string.permission_setup_not_granted
+private fun PermissionSetupStatus.labelRes(feature: PermissionSetupFeature): Int = when {
+    feature == PermissionSetupFeature.TASK_ALERTS && this == PermissionSetupStatus.READY ->
+        R.string.permission_setup_notification_allowed
+    feature == PermissionSetupFeature.TASK_ALERTS && this == PermissionSetupStatus.VISITED_NOT_GRANTED ->
+        R.string.permission_setup_notification_not_allowed
+    feature == PermissionSetupFeature.TASK_ALERTS -> R.string.permission_setup_notification_not_granted
+    this == PermissionSetupStatus.READY -> R.string.permission_setup_ready
+    this == PermissionSetupStatus.AUTHORIZED_WAITING -> R.string.permission_setup_waiting
+    this == PermissionSetupStatus.VISITED_NOT_GRANTED -> R.string.permission_setup_visited
+    else -> R.string.permission_setup_not_granted
 }

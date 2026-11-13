@@ -14,6 +14,24 @@ import org.junit.Test
 class PermissionSetupFlowAndroidTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun skippedPermissionReopensFromSummary() {
+        compose.setContent { DshTheme { PermissionSetupFlow(onFinished = {}, onBack = {}) } }
+        compose.onNodeWithTag("permissionFeature_NOTIFICATION_READ").performScrollTo().performClick()
+        compose.onNodeWithText("逐项开启").performScrollTo().performClick()
+        compose.onNodeWithText("跳过这一项").performScrollTo().performClick()
+        compose.onNodeWithTag("permissionSummary_NOTIFICATION_READ").performScrollTo().performClick()
+        compose.onNodeWithTag("permissionSetupStatus").assertExists()
+    }
+
+    @Test fun retryAllRevisitsSkippedPermissions() {
+        compose.setContent { DshTheme { PermissionSetupFlow(onFinished = {}, onBack = {}) } }
+        compose.onNodeWithTag("permissionFeature_NOTIFICATION_READ").performScrollTo().performClick()
+        compose.onNodeWithText("逐项开启").performScrollTo().performClick()
+        compose.onNodeWithText("跳过这一项").performScrollTo().performClick()
+        compose.onNodeWithText("继续处理未完成项目").performScrollTo().performClick()
+        compose.onNodeWithTag("permissionSetupStatus").assertExists()
+    }
+
     @Test fun firstLaunchCanSkipWithoutOpeningSystemSettings() {
         var finished = 0
         compose.setContent {

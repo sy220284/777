@@ -5,6 +5,21 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class PermissionSetupModelTest {
+    @Test fun notificationRequestFallsBackToSettingsAfterFirstAttempt() {
+        assertEquals(NotificationGrantAction.REQUEST_RUNTIME, notificationGrantAction(33, false))
+        assertEquals(NotificationGrantAction.OPEN_APP_SETTINGS, notificationGrantAction(33, true))
+        assertEquals(NotificationGrantAction.OPEN_APP_SETTINGS, notificationGrantAction(32, false))
+    }
+
+    @Test fun skippedCanBeRevisitedOnExplicitRetry() {
+        val chosen = listOf(PermissionSetupFeature.NOTIFICATION_READ)
+        assertNull(nextPermissionSetupIndex(chosen, 0,
+            setOf(PermissionSetupFeature.NOTIFICATION_READ)) { PermissionSetupStatus.NOT_GRANTED })
+        assertEquals(0, nextPermissionSetupIndex(chosen, 0, emptySet()) {
+            PermissionSetupStatus.NOT_GRANTED
+        })
+    }
+
     @Test fun grantedAndConnectedIsReady() {
         val state = DeviceCapabilitiesState(
             accessibility = true, accessibilityGranted = true,

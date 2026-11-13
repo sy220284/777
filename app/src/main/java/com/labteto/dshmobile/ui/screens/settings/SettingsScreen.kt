@@ -503,13 +503,13 @@ fun SettingsScreen(
                             AppSettingsRow(
                                 icon = SyEntryIcons.Permissions,
                                 title = stringResource(R.string.settings_page_permissions),
-                                value = stringResource(when {
-                                    deviceCapabilities.loading -> R.string.common_loading
-                                    deviceCapabilities.error != null -> R.string.settings_permissions_check_failed
-                                    deviceCapabilities.accessibility && deviceCapabilities.notifications &&
-                                        deviceCapabilities.postingNotifications == true -> R.string.settings_permissions_ready
-                                    else -> R.string.settings_permissions_needs_setup
-                                }),
+                                value = when {
+                                    deviceCapabilities.loading -> stringResource(R.string.common_loading)
+                                    deviceCapabilities.error != null -> stringResource(R.string.settings_permissions_check_failed)
+                                    else -> stringResource(R.string.permission_setup_enabled_count,
+                                        listOf(deviceCapabilities.accessibility, deviceCapabilities.notifications,
+                                            deviceCapabilities.postingNotifications == true).count { it })
+                                },
                                 onClick = { openPage(SettingsDestination.PERMISSIONS) },
                                 compact = true,
                             )

@@ -83,20 +83,21 @@ internal fun DeviceCapabilitiesCard(
     onRequestPostingPermission: () -> Unit,
     onOpenPermissionGuide: () -> Unit,
 ) {
+    val enabledCount = listOf(state.accessibility, state.notifications,
+        state.postingNotifications == true).count { it }
     val overallState = when {
         state.loading -> SyStatus.Running
         state.error != null -> SyStatus.Failed
-        state.accessibility && state.notifications && state.postingNotifications == true -> SyStatus.Done
-        else -> SyStatus.Warning
+        enabledCount == PermissionSetupFeature.entries.size -> SyStatus.Done
+        else -> SyStatus.Neutral
     }
-    val overallLabel = stringResource(
-        when {
+    val overallLabel = if (state.loading || state.error != null || overallState == SyStatus.Done) {
+        stringResource(when {
             state.loading -> R.string.advanced_device_status_checking
             state.error != null -> R.string.advanced_device_status_error
-            overallState == SyStatus.Done -> R.string.advanced_device_status_ready
-            else -> R.string.advanced_device_status_needs_setup
-        },
-    )
+            else -> R.string.advanced_device_status_ready
+        })
+    } else stringResource(R.string.permission_setup_enabled_count, enabledCount)
 
     SettingsCard(stringResource(R.string.advanced_device_capabilities)) {
         SyStatusPill(state = overallState, label = overallLabel)
