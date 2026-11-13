@@ -71,14 +71,13 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
                 sessionStorage.eventLogs.get(state.sessionId), handle.pendingInputs,
             ).remove(messageId) ?: return@synchronized false
             handle.transcriptProjectionCursor = maxOf(handle.transcriptProjectionCursor ?: -1L, update.eventSequence)
-            runtimeStateStore.projection.update { current ->
-                if (current.sessionId != state.sessionId || current.usageMode != LocalUsageMode.CHAT) current
-                else current.copy(
-                    messages = update.hotMessages(),
-                    transcriptIndex = update.transcriptIndex,
-                    kernel = current.kernel.copy(queuedInputCount = update.pendingCount),
-                )
-            }
+            runtimeStateStore.projection.projectChatQueuedUserTimeline(
+                sessionId = state.sessionId,
+                messages = update.hotMessages(),
+                index = update.transcriptIndex,
+                pendingCount = update.pendingCount,
+                clearError = false,
+            )
             if (!sessionStorage.enqueueCurrentSnapshot(state.sessionId)) {
                 runtimeStateStore.projection.publishError(
                     "排队消息已移除并写入事件记录，快照保存排队失败；重新打开会话可恢复",
@@ -131,16 +130,13 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
                     committedQueueEdit = true
                     handle.transcriptProjectionCursor =
                         maxOf(handle.transcriptProjectionCursor ?: -1L, edited.eventSequence)
-                    runtimeStateStore.projection.update { current ->
-                        if (current.sessionId != before.sessionId ||
-                            current.usageMode != LocalUsageMode.CHAT) current
-                        else current.copy(
-                            messages = edited.hotMessages(),
-                            transcriptIndex = edited.transcriptIndex,
-                            kernel = current.kernel.copy(queuedInputCount = edited.pendingCount),
-                            error = null,
-                        )
-                    }
+                    runtimeStateStore.projection.projectChatQueuedUserTimeline(
+                        sessionId = before.sessionId,
+                        messages = edited.hotMessages(),
+                        index = edited.transcriptIndex,
+                        pendingCount = edited.pendingCount,
+                        clearError = true,
+                    )
                     if (!sessionStorage.enqueueCurrentSnapshot(before.sessionId)) {
                         runtimeStateStore.projection.publishError(
                             "排队修改已保存，快照未及时写入；重新进入会话时将从事件恢复",
