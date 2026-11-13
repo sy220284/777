@@ -28,6 +28,8 @@ import javax.inject.Provider
 import javax.inject.Singleton
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.put
 
 /**
@@ -54,6 +56,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
     private val skillManager: com.labteto.dshmobile.local.tools.LocalSkillManager,
     private val pinnedInvocations: com.labteto.dshmobile.local.tools.LocalPinnedInvocationStore,
     private val workspaceGate: com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate,
+    private val mergeQualityReviewer: com.labteto.dshmobile.local.work.LocalWorkspaceMergeQualityReviewer,
 ) : LocalToolsManagementPort {
     internal val workspace = sessionStorage.files.workspace
     internal val toolOutputStore = LocalToolOutputStore(
@@ -102,21 +105,52 @@ internal class LocalToolCompositionRoot @Inject constructor(
     internal suspend fun integrateAgentWorkspace(
         sessionId: String, identity: String, tree: String, allowedPaths: List<String>, beforeCommit: suspend () -> Unit,
     ): kotlinx.serialization.json.JsonObject {
+        // Run expensive model comparison outside the shared-workspace write gate. Pin the
+        // original source and child trees; any concurrent edit requires a fresh review.
+        val comparison = agentWorkspaces.operate(sessionId, "compare_merge", buildJsonObject {
+            put("workspace_id", identity); put("expected_tree", tree)
+        })
+        if (comparison["state"]?.jsonPrimitive?.content != "ready") return comparison
+        val initial = agentWorkspaces.operate(sessionId, "preview_merge", buildJsonObject {
+            put("workspace_id", identity); put("expected_tree", tree)
+        })
+        val overlap = comparison.getValue("comparison").jsonObject
+            .getValue("overlap_paths").jsonArray
+        if (overlap.isEmpty() && initial["state"]?.jsonPrimitive?.content != "ready") return initial
+        val decision = if (overlap.isEmpty()) buildJsonObject {
+            put("resolution", "auto")
+            put("path_choices", buildJsonObject {})
+            put("reason", "父子工作区未同时改动同一个文件；保留双方独立修改，并以最终合并树及后续实际测试验证。")
+            put("criteria", buildJsonObject {
+                put("correctness", "独立修改路径，没有共同文件版本需要取舍")
+                put("experience", "无共享界面文件冲突；实际体验仍需按任务验收")
+                put("maintainability", "保留各自独立文件，避免无依据地覆盖")
+            })
+            put("reviewed_both", true)
+        } else mergeQualityReviewer.review(
+            sessionId, comparison, initial["state"]?.jsonPrimitive?.content == "conflict",
+        )
+        val resolution = decision.getValue("resolution").jsonPrimitive.content
+        val choices = decision.getValue("path_choices")
         val tool = requireNotNull(registry.get("workspace_merge")) { "工作区运行时未启用" }
         val lease = workspaceGate.acquire(tool)
         try {
             check(registry.get("workspace_merge") === tool) { "工作区运行时已更新" }
-            // The admitted child tree is only half of the review. Pin the actual parent
-            // version and the exact three-way result before accepting a shared-workspace write.
             val preview = agentWorkspaces.operate(sessionId, "preview_merge", buildJsonObject {
                 put("workspace_id", identity); put("expected_tree", tree)
+                put("resolution", resolution); put("path_choices", choices)
             })
+            if (preview["source_tree"] != comparison["source_tree"] || preview["tree"] != comparison["tree"]) {
+                error("父子实现自质量审查后已变化，请重新对比并选择")
+            }
             if (preview["state"]?.jsonPrimitive?.content != "ready") return preview
             beforeCommit()
             return agentWorkspaces.operate(sessionId, "merge", buildJsonObject {
                 put("workspace_id", identity); put("expected_tree", tree)
                 put("expected_source_tree", preview.getValue("source_tree"))
                 put("expected_merged_tree", preview.getValue("merged_tree"))
+                put("resolution", resolution); put("path_choices", choices)
+                put("quality_decision", decision)
                 put("allowed_paths", kotlinx.serialization.json.JsonArray(allowedPaths.map { kotlinx.serialization.json.JsonPrimitive(it) }))
             })
         } finally { lease?.close() }
