@@ -81,6 +81,7 @@ internal fun DeviceCapabilitiesCard(
     state: DeviceCapabilitiesState,
     viewModel: SettingsViewModel,
     onRequestPostingPermission: () -> Unit,
+    onOpenPermissionGuide: () -> Unit,
 ) {
     val overallState = when {
         state.loading -> SyStatus.Running
@@ -99,17 +100,27 @@ internal fun DeviceCapabilitiesCard(
 
     SettingsCard(stringResource(R.string.advanced_device_capabilities)) {
         SyStatusPill(state = overallState, label = overallLabel)
+        SyButton(
+            text = stringResource(R.string.permission_setup_entry),
+            onClick = onOpenPermissionGuide,
+            variant = SyButtonVariant.Outline,
+            modifier = Modifier.fillMaxWidth(),
+        )
         CapabilityRow(
             label = stringResource(R.string.advanced_accessibility),
             enabled = state.accessibility,
-            hint = stringResource(R.string.advanced_accessibility_hint),
+            hint = if (state.accessibilityGranted && !state.accessibility)
+                stringResource(R.string.permission_setup_reconnect_hint)
+            else stringResource(R.string.advanced_accessibility_hint),
             actionLabel = stringResource(R.string.advanced_enable_accessibility),
             onAction = viewModel::openAccessibilitySettings,
         )
         CapabilityRow(
             label = stringResource(R.string.advanced_notification_access),
             enabled = state.notifications,
-            hint = stringResource(R.string.advanced_notification_access_hint),
+            hint = if (state.notificationAccessGranted && !state.notifications)
+                stringResource(R.string.permission_setup_reconnect_hint)
+            else stringResource(R.string.advanced_notification_access_hint),
             actionLabel = stringResource(R.string.advanced_enable_notifications),
             onAction = viewModel::openNotificationAccessSettings,
         )
