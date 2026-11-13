@@ -122,6 +122,11 @@ class GitWorkspaceRuntime(
                         put("items", buildJsonObject { put("type", "string") })
                         put("description", "只有超过 256 KiB 时需要：全部预览页面按偏移顺序返回的 review_receipt")
                     })
+                    put("required_outputs", buildJsonObject {
+                        put("type", "array")
+                        put("items", buildJsonObject { put("type", "string") })
+                        put("description", "若存在必需交付文件，检查最终候选树真实包含每一个结果文件；任务图自动传入")
+                    })
                 }
             }
             val description = when (action) {
