@@ -504,7 +504,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 // Child worktrees publish only after the parent integrates their final files.
                 if (workspace.path == this.workspace.path) {
                     sessionStorage.files.publishVerifiedDeliverables(
-                        captured.sessionId, listOf(path),
+                        boundSessionId, listOf(path),
                     )
                 }
                 receipt
