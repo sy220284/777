@@ -847,6 +847,12 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.MODEL_USAGE -> {
+                        localHarness.modelProfiles.firstOrNull {
+                            it.provider.equals("DeepSeek", ignoreCase = true) &&
+                                it.baseUrl.startsWith("https://api.deepseek.com")
+                        }?.let { deepSeekProfile ->
+                            DeepSeekBalanceCard(deepSeekProfile, viewModel::queryDeepSeekBalance)
+                        }
                         AppSettingsSection {
                             AppSettingsRow(
                                 icon = SyEntryIcons.ChatStyle,
