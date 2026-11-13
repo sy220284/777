@@ -39,16 +39,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Git produces refs/remotes/<remote>/<branch>; preserve branch slashes exactly. */
-internal fun splitGitReviewTrackingRef(ref: String): Pair<String, String> {
-    require(ref.startsWith("refs/remotes/")) { "不是远端跟踪分支引用" }
-    val suffix = ref.removePrefix("refs/remotes/")
-    val remote = suffix.substringBefore('/')
-    val branch = suffix.substringAfter('/', missingDelimiterValue = "")
-    require(remote.isNotBlank() && branch.isNotBlank()) { "远端分支引用不完整" }
-    return remote to branch
-}
-
 /** A user/tool row must not become the source of a generated assistant document. */
 internal fun nativeV6SourceAssistantMessageId(
     messages: List<com.labteto.dshmobile.local.session.LocalHarnessMessage>,
@@ -69,7 +59,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val approvalPreferences: LocalApprovalPreferences,
     private val networkSearchSettings: LocalNetworkSearchSettings,
     private val sectionStore: LocalSessionSectionUiFacade,
-    private val independentCodeReview: com.labteto.dshmobile.local.work.LocalIndependentCodeReviewCoordinator,
+    private val reviewFacade: com.labteto.dshmobile.local.presentation.LocalIndependentCodeReviewUiFacade,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -337,15 +327,14 @@ class LocalHarnessViewModel @Inject constructor(
         toolsUi.compareLocalGitForUi(repository)
     internal suspend fun compareRemoteGitForUi(repository: String, remote: String, branch: String) =
         toolsUi.compareRemoteGitForUi(repository, remote, branch)
-    /** Restore an earlier report for the identical diff; this path never invokes a model. */
+    /** Recover an existing report for exactly this code snapshot without model billing. */
     internal suspend fun findIndependentCodeReviewForUi(
         sessionId: String, repository: String,
         diff: com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi,
-    ): com.labteto.dshmobile.local.work.LocalIndependentCodeReview? = withContext(Dispatchers.IO) {
+    ): com.labteto.dshmobile.local.work.LocalIndependentCodeReview? {
         if (runtime.state.value.sessionId != sessionId ||
-            runtime.state.value.usageMode != LocalUsageMode.WORK) return@withContext null
-        independentCodeReview.findForDiff(sessionId, repository, diff.trackingRef,
-            diff.statistics, diff.patch, diff.truncated)
+            runtime.state.value.usageMode != LocalUsageMode.WORK) return null
+        return reviewFacade.find(sessionId, repository, diff)
     }
 
     internal suspend fun runIndependentCodeReviewForUi(
@@ -354,22 +343,7 @@ class LocalHarnessViewModel @Inject constructor(
     ): com.labteto.dshmobile.local.work.LocalIndependentCodeReview {
         require(runtime.state.value.sessionId == sessionId &&
             runtime.state.value.usageMode == LocalUsageMode.WORK) { "已离开当前工作会话，审查中止" }
-        val report = independentCodeReview.review(sessionId, repository, diff.trackingRef,
-            diff.statistics, diff.patch, diff.truncated)
-        // The model may have spent time reviewing a snapshot while the repository changed.
-        // Preserve that report in EventLog, but do not present it as a review of newer files.
-        val current = if (diff.trackingRef.startsWith("worktree/"))
-            toolsUi.compareLocalGitForUi(repository)
-        else {
-            val (remote, branch) = splitGitReviewTrackingRef(diff.trackingRef)
-            toolsUi.compareRemoteGitForUi(repository, remote, branch)
-        }
-        check(!current.truncated && report.digest ==
-            com.labteto.dshmobile.local.work.codeReviewDigest(repository, current.trackingRef,
-                current.statistics, current.patch)) {
-            "审查期间代码修改已变化，旧审查报告已保存；请刷新差异并重新审查当前版本。"
-        }
-        return report
+        return reviewFacade.review(sessionId, repository, diff)
     }
 
     internal suspend fun acceptIndependentCodeReviewForUi(
@@ -379,14 +353,7 @@ class LocalHarnessViewModel @Inject constructor(
     ): Boolean {
         if (runtime.state.value.sessionId != sessionId ||
             runtime.state.value.usageMode != LocalUsageMode.WORK) return false
-        val ref = diff.trackingRef
-        val current = if (ref.startsWith("worktree/")) toolsUi.compareLocalGitForUi(repository)
-            else {
-                val (remote, branch) = splitGitReviewTrackingRef(ref)
-                toolsUi.compareRemoteGitForUi(repository, remote, branch)
-            }
-        return independentCodeReview.accept(sessionId, review.id, review.evidenceSequence,
-            repository, current.trackingRef, current.statistics, current.patch, current.truncated)
+        return reviewFacade.accept(sessionId, repository, review, diff)
     }
 
     suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
