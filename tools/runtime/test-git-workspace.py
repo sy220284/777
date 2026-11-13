@@ -163,8 +163,10 @@ class GitWorkspaceTest(unittest.TestCase):
             self.assertEqual("new independent feature", (self.root / "child-only.txt").read_text())
             # Restore the same parent candidate between alternate policy checks.
             (self.root / "code.txt").write_text("PARENT\nsecond\nthird\n")
+        current = self.call("compare_merge", expected_tree=tree)["comparison"]
+        choices = {path: "parent" for path in current["overlap_paths"]}
         chosen = self.call("preview_merge", expected_tree=tree, resolution="select",
-                           path_choices={"code.txt": "parent"})
+                           path_choices=choices)
         self.assertEqual("ready", chosen["state"])
         self.assertEqual(chosen["merged_tree"], self.call("preview_merge",
             expected_tree=tree, resolution="prefer_parent")["merged_tree"])
@@ -399,6 +401,11 @@ class GitWorkspaceTest(unittest.TestCase):
         (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
         (child / "zz-added.bin").write_bytes(b"new")
         reviewed = self.call("status")["tree"]
+        proposal = self.call("preview_merge", expected_tree=reviewed)
+        reviewed_args = dict(workspace_id=self.identity, expected_tree=reviewed,
+                             expected_source_tree=proposal["source_tree"],
+                             expected_merged_tree=proposal["merged_tree"], resolution="auto",
+                             quality_decision=self.quality_decision())
         code = f"""
 import importlib.util,sys,signal
 from pathlib import Path
@@ -412,8 +419,7 @@ def interrupted(source,target):
         signal.pause()
     return result
 module.os.replace=interrupted
-module.operate({str(self.root)!r},{str(self.store)!r},'session','merge',
-    {{'workspace_id':{self.identity!r},'expected_tree':{reviewed!r}}})
+module.operate({str(self.root)!r},{str(self.store)!r},'session','merge',{reviewed_args!r})
 """
         process = subprocess.Popen([sys.executable, '-B', '-c', code], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
