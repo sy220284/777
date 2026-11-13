@@ -54,13 +54,23 @@ internal class LocalDownloadsPublisher(
         }
 
         val fileName = source.name
+        // Work's dedicated deliverable folders become readable project folders in Downloads.
+        // An ad-hoc exported workspace file stays directly in 下载/神言神语.
+        val projectRelative = item.path.takeIf { it.startsWith("交付成果/") }
+            ?.removePrefix("交付成果/")
+            ?.substringBeforeLast('/', "")
+            .orEmpty()
+        val relativeDirectory = buildString {
+            append("${Environment.DIRECTORY_DOWNLOADS}/$DIRECTORY/")
+            if (projectRelative.isNotBlank()) append(projectRelative).append('/')
+        }
         val mime = MimeTypeMap.getSingleton()
             .getMimeTypeFromExtension(fileName.substringAfterLast('.', "").lowercase())
             ?: "application/octet-stream"
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
             put(MediaStore.MediaColumns.MIME_TYPE, mime)
-            put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/$DIRECTORY/")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, relativeDirectory)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
         val destination = resolver.insert(collection, values)
@@ -79,7 +89,7 @@ internal class LocalDownloadsPublisher(
                 arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) cursor.getString(0) else null
             } ?: fileName
-            val savedPath = "$RELATIVE_DIRECTORY/$name"
+            val savedPath = "$relativeDirectory$name".removeSuffix("/")
             check(published.edit()
                 .putString("$identity.sha256", version)
                 .putString("$identity.uri", destination.toString())
