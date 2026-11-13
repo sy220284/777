@@ -64,22 +64,49 @@ class CodeModePluginTest {
             ToolResult("secret")
         }
         CodeModePlugin(registry).install(HarnessContext(registry))
-        val result = runCatching {
-            registry.execute("code_mode_run", plan("private"),
-                context = ToolContext(approval = { true }))
-        }
-        assertTrue(result.isFailure)
+        val result = registry.execute("code_mode_run", plan("private"),
+            context = ToolContext(approval = { true }))
+        assertTrue(result.isError)
+        assertEquals("CODE_MODE_UNAUTHORIZED_TOOL", result.errorCode)
         assertFalse(called)
     }
 
     @Test fun scriptCannotCallCodeModeRecursively() = runTest {
         val registry = ToolRegistry()
         CodeModePlugin(registry).install(HarnessContext(registry))
-        val result = runCatching {
-            registry.execute("code_mode_run", plan("code_mode_run"),
-                context = ToolContext(approval = { true }))
+        val result = registry.execute("code_mode_run", plan("code_mode_run"),
+            context = ToolContext(approval = { true }))
+        assertTrue(result.isError)
+        assertEquals("CODE_MODE_RECURSION_DENIED", result.errorCode)
+    }
+
+    @Test fun invalidLaterStepRejectsTheWholeScriptBeforeAnyMutation() = runTest {
+        val registry = ToolRegistry()
+        var writes = 0
+        register(registry, "write", ToolAccess.WORKSPACE_WRITE) {
+            writes++
+            ToolResult("saved")
         }
-        assertTrue(result.isFailure)
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val result = registry.execute("code_mode_run", plan("write", "not_registered"),
+            context = ToolContext(approval = { true }))
+        assertEquals("CODE_MODE_TOOL_MISSING", result.errorCode)
+        assertTrue(result.isError)
+        assertEquals(0, writes)
+    }
+
+    @Test fun toolExceptionsProduceAnExplicitUnknownEffectReceipt() = runTest {
+        val registry = ToolRegistry()
+        var laterCalls = 0
+        register(registry, "throws") { throw IllegalStateException("private diagnostic") }
+        register(registry, "later") { laterCalls++; ToolResult("oops") }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val result = registry.execute("code_mode_run", plan("throws", "later"),
+            context = ToolContext(approval = { true }))
+        assertEquals("CODE_MODE_STEP_EXCEPTION", result.errorCode)
+        assertEquals(0, laterCalls)
+        assertTrue(result.content.contains("unknown_after_exception"))
+        assertFalse(result.content.contains("private diagnostic"))
     }
 
     @Test fun firstFailureStopsLaterMutationWithoutAutomaticRetry() = runTest {

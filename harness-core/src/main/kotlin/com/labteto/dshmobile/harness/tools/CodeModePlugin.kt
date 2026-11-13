@@ -2,7 +2,6 @@ package com.labteto.dshmobile.harness.tools
 
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -71,25 +70,29 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
     }
 
     private suspend fun executePlan(original: ToolContext, script: JsonObject): ToolResult {
-        require(script.toString().length <= MAX_SCRIPT_CHARS) { "编排脚本超过长度限制" }
+        if (script.toString().length > MAX_SCRIPT_CHARS)
+            return rejection("CODE_MODE_BAD_PLAN", "编排脚本超过长度限制")
         val steps = (script["steps"] as? JsonArray)?.toList()
-            ?: throw IllegalArgumentException("缺少步骤数组")
-        require(steps.size in 1..MAX_STEPS) { "编排步骤数量需为 1—$MAX_STEPS" }
+            ?: return rejection("CODE_MODE_BAD_PLAN", "缺少步骤数组")
+        if (steps.size !in 1..MAX_STEPS)
+            return rejection("CODE_MODE_BAD_PLAN", "编排步骤数量需为 1—$MAX_STEPS")
 
-        val validated = steps.mapIndexed { index, element ->
+        // Validate the complete script before running the first side-effecting step.
+        val validated = mutableListOf<Triple<String, HarnessTool, JsonObject>>()
+        for ((index, element) in steps.withIndex()) {
             val step = element as? JsonObject
-                ?: throw IllegalArgumentException("步骤 ${index + 1} 不是对象")
+                ?: return rejection("CODE_MODE_BAD_PLAN", "步骤 ${index + 1} 不是对象")
             val name = (step["tool"] as? JsonPrimitive)?.takeIf { it.isString }?.content
-                ?: throw IllegalArgumentException("步骤 ${index + 1} 缺少有效工具名称")
-            require(name != TOOL_NAME) { "Code Mode 不允许嵌套调用自身" }
+                ?: return rejection("CODE_MODE_BAD_PLAN", "步骤 ${index + 1} 缺少有效工具名称")
+            if (name == TOOL_NAME)
+                return rejection("CODE_MODE_RECURSION_DENIED", "Code Mode 不允许嵌套调用自身")
             val handler = liveTools.get(name)
-                ?: throw IllegalArgumentException("步骤 ${index + 1} 的工具不可用：$name")
-            require(handler.exposure == ToolExposure.CORE) {
-                "步骤 ${index + 1} 无权使用未公开或未发现的工具：$name"
-            }
+                ?: return rejection("CODE_MODE_TOOL_MISSING", "步骤 ${index + 1} 的工具不可用：$name")
+            if (handler.exposure != ToolExposure.CORE)
+                return rejection("CODE_MODE_UNAUTHORIZED_TOOL", "步骤 ${index + 1} 未获工具发现授权：$name")
             val arguments = step["args"] as? JsonObject
-                ?: throw IllegalArgumentException("步骤 ${index + 1} 缺少对象类型的参数")
-            Triple(name, handler, arguments)
+                ?: return rejection("CODE_MODE_BAD_PLAN", "步骤 ${index + 1} 缺少对象类型的参数")
+            validated += Triple(name, handler, arguments)
         }
 
         val observations = mutableListOf<JsonObject>()
@@ -101,8 +104,21 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                     .ifBlank { "code-mode" } + "/step-${index + 1}")
             )
             val child = original.copy(attributes = attrs, expectedRegistration = handler)
-            val outcome = withTimeoutOrNull(STEP_TIMEOUT_MILLIS) {
-                liveTools.executeTracked(name, arguments, arguments.toString(), child)
+            val outcome = try {
+                withTimeoutOrNull(STEP_TIMEOUT_MILLIS) {
+                    liveTools.executeTracked(name, arguments, arguments.toString(), child)
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                observations += buildJsonObject {
+                    put("index", index + 1)
+                    put("tool", name)
+                    put("status", "unknown_after_exception")
+                    put("error_type", failure.javaClass.simpleName)
+                    put("hint", "工具出现执行异常，副作用状态未知；核查审计回执后再决定重试")
+                }
+                return receipt(observations, "stopped", "CODE_MODE_STEP_EXCEPTION")
             }
             if (outcome == null) {
                 observations += buildJsonObject {
@@ -131,6 +147,11 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
         }
         return receipt(observations, "completed", null)
     }
+
+    private fun rejection(code: String, detail: String): ToolResult = ToolResult(
+        content = detail, isError = true, errorCode = code,
+        retryable = false, recoveryHint = "请修正脚本和工具授权后重新检查步骤。",
+    )
 
     private fun receipt(steps: List<JsonObject>, status: String, failureCode: String?): ToolResult =
         ToolResult(
