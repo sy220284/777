@@ -20,6 +20,7 @@ class LocalToolsUiFacade @Inject internal constructor(
     private val mcpOAuth: com.labteto.dshmobile.local.tools.LocalMcpOAuthCoordinator,
 ) : com.labteto.dshmobile.uicontract.ToolsUiPort {
     suspend fun agentBackendStatus(): String = agentBackends.status()
+    suspend fun probeAgentBackend(): String = agentBackends.probe()
     suspend fun configureAgentBackend(host: String, port: Int, pin: String, token: String, consent: Boolean) =
         agentBackends.configure(host, port, pin, token, consent)
     suspend fun revokeAgentBackend() = agentBackends.revoke()
