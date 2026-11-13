@@ -73,19 +73,19 @@ class GitWorkspaceTest(unittest.TestCase):
 
     def test_preview_locks_parent_tree_and_exact_merge_result(self):
         child = self.fork()
-        (child / "code.txt").write_text("CHILD\\nsecond\\nthird\\n")
+        (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
         reviewed = self.call("status")["tree"]
         first = self.call("preview_merge", expected_tree=reviewed)
         self.assertEqual("ready", first["state"])
         self.assertFalse(first["diff_truncated"])
         self.assertIn("merged_tree", first)
-        self.assertEqual("first\\nsecond\\nthird\\n", (self.root / "code.txt").read_text())
+        self.assertEqual("first\nsecond\nthird\n", (self.root / "code.txt").read_text())
         (self.root / "parent-extra.txt").write_text("parent changed after preview")
         with self.assertRaisesRegex(ValueError, "source changed since merge preview"):
             self.call("merge", expected_tree=reviewed,
                       expected_source_tree=first["source_tree"],
                       expected_merged_tree=first["merged_tree"])
-        self.assertEqual("first\\nsecond\\nthird\\n", (self.root / "code.txt").read_text())
+        self.assertEqual("first\nsecond\nthird\n", (self.root / "code.txt").read_text())
         second = self.call("preview_merge", expected_tree=reviewed)
         with self.assertRaisesRegex(ValueError, "integration result changed since merge preview"):
             self.call("merge", expected_tree=reviewed,
@@ -95,19 +95,19 @@ class GitWorkspaceTest(unittest.TestCase):
                            expected_source_tree=second["source_tree"],
                            expected_merged_tree=second["merged_tree"])
         self.assertEqual("merged", merged["state"])
-        self.assertEqual("CHILD\\nsecond\\nthird\\n", (self.root / "code.txt").read_text())
+        self.assertEqual("CHILD\nsecond\nthird\n", (self.root / "code.txt").read_text())
         self.assertEqual("parent changed after preview", (self.root / "parent-extra.txt").read_text())
 
     def test_conflict_and_truncated_preview_do_not_offer_merge_token(self):
         child = self.fork()
-        (child / "code.txt").write_text("CHILD\\nsecond\\nthird\\n")
-        (self.root / "code.txt").write_text("PARENT\\nsecond\\nthird\\n")
+        (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
+        (self.root / "code.txt").write_text("PARENT\nsecond\nthird\n")
         preview = self.call("preview_merge", expected_tree=self.call("status")["tree"])
         self.assertEqual("conflict", preview["state"])
         self.assertNotIn("merged_tree", preview)
-        self.assertEqual("PARENT\\nsecond\\nthird\\n", (self.root / "code.txt").read_text())
-        (self.root / "code.txt").write_text("first\\nsecond\\nthird\\n")
-        (child / "huge.txt").write_text("X" * 270000 + "\\n")
+        self.assertEqual("PARENT\nsecond\nthird\n", (self.root / "code.txt").read_text())
+        (self.root / "code.txt").write_text("first\nsecond\nthird\n")
+        (child / "huge.txt").write_text("X" * 270000 + "\n")
         preview = self.call("preview_merge", expected_tree=self.call("status")["tree"])
         self.assertEqual("needs_full_review", preview["state"])
         self.assertTrue(preview["diff_truncated"])
