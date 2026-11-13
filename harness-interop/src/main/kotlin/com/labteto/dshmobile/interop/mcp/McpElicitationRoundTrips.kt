@@ -58,10 +58,10 @@ internal suspend fun mcpCallWithInputRequired(
             "MCP 追问缺少输入请求及延续状态"
         }
         require(inputs.size <= 12) { "MCP 同一轮追问字段过多" }
-        val replies = buildJsonObject {
-            // The server can issue independent prompts in one round. There is exactly
-            // one user interaction at a time through the existing Work owner.
-            for ((key, raw) in inputs) {
+        val repliesByKey = linkedMapOf<String, JsonObject>()
+        // The server can issue independent prompts in one round. There is exactly
+        // one user interaction at a time through the existing Work owner.
+        for ((key, raw) in inputs) {
                 require(key.length in 1..128) { "MCP 追问标识无效" }
                 val entry = raw as? JsonObject ?: error("MCP 追问格式无效")
                 require(entry["method"]?.jsonPrimitive?.content == "elicitation/create") {
@@ -93,12 +93,12 @@ internal suspend fun mcpCallWithInputRequired(
                         "MCP 外部追问禁止通过客户端提交信息"
                     } else validateMcpElicitationAnswer(requireNotNull(schema), answer.content)
                 }
-                put(key, buildJsonObject {
-                    put("action", answer.action)
-                    answer.content?.let { put("content", it) }
-                })
+            repliesByKey[key] = buildJsonObject {
+                put("action", answer.action)
+                answer.content?.let { put("content", it) }
             }
         }
+        val replies = JsonObject(repliesByKey)
         next = buildJsonObject {
             put("name", name)
             put("arguments", arguments)
