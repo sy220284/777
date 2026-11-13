@@ -553,36 +553,43 @@ internal fun MediaMessageCard(
     }
 }
 
-/** Explicit user-selected device destination; sharing never masquerades as a save. */
-/** The save picker is shared by audio's inline button and the photo viewer's overflow. */
+/** One-tap public download, shared by the audio/video/image message actions. */
 @Composable
 private fun rememberMediaSaveAction(
-    file: File?, mime: String, onResult: (Boolean) -> Unit,
+    file: File?, onResult: (String?, String?) -> Unit,
 ): () -> Unit {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val destination = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mime)) { uri ->
-        if (uri != null) scope.launch {
-            val saved = runCatching {
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { output ->
-                        file?.inputStream()?.use { input -> input.copyTo(output) }
-                            ?: error("源文件不可用")
-                    } ?: error("无法写入选定位置")
+    var saving by remember(file?.absolutePath) { mutableStateOf(false) }
+    return {
+        if (file != null && !saving) {
+            saving = true
+            scope.launch {
+                try {
+                    val location = withContext(Dispatchers.IO) {
+                        com.labteto.dshmobile.local.files.LocalDownloadsPublisher(context)
+                            .publishOwnedFile(file)
+                    }
+                    onResult(location, null)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    onResult(null, failure.message ?: "无法保存到手机下载目录")
+                } finally {
+                    saving = false
                 }
             }
-            onResult(saved.isSuccess)
         }
     }
-    return { file?.let { destination.launch(it.name) } }
 }
 
 @Composable
 private fun MediaSaveButton(file: File, mime: String) {
     val resources = LocalResources.current
     var status by remember(file.absolutePath) { mutableStateOf<String?>(null) }
-    val save = rememberMediaSaveAction(file, mime) { success ->
-        status = resources.getString(if (success) R.string.media_action_saved else R.string.media_action_save_failed)
+    val save = rememberMediaSaveAction(file) { location, failure ->
+        status = if (location != null) "已保存：手机存储/$location"
+            else "保存失败：${failure ?: "未知错误"}"
     }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         SyButton(text = resources.getString(R.string.media_action_save), size = SyButtonSize.Small,
@@ -600,10 +607,9 @@ internal fun InlineReplyMediaActions(file: File, mime: String, onError: (String)
     val resources = LocalResources.current
     val context = LocalContext.current
     var open by remember(file.absolutePath) { mutableStateOf(false) }
-    val save = rememberMediaSaveAction(file, mime) { success ->
-        Toast.makeText(context,
-            resources.getString(if (success) R.string.media_action_saved else R.string.media_action_save_failed),
-            Toast.LENGTH_SHORT).show()
+    val save = rememberMediaSaveAction(file) { location, failure ->
+        Toast.makeText(context, if (location != null) "已保存：手机存储/$location"
+            else "保存失败：${failure ?: "未知错误"}", Toast.LENGTH_LONG).show()
     }
     Box {
         IconButton(onClick = { open = true },
@@ -755,10 +761,9 @@ internal fun MediaImageDetailDialog(
         offsetY = if (next <= 1f) 0f else (offsetY + panChange.y).coerceIn(-1100f, 1100f)
     }
     val localFile = file?.takeIf(File::isFile)
-    val save = rememberMediaSaveAction(localFile, localFile?.let(::imageMime) ?: "image/jpeg") { success ->
-        Toast.makeText(context,
-            resources.getString(if (success) R.string.media_action_saved else R.string.media_action_save_failed),
-            Toast.LENGTH_SHORT).show()
+    val save = rememberMediaSaveAction(localFile) { location, failure ->
+        Toast.makeText(context, if (location != null) "已保存：手机存储/$location"
+            else "保存失败：${failure ?: "未知错误"}", Toast.LENGTH_LONG).show()
     }
     val actions = buildList {
         if (onDeleteRequest != null) add(SyMenuItem(
