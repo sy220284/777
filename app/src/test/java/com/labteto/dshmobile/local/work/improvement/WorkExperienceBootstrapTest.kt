@@ -173,6 +173,42 @@ class WorkExperienceBootstrapTest {
     }
 
     @Test
+    fun verifiedGoalWithSourcedFindingCanYieldAReviewCandidateWithoutCopyingDetails() {
+        val root = Files.createTempDirectory("777-finding-learning").toFile()
+        try {
+            val log = LocalSessionEventLogRegistry(root, Json).get("finding-reflection")
+            log.append("goal/state", buildJsonObject {
+                put("id", "goal-finding"); put("revision", 1); put("status", "active")
+            })
+            val start = log.latestSequence()
+            log.append("work/finding", buildJsonObject {
+                put("finding_id", "finding-one")
+                put("source_call_id", "read-one")
+                put("status", "supported")
+                put("summary", "PRIVATE_DISCOVERY_TEXT")
+            })
+            log.append("goal/state", buildJsonObject {
+                put("id", "goal-finding")
+                put("revision", 2)
+                put("status", "completed")
+                put("startedAtSequence", start)
+            })
+            val signals = WorkExperienceBootstrap.collect(
+                log, LocalGoal("深入调查", status = "completed", id = "goal-finding",
+                    revision = 2, startedAtSequence = start),
+            )
+            assertEquals(1, signals.supportedFindings)
+            assertTrue(signals.supports("finding_supported"))
+            assertTrue(signals.canReflect)
+            val prompt = WorkExperienceBootstrap.reviewPrompt("深入调查", signals, true, true)
+            assertTrue(prompt.contains("finding_supported: 1"))
+            assertFalse(prompt.contains("PRIVATE_DISCOVERY_TEXT"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun starterTemplatesClearlyDenyTheyAreVerifiedLessons() {
         val text = WorkExperienceBootstrap.catalogMarkdown()
         assertTrue(text.contains("未验证经验"))
