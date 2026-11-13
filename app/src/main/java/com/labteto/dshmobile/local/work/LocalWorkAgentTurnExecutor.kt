@@ -1119,7 +1119,10 @@ internal class LocalWorkAgentTurnExecutor(
                 if (completed != null) {
                     try {
                         withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
-                            sessionStorage.files.publishVerifiedDeliverables(binding.sessionId, completed.artifactPaths)
+                            sessionStorage.files.publishVerifiedDeliverables(
+                                binding.sessionId, completed.artifactPaths,
+                                localWorkTaskFolderPaths(completed.description, completed.id).deliverables,
+                            )
                         }
                     } catch (error: Exception) {
                         AppLog.failure("WorkAgentTurn", "publish_downloads", error,
