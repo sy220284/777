@@ -100,6 +100,16 @@ class LocalToolsUiFacade @Inject internal constructor(
     suspend fun remoteGitBranchesForUi(repository: String): List<String> =
         withContext(Dispatchers.IO) { tools.remoteGitBranches(repository) }
 
+    suspend fun compareLocalGitForUi(repository: String): LocalRemoteGitDiffUi = withContext(Dispatchers.IO) {
+        val receipt = tools.compareLocalGit(repository)
+        LocalRemoteGitDiffUi(
+            trackingRef = (receipt.getValue("tracking_ref") as kotlinx.serialization.json.JsonPrimitive).content,
+            statistics = (receipt.getValue("stat") as kotlinx.serialization.json.JsonPrimitive).content,
+            patch = (receipt.getValue("patch") as kotlinx.serialization.json.JsonPrimitive).content,
+            truncated = receipt.getValue("truncated").toString() == "true",
+        )
+    }
+
     suspend fun compareRemoteGitForUi(
         repository: String, remote: String, branch: String,
     ): LocalRemoteGitDiffUi = withContext(Dispatchers.IO) {
