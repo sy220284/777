@@ -5,6 +5,8 @@ import com.shenyan.designsystem.foundation.SyMetric
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +41,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
@@ -52,6 +56,7 @@ import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
 import com.labteto.dshmobile.local.files.LocalWorkspaceSearchPage
 import com.labteto.dshmobile.local.files.LocalWorkspaceFileChange
 import com.labteto.dshmobile.local.session.LocalConversationFiles
+import com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.shenyan.SyButton
@@ -62,6 +67,7 @@ import com.shenyan.designsystem.components.SyEmptyState
 import com.shenyan.designsystem.components.SyLoadingState
 import com.labteto.dshmobile.ui.shenyan.SySearchField
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
@@ -111,6 +117,8 @@ internal fun LocalWorkspaceFilesDialog(
     stopSearch: suspend (String) -> Boolean = { false },
     observeChanges: (List<String>) -> kotlinx.coroutines.flow.Flow<LocalWorkspaceFileChange> =
         { kotlinx.coroutines.flow.emptyFlow() },
+    remoteGitBranches: (suspend (String) -> List<String>)? = null,
+    compareRemoteGit: (suspend (String, String, String) -> LocalRemoteGitDiffUi)? = null,
     loadConversation: suspend (String) -> LocalConversationFiles,
     loadPreview: suspend (String) -> LocalWorkspaceFilePreview,
     loadPreviewPage: suspend (String, Long) -> LocalWorkspaceFilePreview = { path, _ -> loadPreview(path) },
@@ -153,10 +161,19 @@ internal fun LocalWorkspaceFilesDialog(
     var query by com.labteto.dshmobile.ui.components.rememberNavigationEntryState("", entryRequest, mode, sessionId)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
     var selecting by rememberSaveable(mode, sessionId, section, directory) { mutableStateOf(false) }
     val selected = remember(mode, sessionId, section, directory) { mutableStateListOf<String>() }
     var sharing by remember { mutableStateOf(false) }
     var shareError by remember(mode, sessionId, section, directory) { mutableStateOf<String?>(null) }
+    var gitSheetOpen by remember(mode, sessionId) { mutableStateOf(false) }
+    var gitLoading by remember(mode, sessionId) { mutableStateOf(false) }
+    var gitError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
+    var gitRepository by remember(mode, sessionId) { mutableStateOf(".") }
+    var gitBranches by remember(mode, sessionId) { mutableStateOf(emptyList<String>()) }
+    var gitSelectedRef by remember(mode, sessionId) { mutableStateOf<String?>(null) }
+    var gitResult by remember(mode, sessionId) { mutableStateOf<LocalRemoteGitDiffUi?>(null) }
+    var gitJob by remember(mode, sessionId) { mutableStateOf<Job?>(null) }
     val chooserTitle = stringResource(R.string.local_files_share_chooser)
     val failedText = stringResource(R.string.local_files_share_failed)
     val limitText = stringResource(R.string.local_files_share_limit, MAX_LOCAL_SHARE_FILES)
@@ -212,6 +229,55 @@ internal fun LocalWorkspaceFilesDialog(
                 shareError = failedText
             } finally {
                 sharing = false
+            }
+        }
+    }
+
+    fun openGitComparison() {
+        val listBranches = remoteGitBranches ?: return
+        gitJob?.cancel()
+        gitRepository = directory.ifBlank { "." }
+        gitSheetOpen = true
+        gitError = null
+        gitSelectedRef = null
+        gitResult = null
+        gitBranches = emptyList()
+        gitJob = scope.launch {
+            gitLoading = true
+            try {
+                gitBranches = listBranches(gitRepository)
+                if (gitBranches.isEmpty()) {
+                    gitError = "当前目录没有可比较的本地远端跟踪分支。请先在该 Git 仓库中获取远端分支。"
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                gitError = failure.message ?: "读取本地 Git 分支失败"
+            } finally {
+                gitLoading = false
+            }
+        }
+    }
+
+    fun compareGitReference(reference: String) {
+        val compare = compareRemoteGit ?: return
+        if (gitLoading || reference !in gitBranches) return
+        val remote = reference.substringBefore('/')
+        val branch = reference.substringAfter('/')
+        gitJob?.cancel()
+        gitJob = scope.launch {
+            gitLoading = true
+            gitSelectedRef = reference
+            gitResult = null
+            gitError = null
+            try {
+                gitResult = compare(gitRepository, remote, branch)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                gitError = failure.message ?: "比较远端分支失败"
+            } finally {
+                gitLoading = false
             }
         }
     }
@@ -543,6 +609,21 @@ internal fun LocalWorkspaceFilesDialog(
                     )
                 }
 
+                if (mode == LocalFilesMode.WORKSPACE && preview == null && !selecting &&
+                    remoteGitBranches != null && compareRemoteGit != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        SyButton(
+                            text = "对比远端分支",
+                            onClick = ::openGitComparison,
+                            enabled = !loading,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
+                        )
+                    }
+                }
                 if (preview == null && !loading && error == null && visibleSharePaths.isNotEmpty()) {
                     if (selecting) {
                         Row(
@@ -728,6 +809,62 @@ internal fun LocalWorkspaceFilesDialog(
                 }
             }
         }
+    if (gitSheetOpen) {
+        val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+        SyResponsiveSheet(
+            title = "比较远端分支",
+            subtitle = "只读取已获取的本地远端分支，不会自动联网",
+            onDismiss = { gitJob?.cancel(); gitSheetOpen = false },
+            scrollable = true,
+        ) {
+            Text("仓库目录：$gitRepository", style = DsType.small13, color = colors.textSecondary)
+            if (gitLoading) Text("正在读取 Git 结果…", color = colors.textSecondary)
+            gitError?.let { Text(it, color = colors.dangerInk) }
+            gitBranches.forEach { reference ->
+                SyButton(
+                    text = if (gitSelectedRef == reference) "已选择 · $reference" else reference,
+                    onClick = { compareGitReference(reference) },
+                    enabled = !gitLoading,
+                    variant = SyButtonVariant.Ghost,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            gitResult?.let { result ->
+                Text(result.trackingRef, style = DsType.small13Strong, color = colors.text)
+                SelectionContainer {
+                    Text(result.statistics.ifBlank { "没有已跟踪文件的变化" },
+                        style = DsType.small13, color = colors.textSecondary)
+                }
+                if (result.patch.isNotEmpty()) {
+                    Text("差异预览", style = DsType.small13Strong, color = colors.text)
+                    SelectionContainer {
+                        Column(
+                            Modifier.fillMaxWidth().heightIn(max = 360.dp)
+                                .verticalScroll(rememberScrollState()),
+                        ) {
+                            Text(result.patch.take(24_000), style = DsType.small13, color = colors.text)
+                        }
+                    }
+                    if (result.patch.length > 24_000) {
+                        Text("界面显示前 24000 字符，完整返回内容可复制。",
+                            style = DsType.caption11, color = colors.textSecondary)
+                    }
+                    SyButton(
+                        text = "复制差异内容",
+                        onClick = { clipboard.setText(AnnotatedString(result.patch)) },
+                        variant = SyButtonVariant.Outline,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (result.truncated) {
+                    Text("差异超过 128KB，当前结果仅包含前 128KB。",
+                        style = DsType.caption11, color = colors.warningInk)
+                }
+                Text("仅比较已跟踪文件，未跟踪的新文件不在本次差异内。",
+                    style = DsType.caption11, color = colors.textSecondary)
+            }
+        }
+    }
 }
 
 /** Virtual root categories; actual file locations never change during an upgrade. */
