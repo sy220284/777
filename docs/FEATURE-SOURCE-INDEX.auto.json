@@ -3444,7 +3444,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "sha256": "bd0c3731e5ded7dd"
+      "sha256": "acef3595ede17b43"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStreamingComponents.kt",
@@ -3452,7 +3452,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "sha256": "a2f521c581a4fb55"
+      "sha256": "ef01560c9f5ab2d1"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModelDefaults.kt",
@@ -4568,12 +4568,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "2620640894d8",
+  "source_snapshot": "29a152b09004",
   "observed_delta": {
-    "baseline": "4e06b120308e",
+    "baseline": "2620640894d8",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt"
     ],
     "moved_unchanged_files": [],
