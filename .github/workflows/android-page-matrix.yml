@@ -27,7 +27,9 @@ concurrency:
 jobs:
   android-16-17-four-way:
     runs-on: ubuntu-latest
-    timeout-minutes: 100
+    # 60-minute maximum wait for exact-SHA CI APKs, then up to 90 minutes for
+    # four Android page-size cells; never reuse another commit's APKs.
+    timeout-minutes: 150
     # All four performance cells share one runner and APKs built by this SHA's CI.
     # SHA-256 and checkout identity are rechecked before any device boots.
     steps:

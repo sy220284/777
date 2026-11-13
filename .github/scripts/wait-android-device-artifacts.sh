@@ -86,7 +86,12 @@ if [[ "$mode" == "--from-ci" ]]; then
   else
     echo "::error::Cross-workflow reuse requires PR or explicit dispatch" >&2; exit 1
   fi
-  for attempt in $(seq 1 180); do
+  # CI first runs scope/static/architecture gates; the x86 APK job can start much
+  # later. The previous 30-minute wait expired three minutes before the actual
+  # exact-revision artifact appeared (run 43429306323).
+  # Preserve a bounded wait that covers those upstream jobs and cold builds.
+  ci_apk_wait_attempts=360  # 60 minutes at one probe every ten seconds
+  for attempt in $(seq 1 "$ci_apk_wait_attempts"); do
     runs_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$expected_head&per_page=100")"
     ci_run="$(printf '%s' "$runs_json" | jq -r \
       --arg branch "$branch" --arg head "$expected_head" --arg event "$event" '
@@ -121,11 +126,11 @@ if [[ "$mode" == "--from-ci" ]]; then
       fi
     fi
     if (( attempt % 6 == 0 )); then
-      echo "Awaiting exact-revision CI APKs (probe $attempt/180)"
+      echo "Awaiting exact-revision CI APKs (probe $attempt/$ci_apk_wait_attempts)"
     fi
     sleep 10
   done
-  echo "::error::No exact-revision CI APK artifact within 30 minutes" >&2
+  echo "::error::No exact-revision CI APK artifact within 60 minutes" >&2
   exit 1
 fi
 
