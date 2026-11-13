@@ -2540,7 +2540,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/McpPluginWorkerTransport.kt",
-      "sha256": "3d24766acd10951a"
+      "sha256": "3f0853efad8f5556"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/McpWorkerCallLedger.kt",
@@ -4620,16 +4620,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "4a80c5408563",
+  "source_snapshot": "aa727b8f24fe",
   "observed_delta": {
-    "baseline": "36d5be2059cb",
+    "baseline": "4a80c5408563",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/uicontract/SettingsUiPort.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/McpPluginWorkerTransport.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
