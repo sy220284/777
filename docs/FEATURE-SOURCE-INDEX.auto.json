@@ -312,7 +312,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt",
-      "sha256": "cf2cc1dcb176b59e"
+      "sha256": "ad66ee9129003cd4"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalWorkPolicyUiPortComposition.kt",
@@ -336,7 +336,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentBackendRuntime.kt",
-      "sha256": "e3fff952cb07f7ba"
+      "sha256": "6f3ce0ba0504dabf"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentContinuationPolicy.kt",
@@ -1492,7 +1492,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelGateway.kt",
-      "sha256": "15f57f6835408a67"
+      "sha256": "c93bc16b72ad8566"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelHistoryBuffer.kt",
@@ -2548,7 +2548,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/LocalMcpNetworkAdmission.kt",
-      "sha256": "b5214a5b098e4419"
+      "sha256": "31ddad55c79f3c6f"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/McpPluginWorkerService.kt",
@@ -2556,7 +2556,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/McpPluginWorkerTransport.kt",
-      "sha256": "3f0853efad8f5556"
+      "sha256": "1502b7fa88ea3ec9"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/McpWorkerCallLedger.kt",
@@ -2616,7 +2616,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalKeylessWebSearchClient.kt",
-      "sha256": "189daab8e6834de6"
+      "sha256": "4637ad3d66624abd"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalSearchUsageStore.kt",
@@ -2624,7 +2624,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebDiagnostics.kt",
-      "sha256": "7b1b1f7f9a7095fd"
+      "sha256": "f44b872100f42288"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebHttpPolicy.kt",
@@ -2636,11 +2636,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebSearchClient.kt",
-      "sha256": "a4e038e4ca60694e"
+      "sha256": "080622eebdc18b79"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTargetResolver.kt",
-      "sha256": "3c6d6056409e9819"
+      "sha256": "496d02adee20d97a"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTools.kt",
@@ -4588,7 +4588,7 @@
     },
     {
       "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
-      "sha256": "80570a82da43bf52"
+      "sha256": "2b7f6b5874c60823"
     },
     {
       "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackend.kt",
@@ -4660,12 +4660,23 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "6529ac822998",
+  "source_snapshot": "a06fbe26f867",
   "observed_delta": {
-    "baseline": "25f85b00914c",
+    "baseline": "6529ac822998",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentBackendRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelGateway.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/LocalMcpNetworkAdmission.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/McpPluginWorkerTransport.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalKeylessWebSearchClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebDiagnostics.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebSearchClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTargetResolver.kt",
+      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],

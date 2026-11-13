@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "6529ac822998",
+  "snapshot": "a06fbe26f867",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1976,
   "production_sources_scanned": 1149,
@@ -9326,10 +9326,21 @@
   "followup_production_or_compatibility": 7,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "25f85b00914c",
+    "baseline": "6529ac822998",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentBackendRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelGateway.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/LocalMcpNetworkAdmission.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/McpPluginWorkerTransport.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalKeylessWebSearchClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebDiagnostics.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebSearchClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTargetResolver.kt",
+      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
