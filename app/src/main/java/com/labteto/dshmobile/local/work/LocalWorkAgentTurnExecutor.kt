@@ -1111,6 +1111,24 @@ internal class LocalWorkAgentTurnExecutor(
         } finally {
             if (ownerJob != null) {
                 workRunRegistry.releaseCompletedTurn(binding, ownerJob)
+                // Auto-admitted goals can complete after the final tool call; publish the same
+                // verified artifact paths that update_goal uses, before declaring the run settled.
+                val completed = binding.workState.snapshot().goal?.takeIf {
+                    it.status == "completed" && it.artifactPaths.isNotEmpty()
+                }
+                if (completed != null) {
+                    try {
+                        withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                            sessionStorage.files.publishVerifiedDeliverables(binding.sessionId, completed.artifactPaths)
+                        }
+                    } catch (error: Exception) {
+                        AppLog.failure("WorkAgentTurn", "publish_downloads", error,
+                            sessionId = binding.sessionId)
+                        binding.state.update { current -> current.copy(
+                            error = "任务已完成，但成果保存到下载目录失败：${error.message}；可在工作区重新保存",
+                        ) }
+                    }
+                }
                 // Derived archive refresh does not change the completed Work result.
                 settledRunId?.let { runId -> onTurnSettled(binding, runId, settledImprovement) }
             }
