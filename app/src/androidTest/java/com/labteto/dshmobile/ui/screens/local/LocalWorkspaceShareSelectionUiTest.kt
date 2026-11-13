@@ -27,6 +27,64 @@ class LocalWorkspaceShareSelectionUiTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
+    fun gitReviewScopeTabsReuseOneEntryWithoutExposingExtraForms() {
+        val calls = mutableListOf<String>()
+        compose.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(
+                    mode = LocalFilesMode.WORKSPACE,
+                    sessionId = "git-source-tabs",
+                    workspacePath = File(context.filesDir, "local-harness/workspace").absolutePath,
+                    loadWorkspace = { emptyList() },
+                    compareLocalGit = { _, _ ->
+                        calls += "local"
+                        com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi(
+                            "worktree/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                            "local diff", "@@ -1 +1 @@\\n+local", truncated = false,
+                        )
+                    },
+                    remoteGitBranches = { listOf("origin/main") },
+                    compareRemoteGit = { _, _, _ ->
+                        calls += "remote"
+                        com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi(
+                            "refs/remotes/origin/main", "remote diff",
+                            "@@ -1 +1 @@\\n+remote", truncated = false,
+                        )
+                    },
+                    compareCommitGit = { _, _ ->
+                        calls += "commit"
+                        com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi(
+                            "commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "commit diff",
+                            "@@ -1 +1 @@\\n+commit", truncated = false,
+                        )
+                    },
+                    loadConversation = { error("不应查询会话") },
+                    loadPreview = { error("不应预览") },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("代码审查").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("代码审查").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("local diff").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("指定提交").performClick()
+        compose.onNodeWithText("读取提交差异").assertExists()
+        compose.onNodeWithText("远端分支").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("origin/main").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("origin/main").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("remote diff").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.runOnIdle { assertEquals(listOf("local", "remote"), calls) }
+    }
+
+    @Test
     fun workspaceGitCompareUsesSelectedTrackingRefAndShowsActualPatch() {
         val calls = mutableListOf<Triple<String, String, String>>()
         compose.setContent {
@@ -56,9 +114,9 @@ class LocalWorkspaceShareSelectionUiTest {
             }
         }
         compose.waitUntil(5_000) {
-            compose.onAllNodesWithText("对比远端分支").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("代码审查").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("对比远端分支").performClick()
+        compose.onNodeWithText("代码审查").performClick()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("upstream/release/v2").fetchSemanticsNodes().isNotEmpty()
         }
@@ -105,9 +163,9 @@ class LocalWorkspaceShareSelectionUiTest {
             }
         }
         compose.waitUntil(5_000) {
-            compose.onAllNodesWithText("检查本地修改").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("代码审查").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("检查本地修改").performClick()
+        compose.onNodeWithText("代码审查").performClick()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("已保存的历史审查报告")
                 .fetchSemanticsNodes().isNotEmpty()
@@ -151,7 +209,7 @@ class LocalWorkspaceShareSelectionUiTest {
                 )
             }
         }
-        compose.onNodeWithText("检查本地修改").performClick()
+        compose.onNodeWithText("代码审查").performClick()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("审查安全结论").fetchSemanticsNodes().isNotEmpty()
         }
@@ -196,7 +254,7 @@ class LocalWorkspaceShareSelectionUiTest {
                 )
             }
         }
-        compose.onNodeWithText("检查本地修改").performClick()
+        compose.onNodeWithText("代码审查").performClick()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("发现高危操作").fetchSemanticsNodes().isNotEmpty()
         }
@@ -221,9 +279,9 @@ class LocalWorkspaceShareSelectionUiTest {
             }
         }
         compose.waitUntil(5_000) {
-            compose.onAllNodesWithText("对比远端分支").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("代码审查").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("对比远端分支").performClick()
+        compose.onNodeWithText("代码审查").performClick()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("当前目录没有可比较的本地远端跟踪分支。请先在该 Git 仓库中获取远端分支。")
                 .fetchSemanticsNodes().isNotEmpty()
