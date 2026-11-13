@@ -291,17 +291,24 @@ internal fun LocalWorkspaceFilesDialog(
         // Try the exact folder in the Android document provider first.
         val folder = android.provider.DocumentsContract.buildDocumentUri(
             "com.android.externalstorage.documents", "primary:Download/神言神语")
-        try {
+        val directOpened = try {
             context.startActivity(Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(folder, android.provider.DocumentsContract.Document.MIME_TYPE_DIR)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             })
+            true
         } catch (_: android.content.ActivityNotFoundException) {
-            context.startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS))
-            shareError = "已打开下载目录，请进入「神言神语」文件夹"
+            false
         } catch (_: SecurityException) {
-            context.startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS))
-            shareError = "已打开下载目录，请进入「神言神语」文件夹"
+            false
+        }
+        if (!directOpened) {
+            try {
+                context.startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS))
+                shareError = "请进入「神言神语」文件夹：手机存储/Download/神言神语"
+            } catch (failure: Exception) {
+                shareError = "请在手机文件管理器打开：手机存储/Download/神言神语"
+            }
         }
     }
 
