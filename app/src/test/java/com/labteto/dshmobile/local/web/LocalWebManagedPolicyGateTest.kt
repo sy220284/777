@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,6 +38,7 @@ class LocalWebManagedPolicyGateTest {
                 .code(302)
                 .message("Found")
                 .header("Location", "https://untrusted.example/mcp")
+                .body("".toResponseBody())
                 .build()
         }.build()
         val client = LocalWebSearchClient(http, Json)
@@ -45,6 +47,7 @@ class LocalWebManagedPolicyGateTest {
             (failure?.javaClass?.name ?: "无异常") + "；请求次数：" + calls.get(),
             failure is com.labteto.dshmobile.local.LocalWebException)
         assertEquals("敏感搜索不得自动重放到重定向地址", 1, calls.get())
+        assertEquals("UNSAFE_REDIRECT", (failure as com.labteto.dshmobile.local.LocalWebException).code)
     }
 
     @Test fun freeSearchPolicyDenialHappensBeforeAnyHttpRequest() = runBlocking {
