@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.harness.tools
 
 import com.labteto.dshmobile.harness.registry.RegistryEntries
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.NonCancellable
@@ -61,10 +60,17 @@ data class ToolResult(
     val richContent: com.labteto.dshmobile.harness.tools.ToolRichContent? = null,
 )
 
+data class ToolPostHookFailure(
+    val hookId: String,
+    val failureType: String,
+)
+
 data class ToolInvocationResult internal constructor(
     val result: ToolResult,
     /** False only when ToolRegistry proves the executor was never entered. */
     val executionStarted: Boolean,
+    /** Post-use diagnostics never overwrite a completed tool's actual result. */
+    val postHookFailures: List<ToolPostHookFailure> = emptyList(),
 )
 
 fun interface HarnessToolExecutor {
@@ -311,16 +317,27 @@ class ToolRegistry private constructor(
                 environment.execute(tool, context, input, rawArguments)
             } else tool.executor.execute(context, input, rawArguments)
 
+        val postHookFailures = mutableListOf<ToolPostHookFailure>()
         suspend fun deliverReceiptAndHooks(result: ToolResult) {
-            // Persist the tool's real outcome before any plugin runs; a post-hook failure must
-            // never erase the side-effect provenance or create a false "not started" receipt.
+            // The executor's outcome is durable before best-effort post-use notifications.
+            // Each Hook failure is independent: do not misreport an already completed mutation.
             context.onExecutionFinished?.invoke(tool, result)
             for (subscription in hookSnapshot.subscriptions) {
-                val completed = withTimeoutOrNull(5_000L) {
-                    subscription.hook.afterUse(ToolPostUseEvent(context.sessionId, tool, result))
-                    true
-                } ?: false
-                check(completed) { "工具后置 Hook 执行超时：" + subscription.id }
+                try {
+                    val completed = withTimeoutOrNull(5_000L) {
+                        subscription.hook.afterUse(ToolPostUseEvent(context.sessionId, tool, result))
+                        true
+                    } ?: false
+                    if (!completed) {
+                        postHookFailures += ToolPostHookFailure(subscription.id, "timeout")
+                    }
+                } catch (cancelled: CancellationException) {
+                    currentCoroutineContext().ensureActive()
+                    postHookFailures += ToolPostHookFailure(subscription.id, "cancelled")
+                } catch (failure: Exception) {
+                    // Avoid exposing plugin exception messages, which may include private data.
+                    postHookFailures += ToolPostHookFailure(subscription.id, failure.javaClass.simpleName)
+                }
             }
         }
         val timeoutMillis = tool.timeoutMillis
@@ -330,6 +347,7 @@ class ToolRegistry private constructor(
             return ToolInvocationResult(
                 result = result,
                 executionStarted = true,
+                postHookFailures = postHookFailures.toList(),
             )
         }
         require(timeoutMillis > 0L) { "工具超时必须大于 0：${tool.name}" }
@@ -351,6 +369,7 @@ class ToolRegistry private constructor(
         return ToolInvocationResult(
             result = settled,
             executionStarted = true,
+            postHookFailures = postHookFailures.toList(),
         )
     }
 

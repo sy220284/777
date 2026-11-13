@@ -3,7 +3,6 @@ package com.labteto.dshmobile.harness.tools
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonArray
@@ -14,7 +13,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-/** The first Code Mode language is a bounded declarative script, not arbitrary JVM/JS execution.
+/** Code Mode uses a size-bounded declarative script, not arbitrary JVM/JS execution.
  * Every step re-enters the original registry, so a script cannot bypass tools, approvals or Hooks.
  */
 class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
@@ -32,14 +31,13 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             name = TOOL_NAME,
             schema = functionToolSchema(
                 TOOL_NAME,
-                "受控串行工具编排。最多8步，支持前序持久结果引用与 when 条件跳过；每步经过原工具权限、审批及审计。遇失败停止，不执行任意脚本或自动重试未知副作用。",
+                "受控串行工具编排。支持前序持久结果引用与 when 条件跳过；每步经过原工具权限、审批及审计，并采用原工具的超时及取消规则。遇失败停止，不执行任意脚本或自动重试未知副作用。",
                 parameterSchema = buildJsonObject {
                     put("type", "object")
                     put("properties", buildJsonObject {
                         put("steps", buildJsonObject {
                             put("type", "array")
                             put("minItems", 1)
-                            put("maxItems", MAX_STEPS)
                             put("items", buildJsonObject {
                                 put("type", "object")
                                 put("properties", buildJsonObject {
@@ -100,8 +98,8 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             return rejection("CODE_MODE_BAD_PLAN", "编排脚本超过长度限制")
         val steps = (script["steps"] as? JsonArray)?.toList()
             ?: return rejection("CODE_MODE_BAD_PLAN", "缺少步骤数组")
-        if (steps.size !in 1..MAX_STEPS)
-            return rejection("CODE_MODE_BAD_PLAN", "编排步骤数量需为 1—$MAX_STEPS")
+        if (steps.isEmpty())
+            return rejection("CODE_MODE_BAD_PLAN", "编排至少需要一个步骤")
 
         // Validate the complete script before running the first side-effecting step.
         val sampled = kotlinx.coroutines.currentCoroutineContext()[ToolBindingSnapshot]
@@ -192,12 +190,12 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             )
             val child = original.copy(attributes = attrs, expectedRegistration = handler)
             val outcome = try {
-                withTimeoutOrNull(STEP_TIMEOUT_MILLIS) {
-                    if (sampled == null) {
-                        liveTools.executeTracked(name, resolvedArguments, resolvedArguments.toString(), child)
-                    } else withContext(CodeModeStepScope(sampled, handler)) {
-                        liveTools.executeTracked(name, resolvedArguments, resolvedArguments.toString(), child)
-                    }
+                // ToolRegistry owns each tool's deadline; an additional script watchdog would
+                // interrupt legitimate long-running tools before their own timeout.
+                if (sampled == null) {
+                    liveTools.executeTracked(name, resolvedArguments, resolvedArguments.toString(), child)
+                } else withContext(CodeModeStepScope(sampled, handler)) {
+                    liveTools.executeTracked(name, resolvedArguments, resolvedArguments.toString(), child)
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
@@ -210,15 +208,6 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                     put("hint", "工具出现执行异常，副作用状态未知；核查审计回执后再决定重试")
                 }
                 return receipt(observations, "stopped", "CODE_MODE_STEP_EXCEPTION")
-            }
-            if (outcome == null) {
-                observations += buildJsonObject {
-                    put("index", index + 1)
-                    put("tool", name)
-                    put("status", "unknown_after_timeout")
-                    put("hint", "调用已超时，副作用可能已发生；先核对审计回执再决定是否重试")
-                }
-                return receipt(observations, "stopped", "CODE_MODE_STEP_TIMEOUT")
             }
             val result = outcome.result
             observations += buildJsonObject {
@@ -317,13 +306,11 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
 
     private companion object {
         const val TOOL_NAME = "code_mode_run"
-        const val MAX_STEPS = 8
-        const val MAX_SCRIPT_CHARS = 32_000
+        const val MAX_SCRIPT_CHARS = 256_000
         const val MAX_REFERENCE_SOURCE_CHARS = 128_000
         const val MAX_REFERENCE_VALUE_CHARS = 8_192
         const val RESULT_REFERENCE_KEY = "\$step_result"
         val REFERENCE_PATH = Regex("""[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*""")
         const val MAX_RESULT_CHARS = 4_000
-        const val STEP_TIMEOUT_MILLIS = 90_000L
     }
 }

@@ -510,6 +510,12 @@ internal class LocalToolExecutionCoordinator(
                     ),
                 )
             }.let { invocation ->
+                // A post-use Hook can fail after the tool has already committed its side effect.
+                // Record this separately; do not convert the real tool outcome into a failure.
+                invocation.postHookFailures.forEach { failure ->
+                    AppLog.warn("LocalToolExecution",
+                        "operation=post_tool_hook_failed session_id=$sessionId call_id=${call.id} tool=${call.name} hook_id=${failure.hookId} cause=${failure.failureType}")
+                }
                 // Observe while the real workspace lease is still held. The caller owns
                 // what to observe; this neutral coordinator never interprets goal semantics.
                 if (invocation.executionStarted && executionLease != null && !invocation.result.isError) {
