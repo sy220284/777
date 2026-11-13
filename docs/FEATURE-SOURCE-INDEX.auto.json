@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1932,
+  "repository_code_file_count": 1933,
   "production_source_count": 1129,
-  "test_code_file_count": 659,
+  "test_code_file_count": 660,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -2376,7 +2376,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubSkillImporter.kt",
-      "sha256": "8e65f89313a1caef"
+      "sha256": "05c40b0926890c91"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalJsonQuery.kt",
@@ -3808,11 +3808,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
-      "sha256": "97e2ad1869d74f9b"
+      "sha256": "1aac0ee78a187054"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
-      "sha256": "387b60915bb63a7d"
+      "sha256": "b6383ebdaedf9b08"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/shenyan/ShenyanTheme.kt",
@@ -4580,15 +4580,15 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "30239c867685",
+  "source_snapshot": "a063176a7417",
   "observed_delta": {
-    "baseline": "6737ca3fb021",
-    "added_production_files": [
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/CodeModePlugin.kt"
-    ],
+    "baseline": "30239c867685",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubSkillImporter.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
