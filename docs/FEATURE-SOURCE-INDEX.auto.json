@@ -192,7 +192,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
-      "sha256": "c5468e4b58aa2db5"
+      "sha256": "d94347a46ae673b0"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalChatGroupUiAdapter.kt",
@@ -1168,7 +1168,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
-      "sha256": "9811ca3a772bf238"
+      "sha256": "95152a59a3492b0b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceExecutionContext.kt",
@@ -2464,7 +2464,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt",
-      "sha256": "5f0ce8ffd4a85607"
+      "sha256": "781e272f70e279dc"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolFailure.kt",
@@ -2476,7 +2476,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt",
-      "sha256": "6b8d0811a255e16a"
+      "sha256": "8b2237445b1bb219"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPromptBudgetPolicy.kt",
@@ -4588,12 +4588,17 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "cc3f6a2d356e",
+  "source_snapshot": "03aea106a3fc",
   "observed_delta": {
-    "baseline": "962c901eab5d",
+    "baseline": "cc3f6a2d356e",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
