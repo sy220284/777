@@ -79,6 +79,46 @@ class GitRemoteDiffTest {
         }
     }
 
+    @Test fun uncommittedReviewDiffWorksWithNoRemote() = runBlocking {
+        val home = kotlin.io.path.createTempDirectory("local-review-git-").toFile()
+        val root = home.resolve("source").apply { mkdirs() }
+        val process = AndroidProcessRuntime(defaultWorkingDirectory = root)
+        suspend fun git(vararg command: String) {
+            val result = process.execute(ProcessRequest(
+                command = listOf("git") + command, timeoutMillis = 10_000,
+            ))
+            assertEquals(result.stderr, 0, result.exitCode)
+        }
+        try {
+            git("init", "-q")
+            git("config", "user.name", "Test")
+            git("config", "user.email", "test@localhost")
+            root.resolve("file.txt").writeText("old\\n")
+            git("add", ".")
+            git("commit", "-qm", "initial")
+            root.resolve("file.txt").writeText("new\\n")
+            root.resolve("other.txt").writeText("untracked secret\\n")
+            val registry = PluginRegistry()
+            registry.install(AndroidRuntimePlugin(root, processRuntime = process))
+            val before = GitRemoteDiff(root, process).compareUncommitted(".")
+            val tool = registry.context.tools.execute("git_diff_uncommitted",
+                buildJsonObject { put("repository", ".") },
+                context = ToolContext(sessionId = "review-session"))
+            assertFalse(tool.content, tool.isError)
+            val result = Json.parseToJsonElement(tool.content).jsonObject
+            assertEquals(before.getValue("tracking_ref"), result.getValue("tracking_ref"))
+            assertTrue(result.getValue("tracking_ref").jsonPrimitive.content.startsWith("worktree/"))
+            assertTrue(result.getValue("patch").jsonPrimitive.content.contains("+new"))
+            assertFalse(result.getValue("patch").jsonPrimitive.content.contains("untracked secret"))
+            assertEquals("false", result.getValue("network_requested").jsonPrimitive.content)
+            assertEquals("1", result.getValue("untracked_file_count").jsonPrimitive.content)
+            git("diff", "--cached", "--exit-code")
+            assertTrue(root.resolve("other.txt").exists())
+        } finally {
+            home.deleteRecursively()
+        }
+    }
+
     @Test fun remoteTrackingRefMustExist() = runBlocking {
         val home = kotlin.io.path.createTempDirectory("remote-diff-missing-").toFile()
         val root = home.resolve("source").apply { mkdirs() }
