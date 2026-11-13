@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "snapshot": "91f5946d2215",
+  "snapshot": "9ba83ba0b028",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1965,
-  "production_sources_scanned": 1142,
+  "code_files_scanned": 1968,
+  "production_sources_scanned": 1145,
   "feature_nodes": 553,
   "functional_leaves": 456,
   "existing_executable_test_mappings": 271,
@@ -9326,12 +9326,14 @@
   "followup_production_or_compatibility": 7,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "3887e46b175a",
-    "added_production_files": [],
-    "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt"
+    "baseline": "91f5946d2215",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkProjectsUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProjectCatalog.kt",
+      "app/src/main/java/com/labteto/dshmobile/test/java/com/labteto/dshmobile/local/work/LocalWorkProjectCatalogTest.kt"
     ],
+    "removed_production_files": [],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
