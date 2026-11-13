@@ -1217,9 +1217,10 @@ internal fun LocalWorkspaceFilesDialog(
                     Text("差异超过 128KB，当前结果仅包含前 128KB。",
                         style = DsType.caption11, color = colors.warningInk)
                 }
-                if (mode == LocalFilesMode.WORKSPACE && runIndependentCodeReview != null &&
-                    result.patch.isNotBlank()) {
-                    SyButton(
+                if (mode == LocalFilesMode.WORKSPACE && result.patch.isNotBlank() &&
+                    (runIndependentCodeReview != null || codeReview != null || codeReviewError != null)) {
+                    // A durable review remains readable even without a model-run capability.
+                    if (runIndependentCodeReview != null) SyButton(
                         text = if (codeReviewBusy) "独立审查中…" else "独立代码审查",
                         onClick = {
                             val review = runIndependentCodeReview
@@ -1272,9 +1273,11 @@ internal fun LocalWorkspaceFilesDialog(
                         }
                     }
                 }
-                if (mode == LocalFilesMode.WORKSPACE && runIndependentSecurityReview != null &&
-                    result.patch.isNotBlank()) {
-                    SyButton(
+                if (mode == LocalFilesMode.WORKSPACE && result.patch.isNotBlank() &&
+                    (runIndependentSecurityReview != null || securityReview != null ||
+                        securityReviewError != null)) {
+                    // Risk evidence and prior user decisions must survive a temporarily unavailable reviewer.
+                    if (runIndependentSecurityReview != null) SyButton(
                         text = if (securityReviewBusy) "安全审查中…" else "独立安全审核",
                         onClick = {
                             val start = runIndependentSecurityReview
