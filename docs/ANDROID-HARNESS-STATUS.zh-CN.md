@@ -450,23 +450,9 @@ upstream/deepseek-harness.lock.json
 
 这些能力必须显式不支持或提供 Android 等价实现。
 
-## 当前质量门禁
+## 工程维护方式
 
-当前主线要求同时通过：
-
-- 架构门禁。
-- 性能门禁。
-- UI 门禁。
-- Kotlin 风险门禁。
-- 单元测试。
-- 官方 Harness 一致性。
-- Lint。
-- optimized APK。
-- Android 16。
-- Android 17。
-- merge-gate。
-
-详见 [VALIDATION.md](VALIDATION.md)。
+仓库已取消统一的验收项目、发布前证明材料和合并检查清单。开发者可按问题需要进行单测、设备调试和构建排障。
 
 
 ## Agent Team 语义
