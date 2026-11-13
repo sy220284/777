@@ -189,6 +189,7 @@ class LocalWebCancellationAndroidTest {
             context, http, Json,
             com.labteto.dshmobile.local.web.LocalSearchUsageStore(context, Json),
             com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings(context),
+            com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy(context),
         )
     }
 
