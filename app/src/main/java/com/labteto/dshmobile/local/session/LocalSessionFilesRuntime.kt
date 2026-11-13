@@ -34,6 +34,22 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.put
 
+/** Preserve human file names in Work while keeping all imported paths under one local folder. */
+internal fun workImportSafeName(originalName: String): String =
+    originalName.substringAfterLast('/').substringAfterLast('\\')
+        .replace(Regex("""[\\/:*?"<>|\p{Cntrl}]"""), "_")
+        .take(120).trim().trim('.').ifBlank { "手机文件" }
+
+internal fun workImportAvailablePath(safeName: String, exists: (String) -> Boolean): String {
+    val stem = safeName.substringBeforeLast('.', safeName)
+    val extension = safeName.substringAfterLast('.', "").takeIf(String::isNotBlank)
+        ?.let { ".$it" }.orEmpty()
+    return (1..512).asSequence().map { index ->
+        val filename = if (index == 1) safeName else "$stem ($index)$extension"
+        "导入文件/$filename"
+    }.firstOrNull { !exists(it) } ?: error("同名文件过多，请先整理工作区的导入文件")
+}
+
 /**
  * Session/File capability owning the app-private workspace views used by local conversations.
  *
@@ -122,21 +138,12 @@ class LocalSessionFilesRuntime @Inject internal constructor(
                 )?.use { cursor ->
                     if (cursor.moveToFirst()) cursor.getString(0) else null
                 } ?: error("所选手机文件没有名称")
-                val safeName = originalName.substringAfterLast('/').substringAfterLast('\\')
-                    .replace(Regex("""[\\/:*?"<>|\p{Cntrl}]"""), "_")
-                    .take(120).trim().trim('.').ifBlank { "手机文件" }
+                val safeName = workImportSafeName(originalName)
                 resolver.openInputStream(uri)?.use { input ->
                     synchronized(workFileImportLock) {
-                        val stem = safeName.substringBeforeLast('.', safeName)
-                        val suffix = safeName.substringAfterLast('.', "").takeIf { it.isNotBlank() }
-                            ?.let { ".$it" }.orEmpty()
-                        val selected = generateSequence(1) { it + 1 }.take(512)
-                            .map { index ->
-                                val filename = if (index == 1) safeName
-                                    else "$stem ($index)$suffix"
-                                "导入文件/$filename"
-                            }.firstOrNull { workspace.workspaceFileAt(it) == null }
-                            ?: error("同名文件过多，请先整理工作区的导入文件")
+                        val selected = workImportAvailablePath(safeName) {
+                            workspace.workspaceFileAt(it) != null
+                        }
                         workspace.writeFromStream(selected, input)
                         selected
                     }
