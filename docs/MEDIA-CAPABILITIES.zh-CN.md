@@ -116,7 +116,6 @@ MiniMax 原始视频状态 Preparing、Queueing、Processing、Success、Fail �
 
 **视觉迁移边界**：这批增强在当前可编译分支使用 `DsTheme` 过渡层，不复制 `SyMaterial` 渲染逻辑。PR #654 的 V5 完整迁移仍是独立草稿，之后需在合流时将新增卡片迁至统一 `Sy*` 组件；Light/Dark/Matte、320～1440dp 与动态/触觉无障碍需运行截图确认。Figma 编辑端本轮因 Starter MCP 调用限额无法写入，不能声称已经完成画板。
 
-**CI 验收**：以包含本章节的最新 PR head 为准，核实 unit-tests、static-gates、architecture-3-gates、build-arm64 和 merge-gate。服务商付费创作及 Android 16/17 真机链路需要独立实测，不能用 JVM 单测替代。
 
 
 ## 2026-10-15 · PR #727 GPT 套餐聊天生图补修
