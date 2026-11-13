@@ -312,7 +312,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt",
-      "sha256": "ad66ee9129003cd4"
+      "sha256": "59cbf34a3f2939d5"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalWorkPolicyUiPortComposition.kt",
@@ -2624,7 +2624,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebDiagnostics.kt",
-      "sha256": "f44b872100f42288"
+      "sha256": "61a6fdb6b502fa68"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebHttpPolicy.kt",
@@ -2640,7 +2640,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTargetResolver.kt",
-      "sha256": "496d02adee20d97a"
+      "sha256": "15bccae1837ced3c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTools.kt",
@@ -4660,13 +4660,15 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "d1b3caf923d0",
+  "source_snapshot": "09ff4bdb3f3e",
   "observed_delta": {
-    "baseline": "297f71318a60",
+    "baseline": "d1b3caf923d0",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkProjectsSheet.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebDiagnostics.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTargetResolver.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
