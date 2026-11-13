@@ -159,14 +159,16 @@ if [[ "${1:-}" == "--cell" ]]; then
   exit 0
 fi
 
-# The independent matrix workflow builds all three APKs on this same runner.
-# Keep the previous same-run artifact mode for explicit backward compatibility.
+# The matrix compares four device environments on one runner using the
+# identical verified x86_64 APKs from the same checkout as the main CI.
+# The default mode also supports downloading current-run APKs.
 if [[ "${1:-}" != "--local-apks" ]]; then
   bash .github/scripts/wait-android-device-artifacts.sh
 fi
 for apk in app-debug.apk app-debug-androidTest.apk app-optimized.apk; do
   test -s ".ci/device-apks/$apk" || { echo "::error::Missing $apk" >&2; exit 1; }
 done
+bash .github/scripts/wait-android-device-artifacts.sh --verify .ci/device-apks
 test -e /dev/kvm || { echo "::error::KVM is unavailable" >&2; exit 1; }
 sudo chmod 666 /dev/kvm
 failures=0

@@ -532,6 +532,54 @@ for token in ("gh run download", "GITHUB_RUN_ID", "GITHUB_REPOSITORY",
         violations.append(f"device artifact waiter lacks same-run safety control: {token}")
 if "actions: read" not in CI:
     violations.append("CI must explicitly allow read-only GitHub Actions artifacts")
+# Product indices exclude workflow-only changes; workflow and helper code
+# remain subject to independent security, syntax and contract validation.
+for feature_script in ("sync-feature-tree.py", "check-feature-tree-sync.py"):
+    source = (SCRIPTS / feature_script).read_text(encoding="utf-8")
+    if 'file.relative_to(root).parts[0] == ".github"' not in source and \
+            'path.relative_to(ROOT).parts[0] == ".github"' not in source:
+        violations.append(f"Feature fingerprint must exclude CI-only files: {feature_script}")
+
+# Prevent future workflow edits from silently recreating a second full APK build.
+matrix_file = WORKFLOWS / "android-page-matrix.yml"
+matrix_workflow = matrix_file.read_text(encoding="utf-8")
+for token in (
+    "actions: read",
+    "wait-android-device-artifacts.sh --from-ci",
+    "run-android-page-matrix.sh --local-apks",
+    "verify-android16-apk.sh",
+):
+    if token not in matrix_workflow:
+        violations.append(f"Four-cell matrix must reuse verified same-SHA CI APKs: {token}")
+for forbidden in ("setup-runtime-cached", ":app:assembleDebug", ":app:assembleOptimized"):
+    if forbidden in matrix_workflow:
+        violations.append(f"Four-cell matrix duplicates build or runtime setup: {forbidden}")
+for token in ("SHA256SUMS.txt", "source-sha.txt", "head-sha.txt",
+              "git rev-parse HEAD", "sha256sum app-debug.apk"):
+    if token not in CI:
+        violations.append(f"CI APK artifact lacks provenance: {token}")
+for token in ("--from-ci", "GITHUB_SHA", "expected_head", "sha256sum -c",
+              "CI APK source SHA or checksum verification failed"):
+    if token not in artifact_waiter:
+        violations.append(f"Cross-workflow artifact verifier missing: {token}")
+
+# Release must own no independent runtime-cache hash formula: CI and release
+# share one action that validates signing, package hashes, architecture and cache key.
+release_job = RELEASE.split("\n  release:\n", 1)[1]
+if release_job.count("uses: ./.github/actions/setup-runtime-cached") != 1:
+    violations.append("Release must use CI's shared verified Runtime setup action")
+if "abi: arm64-v8a" not in release_job:
+    violations.append("Release must prepare the arm64-v8a runtime")
+if release_job.find("Validate release signing material") > release_job.find("setup-runtime-cached"):
+    violations.append("Release must reject missing signing secrets before runtime downloads")
+
+toolchain_workflow = (WORKFLOWS / "dev-toolchain.yml").read_text(encoding="utf-8")
+for token in ("actions/cache/restore@", "actions/cache/save@",
+              ".gradle-toolchain-home/caches/modules-2",
+              "steps.toolchain-gradle-cache.outputs.cache-hit != 'true'"):
+    if token not in toolchain_workflow:
+        violations.append(f"Offline toolchain Gradle cache must be reusable: {token}")
+
 # ABI-scoped downloads must be verified and saved BEFORE costly build tasks, even when
 # those tasks later fail. Keep product validation unchanged.
 runtime_action_file = ROOT / ".github" / "actions" / "setup-runtime-cached" / "action.yml"

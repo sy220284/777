@@ -94,7 +94,9 @@ def inspect():
     for path in sorted(ROOT.rglob("*")):
         if not path.is_file() or any(x in SKIP for x in path.relative_to(ROOT).parts):
             continue
-        if path.relative_to(ROOT).as_posix() == ".github/workflows/feature-tree-auto.yml":
+        # Independently mirror the generator's separation of CI controls and
+        # product code. The CI scripts have their own fail-closed static gates.
+        if path.relative_to(ROOT).parts[0] == ".github":
             continue
         if path.suffix not in CODE and path.name != "gradlew":
             continue
