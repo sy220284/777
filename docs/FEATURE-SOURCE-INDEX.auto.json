@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1954,
-  "production_source_count": 1137,
+  "repository_code_file_count": 1955,
+  "production_source_count": 1138,
   "test_code_file_count": 672,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
@@ -2527,6 +2527,10 @@
       "sha256": "a38489cb00d70b4a"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/LocalMcpNetworkAdmission.kt",
+      "sha256": "b5214a5b098e4419"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/McpPluginWorkerService.kt",
       "sha256": "fa8d167e0033e53c"
     },
@@ -4612,10 +4616,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "9c6744a79876",
+  "source_snapshot": "1609d0f9e58f",
   "observed_delta": {
-    "baseline": "da1bb8b71bfa",
-    "added_production_files": [],
+    "baseline": "9c6744a79876",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/LocalMcpNetworkAdmission.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [],
     "moved_unchanged_files": [],
