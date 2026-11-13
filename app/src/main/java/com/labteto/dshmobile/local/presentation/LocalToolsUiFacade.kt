@@ -108,6 +108,7 @@ class LocalToolsUiFacade @Inject internal constructor(
             statistics = (receipt.getValue("stat") as kotlinx.serialization.json.JsonPrimitive).content,
             patch = (receipt.getValue("patch") as kotlinx.serialization.json.JsonPrimitive).content,
             truncated = receipt.getValue("truncated").toString() == "true",
+            evidenceRevision = (receipt.getValue("head_commit") as kotlinx.serialization.json.JsonPrimitive).content,
         )
     }
 
@@ -120,6 +121,10 @@ class LocalToolsUiFacade @Inject internal constructor(
             statistics = (receipt.getValue("stat") as kotlinx.serialization.json.JsonPrimitive).content,
             patch = (receipt.getValue("patch") as kotlinx.serialization.json.JsonPrimitive).content,
             truncated = receipt.getValue("truncated").toString() == "true",
+            evidenceRevision = listOf("head_commit", "tracking_commit", "merge_base")
+                .joinToString(":") { key ->
+                    (receipt.getValue(key) as kotlinx.serialization.json.JsonPrimitive).content
+                },
         )
     }
 
@@ -261,4 +266,6 @@ data class LocalRemoteGitDiffUi(
     val statistics: String,
     val patch: String,
     val truncated: Boolean,
+    /** Version of the Git objects used to produce this patch. */
+    val evidenceRevision: String = "",
 )
