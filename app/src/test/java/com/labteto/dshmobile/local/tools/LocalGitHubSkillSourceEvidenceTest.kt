@@ -50,6 +50,14 @@ class LocalGitHubSkillSourceEvidenceTest {
         }
     }
 
+    @Test fun updateSourcePreservesOriginalBranchAndImmutableInstalledCommit() {
+        val source = PublicGitHubSkillLocation.parse(
+            "https://github.com/openai/skills/tree/main/skills/.curated/example-skill")
+        val sha = "abcdef0123456789abcdef0123456789abcdef01"
+        assertEquals(source to sha, parseGitHubSkillUpdateSource(
+            githubSkillSourceEvidence(source, sha).toString(Charsets.UTF_8)))
+    }
+
     @Test fun evidenceRejectsNonCommitVersionsAndPathInjection() {
         val source = PublicGitHubSkillLocation.parse(
             "https://github.com/openai/skills/tree/main/skills/.curated/example-skill")

@@ -484,6 +484,10 @@ internal class LocalSkillManager @Inject constructor(
         store.create(id, displayName, description, instructions)
     fun importSkill(filename: String, bytes: ByteArray): String = LocalSkillPackageImporter(storageWorkspace).install(filename, bytes)
     fun exportSkillPackage(id: String): ByteArray = LocalSkillPackageExporter(storageWorkspace).export(id)
+    fun replaceSkillPackage(id: String, archive: ByteArray): String =
+        LocalSkillPackageUpdater(storageWorkspace).replace(id, archive)
+    fun canRollbackSkill(id: String): Boolean = LocalSkillPackageUpdater(storageWorkspace).canRollback(id)
+    fun rollbackSkill(id: String): String = LocalSkillPackageUpdater(storageWorkspace).rollback(id)
     fun remove(id: String) = store.remove(id)
     fun readDocument(id: String) = store.readDocument(id)
     fun updateDocument(id: String, document: String) = store.updateDocument(id, document)

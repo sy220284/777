@@ -112,6 +112,17 @@ internal fun parseGitHubSkillSourceLink(document: String): String {
     return canonical
 }
 
+/** Re-reads and validates the installed origin before any network check or replacement. */
+internal fun parseGitHubSkillUpdateSource(document: String): Pair<PublicGitHubSkillLocation, String> {
+    parseGitHubSkillSourceLink(document)
+    val fields = Json.parseToJsonElement(document).jsonObject
+    fun value(key: String) = fields.getValue(key).jsonPrimitive.content
+    val source = PublicGitHubSkillLocation.parse(
+        "https://github.com/${value("owner")}/${value("repository")}/tree/${value("source_ref")}/${value("directory")}",
+    )
+    return source to value("commit")
+}
+
 /** Fetches a single public GitHub skill folder, then delegates admission to the existing
  * ZIP importer. No desktop Python, Git binary, remote execution or hidden cloud service. */
 @Singleton
@@ -122,8 +133,36 @@ internal class LocalGitHubSkillImporter @Inject constructor(
 ) {
     suspend fun install(link: String): String = withContext(Dispatchers.IO) {
         val source = PublicGitHubSkillLocation.parse(link)
-        // Pin the branch before downloading files; a branch update cannot mix revisions.
         val commit = resolveCommit(source)
+        skills.importSkill("github-skill.zip", download(source, commit))
+    }
+
+    suspend fun availableUpdate(id: String): String? = withContext(Dispatchers.IO) {
+        val document = skills.githubSourceEvidence(id)
+            ?: throw IllegalArgumentException("此技能没有可验证的 GitHub 来源")
+        val (source, currentCommit) = parseGitHubSkillUpdateSource(document)
+        resolveCommit(source).takeUnless { it == currentCommit }
+    }
+
+    suspend fun updateInstalled(id: String, expectedCommit: String): String = withContext(Dispatchers.IO) {
+        require(expectedCommit.matches(Regex("[0-9a-f]{40}"))) { "更新版本无效" }
+        val document = skills.githubSourceEvidence(id)
+            ?: throw IllegalArgumentException("此技能没有可验证的 GitHub 来源")
+        val (source, currentCommit) = parseGitHubSkillUpdateSource(document)
+        val latest = resolveCommit(source)
+        require(latest == expectedCommit && latest != currentCommit) {
+            "远端版本已变化，请重新检查更新"
+        }
+        skills.replaceSkillPackage(id, download(source, latest))
+    }
+
+    fun canRollback(id: String): Boolean = skills.canRollbackSkill(id)
+    suspend fun rollback(id: String): String = withContext(Dispatchers.IO) {
+        skills.rollbackSkill(id)
+    }
+
+    private suspend fun download(source: PublicGitHubSkillLocation, commit: String): ByteArray {
+        // All file downloads are pinned to one immutable GitHub commit.
         val pinned = source.copy(ref = commit)
         val files = linkedMapOf<String, ByteArray>()
         var totalBytes = 0L
@@ -170,7 +209,7 @@ internal class LocalGitHubSkillImporter @Inject constructor(
                 zip.closeEntry()
             }
         }
-        skills.importSkill("github-skill.zip", zipped.toByteArray())
+        return zipped.toByteArray()
     }
 
     /** A share link is a read-only local fact; it never fetches a branch or installs anything. */
