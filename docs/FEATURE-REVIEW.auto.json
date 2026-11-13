@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "snapshot": "47ab379f7681",
+  "snapshot": "51447ab5cab8",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1914,
-  "production_sources_scanned": 1118,
+  "code_files_scanned": 1917,
+  "production_sources_scanned": 1120,
   "feature_nodes": 553,
   "functional_leaves": 456,
   "existing_executable_test_mappings": 271,
@@ -9326,10 +9326,18 @@
   "followup_production_or_compatibility": 7,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "aae6a1b86fad",
-    "added_production_files": [],
+    "baseline": "47ab379f7681",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupFlow.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupModel.kt"
+    ],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/FirstLaunchOnboarding.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AgentDeviceSettingsSections.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
