@@ -170,6 +170,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
                 put("resolution", resolution); put("path_choices", choices)
                 put("quality_decision", decision)
                 put("allowed_paths", kotlinx.serialization.json.JsonArray(allowedPaths.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+                put("required_outputs", kotlinx.serialization.json.JsonArray(allowedPaths.map { kotlinx.serialization.json.JsonPrimitive(it) }))
             })
         } finally { lease?.close() }
     }
