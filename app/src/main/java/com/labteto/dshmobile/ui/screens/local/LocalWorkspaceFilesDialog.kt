@@ -104,6 +104,7 @@ internal fun LocalWorkspaceFilesDialog(
     sessionId: String,
     workspacePath: String,
     loadWorkspace: suspend () -> List<LocalWorkspaceFile>,
+    saveToDownloads: suspend (String) -> String = { error("下载目录保存功能不可用") },
     loadDirectory: suspend (String) -> List<LocalWorkspaceDirectoryEntry> = { emptyList() },
     loadDirectoryPage: suspend (String, Int) -> LocalWorkspaceDirectoryPage = { path, offset ->
         if (offset == 0) LocalWorkspaceDirectoryPage(loadDirectory(path), null)
@@ -176,6 +177,8 @@ internal fun LocalWorkspaceFilesDialog(
     var selecting by rememberSaveable(mode, sessionId, section, directory) { mutableStateOf(false) }
     val selected = remember(mode, sessionId, section, directory) { mutableStateListOf<String>() }
     var sharing by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var savedLocation by remember(mode, sessionId, section, directory) { mutableStateOf<String?>(null) }
     var shareError by remember(mode, sessionId, section, directory) { mutableStateOf<String?>(null) }
     var gitSheetOpen by remember(mode, sessionId) { mutableStateOf(false) }
     var gitIsLocal by remember(mode, sessionId) { mutableStateOf(false) }
@@ -255,6 +258,40 @@ internal fun LocalWorkspaceFilesDialog(
             } finally {
                 sharing = false
             }
+        }
+    }
+
+    fun save(paths: List<String>) {
+        if (saving || paths.isEmpty()) return
+        saving = true
+        shareError = null
+        savedLocation = null
+        scope.launch {
+            val exported = mutableListOf<String>()
+            try {
+                for (path in paths.distinct()) exported += saveToDownloads(path)
+                savedLocation = if (exported.size == 1) {
+                    "已保存：${exported.single()}"
+                } else {
+                    "已保存 ${exported.size} 个文件到 Download/神言神语"
+                }
+                selected.clear()
+                selecting = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                shareError = "已保存 ${exported.size} 个文件；剩余文件保存失败：${failure.message.orEmpty()}"
+            } finally {
+                saving = false
+            }
+        }
+    }
+
+    fun openDownloads() {
+        try {
+            context.startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS))
+        } catch (failure: android.content.ActivityNotFoundException) {
+            shareError = "当前设备没有可打开下载目录的应用"
         }
     }
 
@@ -850,8 +887,16 @@ internal fun LocalWorkspaceFilesDialog(
                                 text = stringResource(R.string.local_files_share_selected),
                                 onClick = { share(selected.toList()) },
                                 modifier = Modifier.weight(1f),
-                                enabled = selected.isNotEmpty() && !sharing,
+                                enabled = selected.isNotEmpty() && !sharing && !saving,
                                 size = SyButtonSize.Small,
+                            )
+                            SyButton(
+                                text = "保存到下载",
+                                onClick = { save(selected.toList()) },
+                                modifier = Modifier.weight(1f),
+                                enabled = selected.isNotEmpty() && !sharing && !saving,
+                                size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Outline,
                             )
                         }
                     } else {
@@ -876,8 +921,31 @@ internal fun LocalWorkspaceFilesDialog(
                         SyButton(
                             text = stringResource(R.string.local_files_share_one),
                             onClick = { share(listOf(preview!!.file.path)) },
-                            enabled = !sharing,
+                            enabled = !sharing && !saving,
                             size = SyButtonSize.Small,
+                        )
+                        SyButton(
+                            text = "保存到下载",
+                            onClick = { save(listOf(preview!!.file.path)) },
+                            enabled = !saving && !sharing,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                        )
+                    }
+                }
+                savedLocation?.let { location ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                    ) {
+                        Text(location, modifier = Modifier.weight(1f),
+                            style = DsType.small13.withReadingWeight())
+                        SyButton(
+                            text = "查看下载",
+                            onClick = ::openDownloads,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
                         )
                     }
                 }
