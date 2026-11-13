@@ -196,7 +196,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
-      "sha256": "f57668d34247a22c"
+      "sha256": "04dbfdddc3949d6f"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalChatGroupUiAdapter.kt",
@@ -4664,12 +4664,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "e6845926d18d",
+  "source_snapshot": "4f778a24717e",
   "observed_delta": {
-    "baseline": "4a06ad54c651",
+    "baseline": "e6845926d18d",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
