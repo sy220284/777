@@ -69,6 +69,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.session.LocalSessionSectionSnapshot
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -120,6 +121,12 @@ internal fun LocalModeDrawer(
     drawerOpen: Boolean,
     pinnedSessionIds: Set<String>,
     sessionTitleOverrides: Map<String, String>,
+    sectionCatalog: LocalSessionSectionSnapshot,
+    onCreateSection: (String) -> Boolean,
+    onRenameSection: (String, String) -> Boolean,
+    onDeleteSection: (String) -> Boolean,
+    onMoveSection: (String, Int) -> Boolean,
+    onAssignSessionSection: (Set<String>, String?) -> Boolean,
     currentGalleryId: String?,
     currentGalleryStoryId: String?,
     currentPersonaName: String,
@@ -201,6 +208,11 @@ internal fun LocalModeDrawer(
     }
     var selectionOpen by remember { mutableStateOf(false) }
     var renameTargetId by remember { mutableStateOf<String?>(null) }
+    var createSectionDialog by remember { mutableStateOf(false) }
+    var renameSectionId by remember { mutableStateOf<String?>(null) }
+    var deleteSectionId by remember { mutableStateOf<String?>(null) }
+    var moveSelectedDialog by remember { mutableStateOf(false) }
+    var sectionError by remember { mutableStateOf<String?>(null) }
     var deleteCandidateIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     val searchFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -317,6 +329,17 @@ internal fun LocalModeDrawer(
             includeOtherModes = crossModeSearch,
             preSortedByUpdatedAt = true,
         )
+    }
+    val visibleSectionGroups = remember(sectionCatalog, sessionSections, searchOpen, historyQuery) {
+        sectionCatalog.sections.mapNotNull { section ->
+            val grouped = sessionSections.recent.filter { sectionCatalog.assignments[it.id] == section.id }
+            if (searchOpen && historyQuery.isNotBlank() && grouped.isEmpty()) null
+            else section to grouped
+        }
+    }
+    val ungroupedRecent = remember(sectionCatalog, sessionSections) {
+        val knownIds = sectionCatalog.sections.mapTo(hashSetOf()) { it.id }
+        sessionSections.recent.filter { sectionCatalog.assignments[it.id] !in knownIds }
     }
     val matchedPersonas = remember(gallery, historyQuery, crossModeSearch) {
         if (crossModeSearch) localDrawerMatchingPersonas(gallery, historyQuery) else emptyList()
