@@ -3484,7 +3484,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureUiActions.kt",
-      "sha256": "b5d93c32b86aae90"
+      "sha256": "13da915e34607813"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalGeneratedMediaMessage.kt",
@@ -3520,7 +3520,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "sha256": "e38d0645892f89a1"
+      "sha256": "a0cf1f6a0cca34c7"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStreamingComponents.kt",
@@ -3528,7 +3528,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "sha256": "16812525b75e37d1"
+      "sha256": "0e1b955533c1bcb7"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModelDefaults.kt",
@@ -3656,7 +3656,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkUiContribution.kt",
-      "sha256": "f0f7b4641714e101"
+      "sha256": "85efd0aef73118fa"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt",
@@ -4664,15 +4664,16 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "c8026d6c05dd",
+  "source_snapshot": "f6013a7fb23d",
   "observed_delta": {
-    "baseline": "69b63dd8fb88",
+    "baseline": "c8026d6c05dd",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/uicontract/FilesUiPort.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureUiActions.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkUiContribution.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
