@@ -571,14 +571,130 @@ internal fun LocalModeDrawer(
                     }
                 }
 
-                if (sessionSections.recent.isNotEmpty()) {
+                if (!searchOpen || historyQuery.isBlank()) {
+                    item(key = "section-create-action") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = SyMetric.gapSm),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "会话分区",
+                                style = DsType.drawerSection.withReadingWeight(),
+                                color = colors.textSecondary,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(onClick = { createSectionDialog = true }) {
+                                Text("新建分区")
+                            }
+                        }
+                    }
+                }
+                visibleSectionGroups.forEach { (section, grouped) ->
+                    item(key = "section-title:" + section.id) {
+                        var menuOpen by remember(section.id) { mutableStateOf(false) }
+                        val sectionIndex = sectionCatalog.sections.indexOfFirst { it.id == section.id }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                section.title,
+                                style = DsType.drawerSection.withReadingWeight(),
+                                color = colors.textSecondary,
+                                modifier = Modifier.weight(1f).padding(start = SyMetric.gapMd),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                grouped.size.toString(),
+                                style = DsType.navigationSupporting.withReadingWeight(),
+                                color = colors.textTertiary,
+                            )
+                            TextButton(onClick = { menuOpen = true }) {
+                                Text("管理")
+                            }
+                            com.labteto.dshmobile.ui.shenyan.SyPopupMenu(
+                                expanded = menuOpen,
+                                onDismiss = { menuOpen = false },
+                                items = listOfNotNull(
+                                    com.labteto.dshmobile.ui.shenyan.SyMenuItem(
+                                        text = "重命名分区",
+                                        icon = FeatherIcons.Edit3,
+                                        onClick = { menuOpen = false; renameSectionId = section.id },
+                                    ),
+                                    if (sectionIndex > 0) com.labteto.dshmobile.ui.shenyan.SyMenuItem(
+                                        text = "向上移动",
+                                        icon = FeatherIcons.ArrowUp,
+                                        onClick = {
+                                            menuOpen = false
+                                            try {
+                                                onMoveSection(section.id, sectionIndex - 1)
+                                                sectionError = null
+                                            } catch (failure: Exception) {
+                                                sectionError = failure.message ?: "分区移动失败"
+                                            }
+                                        },
+                                    ) else null,
+                                    if (sectionIndex < sectionCatalog.sections.lastIndex) com.labteto.dshmobile.ui.shenyan.SyMenuItem(
+                                        text = "向下移动",
+                                        icon = FeatherIcons.ArrowDown,
+                                        onClick = {
+                                            menuOpen = false
+                                            try {
+                                                onMoveSection(section.id, sectionIndex + 1)
+                                                sectionError = null
+                                            } catch (failure: Exception) {
+                                                sectionError = failure.message ?: "分区移动失败"
+                                            }
+                                        },
+                                    ) else null,
+                                    com.labteto.dshmobile.ui.shenyan.SyMenuItem(
+                                        text = "删除分区",
+                                        icon = FeatherIcons.Trash2,
+                                        danger = true,
+                                        onClick = { menuOpen = false; deleteSectionId = section.id },
+                                    ),
+                                ),
+                            )
+                        }
+                    }
+                    itemsIndexed(grouped, key = { _, item -> "section:" + section.id + ":" + item.id }) { _, session ->
+                        LocalSessionDrawerRow(
+                            session = session,
+                            displayTitle = sessionTitleOverrides[session.id] ?: session.title,
+                            galleryEntry = session.galleryId?.let { galleryById[it] },
+                            current = session.id == currentSessionId,
+                            pinned = false,
+                            running = running && session.id == currentSessionId,
+                            selected = session.id in selectedIds,
+                            selectionOpen = selectionOpen,
+                            onClick = {
+                                if (selectionOpen) {
+                                    if (session.id in selectedIds) selectedIds.remove(session.id)
+                                    else selectedIds.add(session.id)
+                                } else {
+                                    onSwitchSession(session.id)
+                                }
+                            },
+                            onSelectMultiple = {
+                                if (session.id !in selectedIds) selectedIds.add(session.id)
+                                selectionOpen = true
+                            },
+                            onRename = { renameTargetId = session.id },
+                            onTogglePinned = { onTogglePinSession(session.id) },
+                            onDelete = { deleteCandidateIds = setOf(session.id) },
+                        )
+                    }
+                }
+
+                if (ungroupedRecent.isNotEmpty()) {
                     item(key = "drawer-recent-heading") {
                         DrawerSectionTitle(
                             title = stringResource(R.string.local_drawer_recent),
-                            count = sessionSections.recent.size,
+                            count = ungroupedRecent.size,
                         )
                     }
-                    itemsIndexed(sessionSections.recent, key = { _, item -> "recent:" + item.id }) { _, session ->
+                    itemsIndexed(ungroupedRecent, key = { _, item -> "recent:" + item.id }) { _, session ->
                         LocalSessionDrawerRow(
                             session = session,
                             displayTitle = sessionTitleOverrides[session.id] ?: session.title,
@@ -612,7 +728,8 @@ internal fun LocalModeDrawer(
                 }
 
                 if (crossModeSearch && matchedPersonas.isEmpty() && matchedTasks.isEmpty() &&
-                    matchedFiles.isEmpty() && sessionSections.pinned.isEmpty() && sessionSections.recent.isEmpty() &&
+                    matchedFiles.isEmpty() && sessionSections.pinned.isEmpty() && ungroupedRecent.isEmpty() &&
+                    visibleSectionGroups.all { it.second.isEmpty() } &&
                     !fileSearchFailed) {
                     item(key = "drawer-no-sessions") {
                         Text(
