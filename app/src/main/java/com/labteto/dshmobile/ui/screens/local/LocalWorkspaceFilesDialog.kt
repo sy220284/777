@@ -118,6 +118,7 @@ internal fun LocalWorkspaceFilesDialog(
     observeChanges: (List<String>) -> kotlinx.coroutines.flow.Flow<LocalWorkspaceFileChange> =
         { kotlinx.coroutines.flow.emptyFlow() },
     remoteGitBranches: (suspend (String) -> List<String>)? = null,
+    compareLocalGit: (suspend (String) -> LocalRemoteGitDiffUi)? = null,
     compareRemoteGit: (suspend (String, String, String) -> LocalRemoteGitDiffUi)? = null,
     findIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview?)? = null,
     runIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview)? = null,
@@ -170,6 +171,7 @@ internal fun LocalWorkspaceFilesDialog(
     var sharing by remember { mutableStateOf(false) }
     var shareError by remember(mode, sessionId, section, directory) { mutableStateOf<String?>(null) }
     var gitSheetOpen by remember(mode, sessionId) { mutableStateOf(false) }
+    var gitIsLocal by remember(mode, sessionId) { mutableStateOf(false) }
     var gitLoading by remember(mode, sessionId) { mutableStateOf(false) }
     var gitError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
     var gitRepository by remember(mode, sessionId) { mutableStateOf(".") }
@@ -240,10 +242,48 @@ internal fun LocalWorkspaceFilesDialog(
         }
     }
 
+    /** Review current tracked edits directly, even when the repo has no remote. */
+    fun openLocalGitComparison() {
+        val compare = compareLocalGit ?: return
+        gitJob?.cancel()
+        gitRepository = directory.ifBlank { "." }
+        gitIsLocal = true
+        gitSheetOpen = true
+        gitBranches = emptyList()
+        gitSelectedRef = null
+        gitResult = null
+        gitError = null
+        codeReview = null
+        codeReviewError = null
+        gitJob = scope.launch {
+            gitLoading = true
+            try {
+                val diff = compare(gitRepository)
+                gitResult = diff
+                if (!diff.truncated && diff.patch.isNotBlank()) {
+                    try {
+                        codeReview = findIndependentCodeReview?.invoke(sessionId, gitRepository, diff)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        codeReviewError = failure.message ?: "读取历史代码审查记录失败"
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                gitError = failure.message ?: "读取本地 Git 修改失败"
+            } finally {
+                gitLoading = false
+            }
+        }
+    }
+
     fun openGitComparison() {
         val listBranches = remoteGitBranches ?: return
         gitJob?.cancel()
         gitRepository = directory.ifBlank { "." }
+        gitIsLocal = false
         gitSheetOpen = true
         gitError = null
         gitSelectedRef = null
@@ -632,12 +672,20 @@ internal fun LocalWorkspaceFilesDialog(
                 }
 
                 if (mode == LocalFilesMode.WORKSPACE && preview == null && !selecting &&
-                    remoteGitBranches != null && compareRemoteGit != null) {
+                    (compareLocalGit != null || (remoteGitBranches != null && compareRemoteGit != null))) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
-                        horizontalArrangement = Arrangement.End,
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm, Alignment.End),
                     ) {
-                        SyButton(
+                        if (compareLocalGit != null) SyButton(
+                            text = "检查本地修改",
+                            onClick = ::openLocalGitComparison,
+                            enabled = !loading,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                            modifier = Modifier.testTag("work_local_git_diff"),
+                        )
+                        if (remoteGitBranches != null && compareRemoteGit != null) SyButton(
                             text = "对比远端分支",
                             onClick = ::openGitComparison,
                             enabled = !loading,
@@ -877,8 +925,9 @@ internal fun LocalWorkspaceFilesDialog(
     if (gitSheetOpen) {
         val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
         SyResponsiveSheet(
-            title = "比较远端分支",
-            subtitle = "只读取已获取的本地远端分支，不会自动联网",
+            title = if (gitIsLocal) "检查本地修改" else "比较远端分支",
+            subtitle = if (gitIsLocal) "包括暂存与未暂存的已跟踪文件，不联网，不自动提交"
+                else "只读取已获取的本地远端分支，不会自动联网",
             onDismiss = { gitJob?.cancel(); gitSheetOpen = false },
             scrollable = true,
         ) {
