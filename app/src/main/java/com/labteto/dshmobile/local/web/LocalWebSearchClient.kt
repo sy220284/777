@@ -102,6 +102,8 @@ internal class LocalWebSearchClient(
             .build()
         val timeout = timeoutSeconds.coerceIn(15L, 900L)
         val client = http.newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
             .callTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS)
             .readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS)
             .build()
