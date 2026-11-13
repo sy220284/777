@@ -4,6 +4,8 @@ import com.shenyan.designsystem.foundation.SyMetric
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -105,6 +107,7 @@ internal fun LocalWorkspaceFilesDialog(
     workspacePath: String,
     loadWorkspace: suspend () -> List<LocalWorkspaceFile>,
     saveToDownloads: suspend (String) -> String = { error("下载目录保存功能不可用") },
+    importFromPhone: (suspend (android.net.Uri) -> String)? = null,
     loadDirectory: suspend (String) -> List<LocalWorkspaceDirectoryEntry> = { emptyList() },
     loadDirectoryPage: suspend (String, Int) -> LocalWorkspaceDirectoryPage = { path, offset ->
         if (offset == 0) LocalWorkspaceDirectoryPage(loadDirectory(path), null)
@@ -179,6 +182,8 @@ internal fun LocalWorkspaceFilesDialog(
     var sharing by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var savedLocation by remember(mode, sessionId, section, directory) { mutableStateOf<String?>(null) }
+    var importedLocation by remember(mode, sessionId) { mutableStateOf<String?>(null) }
+    var importing by remember(mode, sessionId) { mutableStateOf(false) }
     var shareError by remember(mode, sessionId, section, directory) { mutableStateOf<String?>(null) }
     var gitSheetOpen by remember(mode, sessionId) { mutableStateOf(false) }
     var gitIsLocal by remember(mode, sessionId) { mutableStateOf(false) }
@@ -705,6 +710,38 @@ internal fun LocalWorkspaceFilesDialog(
         initialFilePath?.let(onInitialFilePathConsumed)
     }
 
+    val phoneFilePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments(),
+    ) { pickedUris ->
+        val importFile = importFromPhone
+        if (importFile != null && pickedUris.isNotEmpty() && !importing) {
+            scope.launch {
+                importing = true
+                importedLocation = null
+                var completed = 0
+                var firstPath: String? = null
+                try {
+                    pickedUris.distinct().forEach { uri ->
+                        val path = importFile(uri)
+                        if (firstPath == null) firstPath = path
+                        completed++
+                    }
+                    reload()
+                    importedLocation = "已将 $completed 个手机文件导入工作区" +
+                        if (completed == 1) "：${firstPath.orEmpty()}" else ""
+                    if (completed == 1 && firstPath != null) openPreview(requireNotNull(firstPath))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    if (completed > 0) reload()
+                    importedLocation = "已导入 $completed 个文件，其余文件导入失败：${failure.message.orEmpty()}"
+                } finally {
+                    importing = false
+                }
+            }
+        }
+    }
+
     fun navigateBack() {
         invalidatePreview()
         when {
@@ -811,6 +848,22 @@ internal fun LocalWorkspaceFilesDialog(
                             onClick = ::openDownloads,
                             size = SyButtonSize.Small,
                             variant = SyButtonVariant.Outline,
+                        )
+                    }
+                }
+                if (mode == LocalFilesMode.WORKSPACE && section == -1 &&
+                    preview == null && query.isBlank() && importFromPhone != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        SyButton(
+                            text = if (importing) "导入中…" else "导入手机文件",
+                            onClick = { phoneFilePicker.launch(arrayOf("*/*")) },
+                            enabled = !importing,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                            modifier = Modifier.testTag("work_import_phone_file"),
                         )
                     }
                 }
@@ -963,6 +1016,13 @@ internal fun LocalWorkspaceFilesDialog(
                             variant = SyButtonVariant.Ghost,
                         )
                     }
+                }
+                importedLocation?.let { message ->
+                    Text(
+                        message,
+                        modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapSm),
+                        style = DsType.small13.withReadingWeight(),
+                    )
                 }
                 shareError?.let {
                     Text(
