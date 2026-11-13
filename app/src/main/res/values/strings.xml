@@ -2394,4 +2394,33 @@
     <string name="persona_v4_discard_cancel">继续编辑</string>
     <string name="usage_action_work_summary">工作背景摘要</string>
     <string name="local_transcript_load_older">加载更早对话</string>
+
+    <!-- Function-first system authorization, shared by first launch and Settings. -->
+    <string name="permission_setup_choose">你想让 777 帮你做哪些事？</string>
+    <string name="permission_setup_choose_hint">只为你选择的功能申请权限；以后可以在设置中补开。</string>
+    <string name="permission_setup_screen">操作手机界面</string>
+    <string name="permission_setup_screen_hint">使用无障碍服务读取当前控件、点击、输入和滚动；需要在系统设置中开启。</string>
+    <string name="permission_setup_read_notifications">读取手机通知</string>
+    <string name="permission_setup_read_notifications_hint">使用通知使用权读取其他应用的当前通知，与任务提醒权限分开授权。</string>
+    <string name="permission_setup_task_alerts">接收任务提醒</string>
+    <string name="permission_setup_task_alerts_hint">允许 777 发送任务进度、完成和异常提醒。</string>
+    <string name="permission_setup_begin">逐项开启</string>
+    <string name="permission_setup_later">稍后再说</string>
+    <string name="permission_setup_step_count">第 %1$d 项，共 %2$d 项</string>
+    <string name="permission_setup_open">去开启</string>
+    <string name="permission_setup_open_again">重新打开系统设置</string>
+    <string name="permission_setup_open_failed">无法打开授权页面</string>
+    <string name="permission_setup_refresh">重新检测</string>
+    <string name="permission_setup_skip">跳过这一项</string>
+    <string name="permission_setup_ready">已授权并连接</string>
+    <string name="permission_setup_waiting">已授权，等待服务连接</string>
+    <string name="permission_setup_visited">已前往设置，尚未授权</string>
+    <string name="permission_setup_not_granted">尚未授权</string>
+    <string name="permission_setup_reconnect_hint">系统已授权，但服务未连接。可重新检测；仍未连接时进入系统设置关闭后重新开启。</string>
+    <string name="permission_setup_restricted_hint">如果无障碍开关为灰色，请先进入 777 的系统应用信息，允许受限制的设置，再返回开启服务。</string>
+    <string name="permission_setup_summary">权限设置结果</string>
+    <string name="permission_setup_summary_hint">点击任意未完成项目，可以继续授权。已去过设置但没有授权的项目会保持未完成。</string>
+    <string name="permission_setup_finish">完成，进入应用</string>
+    <string name="permission_setup_retry">继续处理未完成项目</string>
+    <string name="permission_setup_entry">一键检查与授权</string>
 </resources>
