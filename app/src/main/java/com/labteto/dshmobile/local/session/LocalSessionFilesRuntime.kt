@@ -166,7 +166,7 @@ class LocalSessionFilesRuntime @Inject internal constructor(
         deliverablesDirectory: String? = null,
     ): List<String> {
         val finalPaths = withContext(Dispatchers.IO) {
-            val root = java.nio.file.Path.of(workspace.path)
+            val root = java.nio.file.Paths.get(workspace.path)
             val folderFiles = deliverablesDirectory?.let { subfolder ->
                 require(subfolder.startsWith("交付成果/") &&
                     subfolder.split('/').none { it.isBlank() || it == "." || it == ".." }) {
@@ -180,7 +180,7 @@ class LocalSessionFilesRuntime @Inject internal constructor(
                         entries.filter { java.nio.file.Files.isRegularFile(it, java.nio.file.LinkOption.NOFOLLOW_LINKS) }
                             .map { root.relativize(it).toString().replace('\\', '/') }
                             .filter { workspace.workspaceFileAt(it) != null }
-                            .toList()
+                            .collect(java.util.stream.Collectors.toList())
                     }
                 }
             }.orEmpty()
