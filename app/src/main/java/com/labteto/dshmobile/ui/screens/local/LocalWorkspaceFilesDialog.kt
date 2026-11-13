@@ -123,6 +123,7 @@ internal fun LocalWorkspaceFilesDialog(
     remoteGitBranches: (suspend (String) -> List<String>)? = null,
     compareLocalGit: (suspend (String, Boolean) -> LocalRemoteGitDiffUi)? = null,
     compareRemoteGit: (suspend (String, String, String) -> LocalRemoteGitDiffUi)? = null,
+    compareCommitGit: (suspend (String, String) -> LocalRemoteGitDiffUi)? = null,
     findIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview?)? = null,
     runIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview)? = null,
     acceptIndependentCodeReview: (suspend (String, String, com.labteto.dshmobile.local.work.LocalIndependentCodeReview, LocalRemoteGitDiffUi) -> Boolean)? = null,
@@ -178,6 +179,8 @@ internal fun LocalWorkspaceFilesDialog(
     var shareError by remember(mode, sessionId, section, directory) { mutableStateOf<String?>(null) }
     var gitSheetOpen by remember(mode, sessionId) { mutableStateOf(false) }
     var gitIsLocal by remember(mode, sessionId) { mutableStateOf(false) }
+    var gitIsCommit by remember(mode, sessionId) { mutableStateOf(false) }
+    var gitCommitInput by remember(mode, sessionId) { mutableStateOf("") }
     var projectsSheetOpen by remember(mode, sessionId) { mutableStateOf(false) }
     var gitIncludeUntracked by remember(mode, sessionId) { mutableStateOf(false) }
     var gitLoading by remember(mode, sessionId) { mutableStateOf(false) }
@@ -261,6 +264,7 @@ internal fun LocalWorkspaceFilesDialog(
         gitJob?.cancel()
         gitRepository = directory.ifBlank { "." }
         gitIsLocal = true
+        gitIsCommit = false
         gitSheetOpen = true
         gitBranches = emptyList()
         gitSelectedRef = null
@@ -306,6 +310,7 @@ internal fun LocalWorkspaceFilesDialog(
         gitJob?.cancel()
         gitRepository = directory.ifBlank { "." }
         gitIsLocal = false
+        gitIsCommit = false
         gitSheetOpen = true
         gitError = null
         gitSelectedRef = null
@@ -372,6 +377,67 @@ internal fun LocalWorkspaceFilesDialog(
                 throw cancelled
             } catch (failure: Exception) {
                 gitError = failure.message ?: "比较远端分支失败"
+            } finally {
+                gitLoading = false
+            }
+        }
+    }
+
+
+    /** A single advanced target field, using the same review and approval pipeline as other diffs. */
+    fun openCommitComparison() {
+        if (compareCommitGit == null) return
+        gitJob?.cancel()
+        gitRepository = directory.ifBlank { "." }
+        gitIsLocal = false
+        gitIsCommit = true
+        gitSheetOpen = true
+        gitCommitInput = ""
+        gitBranches = emptyList()
+        gitSelectedRef = null
+        gitResult = null
+        gitError = null
+        codeReview = null
+        codeReviewError = null
+        securityReview = null
+        securityReviewError = null
+    }
+
+    fun loadCommitComparison() {
+        val compare = compareCommitGit ?: return
+        val commit = gitCommitInput.trim()
+        if (commit.isEmpty()) {
+            gitError = "请粘贴要审查的 Git 提交哈希"
+            return
+        }
+        gitJob?.cancel()
+        gitJob = scope.launch {
+            gitLoading = true
+            gitError = null
+            gitResult = null
+            gitSelectedRef = null
+            codeReview = null
+            codeReviewError = null
+            securityReview = null
+            securityReviewError = null
+            try {
+                val diff = compare(gitRepository, commit)
+                gitResult = diff
+                gitSelectedRef = diff.trackingRef
+                if (!diff.truncated && diff.patch.isNotBlank()) {
+                    try {
+                        codeReview = findIndependentCodeReview?.invoke(sessionId, gitRepository, diff)
+                        securityReview = findIndependentSecurityReview?.invoke(sessionId, gitRepository, diff)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        codeReviewError = failure.message ?: "读取历史审查失败"
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                gitError = failure.message ?: "读取指定提交失败"
             } finally {
                 gitLoading = false
             }
@@ -721,10 +787,12 @@ internal fun LocalWorkspaceFilesDialog(
                     }
                 }
                 if (mode == LocalFilesMode.WORKSPACE && preview == null && !selecting &&
-                    (compareLocalGit != null || (remoteGitBranches != null && compareRemoteGit != null))) {
-                    Row(
+                    (compareLocalGit != null || compareCommitGit != null ||
+                        (remoteGitBranches != null && compareRemoteGit != null))) {
+                    androidx.compose.foundation.layout.FlowRow(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
                         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm, Alignment.End),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                     ) {
                         if (compareLocalGit != null) SyButton(
                             text = "检查本地修改",
@@ -740,6 +808,14 @@ internal fun LocalWorkspaceFilesDialog(
                             enabled = !loading,
                             size = SyButtonSize.Small,
                             variant = SyButtonVariant.Ghost,
+                        )
+                        if (compareCommitGit != null) SyButton(
+                            text = "审查指定提交",
+                            onClick = ::openCommitComparison,
+                            enabled = !loading,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
+                            modifier = Modifier.testTag("work_git_commit_review_open"),
                         )
                     }
                 }
@@ -1025,13 +1101,35 @@ internal fun LocalWorkspaceFilesDialog(
     if (gitSheetOpen) {
         val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
         SyResponsiveSheet(
-            title = if (gitIsLocal) "检查本地修改" else "比较远端分支",
-            subtitle = if (gitIsLocal) "包括暂存与未暂存的已跟踪文件，不联网，不自动提交"
-                else "只读取已获取的本地远端分支，不会自动联网",
+            title = when {
+                gitIsCommit -> "审查指定提交"
+                gitIsLocal -> "检查本地修改"
+                else -> "比较远端分支"
+            },
+            subtitle = when {
+                gitIsCommit -> "审查已存在的 Git 提交，合并提交使用第一父提交作为基线；不联网"
+                gitIsLocal -> "包括暂存与未暂存的已跟踪文件，不联网，不自动提交"
+                else -> "只读取已获取的本地远端分支，不会自动联网"
+            },
             onDismiss = { gitJob?.cancel(); gitSheetOpen = false },
             scrollable = true,
         ) {
             Text("仓库目录：$gitRepository", style = DsType.small13, color = colors.textSecondary)
+            if (gitIsCommit && compareCommitGit != null) {
+                SySearchField(
+                    gitCommitInput, { gitCommitInput = it.take(64) },
+                    placeholder = "粘贴 Git 提交哈希",
+                    modifier = Modifier.fillMaxWidth().testTag("work_git_commit_input"),
+                )
+                SyButton(
+                    text = if (gitLoading) "正在读取…" else "读取提交差异",
+                    onClick = ::loadCommitComparison,
+                    enabled = !gitLoading && gitCommitInput.trim().length >= 7,
+                    modifier = Modifier.fillMaxWidth().testTag("work_git_commit_load"),
+                )
+                Text("只接受仓库中已有的提交哈希，支持首次提交；提交内容变化时历史审查不会误复用。",
+                    style = DsType.caption11, color = colors.textSecondary)
+            }
             if (gitIsLocal && compareLocalGit != null) {
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
