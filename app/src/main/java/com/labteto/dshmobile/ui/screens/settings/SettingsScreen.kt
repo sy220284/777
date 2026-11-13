@@ -61,8 +61,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -350,7 +348,7 @@ fun SettingsScreen(
         }
     }
 
-    BackHandler(enabled = handleRootSystemBack || page != SettingsDestination.ROOT) { navigateBack() }
+    BackHandler(enabled = !showPermissionSetup && (handleRootSystemBack || page != SettingsDestination.ROOT)) { navigateBack() }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         if (page == SettingsDestination.ACCOUNT) viewModel.refreshChatGpt()
     }
@@ -408,18 +406,14 @@ fun SettingsScreen(
     }
 
     if (showPermissionSetup) {
-        Dialog(
-            onDismissRequest = { showPermissionSetup = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            PermissionSetupFlow(
-                onFinished = {
-                    showPermissionSetup = false
-                    viewModel.refreshDeviceCapabilities()
-                },
-                onBack = { showPermissionSetup = false },
-            )
-        }
+        PermissionSetupFlow(
+            onFinished = {
+                showPermissionSetup = false
+                viewModel.refreshDeviceCapabilities()
+            },
+            onBack = { showPermissionSetup = false },
+        )
+        return
     }
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Box {
