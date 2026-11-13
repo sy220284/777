@@ -29,6 +29,20 @@ data class UiSettingsSnapshot(
     val personaBannedPhrases: List<String> = emptyList(),
 ) { val modelProfiles: List<LocalModelProfile> get() = modelSelection.profiles }
 
+
+/** Read-only projection: Settings explains active execution restrictions without exposing policy files. */
+data class UiExecutionPolicySnapshot(
+    val networkEnabled: Boolean,
+    val allowedHosts: List<String>?,
+    val deniedHosts: List<String>,
+    val allowedModelProviders: List<String>?,
+    val browserHistoryEnabled: Boolean,
+    val browserUploadEnabled: Boolean,
+    val browserDownloadEnabled: Boolean,
+    val browserControlEnabled: Boolean,
+    val managedRestrictions: List<String>,
+)
+
 /** Workflow APIs retain their original owners. No credentials or mutable stores are returned. */
 interface SettingsUiPort {
     val state: Flow<UiSettingsSnapshot>

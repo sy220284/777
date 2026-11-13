@@ -73,6 +73,7 @@ import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.AppSettings
+import com.labteto.dshmobile.uicontract.UiExecutionPolicySnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
@@ -434,6 +435,15 @@ fun SettingsScreen(
         } else {
             null
         }
+    }
+
+    var executionPolicyRefresh by remember { mutableStateOf(0) }
+    val executionPolicyResult by produceState<Result<UiExecutionPolicySnapshot>?>(
+        initialValue = null, key1 = page, key2 = executionPolicyRefresh,
+    ) {
+        value = if (page == SettingsDestination.ADVANCED) {
+            withContext(Dispatchers.IO) { runCatching { viewModel.executionPolicySummary() } }
+        } else null
     }
 
     val title = when (page) {
@@ -1068,6 +1078,61 @@ fun SettingsScreen(
                                 icon = SyEntryIcons.Advanced,
                                 title = stringResource(R.string.settings_runtime_diagnostics),
                                 onClick = { openPage(SettingsDestination.DIAGNOSTICS) },
+                            )
+                        }
+                        SettingsCard("运行权限与管理策略") {
+                            val policy = executionPolicyResult?.getOrNull()
+                            val failure = executionPolicyResult?.exceptionOrNull()
+                            when {
+                                failure != null -> Text(
+                                    "策略加载失败：${failure.message ?: "配置无效，请检查管理策略文件"}",
+                                    style = DsType.caption11.withReadingWeight(),
+                                    color = colors.dangerInk,
+                                )
+                                policy == null -> Text(
+                                    "正在读取当前执行策略…",
+                                    style = DsType.caption11.withReadingWeight(),
+                                    color = colors.textSecondary,
+                                )
+                                else -> {
+                                    Text(
+                                        "网络：${if (policy.networkEnabled) "可用" else "已限制"}；" +
+                                            "浏览器控制：${if (policy.browserControlEnabled) "允许" else "未授权"}",
+                                        style = DsType.std14.withReadingWeight(),
+                                        color = colors.textPrimary,
+                                    )
+                                    Text(
+                                        "浏览器上传 / 下载 / 历史：${if (policy.browserUploadEnabled) "允许" else "限制"} / " +
+                                            "${if (policy.browserDownloadEnabled) "允许" else "限制"} / " +
+                                            "${if (policy.browserHistoryEnabled) "允许" else "限制"}",
+                                        style = DsType.caption11.withReadingWeight(),
+                                        color = colors.textSecondary,
+                                    )
+                                    policy.allowedModelProviders?.let { providers ->
+                                        Text("可用模型来源：${providers.joinToString().ifBlank { "全部受限" }}",
+                                            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                                    }
+                                    policy.allowedHosts?.let { hosts ->
+                                        Text("网络允许列表：${hosts.joinToString().ifBlank { "全部受限" }}",
+                                            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                                    }
+                                    if (policy.deniedHosts.isNotEmpty()) Text(
+                                        "被限制的域名：${policy.deniedHosts.joinToString()}",
+                                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary,
+                                    )
+                                    Text(
+                                        if (policy.managedRestrictions.isEmpty()) "当前没有管理策略锁定字段"
+                                        else "管理策略锁定：${policy.managedRestrictions.joinToString("、")}",
+                                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary,
+                                    )
+                                }
+                            }
+                            SyButton(
+                                text = "重新检查",
+                                onClick = { executionPolicyRefresh++ },
+                                size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Ghost,
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
                     }

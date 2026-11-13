@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.LocalWebProvider
+import com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy
+import com.labteto.dshmobile.uicontract.UiExecutionPolicySnapshot
 import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
@@ -38,6 +40,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     private val web: LocalWebProvider,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val approvalPreferences: LocalApprovalPreferences,
+    private val executionPolicy: LocalManagedExecutionPolicy,
     runtimeStateStore: LocalRuntimeStateStore,
 ) : com.labteto.dshmobile.uicontract.SettingsUiPort {
     private val runtimeState = runtimeStateStore.state
@@ -92,6 +95,31 @@ class LocalSettingsRuntime @Inject internal constructor(
     override suspend fun cancelStagedSessionRestore() = sessionStorage.cancelStagedRestore()
     override suspend fun stageLegacySessionRestore(archive: java.io.InputStream) =
         sessionStorage.stageLegacyRestoreStorage(archive)
+    /** Read the current effective policy each time; never cache a stale grant or expose secrets. */
+    internal fun executionPolicySummary(): UiExecutionPolicySnapshot {
+        val policy = executionPolicy.current()
+        val names = mapOf(
+            "network.enabled" to "网络访问开关",
+            "network.allowedHosts" to "可连接域名",
+            "network.deniedHosts" to "禁止连接域名",
+            "model.allowedProviders" to "模型供应商",
+            "browser.history" to "浏览历史访问",
+            "browser.upload" to "浏览器上传",
+            "browser.download" to "浏览器下载",
+            "browser.control" to "浏览器操作",
+        )
+        return UiExecutionPolicySnapshot(
+            networkEnabled = policy.networkEnabled,
+            allowedHosts = policy.allowedHosts?.sorted(),
+            deniedHosts = policy.deniedHosts.sorted(),
+            allowedModelProviders = policy.allowedModelProviders?.sorted(),
+            browserHistoryEnabled = policy.browserHistoryAllowed,
+            browserUploadEnabled = policy.browserUploadAllowed,
+            browserDownloadEnabled = policy.browserDownloadAllowed,
+            browserControlEnabled = policy.browserControlAllowed,
+            managedRestrictions = policy.managedFields.sorted().map { names.getValue(it) },
+        )
+    }
     override suspend fun environmentInfo() = diagnostics.environmentInfo()
     override suspend fun diagnosticReport() = diagnostics.diagnosticReport()
     override fun clearCredential() = modelRuntime.clearCredential()

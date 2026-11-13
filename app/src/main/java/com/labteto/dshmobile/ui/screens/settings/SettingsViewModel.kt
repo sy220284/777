@@ -23,6 +23,7 @@ import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.local.presentation.LocalSettingsDataFacade
 import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
+import com.labteto.dshmobile.uicontract.UiExecutionPolicySnapshot
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_DIR
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_FILE
@@ -103,6 +104,8 @@ class SettingsViewModel @Inject constructor(
     fun set(transform: (AppSettings) -> AppSettings) {
         viewModelScope.launch { hostsStore.setSetting(transform) }
     }
+
+    fun executionPolicySummary(): UiExecutionPolicySnapshot = localHarness.executionPolicySummary()
 
     fun configureApprovalMode(mode: LocalApprovalMode) = localHarness.configureApprovalMode(mode)
 
