@@ -21,7 +21,7 @@ import kotlinx.serialization.json.jsonPrimitive
 internal class LocalWorkBuiltinToolRuntime(
     private val persist: (LocalWorkRunBinding) -> Unit,
     private val workspaceRoot: java.io.File? = null,
-    private val publishVerifiedDeliverables: suspend (String, List<String>, String?) -> List<String> = { _, _, _ -> emptyList() },
+    private val publishVerifiedDeliverables: suspend (String, List<String>, String?) -> List<String> = { _, _, _ -> error("Work 成果发布能力未接入") },
 ) {
     internal suspend fun execute(
         call: LocalToolCall,
