@@ -100,6 +100,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -263,6 +265,22 @@ class ToolsViewModel @Inject constructor(
 
     init {
         refresh()
+        viewModelScope.launch {
+            localTools.skillChanges().collectLatest {
+                // A directory may be created just before its SKILL.md is written.
+                delay(220)
+                operationGate.run {
+                    val skills = localTools.installedSkills()
+                    val presets = localTools.presetSkills()
+                    val activeIds = skills.map { it.name }.toSet()
+                    _state.value = _state.value.copy(
+                        skills = skills, presets = presets,
+                        pendingSkillUpdates = _state.value.pendingSkillUpdates.filterKeys { it in activeIds },
+                        upToDateSkills = _state.value.upToDateSkills.filterTo(mutableSetOf()) { it in activeIds },
+                    )
+                }
+            }
+        }
     }
 
     fun acknowledgeNotice(notice: ToolsNotice) {

@@ -12,6 +12,7 @@ import javax.inject.Singleton
 @Singleton
 class LocalToolsUiFacade @Inject internal constructor(
     private val tools: LocalToolsRuntime,
+    private val skillManager: com.labteto.dshmobile.local.tools.LocalSkillManager,
     private val agentBackends: com.labteto.dshmobile.local.agent.LocalAgentBackendRuntime,
     private val gitHubSkillImporter: com.labteto.dshmobile.local.tools.LocalGitHubSkillImporter,
     private val gitHubBrowser: com.labteto.dshmobile.local.tools.LocalGitHubCredentialManager,
@@ -142,6 +143,8 @@ class LocalToolsUiFacade @Inject internal constructor(
         val hasThirdPartyPlugin = tools.installedPluginIds().any { it != "android-local-builtins" }
         return hasMcpTools to hasThirdPartyPlugin
     }
+    /** Refresh the existing skill inventory when the real on-device skill files change. */
+    fun skillChanges(): kotlinx.coroutines.flow.Flow<Unit> = skillManager.changes()
     override suspend fun installedSkills() = withContext(Dispatchers.IO) {
         tools.installedSkills().map { item ->
             val result = runCatching { gitHubSkillImporter.installedSourceLink(item.name) }

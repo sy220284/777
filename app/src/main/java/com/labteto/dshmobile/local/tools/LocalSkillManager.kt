@@ -11,6 +11,7 @@ import java.nio.file.LinkOption
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.map
 
 /** Preset instructions use the existing SKILL.md model tool contract. */
 internal data class LocalPresetSkill(
@@ -480,6 +481,22 @@ internal class LocalSkillManager @Inject constructor(
         store.seedOnce()
     }
     fun installed(): List<LocalInstalledSkill> = store.installed()
+
+    /** Existing native observer notices external skill installs, edits and removals. */
+    fun changes(): kotlinx.coroutines.flow.Flow<Unit> =
+        com.labteto.dshmobile.local.files.watchWorkspaceFileChanges(
+            java.io.File(storageWorkspace.path),
+        ) {
+            val root = java.io.File(storageWorkspace.path, ".dsh/skills")
+            val folders = root.listFiles().orEmpty().filter {
+                it.isDirectory && !Files.isSymbolicLink(it.toPath())
+            }
+            listOf(".dsh/skills") + folders.map { ".dsh/skills/${it.name}" }
+        }.mapToSkillRefresh()
+
+    private fun kotlinx.coroutines.flow.Flow<com.labteto.dshmobile.local.files.LocalWorkspaceFileChange>
+        .mapToSkillRefresh(): kotlinx.coroutines.flow.Flow<Unit> = map { Unit }
+
     fun githubSourceEvidence(id: String): String? = store.githubSourceEvidence(id)
     fun presets(): List<LocalPresetSkill> = store.presets()
     fun install(id: String) = store.install(id)

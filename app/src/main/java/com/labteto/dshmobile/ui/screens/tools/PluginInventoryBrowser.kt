@@ -86,6 +86,24 @@ private data class InventoryRow(
     val rollbackAvailable: Boolean = false,
 )
 
+/** Match visible skill names first, then identifiers, then explanatory descriptions. */
+internal fun inventorySearchScore(query: String, name: String, id: String, detail: String): Int? {
+    val term = query.trim().lowercase()
+    if (term.isEmpty()) return 0
+    val title = name.lowercase()
+    val key = id.lowercase()
+    val body = detail.lowercase()
+    return when {
+        title == term || key == term -> 600
+        title.startsWith(term) -> 500
+        key.startsWith(term) -> 450
+        title.contains(term) -> 350
+        key.contains(term) -> 300
+        body.contains(term) -> 120
+        else -> null
+    }
+}
+
 /** Browses real installed/connected plugin inventory; does not advertise unsupported storefront apps. */
 @Composable
 internal fun PluginInventoryBrowser(
@@ -225,11 +243,9 @@ internal fun PluginInventoryBrowser(
         3 -> local.filter { it.id in setOf("local:android-device", "local:android-automation", "local:android-webhook") }
         4 -> local.filter { it.id == "local:local-vision" }
         else -> local
-    }).filter { item ->
-            query.isBlank() || item.name.contains(query.trim(), ignoreCase = true) ||
-                item.id.contains(query.trim(), ignoreCase = true) ||
-                item.detail.contains(query.trim(), ignoreCase = true)
-        }
+    }).mapNotNull { item ->
+        inventorySearchScore(query, item.name, item.id, item.detail)?.let { score -> item to score }
+    }.sortedByDescending { it.second }.map { it.first }
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(if (embedded) Modifier.fillMaxSize() else Modifier.fillMaxSize().safeDrawingPadding()) {

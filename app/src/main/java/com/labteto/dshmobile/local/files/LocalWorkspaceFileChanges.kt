@@ -67,6 +67,12 @@ internal fun workspaceFileWatchTargets(
 internal fun watchWorkspaceFileChanges(
     workspace: File,
     paths: List<String>,
+): Flow<LocalWorkspaceFileChange> = watchWorkspaceFileChanges(workspace) { paths }
+
+/** Dynamic targets keep newly created skill folders observable without a polling timer. */
+internal fun watchWorkspaceFileChanges(
+    workspace: File,
+    paths: () -> List<String>,
 ): Flow<LocalWorkspaceFileChange> = callbackFlow {
     val root = workspace.canonicalFile
     val lock = Any()
@@ -75,7 +81,7 @@ internal fun watchWorkspaceFileChanges(
     fun refresh() {
         synchronized(lock) {
             if (closed) return
-            val targets = workspaceFileWatchTargets(root, paths)
+            val targets = workspaceFileWatchTargets(root, paths())
             active.keys.filter { it !in targets }.forEach { folder ->
                 active.remove(folder)?.stopWatching()
             }
