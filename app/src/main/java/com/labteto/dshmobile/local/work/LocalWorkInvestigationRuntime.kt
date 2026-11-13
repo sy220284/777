@@ -162,6 +162,32 @@ internal object LocalWorkInvestigationRuntime {
     }
 
     /**
+     * A failed read may be followed by another successful read after recovery.
+     * All failed tools in the current turn must be known, read-only and settled.
+     * Unknown or write-like effects are still rejected by the existing Goal
+     * recovery ledger; this signal only removes the overly broad failure veto.
+     */
+    fun recoveredReadOnlyFailure(log: LocalSessionEventLog): Boolean {
+        val window = log.pageBeforeChronological(limit = WINDOW)
+        val turnStart = window.lastOrNull { it.type == "turn/start" }?.sequence ?: return false
+        val results = window.filter { it.type == "tool/result" && it.sequence > turnStart }
+        val failures = results.filter { it.data.text("is_error") == "true" }
+        if (failures.isEmpty()) return false
+        if (failures.any { result ->
+                result.data.text("side_effect") != "none" ||
+                    result.data.text("error_code") == "TOOL_OUTCOME_UNKNOWN" ||
+                    sourceKind(result.data.text("name")) == null
+            }) return false
+        val lastFailure = failures.maxOf { it.sequence }
+        return results.any { result ->
+            result.sequence > lastFailure &&
+                result.data.text("is_error") == "false" &&
+                result.data.text("side_effect") == "none" &&
+                sourceKind(result.data.text("name")) != null
+        }
+    }
+
+    /**
      * Progress identity reflects distinct evidence actually inspected and the latest
      * state of each finding, not elapsed time or a fresh call ID. Repeating the same
      * range/output cannot reset the stalled-work continuation guard.
