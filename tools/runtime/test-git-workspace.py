@@ -326,6 +326,80 @@ class GitWorkspaceTest(unittest.TestCase):
         self.assertEqual("merged", merged["state"])
         self.assertEqual("X" * 270000, (self.root / "large.txt").read_text())
 
+    def test_large_parent_and_child_diffs_are_fully_pageable(self):
+        import base64
+        import hashlib
+
+        child = self.fork()
+        (self.root / "parent-large.txt").write_text("parent" * 50000)
+        (child / "child-large.txt").write_text("child" * 55000)
+        tree = self.call("status")["tree"]
+        first = self.call("compare_merge", expected_tree=tree)
+        self.assertEqual("needs_full_review", first["state"])
+        self.assertNotIn("parent_diff", first)
+        self.assertNotIn("child_diff", first)
+        for side, expected in (("parent", b"parent"), ("child", b"child")):
+            chunks = []
+            offset = 0
+            while True:
+                page = self.call("compare_merge", expected_tree=tree,
+                                 review_side=side, review_offset=offset)
+                self.assertEqual(first["source_tree"], page["source_tree"])
+                self.assertEqual(first["tree"], page["tree"])
+                self.assertEqual(first["comparison"], page["comparison"])
+                self.assertEqual(offset, page["diff_offset"])
+                data = base64.b64decode(page["diff_base64"], validate=True)
+                self.assertTrue(data or page["last_page"])
+                chunks.append(data)
+                self.assertEqual(page["last_page"], page["next_offset"] is None)
+                if page["next_offset"] is None:
+                    break
+                self.assertGreater(page["next_offset"], offset)
+                offset = page["next_offset"]
+            content = b"".join(chunks)
+            self.assertIn(expected, content)
+            self.assertEqual(first[side + "_diff_bytes"], len(content))
+            self.assertEqual(first[side + "_diff_sha256"],
+                             hashlib.sha256(content).hexdigest())
+        with self.assertRaisesRegex(ValueError, "review side"):
+            self.call("compare_merge", expected_tree=tree, review_side="invalid")
+        with self.assertRaisesRegex(ValueError, "offset"):
+            self.call("compare_merge", expected_tree=tree, review_side="child",
+                      review_offset=1)
+        with self.assertRaisesRegex(ValueError, "requires a review side"):
+            self.call("compare_merge", expected_tree=tree, review_offset=262144)
+
+    def test_required_output_directory_and_prefix_are_checked_before_write(self):
+        child = self.fork()
+        (child / "results").mkdir()
+        (child / "results" / "a.txt").write_text("real result")
+        (child / "results-sibling.txt").write_text("not the requested directory")
+        tree = self.call("status")["tree"]
+        preview = self.call("preview_merge", expected_tree=tree)
+        self.assertEqual("ready", preview["state"])
+        with self.assertRaisesRegex(ValueError, "drops a required output"):
+            self.call("merge", expected_tree=tree, required_outputs=["missing-dir/"],
+                      expected_source_tree=preview["source_tree"],
+                      expected_merged_tree=preview["merged_tree"])
+        with self.assertRaisesRegex(ValueError, "drops a required output"):
+            self.call("merge", expected_tree=tree, required_outputs=["results-sibling"],
+                      allowed_paths=["results"],
+                      expected_source_tree=preview["source_tree"],
+                      expected_merged_tree=preview["merged_tree"])
+        with self.assertRaisesRegex(ValueError, "drops a required output"):
+            self.call("merge", expected_tree=tree, required_outputs=["res"],
+                      expected_source_tree=preview["source_tree"],
+                      expected_merged_tree=preview["merged_tree"])
+        self.assertFalse((self.root / "results").exists())
+        merged = self.call("merge", expected_tree=tree,
+                           required_outputs=["results/"],
+                           allowed_paths=["results", "results-sibling.txt"],
+                           expected_source_tree=preview["source_tree"],
+                           expected_merged_tree=preview["merged_tree"])
+        self.assertEqual("merged", merged["state"])
+        self.assertEqual("real result", (self.root / "results" / "a.txt").read_text())
+        self.assertEqual("not the requested directory", (self.root / "results-sibling.txt").read_text())
+
     def test_conflict_never_modifies_shared_files_or_index(self):
         child = self.fork()
         (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
