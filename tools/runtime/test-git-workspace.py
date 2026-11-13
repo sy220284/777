@@ -139,8 +139,8 @@ class GitWorkspaceTest(unittest.TestCase):
 
     def test_quality_choice_can_keep_parent_take_child_or_select_by_file(self):
         child = self.fork()
-        (self.root / "code.txt").write_text("PARENT\\nsecond\\nthird\\n")
-        (child / "code.txt").write_text("CHILD\\nsecond\\nthird\\n")
+        (self.root / "code.txt").write_text("PARENT\nsecond\nthird\n")
+        (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
         (child / "child-only.txt").write_text("new independent feature")
         tree = self.call("status")["tree"]
         comparison = self.call("compare_merge", expected_tree=tree)
@@ -150,8 +150,8 @@ class GitWorkspaceTest(unittest.TestCase):
         self.assertIn("CHILD", comparison["child_diff"])
         auto = self.call("preview_merge", expected_tree=tree)
         self.assertEqual("conflict", auto["state"])
-        for mode, wanted in (("prefer_parent", "PARENT\\nsecond\\nthird\\n"),
-                             ("prefer_child", "CHILD\\nsecond\\nthird\\n")):
+        for mode, wanted in (("prefer_parent", "PARENT\nsecond\nthird\n"),
+                             ("prefer_child", "CHILD\nsecond\nthird\n")):
             preview = self.call("preview_merge", expected_tree=tree, resolution=mode)
             self.assertEqual("ready", preview["state"])
             self.assertEqual(mode, preview["resolution"])
@@ -162,7 +162,7 @@ class GitWorkspaceTest(unittest.TestCase):
             self.assertEqual(wanted, (self.root / "code.txt").read_text())
             self.assertEqual("new independent feature", (self.root / "child-only.txt").read_text())
             # Restore the same parent candidate between alternate policy checks.
-            (self.root / "code.txt").write_text("PARENT\\nsecond\\nthird\\n")
+            (self.root / "code.txt").write_text("PARENT\nsecond\nthird\n")
         chosen = self.call("preview_merge", expected_tree=tree, resolution="select",
                            path_choices={"code.txt": "parent"})
         self.assertEqual("ready", chosen["state"])
@@ -174,7 +174,7 @@ class GitWorkspaceTest(unittest.TestCase):
 
     def test_merge_requires_full_review_receipt_and_comparison_criteria(self):
         child = self.fork()
-        (child / "code.txt").write_text("CHILD\\nsecond\\nthird\\n")
+        (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
         expected = self.call("status")["tree"]
         with self.assertRaisesRegex(ValueError, "complete merge preview"):
             workspace.operate(self.root, self.store, "session", "merge",
@@ -186,12 +186,12 @@ class GitWorkspaceTest(unittest.TestCase):
                                    expected_source_tree=preview["source_tree"],
                                    expected_merged_tree=preview["merged_tree"],
                                    quality_decision=dict(resolution="auto", reason="insufficient")))
-        self.assertEqual("first\\nsecond\\nthird\\n", (self.root / "code.txt").read_text())
+        self.assertEqual("first\nsecond\nthird\n", (self.root / "code.txt").read_text())
 
     def test_quality_decision_must_review_both_versions_when_both_changed(self):
         child = self.fork()
-        (child / "code.txt").write_text("CHILD\\nsecond\\nthird\\n")
-        (self.root / "code.txt").write_text("PARENT\\nsecond\\nthird\\n")
+        (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
+        (self.root / "code.txt").write_text("PARENT\nsecond\nthird\n")
         tree = self.call("status")["tree"]
         preview = self.call("preview_merge", expected_tree=tree, resolution="prefer_parent")
         args = dict(workspace_id=self.identity, expected_tree=tree, resolution="prefer_parent",
