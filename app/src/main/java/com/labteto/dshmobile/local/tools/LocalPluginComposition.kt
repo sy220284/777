@@ -28,6 +28,7 @@ import com.labteto.dshmobile.interop.lsp.LspPlugin
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.LocalWebProvider
+import com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy
 import com.labteto.dshmobile.local.TokenUsageContext
 import com.labteto.dshmobile.local.model.LocalApiKeyStore
 import com.labteto.dshmobile.local.model.LocalModelGateway
@@ -67,6 +68,7 @@ class LocalPluginCompositionFactory @Inject constructor(
     private val automationScheduler: HarnessAutomationScheduler,
     private val automationStore: AutomationStore,
     private val webhookController: WebhookController,
+    private val managedPolicy: LocalManagedExecutionPolicy,
 ) {
     internal fun createWebTools(
         searchKeyProvider: suspend () -> String?,
@@ -102,6 +104,7 @@ class LocalPluginCompositionFactory @Inject constructor(
         automationScheduler = automationScheduler,
         automationStore = automationStore,
         webhookController = webhookController,
+        managedPolicy = managedPolicy,
         workspaceRoot = workspaceRoot,
         runtimeProcess = runtimeProcess,
         runtimeTerminal = runtimeTerminal,
@@ -132,6 +135,7 @@ internal class LocalPluginComposition(
     automationScheduler: HarnessAutomationScheduler,
     automationStore: AutomationStore,
     webhookController: WebhookController,
+    managedPolicy: LocalManagedExecutionPolicy,
     workspaceRoot: File,
     runtimeProcess: AndroidProcessRuntime,
     runtimeTerminal: PersistentPipeTerminalProvider,
@@ -214,9 +218,9 @@ internal class LocalPluginComposition(
         environment = { runtimeProcess.processEnvironment() },
         resourceScheduler = resourceScheduler,
     )
-    private val deviceProvider = AndroidDeviceProvider(
-        context = context,
-        resourceScheduler = resourceScheduler,
+    private val deviceProvider = LocalManagedDeviceProvider(
+        AndroidDeviceProvider(context = context, resourceScheduler = resourceScheduler),
+        policy = managedPolicy::current,
     )
     private val devicePlugin = AndroidDevicePlugin(deviceProvider)
     private val visionPlugin = LocalVisionPlugin(
