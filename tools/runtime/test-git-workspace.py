@@ -203,6 +203,31 @@ class GitWorkspaceTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "explicit comparison"):
             workspace.operate(self.root, self.store, "session", "merge", args)
 
+    def test_select_can_drop_dependent_child_files_and_replace_parent_only_files(self):
+        child = self.fork()
+        (self.root / "code.txt").write_text("PARENT\nsecond\nthird\n")
+        (self.root / "parent-only.txt").write_text("obsolete")
+        (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
+        (child / "child-only.txt").write_text("depends on CHILD")
+        tree = self.call("status")["tree"]
+        comparison = self.call("compare_merge", expected_tree=tree)["comparison"]
+        self.assertEqual(["code.txt"], comparison["overlap_paths"])
+        self.assertEqual(["child-only.txt"], comparison["child_only_paths"])
+        self.assertEqual(["parent-only.txt"], comparison["parent_only_paths"])
+        choices = {"code.txt": "parent", "child-only.txt": "parent",
+                   "parent-only.txt": "child"}
+        preview = self.call("preview_merge", expected_tree=tree, resolution="select",
+                            path_choices=choices)
+        self.assertEqual("ready", preview["state"])
+        result = self.call("merge", expected_tree=tree, resolution="select",
+                           path_choices=choices,
+                           expected_source_tree=preview["source_tree"],
+                           expected_merged_tree=preview["merged_tree"])
+        self.assertEqual("merged", result["state"])
+        self.assertEqual("PARENT\nsecond\nthird\n", (self.root / "code.txt").read_text())
+        self.assertFalse((self.root / "child-only.txt").exists())
+        self.assertFalse((self.root / "parent-only.txt").exists())
+
     def test_large_diff_requires_every_page_before_quality_merge(self):
         child = self.fork()
         (child / "large.txt").write_text("X" * 270000)
