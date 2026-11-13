@@ -406,6 +406,7 @@ class LocalHarnessViewModel @Inject constructor(
         return securityReviewFacade.approve(sessionId, repository, review, diff)
     }
 
+    suspend fun saveWorkspaceFileToDownloads(path: String) = runtime.session.saveWorkspaceFileToDownloadsForUi(path)
     suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
     suspend fun workspaceDirectory(path: String) = runtime.session.workspaceDirectoryForUi(path)
     suspend fun workspaceDirectoryPage(path: String, offset: Int) = runtime.session.workspaceDirectoryPageForUi(path, offset)
