@@ -133,9 +133,9 @@ def merge_proposal(source, admission, child_tree, resolution="auto", choices=Non
 
 def review_receipt(proposal, offset, page):
     digest = hashlib.sha256()
-    digest.update(proposal["source_tree"].encode() + b"\\0" +
-                  proposal["merged_tree"].encode() + b"\\0" +
-                  str(offset).encode() + b"\\0" + page)
+    digest.update(proposal["source_tree"].encode() + b"\0" +
+                  proposal["merged_tree"].encode() + b"\0" +
+                  str(offset).encode() + b"\0" + page)
     return digest.hexdigest()
 
 
