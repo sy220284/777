@@ -39,6 +39,9 @@ class GitWorkspaceRuntime(
     suspend fun compareRemote(repository: String, remote: String, branch: String): JsonObject =
         GitRemoteDiff(workspaceRoot, processRuntime).compare(repository, remote, branch)
 
+    suspend fun compareCommit(repository: String, commit: String): JsonObject =
+        GitRemoteDiff(workspaceRoot, processRuntime).compareCommit(repository, commit)
+
 
     suspend fun fork(sessionId: String, invocationId: String, repository: String = "."): JsonObject {
         val id = MessageDigest.getInstance("SHA-256").digest("$sessionId\u0000$invocationId".toByteArray())
