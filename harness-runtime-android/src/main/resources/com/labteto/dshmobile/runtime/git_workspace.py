@@ -561,6 +561,11 @@ def locked(root, store, owner, action, arguments):
         if not truncated or next_offset == len(patch):
             receipt["merged_tree"] = proposal["merged_tree"]
         return receipt
+    if action == "recover_merge":
+        pending = admission.get("integration")
+        if not pending or pending["state"] not in ("staging", "applying", "needs_inspection"):
+            raise ValueError("no pending merge integration to recover")
+        return recover_integration(source, manifest, admission)
     if action == "discard":
         if admission.get("integration", {}).get("state") in ("staging", "applying", "needs_inspection"):
             raise ValueError("recover the pending integration before discarding its workspace")
