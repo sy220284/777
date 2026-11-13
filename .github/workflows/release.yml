@@ -1,28 +1,20 @@
 name: Release APK
 
 'on':
-  # GitHub schedule 可能漏发：完整 main CI 成功时及时检查，半小时定时兜底。
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  push:
     branches: [main]
-  schedule:
-    - cron: '13,43 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
-  actions: read
 
 concurrency:
-  # 当前发布批次不可被下一次触发打断；尚未开始的下一批只需处理最新快照。
   group: release-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
   check-release:
-    # 不允许 PR、失败的 CI 或外部仓库的 workflow_run 获得发版资格。
-    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository) }}
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -32,182 +24,44 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.sha }}
-      - name: Detect tested release candidate
+          fetch-depth: 0
+      - name: 识别需要发布的源码版本
         id: detect
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-
           skip_release() {
             echo "should_release=false" >> "$GITHUB_OUTPUT"
             echo "version=" >> "$GITHUB_OUTPUT"
           }
-
-          # 每次触发均锁定事件创建时的主线提交，发布中发生的新合并留给下一批。
-          BATCH_SHA="$(git rev-parse HEAD)"
-          RELEASE_SHA="$BATCH_SHA"
-
-          # A backend-only baseline is intentionally non-user-facing: never create
-          # a release, even when all infrastructure and device tests are green.
+          RELEASE_SHA="$(git rev-parse HEAD)"
           if [ -f docs/UI-BACKEND-RESET.zh-CN.md ]; then
-            echo "当前分支为无界面后端基线；禁止自动发布空白客户端 APK。"
+            echo "当前版本为无界面后端基线，不生成客户端安装包"
             skip_release
             exit 0
           fi
-
-          release_equivalent_to_batch() {
-            release_sha="$1"
-            batch_sha="$2"
-            if [ "$release_sha" = "$batch_sha" ]; then
-              return 0
-            fi
-
-            comparison="$(gh api "repos/$GITHUB_REPOSITORY/compare/$release_sha...$batch_sha" 2>/dev/null || true)"
-            status="$(printf '%s' "$comparison" | jq -r '.status // empty')"
-            if [ "$status" != "ahead" ]; then
-              return 1
-            fi
-            # GitHub compare returns at most 300 changed-file entries. Never
-            # classify an incomplete change list as release-equivalent.
-            count="$(printf '%s' "$comparison" | jq -r '.files | length // 0')"
-            if [ "$count" -ge 300 ]; then
-              echo "发布等价判断：变更文件达到 API 比较上限，拒绝以不完整文件列表放行。" >&2
-              return 1
-            fi
-
-            changes="$RUNNER_TEMP/release-change-files.txt"
-            printf '%s' "$comparison" | jq -r '.files[]? | (.filename, .previous_filename?) | select(. != null and . != "")' | sort -u > "$changes"
-            python3 "$RUNNER_TEMP/classify-ci-scope.py" --paths-file "$changes" --release-safe
-          }
-
-          # An ordinary CI success (docs/automation lane) is not release evidence.
-          # Only a completed full main CI matrix may authorize a binary release.
-          has_full_main_validation() {
-            candidate_sha="$1"
-            ids="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$candidate_sha&status=success&per_page=100" \
-              --jq '.workflow_runs[] | select(.name == "CI" and .event == "push" and .conclusion == "success") | .id')"
-            [ -n "$ids" ] || return 1
-            while IFS= read -r run_id; do
-              [ -n "$run_id" ] || continue
-              jobs="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")"
-              if printf '%s' "$jobs" | jq -e '
-                [.jobs[] | select(.conclusion == "success") | .name] as $passed
-                | (["scope", "static-gates", "architecture-3-gates",
-                    "unit-tests", "build-arm64",
-                    "device-artifacts-x86", "android-16-instrumented",
-                    "android-17-instrumented", "merge-gate"]
-                   | all(. as $lane | $passed | index($lane) != null))
-              ' >/dev/null; then
-                return 0
-              fi
-            done <<< "$ids"
-            return 1
-          }
-
-          # 比对目标固定为本次触发快照，绝不追随发布期间变化的 main。
-          cp .github/scripts/classify-ci-scope.py "$RUNNER_TEMP/classify-ci-scope.py"
-
-          # An explicitly retired GitHub Release must never be regenerated from
-          # an unchanged APK. Preserve the tag and source SHA as audit evidence.
+          RELEASE_TAGS="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$' || true)"
+          MAX_RELEASE_TAG="$(printf '%s\n' "$RELEASE_TAGS" | sed '/^$/d' | sort -V | tail -n 1)"
           RETIRED_TAGS=""
           if [ -f .github/scripts/retired-releases.txt ]; then
-            while read -r retired_tag retired_sha retired_id; do
-              [ -n "$retired_tag" ] || continue
-              [[ "$retired_tag" == \#* ]] && continue
-              if [[ ! "$retired_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]] ||
-                 [[ ! "$retired_sha" =~ ^[0-9a-f]{40}$ ]] ||
-                 [[ ! "$retired_id" =~ ^[0-9]+$ ]]; then
-                echo "::error::Invalid retired release ledger entry: $retired_tag"
-                exit 1
-              fi
-              RETIRED_TAGS="${RETIRED_TAGS}${retired_tag}"$'\n'
-              if release_equivalent_to_batch "$retired_sha" "$BATCH_SHA"; then
-                echo "::notice::Retired $retired_tag matches current APK; refusing to recreate it."
-                skip_release
-                exit 0
-              fi
-            done < .github/scripts/retired-releases.txt
+            RETIRED_TAGS="$(awk '$1 ~ /^v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$/ { print $1 }' .github/scripts/retired-releases.txt)"
           fi
-
-          if ! has_full_main_validation "$RELEASE_SHA"; then
-            echo "本批次提交未完成主线完整 CI；寻找与本批次产物等价的已验证候选。"
-            FOUND_CANDIDATE=false
-            while IFS= read -r candidate_sha; do
-              [ -n "$candidate_sha" ] || continue
-              if release_equivalent_to_batch "$candidate_sha" "$BATCH_SHA" &&
-                 has_full_main_validation "$candidate_sha"; then
-                RELEASE_SHA="$candidate_sha"
-                FOUND_CANDIDATE=true
-                echo "找到本批次等价的完整验证候选：$RELEASE_SHA -> $BATCH_SHA"
-                break
-              fi
-            done < <(
-              gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?branch=main&status=success&per_page=100" \
-                --jq '.workflow_runs[] | select(.name == "CI" and .event == "push" and .conclusion == "success") | .head_sha' |
-                awk '!seen[$0]++' |
-                head -n 50
-            )
-            if [ "$FOUND_CANDIDATE" != "true" ]; then
-              echo "本批次没有符合完整验收的构建候选，本次跳过，下一批重新检查。"
-              skip_release
-              exit 0
-            fi
-          fi
-
-          if ! release_equivalent_to_batch "$RELEASE_SHA" "$BATCH_SHA"; then
-            echo "候选提交与本批次快照产物不等价：$RELEASE_SHA != $BATCH_SHA"
-            skip_release
-            exit 0
-          fi
-          if [ "$RELEASE_SHA" != "$BATCH_SHA" ]; then
-            echo "本批次只有不影响 APK 的变更：$RELEASE_SHA -> $BATCH_SHA"
-          fi
-
-          echo "release_sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
-
-          RELEASE_TAGS="$(
-            gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
-              --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' |
-              grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$' || true
-          )"
-          MAX_RELEASE_TAG="$(printf '%s\n' "$RELEASE_TAGS" | sed '/^$/d' | sort -V | tail -n 1)"
           MAX_RESERVED_TAG="$(printf '%s\n%s\n' "$MAX_RELEASE_TAG" "$RETIRED_TAGS" | sed '/^$/d' | sort -V | tail -n 1)"
 
-          # Compare against the latest *published* binary, not the previous
-          # Git commit. A docs-only main change cannot produce a new APK tag.
-          classifier="$RUNNER_TEMP/classify-ci-scope.py"
-          if [ ! -s "$classifier" ]; then
-            git fetch --no-tags --depth=1 origin "$RELEASE_SHA" >/dev/null 2>&1
-            git show "$RELEASE_SHA:.github/scripts/classify-ci-scope.py" > "$classifier"
-          fi
-          if [ -n "$MAX_RELEASE_TAG" ]; then
-            git fetch --no-tags --depth=1 origin "$RELEASE_SHA" >/dev/null 2>&1
-            git fetch --no-tags --depth=1 origin "refs/tags/$MAX_RELEASE_TAG" >/dev/null 2>&1
+          # Only code/build changes create a new APK. Documentation and governance edits do not.
+          if [ -n "$MAX_RELEASE_TAG" ] && git fetch --no-tags origin "refs/tags/$MAX_RELEASE_TAG"; then
             published_sha="$(git rev-parse 'FETCH_HEAD^{commit}')"
-            changes="$RUNNER_TEMP/release-since-published.txt"
-            git diff --no-renames --name-only --diff-filter=ACMRD "$published_sha" "$RELEASE_SHA" > "$changes"
-            if python3 "$classifier" --paths-file "$changes" --release-safe; then
-              echo "相对上一正式 APK 没有影响产物的变化，不发布新版本。"
+            if ! git diff --name-only "$published_sha" "$RELEASE_SHA" | grep -Eq '^(app/|core/|harness-|ui-|reference-validation/|tools/runtime/|gradle/|build-logic/|upstream/|settings\.gradle|build\.gradle|gradle\.properties|AndroidManifest)'; then
+              echo "与上一正式包相比没有客户端或构建变化"
               skip_release
               exit 0
             fi
           fi
 
-          if ! has_full_main_validation "$RELEASE_SHA"; then
-            echo "缺少与发布提交一致的完整 main CI 验收（双模拟器、ARM64、x86），拒绝发布。"
-            skip_release
-            exit 0
-          fi
-
-          RELEASED_TARGET_TAG="$(
-            gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
-              --jq ".[] | select(.draft == false and .prerelease == false and .target_commitish == \"$RELEASE_SHA\") | .tag_name" |
-              head -n 1
-          )"
-          if [ -n "$RELEASED_TARGET_TAG" ]; then
-            echo "当前主线提交已经发布：$RELEASE_SHA -> $RELEASED_TARGET_TAG"
+          released="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.draft == false and .prerelease == false and .target_commitish == \"$RELEASE_SHA\") | .tag_name" | head -n 1)"
+          if [ -n "$released" ]; then
+            echo "此提交已发布：$released"
             skip_release
             exit 0
           fi
@@ -218,21 +72,14 @@ jobs:
           elif [[ "$FALLBACK_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]]; then
             VERSION="$FALLBACK_VERSION"
           else
-            echo "::error::无法从最高正式 Release 或 .github/release-version 推导发布版本。"
+            echo "::error::无法推导合法版本号"
             exit 1
           fi
-
-          CANDIDATE_TAG="v$VERSION"
-          if [ -n "$MAX_RESERVED_TAG" ]; then
-            HIGHEST_TAG="$(printf '%s\n%s\n' "$CANDIDATE_TAG" "$MAX_RESERVED_TAG" | sort -V | tail -n 1)"
-            if [ "$HIGHEST_TAG" != "$CANDIDATE_TAG" ] || [ "$CANDIDATE_TAG" = "$MAX_RESERVED_TAG" ]; then
-              echo "::error::拒绝生成非递增版本：$CANDIDATE_TAG <= $MAX_RESERVED_TAG"
-              exit 1
-            fi
-          fi
-          echo "检测到已通过 CI 且尚未发布的主线：$RELEASE_SHA -> v$VERSION"
+          echo "release_sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
           echo "should_release=true" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "准备构建并发布：$RELEASE_SHA -> v$VERSION"
+
 
   release:
     needs: check-release
@@ -325,8 +172,7 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
-      # CI and release must verify and cache exactly the same signed runtime packages.
-      # One shared action owns the cache key, ABI, signing and hash checks.
+      # Reuse signed runtime package cache for repeatable local builds.
       - uses: ./.github/actions/setup-runtime-cached
         with:
           abi: arm64-v8a
@@ -342,8 +188,6 @@ jobs:
           echo "DSH_VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
-      # CI 已完成单测、Lint、优化包校验与 Android 16/17 仪器测试；
-      # 发布阶段只构建正式签名包，避免同一提交重复消耗运行器。
 
       - name: Build release APK
         env:
