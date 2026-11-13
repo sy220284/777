@@ -59,6 +59,51 @@ class LocalDownloadsPublisherAndroidTest {
     }
 
     @Test
+    fun firstLaunchCreatesOneStableChineseDownloadFolder() {
+        val publisher = LocalDownloadsPublisher(context)
+        publisher.ensureDirectory()
+        val files = matchingIds("成果保存说明", "Download/神言神语/")
+        assertTrue("首次使用后应在公共下载目录生成文件夹", files.isNotEmpty())
+        publisher.ensureDirectory()
+        assertEquals("同一安装反复启动不得重复创建说明文件",
+            files.size, matchingIds("成果保存说明", "Download/神言神语/").size)
+    }
+
+    @Test
+    fun localMediaAndWorkspaceFilesUseSameDownloadFolderAndKeepVersionStatus() {
+        val folder = File(context.filesDir, "media-studio").apply { mkdirs() }
+        val audio = File(folder, "media-${UUID.randomUUID()}.mp3")
+        val publisher = LocalDownloadsPublisher(context)
+        try {
+            audio.writeText("first audio bytes")
+            val first = publisher.publishOwnedFile(audio)
+            assertTrue(first.startsWith("Download/神言神语/"))
+            val cached = publisher.publishedOwnedFile(audio)
+            assertEquals(first, cached?.location)
+            assertEquals(true, cached?.currentVersion)
+            assertEquals(first, publisher.publishOwnedFile(audio))
+            assertEquals(1, countPublished(audio.nameWithoutExtension))
+
+            audio.writeText("new audio content")
+            assertEquals(false, publisher.publishedOwnedFile(audio)?.currentVersion)
+            val second = publisher.publishOwnedFile(audio)
+            assertNotEquals(first, second)
+            assertEquals("new audio content", readPublished(second))
+        } finally {
+            removePublished(audio.nameWithoutExtension)
+            audio.delete()
+        }
+    }
+
+    @Test
+    fun refusesToPublishOtherApplicationsFiles() {
+        val file = File("/system/build.prop")
+        assertThrows(IllegalArgumentException::class.java) {
+            LocalDownloadsPublisher(context).publishOwnedFile(file)
+        }
+    }
+
+    @Test
     fun refusesToPublishWorkspaceParentPath() {
         val root = File(context.cacheDir, "downloads-invalid-${UUID.randomUUID()}").apply { mkdirs() }
         try {
