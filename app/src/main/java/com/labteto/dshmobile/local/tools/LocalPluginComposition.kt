@@ -170,6 +170,10 @@ internal class LocalPluginComposition(
         stdioCommandResolver = runtimeProcess::resolveCommand,
         stdioEnvironmentProvider = { runtimeProcess.processEnvironment() },
         httpCredentialProvider = mcpCredentials::forEndpoint,
+        verifyHttpEndpoint = { endpoint ->
+            val uri = java.net.URI(endpoint)
+            managedPolicy.current().requireNetworkDestination(uri.scheme.orEmpty(), uri.host.orEmpty())
+        },
         credentialAwareHttpTransportFactory = { serverId, endpoint, bearer ->
             com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerTransport(
                 context.applicationContext, kind = "http", endpoint = endpoint,
