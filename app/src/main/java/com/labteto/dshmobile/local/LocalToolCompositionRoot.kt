@@ -102,6 +102,108 @@ internal class LocalToolCompositionRoot @Inject constructor(
         }
     }
 
+
+    /** Read every version-pinned parent/child diff page before comparing implementations. */
+    private suspend fun completeMergeComparison(
+        sessionId: String, identity: String, tree: String,
+    ): kotlinx.serialization.json.JsonObject {
+        val first = agentWorkspaces.operate(sessionId, "compare_merge", buildJsonObject {
+            put("workspace_id", identity); put("expected_tree", tree)
+        })
+        if (first["state"]?.jsonPrimitive?.content != "needs_full_review") return first
+        val contents = mutableMapOf<String, String>()
+        for (side in listOf("parent", "child")) {
+            val expectedLength = first.getValue("${side}_diff_bytes").jsonPrimitive.content.toInt()
+            val expectedHash = first.getValue("${side}_diff_sha256").jsonPrimitive.content
+            val output = java.io.ByteArrayOutputStream()
+            var offset = 0
+            do {
+                val page = agentWorkspaces.operate(sessionId, "compare_merge", buildJsonObject {
+                    put("workspace_id", identity); put("expected_tree", tree)
+                    put("review_side", side); put("review_offset", offset)
+                })
+                check(page["state"] == first["state"] &&
+                    page["source_tree"] == first["source_tree"] &&
+                    page["tree"] == first["tree"] &&
+                    page["comparison"] == first["comparison"] &&
+                    page["${side}_diff_sha256"] == first["${side}_diff_sha256"] &&
+                    page["review_side"]?.jsonPrimitive?.content == side &&
+                    page["diff_offset"]?.jsonPrimitive?.content?.toIntOrNull() == offset) {
+                    "父子工作区差异分页时版本或顺序发生变化"
+                }
+                val bytes = android.util.Base64.decode(
+                    page.getValue("diff_base64").jsonPrimitive.content, android.util.Base64.DEFAULT,
+                )
+                output.write(bytes)
+                val next = page["next_offset"]?.jsonPrimitive?.content?.toIntOrNull()
+                check(output.size() <= expectedLength &&
+                    page["last_page"]?.jsonPrimitive?.content == (next == null).toString() &&
+                    (next == null || (next == output.size() && next > offset))) {
+                    "父子工作区差异页不连续或内容不完整"
+                }
+                offset = next ?: output.size()
+            } while (next != null)
+            check(output.size() == expectedLength) { "父子工作区差异缺页" }
+            val hash = java.security.MessageDigest.getInstance("SHA-256").digest(output.toByteArray())
+                .joinToString("") { "%02x".format(it) }
+            check(hash == expectedHash) { "父子工作区差异内容校验失败" }
+            contents[side] = output.toByteArray().toString(Charsets.UTF_8)
+        }
+        return buildJsonObject {
+            first.forEach { (key, value) -> put(key, value) }
+            put("state", "ready")
+            put("parent_diff", contents.getValue("parent"))
+            put("child_diff", contents.getValue("child"))
+        }
+    }
+
+    /** Collect exact preview receipts; a final page alone cannot authorize a large merge. */
+    private suspend fun completeMergePreview(
+        sessionId: String, identity: String, tree: String, resolution: String,
+        choices: kotlinx.serialization.json.JsonElement,
+    ): kotlinx.serialization.json.JsonObject {
+        suspend fun readPage(offset: Int) = agentWorkspaces.operate(sessionId, "preview_merge", buildJsonObject {
+            put("workspace_id", identity); put("expected_tree", tree)
+            put("resolution", resolution); put("path_choices", choices)
+            put("review_offset", offset)
+        })
+        val first = readPage(0)
+        if (first["state"]?.jsonPrimitive?.content != "needs_full_review") return first
+        val receipts = mutableListOf<kotlinx.serialization.json.JsonElement>()
+        var page = first
+        var offset = 0
+        while (true) {
+            check(page["source_tree"] == first["source_tree"] &&
+                page["tree"] == first["tree"] &&
+                page["comparison"] == first["comparison"] &&
+                page["resolution"] == first["resolution"] &&
+                page["diff_bytes"] == first["diff_bytes"] &&
+                page["diff_offset"]?.jsonPrimitive?.content?.toIntOrNull() == offset) {
+                "合并预览分页时结果版本或顺序发生变化"
+            }
+            receipts += page["review_receipt"] ?: error("大补丁缺少完整审查页回执")
+            val next = page["next_offset"]?.jsonPrimitive?.content?.toIntOrNull()
+            if (next == null) {
+                check(page["last_page"]?.jsonPrimitive?.content == "true" && page["merged_tree"] != null) {
+                    "大补丁预览未返回最终合并版本"
+                }
+                return buildJsonObject {
+                    page.forEach { (key, value) -> put(key, value) }
+                    put("state", "ready")
+                    put("review_receipts", kotlinx.serialization.json.JsonArray(receipts))
+                }
+            }
+            check(next > offset && page["last_page"]?.jsonPrimitive?.content == "false") {
+                "合并预览页偏移无效"
+            }
+            offset = next
+            page = readPage(offset)
+            check(page["state"]?.jsonPrimitive?.content == "needs_full_review") {
+                "合并预览分页状态发生变化"
+            }
+        }
+    }
+
     internal suspend fun integrateAgentWorkspace(
         sessionId: String, identity: String, tree: String, allowedPaths: List<String>, beforeCommit: suspend () -> Unit,
     ): kotlinx.serialization.json.JsonObject {
@@ -125,13 +227,9 @@ internal class LocalToolCompositionRoot @Inject constructor(
         }
         // Run expensive model comparison outside the shared-workspace write gate. Pin the
         // original source and child trees; any concurrent edit requires a fresh review.
-        val comparison = agentWorkspaces.operate(sessionId, "compare_merge", buildJsonObject {
-            put("workspace_id", identity); put("expected_tree", tree)
-        })
+        val comparison = completeMergeComparison(sessionId, identity, tree)
         if (comparison["state"]?.jsonPrimitive?.content != "ready") return comparison
-        val initial = agentWorkspaces.operate(sessionId, "preview_merge", buildJsonObject {
-            put("workspace_id", identity); put("expected_tree", tree)
-        })
+        val initial = completeMergePreview(sessionId, identity, tree, "auto", buildJsonObject {})
         val fileChanges = comparison.getValue("comparison").jsonObject
         val overlap = fileChanges.getValue("overlap_paths").jsonArray
         val parentChanges = overlap.isNotEmpty() || fileChanges.getValue("parent_only_paths").jsonArray.isNotEmpty()
@@ -157,10 +255,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
         val lease = workspaceGate.acquire(tool)
         try {
             check(registry.get("workspace_merge") === tool) { "工作区运行时已更新" }
-            val preview = agentWorkspaces.operate(sessionId, "preview_merge", buildJsonObject {
-                put("workspace_id", identity); put("expected_tree", tree)
-                put("resolution", resolution); put("path_choices", choices)
-            })
+            val preview = completeMergePreview(sessionId, identity, tree, resolution, choices)
             if (preview["source_tree"] != comparison["source_tree"] || preview["tree"] != comparison["tree"]) {
                 error("父子实现自质量审查后已变化，请重新对比并选择")
             }
@@ -172,6 +267,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
                 put("expected_merged_tree", preview.getValue("merged_tree"))
                 put("resolution", resolution); put("path_choices", choices)
                 put("quality_decision", decision)
+                preview["review_receipts"]?.let { put("review_receipts", it) }
                 put("allowed_paths", kotlinx.serialization.json.JsonArray(allowedPaths.map { kotlinx.serialization.json.JsonPrimitive(it) }))
                 put("required_outputs", kotlinx.serialization.json.JsonArray(allowedPaths.map { kotlinx.serialization.json.JsonPrimitive(it) }))
             })
