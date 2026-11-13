@@ -323,8 +323,8 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun importAttachment(uri: Uri): LocalImportedAttachment = runtime.session.importAttachment(uri)
     internal suspend fun remoteGitBranchesForUi(repository: String) =
         toolsUi.remoteGitBranchesForUi(repository)
-    internal suspend fun compareLocalGitForUi(repository: String) =
-        toolsUi.compareLocalGitForUi(repository)
+    internal suspend fun compareLocalGitForUi(repository: String, includeUntracked: Boolean) =
+        toolsUi.compareLocalGitForUi(repository, includeUntracked)
     internal suspend fun compareRemoteGitForUi(repository: String, remote: String, branch: String) =
         toolsUi.compareRemoteGitForUi(repository, remote, branch)
     /** Recover an existing report for exactly this code snapshot without model billing. */

@@ -27,7 +27,7 @@ class LocalIndependentCodeReviewUiFacade @Inject internal constructor(
         LocalIndependentCodeReview {
         val report = reviewer.review(sessionId, repository, diff.trackingRef,
             diff.statistics, diff.patch, diff.truncated, diff.evidenceRevision)
-        val current = currentDiff(repository, diff.trackingRef)
+        val current = currentDiff(repository, diff.trackingRef, diff.includesUntrackedFiles)
         // The original report is durable, but must not be displayed as a finding for newer code.
         check(!current.truncated && report.digest == codeReviewDigest(
             repository, current.trackingRef, current.statistics, current.patch,
@@ -38,14 +38,14 @@ class LocalIndependentCodeReviewUiFacade @Inject internal constructor(
 
     internal suspend fun accept(sessionId: String, repository: String,
         review: LocalIndependentCodeReview, diff: LocalRemoteGitDiffUi): Boolean {
-        val current = currentDiff(repository, diff.trackingRef)
+        val current = currentDiff(repository, diff.trackingRef, diff.includesUntrackedFiles)
         return reviewer.accept(sessionId, review.id, review.evidenceSequence,
             repository, current.trackingRef, current.statistics, current.patch, current.truncated,
             current.evidenceRevision)
     }
 
-    private suspend fun currentDiff(repository: String, ref: String): LocalRemoteGitDiffUi {
-        if (ref.startsWith("worktree/")) return tools.compareLocalGitForUi(repository)
+    private suspend fun currentDiff(repository: String, ref: String, includeUntracked: Boolean): LocalRemoteGitDiffUi {
+        if (ref.startsWith("worktree/")) return tools.compareLocalGitForUi(repository, includeUntracked)
         val (remote, branch) = splitGitReviewTrackingRef(ref)
         return tools.compareRemoteGitForUi(repository, remote, branch)
     }

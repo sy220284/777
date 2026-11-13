@@ -101,14 +101,16 @@ class LocalToolsUiFacade @Inject internal constructor(
     suspend fun remoteGitBranchesForUi(repository: String): List<String> =
         withContext(Dispatchers.IO) { tools.remoteGitBranches(repository) }
 
-    suspend fun compareLocalGitForUi(repository: String): LocalRemoteGitDiffUi = withContext(Dispatchers.IO) {
-        val receipt = tools.compareLocalGit(repository)
+    suspend fun compareLocalGitForUi(repository: String, includeUntracked: Boolean = false): LocalRemoteGitDiffUi = withContext(Dispatchers.IO) {
+        val receipt = tools.compareLocalGit(repository, includeUntracked)
         LocalRemoteGitDiffUi(
             trackingRef = (receipt.getValue("tracking_ref") as kotlinx.serialization.json.JsonPrimitive).content,
             statistics = (receipt.getValue("stat") as kotlinx.serialization.json.JsonPrimitive).content,
             patch = (receipt.getValue("patch") as kotlinx.serialization.json.JsonPrimitive).content,
             truncated = receipt.getValue("truncated").toString() == "true",
             evidenceRevision = (receipt.getValue("head_commit") as kotlinx.serialization.json.JsonPrimitive).content,
+            untrackedFileCount = receipt.getValue("untracked_file_count").toString().toInt(),
+            includesUntrackedFiles = receipt.getValue("includes_untracked_files").toString() == "true",
         )
     }
 
@@ -268,4 +270,6 @@ data class LocalRemoteGitDiffUi(
     val truncated: Boolean,
     /** Version of the Git objects used to produce this patch. */
     val evidenceRevision: String = "",
+    val untrackedFileCount: Int = 0,
+    val includesUntrackedFiles: Boolean = false,
 )

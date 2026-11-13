@@ -120,7 +120,7 @@ internal fun LocalWorkspaceFilesDialog(
     observeChanges: (List<String>) -> kotlinx.coroutines.flow.Flow<LocalWorkspaceFileChange> =
         { kotlinx.coroutines.flow.emptyFlow() },
     remoteGitBranches: (suspend (String) -> List<String>)? = null,
-    compareLocalGit: (suspend (String) -> LocalRemoteGitDiffUi)? = null,
+    compareLocalGit: (suspend (String, Boolean) -> LocalRemoteGitDiffUi)? = null,
     compareRemoteGit: (suspend (String, String, String) -> LocalRemoteGitDiffUi)? = null,
     findIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview?)? = null,
     runIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview)? = null,
@@ -174,6 +174,7 @@ internal fun LocalWorkspaceFilesDialog(
     var shareError by remember(mode, sessionId, section, directory) { mutableStateOf<String?>(null) }
     var gitSheetOpen by remember(mode, sessionId) { mutableStateOf(false) }
     var gitIsLocal by remember(mode, sessionId) { mutableStateOf(false) }
+    var gitIncludeUntracked by remember(mode, sessionId) { mutableStateOf(false) }
     var gitLoading by remember(mode, sessionId) { mutableStateOf(false) }
     var gitError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
     var gitRepository by remember(mode, sessionId) { mutableStateOf(".") }
@@ -261,7 +262,7 @@ internal fun LocalWorkspaceFilesDialog(
         gitJob = scope.launch {
             gitLoading = true
             try {
-                val diff = compare(gitRepository)
+                val diff = compare(gitRepository, gitIncludeUntracked)
                 gitResult = diff
                 if (!diff.truncated && diff.patch.isNotBlank()) {
                     try {
@@ -936,6 +937,28 @@ internal fun LocalWorkspaceFilesDialog(
             scrollable = true,
         ) {
             Text("仓库目录：$gitRepository", style = DsType.small13, color = colors.textSecondary)
+            if (gitIsLocal && compareLocalGit != null) {
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+                    SyCheckboxControl(
+                        checked = gitIncludeUntracked,
+                        onCheckedChange = { selected ->
+                            if (!gitLoading && !codeReviewBusy) {
+                                gitIncludeUntracked = selected
+                                codeReview = null
+                                openLocalGitComparison()
+                            }
+                        },
+                    )
+                    Text("同时审查新建文件", style = DsType.small13, color = colors.text,
+                        modifier = Modifier.testTag("work_git_include_untracked"))
+                }
+                gitResult?.let { snapshot ->
+                    if (snapshot.untrackedFileCount > 0) Text(
+                        "发现 " + snapshot.untrackedFileCount + " 个未跟踪文件。新文件可能包含密钥；选择后才会纳入模型审查。",
+                        style = DsType.caption11, color = colors.warningInk)
+                }
+            }
             if (gitLoading) Text("正在读取 Git 结果…", color = colors.textSecondary)
             gitError?.let { Text(it, color = colors.dangerInk) }
             if (gitBranches.size > 8) SySearchField(
@@ -1034,8 +1057,11 @@ internal fun LocalWorkspaceFilesDialog(
                         }
                     }
                 }
-                Text("仅比较已跟踪文件，未跟踪的新文件不在本次差异内。",
-                    style = DsType.caption11, color = colors.textSecondary)
+                Text(if (result.includesUntrackedFiles) {
+                    "已纳入所选未跟踪文件；忽略规则仍生效。超出范围会标记截断并停止审查。"
+                } else {
+                    "当前只检查已跟踪文件；开启上方选项后可审查新建文件。"
+                }, style = DsType.caption11, color = colors.textSecondary)
             }
         }
     }
