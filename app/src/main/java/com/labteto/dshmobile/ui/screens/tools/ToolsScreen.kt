@@ -1169,7 +1169,11 @@ fun ToolsScreen(
         SyResponsiveSheet(
             title = stringResource(R.string.tools_github_connector),
             subtitle = stringResource(R.string.tools_github_connector_hint),
-            onDismiss = { showGitHubConfig = false },
+            onDismiss = {
+                showGitHubConfig = false
+                editGitHubCredentials = false
+                githubToken = ""
+            },
         ) {
             Text(
                 stringResource(R.string.tools_github_capabilities),
@@ -1257,7 +1261,10 @@ fun ToolsScreen(
                 pendingLocalNetworkAction = null
                 viewModel.cancelMcpLogin()
                 showExternalConfig = false
+                showMcpAdvanced = false
+                showMcpStdio = false
                 mcpBearer = ""
+                mcpClientId = ""
             },
         ) {
             if (state.servers.isEmpty()) {
@@ -1375,7 +1382,7 @@ fun ToolsScreen(
                 onClick = {
                     val id = serverId.trim()
                     val url = endpoint.trim()
-                    val client = mcpClientId.trim()
+                    val client = if (showMcpAdvanced) mcpClientId.trim() else ""
                     connectWithLocalNetworkPermission(url) { viewModel.loginMcp(id, url, client) }
                 },
                 enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
@@ -1423,7 +1430,7 @@ fun ToolsScreen(
                 onClick = {
                     val id = serverId.trim()
                     val url = endpoint.trim()
-                    val bearer = mcpBearer
+                    val bearer = if (showMcpAdvanced) mcpBearer else ""
                     connectWithLocalNetworkPermission(url) { viewModel.connectHttp(id, url, bearer) }
                 },
                 enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
@@ -1431,7 +1438,7 @@ fun ToolsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 icon = SyEntryIcons.Connections,
             )
-            SyButton(
+            if (showMcpAdvanced) SyButton(
                 text = "清除该 MCP 服务的认证信息",
                 onClick = { viewModel.clearMcpCredential(serverId.trim()) },
                 enabled = !state.loading && serverId.isNotBlank(),
