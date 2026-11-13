@@ -8,7 +8,7 @@
 
 | 原分类 | 能力 | 所有权 | 当前真实状态 | 完成验收标准 |
 |---|---|---|---|---|
-| 缺少 | 会话分区管理 | Chat / Session | 尚未实施 | 分区创建/编辑/移动/删除；重启后恢复、会话隔离、UI 可见 |
+| 缺少 | 会话分区管理 | Chat / Session | 本地持久分区目录与侧栏入口已接通；编译及设备回归待验收 | 分区创建/编辑/移动/删除；重启后恢复、会话隔离、UI 可见 |
 | 缺少 | 会话预测与示例采样 | Shared Model / Chat | 尚未实施 | 模型选路固定；独立请求、取消、费用计量及可见结果 |
 | 缺少 | 项目管理完整生命周期 | Project Feature | 尚未实施 | 建项目/导入/更新/移动/删除/会话绑定；文件引用与恢复一致 |
 | 缺少 | 外部编码代理历史与配置迁移 | Work / Import | 尚未实施 | 校验来源、格式兼容、冲突处理和可追溯导入 |
@@ -19,13 +19,13 @@
 | 缺少 | 用户身份验证与撤销 | Shared Security | 尚未实施 | Android 身份认证、授权周期、撤销及敏感工具验收 |
 | 缺少 | 对外类型化 App Server | Shared API | 尚未实施 | 稳定协议、鉴权、权限边界、会话唯一所有权、外部客户端测试 |
 | 缺少 | 远程配对与客户端撤销 | Shared API / Security | 尚未实施 | 经授权配对、设备列表、吊销及审计；Android 后台可靠性 |
-| 部分 | 队列编辑删除重排主动开始 | Shared AgentQueue / Work / Chat | 核心事务已接入，Feature/UI 未接入 | 完整 ModelMessage 重建、历史投影、所有者/代次、队列 UI、重启恢复 |
+| 部分 | 队列编辑删除重排主动开始 | Shared AgentQueue / Work / Chat | Chat/Work Feature 及侧栏编辑已接入；端到端验收待确认 | 完整 ModelMessage 重建、历史投影、所有者/代次、队列 UI、重启恢复 |
 | 部分 | 运行中轮次调整 steer | Work Feature | 已有真实前台路径，待等效验收 | 运行中模型采样中断与新输入交付时序、取消和恢复 |
 | 部分 | 独立代码审查和审核会话 | Work / Reviewer | 尚未进一步修改 | 真实文件差异+测试事实、独立 Reviewer、人工接纳记录 |
 | 部分 | 多环境执行与远端 Agent 协同 | Work / Runtime | 尚未进一步修改 | 环境指纹、能力授权、代理状态、网络异常和任务重启 |
 | 部分 | 增量模糊文件搜索 | Workspace / Files | 现有文件搜索已接入模糊评分；搜索 Session 未接入 | 多次关键词更新、取消、文件变化、排名、性能及 UI |
 | 部分 | 远端 Git 分支差异 API | Android Runtime | 已接入可发现工具，CI 待验收 | 已跟踪分支比较、无网络副作用、快照/补丁限制、调用验证 |
-| 部分 | 统一文件读写与变化订阅 | Workspace / Files | 尚未进一步修改 | 订阅令牌、实时变更和断线恢复、Android 文件权限 |
+| 部分 | 统一文件读写与变化订阅 | Workspace / Files | 工作区订阅与界面自动刷新已接入；Android 回归待确认 | 订阅令牌、实时变更和断线恢复、Android 文件权限 |
 | 部分 | 对外完整文件 API | Shared API / Files | 尚未实施 | 文件读写权限、并发/版本约束、外部鉴权和订阅 |
 | 部分 | 技能热发现与精排 | Tools / Skills | 尚未进一步修改 | 目录增量、依赖安全、技能效果归因与 UI |
 | 部分 | MCP elicitation | Interop / MCP | 尚未实施 | 远端请求会话双向身份、用户答复/取消、重试去重 |
@@ -44,9 +44,12 @@
 ## 已提交的代码级变更
 
 - 工具执行前后 Hooks：`harness-core/.../ToolHookRegistry.kt`、`ToolRegistry.kt`；有拒绝、审批时版本失效、真实回执与失败回归。产品钩子配置尚未实现。
-- 输入队列原子操作：`harness-core/.../AgentInputQueue.kt`；具编辑/删除/重排及回滚。现阶段的纯文本编辑对含 modelMessage 的队列项拒绝执行；还须由 Work/Chat Feature 建立完整用户入口和模型消息重建。
-- 模糊文件检索：`app/.../LocalWorkspaceFuzzyMatcher.kt`、`LocalWorkspace.kt`；现有文件搜索入口使用可复现的路径评分，不建立第二数据库。仍缺增量会话接口。
+- 输入队列原子操作：`harness-core/.../AgentInputQueue.kt`；具编辑/删除/重排及回滚。Chat/Work 侧功能和统一编辑界面已接入；仍需验证 ModelMessage 完整性、崩溃恢复和 Android UI。
+- 模糊文件检索：`app/.../LocalWorkspaceFuzzyMatcher.kt`、`LocalWorkspace.kt`；现有文件搜索入口使用可复现的路径评分，不建立第二数据库，文件页已具备实时变化订阅；仍需验证长扫描取消、索引规模和设备回归。
 - 远端差异：`harness-runtime-android/.../GitRemoteDiff.kt`；由 AndroidRuntimePlugin 注册 `git_diff_remote` 可发现工具，仅基于本地远端跟踪引用，限制路径、ref 和补丁长度，不执行隐式远端拉取。
+
+- 会话分区：`app/.../session/LocalSessionSectionCatalog.kt` 与 `LocalHarnessDrawer.kt` 已接入创建、重命名、上下排序、批量归类/移出与删除；本地原子写入完成后才发布状态，分区删除不删会话，测试 `LocalSessionSectionCatalogTest.kt` 覆盖重启、非法归属、失败回滚。CI 与 Android 可见性尚未完成最终验收。
+- 同步基础设施：`.github/workflows/v6-feature-index-refresh.yml` 已加入远端分支更新冲突后的最新源码重建与重试，修复短时间连续提交触发非快进推送失败的根因。
 
 ## 工程验收门槛
 
