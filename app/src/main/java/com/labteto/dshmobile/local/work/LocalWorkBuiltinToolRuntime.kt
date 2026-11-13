@@ -21,6 +21,7 @@ import kotlinx.serialization.json.jsonPrimitive
 internal class LocalWorkBuiltinToolRuntime(
     private val persist: (LocalWorkRunBinding) -> Unit,
     private val workspaceRoot: java.io.File? = null,
+    private val publishVerifiedDeliverables: suspend (String, List<String>) -> List<String> = { _, _ -> emptyList() },
 ) {
     internal suspend fun execute(
         call: LocalToolCall,
@@ -56,10 +57,17 @@ internal class LocalWorkBuiltinToolRuntime(
                 progress.createGoal(args.string("description"), artifactPaths, verificationCommands)
             }
             "get_goal" -> progress.getGoal()
-            "update_goal" -> progress.updateGoal(
-                status = args.string("status"),
-                note = args["note"]?.jsonPrimitive?.contentOrNull,
-            )
+            "update_goal" -> {
+                val receipt = progress.updateGoal(
+                    status = args.string("status"),
+                    note = args["note"]?.jsonPrimitive?.contentOrNull,
+                )
+                val completed = run.workState.snapshot().goal?.takeIf { it.status == "completed" }
+                if (completed != null && completed.artifactPaths.isNotEmpty()) {
+                    val saved = publishVerifiedDeliverables(run.sessionId, completed.artifactPaths)
+                    "$receipt；成果已发布到手机下载目录：${saved.joinToString()}"
+                } else receipt
+            }
             "ask_user_question" -> run.interactions.awaitQuestion(
                 LocalQuestion(
                     callId = call.id,
