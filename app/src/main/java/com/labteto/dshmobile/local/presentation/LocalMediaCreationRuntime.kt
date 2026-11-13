@@ -131,7 +131,10 @@ class LocalMediaCreationRuntime @Inject internal constructor(
                     val file = api.downloadGeneratedImage(url)
                     downloaded = file
                     committed = store.attachDownloadedImage(id, sessionId, url, file)
-                    if (committed) MediaUiReceipt.Applied
+                    if (committed) {
+                        publishMediaToDownloads(file)
+                        MediaUiReceipt.Applied
+                    }
                     else MediaUiReceipt.Failed("下载期间成果已删除、变更或由其他操作保存，请刷新")
                 } finally { if (!committed) downloaded?.delete() }
             }
@@ -185,6 +188,19 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     private val imageDownloads = mutableMapOf<String, Deferred<MediaUiReceipt>>()
     override val storageError: StateFlow<String?> get() = store.recoveryErrors
     override fun observe(sessionId: String?, limit: Int): Flow<LocalMediaPage> = store.observe(sessionId, limit)
+    private suspend fun publishMediaToDownloads(file: File?) {
+        if (file == null) return
+        try {
+            withContext(Dispatchers.IO) { store.publishResultToDownloads(file) }
+            store.clearDownloadPublicationFailure()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            AppLog.failure("MediaCreation", "publish_downloads", failure)
+            store.recordDownloadPublicationFailure(failure)
+        }
+    }
+
     fun resultFile(item: LocalMediaResult): File? = store.file(item.fileName)
     fun videoFile(task: LocalMediaVideoTask): File? = store.file(task.fileName)
     suspend fun removeResult(id: String) {
@@ -252,6 +268,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
                 catch (failure: Exception) { AppLog.warn("MediaCreation", "save_generated_image", failure); null }
             }
             store.addResult(offer, LocalMediaKind.IMAGE, sessionId, prompt, id, file = file, link = result.url.takeIf { file == null }, sourceMessageId = sourceMessageId, imageRatio = ratio, revisionOf = revisionOf)
+            publishMediaToDownloads(file)
         }
     }
     suspend fun submitSpeech(offer: LocalMediaOffer, text: String, voice: String, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaCreationJob {
@@ -272,6 +289,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
             }
             markMediaProviderSucceeded()
             store.addResult(offer, LocalMediaKind.SPEECH, sessionId, spoken, id, file = file, sourceMessageId = sourceMessageId, voiceId = voice, revisionOf = revisionOf)
+            publishMediaToDownloads(file)
         }
     }
     suspend fun submitTranscribe(offer: LocalMediaOffer, uri: Uri, sessionId: String, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaCreationJob {
@@ -389,6 +407,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
             val file = downloaded
             store.updateVideo(id) { it.copy(fileName = file.name, deliveryPhase = LocalMediaDeliveryPhase.SAVED, lastError = null) }
             committed = true
+            publishMediaToDownloads(file)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
