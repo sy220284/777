@@ -14,6 +14,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -21,6 +22,7 @@ import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.observability.isDiagnosticFailure
+import com.labteto.dshmobile.observability.sanitizeDiagnosticText
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SySegment
@@ -151,7 +153,7 @@ internal fun EnvironmentInfoDialog(
             val visible = events.filter { !errorsOnly || it.isDiagnosticFailure() }.takeLast(40)
             Text(
                 if (visible.isEmpty()) emptyEvents else visible.joinToString("\n") {
-                    "${eventTime.format(Date(it.timestampMillis))} ${it.level}/${it.tag} ${it.throwableType.orEmpty()} ${it.message.replace("\n", " ").take(240)}"
+                    "${eventTime.format(Date(it.timestampMillis))} ${it.level}/${it.tag} ${it.throwableType.orEmpty()} ${sanitizeDiagnosticText(it.message).replace("\n", " ").take(240)}"
                 },
                 style = DsType.mdCode.withReadingWeight(),
                 color = colors.text,
@@ -160,5 +162,47 @@ internal fun EnvironmentInfoDialog(
         }
         SyButton(text = stringResource(R.string.settings_diagnostic_refresh), onClick = { events = AppLog.snapshot() }, modifier = Modifier.fillMaxWidth())
         SyButton(text = stringResource(R.string.settings_export_diagnostics), onClick = onExport, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+/** Show the exact sanitized report that will be exported or shared. No background upload. */
+@Composable
+internal fun DiagnosticReviewDialog(
+    report: String,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onExport: () -> Unit,
+    onShare: () -> Unit,
+) {
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    SyResponsiveSheet(
+        title = "检查诊断报告",
+        onDismiss = onDismiss,
+        scrollable = true,
+        dismissEnabled = !busy,
+    ) {
+        Text(
+            "请先核对以下完整报告。分享将调用 Android 应用选择器，由你指定接收方；保存只写入所选位置。",
+            style = DsType.small13.withReadingWeight(),
+            color = colors.textSecondary,
+        )
+        SelectionContainer {
+            Text(
+                report,
+                modifier = Modifier.fillMaxWidth().heightIn(max = 340.dp)
+                    .verticalScroll(rememberScrollState())
+                    .then(Modifier),
+                style = DsType.mdCode.withReadingWeight(),
+                color = colors.text,
+            )
+        }
+        Text("共 ${report.toByteArray(Charsets.UTF_8).size} 字节，以下操作使用当前预览的同一版本。",
+            style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+        SyButton(text = "保存此报告", onClick = onExport,
+            enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("diagnostic-reviewed-export"))
+        SyButton(text = "选择应用分享", onClick = onShare,
+            enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("diagnostic-reviewed-share"))
+        SyButton(text = "取消", onClick = onDismiss,
+            enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("diagnostic-reviewed-cancel"))
     }
 }

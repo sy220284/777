@@ -7,6 +7,10 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import android.Manifest
 import android.os.Build
 import android.graphics.BitmapFactory
+import android.content.ClipData
+import android.content.Intent
+import androidx.core.content.FileProvider
+import java.io.File
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -209,10 +213,30 @@ fun SettingsScreen(
     val storageExportFailed = stringResource(R.string.settings_local_session_storage_export_failed)
     val storageCompacted = stringResource(R.string.settings_local_session_storage_compacted)
     val storageCompactFailed = stringResource(R.string.settings_local_session_storage_compact_failed)
+    // The reviewed immutable bytes are the same bytes given to SAF or the native share sheet.
+    var diagnosticDraft by remember { mutableStateOf<String?>(null) }
+    var diagnosticBusy by remember { mutableStateOf(false) }
+    val reviewDiagnostics: () -> Unit = {
+        if (!diagnosticBusy) {
+            diagnosticBusy = true
+            scope.launch {
+                try {
+                    diagnosticDraft = viewModel.diagnosticReport()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    AppLog.failure("Settings", "diagnostic_preview", error)
+                    toast.second(exportFailed)
+                } finally {
+                    diagnosticBusy = false
+                }
+            }
+        }
+    }
     val diagnosticExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
-        if (uri != null) scope.launch {
+        val report = diagnosticDraft
+        if (uri != null && report != null) scope.launch {
             try {
-                val report = viewModel.diagnosticReport()
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openOutputStream(uri)?.use { stream ->
                         stream.write(report.toByteArray(Charsets.UTF_8))
@@ -223,11 +247,46 @@ fun SettingsScreen(
                     .firstOrNull { it.startsWith("日志完整性：") }
                     ?.removePrefix("日志完整性：")
                 toast.second(if (integrity == "正常") exportSuccess else exportPartial)
+                diagnosticDraft = null
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 AppLog.failure("Settings", "export_diagnostic_report", error)
                 toast.second(exportFailed)
+            }
+        }
+    }
+    val shareDiagnostic: () -> Unit = {
+        val reviewed = diagnosticDraft
+        if (reviewed != null && !diagnosticBusy) {
+            diagnosticBusy = true
+            scope.launch {
+                try {
+                    val share = withContext(Dispatchers.IO) {
+                        val directory = File(context.cacheDir, "diagnostic-shares")
+                        check(directory.isDirectory || directory.mkdirs()) { "无法建立诊断分享目录" }
+                        val target = File.createTempFile("777-reviewed-", ".txt", directory)
+                        target.writeText(reviewed, Charsets.UTF_8)
+                        FileProvider.getUriForFile(context, "${context.packageName}.files", target)
+                    }
+                    context.startActivity(Intent.createChooser(
+                        Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_STREAM, share)
+                            clipData = ClipData.newUri(context.contentResolver, "777 诊断", share)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        },
+                        "选择接收诊断报告的应用",
+                    ))
+                    diagnosticDraft = null
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    AppLog.failure("Settings", "share_diagnostic_report", error)
+                    toast.second(exportFailed)
+                } finally {
+                    diagnosticBusy = false
+                }
             }
         }
     }
@@ -1079,7 +1138,7 @@ fun SettingsScreen(
                                 icon = FeatherIcons.Info,
                                 title = stringResource(R.string.settings_export_diagnostics),
                                 reservedEntryHeight = 88.dp,
-                                onClick = { diagnosticExporter.launch("777-diagnostics.txt") },
+                                onClick = reviewDiagnostics,
                             )
                         }
                     }
@@ -1105,10 +1164,18 @@ fun SettingsScreen(
         EnvironmentInfoDialog(
             text = environmentInfo ?: stringResource(R.string.common_loading),
             onDismiss = { showEnvironment = false },
-            onExport = { diagnosticExporter.launch("777-diagnostics.txt") },
+            onExport = reviewDiagnostics,
         )
     }
-
+    diagnosticDraft?.let { approved ->
+        DiagnosticReviewDialog(
+            report = approved,
+            busy = diagnosticBusy,
+            onDismiss = { if (!diagnosticBusy) diagnosticDraft = null },
+            onExport = { diagnosticExporter.launch("777-diagnostics.txt") },
+            onShare = shareDiagnostic,
+        )
+    }
 
 }
 
