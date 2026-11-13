@@ -117,6 +117,7 @@ internal data class LocalWorkFeatureUiActions(
         { kotlinx.coroutines.flow.emptyFlow() },
     val remoteGitBranches: (suspend (String) -> List<String>)? = null,
     val compareRemoteGit: (suspend (String, String, String) -> LocalRemoteGitDiffUi)? = null,
+    val findIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview?)? = null,
     val runIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview)? = null,
     val acceptIndependentCodeReview: (suspend (String, String, com.labteto.dshmobile.local.work.LocalIndependentCodeReview, LocalRemoteGitDiffUi) -> Boolean)? = null,
     val conversationFiles: suspend (String) -> LocalConversationFiles,
