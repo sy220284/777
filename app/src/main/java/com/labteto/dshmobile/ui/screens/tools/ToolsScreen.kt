@@ -6,6 +6,13 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Context
+import android.content.ClipData
+import android.content.Intent
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.nio.file.AtomicMoveNotSupportedException
+import androidx.core.content.FileProvider
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
@@ -401,6 +408,54 @@ class ToolsViewModel @Inject constructor(
                     loading = false,
                     feedback = error.message ?: appContext.getString(R.string.skills_import_failed),
                 )
+            }
+        }
+    }
+
+    fun shareSkillPackage(id: String) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val file = withContext(Dispatchers.IO) {
+                    val bytes = localTools.exportSkillPackage(id)
+                    val folder = File(appContext.cacheDir, "skill-package-shares")
+                    require(!Files.isSymbolicLink(folder.toPath()) &&
+                        (folder.isDirectory || folder.mkdirs())) { "无法创建技能分享缓存" }
+                    val pending = Files.createTempFile(folder.toPath(), "skill-", ".partial")
+                    try {
+                        Files.write(pending, bytes)
+                        val target = File(folder, "$"+"id.zip").toPath()
+                        try {
+                            Files.move(pending, target, StandardCopyOption.ATOMIC_MOVE,
+                                StandardCopyOption.REPLACE_EXISTING)
+                        } catch (_: AtomicMoveNotSupportedException) {
+                            Files.move(pending, target, StandardCopyOption.REPLACE_EXISTING)
+                        }
+                        target.toFile()
+                    } finally {
+                        Files.deleteIfExists(pending)
+                    }
+                }
+                val uri = FileProvider.getUriForFile(
+                    appContext, "$"+"{appContext.packageName}.files", file,
+                )
+                val send = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/zip"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    clipData = ClipData.newRawUri(file.name, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                appContext.startActivity(Intent.createChooser(send, "分享完整技能包").apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+                _state.value = _state.value.copy(loading = false,
+                    feedback = "技能包已生成，可选择分享目标")
+            } catch (cancelled: CancellationException) {
+                _state.value = _state.value.copy(loading = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false,
+                    feedback = error.message ?: "技能包分享失败")
             }
         }
     }
@@ -843,6 +898,7 @@ fun ToolsScreen(
                                     onCreateSkill = viewModel::createSkill,
                                     onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
                                     onRemoveSkill = viewModel::removeSkill,
+                                    onShareSkillPackage = viewModel::shareSkillPackage,
                                     onOpenSkillEditor = viewModel::openSkillEditor,
                                     onCloseSkillEditor = viewModel::closeSkillEditor,
                                     onSaveSkillDocument = viewModel::saveSkillDocument,

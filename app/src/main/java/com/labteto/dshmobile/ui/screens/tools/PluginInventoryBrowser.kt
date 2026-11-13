@@ -113,6 +113,7 @@ internal fun PluginInventoryBrowser(
     onCreateSkill: ((String, String, String, String) -> Unit)? = null,
     onImportSkill: (() -> Unit)? = null,
     onRemoveSkill: ((String) -> Unit)? = null,
+    onShareSkillPackage: ((String) -> Unit)? = null,
     onOpenSkillEditor: ((String) -> Unit)? = null,
     onCloseSkillEditor: (() -> Unit)? = null,
     onSaveSkillDocument: ((String, String) -> Unit)? = null,
@@ -127,6 +128,7 @@ internal fun PluginInventoryBrowser(
     var selectedRow by remember { mutableStateOf<InventoryRow?>(null) }
     var showCreateSkill by remember { mutableStateOf(false) }
     var removeSkillName by remember { mutableStateOf<String?>(null) }
+    var sharePackageSkillName by remember { mutableStateOf<String?>(null) }
     var newSkillId by remember { mutableStateOf("") }
     var newSkillDisplayName by remember { mutableStateOf("") }
     var newSkillDescription by remember { mutableStateOf("") }
@@ -569,6 +571,19 @@ internal fun PluginInventoryBrowser(
                 )
             }
 
+            if (item.installedSkill && onShareSkillPackage != null) {
+                SyButton(
+                    text = "分享完整技能包",
+                    variant = SyButtonVariant.Info,
+                    enabled = !loading,
+                    modifier = Modifier.testTag("skill-share-package"),
+                    onClick = {
+                        sharePackageSkillName = item.id.substringAfter(":")
+                        selectedRow = null
+                    },
+                )
+            }
+
             if (item.installedSkill && onOpenSkillEditor != null) {
                 SyButton(
                     text = stringResource(R.string.skills_edit),
@@ -664,6 +679,29 @@ internal fun PluginInventoryBrowser(
                 label = { Text(stringResource(R.string.skills_instruction_label)) },
                 minLines = 5,
                 modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+    sharePackageSkillName?.let { id ->
+        SyResponsiveSheet(
+            title = "分享完整技能包",
+            onDismiss = { sharePackageSkillName = null },
+            footer = {
+                SyButton(
+                    text = "生成并分享",
+                    enabled = !loading,
+                    modifier = Modifier.fillMaxWidth().testTag("skill-share-package-confirm"),
+                    onClick = {
+                        onShareSkillPackage?.invoke(id)
+                        sharePackageSkillName = null
+                    },
+                )
+            },
+        ) {
+            Text(
+                "将导出 SKILL.md 及技能目录下的全部附属资料，请先确认其中没有需要保密的内容。",
+                style = DsType.std14.withReadingWeight(),
+                color = colors.textSecondary,
             )
         }
     }

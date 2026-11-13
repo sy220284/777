@@ -170,6 +170,7 @@ class LocalToolsUiFacade @Inject internal constructor(
     override suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         tools.createSkill(id, displayName, description, instructions)
     override suspend fun importSkill(filename: String, bytes: ByteArray) = tools.importSkill(filename, bytes)
+    suspend fun exportSkillPackage(id: String): ByteArray = tools.exportSkillPackage(id)
     override suspend fun removeSkill(id: String) = tools.removeSkill(id)
     override suspend fun readSkillDocument(id: String) = tools.readSkillDocument(id)
     override suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)
