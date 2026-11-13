@@ -121,6 +121,7 @@ internal fun WorkTimelineStepRow(
     active: Boolean = false,
     activity: com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem? = null,
     groupedMessages: List<com.labteto.dshmobile.local.session.LocalHarnessMessage> = emptyList(),
+    operationGroup: Boolean = false,
 ) {
     if (message.role != "tool") {
         val content = localWorkTimelineText(message.content) ?: return
@@ -147,13 +148,22 @@ internal fun WorkTimelineStepRow(
     val phase = completedWorkToolPhase(message)
     val action = workToolActionLabel(message.toolName, activity?.argumentsPreview)
     var detailsOpen by remember(message.id) { mutableStateOf(false) }
-    val hasDetails = message.content.isNotBlank() || message.blocks.isNotEmpty() || groupedMessages.any { it.content.isNotBlank() || it.blocks.isNotEmpty() }
+    val receipts = listOf(message) + groupedMessages
+    val hasDetails = operationGroup || message.content.isNotBlank() || message.blocks.isNotEmpty() ||
+        groupedMessages.any { it.content.isNotBlank() || it.blocks.isNotEmpty() }
+    val activities = receipts.mapNotNull { userFacingWorkToolAction(it.toolName) }.distinct()
+    val groupLabel = if (operationGroup) {
+        val summary = activities.take(2).joinToString("、").ifBlank { "工具操作" }
+        "$summary · 已完成 ${receipts.size} 项"
+    } else null
     WorkToolStatusRow(message.toolName, phase, argumentsPreview = activity?.argumentsPreview,
-        repeatCount = repeatCount,
+        repeatCount = if (operationGroup) 1 else repeatCount,
+        labelOverride = groupLabel,
         modifier = Modifier.testTag(message.toolCallId?.let { "work-tool:$it" } ?: "work-tool:${message.id}"),
         onClick = if (hasDetails) ({ detailsOpen = true }) else null)
     if (detailsOpen) {
-        SyResponsiveSheet(title = "工具回执 · $action", onDismiss = { detailsOpen = false },
+        SyResponsiveSheet(title = if (operationGroup) "操作记录 · ${receipts.size} 项" else "工具回执 · $action",
+            onDismiss = { detailsOpen = false },
             scrollable = true, seamlessBackground = false,
             trailing = {
                 SyButton("关闭", onClick = { detailsOpen = false }, size = SyButtonSize.Small,
@@ -161,9 +171,11 @@ internal fun WorkTimelineStepRow(
             }) {
             Text(workToolPhaseText(phase), style = DsType.std14Strong.withReadingWeight())
             message.toolErrorCode?.let { Text(it, style = DsType.small13.withReadingWeight()) }
-            (listOf(message) + groupedMessages).forEachIndexed { index, receipt ->
-                if (repeatCount > 1) {
-                    Text("第 " + (index + 1) + " 次检查",
+            receipts.forEachIndexed { index, receipt ->
+                if (operationGroup || repeatCount > 1) {
+                    Text(if (operationGroup) "第 ${index + 1} 项 · " +
+                        (userFacingWorkToolAction(receipt.toolName) ?: receipt.toolName.orEmpty())
+                        else "第 ${index + 1} 次检查",
                         style = DsType.small13.withReadingWeight())
                 }
                 receipt.blocks.filterIsInstance<com.labteto.dshmobile.local.session.LocalMessageBlock.Image>().forEach { image ->
@@ -214,12 +226,13 @@ private fun WorkToolStatusRow(
     onClick: (() -> Unit)? = null,
     argumentsPreview: String? = null,
     repeatCount: Int = 1,
+    labelOverride: String? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val provider = userFacingWorkToolProvider(name)
     val action = workToolActionLabel(name, argumentsPreview)
     // Provider is already visible via the icon. Repeating it in every title adds noise.
-    val label = if (repeatCount > 1) "$action · 已检查 " + repeatCount + " 次" else action
+    val label = labelOverride ?: if (repeatCount > 1) "$action · 已检查 " + repeatCount + " 次" else action
     val status = workToolPhaseText(phase)
     val tint = when (phase) {
         LocalToolUiPhase.FAILED -> colors.dangerInk
