@@ -184,16 +184,57 @@ class McpElicitationRoundTripsTest {
         assertEquals(1, calls)
     }
 
-    @Test fun indefiniteInputRequiredRoundsStopWithExplicitFailure() = runTest {
+    @Test fun moreThanEightLegitimateElicitationRoundsCanFinish() = runTest {
         var calls = 0
-        val failure = runCatching {
-            mcpCallWithInputRequired(
-                request = { calls++; required() },
-                name = "read", arguments = input,
-                onElicitation = { McpElicitationReply("decline") },
-            )
+        var prompts = 0
+        val result = mcpCallWithInputRequired(
+            request = {
+                calls++
+                if (calls <= 10) required()
+                else buildJsonObject { put("resultType", "complete") }
+            },
+            name = "read", arguments = input,
+            onElicitation = {
+                prompts++
+                McpElicitationReply("decline")
+            },
+        )
+        assertEquals(11, calls)
+        assertEquals(10, prompts)
+        assertEquals("complete", result["resultType"]!!.jsonPrimitive.content)
+    }
+
+    @Test fun formWithMoreThanTwelveFieldsUsesTheSameProtocol() = runTest {
+        val schema = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                repeat(15) { index ->
+                    put("item$index", buildJsonObject { put("type", "string") })
+                }
+            })
         }
-        assertTrue(failure.isFailure)
-        assertEquals(8, calls)
+        var calls = 0
+        val result = mcpCallWithInputRequired(
+            request = {
+                calls++
+                if (calls == 1) buildJsonObject {
+                    put("resultType", "input_required")
+                    put("inputRequests", buildJsonObject {
+                        put("form", buildJsonObject {
+                            put("method", "elicitation/create")
+                            put("params", buildJsonObject {
+                                put("mode", "form")
+                                put("message", "完整设置")
+                                put("requestedSchema", schema)
+                            })
+                        })
+                    })
+                } else buildJsonObject { put("resultType", "complete") }
+            },
+            name = "read", arguments = input,
+            onElicitation = { McpElicitationReply("accept", buildJsonObject {}) },
+        )
+        assertEquals("complete", result["resultType"]!!.jsonPrimitive.content)
+        assertEquals(2, calls)
     }
 }
