@@ -35,7 +35,30 @@ class GitWorkspaceTest(unittest.TestCase):
     def git(self, *args):
         return subprocess.check_output(["git", "-C", str(self.root), *args])
 
+    def quality_decision(self, resolution="auto"):
+        return dict(resolution=resolution, reviewed_both=True,
+                    reason="Test fixture: both implementations were compared before choosing the reviewed tree.",
+                    criteria=dict(correctness="compare the asserted final file contents",
+                                  experience="no device UX evidence is claimed by the fixture",
+                                  maintainability="keep unrelated parent and child modifications"))
+
     def call(self, action, **arguments):
+        if action == "merge":
+            # Legacy lifecycle cases use a fully reviewed preview; production itself never
+            # invents these tokens, as asserted in test_merge_requires_full_review_receipt.
+            pending = self.call("status").get("integration", {})
+            if pending.get("state") not in ("staging", "applying", "needs_inspection"):
+                expected = arguments["expected_tree"]
+                mode = arguments.get("resolution", "auto")
+                if "expected_source_tree" not in arguments:
+                    proposal = self.call("preview_merge", expected_tree=expected,
+                                         resolution=mode, path_choices=arguments.get("path_choices", {}))
+                    if proposal["state"] != "ready":
+                        return proposal
+                    arguments.update(expected_source_tree=proposal["source_tree"],
+                                     expected_merged_tree=proposal["merged_tree"])
+                arguments.setdefault("resolution", mode)
+                arguments.setdefault("quality_decision", self.quality_decision(mode))
         return workspace.operate(self.root, self.store, "session", action,
                                  dict(workspace_id=self.identity, **arguments))
 
@@ -113,6 +136,70 @@ class GitWorkspaceTest(unittest.TestCase):
         self.assertTrue(preview["diff_truncated"])
         self.assertNotIn("merged_tree", preview)
         self.assertFalse((self.root / "huge.txt").exists())
+
+    def test_quality_choice_can_keep_parent_take_child_or_select_by_file(self):
+        child = self.fork()
+        (self.root / "code.txt").write_text("PARENT\\nsecond\\nthird\\n")
+        (child / "code.txt").write_text("CHILD\\nsecond\\nthird\\n")
+        (child / "child-only.txt").write_text("new independent feature")
+        tree = self.call("status")["tree"]
+        comparison = self.call("compare_merge", expected_tree=tree)
+        self.assertEqual("ready", comparison["state"])
+        self.assertEqual(["code.txt"], comparison["comparison"]["overlap_paths"])
+        self.assertIn("PARENT", comparison["parent_diff"])
+        self.assertIn("CHILD", comparison["child_diff"])
+        auto = self.call("preview_merge", expected_tree=tree)
+        self.assertEqual("conflict", auto["state"])
+        for mode, wanted in (("prefer_parent", "PARENT\\nsecond\\nthird\\n"),
+                             ("prefer_child", "CHILD\\nsecond\\nthird\\n")):
+            preview = self.call("preview_merge", expected_tree=tree, resolution=mode)
+            self.assertEqual("ready", preview["state"])
+            self.assertEqual(mode, preview["resolution"])
+            result = self.call("merge", expected_tree=tree, resolution=mode,
+                               expected_source_tree=preview["source_tree"],
+                               expected_merged_tree=preview["merged_tree"])
+            self.assertIn(result["state"], ("merged", "already_present"))
+            self.assertEqual(wanted, (self.root / "code.txt").read_text())
+            self.assertEqual("new independent feature", (self.root / "child-only.txt").read_text())
+            # Restore the same parent candidate between alternate policy checks.
+            (self.root / "code.txt").write_text("PARENT\\nsecond\\nthird\\n")
+        chosen = self.call("preview_merge", expected_tree=tree, resolution="select",
+                           path_choices={"code.txt": "parent"})
+        self.assertEqual("ready", chosen["state"])
+        self.assertEqual(chosen["merged_tree"], self.call("preview_merge",
+            expected_tree=tree, resolution="prefer_parent")["merged_tree"])
+        with self.assertRaisesRegex(ValueError, "select requires"):
+            self.call("preview_merge", expected_tree=tree, resolution="select",
+                      path_choices={"some-other-file": "child"})
+
+    def test_merge_requires_full_review_receipt_and_comparison_criteria(self):
+        child = self.fork()
+        (child / "code.txt").write_text("CHILD\\nsecond\\nthird\\n")
+        expected = self.call("status")["tree"]
+        with self.assertRaisesRegex(ValueError, "complete merge preview"):
+            workspace.operate(self.root, self.store, "session", "merge",
+                              dict(workspace_id=self.identity, expected_tree=expected))
+        preview = self.call("preview_merge", expected_tree=expected)
+        with self.assertRaisesRegex(ValueError, "quality decision"):
+            workspace.operate(self.root, self.store, "session", "merge",
+                              dict(workspace_id=self.identity, expected_tree=expected,
+                                   expected_source_tree=preview["source_tree"],
+                                   expected_merged_tree=preview["merged_tree"],
+                                   quality_decision=dict(resolution="auto", reason="insufficient")))
+        self.assertEqual("first\\nsecond\\nthird\\n", (self.root / "code.txt").read_text())
+
+    def test_quality_decision_must_review_both_versions_when_both_changed(self):
+        child = self.fork()
+        (child / "code.txt").write_text("CHILD\\nsecond\\nthird\\n")
+        (self.root / "code.txt").write_text("PARENT\\nsecond\\nthird\\n")
+        tree = self.call("status")["tree"]
+        preview = self.call("preview_merge", expected_tree=tree, resolution="prefer_parent")
+        args = dict(workspace_id=self.identity, expected_tree=tree, resolution="prefer_parent",
+                    expected_source_tree=preview["source_tree"],
+                    expected_merged_tree=preview["merged_tree"],
+                    quality_decision={**self.quality_decision("prefer_parent"), "reviewed_both": False})
+        with self.assertRaisesRegex(ValueError, "explicit comparison"):
+            workspace.operate(self.root, self.store, "session", "merge", args)
 
     def test_conflict_never_modifies_shared_files_or_index(self):
         child = self.fork()
