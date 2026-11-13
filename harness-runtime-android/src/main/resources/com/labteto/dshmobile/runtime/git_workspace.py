@@ -37,6 +37,21 @@ def commit(root, tree, parent):
     return git(root, "commit-tree", tree, "-p", parent, data=b"Agent workspace snapshot\n", env=env).stdout.decode().strip()
 
 
+def merge_proposal(source, admission, child_tree):
+    """Compute the exact integration result without changing either worktree."""
+    parent_tree = snapshot(source)
+    parent = commit(source, parent_tree, admission["base_commit"])
+    child = commit(source, child_tree, admission["base_commit"])
+    attempt = git(source, "merge-tree", "--write-tree", "--merge-base=" + admission["base_commit"],
+                  parent, child, accepted=(0, 1))
+    if attempt.returncode == 1:
+        return dict(state="conflict", source_tree=parent_tree,
+                    detail=attempt.stdout.decode(errors="replace")[:262144])
+    merged_tree = attempt.stdout.decode().splitlines()[0]
+    patch = git(source, "diff", "--binary", "--full-index", parent_tree, merged_tree).stdout
+    return dict(state="ready", source_tree=parent_tree, merged_tree=merged_tree, patch=patch)
+
+
 def save(path, value):
     temporary = path.with_suffix(".tmp")
     with temporary.open("w") as output:
@@ -386,6 +401,24 @@ def locked(root, store, owner, action, arguments):
                     diff=patch[:262144].decode(errors="replace"), diff_truncated=len(patch) > 262144)
     if arguments.get("expected_tree") != child_tree:
         raise ValueError("workspace changed since review; inspect again")
+    if action == "preview_merge":
+        pending = admission.get("integration")
+        if pending and pending["state"] in ("staging", "applying", "needs_inspection"):
+            raise ValueError("pending integration must be recovered before another merge preview")
+        proposal = merge_proposal(source, admission, child_tree)
+        if proposal["state"] == "conflict":
+            return dict(workspace_id=workspace_id, tree=child_tree, **proposal)
+        patch = proposal["patch"]
+        truncated = len(patch) > 262144
+        receipt = dict(workspace_id=workspace_id, tree=child_tree,
+                       source_tree=proposal["source_tree"],
+                       state="needs_full_review" if truncated else "ready",
+                       diff=patch[:262144].decode(errors="replace"),
+                       diff_bytes=len(patch), diff_truncated=truncated)
+        # A truncated preview cannot authorize a mutation of undisclosed paths.
+        if not truncated:
+            receipt["merged_tree"] = proposal["merged_tree"]
+        return receipt
     if action == "discard":
         if admission.get("integration", {}).get("state") in ("staging", "applying", "needs_inspection"):
             raise ValueError("recover the pending integration before discarding its workspace")
@@ -408,16 +441,17 @@ def locked(root, store, owner, action, arguments):
         paths = [os.fsdecode(path) for path in changed.split(b"\0") if path]
         if any(not any(path == scope or path.startswith(scope + "/") for scope in allowed) for path in paths):
             raise ValueError("workspace contains changes outside declared outputs; inspect before merging")
-    parent_tree = snapshot(source)
-    parent = commit(source, parent_tree, admission["base_commit"])
-    child = commit(source, child_tree, admission["base_commit"])
-    merge = git(source, "merge-tree", "--write-tree", "--merge-base=" + admission["base_commit"],
-                parent, child, accepted=(0, 1))
-    if merge.returncode == 1:
+    proposal = merge_proposal(source, admission, child_tree)
+    parent_tree = proposal["source_tree"]
+    if "expected_source_tree" in arguments and arguments["expected_source_tree"] != parent_tree:
+        raise ValueError("source changed since merge preview; inspect again")
+    if proposal["state"] == "conflict":
         return dict(workspace_id=workspace_id, state="conflict", tree=child_tree,
-                    source_tree=parent_tree, detail=merge.stdout.decode(errors="replace")[:262144])
-    merged_tree = merge.stdout.decode().splitlines()[0]
-    patch = git(source, "diff", "--binary", "--full-index", parent_tree, merged_tree).stdout
+                    source_tree=parent_tree, detail=proposal["detail"])
+    merged_tree = proposal["merged_tree"]
+    if "expected_merged_tree" in arguments and arguments["expected_merged_tree"] != merged_tree:
+        raise ValueError("integration result changed since merge preview; inspect again")
+    patch = proposal["patch"]
     if patch:
         git(source, "apply", "--check", "--binary", "--whitespace=nowarn", "-", data=patch)
         if snapshot(source) != parent_tree:
