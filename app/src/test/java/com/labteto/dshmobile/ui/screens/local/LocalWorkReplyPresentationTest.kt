@@ -147,7 +147,7 @@ class LocalWorkReplyPresentationTest {
         assertTrue(batch.operationGroup)
         assertEquals(3, batch.repeatCount)
         assertEquals(listOf("two", "three"), batch.groupedMessages.map { it.id })
-        assertEquals("work-tool:message:one", batch.key)
+        assertEquals("work-tool:execution:execution-one", batch.key)
         assertEquals("work-step:note", grouped[1].key)
 
         val artifact = LocalTranscriptItem.WorkArtifact(
@@ -169,10 +169,13 @@ class LocalWorkReplyPresentationTest {
             listOf(good, good.copy(id = "a2"), failure,
                 good.copy(id = "a3"), unknown, good.copy(id = "a4")),
         ))
-        assertEquals(6, output.size)
-        assertFalse(output.filterIsInstance<LocalTranscriptItem.WorkStep>().any { it.operationGroup })
-        assertEquals(listOf("a", "a2", "b", "a3", "c", "a4"),
-            output.filterIsInstance<LocalTranscriptItem.WorkStep>().map { it.message.id })
+        assertEquals(5, output.size)
+        val steps = output.filterIsInstance<LocalTranscriptItem.WorkStep>()
+        assertTrue(steps.first().operationGroup)
+        assertEquals(listOf("a2"), steps.first().groupedMessages.map { it.id })
+        assertEquals(listOf("a", "b", "a3", "c", "a4"), steps.map { it.message.id })
+        assertTrue(steps[1].message.toolIsError == true)
+        assertEquals("TOOL_OUTCOME_UNKNOWN", steps[3].message.toolErrorCode)
     }
 
     @Test fun independentToolCallsKeepSeparateChronologicalRows() {
