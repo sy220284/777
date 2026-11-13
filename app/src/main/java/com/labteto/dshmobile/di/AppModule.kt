@@ -28,7 +28,12 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
+    fun provideOkHttpClient(policy: com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy): OkHttpClient = OkHttpClient.Builder()
+        .addInterceptor { chain ->
+            val target = chain.request().url
+            policy.current().requireNetworkDestination(target.scheme, target.host)
+            chain.proceed(chain.request())
+        }
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
