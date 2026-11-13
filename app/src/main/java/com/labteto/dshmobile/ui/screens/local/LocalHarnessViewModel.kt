@@ -325,6 +325,17 @@ class LocalHarnessViewModel @Inject constructor(
         toolsUi.remoteGitBranchesForUi(repository)
     internal suspend fun compareRemoteGitForUi(repository: String, remote: String, branch: String) =
         toolsUi.compareRemoteGitForUi(repository, remote, branch)
+    /** Restore an earlier report for the identical diff; this path never invokes a model. */
+    internal suspend fun findIndependentCodeReviewForUi(
+        sessionId: String, repository: String,
+        diff: com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi,
+    ): com.labteto.dshmobile.local.work.LocalIndependentCodeReview? = withContext(Dispatchers.IO) {
+        if (runtime.state.value.sessionId != sessionId ||
+            runtime.state.value.usageMode != LocalUsageMode.WORK) return@withContext null
+        independentCodeReview.findForDiff(sessionId, repository, diff.trackingRef,
+            diff.statistics, diff.patch, diff.truncated)
+    }
+
     internal suspend fun runIndependentCodeReviewForUi(
         sessionId: String, repository: String,
         diff: com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi,
