@@ -60,6 +60,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val networkSearchSettings: LocalNetworkSearchSettings,
     private val sectionStore: LocalSessionSectionUiFacade,
     private val reviewFacade: com.labteto.dshmobile.local.presentation.LocalIndependentCodeReviewUiFacade,
+    private val securityReviewFacade: com.labteto.dshmobile.local.presentation.LocalIndependentSecurityReviewUiFacade,
     private val workProjectUi: com.labteto.dshmobile.local.presentation.LocalWorkProjectsUiFacade,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
@@ -372,6 +373,35 @@ class LocalHarnessViewModel @Inject constructor(
         if (runtime.state.value.sessionId != sessionId ||
             runtime.state.value.usageMode != LocalUsageMode.WORK) return false
         return reviewFacade.accept(sessionId, repository, review, diff)
+    }
+
+
+    internal suspend fun findIndependentSecurityReviewForUi(
+        sessionId: String, repository: String,
+        diff: com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi,
+    ): com.labteto.dshmobile.local.work.LocalSecurityReview? {
+        if (runtime.state.value.sessionId != sessionId ||
+            runtime.state.value.usageMode != LocalUsageMode.WORK) return null
+        return securityReviewFacade.find(sessionId, repository, diff)
+    }
+
+    internal suspend fun runIndependentSecurityReviewForUi(
+        sessionId: String, repository: String,
+        diff: com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi,
+    ): com.labteto.dshmobile.local.work.LocalSecurityReview {
+        require(runtime.state.value.sessionId == sessionId &&
+            runtime.state.value.usageMode == LocalUsageMode.WORK) { "已离开当前工作会话，安全审核中止" }
+        return securityReviewFacade.review(sessionId, repository, diff)
+    }
+
+    internal suspend fun approveIndependentSecurityReviewForUi(
+        sessionId: String, repository: String,
+        review: com.labteto.dshmobile.local.work.LocalSecurityReview,
+        diff: com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi,
+    ): Boolean {
+        if (runtime.state.value.sessionId != sessionId ||
+            runtime.state.value.usageMode != LocalUsageMode.WORK) return false
+        return securityReviewFacade.approve(sessionId, repository, review, diff)
     }
 
     suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
