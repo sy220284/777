@@ -4624,14 +4624,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "3d80c9016227",
+  "source_snapshot": "4dfda623f1bb",
   "observed_delta": {
-    "baseline": "e111bd056e4c",
+    "baseline": "3d80c9016227",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsSections.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
