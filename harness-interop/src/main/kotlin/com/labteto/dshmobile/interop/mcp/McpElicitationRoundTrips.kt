@@ -109,6 +109,21 @@ internal suspend fun mcpCallWithInputRequired(
     error("MCP 追问次数超过协议安全上限，请重新发起工具调用")
 }
 
+/** Restricted MCP enum values; labels are UI-only and never sent to the server. */
+private fun elicitationChoices(spec: JsonObject, titledKey: String): Set<String> {
+    val entries = (spec["enum"] ?: spec[titledKey]) as? JsonArray
+        ?: error("MCP 选择字段缺少枚举选项")
+    require(entries.isNotEmpty()) { "MCP 选择字段没有选项" }
+    val values = entries.map { entry ->
+        val literal = if (entry is JsonObject) entry["const"] else entry
+        val value = literal as? JsonPrimitive
+        require(value != null && value.isString) { "MCP 选项必须为字符串" }
+        value.content
+    }
+    require(values.distinct().size == values.size) { "MCP 表单选项重复" }
+    return values.toSet()
+}
+
 private fun validateMcpElicitationSchema(schema: JsonObject) {
     require(schema["type"]?.jsonPrimitive?.content == "object") {
         "MCP 表单仅允许扁平对象"
@@ -123,8 +138,23 @@ private fun validateMcpElicitationSchema(schema: JsonObject) {
         require(name.isNotBlank() && name.length <= 100) { "MCP 表单字段名称无效" }
         val property = raw as? JsonObject ?: error("MCP 表单字段格式无效")
         val type = property["type"]?.jsonPrimitive?.content ?: error("MCP 字段缺少类型")
-        require(type in setOf("string", "integer", "number", "boolean")) {
+        require(type in setOf("string", "integer", "number", "boolean", "array")) {
             "MCP 表单字段类型暂未支持：$type"
+        }
+        if (type == "array") {
+            val items = property["items"] as? JsonObject
+                ?: error("MCP 多选字段缺少 items")
+            require(items["type"]?.jsonPrimitive?.contentOrNull == "string" ||
+                items["anyOf"] is JsonArray) { "MCP 多选仅支持字符串选项" }
+            elicitationChoices(items, "anyOf")
+            val minItems = property["minItems"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+            val maxItems = property["maxItems"]?.jsonPrimitive?.content?.toIntOrNull()
+            require(minItems >= 0 && (maxItems == null || maxItems >= minItems)) {
+                "MCP 多选数量约束无效"
+            }
+        }
+        if (type == "string" && property["oneOf"] != null) {
+            elicitationChoices(property, "oneOf")
         }
         // Passwords and API credentials belong in URL-mode elicitation, never form-mode.
         val lower = (name + " " + (property["format"]?.jsonPrimitive?.contentOrNull ?: "")).lowercase()
@@ -144,6 +174,20 @@ private fun validateMcpElicitationAnswer(schema: JsonObject, content: JsonObject
     for ((key, value) in answer) {
         val property = properties.getValue(key).jsonObject
         val type = property["type"]?.jsonPrimitive?.content
+        if (type == "array") {
+            val selected = value as? JsonArray ?: error("MCP 多选字段格式无效")
+            val items = property["items"]!!.jsonObject
+            val allowed = elicitationChoices(items, "anyOf")
+            require(selected.all { item ->
+                val literal = item as? JsonPrimitive
+                literal != null && literal.isString && literal.content in allowed
+            }) { "MCP 多选包含未授权的选项" }
+            val minimum = property["minItems"]?.jsonPrimitive?.content?.toIntOrNull()
+            val maximum = property["maxItems"]?.jsonPrimitive?.content?.toIntOrNull()
+            require((minimum == null || selected.size >= minimum) &&
+                (maximum == null || selected.size <= maximum)) { "MCP 多选数量不符合要求" }
+            continue
+        }
         val primitive = value as? JsonPrimitive ?: error("MCP 表单字段值无效")
         when (type) {
             "string" -> {
@@ -154,15 +198,30 @@ private fun validateMcpElicitationAnswer(schema: JsonObject, content: JsonObject
                 require((min == null || str.length >= min) && (max == null || str.length <= max)) {
                     "MCP 字段长度不符合要求"
                 }
-                (property["enum"] as? JsonArray)?.let { list ->
+                if (property["oneOf"] != null) {
+                    require(str in elicitationChoices(property, "oneOf")) {
+                        "MCP 答复不在可选项中"
+                    }
+                } else (property["enum"] as? JsonArray)?.let { list ->
                     require(list.any { it == primitive }) { "MCP 答复不在可选项中" }
                 }
             }
-            "integer" -> require(!primitive.isString && primitive.content.toLongOrNull() != null) {
-                "MCP 整数字段格式无效"
-            }
-            "number" -> require(!primitive.isString && primitive.content.toDoubleOrNull() != null) {
-                "MCP 数字字段格式无效"
+            "integer", "number" -> {
+                val number = if (type == "integer") {
+                    require(!primitive.isString && primitive.content.toLongOrNull() != null) {
+                        "MCP 整数字段格式无效"
+                    }
+                    primitive.content.toLong().toDouble()
+                } else {
+                    require(!primitive.isString) { "MCP 数字字段格式无效" }
+                    primitive.content.toDoubleOrNull()
+                        ?: error("MCP 数字字段格式无效")
+                }
+                require(number.isFinite()) { "MCP 数字字段必须为有限值" }
+                val minimum = property["minimum"]?.jsonPrimitive?.content?.toDoubleOrNull()
+                val maximum = property["maximum"]?.jsonPrimitive?.content?.toDoubleOrNull()
+                require((minimum == null || number >= minimum) &&
+                    (maximum == null || number <= maximum)) { "MCP 数字超出允许范围" }
             }
             "boolean" -> require(!primitive.isString && primitive.content in setOf("true","false")) {
                 "MCP 布尔字段格式无效"

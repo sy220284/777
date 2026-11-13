@@ -3,6 +3,8 @@ package com.labteto.dshmobile.interop.mcp
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -69,6 +71,74 @@ class McpElicitationRoundTripsTest {
         )
         assertEquals(2, step)
         assertEquals(true, result["isError"]!!.jsonPrimitive.content.toBoolean())
+    }
+
+
+    @Test fun multiSelectArrayRoundTripsAndRejectsInvalidChoices() = runTest {
+        val selectionSchema = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                put("colors", buildJsonObject {
+                    put("type", "array")
+                    put("minItems", 1)
+                    put("maxItems", 2)
+                    put("items", buildJsonObject {
+                        put("type", "string")
+                        put("enum", buildJsonArray {
+                            add(JsonPrimitive("red"))
+                            add(JsonPrimitive("blue"))
+                        })
+                    })
+                })
+            })
+            put("required", buildJsonArray { add(JsonPrimitive("colors")) })
+        }
+        val prompt = buildJsonObject {
+            put("resultType", "input_required")
+            put("inputRequests", buildJsonObject {
+                put("colors", buildJsonObject {
+                    put("method", "elicitation/create")
+                    put("params", buildJsonObject {
+                        put("mode", "form")
+                        put("message", "选择颜色")
+                        put("requestedSchema", selectionSchema)
+                    })
+                })
+            })
+        }
+        suspend fun runWith(values: List<String>): Pair<Int, Result<JsonObject>> {
+            var calls = 0
+            val result = runCatching {
+                mcpCallWithInputRequired(
+                    request = { args ->
+                        calls++
+                        if (calls == 1) prompt else {
+                            val selected = args["inputResponses"]!!.jsonObject
+                                .getValue("colors").jsonObject.getValue("content").jsonObject
+                                .getValue("colors") as kotlinx.serialization.json.JsonArray
+                            assertEquals(values.size, selected.size)
+                            buildJsonObject { put("resultType", "complete") }
+                        }
+                    },
+                    name = "choose", arguments = input,
+                    onElicitation = {
+                        McpElicitationReply("accept", buildJsonObject {
+                            put("colors", buildJsonArray { values.forEach { add(JsonPrimitive(it)) } })
+                        })
+                    },
+                )
+            }
+            return calls to result
+        }
+        val valid = runWith(listOf("red", "blue"))
+        assertEquals(2, valid.first)
+        assertTrue(valid.second.isSuccess)
+        val invalid = runWith(listOf("red", "wrong"))
+        assertEquals(1, invalid.first)
+        assertTrue(invalid.second.isFailure)
+        val empty = runWith(emptyList())
+        assertEquals(1, empty.first)
+        assertTrue(empty.second.isFailure)
     }
 
     @Test fun ordinaryResultsNeverPromptOrReplay() = runTest {
