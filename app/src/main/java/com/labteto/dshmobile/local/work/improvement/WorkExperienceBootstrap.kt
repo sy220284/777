@@ -98,7 +98,7 @@ internal object WorkExperienceBootstrap {
         var rejections = 0
         var conflicts = 0
         var contractErrors = 0
-        var supportedFindings = 0
+        val currentFindings = linkedMapOf<String, String>()
         forEachCompletedGoalEvent(log, goal) { event ->
             when (event.type) {
                 "tool/result" -> if (
@@ -110,16 +110,21 @@ internal object WorkExperienceBootstrap {
                         contractErrors++
                     }
                 }
-                "work/finding" -> if (
-                    (event.data["status"] as? JsonPrimitive)?.contentOrNull == "supported"
-                ) supportedFindings++
+                "work/finding" -> {
+                    val id = (event.data["finding_id"] as? JsonPrimitive)?.contentOrNull
+                    val status = (event.data["status"] as? JsonPrimitive)?.contentOrNull
+                    if (!id.isNullOrBlank() && status in setOf("hypothesis", "supported", "rejected")) {
+                        currentFindings[id] = status.orEmpty()
+                    }
+                }
                 "goal/transition-rejected" -> rejections++
                 "work/output-quality" -> {
                     conflicts += (event.data["findings"] as? JsonArray)?.size ?: 0
                 }
             }
         }
-        return Signals(toolFailures, rejections, conflicts, contractErrors, supportedFindings)
+        return Signals(toolFailures, rejections, conflicts, contractErrors,
+            currentFindings.values.count { it == "supported" })
     }
 
     /**
