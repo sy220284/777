@@ -8,9 +8,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 
 /** A notification is a hint to re-read real bytes, never a proof of file integrity. */
-internal enum class LocalWorkspaceChangeKind { CREATED, UPDATED, REMOVED, MOVED, UNKNOWN }
+enum class LocalWorkspaceChangeKind { CREATED, UPDATED, REMOVED, MOVED, UNKNOWN }
 
-internal data class LocalWorkspaceFileChange(
+data class LocalWorkspaceFileChange(
     val path: String,
     val kind: LocalWorkspaceChangeKind,
 )
