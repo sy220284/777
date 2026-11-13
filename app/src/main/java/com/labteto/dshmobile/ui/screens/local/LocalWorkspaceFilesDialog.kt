@@ -5,7 +5,6 @@ import com.shenyan.designsystem.foundation.SyMetric
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -48,7 +47,6 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -968,20 +966,7 @@ internal fun LocalWorkspaceFilesDialog(
                 }
                 if (result.patch.isNotEmpty()) {
                     Text("差异预览", style = DsType.small13Strong, color = colors.text)
-                    SelectionContainer {
-                        Column(
-                            Modifier.fillMaxWidth().heightIn(max = 360.dp)
-                                .verticalScroll(rememberScrollState()),
-                        ) {
-                            Text(result.patch.take(24_000), style = DsType.small13, color = colors.text,
-                                    fontFamily = FontFamily.Monospace, softWrap = false,
-                                    modifier = Modifier.horizontalScroll(rememberScrollState()))
-                        }
-                    }
-                    if (result.patch.length > 24_000) {
-                        Text("界面显示前 24000 字符，完整返回内容可复制。",
-                            style = DsType.caption11, color = colors.textSecondary)
-                    }
+                    LocalGitDiffPreview(result.patch)
                     SyButton(
                         text = "复制差异内容",
                         onClick = { clipboard.setText(AnnotatedString(result.patch)) },
