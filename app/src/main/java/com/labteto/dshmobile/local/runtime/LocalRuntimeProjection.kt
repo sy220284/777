@@ -163,6 +163,28 @@ internal class LocalRuntimeProjection(
         }
     }
 
+    /** Runtime-owned projection for a committed Chat inbox mutation, guarded by active session and mode. */
+    internal fun projectChatQueuedUserTimeline(
+        sessionId: String,
+        messages: List<LocalHarnessMessage>,
+        index: com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex,
+        pendingCount: Int,
+        clearError: Boolean,
+    ) {
+        state.update { visible ->
+            if (visible.sessionId != sessionId || visible.usageMode != LocalUsageMode.CHAT) {
+                visible
+            } else {
+                visible.copy(
+                    messages = messages,
+                    transcriptIndex = index,
+                    kernel = visible.kernel.copy(queuedInputCount = pendingCount),
+                    error = if (clearError) null else visible.error,
+                )
+            }
+        }
+    }
+
     internal fun removeForegroundTranscriptMessage(
         sessionId: String,
         messageId: String,
