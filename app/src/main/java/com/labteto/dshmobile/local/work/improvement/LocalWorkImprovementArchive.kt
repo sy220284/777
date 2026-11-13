@@ -33,7 +33,8 @@ internal class LocalWorkImprovementArchive(
     private data class Problem(val session: String, val sequence: Long, val createdAt: Long, val summary: String)
     private data class GoalReceipt(val session: String, val sequence: Long, val createdAt: Long, val hasMachineEvidence: Boolean)
     private data class Finding(
-        val session: String, val goalId: String, val id: String, val sequence: Long,
+        val session: String, val goalId: String, val projectId: String,
+        val id: String, val sequence: Long,
         val createdAt: Long, val status: String, val summary: String,
         val sourceCallId: String, val nextAction: String,
     )
@@ -101,6 +102,51 @@ internal class LocalWorkImprovementArchive(
         return adopted?.copy(active = true) ?: matches.firstOrNull {
             it.id !in used || it.id in usedForThisGoal
         }?.copy(active = false)
+    }
+
+    /**
+     * Cross-task reuse of researched leads, scoped to the very same project.
+     * Suggestions remain untrusted historical evidence; they never change policy
+     * or overwrite the current Goal. A bounded, relevance-filtered excerpt is
+     * assembled from the existing cached Session EventLog projection.
+     */
+    @Synchronized
+    fun relevantDiscoveries(projectId: String, objective: String): String {
+        if (projectId.isBlank() || objective.isBlank()) return ""
+        val terms = investigationSearchTerms(objective)
+        if (terms.size < 2) return ""
+        val candidates = cached.values.asSequence()
+            .flatMap { it.findings.values.asSequence() }
+            .filter { it.projectId == projectId && it.status == "supported" }
+            .map { finding ->
+                val overlap = investigationSearchTerms(finding.summary + " " + finding.nextAction)
+                    .count { it in terms }
+                finding to overlap
+            }
+            .filter { it.second >= 2 }
+            .sortedWith(compareByDescending<Pair<Finding, Int>> { it.second }
+                .thenByDescending { it.first.createdAt })
+            .take(3)
+            .toList()
+        if (candidates.isEmpty()) return ""
+        return buildString {
+            appendLine("【相似任务的本机调查线索：历史来源需要重新核验，按当前目标和权限使用】")
+            candidates.forEach { (finding, _) ->
+                append("- ").append(finding.summary.replace("\\n", " ").take(220))
+                append("；会话=").append(finding.session.take(70))
+                append("，来源调用=").append(finding.sourceCallId.take(70))
+                appendLine()
+            }
+        }.take(950)
+    }
+
+    private fun investigationSearchTerms(value: String): Set<String> {
+        val excluded = setOf("任务", "进行", "检查", "问题", "发现", "结果", "工作", "处理", "一个", "已经")
+        val lower = value.lowercase()
+        val latin = Regex("[a-z0-9_]{2,}").findAll(lower).map { it.value }
+        val han = Regex("[\\u4e00-\\u9fff]+").findAll(lower)
+            .flatMap { it.value.windowed(2).asSequence() }
+        return (latin + han).filter { it !in excluded }.toSet()
     }
 
     /** Create only missing files. The user's notes are never overwritten. */
@@ -393,7 +439,8 @@ internal class LocalWorkImprovementArchive(
                 "work/finding" -> {
                     val id = data.text("finding_id").orEmpty()
                     if (id.isNotBlank() && data.text("status") in setOf("hypothesis", "supported", "rejected")) {
-                        findings[id] = Finding(session, data.text("goal_id").orEmpty(), id, e.sequence,
+                        findings[id] = Finding(session, data.text("goal_id").orEmpty(),
+                            data.text("project_id").orEmpty(), id, e.sequence,
                             e.createdAt, data.text("status").orEmpty(),
                             data.text("summary").orEmpty().take(500),
                             data.text("source_call_id").orEmpty().take(100),
