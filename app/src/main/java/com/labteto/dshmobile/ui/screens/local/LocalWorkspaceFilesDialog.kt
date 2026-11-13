@@ -789,33 +789,23 @@ internal fun LocalWorkspaceFilesDialog(
                 if (mode == LocalFilesMode.WORKSPACE && preview == null && !selecting &&
                     (compareLocalGit != null || compareCommitGit != null ||
                         (remoteGitBranches != null && compareRemoteGit != null))) {
-                    androidx.compose.foundation.layout.FlowRow(
+                    Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
-                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm, Alignment.End),
-                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                        horizontalArrangement = Arrangement.End,
                     ) {
-                        if (compareLocalGit != null) SyButton(
-                            text = "检查本地修改",
-                            onClick = ::openLocalGitComparison,
+                        SyButton(
+                            text = "代码审查",
+                            onClick = {
+                                when {
+                                    compareLocalGit != null -> openLocalGitComparison()
+                                    remoteGitBranches != null && compareRemoteGit != null -> openGitComparison()
+                                    compareCommitGit != null -> openCommitComparison()
+                                }
+                            },
                             enabled = !loading,
                             size = SyButtonSize.Small,
                             variant = SyButtonVariant.Outline,
-                            modifier = Modifier.testTag("work_local_git_diff"),
-                        )
-                        if (remoteGitBranches != null && compareRemoteGit != null) SyButton(
-                            text = "对比远端分支",
-                            onClick = ::openGitComparison,
-                            enabled = !loading,
-                            size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Ghost,
-                        )
-                        if (compareCommitGit != null) SyButton(
-                            text = "审查指定提交",
-                            onClick = ::openCommitComparison,
-                            enabled = !loading,
-                            size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Ghost,
-                            modifier = Modifier.testTag("work_git_commit_review_open"),
+                            modifier = Modifier.testTag("work_git_review_entry"),
                         )
                     }
                 }
@@ -1114,6 +1104,37 @@ internal fun LocalWorkspaceFilesDialog(
             onDismiss = { gitJob?.cancel(); gitSheetOpen = false },
             scrollable = true,
         ) {
+            Text("审查范围", style = DsType.small13Strong, color = colors.text)
+            androidx.compose.foundation.layout.FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+            ) {
+                if (compareLocalGit != null) SyButton(
+                    text = "本地修改",
+                    onClick = ::openLocalGitComparison,
+                    enabled = !gitLoading && !codeReviewBusy && !securityReviewBusy,
+                    size = SyButtonSize.Small,
+                    variant = if (gitIsLocal) SyButtonVariant.Outline else SyButtonVariant.Ghost,
+                    modifier = Modifier.testTag("work_local_git_diff"),
+                )
+                if (remoteGitBranches != null && compareRemoteGit != null) SyButton(
+                    text = "远端分支",
+                    onClick = ::openGitComparison,
+                    enabled = !gitLoading && !codeReviewBusy && !securityReviewBusy,
+                    size = SyButtonSize.Small,
+                    variant = if (!gitIsLocal && !gitIsCommit) SyButtonVariant.Outline else SyButtonVariant.Ghost,
+                    modifier = Modifier.testTag("work_git_remote_diff"),
+                )
+                if (compareCommitGit != null) SyButton(
+                    text = "指定提交",
+                    onClick = ::openCommitComparison,
+                    enabled = !gitLoading && !codeReviewBusy && !securityReviewBusy,
+                    size = SyButtonSize.Small,
+                    variant = if (gitIsCommit) SyButtonVariant.Outline else SyButtonVariant.Ghost,
+                    modifier = Modifier.testTag("work_git_commit_review_open"),
+                )
+            }
             Text("仓库目录：$gitRepository", style = DsType.small13, color = colors.textSecondary)
             if (gitIsCommit && compareCommitGit != null) {
                 SySearchField(
