@@ -25,6 +25,7 @@ internal class LocalDownloadsPublisher(context: Context, private val workspace: 
         const val DIRECTORY = "神言神语"
         const val RELATIVE_DIRECTORY = "Download/$DIRECTORY"
         private val ROOT = "${Environment.DIRECTORY_DOWNLOADS}/$DIRECTORY/"
+        private val publicationLock = Any()
     }
 
     /** An explanatory first-run file makes the public folder visible before any task completes. */
@@ -106,10 +107,11 @@ internal class LocalDownloadsPublisher(context: Context, private val workspace: 
     }
 
     /** Unchanged sources require zero data reads; changed sources are streamed exactly once. */
-    @Synchronized private fun publishInternal(
+    private fun publishInternal(
         id: String, filename: String, directory: String, size: Long, modified: Long,
         copy: (OutputStream) -> Long,
     ): LocalPublishedDownload {
+        synchronized(publicationLock) {
         val old = cached(id)
         if (old != null && sameSource(id, size, modified)) return old
         val values = ContentValues().apply {
@@ -153,6 +155,7 @@ internal class LocalDownloadsPublisher(context: Context, private val workspace: 
             return LocalPublishedDownload(path, uri, true)
         } finally {
             if (!retained) resolver.delete(uri, null, null)
+        }
         }
     }
 
