@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
@@ -14,6 +15,9 @@ data class DeviceCapabilitiesState(
     val loading: Boolean = false,
     val accessibility: Boolean = false,
     val notifications: Boolean = false,
+    /** System grant and a bound service are separate states after returning from Settings. */
+    val accessibilityGranted: Boolean = false,
+    val notificationAccessGranted: Boolean = false,
     /** System permission for this app to POST notifications; independent from listener access. */
     val postingNotifications: Boolean? = null,
     val virtualDisplay: Boolean = true,
@@ -28,7 +32,19 @@ internal class DeviceCapabilitiesController(
     val state: StateFlow<DeviceCapabilitiesState> = _state.asStateFlow()
 
     fun refresh() {
+        val accessibilityComponent = ComponentName(appContext, HarnessAccessibilityService::class.java)
+        val enabledAccessibility = Settings.Secure.getString(
+            appContext.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ).orEmpty().split(':')
+        val accessibilityGranted = Settings.Secure.getInt(
+            appContext.contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED, 0,
+        ) == 1 && enabledAccessibility.any {
+            ComponentName.unflattenFromString(it) == accessibilityComponent
+        }
         _state.value = readDeviceCapabilityState().copy(
+            accessibilityGranted = accessibilityGranted,
+            notificationAccessGranted = appContext.packageName in
+                NotificationManagerCompat.getEnabledListenerPackages(appContext),
             postingNotifications = NotificationManagerCompat.from(appContext).areNotificationsEnabled(),
         )
     }
