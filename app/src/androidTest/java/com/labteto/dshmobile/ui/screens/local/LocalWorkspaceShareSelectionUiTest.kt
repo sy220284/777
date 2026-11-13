@@ -27,6 +27,78 @@ class LocalWorkspaceShareSelectionUiTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
+    fun workspaceGitCompareUsesSelectedTrackingRefAndShowsActualPatch() {
+        val calls = mutableListOf<Triple<String, String, String>>()
+        compose.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(
+                    mode = LocalFilesMode.WORKSPACE,
+                    sessionId = "git-compare",
+                    workspacePath = File(context.filesDir, "local-harness/workspace").absolutePath,
+                    loadWorkspace = { emptyList() },
+                    remoteGitBranches = { directory ->
+                        assertEquals(".", directory)
+                        listOf("origin/main", "upstream/release/v2")
+                    },
+                    compareRemoteGit = { directory, remote, branch ->
+                        calls += Triple(directory, remote, branch)
+                        com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi(
+                            "refs/remotes/$remote/$branch",
+                            "1 file changed, 1 insertion(+)",
+                            "@@ -1 +1 @@\\n+changed",
+                            truncated = false,
+                        )
+                    },
+                    loadConversation = { error("不能扫描会话") },
+                    loadPreview = { error("不需要文件预览") },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("对比远端分支").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("对比远端分支").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("upstream/release/v2").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("upstream/release/v2").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("差异预览").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("1 file changed, 1 insertion(+)").assertExists()
+        compose.runOnIdle { assertEquals(listOf(Triple(".", "upstream", "release/v2")), calls) }
+    }
+
+    @Test
+    fun workspaceGitWithoutTrackingRefsExplainsWhatToDoInsteadOfPretendingSuccess() {
+        compose.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(
+                    mode = LocalFilesMode.WORKSPACE,
+                    sessionId = "git-no-branches",
+                    workspacePath = File(context.filesDir, "local-harness/workspace").absolutePath,
+                    loadWorkspace = { emptyList() },
+                    remoteGitBranches = { emptyList() },
+                    compareRemoteGit = { _, _, _ -> error("不能比较不存在的分支") },
+                    loadConversation = { error("不能扫描会话") },
+                    loadPreview = { error("不需要文件预览") },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("对比远端分支").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("对比远端分支").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("当前目录没有可比较的本地远端跟踪分支。请先在该 Git 仓库中获取远端分支。")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("差异预览").assertDoesNotExist()
+    }
+
+    @Test
     fun returningWhilePreviewLoadsDoesNotReopenTheOldFile() {
         val started = java.util.concurrent.atomic.AtomicBoolean(false)
         val release = kotlinx.coroutines.CompletableDeferred<Unit>()
