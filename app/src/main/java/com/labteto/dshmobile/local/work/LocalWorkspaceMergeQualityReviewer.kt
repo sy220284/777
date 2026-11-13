@@ -102,7 +102,7 @@ internal class LocalWorkspaceMergeQualityReviewer @Inject constructor(
                 check(part.completionReason == LocalModelCompletionReason.COMPLETED && part.toolCalls.isEmpty()) {
                     "大补丁质量比较第 ${index + 1}/${chunks.size} 段未完整完成"
                 }
-                summary = requireNotNull(part.content?.trim()?.takeIf(String::isNotEmpty)) {
+                summary = requireNotNull(part.content?.trim()?.takeIf { it.isNotEmpty() }) {
                     "大补丁质量比较缺少实际代码摘要"
                 }
                 check(summary.length <= 12_000) { "分段质量摘要超出单次模型上下文范围，需压缩后重审" }
