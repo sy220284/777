@@ -296,7 +296,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalUiSessionIdentityProjection.kt",
-      "sha256": "8d931f751c463e02"
+      "sha256": "bc5e4235ad309d12"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalUsageMode.kt",
@@ -3936,7 +3936,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/uicontract/ConversationUiPort.kt",
-      "sha256": "57764ddbfada59a7"
+      "sha256": "fe4f8319c6be7f76"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/uicontract/CurrentPersonaUiPort.kt",
@@ -4576,16 +4576,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "abcb60940039",
+  "source_snapshot": "6737ca3fb021",
   "observed_delta": {
-    "baseline": "8c7e6f53a785",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSessionSectionUiFacade.kt"
-    ],
+    "baseline": "abcb60940039",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/LocalUiSessionIdentityProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/uicontract/ConversationUiPort.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
