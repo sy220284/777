@@ -27,6 +27,7 @@ internal class LocalWebSearchClient(
     private val http: OkHttpClient,
     private val json: Json,
     private val onBillableResult: (String) -> Unit = {},
+    private val verifyEndpoint: (String) -> Unit = {},
 ) {
     suspend fun search(
         apiKey: String,
@@ -107,6 +108,7 @@ internal class LocalWebSearchClient(
         var attempt = 0
         while (true) {
             try {
+                verifyEndpoint(endpoint)
                 return withCancellableHttpResponse(client.newCall(request)) { response ->
                     if (!response.isSuccessful) {
                         val code = when (response.code) {
