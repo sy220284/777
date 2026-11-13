@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1945,
+  "repository_code_file_count": 1947,
   "production_source_count": 1134,
-  "test_code_file_count": 666,
+  "test_code_file_count": 668,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -4600,19 +4600,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "924a3d75d7fb",
+  "source_snapshot": "66a75cc8eb49",
   "observed_delta": {
-    "baseline": "cc369dde7bea",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalMcpElicitationUiBridge.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/McpElicitationDialog.kt"
-    ],
+    "baseline": "924a3d75d7fb",
+    "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/interaction/LocalInteractionModels.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
