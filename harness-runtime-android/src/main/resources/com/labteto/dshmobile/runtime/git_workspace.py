@@ -37,19 +37,113 @@ def commit(root, tree, parent):
     return git(root, "commit-tree", tree, "-p", parent, data=b"Agent workspace snapshot\n", env=env).stdout.decode().strip()
 
 
-def merge_proposal(source, admission, child_tree):
-    """Compute the exact integration result without changing either worktree."""
+MERGE_RESOLUTIONS = ("auto", "prefer_parent", "prefer_child", "select")
+MAX_REVIEW_BYTES = 262144
+
+
+def changed_paths(source, before, after):
+    data = git(source, "diff", "--name-only", "--no-renames", "-z", before, after).stdout
+    return {os.fsdecode(part) for part in data.split(b"\\0") if part}
+
+
+def tree_blobs(source, tree):
+    entries = {}
+    for record in git(source, "ls-tree", "-r", "-z", tree).stdout.split(b"\\0"):
+        if not record:
+            continue
+        header, path = record.split(b"\\t", 1)
+        mode, kind, oid = header.decode().split()
+        entries[os.fsdecode(path)] = (mode, kind, oid)
+    return entries
+
+
+def merge_comparison(source, admission, parent_tree, child_tree):
+    base = admission["base_tree"]
+    parent = changed_paths(source, base, parent_tree)
+    child = changed_paths(source, base, child_tree)
+    return dict(parent_only_paths=sorted(parent - child),
+                child_only_paths=sorted(child - parent),
+                overlap_paths=sorted(parent & child))
+
+
+def choose_file_versions(source, parent_tree, child_tree, comparison, resolution, choices):
+    """Use the exact selected whole-file versions; unrelated parent edits remain intact."""
+    overlap = set(comparison["overlap_paths"])
+    if resolution == "select":
+        if set(choices) != overlap or any(choice not in ("parent", "child") for choice in choices.values()):
+            raise ValueError("select requires a parent/child choice for every overlapping path")
+    elif choices:
+        raise ValueError("path_choices are only valid for select resolution")
+    use_child = set(comparison["child_only_paths"])
+    use_child.update(path for path in overlap if
+                     (resolution == "prefer_child" or
+                      (resolution == "select" and choices[path] == "child")))
+    if not use_child:
+        return parent_tree
+    parent_files = tree_blobs(source, parent_tree)
+    child_files = tree_blobs(source, child_tree)
+    # File/directory path replacement must be handled by an explicit new candidate
+    # worktree rather than guessing which unrelated descendant should be removed.
+    retained = set(parent_files) - use_child
+    for path in use_child:
+        if any(other.startswith(path + "/") or path.startswith(other + "/")
+               for other in retained):
+            raise ValueError("file/directory overlap needs a reworked workspace: " + path)
+    with tempfile.TemporaryDirectory(prefix="merge-choice-") as directory:
+        env = dict(os.environ, GIT_INDEX_FILE=str(Path(directory) / "index"))
+        git(source, "read-tree", parent_tree, env=env)
+        instructions = bytearray()
+        for path in sorted(use_child):
+            entry = child_files.get(path)
+            if entry is not None and entry[1] != "blob":
+                raise ValueError("non-file merge needs a reworked workspace: " + path)
+            mode, oid = (entry[0], entry[2]) if entry else ("0", "0" * 40)
+            instructions.extend(f"{mode} {oid}\\t".encode() + os.fsencode(path) + b"\\0")
+        git(source, "update-index", "-z", "--index-info", data=bytes(instructions), env=env)
+        return git(source, "write-tree", env=env).stdout.decode().strip()
+
+
+def merge_proposal(source, admission, child_tree, resolution="auto", choices=None):
+    """Compute a precisely versioned choice; Git's text auto-merge is one option, not a verdict."""
+    if resolution not in MERGE_RESOLUTIONS:
+        raise ValueError("unknown merge resolution")
+    choices = {} if choices is None else choices
+    if not isinstance(choices, dict) or any(not isinstance(path, str) for path in choices):
+        raise ValueError("invalid path_choices")
     parent_tree = snapshot(source)
-    parent = commit(source, parent_tree, admission["base_commit"])
-    child = commit(source, child_tree, admission["base_commit"])
-    attempt = git(source, "merge-tree", "--write-tree", "--merge-base=" + admission["base_commit"],
-                  parent, child, accepted=(0, 1))
-    if attempt.returncode == 1:
-        return dict(state="conflict", source_tree=parent_tree,
-                    detail=attempt.stdout.decode(errors="replace")[:262144])
-    merged_tree = attempt.stdout.decode().splitlines()[0]
+    comparison = merge_comparison(source, admission, parent_tree, child_tree)
+    if resolution == "auto":
+        if choices:
+            raise ValueError("auto resolution cannot accept path choices")
+        parent = commit(source, parent_tree, admission["base_commit"])
+        child = commit(source, child_tree, admission["base_commit"])
+        attempt = git(source, "merge-tree", "--write-tree", "--merge-base=" + admission["base_commit"],
+                      parent, child, accepted=(0, 1))
+        if attempt.returncode == 1:
+            return dict(state="conflict", source_tree=parent_tree, comparison=comparison,
+                        resolution=resolution, detail=attempt.stdout.decode(errors="replace")[:MAX_REVIEW_BYTES])
+        merged_tree = attempt.stdout.decode().splitlines()[0]
+    else:
+        merged_tree = choose_file_versions(source, parent_tree, child_tree, comparison, resolution, choices)
     patch = git(source, "diff", "--binary", "--full-index", parent_tree, merged_tree).stdout
-    return dict(state="ready", source_tree=parent_tree, merged_tree=merged_tree, patch=patch)
+    return dict(state="ready", source_tree=parent_tree, merged_tree=merged_tree, patch=patch,
+                resolution=resolution, comparison=comparison)
+
+
+def validate_quality_decision(decision, resolution, comparison):
+    """A review is an attributable judgment, not an assertion that tests executed."""
+    if not isinstance(decision, dict) or decision.get("resolution") != resolution:
+        raise ValueError("merge quality decision is missing or does not match resolution")
+    reason = decision.get("reason")
+    if not isinstance(reason, str) or len(reason.strip()) < 12 or len(reason) > 4000:
+        raise ValueError("merge quality decision requires a concrete reason")
+    criteria = decision.get("criteria")
+    if not isinstance(criteria, dict) or not all(
+            isinstance(criteria.get(key), str) and criteria[key].strip()
+            for key in ("correctness", "experience", "maintainability")):
+        raise ValueError("merge quality decision must compare correctness, experience and maintainability")
+    if comparison["overlap_paths"] and not decision.get("reviewed_both"):
+        raise ValueError("overlapping implementations require explicit comparison of both sides")
 
 
 def save(path, value):
@@ -401,21 +495,39 @@ def locked(root, store, owner, action, arguments):
                     diff=patch[:262144].decode(errors="replace"), diff_truncated=len(patch) > 262144)
     if arguments.get("expected_tree") != child_tree:
         raise ValueError("workspace changed since review; inspect again")
-    if action == "preview_merge":
+    if action in ("compare_merge", "preview_merge"):
         pending = admission.get("integration")
         if pending and pending["state"] in ("staging", "applying", "needs_inspection"):
-            raise ValueError("pending integration must be recovered before another merge preview")
-        proposal = merge_proposal(source, admission, child_tree)
+            raise ValueError("pending integration must be recovered before another merge review")
+        parent_tree = snapshot(source)
+        comparison = merge_comparison(source, admission, parent_tree, child_tree)
+        if action == "compare_merge":
+            parent_diff = git(source, "diff", "--binary", "--full-index",
+                              base_tree, parent_tree).stdout
+            child_diff = git(source, "diff", "--binary", "--full-index",
+                             base_tree, child_tree).stdout
+            if len(parent_diff) > MAX_REVIEW_BYTES or len(child_diff) > MAX_REVIEW_BYTES:
+                return dict(state="needs_full_review", workspace_id=workspace_id,
+                            tree=child_tree, source_tree=parent_tree, comparison=comparison,
+                            parent_diff_bytes=len(parent_diff), child_diff_bytes=len(child_diff))
+            return dict(state="ready", workspace_id=workspace_id, tree=child_tree,
+                        source_tree=parent_tree, comparison=comparison,
+                        parent_diff=parent_diff.decode(errors="replace"),
+                        child_diff=child_diff.decode(errors="replace"))
+        resolution = arguments.get("resolution", "auto")
+        choices = arguments.get("path_choices", {})
+        proposal = merge_proposal(source, admission, child_tree, resolution, choices)
         if proposal["state"] == "conflict":
             return dict(workspace_id=workspace_id, tree=child_tree, **proposal)
         patch = proposal["patch"]
-        truncated = len(patch) > 262144
+        truncated = len(patch) > MAX_REVIEW_BYTES
         receipt = dict(workspace_id=workspace_id, tree=child_tree,
                        source_tree=proposal["source_tree"],
+                       resolution=resolution, path_choices=choices,
+                       comparison=proposal["comparison"],
                        state="needs_full_review" if truncated else "ready",
-                       diff=patch[:262144].decode(errors="replace"),
+                       diff=patch[:MAX_REVIEW_BYTES].decode(errors="replace"),
                        diff_bytes=len(patch), diff_truncated=truncated)
-        # A truncated preview cannot authorize a mutation of undisclosed paths.
         if not truncated:
             receipt["merged_tree"] = proposal["merged_tree"]
         return receipt
@@ -441,16 +553,24 @@ def locked(root, store, owner, action, arguments):
         paths = [os.fsdecode(path) for path in changed.split(b"\0") if path]
         if any(not any(path == scope or path.startswith(scope + "/") for scope in allowed) for path in paths):
             raise ValueError("workspace contains changes outside declared outputs; inspect before merging")
-    proposal = merge_proposal(source, admission, child_tree)
+    if not all(arguments.get(key) for key in ("expected_source_tree", "expected_merged_tree")):
+        raise ValueError("a complete merge preview and its two tree versions are required")
+    resolution = arguments.get("resolution", "auto")
+    choices = arguments.get("path_choices", {})
+    proposal = merge_proposal(source, admission, child_tree, resolution, choices)
     parent_tree = proposal["source_tree"]
-    if "expected_source_tree" in arguments and arguments["expected_source_tree"] != parent_tree:
+    if arguments["expected_source_tree"] != parent_tree:
         raise ValueError("source changed since merge preview; inspect again")
     if proposal["state"] == "conflict":
         return dict(workspace_id=workspace_id, state="conflict", tree=child_tree,
                     source_tree=parent_tree, detail=proposal["detail"])
     merged_tree = proposal["merged_tree"]
-    if "expected_merged_tree" in arguments and arguments["expected_merged_tree"] != merged_tree:
+    if arguments["expected_merged_tree"] != merged_tree:
         raise ValueError("integration result changed since merge preview; inspect again")
+    if len(proposal["patch"]) > MAX_REVIEW_BYTES:
+        raise ValueError("full merge review required for large changes")
+    decision = arguments.get("quality_decision")
+    validate_quality_decision(decision, resolution, proposal["comparison"])
     patch = proposal["patch"]
     if patch:
         git(source, "apply", "--check", "--binary", "--whitespace=nowarn", "-", data=patch)
@@ -475,7 +595,9 @@ def locked(root, store, owner, action, arguments):
     else:
         actual = snapshot(source)
     return dict(workspace_id=workspace_id, state="merged" if patch else "already_present",
-                tree=child_tree, source_tree=actual, base_tree=base_tree)
+                tree=child_tree, source_tree=actual, base_tree=base_tree,
+                merged_tree=merged_tree, resolution=resolution,
+                quality_decision=decision, comparison=proposal["comparison"])
 
 
 if __name__ == "__main__":
