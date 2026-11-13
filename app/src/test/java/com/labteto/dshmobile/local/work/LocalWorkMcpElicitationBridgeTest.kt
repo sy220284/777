@@ -8,6 +8,43 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LocalWorkMcpElicitationBridgeTest {
+
+    @Test fun multiSelectAndTitledOptionsPreserveActualValuesAndLabels() {
+        val schema = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                put("colors", buildJsonObject {
+                    put("type", "array")
+                    put("minItems", 1)
+                    put("maxItems", 2)
+                    put("default", buildJsonArray { add(JsonPrimitive("#ff0000")) })
+                    put("items", buildJsonObject {
+                        put("anyOf", buildJsonArray {
+                            add(buildJsonObject { put("const", "#ff0000"); put("title", "红色") })
+                            add(buildJsonObject { put("const", "#0000ff"); put("title", "蓝色") })
+                        })
+                    })
+                })
+                put("kind", buildJsonObject {
+                    put("type", "string")
+                    put("oneOf", buildJsonArray {
+                        add(buildJsonObject { put("const", "g"); put("title", "绿色") })
+                    })
+                })
+            })
+            put("required", buildJsonArray { add(JsonPrimitive("colors")) })
+        }
+        val fields = LocalWorkMcpElicitationBridge.fromSchema(schema)
+        assertEquals("array", fields[0].kind)
+        assertEquals(listOf("#ff0000", "#0000ff"), fields[0].options)
+        assertEquals("红色", fields[0].optionLabels["#ff0000"])
+        assertEquals("[\"#ff0000\"]", fields[0].defaultValue)
+        assertEquals(1, fields[0].minItems)
+        assertEquals(2, fields[0].maxItems)
+        assertEquals(listOf("g"), fields[1].options)
+        assertEquals("绿色", fields[1].optionLabels["g"])
+    }
+
     @Test fun serverSchemaBecomesTypedNativeFieldPresentation() {
         val schema = buildJsonObject {
             put("type", "object")
