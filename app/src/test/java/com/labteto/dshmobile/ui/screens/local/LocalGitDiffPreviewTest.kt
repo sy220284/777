@@ -33,6 +33,21 @@ class LocalGitDiffPreviewTest {
         assertTrue(result.files[0].lines.any { it.kind == GitDiffLineKind.META })
     }
 
+    @Test fun decodesGitQuotedPathsWithoutLosingUnicode() {
+        val chinese = "diff --git \"a/\\345\\220\\253 \\347\\251\\272 \\346\\240\\274.txt\" \"b/\\345\\220\\253 \\347\\251\\272 \\346\\240\\274.txt\""
+        val result = parseGitDiffPreview("$chinese\n@@ -1 +1 @@\n-before\n+after")
+        assertEquals("含 空 格.txt", result.files.single().path)
+        assertEquals(1, result.files.single().added)
+        assertEquals(1, result.files.single().removed)
+
+        val backslash = "diff --git \"a/a\\\\b.kt\" \"b/a\\\\b.kt\""
+        assertEquals("a\\b.kt", gitDiffTargetPath(backslash))
+        val tab = "diff --git \"a/a\\tb.kt\" \"b/a\\tb.kt\""
+        assertEquals("a\tb.kt", gitDiffTargetPath(tab))
+        assertEquals("main.kt", gitDiffTargetPath("diff --git a/main.kt b/main.kt"))
+        assertEquals(null, gitDiffTargetPath("not a git diff header"))
+    }
+
     @Test fun capsUiRowsAndFilesWithoutChangingTheUnderlyingPatch() {
         val patch = (1..6).joinToString("\n") { index ->
             "diff --git a/f$index.kt b/f$index.kt\n@@ -1 +1 @@\n-old\n+new"
