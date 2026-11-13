@@ -114,6 +114,9 @@ data class ToolsUiState(
     val localPlugins: List<String> = emptyList(),
     val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     val presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
+    val curatedSkills: List<String> = emptyList(),
+    val curatedLoading: Boolean = false,
+    val curatedError: String? = null,
     val createdSkillId: String? = null,
     val skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
     val savedSkillId: String? = null,
@@ -278,6 +281,9 @@ class ToolsViewModel @Inject constructor(
                     localPlugins = plugins,
                     skills = skills,
                     presets = presets,
+                    curatedSkills = _state.value.curatedSkills,
+                    curatedLoading = _state.value.curatedLoading,
+                    curatedError = _state.value.curatedError,
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -311,6 +317,47 @@ class ToolsViewModel @Inject constructor(
                     feedback = error.message,
                     feedbackRes = if (error.message == null) R.string.skills_operation_failed else null,
                 )
+            }
+        }
+    }
+
+    /** Fetch on user entry to Skills; discovery never installs a package. */
+    fun refreshCuratedSkills() {
+        if (_state.value.curatedLoading) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(curatedLoading = true, curatedError = null)
+            try {
+                val names = localTools.curatedGitHubSkills()
+                    .filter { it.matches(Regex("[a-z][a-z0-9-]{1,47}")) }
+                    .distinct().sorted()
+                _state.value = _state.value.copy(curatedLoading = false, curatedSkills = names)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(curatedLoading = false,
+                    curatedError = "官方精选目录读取失败：" + (error.message ?: "请检查网络"))
+            }
+        }
+    }
+
+    fun installCuratedSkill(id: String) {
+        if (id !in _state.value.curatedSkills) return
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val installedId = localTools.installGitHubSkill(
+                    com.labteto.dshmobile.local.tools.curatedGitHubSkillUrl(id))
+                _state.value = _state.value.copy(
+                    loading = false,
+                    skills = localTools.installedSkills(),
+                    presets = localTools.presetSkills(),
+                    createdSkillId = installedId,
+                    feedback = "官方精选技能已安装：$installedId")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false,
+                    feedback = "精选技能安装失败：" + (error.message ?: "请检查网络或技能包"))
             }
         }
     }
@@ -672,6 +719,10 @@ fun ToolsScreen(
     }
     // Switching tabs must not discard the plugin/skill search and filter context.
     val inventoryTabStates = rememberSaveableStateHolder()
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == 1 && state.curatedSkills.isEmpty() &&
+            !state.curatedLoading && state.curatedError == null) viewModel.refreshCuratedSkills()
+    }
 
     val noticeMessage = state.notice?.let { notice ->
         stringResource(
@@ -771,6 +822,9 @@ fun ToolsScreen(
                                     connectedServices = state.servers,
                                     skills = state.skills,
                                     presets = state.presets,
+                                    curatedSkills = state.curatedSkills,
+                                    curatedLoading = state.curatedLoading,
+                                    curatedError = state.curatedError,
                                     createdSkillId = state.createdSkillId,
                                     skillEditor = state.skillEditor,
                                     savedSkillId = state.savedSkillId,
@@ -785,6 +839,8 @@ fun ToolsScreen(
                                     onReturnToChat = onClose,
                                     onUseCapability = onUseCapability,
                                     onInstallPreset = viewModel::installPreset,
+                                    onInstallCurated = viewModel::installCuratedSkill,
+                                    onRefreshCurated = viewModel::refreshCuratedSkills,
                                     onCreateSkill = viewModel::createSkill,
                                     onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
                                     onRemoveSkill = viewModel::removeSkill,

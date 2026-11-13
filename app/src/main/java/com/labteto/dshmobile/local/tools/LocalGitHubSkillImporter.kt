@@ -20,6 +20,12 @@ import kotlinx.serialization.json.contentOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
+/** Fixed upstream path; the ZIP importer still validates every downloaded file. */
+internal fun curatedGitHubSkillUrl(id: String): String {
+    require(id.matches(Regex("[a-z][a-z0-9-]{1,47}"))) { "官方技能标识格式无效" }
+    return "https://github.com/openai/skills/tree/main/skills/.curated/$id"
+}
+
 internal data class PublicGitHubSkillLocation(
     val owner: String, val repository: String, val ref: String, val directory: String,
 ) {

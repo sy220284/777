@@ -78,6 +78,7 @@ private data class InventoryRow(
     val modelInvocable: Boolean = true,
     val installedSkill: Boolean = false,
     val installablePreset: Boolean = false,
+    val installableCurated: Boolean = false,
 )
 
 /** Browses real installed/connected plugin inventory; does not advertise unsupported storefront apps. */
@@ -87,6 +88,9 @@ internal fun PluginInventoryBrowser(
     connectedServices: List<McpServerSnapshot> = emptyList(),
     skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
+    curatedSkills: List<String> = emptyList(),
+    curatedLoading: Boolean = false,
+    curatedError: String? = null,
     createdSkillId: String? = null,
     skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
     savedSkillId: String? = null,
@@ -100,6 +104,8 @@ internal fun PluginInventoryBrowser(
     onReturnToChat: () -> Unit,
     onUseCapability: ((String) -> Unit)? = null,
     onInstallPreset: ((String) -> Unit)? = null,
+    onInstallCurated: ((String) -> Unit)? = null,
+    onRefreshCurated: (() -> Unit)? = null,
     onCreateSkill: ((String, String, String, String) -> Unit)? = null,
     onImportSkill: (() -> Unit)? = null,
     onRemoveSkill: ((String) -> Unit)? = null,
@@ -186,7 +192,17 @@ internal fun PluginInventoryBrowser(
             connectedService = false, icon = FeatherIcons.BookOpen,
             available = false, installablePreset = true)
     }
-    val list = (if (skillsOnly) installedSkills + availablePresets else when (selectedCategory) {
+    val installedIds = skills.map { it.name }.toSet()
+    val presetIds = presets.map { it.id }.toSet()
+    val curated = curatedSkills.filterNot { it in installedIds || it in presetIds }.map { id ->
+        InventoryRow(
+            id = "curated-skill:$id", name = id,
+            detail = "官方精选 · openai/skills · 安装前校验包内容",
+            connectedService = false, icon = FeatherIcons.BookOpen,
+            available = false, installableCurated = true,
+        )
+    }
+    val list = (if (skillsOnly) installedSkills + availablePresets + curated else when (selectedCategory) {
         1 -> filteredConnections
         2 -> local.filter { it.id in setOf("local:android-runtime", "local:local-language-server", "local:android-local-builtins") }
         3 -> local.filter { it.id in setOf("local:android-device", "local:android-automation", "local:android-webhook") }
@@ -346,6 +362,31 @@ internal fun PluginInventoryBrowser(
                         }
                     }
                 }
+                if (skillsOnly && (curatedLoading || curatedError != null || curated.isNotEmpty())) {
+                    item(key = "curated-status") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                        ) {
+                            Text(
+                                curatedError ?: if (curatedLoading) "正在读取官方精选技能"
+                                    else "官方精选技能 · 可直接安装",
+                                style = DsType.small13.withReadingWeight(),
+                                color = if (curatedError == null) colors.textSecondary else colors.dangerInk,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (!curatedLoading && onRefreshCurated != null) {
+                                SyButton(
+                                    text = stringResource(R.string.tools_refresh),
+                                    size = SyButtonSize.Small,
+                                    variant = SyButtonVariant.Ghost,
+                                    onClick = onRefreshCurated,
+                                )
+                            }
+                        }
+                    }
+                }
                 if (error != null) {
                     item(key = "inventory-error") {
                         Column(
@@ -430,7 +471,8 @@ internal fun PluginInventoryBrowser(
                                 SyButton(
                                     enabled = !loading,
                                     text = stringResource(
-                                        if (item.installablePreset && onInstallPreset != null) R.string.skills_install
+                                        if ((item.installablePreset && onInstallPreset != null) ||
+                                             (item.installableCurated && onInstallCurated != null)) R.string.skills_install
                                         else if (onUseCapability != null && item.available) R.string.plugin_use
                                         else R.string.tools_catalog_details
                                     ),
@@ -439,6 +481,7 @@ internal fun PluginInventoryBrowser(
                                     modifier = Modifier.testTag("plugin-inventory-action-${item.id}"),
                                     onClick = {
                                         if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
+                                         else if (item.installableCurated && onInstallCurated != null) onInstallCurated(item.id.substringAfter(":"))
                                         else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
                                         else selectedRow = item
                                     },
@@ -459,7 +502,8 @@ internal fun PluginInventoryBrowser(
                 val usePrompt = if (item.installedSkill) "@skill:${item.id.substringAfter(":")}\n" else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
                 SyButton(
                     text = stringResource(
-                        if (item.installablePreset && onInstallPreset != null) R.string.skills_install
+                        if ((item.installablePreset && onInstallPreset != null) ||
+                                             (item.installableCurated && onInstallCurated != null)) R.string.skills_install
                         else if (onUseCapability != null && item.available) R.string.plugin_use
                         else if (item.connectedService) R.string.tools_external_services
                         else R.string.tools_catalog_return_chat,
@@ -470,6 +514,7 @@ internal fun PluginInventoryBrowser(
                     onClick = {
                         selectedRow = null
                         if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
+                                         else if (item.installableCurated && onInstallCurated != null) onInstallCurated(item.id.substringAfter(":"))
                         else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
                         else if (item.connectedService) onManageConnections() else onReturnToChat()
                     },
