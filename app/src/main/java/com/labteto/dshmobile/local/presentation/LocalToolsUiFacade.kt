@@ -147,6 +147,10 @@ class LocalToolsUiFacade @Inject internal constructor(
         com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot(it.id, it.title, it.description, it.installed)
     }
     override suspend fun curatedGitHubSkills() = gitHubSkillImporter.curatedSkills()
+    /** The feature owns source validation; UI passes only the name from a visible catalog row. */
+    suspend fun installCuratedSkill(id: String) = gitHubSkillImporter.install(
+        com.labteto.dshmobile.local.tools.curatedGitHubSkillUrl(id),
+    )
     override suspend fun installGitHubSkill(link: String) = gitHubSkillImporter.install(link)
     override suspend fun installPreset(id: String) = tools.installPreset(id)
     override suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =

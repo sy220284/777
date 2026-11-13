@@ -345,8 +345,7 @@ class ToolsViewModel @Inject constructor(
         launchOperation {
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
             try {
-                val installedId = localTools.installGitHubSkill(
-                    com.labteto.dshmobile.local.tools.curatedGitHubSkillUrl(id))
+                val installedId = localTools.installCuratedSkill(id)
                 _state.value = _state.value.copy(
                     loading = false,
                     skills = localTools.installedSkills(),
