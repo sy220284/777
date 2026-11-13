@@ -773,7 +773,7 @@ internal fun LocalModeDrawer(
                                 text = "移动到分区",
                                 onClick = { moveSelectedDialog = true },
                                 enabled = selectedIds.isNotEmpty() && !deleteInFlight,
-                                variant = SyButtonVariant.Secondary,
+                                variant = SyButtonVariant.Outline,
                                 size = SyButtonSize.Small,
                             )
                             SyButton(
