@@ -3756,7 +3756,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsController.kt",
-      "sha256": "3f59c99a217d4242"
+      "sha256": "dd65a441288587c2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsSections.kt",
@@ -3792,7 +3792,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
-      "sha256": "3161ffdf34e58746"
+      "sha256": "8d1ac7017529cb29"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationComponents.kt",
@@ -4624,14 +4624,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "77b6b88b2cfc",
+  "source_snapshot": "e111bd056e4c",
   "observed_delta": {
-    "baseline": "cdb6b195542b",
+    "baseline": "77b6b88b2cfc",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryManager.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsDataFacade.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsController.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
