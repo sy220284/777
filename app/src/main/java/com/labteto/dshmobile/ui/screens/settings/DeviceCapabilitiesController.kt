@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.settings
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
@@ -46,6 +47,14 @@ internal class DeviceCapabilitiesController(
             notificationAccessGranted = appContext.packageName in
                 NotificationManagerCompat.getEnabledListenerPackages(appContext),
             postingNotifications = NotificationManagerCompat.from(appContext).areNotificationsEnabled(),
+        )
+    }
+
+    fun openAppDetails() {
+        appContext.startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                .setData(Uri.parse("package:" + appContext.packageName))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
 
