@@ -284,7 +284,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
-      "sha256": "49922f5f9cd1e0f4"
+      "sha256": "7a4c7b37be2041e1"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
@@ -2524,7 +2524,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsManagementPort.kt",
-      "sha256": "2b211ca7779c49e5"
+      "sha256": "023ddce92ec0f4de"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsModels.kt",
@@ -2532,7 +2532,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt",
-      "sha256": "7d2c2a1c3bea7881"
+      "sha256": "adf1d54a2f57a890"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTurnSettlement.kt",
@@ -4616,7 +4616,7 @@
     },
     {
       "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/GitWorkspaceRuntime.kt",
-      "sha256": "6877cebf7217667f"
+      "sha256": "c14cdb461f3d719c"
     },
     {
       "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/ManagedProcess.kt",
@@ -4656,13 +4656,16 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "57968a2a5c75",
+  "source_snapshot": "8fd1be0b6914",
   "observed_delta": {
-    "baseline": "27f04cdb4ff9",
+    "baseline": "57968a2a5c75",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/GitRemoteDiff.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsManagementPort.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt",
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/GitWorkspaceRuntime.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
