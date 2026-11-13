@@ -114,6 +114,11 @@ class GitRemoteDiffTest {
             assertEquals("1", result.getValue("untracked_file_count").jsonPrimitive.content)
             git("diff", "--cached", "--exit-code")
             assertTrue(root.resolve("other.txt").exists())
+            val optedIn = GitRemoteDiff(root, process).compareUncommitted(".", includeUntracked = true)
+            assertTrue(optedIn.getValue("patch").jsonPrimitive.content.contains("untracked secret"))
+            assertEquals("true", optedIn.getValue("includes_untracked_files").jsonPrimitive.content)
+            assertEquals("false", optedIn.getValue("truncated").jsonPrimitive.content)
+            git("diff", "--cached", "--exit-code")
         } finally {
             home.deleteRecursively()
         }

@@ -11,9 +11,12 @@ import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.functionToolSchema
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.LinkOption
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
@@ -82,8 +85,14 @@ internal class GitRemoteDiff(
         context.tools.register(HarnessTool(
             name = "git_diff_uncommitted",
             schema = functionToolSchema("git_diff_uncommitted",
-                "查看当前工作区已跟踪文件的暂存与未暂存修改；只读、无需远端分支",
-                buildJsonObject { put("repository", buildJsonObject { put("type", "string") }) }),
+                "查看暂存、未暂存修改；可选择新建未跟踪文件（只读，无需远端）",
+                buildJsonObject {
+                    put("repository", buildJsonObject { put("type", "string") })
+                    put("include_untracked", buildJsonObject {
+                        put("type", "boolean")
+                        put("description", "将新建未跟踪文件纳入审查，可能含敏感信息，默认 false")
+                    })
+                }),
             access = ToolAccess.READ_ONLY, approvalPolicy = ToolApprovalPolicy.NEVER,
             exposure = ToolExposure.OPTIONAL, timeoutMillis = 30_000L,
             metadata = ToolMetadata(family = "文件", environmentBound = true,
@@ -91,7 +100,8 @@ internal class GitRemoteDiff(
             executor = HarnessToolExecutor { _, input, _ ->
                 val repository = input["repository"]?.jsonPrimitive?.contentOrNull ?: "."
                 try {
-                    ToolResult(compareUncommitted(repository).toString())
+                    ToolResult(compareUncommitted(repository,
+                        includeUntracked = input["include_untracked"]?.jsonPrimitive?.booleanOrNull == true).toString())
                 } catch (failure: IllegalArgumentException) {
                     ToolResult("本地 Git 修改请求无效：" + failure.message.orEmpty(),
                         isError = true, errorCode = "INVALID_GIT_DIFF_REQUEST")
@@ -154,27 +164,71 @@ internal class GitRemoteDiff(
         return result.stdout.trimEnd()
     }
 
-    /** Stable, versioned local diff; no git add, fetch, checkout, or untracked file inclusion. */
-    internal suspend fun compareUncommitted(repository: String): JsonObject {
+    /**
+     * git diff --no-index returns exit code 1 for a valid new-file patch.
+     * Keep filenames in the argument vector, never in a shell command.
+     */
+    private suspend fun newFilePatch(target: File, relative: String): String {
+        val result = processRuntime.execute(ProcessRequest(
+            command = listOf("git", "-c", "core.fsmonitor=false", "-C", target.path,
+                "diff", "--no-index", "--no-ext-diff", "--no-textconv", "--",
+                "/dev/null", relative),
+            workingDirectory = target.path, timeoutMillis = 20_000L,
+        ))
+        check(!result.timedOut) { "新文件差异读取超时" }
+        check(result.exitCode in 0..1) { "新文件差异读取失败：" + result.stderr.take(480) }
+        return result.stdout.trimEnd()
+    }
+
+    /** Explicit opt-in for new-file content, with fail-closed review completeness. */
+    internal suspend fun compareUncommitted(repository: String, includeUntracked: Boolean = false): JsonObject {
         val target = repositoryDirectory(repository)
         val root = verifiedRepositoryRoot(target)
         val headCommit = runGit(target, "rev-parse", "--verify", "HEAD^{commit}").trim()
         require(headCommit.matches(Regex("[0-9a-f]{40,64}"))) { "Git HEAD 版本异常" }
         val stat = runGit(target, "diff", "--no-ext-diff", "--no-textconv", "--stat", "HEAD", "--")
-        val patch = runGit(target, "diff", "--no-ext-diff", "--no-textconv", "--unified=3", "HEAD", "--")
-        val untracked = runGit(target, "ls-files", "--others", "--exclude-standard", "--")
-            .lineSequence().count { it.isNotBlank() }
+        val tracked = runGit(target, "diff", "--no-ext-diff", "--no-textconv", "--unified=3", "HEAD", "--")
+        // NUL delimiters preserve spaces, Unicode and embedded newlines in filenames.
+        val untracked = runGit(target, "ls-files", "--others", "--exclude-standard", "-z", "--")
+            .split('\u0000').filter(String::isNotEmpty)
         val cap = 128 * 1024
+        val patch = StringBuilder(tracked.take(cap))
+        var incomplete = tracked.length > cap
+        if (includeUntracked) {
+            for (name in untracked.take(24)) {
+                val path = File(target, name).toPath().toAbsolutePath().normalize()
+                if (!path.startsWith(root.toPath()) ||
+                    !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) ||
+                    Files.size(path) > cap.toLong()) {
+                    incomplete = true
+                    continue
+                }
+                val extra = newFilePatch(target, name)
+                if (patch.length + extra.length + 2 > cap) {
+                    incomplete = true
+                    break
+                }
+                if (extra.isNotBlank()) {
+                    if (patch.isNotEmpty()) patch.append('\n')
+                    patch.append(extra)
+                }
+            }
+            if (untracked.size > 24) incomplete = true
+        }
+        val visibleStat = if (untracked.isNotEmpty()) {
+            stat + "\n未跟踪文件：" + untracked.size +
+                (if (includeUntracked) "（已包含）" else "（未包含）")
+        } else stat
         return buildJsonObject {
             put("repository", root.path)
             put("tracking_ref", "worktree/" + headCommit)
             put("head_commit", headCommit)
-            put("stat", stat.take(12_000))
-            put("patch", patch.take(cap))
-            put("truncated", patch.length > cap)
+            put("stat", visibleStat.take(12_000))
+            put("patch", patch.toString())
+            put("truncated", incomplete)
             put("includes_tracked_worktree_changes", true)
-            put("includes_untracked_files", false)
-            put("untracked_file_count", untracked)
+            put("includes_untracked_files", includeUntracked)
+            put("untracked_file_count", untracked.size)
             put("network_requested", false)
         }
     }

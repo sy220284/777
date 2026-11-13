@@ -19,7 +19,7 @@ internal interface LocalToolsManagementPort {
     suspend fun recoverFailedPlugin(id: String): List<String> =
         error("当前工具 Owner 不支持插件恢复")
     suspend fun remoteGitBranches(repository: String): List<String>
-    suspend fun compareLocalGit(repository: String): kotlinx.serialization.json.JsonObject
+    suspend fun compareLocalGit(repository: String, includeUntracked: Boolean = false): kotlinx.serialization.json.JsonObject
     suspend fun compareRemoteGit(repository: String, remote: String, branch: String): kotlinx.serialization.json.JsonObject
 
     fun installedPluginIds(): List<String>

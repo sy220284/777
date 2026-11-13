@@ -69,8 +69,8 @@ internal class LocalToolCompositionRoot @Inject constructor(
     override suspend fun remoteGitBranches(repository: String): List<String> =
         agentWorkspaces.remoteTrackingBranches(repository)
 
-    override suspend fun compareLocalGit(repository: String): kotlinx.serialization.json.JsonObject =
-        agentWorkspaces.compareLocal(repository)
+    override suspend fun compareLocalGit(repository: String, includeUntracked: Boolean): kotlinx.serialization.json.JsonObject =
+        agentWorkspaces.compareLocal(repository, includeUntracked)
 
     override suspend fun compareRemoteGit(
         repository: String, remote: String, branch: String,
