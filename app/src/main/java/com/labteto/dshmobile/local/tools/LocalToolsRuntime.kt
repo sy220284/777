@@ -21,6 +21,7 @@ class LocalToolsRuntime @Inject internal constructor(
     internal suspend fun clearGitHub() = githubCredentials.clear()
     internal suspend fun remoteGitBranches(repository: String): List<String> =
         management.remoteGitBranches(repository)
+    internal suspend fun compareLocalGit(repository: String) = management.compareLocalGit(repository)
     internal suspend fun compareRemoteGit(repository: String, remote: String, branch: String) =
         management.compareRemoteGit(repository, remote, branch)
     internal fun capabilityCatalogue() = management.capabilityCatalogue()
