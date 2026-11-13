@@ -1864,7 +1864,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalIndependentCodeReviewUiFacade.kt",
-      "sha256": "c2395542dd50185d"
+      "sha256": "8162a3a2e23cc43f"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalMediaCreationRuntime.kt",
@@ -1936,7 +1936,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
-      "sha256": "596c1287acf9b39e"
+      "sha256": "fabac4ef68e7b29b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTranscriptHistoryLoader.kt",
@@ -3456,7 +3456,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureUiActions.kt",
-      "sha256": "f569a67a40f4ea13"
+      "sha256": "8b15b338cff38192"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalGeneratedMediaMessage.kt",
@@ -3500,7 +3500,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "sha256": "28e4c0a1d93f29f1"
+      "sha256": "387f835ea750c778"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModelDefaults.kt",
@@ -3628,7 +3628,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt",
-      "sha256": "42e24e5890d205ab"
+      "sha256": "30ed56e69a63ef08"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceShare.kt",
@@ -4632,16 +4632,17 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "24c3cb7efa72",
+  "source_snapshot": "3887e46b175a",
   "observed_delta": {
-    "baseline": "f6f9b52c2e09",
+    "baseline": "24c3cb7efa72",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsManagementPort.kt",
-      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/GitRemoteDiff.kt",
-      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/GitWorkspaceRuntime.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalIndependentCodeReviewUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureUiActions.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
