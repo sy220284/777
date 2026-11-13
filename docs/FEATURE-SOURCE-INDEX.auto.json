@@ -2412,7 +2412,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
-      "sha256": "aa91818e550b53f0"
+      "sha256": "d348c5c2b9f08afa"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSandboxBoundary.kt",
@@ -2520,7 +2520,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/McpPluginWorkerService.kt",
-      "sha256": "be0d5f5532b5668c"
+      "sha256": "fa8d167e0033e53c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/McpPluginWorkerTransport.kt",
@@ -4512,7 +4512,7 @@
     },
     {
       "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpLegacyTransports.kt",
-      "sha256": "fb0da5dd06d7bec8"
+      "sha256": "05492418807b7ad3"
     },
     {
       "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpSseResponse.kt",
@@ -4520,7 +4520,7 @@
     },
     {
       "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
-      "sha256": "1ea9a5878e54e794"
+      "sha256": "6b1b3525b1893686"
     },
     {
       "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackend.kt",
@@ -4592,13 +4592,16 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "01a74989c13e",
+  "source_snapshot": "cc369dde7bea",
   "observed_delta": {
-    "baseline": "5652c16b4bec",
+    "baseline": "01a74989c13e",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpElicitationRoundTrips.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/ipc/McpPluginWorkerService.kt",
+      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpLegacyTransports.kt",
+      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
