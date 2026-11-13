@@ -272,6 +272,10 @@ private fun WorkToolStatusRow(
                 Text(status, style = DsType.small13.withReadingWeight(), color = tint)
             }
         }
+        if (labelOverride != null && onClick != null) {
+            Icon(imageVector = FeatherIcons.ChevronRight, contentDescription = "展开操作明细",
+                tint = colors.textSecondary, modifier = Modifier.size(16.dp))
+        }
     }
 }
 
