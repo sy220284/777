@@ -1152,7 +1152,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalDownloadsPublisher.kt",
-      "sha256": "1408fb849f34f79c"
+      "sha256": "adfb19ef72046627"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalLargeFileIO.kt",
@@ -2256,7 +2256,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
-      "sha256": "bad6d055c3566f91"
+      "sha256": "c6fc5bd0bc03a335"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionLifecyclePort.kt",
@@ -2880,7 +2880,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-      "sha256": "e061134a1fd9b599"
+      "sha256": "775dbb1c9213c9a2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkApprovalCoordinator.kt",
@@ -2920,7 +2920,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkBuiltinToolRuntime.kt",
-      "sha256": "b09201f6bef475e9"
+      "sha256": "0c0c3195457dade9"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCapabilityRecovery.kt",
@@ -4664,12 +4664,17 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "ddb034815b04",
+  "source_snapshot": "59f4ed087a02",
   "observed_delta": {
-    "baseline": "7cee9e06d357",
+    "baseline": "ddb034815b04",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalDownloadsPublisher.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkBuiltinToolRuntime.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
