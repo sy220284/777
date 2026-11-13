@@ -3760,7 +3760,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsSections.kt",
-      "sha256": "d7c9cc2f5e9930f9"
+      "sha256": "b386d2c554d25475"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MiniMaxQuotaPage.kt",
@@ -4624,14 +4624,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "e111bd056e4c",
+  "source_snapshot": "3d80c9016227",
   "observed_delta": {
-    "baseline": "77b6b88b2cfc",
+    "baseline": "e111bd056e4c",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsController.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsSections.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
