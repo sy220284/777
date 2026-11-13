@@ -190,9 +190,10 @@ class V6SeamlessNavigationInteractionTest {
             }
         }
         compose.onNodeWithTag("messageActionToolbar:chat-history-actions").assertDoesNotExist()
-        compose.onNodeWithTag("messageActionSurface:chat-history-actions").performClick()
+        compose.onNodeWithTag("messageActionToggle:chat-history-actions").assertExists()
+        compose.onNodeWithTag("messageActionToggle:chat-history-actions").performClick()
         compose.onNodeWithTag("messageActionToolbar:chat-history-actions").assertExists()
-        compose.onNodeWithTag("messageActionSurface:chat-history-actions").performClick()
+        compose.onNodeWithTag("messageActionToggle:chat-history-actions").performClick()
         compose.onNodeWithTag("messageActionToolbar:chat-history-actions").assertDoesNotExist()
     }
 
