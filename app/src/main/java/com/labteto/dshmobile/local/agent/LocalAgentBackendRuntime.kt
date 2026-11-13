@@ -8,6 +8,7 @@ import com.labteto.dshmobile.harness.agent.AgentBackendExecutionContext
 import com.labteto.dshmobile.harness.agent.AgentRunExecutionContext
 import com.labteto.dshmobile.local.agent.ipc.AndroidIsolatedAgentBackend
 import com.labteto.dshmobile.local.security.KeystorePreferenceSecretStore
+import com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy
 import com.labteto.dshmobile.runtime.AgentTlsBackend
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
@@ -31,6 +32,7 @@ import kotlinx.serialization.json.put
 internal class LocalAgentBackendRuntime @Inject constructor(
     @ApplicationContext private val context: Context,
     dataStore: DataStore<Preferences>,
+    private val managedPolicy: LocalManagedExecutionPolicy,
 ) {
     private val store = KeystorePreferenceSecretStore(dataStore, "agent_backend_peer_v1", "dsh.agent.backend.v1")
     private class Peer(val revision: String, val host: String, val port: Int, val pin: String, val token: String)
@@ -40,12 +42,25 @@ internal class LocalAgentBackendRuntime @Inject constructor(
             data.getValue("port").jsonPrimitive.int, data.getValue("pin").jsonPrimitive.content,
             data.getValue("token").jsonPrimitive.content)
     }
-    suspend fun status(): String = peer()?.let { "已授权 ${it.host}:${it.port}（证书 ${it.pin.take(12)}…）" } ?: "尚未授权远端执行器"
+    suspend fun status(): String = peer()?.let { "已保存远端授权 ${it.host}:${it.port}（待连接验证，证书 ${it.pin.take(12)}…）" } ?: "尚未授权远端执行器"
+    suspend fun probe(): String {
+        val selected = requireNotNull(peer()) { "尚未配置远端执行器" }
+        managedPolicy.current().requireNetworkDestination("https", selected.host)
+        val revision = selected.revision
+        AgentTlsBackend(selected.host, selected.port, selected.pin, selected.token,
+            requireGrantCurrent = {
+                check(peer()?.revision == revision) { "远端授权已更新或撤销" }
+                managedPolicy.current().requireNetworkDestination("https", selected.host)
+            },
+        ).probe()
+        return "远端连接验证成功（TLS 证书、口令、授权版本均匹配）"
+    }
     suspend fun configure(host: String, port: Int, pin: String, token: String, contextExportConsent: Boolean) {
         require(contextExportConsent) { "必须由用户授权任务上下文传输" }
         require(host.isNotBlank() && host == host.trim() && host.none { it.isWhitespace() || it in "/@?#" })
         require(port in 1..65535 && pin.matches(Regex("[0-9a-fA-F]{64}")))
         require(token.isNotBlank() && token.all { it.code in 33..126 } && token.length <= 4096)
+        managedPolicy.current().requireNetworkDestination("https", host)
         store.put(buildJsonObject {
             put("revision", UUID.randomUUID().toString()); put("host", host); put("port", port)
             put("pin", pin.lowercase()); put("token", token)
@@ -72,6 +87,7 @@ internal class LocalAgentBackendRuntime @Inject constructor(
             check(selected.revision == expected) { "远端授权或执行端已变化，原任务停止续跑" }
             val checkGrant: suspend () -> Unit = {
                 currentCoroutineContext().ensureActive()
+                managedPolicy.current().requireNetworkDestination("https", selected.host)
                 check(peer()?.revision == expected) { "远端授权已变更或撤销" }
                 currentCoroutineContext()[AgentRunExecutionContext]?.requireCurrent()
             }
