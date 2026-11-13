@@ -56,7 +56,7 @@ class SettingsViewModel @Inject constructor(
 
     private val appContext = context.applicationContext
     private val deviceCapabilitiesController = DeviceCapabilitiesController(appContext)
-    private val memorySettingsController = MemorySettingsController(viewModelScope, localHarness::memoryContext, settingsData::memoryPage, settingsData::updateMemory, settingsData::forgetMemory)
+    private val memorySettingsController = MemorySettingsController(viewModelScope, localHarness::memoryContext, settingsData::memoryPage, settingsData::updateMemory, settingsData::forgetMemory, settingsData::restoreMemory)
     internal val personalizationRulesEditor = PersonalizationRulesEditor()
     private var desiredUserRules: String? = null
     private var desiredAutoRecall: Boolean? = null
@@ -391,6 +391,9 @@ class SettingsViewModel @Inject constructor(
 
     fun forgetMemory(id: String, onDone: (String?) -> Unit = {}) =
         memorySettingsController.forget(id, onDone)
+
+    fun restoreMemory(id: String, onDone: (String?) -> Unit = {}) =
+        memorySettingsController.restore(id, onDone)
 
     fun configureLocalAgent(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int, workerProfileId: String?) {
         localHarness.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts, workerProfileId)
