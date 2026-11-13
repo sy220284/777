@@ -104,13 +104,45 @@ class LocalSessionFilesRuntime @Inject internal constructor(
             } else attachmentImporter.import(uri)
         } }
 
+    private val workFileImportLock = Any()
+
     override suspend fun importWorkspaceFile(uri: Uri): String {
         require(com.labteto.dshmobile.local.isSupportedPickerAttachmentUri(uri.scheme, uri.authority)) {
             "只能导入 Android 文件选择器授权的文档"
         }
-        // Reuse the sole attachment importer: SAF's one-time grant is consumed immediately,
-        // and Work tools receive the durable workspace-relative path (including APK files).
-        return importAttachment(uri).relativePath
+        // A Work file enters its ordinary visible workspace directly. The shared streaming
+        // writer handles atomic commit, bounds RAM use and avoids duplicating Chat attachments.
+        return withContext(Dispatchers.IO) {
+            resourceScheduler.withResource(
+                HarnessResourceKind.FILE_IO, "file:import_work", priority = HarnessResourcePriority.INTERACTIVE,
+            ) {
+                val resolver = context.contentResolver
+                val originalName = resolver.query(
+                    uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null,
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                } ?: error("所选手机文件没有名称")
+                val safeName = originalName.substringAfterLast('/').substringAfterLast('\\')
+                    .replace(Regex("[\\\\/:*?\\"<>|\\u0000-\\u001f]"), "_")
+                    .take(120).trim().trim('.').ifBlank { "手机文件" }
+                resolver.openInputStream(uri)?.use { input ->
+                    synchronized(workFileImportLock) {
+                        val stem = safeName.substringBeforeLast('.', safeName)
+                        val suffix = safeName.substringAfterLast('.', "").takeIf { it.isNotBlank() }
+                            ?.let { ".$it" }.orEmpty()
+                        val selected = generateSequence(1) { it + 1 }.take(512)
+                            .map { index ->
+                                val filename = if (index == 1) safeName
+                                    else "$stem ($index)$suffix"
+                                "导入文件/$filename"
+                            }.firstOrNull { workspace.workspaceFileAt(it) == null }
+                            ?: error("同名文件过多，请先整理工作区的导入文件")
+                        workspace.writeFromStream(selected, input)
+                        selected
+                    }
+                } ?: error("无法读取系统授权的手机文件")
+            }
+        }
     }
 
     internal suspend fun importToolImages(content: com.labteto.dshmobile.harness.tools.ToolRichContent?): List<LocalImportedAttachment> =
