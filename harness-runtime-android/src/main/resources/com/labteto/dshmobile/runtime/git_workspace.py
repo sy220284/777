@@ -542,8 +542,9 @@ def locked(root, store, owner, action, arguments):
                        comparison=proposal["comparison"],
                        state="needs_full_review" if truncated else "ready",
                        diff=page.decode(errors="replace"),
-                       diff_bytes=len(patch), diff_truncated=next_offset < len(patch),
-                       diff_offset=offset, next_offset=next_offset if next_offset < len(patch) else None)
+                       diff_bytes=len(patch), diff_truncated=truncated,
+                       diff_offset=offset, last_page=next_offset == len(patch),
+                       next_offset=next_offset if next_offset < len(patch) else None)
         if truncated:
             # Every page is bound to the same exact source/result pair. Collect them
             # all before the reviewed merge can be committed.
