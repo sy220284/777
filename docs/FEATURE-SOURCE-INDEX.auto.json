@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1962,
-  "production_source_count": 1140,
+  "repository_code_file_count": 1963,
+  "production_source_count": 1141,
   "test_code_file_count": 677,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
@@ -1297,6 +1297,10 @@
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/DeepSeekChatRequestPolicy.kt",
       "sha256": "b2d551a3a8ae7018"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/model/DeepSeekProviderBalance.kt",
+      "sha256": "78486cd55c8ce8e2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/DeepSeekUsageAccounting.kt",
@@ -4624,14 +4628,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "97ac3e9183e6",
+  "source_snapshot": "bf38a7ee6b08",
   "observed_delta": {
-    "baseline": "08805b87cedc",
-    "added_production_files": [],
-    "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt"
+    "baseline": "97ac3e9183e6",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/model/DeepSeekProviderBalance.kt"
     ],
+    "removed_production_files": [],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
