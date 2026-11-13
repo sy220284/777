@@ -123,7 +123,7 @@ class LocalSessionFilesRuntime @Inject internal constructor(
                     if (cursor.moveToFirst()) cursor.getString(0) else null
                 } ?: error("所选手机文件没有名称")
                 val safeName = originalName.substringAfterLast('/').substringAfterLast('\\')
-                    .replace(Regex("""[\\\\/:*?"<>|\\p{Cntrl}]"""), "_")
+                    .replace(Regex("""[\\/:*?"<>|\p{Cntrl}]"""), "_")
                     .take(120).trim().trim('.').ifBlank { "手机文件" }
                 resolver.openInputStream(uri)?.use { input ->
                     synchronized(workFileImportLock) {
