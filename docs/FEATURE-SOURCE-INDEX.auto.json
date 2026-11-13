@@ -2620,7 +2620,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebSearchClient.kt",
-      "sha256": "05fab6d350c7d01f"
+      "sha256": "a4e038e4ca60694e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTargetResolver.kt",
@@ -4624,13 +4624,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "f121ad1e9e7f",
+  "source_snapshot": "9d886ba41e0b",
   "observed_delta": {
-    "baseline": "b1bb13c4221f",
+    "baseline": "f121ad1e9e7f",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/web/LocalKeylessWebSearchClient.kt",
       "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebSearchClient.kt"
     ],
     "moved_unchanged_files": [],
