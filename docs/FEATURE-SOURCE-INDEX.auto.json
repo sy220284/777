@@ -2,8 +2,8 @@
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
   "repository_code_file_count": 1969,
-  "production_source_count": 1146,
-  "test_code_file_count": 678,
+  "production_source_count": 1145,
+  "test_code_file_count": 679,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -1960,7 +1960,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkProjectsUiFacade.kt",
-      "sha256": "02c40d3048b23f77"
+      "sha256": "f44b1f4367389b8c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkSummaryControls.kt",
@@ -3052,7 +3052,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProjectCatalog.kt",
-      "sha256": "fef06f132e3a1eed"
+      "sha256": "4336f0f5b850ccb0"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkPromptPlacement.kt",
@@ -3257,10 +3257,6 @@
     {
       "path": "app/src/main/java/com/labteto/dshmobile/persistence/RecoveringJsonValue.kt",
       "sha256": "16dbd2b42fcca2c4"
-    },
-    {
-      "path": "app/src/main/java/com/labteto/dshmobile/test/java/com/labteto/dshmobile/local/work/LocalWorkProjectCatalogTest.kt",
-      "sha256": "8f9cc8f9c0703149"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/AppRoot.kt",
@@ -3512,7 +3508,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "sha256": "33fa668440497452"
+      "sha256": "55e339c600885d22"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModelDefaults.kt",
@@ -3616,7 +3612,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkProjectsSheet.kt",
-      "sha256": "43b22b8863a228c7"
+      "sha256": "eb38defbb3cbde59"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkStateContent.kt",
@@ -4648,19 +4644,18 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "98400c8ac7a0",
+  "source_snapshot": "0127fef3ac37",
   "observed_delta": {
-    "baseline": "9ba83ba0b028",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkProjectsSheet.kt"
+    "baseline": "98400c8ac7a0",
+    "added_production_files": [],
+    "removed_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/test/java/com/labteto/dshmobile/local/work/LocalWorkProjectCatalogTest.kt"
     ],
-    "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureUiActions.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkProjectsUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProjectCatalog.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkUiContribution.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkProjectsSheet.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
