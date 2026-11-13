@@ -164,7 +164,7 @@ internal fun parseLocalPolicyLayer(raw: String): LocalPolicyLayer {
 }
 
 @Singleton
-internal class LocalManagedExecutionPolicy @Inject constructor(
+class LocalManagedExecutionPolicy @Inject constructor(
     @ApplicationContext context: Context,
 ) {
     private val policyRoot = File(context.filesDir, "local-harness")
@@ -172,7 +172,7 @@ internal class LocalManagedExecutionPolicy @Inject constructor(
     private val workspaceFile = File(policyRoot, "workspace-execution-policy.json")
     private val managedFile = File(policyRoot, "managed-execution-requirements.json")
 
-    fun current(): LocalEffectiveExecutionPolicy = mergeLocalExecutionPolicy(
+    internal fun current(): LocalEffectiveExecutionPolicy = mergeLocalExecutionPolicy(
         user = load(userFile),
         workspace = load(workspaceFile),
         managed = load(managedFile),
