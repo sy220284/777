@@ -149,7 +149,10 @@ class CodeModePluginTest {
             ToolResult("""{"file":{"path":"docs/demo.md","count":3}}""")
         }
         registry.register(HarnessTool(
-            "consume", functionToolSchema("consume", "使用结果"), ToolAccess.WORKSPACE_WRITE,
+            "consume", functionToolSchema("consume", "使用结果", parameterSchema = buildJsonObject {
+                put("type", "object")
+                put("additionalProperties", true)
+            }), ToolAccess.WORKSPACE_WRITE,
             ToolApprovalPolicy.ALWAYS, ToolExposure.CORE, ToolMetadata("test"),
             executor = HarnessToolExecutor { _, args, _ ->
                 received = args

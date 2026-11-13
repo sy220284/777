@@ -46,7 +46,8 @@
 
 - 技能来源可追溯：GitHub 技能安装时先将分支解析到不可变的完整提交编号，再以此版本逐个下载文件；仓库/目录/原始分支与提交编号随安装包原子存入 `.github-source.json`，为后续升级/冲突检测提供依据。
 - 技能目录第一阶段：Tools 技能页列出官方 GitHub 精选目录，可搜索并点击安装；复用本机有上限及包校验的安全导入器，网络失败可见重试。本阶段是技能分发，尚需独立完成通用插件市场、来源/更新等能力。
-- Code Mode 步骤依赖增强：新增 `$step_result` 持久结果引用与 JSON 字段选取，全部引用预校验；临时结果与无效路径安全停止，并纳入 JVM 回归。\n- Code Mode 第一阶段：新增 Android 内建 `code_mode_run` 入口，以长度、步骤数、超时和工具曝光约束执行有界编排。每步仍走原始 ToolRegistry 校验、用户审批、Hooks 和执行回执；不执行不受信任原生脚本，不自动授予工具权限。已纳入源代码及 JVM 测试，Android 构建、端到端可见性及更复杂脚本表达式仍需验收。
+- Code Mode 步骤依赖增强：新增 `$step_result` 持久结果引用与 JSON 字段选取，全部引用预校验；临时结果与无效路径安全停止，并纳入 JVM 回归。
+- Code Mode 第一阶段：新增 Android 内建 `code_mode_run` 入口，以长度、步骤数、超时和工具曝光约束执行有界编排。每步仍走原始 ToolRegistry 校验、用户审批、Hooks 和执行回执；不执行不受信任原生脚本，不自动授予工具权限。已纳入源代码及 JVM 测试，Android 构建、端到端可见性及更复杂脚本表达式仍需验收。
 
 - 工具执行前后 Hooks：`harness-core/.../ToolHookRegistry.kt`、`ToolRegistry.kt`；有拒绝、审批时版本失效、真实回执与失败回归。产品钩子配置尚未实现。
 - 输入队列原子操作：`harness-core/.../AgentInputQueue.kt`；具编辑/删除/重排及回滚。Chat/Work 侧功能和统一编辑界面已接入；仍需验证 ModelMessage 完整性、崩溃恢复和 Android UI。

@@ -247,7 +247,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
         const val MAX_REFERENCE_SOURCE_CHARS = 128_000
         const val MAX_REFERENCE_VALUE_CHARS = 8_192
         const val RESULT_REFERENCE_KEY = "\$step_result"
-        val REFERENCE_PATH = Regex("""[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*""")
+        val REFERENCE_PATH = Regex("""[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*""")
         const val MAX_RESULT_CHARS = 4_000
         const val STEP_TIMEOUT_MILLIS = 90_000L
     }
