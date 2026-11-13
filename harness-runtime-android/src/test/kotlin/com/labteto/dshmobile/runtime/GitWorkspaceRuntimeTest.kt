@@ -55,12 +55,29 @@ class GitWorkspaceRuntimeTest {
             assertFalse(initial.content, initial.isError)
             val initialProposal = Json.parseToJsonElement(initial.content).jsonObject
             assertEquals("ready", initialProposal.getValue("state").jsonPrimitive.content)
+            val compared = registry.context.tools.execute("workspace_compare_merge", buildJsonObject {
+                put("workspace_id", id)
+                put("expected_tree", tree)
+            }, context = ToolContext(sessionId = "session"))
+            assertFalse(compared.content, compared.isError)
+            assertTrue(compared.content.contains("child_diff"))
             assertEquals("parent\n", root.resolve("code.txt").readText())
             fun merge(sourceTree: String, mergedTree: String) = buildJsonObject {
                 put("workspace_id", id)
                 put("expected_tree", tree)
                 put("expected_source_tree", sourceTree)
                 put("expected_merged_tree", mergedTree)
+                put("resolution", "auto")
+                put("quality_decision", buildJsonObject {
+                    put("resolution", "auto")
+                    put("reason", "父子工作区没有共同修改的文件，完整比较后选择安全保留各自独立变更")
+                    put("criteria", buildJsonObject {
+                        put("correctness", "无冲突且最终树版本锁定")
+                        put("experience", "设备使用体验由独立设备回归检查")
+                        put("maintainability", "保留父子两方不重叠的改动")
+                    })
+                    put("reviewed_both", true)
+                })
             }
             val initialArgs = merge(
                 initialProposal.getValue("source_tree").jsonPrimitive.content,
