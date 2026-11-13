@@ -41,7 +41,8 @@ internal object LocalWorkFindingJournal {
                     val declaration = log.latestMatching(setOf("tool/call")) { data ->
                         data.text("id") == sourceCallId && data.text("goal_id") == goalId
                     }
-                    require(declaration != null && declaration.sequence < source.sequence) {
+                    require(declaration != null && declaration.sequence < source.sequence &&
+                        declaration.data.text("name") != "work_finding") {
                         "来源工具不属于当前目标或尚未结算"
                     }
                     val findingId = if (action == "record") {
