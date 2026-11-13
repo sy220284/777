@@ -131,7 +131,9 @@ class ToolHookRegistry {
         val current = state
         synchronized(current.lock) {
             val proposed = snapshot.associateBy(ToolHookSubscription::id)
-            if (current.subscriptions == proposed) return@synchronized
+            // Hook ordering is executable policy. LinkedHashMap equality ignores order;
+            // reordering must invalidate an approval captured under the old sequence.
+            if (current.subscriptions.entries.toList() == proposed.entries.toList()) return@synchronized
             current.subscriptions.clear()
             current.subscriptions.putAll(proposed)
             current.generation++
