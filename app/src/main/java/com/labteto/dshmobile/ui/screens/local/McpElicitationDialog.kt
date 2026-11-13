@@ -23,9 +23,25 @@ import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+
+/** Keep multi-select draft typed as a string array; malformed drafts remain invalid. */
+private fun selectedMcpOptions(raw: String): List<String>? {
+    if (raw.isBlank()) return emptyList()
+    val decoded = try {
+        Json.parseToJsonElement(raw) as? JsonArray
+    } catch (_: SerializationException) {
+        null
+    } ?: return null
+    return decoded.map { item ->
+        (item as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+    }
+}
 
 /** User-visible server identity and one native form, through the existing question waiter. */
 @Composable
@@ -37,7 +53,11 @@ internal fun McpElicitationDialog(
     val fields = question.mcpFormFields.orEmpty()
     val context = LocalContext.current
     var drafts by rememberSaveable(question.requestId) {
-        mutableStateOf(fields.associate { it.name to it.defaultValue })
+        mutableStateOf(fields.associate { field ->
+            field.name to field.defaultValue.ifBlank {
+                if (field.kind == "array" && field.required) "[]" else ""
+            }
+        })
     }
     var opened by rememberSaveable(question.requestId) { mutableStateOf(false) }
     var error by rememberSaveable(question.requestId) { mutableStateOf<String?>(null) }
@@ -47,6 +67,11 @@ internal fun McpElicitationDialog(
     val valid = fields.all { field ->
         val raw = drafts[field.name].orEmpty()
         if (raw.isBlank()) !field.required else when (field.kind) {
+            "array" -> selectedMcpOptions(raw)?.let { selected ->
+                (field.minItems == null || selected.size >= field.minItems) &&
+                    (field.maxItems == null || selected.size <= field.maxItems) &&
+                    selected.all { it in field.options }
+            } ?: false
             "integer" -> raw.toLongOrNull()?.let { n ->
                 (field.minimum == null || n.toDouble() >= field.minimum) &&
                     (field.maximum == null || n.toDouble() <= field.maximum)
@@ -90,7 +115,22 @@ internal fun McpElicitationDialog(
             fields.forEach { field ->
                 val value = drafts[field.name].orEmpty()
                 Text(field.title + if (field.required) " · 必填" else "")
-                if (field.kind == "boolean") {
+                if (field.kind == "array") {
+                    val selected = selectedMcpOptions(value).orEmpty()
+                    field.options.forEach { option ->
+                        SySheetChoiceRow(
+                            title = field.optionLabels[option] ?: option,
+                            selected = option in selected,
+                            onClick = {
+                                val next = if (option in selected) selected - option
+                                    else selected + option
+                                drafts = drafts + (field.name to
+                                    JsonArray(next.map(::JsonPrimitive)).toString())
+                                error = null
+                            },
+                        )
+                    }
+                } else if (field.kind == "boolean") {
                     listOf("true" to "是", "false" to "否").forEach { (raw,label) ->
                         SySheetChoiceRow(
                             title = label,
@@ -101,7 +141,7 @@ internal fun McpElicitationDialog(
                 } else if (field.options.isNotEmpty()) {
                     field.options.forEach { option ->
                         SySheetChoiceRow(
-                            title = option,
+                            title = field.optionLabels[option] ?: option,
                             selected = value == option,
                             onClick = { drafts = drafts + (field.name to option); error = null },
                         )
@@ -128,6 +168,8 @@ internal fun McpElicitationDialog(
                     fields.forEach { field ->
                         val raw = drafts[field.name].orEmpty()
                         if (raw.isNotBlank()) when (field.kind) {
+                            "array" -> put(field.name,
+                                JsonArray(requireNotNull(selectedMcpOptions(raw)).map(::JsonPrimitive)))
                             "integer" -> put(field.name, JsonPrimitive(raw.toLong()))
                             "number" -> put(field.name, JsonPrimitive(raw.toDouble()))
                             "boolean" -> put(field.name, JsonPrimitive(raw.toBooleanStrict()))

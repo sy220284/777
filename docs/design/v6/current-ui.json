@@ -1,9 +1,9 @@
 {
   "schema": "777.v6.current-ui/1",
-  "baselineCommit": "3cdd12f3395876b2d495721336d5d378b562a03c",
-  "asOf": "2026-10-14",
+  "baselineCommit": "02544aa4b8d96fbd0e0aac5d7bf1a3e9f581df6a",
+  "asOf": "2026-11-13",
   "platform": "Android mobile",
-  "sourceOfTruth": "merged Compose on main",
+  "sourceOfTruth": "Merged Android Compose on main@02544aa4b8d96fbd0e0aac5d7bf1a3e9f581df6a",
   "routes": [
     {
       "id": "HOME",
@@ -153,13 +153,6 @@
     "PLUS_SHEET_WHITE_BG",
     "PLUS_NESTED_BIG_ICON_CARDS"
   ],
-  "pendingPRs": [
-    {
-      "number": 705,
-      "scope": "UI3.0 independent packs and ports",
-      "merged": false
-    }
-  ],
   "figma": {
     "editableSync": "blocked",
     "reason": "Starter MCP quota exceeded; no canvas write verified"
@@ -188,17 +181,46 @@
     "specialCasePolicy": "Notification butterfly, launcher, portrait, and transparent splash are separately validated identity/system assets"
   },
   "mergedUIFixes": [
-    711
+    711,
+    896
   ],
   "mergedRelevantPRs": [
-    711
+    705,
+    711,
+    715,
+    766,
+    896
   ],
   "designVersion": "V6.3",
   "deliveryVersion": "6.3.0",
-  "designStatus": "candidate / PR #715 pending merge",
+  "designStatus": "Merged Compose baseline; Android 16/17 visual and accessibility acceptance pending",
   "workingTreeUpgrade": {
     "date": "2026-10-15",
     "baseCommit": "45bb1f54c9fa5136368879d4e80ca2f48f130aff",
-    "status": "PR candidate; merge and device acceptance pending"
-  }
+    "status": "历史 2026-10-15 候选快照，非当前生产状态"
+  },
+  "historicalMergedPRs": [
+    {
+      "number": 705,
+      "mergedOn": "2026-10-17",
+      "note": "曾合并 UI 3.0，后被原生 V6 恢复取代"
+    },
+    {
+      "number": 715,
+      "mergedOn": "2026-10-14",
+      "note": "V6.3 图标设计源"
+    },
+    {
+      "number": 766,
+      "mergedOn": "2026-10-19",
+      "note": "原生 V6 恢复"
+    },
+    {
+      "number": 896,
+      "mergedOn": "2026-11-13",
+      "note": "全宽阅读与 Work 交互"
+    }
+  ],
+  "interactionContract": "V6-IMPLEMENTED-INTERACTION-CONTRACT.zh-CN.md",
+  "proposedDesignDocument": "V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md"
 }

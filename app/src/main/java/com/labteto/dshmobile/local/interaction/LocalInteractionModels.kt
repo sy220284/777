@@ -22,7 +22,7 @@ data class LocalApproval(
     val requestId: String? = null,
 )
 
-/** Flat primitive fields requested by a connected MCP server; UI owns only the draft. */
+/** MCP flat form fields, including protocol-supported string multi-select arrays. */
 data class LocalQuestionFormField(
     val name: String,
     val title: String,
@@ -34,6 +34,9 @@ data class LocalQuestionFormField(
     val maxLength: Int? = null,
     val minimum: Double? = null,
     val maximum: Double? = null,
+    val optionLabels: Map<String, String> = emptyMap(),
+    val minItems: Int? = null,
+    val maxItems: Int? = null,
 )
 
 const val LOCAL_MCP_QUESTION_DECLINE = "__MCP_QUESTION_DECLINED__"

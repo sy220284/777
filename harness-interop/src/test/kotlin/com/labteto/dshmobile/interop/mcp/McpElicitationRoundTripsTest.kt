@@ -3,6 +3,8 @@ package com.labteto.dshmobile.interop.mcp
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -71,6 +73,74 @@ class McpElicitationRoundTripsTest {
         assertEquals(true, result["isError"]!!.jsonPrimitive.content.toBoolean())
     }
 
+
+    @Test fun multiSelectArrayRoundTripsAndRejectsInvalidChoices() = runTest {
+        val selectionSchema = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                put("colors", buildJsonObject {
+                    put("type", "array")
+                    put("minItems", 1)
+                    put("maxItems", 2)
+                    put("items", buildJsonObject {
+                        put("type", "string")
+                        put("enum", buildJsonArray {
+                            add(JsonPrimitive("red"))
+                            add(JsonPrimitive("blue"))
+                        })
+                    })
+                })
+            })
+            put("required", buildJsonArray { add(JsonPrimitive("colors")) })
+        }
+        val prompt = buildJsonObject {
+            put("resultType", "input_required")
+            put("inputRequests", buildJsonObject {
+                put("colors", buildJsonObject {
+                    put("method", "elicitation/create")
+                    put("params", buildJsonObject {
+                        put("mode", "form")
+                        put("message", "选择颜色")
+                        put("requestedSchema", selectionSchema)
+                    })
+                })
+            })
+        }
+        suspend fun runWith(values: List<String>): Pair<Int, Result<JsonObject>> {
+            var calls = 0
+            val result = runCatching {
+                mcpCallWithInputRequired(
+                    request = { args ->
+                        calls++
+                        if (calls == 1) prompt else {
+                            val selected = args["inputResponses"]!!.jsonObject
+                                .getValue("colors").jsonObject.getValue("content").jsonObject
+                                .getValue("colors") as kotlinx.serialization.json.JsonArray
+                            assertEquals(values.size, selected.size)
+                            buildJsonObject { put("resultType", "complete") }
+                        }
+                    },
+                    name = "choose", arguments = input,
+                    onElicitation = {
+                        McpElicitationReply("accept", buildJsonObject {
+                            put("colors", buildJsonArray { values.forEach { add(JsonPrimitive(it)) } })
+                        })
+                    },
+                )
+            }
+            return calls to result
+        }
+        val valid = runWith(listOf("red", "blue"))
+        assertEquals(2, valid.first)
+        assertTrue(valid.second.isSuccess)
+        val invalid = runWith(listOf("red", "wrong"))
+        assertEquals(1, invalid.first)
+        assertTrue(invalid.second.isFailure)
+        val empty = runWith(emptyList())
+        assertEquals(1, empty.first)
+        assertTrue(empty.second.isFailure)
+    }
+
     @Test fun ordinaryResultsNeverPromptOrReplay() = runTest {
         var calls = 0
         mcpCallWithInputRequired(
@@ -114,16 +184,90 @@ class McpElicitationRoundTripsTest {
         assertEquals(1, calls)
     }
 
-    @Test fun indefiniteInputRequiredRoundsStopWithExplicitFailure() = runTest {
+    @Test fun cancellationStopsFurtherServerPromptsWithoutReopeningTheUI() = runTest {
         var calls = 0
-        val failure = runCatching {
+        var prompts = 0
+        val stopped = runCatching {
             mcpCallWithInputRequired(
                 request = { calls++; required() },
-                name = "read", arguments = input,
-                onElicitation = { McpElicitationReply("decline") },
+                name = "write", arguments = input,
+                onElicitation = { prompts++; McpElicitationReply("cancel") },
             )
         }
-        assertTrue(failure.isFailure)
-        assertEquals(8, calls)
+        assertTrue(stopped.isFailure)
+        assertEquals(2, calls)
+        assertEquals(1, prompts)
+    }
+
+    @Test fun repeatedEmptyPromptWithUnchangedStateStopsWithoutBusyLoop() = runTest {
+        var calls = 0
+        val stuck = buildJsonObject {
+            put("resultType", "input_required")
+            put("requestState", "same")
+            put("inputRequests", buildJsonObject {})
+        }
+        val result = runCatching {
+            mcpCallWithInputRequired(
+                request = { calls++; stuck },
+                name = "read", arguments = input,
+                onElicitation = { error("无输入请求不应弹窗") },
+            )
+        }
+        assertTrue(result.isFailure)
+        assertEquals(2, calls)
+    }
+
+    @Test fun moreThanEightLegitimateElicitationRoundsCanFinish() = runTest {
+        var calls = 0
+        var prompts = 0
+        val result = mcpCallWithInputRequired(
+            request = {
+                calls++
+                if (calls <= 10) required()
+                else buildJsonObject { put("resultType", "complete") }
+            },
+            name = "read", arguments = input,
+            onElicitation = {
+                prompts++
+                McpElicitationReply("decline")
+            },
+        )
+        assertEquals(11, calls)
+        assertEquals(10, prompts)
+        assertEquals("complete", result["resultType"]!!.jsonPrimitive.content)
+    }
+
+    @Test fun formWithMoreThanTwelveFieldsUsesTheSameProtocol() = runTest {
+        val schema = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                repeat(15) { index ->
+                    put("item$index", buildJsonObject { put("type", "string") })
+                }
+            })
+        }
+        var calls = 0
+        val result = mcpCallWithInputRequired(
+            request = {
+                calls++
+                if (calls == 1) buildJsonObject {
+                    put("resultType", "input_required")
+                    put("inputRequests", buildJsonObject {
+                        put("form", buildJsonObject {
+                            put("method", "elicitation/create")
+                            put("params", buildJsonObject {
+                                put("mode", "form")
+                                put("message", "完整设置")
+                                put("requestedSchema", schema)
+                            })
+                        })
+                    })
+                } else buildJsonObject { put("resultType", "complete") }
+            },
+            name = "read", arguments = input,
+            onElicitation = { McpElicitationReply("accept", buildJsonObject {}) },
+        )
+        assertEquals("complete", result["resultType"]!!.jsonPrimitive.content)
+        assertEquals(2, calls)
     }
 }

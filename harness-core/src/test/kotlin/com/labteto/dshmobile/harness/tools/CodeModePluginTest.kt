@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.harness.tools
 
 import com.labteto.dshmobile.harness.plugin.HarnessContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -56,6 +57,73 @@ class CodeModePluginTest {
         assertEquals(2, approvals)
         assertEquals(listOf("read", "write", "code_mode_run"), receipts)
         assertTrue(result.content.contains("\"completed_steps\":2"))
+    }
+
+
+    @Test fun scriptsWithMoreThanEightStepsCompleteUsingOriginalToolRules() = runTest {
+        val registry = ToolRegistry()
+        var completed = 0
+        register(registry, "read") { completed++; ToolResult("ok") }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val actual = registry.execute("code_mode_run", plan(*Array(12) { "read" }),
+            context = ToolContext(approval = { true }))
+        assertFalse(actual.isError)
+        assertEquals(12, completed)
+        assertTrue(actual.content.contains("\"completed_steps\":12"))
+    }
+
+    @Test fun slowStepIsNotInterruptedByAnUnrelatedCodeModeDeadline() = runTest {
+        val registry = ToolRegistry()
+        register(registry, "slow") {
+            delay(91_000)
+            ToolResult("finished")
+        }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val actual = registry.execute("code_mode_run", plan("slow"),
+            context = ToolContext(approval = { true }))
+        assertFalse(actual.isError)
+        assertTrue(actual.content.contains("\"completed_steps\":1"))
+    }
+
+    @Test fun registeredToolTimeoutStillAppliesInsideCodeMode() = runTest {
+        val registry = ToolRegistry()
+        registry.register(HarnessTool(
+            name = "limited",
+            schema = functionToolSchema("limited", "限时测试"),
+            access = ToolAccess.READ_ONLY,
+            approvalPolicy = ToolApprovalPolicy.NEVER,
+            exposure = ToolExposure.CORE,
+            metadata = ToolMetadata("test"),
+            timeoutMillis = 1_000L,
+            executor = HarnessToolExecutor { _, _, _ ->
+                delay(2_000)
+                ToolResult("too late")
+            },
+        ))
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val actual = registry.execute("code_mode_run", plan("limited"),
+            context = ToolContext(approval = { true }))
+        assertEquals("CODE_MODE_STEP_FAILED", actual.errorCode)
+        assertTrue(actual.content.contains("TOOL_TIMEOUT"))
+    }
+
+
+    @Test fun childPostHookFailureIsVisibleWithoutMarkingScriptFailed() = runTest {
+        val registry = ToolRegistry()
+        register(registry, "read") { ToolResult("read success") }
+        registry.registerHook(ToolHookSubscription("audit-failed", object : ToolLifecycleHook {
+            override suspend fun afterUse(event: ToolPostUseEvent) {
+                error("internal diagnostics")
+            }
+        }, setOf("read")))
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val actual = registry.execute("code_mode_run", plan("read"),
+            context = ToolContext(approval = { true }))
+        assertFalse(actual.isError)
+        assertTrue(actual.content.contains("\"completed_steps\":1"))
+        assertTrue(actual.content.contains("\"post_hook_failures\""))
+        assertTrue(actual.content.contains("audit-failed"))
+        assertFalse(actual.content.contains("internal diagnostics"))
     }
 
     @Test fun internalToolsCannotBeSmuggledIntoScript() = runTest {

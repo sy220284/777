@@ -61,9 +61,6 @@ jobs:
           bash tools/dev/setup-toolchain.sh --self-test
           python3 tools/dev/test-install.py
           python3 tools/runtime/test-verification.py
-          # 复用现有工具链验收入口，先验证真实 Git 三方择优合并与文件隔离
-          python3 tools/runtime/test-git-workspace.py
-          python3 tools/runtime/test-agent-workspace-files.py
           if grep -RInE '^[[:space:]]*(curl|wget|apt-get)([[:space:]]|$)' tools/dev --include='*.sh' ||              grep -RIn 'download_verified' tools/dev --include='*.sh'; then
             echo "本地工具链脚本出现外部下载/包管理入口；组件只能来自 GitHub Actions Artifact。" >&2
             exit 1

@@ -12,6 +12,7 @@ import com.labteto.dshmobile.local.interaction.LocalQuestionFormField
 import com.labteto.dshmobile.local.interaction.LOCAL_MCP_QUESTION_DECLINE
 import com.labteto.dshmobile.ui.theme.DshTheme
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
@@ -45,6 +46,41 @@ class McpElicitationDialogTest {
         compose.runOnIdle {
             assertEquals("test-user", Json.parseToJsonElement(requireNotNull(sent))
                 .jsonObject.getValue("name").jsonPrimitive.content)
+        }
+    }
+
+
+    @Test fun multipleChoicesSubmitArrayAndRespectMaxItems() {
+        var answer: String? = null
+        compose.setContent {
+            DshTheme {
+                McpElicitationDialog(
+                    question = LocalQuestion(
+                        callId = "mcp-multi", question = "请选择",
+                        requestId = "request-multi",
+                        mcpFormFields = listOf(LocalQuestionFormField(
+                            name = "colors", title = "颜色", kind = "array", required = true,
+                            options = listOf("r", "g", "b"),
+                            optionLabels = mapOf("r" to "红", "g" to "绿", "b" to "蓝"),
+                            minItems = 1, maxItems = 2,
+                        )),
+                    ),
+                    onAnswer = { answer = it; true },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("mcp-form-submit").assertIsNotEnabled()
+        compose.onNodeWithText("红").performClick()
+        compose.onNodeWithText("绿").performClick()
+        compose.onNodeWithText("蓝").performClick()
+        compose.onNodeWithTag("mcp-form-submit").assertIsNotEnabled()
+        compose.onNodeWithText("蓝").performClick()
+        compose.onNodeWithTag("mcp-form-submit").performClick()
+        compose.runOnIdle {
+            val colors = Json.parseToJsonElement(requireNotNull(answer)).jsonObject
+                .getValue("colors").jsonArray.map { it.jsonPrimitive.content }
+            assertEquals(listOf("r", "g"), colors)
         }
     }
 

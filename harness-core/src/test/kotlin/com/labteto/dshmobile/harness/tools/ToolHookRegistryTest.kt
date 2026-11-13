@@ -147,13 +147,36 @@ class ToolHookRegistryTest {
                 error("post handler failed")
             }
         }))
-        val failed = runCatching {
-            registry.executeTracked("patch", JsonObject(emptyMap()), context = ToolContext(
-                onExecutionFinished = { _, _ -> sequence += "receipt" },
-            ))
-        }.isFailure
-        assertTrue(failed)
-        assertEquals(listOf("side_effect", "receipt", "post"), sequence)
+        registry.registerHook(ToolHookSubscription("post-success", object : ToolLifecycleHook {
+            override suspend fun afterUse(event: ToolPostUseEvent) { sequence += "post2" }
+        }))
+        val actual = registry.executeTracked("patch", JsonObject(emptyMap()), context = ToolContext(
+            onExecutionFinished = { _, _ -> sequence += "receipt" },
+        ))
+        assertTrue(actual.executionStarted)
+        assertFalse(actual.result.isError)
+        assertEquals("saved", actual.result.content)
+        assertEquals(listOf(ToolPostHookFailure("post-failure", "IllegalStateException")),
+            actual.postHookFailures)
+        assertEquals(listOf("side_effect", "receipt", "post", "post2"), sequence)
+    }
+
+
+
+    @Test fun postHookTimeoutDoesNotTurnSuccessfulMutationIntoFailure() = runTest {
+        val registry = ToolRegistry()
+        registry.register(tool { ToolResult("saved") })
+        registry.registerHook(ToolHookSubscription("slow-audit", object : ToolLifecycleHook {
+            override suspend fun afterUse(event: ToolPostUseEvent) {
+                delay(60_000)
+            }
+        }))
+        val actual = registry.executeTracked("patch", JsonObject(emptyMap()))
+        assertTrue(actual.executionStarted)
+        assertFalse(actual.result.isError)
+        assertEquals("saved", actual.result.content)
+        assertEquals(listOf(ToolPostHookFailure("slow-audit", "timeout")),
+            actual.postHookFailures)
     }
 
     @Test fun preHookTimeoutBlocksToolWithoutStartingOrRequestingApproval() = runTest {
