@@ -7,6 +7,10 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import android.Manifest
 import android.os.Build
 import android.graphics.BitmapFactory
+import android.content.ClipData
+import android.content.Intent
+import androidx.core.content.FileProvider
+import java.io.File
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -69,6 +73,7 @@ import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.AppSettings
+import com.labteto.dshmobile.uicontract.UiExecutionPolicySnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
@@ -210,10 +215,30 @@ fun SettingsScreen(
     val storageExportFailed = stringResource(R.string.settings_local_session_storage_export_failed)
     val storageCompacted = stringResource(R.string.settings_local_session_storage_compacted)
     val storageCompactFailed = stringResource(R.string.settings_local_session_storage_compact_failed)
+    // The reviewed immutable bytes are the same bytes given to SAF or the native share sheet.
+    var diagnosticDraft by remember { mutableStateOf<String?>(null) }
+    var diagnosticBusy by remember { mutableStateOf(false) }
+    val reviewDiagnostics: () -> Unit = {
+        if (!diagnosticBusy) {
+            diagnosticBusy = true
+            scope.launch {
+                try {
+                    diagnosticDraft = viewModel.diagnosticReport()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    AppLog.failure("Settings", "diagnostic_preview", error)
+                    toast.second(exportFailed)
+                } finally {
+                    diagnosticBusy = false
+                }
+            }
+        }
+    }
     val diagnosticExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
-        if (uri != null) scope.launch {
+        val report = diagnosticDraft
+        if (uri != null && report != null) scope.launch {
             try {
-                val report = viewModel.diagnosticReport()
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openOutputStream(uri)?.use { stream ->
                         stream.write(report.toByteArray(Charsets.UTF_8))
@@ -224,11 +249,46 @@ fun SettingsScreen(
                     .firstOrNull { it.startsWith("日志完整性：") }
                     ?.removePrefix("日志完整性：")
                 toast.second(if (integrity == "正常") exportSuccess else exportPartial)
+                diagnosticDraft = null
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 AppLog.failure("Settings", "export_diagnostic_report", error)
                 toast.second(exportFailed)
+            }
+        }
+    }
+    val shareDiagnostic: () -> Unit = {
+        val reviewed = diagnosticDraft
+        if (reviewed != null && !diagnosticBusy) {
+            diagnosticBusy = true
+            scope.launch {
+                try {
+                    val share = withContext(Dispatchers.IO) {
+                        val directory = File(context.cacheDir, "diagnostic-shares")
+                        check(directory.isDirectory || directory.mkdirs()) { "无法建立诊断分享目录" }
+                        val target = File.createTempFile("777-reviewed-", ".txt", directory)
+                        target.writeText(reviewed, Charsets.UTF_8)
+                        FileProvider.getUriForFile(context, "${context.packageName}.files", target)
+                    }
+                    context.startActivity(Intent.createChooser(
+                        Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_STREAM, share)
+                            clipData = ClipData.newUri(context.contentResolver, "777 诊断", share)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        },
+                        "选择接收诊断报告的应用",
+                    ))
+                    diagnosticDraft = null
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    AppLog.failure("Settings", "share_diagnostic_report", error)
+                    toast.second(exportFailed)
+                } finally {
+                    diagnosticBusy = false
+                }
             }
         }
     }
@@ -378,6 +438,15 @@ fun SettingsScreen(
         }
     }
 
+    var executionPolicyRefresh by remember { mutableStateOf(0) }
+    val executionPolicyResult by produceState<Result<UiExecutionPolicySnapshot>?>(
+        initialValue = null, key1 = page, key2 = executionPolicyRefresh,
+    ) {
+        value = if (page == SettingsDestination.ADVANCED) {
+            withContext(Dispatchers.IO) { runCatching { viewModel.executionPolicySummary() } }
+        } else null
+    }
+
     val title = when (page) {
         SettingsDestination.ROOT -> stringResource(R.string.settings_title)
         SettingsDestination.SESSION -> stringResource(R.string.settings_page_session)
@@ -506,9 +575,14 @@ fun SettingsScreen(
                                 value = when {
                                     deviceCapabilities.loading -> stringResource(R.string.common_loading)
                                     deviceCapabilities.error != null -> stringResource(R.string.settings_permissions_check_failed)
-                                    else -> stringResource(R.string.permission_setup_enabled_count,
-                                        listOf(deviceCapabilities.accessibility, deviceCapabilities.notifications,
-                                            deviceCapabilities.postingNotifications == true).count { it })
+                                    else -> stringResource(
+                                        R.string.permission_setup_enabled_count,
+                                        listOf(
+                                            deviceCapabilities.accessibility,
+                                            deviceCapabilities.notifications,
+                                            deviceCapabilities.postingNotifications == true,
+                                        ).count { it },
+                                    )
                                 },
                                 onClick = { openPage(SettingsDestination.PERMISSIONS) },
                                 compact = true,
@@ -789,6 +863,12 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.MODEL_USAGE -> {
+                        localHarness.modelProfiles.firstOrNull {
+                            it.provider.equals("DeepSeek", ignoreCase = true) &&
+                                it.baseUrl.startsWith("https://api.deepseek.com")
+                        }?.let { deepSeekProfile ->
+                            DeepSeekBalanceCard(deepSeekProfile, viewModel::queryDeepSeekBalance)
+                        }
                         AppSettingsSection {
                             AppSettingsRow(
                                 icon = SyEntryIcons.ChatStyle,
@@ -1025,6 +1105,59 @@ fun SettingsScreen(
                                 onClick = { openPage(SettingsDestination.DIAGNOSTICS) },
                             )
                         }
+                        SettingsCard("运行权限与管理策略") {
+                            val policy = executionPolicyResult?.getOrNull()
+                            val failure = executionPolicyResult?.exceptionOrNull()
+                            when {
+                                failure != null -> Text(
+                                    "策略加载失败：${failure.message ?: "配置无效，请检查管理策略文件"}",
+                                    style = DsType.caption11.withReadingWeight(),
+                                    color = colors.dangerInk,
+                                )
+                                policy == null -> Text(
+                                    "正在读取当前执行策略…",
+                                    style = DsType.caption11.withReadingWeight(),
+                                    color = colors.textSecondary,
+                                )
+                                else -> {
+                                    Text(
+                                        "网络：${if (policy.networkEnabled) "可用" else "已限制"}",
+                                        style = DsType.std14.withReadingWeight(),
+                                        color = colors.text,
+                                    )
+                                    Text(
+                                        "浏览器历史、上传、下载、控制的独立管理策略尚未接入实际执行；" +
+                                            "当前设备操作仍按 Android 系统权限和工具审批执行。",
+                                        style = DsType.caption11.withReadingWeight(),
+                                        color = colors.textSecondary,
+                                    )
+                                    policy.allowedModelProviders?.let { providers ->
+                                        Text("可用模型来源：${providers.joinToString().ifBlank { "全部受限" }}",
+                                            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                                    }
+                                    policy.allowedHosts?.let { hosts ->
+                                        Text("网络允许列表：${hosts.joinToString().ifBlank { "全部受限" }}",
+                                            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                                    }
+                                    if (policy.deniedHosts.isNotEmpty()) Text(
+                                        "被限制的域名：${policy.deniedHosts.joinToString()}",
+                                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary,
+                                    )
+                                    Text(
+                                        if (policy.managedRestrictions.isEmpty()) "当前没有管理策略锁定字段"
+                                        else "管理策略锁定：${policy.managedRestrictions.joinToString("、")}",
+                                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary,
+                                    )
+                                }
+                            }
+                            SyButton(
+                                text = "重新检查",
+                                onClick = { executionPolicyRefresh++ },
+                                size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Ghost,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
 
                     SettingsDestination.SESSION_STORAGE -> {
@@ -1093,7 +1226,7 @@ fun SettingsScreen(
                                 icon = FeatherIcons.Info,
                                 title = stringResource(R.string.settings_export_diagnostics),
                                 reservedEntryHeight = 88.dp,
-                                onClick = { diagnosticExporter.launch("777-diagnostics.txt") },
+                                onClick = reviewDiagnostics,
                             )
                         }
                     }
@@ -1119,10 +1252,18 @@ fun SettingsScreen(
         EnvironmentInfoDialog(
             text = environmentInfo ?: stringResource(R.string.common_loading),
             onDismiss = { showEnvironment = false },
-            onExport = { diagnosticExporter.launch("777-diagnostics.txt") },
+            onExport = reviewDiagnostics,
         )
     }
-
+    diagnosticDraft?.let { approved ->
+        DiagnosticReviewDialog(
+            report = approved,
+            busy = diagnosticBusy,
+            onDismiss = { if (!diagnosticBusy) diagnosticDraft = null },
+            onExport = { diagnosticExporter.launch("777-diagnostics.txt") },
+            onShare = shareDiagnostic,
+        )
+    }
 
 }
 

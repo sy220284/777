@@ -1,10 +1,10 @@
+> **历史冻结快照（PR #895 起停止维护）**：本功能树及其代码映射、PR 标记和数量均可能过期。以当前源码、产品入口和真实测试为准；不再自动/人工同步，也不参与 CI 验收。
+
 # 777《神言神语》全功能架构树
 
-> 历史静态功能树，停止自动同步与验收登记；当前实现以实际源码为准。
+历史扫描基准：源码内容指纹 `af5ec05f0516`，节点与来源标记保留原始记录，后续不再更新。
 
-代码核对基准：本次全量扫描的源码内容指纹 `e6b67d4b2315`。扫描后确认的功能变更写入功能树；证据不足的候选变化保留待核实，不能视为已交付。
-
-说明：本图展示已登记的产品功能及归属。历史功能仍需按真实调用链逐项验收；源码符号、路由和测试存在仅构成局部证据，不证明全部功能可用。参考 [功能审计](FUNCTION-AUDIT.zh-CN.md)、[代码证据台账](FEATURE-CODE-EVIDENCE.zh-CN.md)、[自动复核结果](FEATURE-REVIEW.auto.json) 与[交互式树状图](FEATURE-TREE.zh-CN.html)。
+说明：本图仅展示原登记的功能与层级，保留为静态历史快照。交互查看见 [功能树 HTML 版](FEATURE-TREE.zh-CN.html)。
 
 ```text
  777 神言神语（当前生产代码功能树）
@@ -562,70 +562,3 @@
       └─ 受审批的远端文件与原生进程执行（PR #874，完整环境仍待补齐）
 ```
 
-## 与代码同步维护
-
-本清单是随代码维护的功能索引，系统架构约束仍以 [架构 3.0](ARCHITECTURE.md) 为准。
-
-- **何时更新**：新建、删除、重命名、拆分、合并、迁移功能或子功能；调整归属、用户可见入口、运行方式、共享能力或平台边界；有关 PR 合并、关闭或替换时。
-- **更新依据**：先核对最新主线及所有未合并 PR 的实际改动和生产装配，再与当前架构、功能归属和代码位置交叉验证；不把文件名、UI 文案、待办计划直接当作已交付能力。
-- **状态规则**：主线已有的功能按正常节点展示；仅存在于未合并 PR 的变化标注具体 PR 编号；合并后移除对应“待合并”状态并按主线重核；关闭未合并的变更从清单移除或依据实际替代 PR 重新标注。
-- **同改同核**：此 Markdown 与 [交互式树状图](FEATURE-TREE.zh-CN.html) 是同一份功能清单的两种视图。更新时逐项比对节点名称、上下级关系、PR 状态、代码定位及整体数量，不得只修改其中一份。
-- **维护范围**：功能树仅用于记录代码入口及产品模块，不再与仓库验收、CI 签收材料或逐项测试索引绑定。
-
-## 架构与源代码定位
-
-- **应用外壳与统一交互**：`app/src/main/java/com/labteto/dshmobile/ui/screens/local/`、`app/src/main/java/com/labteto/dshmobile/ui/components/`、`app/src/main/java/com/labteto/dshmobile/ui/sidebar/`
-- **聊天功能**：`app/src/main/java/com/labteto/dshmobile/local/chat/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryOverviewV3.kt`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryScreen.kt`
-- **工作与智能体功能**：`app/src/main/java/com/labteto/dshmobile/local/work/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt`
-- **自动化功能**：`app/src/main/java/com/labteto/dshmobile/automation/`、`app/src/main/java/com/labteto/dshmobile/local/automation/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/`
-- **工具与扩展功能**：`app/src/main/java/com/labteto/dshmobile/local/tools/`、`harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/`、`app/src/main/java/com/labteto/dshmobile/ui/screens/tools/`
-- **设置与个人配置**：`app/src/main/java/com/labteto/dshmobile/ui/screens/settings/`、`app/src/main/java/com/labteto/dshmobile/local/model/`、`app/src/main/java/com/labteto/dshmobile/local/usage/`
-- **共享会话与事件**：`app/src/main/java/com/labteto/dshmobile/local/session/`、`harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/`
-- **共享模型与路由**：`app/src/main/java/com/labteto/dshmobile/local/model/`、`app/src/main/java/com/labteto/dshmobile/local/context/`
-- **共享智能体核心**：`harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/`、`app/src/main/java/com/labteto/dshmobile/local/agent/`
-- **共享工具执行**：`harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/`、`app/src/main/java/com/labteto/dshmobile/local/tools/`
-- **共享记忆**：`app/src/main/java/com/labteto/dshmobile/local/memory/`
-- **共享资源与任务**：`harness-core/src/main/kotlin/com/labteto/dshmobile/harness/resource/`、`app/src/main/java/com/labteto/dshmobile/local/jobs/`
-- **共享交互**：`app/src/main/java/com/labteto/dshmobile/local/interaction/`、`app/src/main/java/com/labteto/dshmobile/local/send/`
-- **共享用量和诊断**：`app/src/main/java/com/labteto/dshmobile/local/usage/`、`app/src/main/java/com/labteto/dshmobile/observability/`
-- **共享存储与安全**：`app/src/main/java/com/labteto/dshmobile/local/persistence/`、`app/src/main/java/com/labteto/dshmobile/local/security/`
-- **轻量进程内核**：`app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeKernel.kt`
-- **Android 本机运行时**：`harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/`、`harness-device-android/src/main/java/com/labteto/dshmobile/device/`
-- **底层协议与兼容**：`app/src/main/java/com/labteto/dshmobile/local/model/`（本机模型协议）；`core/` 保留的旧远程协议代码不属于当前产品入口
-- **外部互通适配**：`harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/`
-- **构建与调试**：`gradlew`、`docs/VALIDATION.md`
-- **测试与语义验证**：`reference-validation/src/`、`harness-core/src/test/`、`app/src/test/`
-- **发布与升级**：`app/src/main/java/com/labteto/dshmobile/update/`、`.github/workflows/`
-## PR #610 实现来源与验证边界（2026-10-10）
-
-> 功能退役复核：PR #598 已合并并删除远程 Mock Harness 和中继协议验证链路，本树同步移除“模拟 Harness 服务端”和“真实中继协议一致性测试”。远程控制、远程会话、主机配对和远程中继不再是产品能力；本机模型协议、MCP、GitHub、本地 Webhook 等继续保留。
-
-- **范围**：原 407 个仍有效的末级功能保持不变，新增 41 个 PR 专属树节点（其中一个是交接功能父节点），统一以 `[来源 PR #610]` 标识。来源标记仅用于追溯代码变更，合并状态见 GitHub。
-- **共享会话**：`DurableSessionCatalog` 接管真实会话身份，正常读取会话列表不再依赖 `.json` 后缀过滤。新会话保存和删除同步维护持久目录；升级或目录损坏时校验文档身份、兼顾备份和旧快照；单个损坏会话隔离处理。原 EventLog 和摘要索引继续各自承担职责。
-- **聊天与人物**：已合并 #604 的 V4 为基线；#610 的群聊点名分辨、独立人物约定、日记人工纠正与停用、来源会话跳转、长期事实修改后派生日记失效／幂等恢复单独标记。
-- **聊天转工作**：用户选定已加载历史公共发言，可分页加载更早内容、筛选并保留选中项；交接摘要携带来源会话、消息编号和节选。选中的本地附件只能提供验证符合导入路径规范的 SHA-256 引用，后续读取仍受原始权限与文件存在性校验。
-- **工作与交付**：基于真实工具事件及已有文件版本记录，关联成果、调用源、事件序号、任务要求和内容哈希；证据链接不代表需求已经验证通过。团队完成声明同时考虑未结消息和失败成员。
-- **配置与记忆**：模型表现推理与温度上限贯通配置和请求；记忆更正保留来源失效待办；工具和设备状态仅作只读提示，屏幕录制／共享继续由 Android 逐次授权。
-- **历史说明**：这是旧功能树快照，已停止生成逐项验收索引，不设置 CI 合并门槛；实际功能以代码为准。
-
-### 新增节点代码归属
-
-| 领域 | 源码权威入口 |
-|---|---|
-| 会话身份与恢复 | `harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt`、`VersionedSessionStore.kt`、`app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt` |
-| 聊天人物与记忆 | `app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt`、`LocalChatMemoryProjectionPort.kt`、`app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt` |
-| 聊天转工作 | `app/src/main/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterials.kt`、`app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheet.kt` |
-| Work 成果与验收证据 | `app/src/main/java/com/labteto/dshmobile/local/work/LocalRequirementEvidence.kt`、`LocalWorkArtifactVersion.kt`、`LocalWorkCompletionClaimGuard.kt` |
-| 模型与权限 | `app/src/main/java/com/labteto/dshmobile/local/model/LocalModelPerformanceStore.kt`、`app/src/main/java/com/labteto/dshmobile/local/tools/LocalTaskCapabilityReadiness.kt` |
-
-HTML 交互版中的 PR 专属节点另外逐项附有代码路径。此功能树是范围与归属索引，不能代替代码和实机审计。
-
-## 人物自由回应改造（本分支，尚未合并）
-
-人物人设与采样节点替代旧行为调节子树：退出亲密距离、状态轮数、主动与开放、成长速度、互动新鲜度、关系节奏与阶段锁定控制；保留已有卡片兼容读取和独立模型温度。角色身份与聊天背景仍由 Chat 所有者维护。该范围同时更新上述 Markdown 与 HTML 视图，实际主线交付以合并状态为准。
-
-本分支的人物生成范围与体验验收边界见 [聊天人物自由回应改造](CHAT-FREE-RESPONSE.zh-CN.md)。
-
-### 聊天连续性优化
-
-独立故事以 `ChatExperienceScope` 隔离共同经历；`LocalChatHistoryWindow` 保留双方表达；`groupChatResponders` 延续实际交流对象；`ChatDiaryStateCorrection` 将人工纠正投影到当前状态与连续性，恢复和生成前沿用同一决定。人物资料按完整事实取用，检索线索只帮助找回事件，心理记录保留来源和不确定性。详见 [聊天改造说明](CHAT-FREE-RESPONSE.zh-CN.md)，实际验证结果以最终提交的 CI 为准。

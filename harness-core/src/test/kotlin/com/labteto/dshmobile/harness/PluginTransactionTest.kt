@@ -13,6 +13,58 @@ import org.junit.Test
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class PluginTransactionTest {
     private class Resource { var closed = false }
+    @Test fun failedPluginInstallDoesNotLeakStagedHookRules() = runTest {
+        val registry = PluginRegistry()
+        val failed = object : HarnessPlugin {
+            override val id = "failing-hook"
+            override suspend fun install(context: HarnessContext) {
+                context.tools.registerHook(ToolHookSubscription("blocked", object : ToolLifecycleHook {
+                    override suspend fun beforeUse(request: ToolPreUseRequest): ToolPreUseDecision =
+                        ToolPreUseDecision.Deny("测试拒绝")
+                }))
+                error("failure after registering a hook")
+            }
+            override suspend fun uninstall(context: HarnessContext) {
+                context.tools.unregisterHook("blocked")
+            }
+        }
+        assertTrue(runCatching { registry.install(failed) }.isFailure)
+        assertTrue(registry.context.tools.hookIds().isEmpty())
+    }
+
+    @Test fun stagedHookRemainsInvisibleUntilCommitAndRetainedContextFollowsLiveView() = runTest {
+        val registry = PluginRegistry()
+        val reached = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        lateinit var retained: HarnessContext
+        val adding = async {
+            registry.install(object : HarnessPlugin {
+                override val id = "delayed-hook"
+                override suspend fun install(context: HarnessContext) {
+                    retained = context
+                    context.tools.registerHook(ToolHookSubscription(
+                        "during-install", object : ToolLifecycleHook {}))
+                    reached.complete(Unit)
+                    resume.await()
+                }
+                override suspend fun uninstall(context: HarnessContext) {
+                    context.tools.unregisterHook("during-install")
+                    context.tools.unregisterHook("after-install")
+                }
+            })
+        }
+        reached.await()
+        assertTrue(registry.context.tools.hookIds().isEmpty())
+        resume.complete(Unit)
+        adding.await()
+        assertEquals(listOf("during-install"), registry.context.tools.hookIds())
+        retained.tools.registerHook(ToolHookSubscription(
+            "after-install", object : ToolLifecycleHook {}))
+        assertEquals(listOf("during-install", "after-install"), registry.context.tools.hookIds())
+        assertTrue(registry.uninstall("delayed-hook"))
+        assertTrue(registry.context.tools.hookIds().isEmpty())
+    }
+
     @Test fun rollbackPublishesRecreatedResourceInsteadOfClosedReference() = runTest {
         val registry = PluginRegistry()
         var resource = Resource()

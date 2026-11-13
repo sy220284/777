@@ -55,9 +55,13 @@ class AndroidRuntimePlugin(
     override val id: String = "android-runtime"
     private val terminalLeases = ConcurrentHashMap<String, HarnessResourceLease>()
     private val gitWorkspaces = GitWorkspaceRuntime(workspaceRoot, processRuntime)
+    private val remoteDiff = GitRemoteDiff(workspaceRoot, processRuntime)
 
     override suspend fun install(context: HarnessContext) {
-        if (includeGitWorkspaces) gitWorkspaces.install(context)
+        if (includeGitWorkspaces) {
+            gitWorkspaces.install(context)
+            remoteDiff.install(context)
+        }
         context.tools.register(
             HarnessTool(
                 name = "runtime_command_status",
@@ -352,7 +356,10 @@ class AndroidRuntimePlugin(
     }
 
     override suspend fun uninstall(context: HarnessContext) {
-        if (includeGitWorkspaces) gitWorkspaces.uninstall(context)
+        if (includeGitWorkspaces) {
+            remoteDiff.uninstall(context)
+            gitWorkspaces.uninstall(context)
+        }
         terminalProvider.closeAll()
         terminalLeases.keys.toList().forEach { sessionId ->
             runCatching { terminalProvider.close(sessionId) }

@@ -66,6 +66,19 @@ internal class LocalToolCompositionRoot @Inject constructor(
     )
     internal val agentWorkspaces = com.labteto.dshmobile.runtime.GitWorkspaceRuntime(File(workspace.path), process)
 
+    override suspend fun remoteGitBranches(repository: String): List<String> =
+        agentWorkspaces.remoteTrackingBranches(repository)
+
+    override suspend fun compareLocalGit(repository: String, includeUntracked: Boolean): kotlinx.serialization.json.JsonObject =
+        agentWorkspaces.compareLocal(repository, includeUntracked)
+
+    override suspend fun compareRemoteGit(
+        repository: String, remote: String, branch: String,
+    ): kotlinx.serialization.json.JsonObject = agentWorkspaces.compareRemote(repository, remote, branch)
+
+    override suspend fun compareCommitGit(repository: String, commit: String): kotlinx.serialization.json.JsonObject =
+        agentWorkspaces.compareCommit(repository, commit)
+
     internal suspend fun resolveAgentWorkspace(sessionId: String, identity: String): com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext {
         val admission = agentWorkspaces.operate(sessionId, "locate", buildJsonObject { put("workspace_id", identity) })
         return com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext(
@@ -180,6 +193,11 @@ internal class LocalToolCompositionRoot @Inject constructor(
             },
             usageContextProvider = { sessionId, callId ->
                 usageBridge.resolve(sessionId, callId, TokenUsageAction.VISION)
+            },
+            onMcpElicitation = { sessionId, serverId, callId, prompt ->
+                com.labteto.dshmobile.local.work.LocalWorkMcpElicitationBridge.answer(
+                    workRunRegistry, sessionId, serverId, callId, prompt,
+                )
             },
         )
     }
@@ -305,6 +323,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
     override fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         skillManager.create(id, displayName, description, instructions)
     override fun importSkill(filename: String, bytes: ByteArray): String = skillManager.importSkill(filename, bytes)
+    override fun exportSkillPackage(id: String): ByteArray = skillManager.exportSkillPackage(id)
     override fun removeSkill(id: String) = skillManager.remove(id)
     override fun readSkillDocument(id: String) = skillManager.readDocument(id)
     override fun updateSkillDocument(id: String, document: String) = skillManager.updateDocument(id, document)

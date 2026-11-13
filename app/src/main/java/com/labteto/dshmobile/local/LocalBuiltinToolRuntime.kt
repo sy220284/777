@@ -165,6 +165,19 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 endLine = args.int("end_line", args.int("start_line", 1) + 399),
                 startChar = args.int("start_char", 0),
             ) } } }
+            "file_version" -> withContext(Dispatchers.IO) {
+                val file = workspace.fileVersion(args.string("path"))
+                "revision=" + file.revision + "；bytes=" + file.bytes
+            }
+            "file_write_if_version" -> {
+                require(allowMutation) { "该子任务处于只读模式" }
+                withContext(Dispatchers.IO) {
+                    val file = workspace.writeIfVersion(
+                        args.string("path"), args.string("expected_revision"), args.string("content"),
+                    )
+                    "条件写入已提交；revision=" + file.revision + "；bytes=" + file.bytes
+                }
+            }
             "read_chunk" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
                 HarnessResourceKind.FILE_IO, "tool:read_chunk"
             ) {
@@ -485,7 +498,17 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 after = args.int("after", 0),
                 offsetChars = args.int("offset_chars", 0),
             )
-            "present" -> workspace.present(args.string("path"))
+            "present" -> {
+                val path = args.string("path")
+                val receipt = workspace.present(path)
+                // Child worktrees publish only after the parent integrates their final files.
+                if (workspace.path == this.workspace.path) {
+                    sessionStorage.files.publishVerifiedDeliverables(
+                        boundSessionId, listOf(path),
+                    )
+                }
+                receipt
+            }
             else -> "未知工具：${call.name}"
         }
     }

@@ -11,6 +11,7 @@ import java.nio.file.LinkOption
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.map
 
 /** Preset instructions use the existing SKILL.md model tool contract. */
 internal data class LocalPresetSkill(
@@ -153,6 +154,19 @@ internal class LocalSkillStore(
             com.labteto.dshmobile.observability.AppLog.warn("LocalSkills", "技能条目无法读取：$name", error)
             LocalInstalledSkill(name, "无法读取，请修复或删除此技能", false, "自定义技能（$name）")
         }
+    }
+
+    /** Read the provenance from the same admitted skill directory; never follow a source-file symlink. */
+    fun githubSourceEvidence(id: String): String? {
+        require(LOCAL_SKILL_ID_PATTERN.matches(id)) { "技能编号无效" }
+        requireInstalled(id)
+        val source = File(skillsDir, "$id/.github-source.json")
+        if (Files.notExists(source.toPath(), LinkOption.NOFOLLOW_LINKS)) return null
+        require(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+            Files.size(source.toPath()) in 1L..8192L) {
+            "GitHub 技能来源记录损坏，请检查本地 .github-source.json"
+        }
+        return source.readText(Charsets.UTF_8)
     }
 
     fun presets(): List<LocalPresetSkill> {
@@ -462,14 +476,42 @@ internal class LocalSkillManager @Inject constructor(
         readDirectory("")
         files
     }
-    fun initializeDefaults() = store.seedOnce()
+    fun initializeDefaults() {
+        LocalSkillPackageUpdater(storageWorkspace).recoverInterruptedTransactions()
+        store.seedOnce()
+    }
     fun installed(): List<LocalInstalledSkill> = store.installed()
+
+    /** Existing native observer notices external skill installs, edits and removals. */
+    fun changes(): kotlinx.coroutines.flow.Flow<Unit> =
+        com.labteto.dshmobile.local.files.watchWorkspaceFileChanges(
+            java.io.File(storageWorkspace.path),
+        ) {
+            val root = java.io.File(storageWorkspace.path, ".dsh/skills")
+            val folders = root.listFiles().orEmpty().filter {
+                it.isDirectory && !Files.isSymbolicLink(it.toPath())
+            }
+            listOf(".dsh/skills") + folders.map { ".dsh/skills/${it.name}" }
+        }.mapToSkillRefresh()
+
+    private fun kotlinx.coroutines.flow.Flow<com.labteto.dshmobile.local.files.LocalWorkspaceFileChange>
+        .mapToSkillRefresh(): kotlinx.coroutines.flow.Flow<Unit> = map { Unit }
+
+    fun githubSourceEvidence(id: String): String? = store.githubSourceEvidence(id)
     fun presets(): List<LocalPresetSkill> = store.presets()
     fun install(id: String) = store.install(id)
     fun create(id: String, displayName: String, description: String, instructions: String) =
         store.create(id, displayName, description, instructions)
     fun importSkill(filename: String, bytes: ByteArray): String = LocalSkillPackageImporter(storageWorkspace).install(filename, bytes)
-    fun remove(id: String) = store.remove(id)
+    fun exportSkillPackage(id: String): ByteArray = LocalSkillPackageExporter(storageWorkspace).export(id)
+    fun replaceSkillPackage(id: String, archive: ByteArray): String =
+        LocalSkillPackageUpdater(storageWorkspace).replace(id, archive)
+    fun canRollbackSkill(id: String): Boolean = LocalSkillPackageUpdater(storageWorkspace).canRollback(id)
+    fun rollbackSkill(id: String): String = LocalSkillPackageUpdater(storageWorkspace).rollback(id)
+    fun remove(id: String) {
+        store.remove(id)
+        LocalSkillPackageUpdater(storageWorkspace).forgetRollback(id)
+    }
     fun readDocument(id: String) = store.readDocument(id)
     fun updateDocument(id: String, document: String) = store.updateDocument(id, document)
     fun setModelInvocable(id: String, enabled: Boolean) = store.setModelInvocable(id, enabled)

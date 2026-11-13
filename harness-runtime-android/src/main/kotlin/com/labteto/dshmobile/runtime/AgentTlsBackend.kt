@@ -23,23 +23,31 @@ class AgentTlsBackend(
         require(credential.isNotBlank() && credential.toByteArray().size <= 65_535)
     }
 
-    override suspend fun run(request: AgentBackendRequest, services: AgentBackendServices): AgentRunResult {
+    /** A TLS/credential health check that never starts an agent turn or executes a tool. */
+    suspend fun probe(): Unit {
         requireGrantCurrent()
+        val socket = openAuthenticated()
+        try { requireGrantCurrent() } finally { socket.close() }
+    }
+
+    private suspend fun openAuthenticated(): SSLSocket {
         val trust = object : X509TrustManager {
             override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
-            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = error("client validation is server-owned")
+            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) =
+                error("client validation is server-owned")
             override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
                 val certificate = chain.firstOrNull() ?: error("后端未提供证书")
                 certificate.checkValidity()
                 val actual = MessageDigest.getInstance("SHA-256").digest(certificate.encoded)
                     .joinToString("") { "%02x".format(it) }
-                check(MessageDigest.isEqual(actual.toByteArray(), peerSha256.toByteArray())) { "远端执行器证书已变化" }
+                check(MessageDigest.isEqual(actual.toByteArray(), peerSha256.toByteArray())) {
+                    "远端执行器证书已变化"
+                }
             }
         }
         val ssl = SSLContext.getInstance("TLS").apply { init(null, arrayOf<TrustManager>(trust), null) }
         val socket = ssl.socketFactory.createSocket() as SSLSocket
         val connecting = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        var channel: FramedAgentChannel? = null
         try {
             suspendCancellableCoroutine<Unit> { continuation ->
                 continuation.invokeOnCancellation { socket.close() }
@@ -50,12 +58,30 @@ class AgentTlsBackend(
                         socket.soTimeout = 15_000
                         socket.startHandshake()
                         DataOutputStream(socket.outputStream).apply { writeUTF(credential); flush() }
-                        check(DataInputStream(socket.inputStream).readInt() == AgentBackendProtocol.VERSION) { "远端执行器未确认授权" }
+                        check(DataInputStream(socket.inputStream).readInt() == AgentBackendProtocol.VERSION) {
+                            "远端执行器未确认授权"
+                        }
                         socket.soTimeout = 90_000
                         continuation.resume(Unit)
-                    } catch (error: Exception) { continuation.resumeWithException(error) }
+                    } catch (error: Exception) {
+                        if (continuation.isActive) continuation.resumeWithException(error)
+                    }
                 }
             }
+            return socket
+        } catch (failure: Throwable) {
+            socket.close()
+            throw failure
+        } finally {
+            connecting.cancel()
+        }
+    }
+
+    override suspend fun run(request: AgentBackendRequest, services: AgentBackendServices): AgentRunResult {
+        requireGrantCurrent()
+        val socket = openAuthenticated()
+        var channel: FramedAgentChannel? = null
+        try {
             requireGrantCurrent()
             val connection = FramedAgentChannel(socket.inputStream, socket.outputStream, onClose = socket::close)
             channel = connection
@@ -68,6 +94,6 @@ class AgentTlsBackend(
                 extend = services.extend,
             )
             return AgentBackendProtocol.host(connection, request.copy(remoteTools = remoteTools), checked, requireGrantCurrent)
-        } finally { channel?.close(); socket.close(); connecting.cancel() }
+        } finally { channel?.close(); socket.close() }
     }
 }

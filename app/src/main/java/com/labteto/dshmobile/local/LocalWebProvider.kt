@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.web.LocalWebDiagnostics
 import com.labteto.dshmobile.local.web.LocalWebSearchClient
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.web.LocalSearchUsageStore
+import com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy
 import com.labteto.dshmobile.local.web.LocalKeylessWebSearchClient
 import com.labteto.dshmobile.local.web.isRetryableWebTransportFailure
 import com.labteto.dshmobile.local.web.isTextualWebMediaType
@@ -44,11 +45,12 @@ class LocalWebProvider @Inject constructor(
     json: Json,
     private val searchUsage: LocalSearchUsageStore,
     private val networkSettings: LocalNetworkSearchSettings,
+    private val managedPolicy: LocalManagedExecutionPolicy,
 ) {
     private val searchClient = LocalWebSearchClient(http, json) { searchUsage.record("deepseek", it) }
     private val keylessSearchClient = LocalKeylessWebSearchClient(http) { searchUsage.record("bing", "search") }
     private val targetResolver = com.labteto.dshmobile.local.web.LocalWebTargetResolver(context, http)
-    private val diagnostics = LocalWebDiagnostics(targetResolver)
+    private val diagnostics = LocalWebDiagnostics(targetResolver, ::requirePolicyTarget)
 
     suspend fun fetch(
         input: String,
@@ -66,7 +68,7 @@ class LocalWebProvider @Inject constructor(
                     .url(route.url)
                     .header("User-Agent", LOCAL_WEB_USER_AGENT)
                     .header("Accept", "text/html,text/plain,application/json,application/xml;q=0.9,*/*;q=0.5")
-                route.hostHeader?.let { requestBuilder.header("Host", it) }
+                route.attachValidatedOrigin(requestBuilder, current)
                 val result = withCancellableHttpResponse(route.client.newCall(requestBuilder.build())) { response ->
                     if (response.isRedirect) {
                         if (redirectCount >= MAX_REDIRECTS) {
@@ -164,7 +166,7 @@ class LocalWebProvider @Inject constructor(
                 .header("User-Agent", LOCAL_WEB_USER_AGENT)
                 .method(verb, requestBody)
             safeHeaders.forEach { (name, value) -> builder.header(name, value) }
-            route.hostHeader?.let { builder.header("Host", it) }
+            route.attachValidatedOrigin(builder, current)
             val result = executeWithTransientRetry(
                 client = if (verb in SAFE_RETRY_METHODS) route.client else route.client.newBuilder()
                     .retryOnConnectionFailure(false).followRedirects(false)
@@ -223,7 +225,7 @@ class LocalWebProvider @Inject constructor(
                 .url(route.url)
                 .header("User-Agent", LOCAL_WEB_USER_AGENT)
                 .get()
-            route.hostHeader?.let { builder.header("Host", it) }
+            route.attachValidatedOrigin(builder, current)
             val result = withCancellableHttpResponse(route.client.newCall(builder.build())) { response ->
                 if (response.isRedirect) {
                     if (redirectCount >= MAX_REDIRECTS) {
@@ -391,7 +393,14 @@ class LocalWebProvider @Inject constructor(
         }
     }
 
-    private fun validateTarget(input: String): com.labteto.dshmobile.local.web.LocalWebTargetResolver.ValidatedTarget = targetResolver.validateTarget(input)
+    private fun requirePolicyTarget(uri: java.net.URI) {
+        managedPolicy.current().requireNetworkDestination(uri.scheme.orEmpty(), uri.host.orEmpty())
+    }
+
+    private fun validateTarget(
+        input: String,
+    ): com.labteto.dshmobile.local.web.LocalWebTargetResolver.ValidatedTarget =
+        targetResolver.validateTarget(input, ::requirePolicyTarget)
     private fun normalizeInput(input: String): String = targetResolver.normalizeInput(input)
     private fun requestRoute(
         target: com.labteto.dshmobile.local.web.LocalWebTargetResolver.ValidatedTarget,

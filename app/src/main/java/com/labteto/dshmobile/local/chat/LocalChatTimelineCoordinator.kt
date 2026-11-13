@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
+import com.labteto.dshmobile.local.agent.LocalQueuedUserMessageEditor
+import com.labteto.dshmobile.local.agent.LocalQueuedUserPreview
+import com.labteto.dshmobile.local.agent.userPreviews
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.LocalForegroundModelHistoryRuntime
 import com.labteto.dshmobile.local.model.chatSystemPrompt
@@ -49,6 +53,54 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
     private val directTurn: LocalChatDirectTurnExecutor,
     private val json: Json,
 ) {
+    internal fun queuedUserInputs(): List<LocalQueuedUserPreview> =
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            val state = runtimeStateStore.state.value
+            if (state.usageMode != LocalUsageMode.CHAT || state.loading ||
+                runtimeStateStore.sessionTransitioning) emptyList()
+            else runtimeStateStore.foregroundRunHandle.pendingInputs.userPreviews()
+        }
+
+    internal fun removeQueuedUserInput(messageId: String): Boolean =
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            val state = runtimeStateStore.state.value
+            if (state.usageMode != LocalUsageMode.CHAT || state.loading ||
+                runtimeStateStore.sessionTransitioning) return@synchronized false
+            val handle = runtimeStateStore.foregroundRunHandle
+            val update = LocalQueuedUserMessageEditor(
+                sessionStorage.eventLogs.get(state.sessionId), handle.pendingInputs,
+            ).remove(messageId) ?: return@synchronized false
+            handle.transcriptProjectionCursor = maxOf(handle.transcriptProjectionCursor ?: -1L, update.eventSequence)
+            runtimeStateStore.projection.projectChatQueuedUserTimeline(
+                sessionId = state.sessionId,
+                messages = update.hotMessages(),
+                index = update.transcriptIndex,
+                pendingCount = update.pendingCount,
+                clearError = false,
+            )
+            if (!sessionStorage.enqueueCurrentSnapshot(state.sessionId)) {
+                runtimeStateStore.projection.publishError(
+                    "排队消息已移除并写入事件记录，快照保存排队失败；重新打开会话可恢复",
+                )
+            }
+            true
+        }
+
+    internal fun reorderQueuedUserInputs(orderedIds: List<String>): Boolean =
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            val state = runtimeStateStore.state.value
+            if (state.usageMode != LocalUsageMode.CHAT || state.loading ||
+                runtimeStateStore.sessionTransitioning) return@synchronized false
+            val changed = LocalQueuedUserMessageEditor(
+                sessionStorage.eventLogs.get(state.sessionId),
+                runtimeStateStore.foregroundRunHandle.pendingInputs,
+            ).reorder(orderedIds)
+            if (changed && !sessionStorage.enqueueCurrentSnapshot(state.sessionId)) {
+                runtimeStateStore.projection.publishError("排队顺序已持久化，快照保存失败；可从事件记录恢复")
+            }
+            changed
+        }
+
     internal fun editAndResendUserMessage(
         messageId: String,
         replacement: String,
@@ -64,6 +116,41 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
             }
             if (!before.modelState.configured) {
                 return@synchronized LocalChatUserEditResult.UNCONFIGURED
+            }
+            if (!before.loading && !runtimeStateStore.sessionTransitioning &&
+                handle.pendingInputs.snapshot().any {
+                    it.id == messageId && it.kind == QueuedAgentInputKind.USER
+                }) {
+                var committedQueueEdit = false
+                try {
+                    val edited = LocalQueuedUserMessageEditor(
+                        sessionStorage.eventLogs.get(before.sessionId), handle.pendingInputs,
+                    ).edit(messageId, requestedText)
+                        ?: return@synchronized LocalChatUserEditResult.UNCHANGED
+                    committedQueueEdit = true
+                    handle.transcriptProjectionCursor =
+                        maxOf(handle.transcriptProjectionCursor ?: -1L, edited.eventSequence)
+                    runtimeStateStore.projection.projectChatQueuedUserTimeline(
+                        sessionId = before.sessionId,
+                        messages = edited.hotMessages(),
+                        index = edited.transcriptIndex,
+                        pendingCount = edited.pendingCount,
+                        clearError = true,
+                    )
+                    if (!sessionStorage.enqueueCurrentSnapshot(before.sessionId)) {
+                        runtimeStateStore.projection.publishError(
+                            "排队修改已保存，快照未及时写入；重新进入会话时将从事件恢复",
+                        )
+                    }
+                    return@synchronized LocalChatUserEditResult.SENT
+                } catch (error: Exception) {
+                    runtimeStateStore.projection.publishError(
+                        "排队消息编辑失败：" + (error.message ?: error::class.java.simpleName),
+                    )
+                    return@synchronized if (committedQueueEdit)
+                        LocalChatUserEditResult.COMMITTED_NOT_STARTED
+                    else LocalChatUserEditResult.FAILED
+                }
             }
             if (
                 before.loading ||

@@ -69,6 +69,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.session.LocalSessionSectionSnapshot
+import com.labteto.dshmobile.local.session.LocalSessionSection
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -120,6 +122,12 @@ internal fun LocalModeDrawer(
     drawerOpen: Boolean,
     pinnedSessionIds: Set<String>,
     sessionTitleOverrides: Map<String, String>,
+    sectionCatalog: LocalSessionSectionSnapshot,
+    onCreateSection: (String) -> Boolean,
+    onRenameSection: (String, String) -> Boolean,
+    onDeleteSection: (String) -> Boolean,
+    onMoveSection: (String, Int) -> Boolean,
+    onAssignSessionSection: (Set<String>, String?) -> Boolean,
     currentGalleryId: String?,
     currentGalleryStoryId: String?,
     currentPersonaName: String,
@@ -199,6 +207,11 @@ internal fun LocalModeDrawer(
     }
     var selectionOpen by remember { mutableStateOf(false) }
     var renameTargetId by remember { mutableStateOf<String?>(null) }
+    var createSectionDialog by remember { mutableStateOf(false) }
+    var renameSectionId by remember { mutableStateOf<String?>(null) }
+    var deleteSectionId by remember { mutableStateOf<String?>(null) }
+    var moveSelectedDialog by remember { mutableStateOf(false) }
+    var sectionError by remember { mutableStateOf<String?>(null) }
     var deleteCandidateIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     val searchFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -316,6 +329,15 @@ internal fun LocalModeDrawer(
             preSortedByUpdatedAt = true,
         )
     }
+    val groupedHistory = remember(sectionCatalog, sessionSections, searchOpen, historyQuery) {
+        localDrawerGroupSessions(
+            unpinnedRecent = sessionSections.recent,
+            catalog = sectionCatalog,
+            includeEmptyGroups = !searchOpen || historyQuery.isBlank(),
+        )
+    }
+    val visibleSectionGroups = groupedHistory.groups
+    val ungroupedRecent = groupedHistory.ungrouped
     val matchedPersonas = remember(gallery, historyQuery, crossModeSearch) {
         if (crossModeSearch) localDrawerMatchingPersonas(gallery, historyQuery) else emptyList()
     }
@@ -544,14 +566,130 @@ internal fun LocalModeDrawer(
                     }
                 }
 
-                if (sessionSections.recent.isNotEmpty()) {
+                if (!searchOpen || historyQuery.isBlank()) {
+                    item(key = "section-create-action") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = SyMetric.gapSm),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "会话分区",
+                                style = DsType.drawerSection.withReadingWeight(),
+                                color = colors.textSecondary,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(onClick = { createSectionDialog = true }) {
+                                Text("新建分区")
+                            }
+                        }
+                    }
+                }
+                visibleSectionGroups.forEach { (section, grouped) ->
+                    item(key = "section-title:" + section.id) {
+                        var menuOpen by remember(section.id) { mutableStateOf(false) }
+                        val sectionIndex = sectionCatalog.sections.indexOfFirst { it.id == section.id }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                section.title,
+                                style = DsType.drawerSection.withReadingWeight(),
+                                color = colors.textSecondary,
+                                modifier = Modifier.weight(1f).padding(start = SyMetric.gapMd),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                grouped.size.toString(),
+                                style = DsType.navigationSupporting.withReadingWeight(),
+                                color = colors.textTertiary,
+                            )
+                            TextButton(onClick = { menuOpen = true }) {
+                                Text("管理")
+                            }
+                            com.labteto.dshmobile.ui.shenyan.SyPopupMenu(
+                                expanded = menuOpen,
+                                onDismiss = { menuOpen = false },
+                                items = listOfNotNull(
+                                    com.labteto.dshmobile.ui.shenyan.SyMenuItem(
+                                        text = "重命名分区",
+                                        icon = FeatherIcons.Edit3,
+                                        onClick = { menuOpen = false; renameSectionId = section.id },
+                                    ),
+                                    if (sectionIndex > 0) com.labteto.dshmobile.ui.shenyan.SyMenuItem(
+                                        text = "向上移动",
+                                        icon = FeatherIcons.ArrowUp,
+                                        onClick = {
+                                            menuOpen = false
+                                            try {
+                                                onMoveSection(section.id, sectionIndex - 1)
+                                                sectionError = null
+                                            } catch (failure: Exception) {
+                                                sectionError = failure.message ?: "分区移动失败"
+                                            }
+                                        },
+                                    ) else null,
+                                    if (sectionIndex < sectionCatalog.sections.lastIndex) com.labteto.dshmobile.ui.shenyan.SyMenuItem(
+                                        text = "向下移动",
+                                        icon = FeatherIcons.ArrowDown,
+                                        onClick = {
+                                            menuOpen = false
+                                            try {
+                                                onMoveSection(section.id, sectionIndex + 1)
+                                                sectionError = null
+                                            } catch (failure: Exception) {
+                                                sectionError = failure.message ?: "分区移动失败"
+                                            }
+                                        },
+                                    ) else null,
+                                    com.labteto.dshmobile.ui.shenyan.SyMenuItem(
+                                        text = "删除分区",
+                                        icon = FeatherIcons.Trash2,
+                                        danger = true,
+                                        onClick = { menuOpen = false; deleteSectionId = section.id },
+                                    ),
+                                ),
+                            )
+                        }
+                    }
+                    itemsIndexed(grouped, key = { _, item -> "section:" + section.id + ":" + item.id }) { _, session ->
+                        LocalSessionDrawerRow(
+                            session = session,
+                            displayTitle = sessionTitleOverrides[session.id] ?: session.title,
+                            galleryEntry = session.galleryId?.let { galleryById[it] },
+                            current = session.id == currentSessionId,
+                            pinned = false,
+                            running = running && session.id == currentSessionId,
+                            selected = session.id in selectedIds,
+                            selectionOpen = selectionOpen,
+                            onClick = {
+                                if (selectionOpen) {
+                                    if (session.id in selectedIds) selectedIds.remove(session.id)
+                                    else selectedIds.add(session.id)
+                                } else {
+                                    onSwitchSession(session.id)
+                                }
+                            },
+                            onSelectMultiple = {
+                                if (session.id !in selectedIds) selectedIds.add(session.id)
+                                selectionOpen = true
+                            },
+                            onRename = { renameTargetId = session.id },
+                            onTogglePinned = { onTogglePinSession(session.id) },
+                            onDelete = { deleteCandidateIds = setOf(session.id) },
+                        )
+                    }
+                }
+
+                if (ungroupedRecent.isNotEmpty()) {
                     item(key = "drawer-recent-heading") {
                         DrawerSectionTitle(
                             title = stringResource(R.string.local_drawer_recent),
-                            count = sessionSections.recent.size,
+                            count = ungroupedRecent.size,
                         )
                     }
-                    itemsIndexed(sessionSections.recent, key = { _, item -> "recent:" + item.id }) { _, session ->
+                    itemsIndexed(ungroupedRecent, key = { _, item -> "recent:" + item.id }) { _, session ->
                         LocalSessionDrawerRow(
                             session = session,
                             displayTitle = sessionTitleOverrides[session.id] ?: session.title,
@@ -585,7 +723,8 @@ internal fun LocalModeDrawer(
                 }
 
                 if (crossModeSearch && matchedPersonas.isEmpty() && matchedTasks.isEmpty() &&
-                    matchedFiles.isEmpty() && sessionSections.pinned.isEmpty() && sessionSections.recent.isEmpty() &&
+                    matchedFiles.isEmpty() && sessionSections.pinned.isEmpty() && ungroupedRecent.isEmpty() &&
+                    visibleSectionGroups.all { it.second.isEmpty() } &&
                     !fileSearchFailed) {
                     item(key = "drawer-no-sessions") {
                         Text(
@@ -625,6 +764,13 @@ internal fun LocalModeDrawer(
                                 modifier = Modifier.weight(1f),
                             )
                             SyButton(
+                                text = "移动到分区",
+                                onClick = { moveSelectedDialog = true },
+                                enabled = selectedIds.isNotEmpty() && !deleteInFlight,
+                                variant = SyButtonVariant.Outline,
+                                size = SyButtonSize.Small,
+                            )
+                            SyButton(
                                 text = stringResource(R.string.local_delete_session),
                                 onClick = { deleteCandidateIds = selectedIds.toSet() },
                                 enabled = selectedIds.isNotEmpty() && !deleteInFlight,
@@ -651,6 +797,116 @@ internal fun LocalModeDrawer(
                 }
             }
         }
+        }
+        if (sectionError != null) {
+            com.labteto.dshmobile.ui.shenyan.SyDialog(
+                title = "分区操作未完成",
+                onDismiss = { sectionError = null },
+            ) {
+                Text(sectionError.orEmpty(), style = DsType.std14.withReadingWeight())
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    SyButton(
+                        text = "确定",
+                        onClick = { sectionError = null },
+                        variant = SyButtonVariant.Primary,
+                    )
+                }
+            }
+        }
+        if (createSectionDialog) {
+            RenameDialog(
+                initial = "",
+                title = "新建分区",
+                onDismiss = { createSectionDialog = false },
+                onConfirm = { name ->
+                    try {
+                        if (onCreateSection(name)) {
+                            createSectionDialog = false
+                            sectionError = null
+                        }
+                    } catch (failure: Exception) {
+                        sectionError = failure.message ?: "分区保存失败"
+                    }
+                },
+            )
+        }
+        renameSectionId?.let { id ->
+            val section = sectionCatalog.sections.firstOrNull { it.id == id }
+            if (section != null) {
+                RenameDialog(
+                    initial = section.title,
+                    title = "重命名分区",
+                    onDismiss = { renameSectionId = null },
+                    onConfirm = { name ->
+                        try {
+                            if (onRenameSection(id, name) || section.title == name.trim()) {
+                                renameSectionId = null
+                                sectionError = null
+                            }
+                        } catch (failure: Exception) {
+                            sectionError = failure.message ?: "分区重命名失败"
+                        }
+                    },
+                )
+            }
+        }
+        deleteSectionId?.let { id ->
+            ConfirmDialog(
+                title = "删除分区",
+                body = "分区内的会话会移回最近记录，会话内容不会删除。",
+                confirmLabel = "删除分区",
+                onDismiss = { deleteSectionId = null },
+                onConfirm = {
+                    try {
+                        if (onDeleteSection(id)) {
+                            deleteSectionId = null
+                            sectionError = null
+                        }
+                    } catch (failure: Exception) {
+                        sectionError = failure.message ?: "删除分区失败"
+                    }
+                },
+            )
+        }
+        if (moveSelectedDialog) {
+            val selected = selectedIds.toSet()
+            fun commitMove(targetId: String?) {
+                try {
+                    if (onAssignSessionSection(selected, targetId)) {
+                        moveSelectedDialog = false
+                        selectedIds.clear()
+                        selectionOpen = false
+                        sectionError = null
+                    } else {
+                        sectionError = "选择的会话已变化或无需移动，请刷新后重试"
+                    }
+                } catch (failure: Exception) {
+                    sectionError = failure.message ?: "会话分区移动失败"
+                }
+            }
+            com.labteto.dshmobile.ui.shenyan.SyDialog(
+                title = "移动 ${selected.size} 个会话",
+                onDismiss = { moveSelectedDialog = false },
+            ) {
+                LazyColumn(modifier = Modifier.height(320.dp)) {
+                    item(key = "none") {
+                        TextButton(onClick = { commitMove(null) }) { Text("移出分区（最近记录）") }
+                    }
+                    items(sectionCatalog.sections, key = LocalSessionSection::id) { section ->
+                        TextButton(
+                            onClick = { commitMove(section.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(section.title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    SyButton(
+                        text = "取消",
+                        onClick = { moveSelectedDialog = false },
+                        variant = SyButtonVariant.Ghost,
+                    )
+                }
+            }
         }
         renameTargetId?.let { id ->
             RenameDialog(

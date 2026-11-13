@@ -26,6 +26,8 @@ internal fun withWorkRuntimeContext(
         .containsMatchIn(task)
     val asksCode = Regex("代码|工作区|文件|仓库|脚本|终端|构建|测试|github|git|npm|python|node|shell|bash|code|build", RegexOption.IGNORE_CASE)
         .containsMatchIn(task)
+    val asksPhoneFiles = Regex("手机.{0,8}(下载|文件)|下载目录|安装包|Download/|\\bapk\\b", RegexOption.IGNORE_CASE)
+        .containsMatchIn(task)
     val runtime = buildString {
         appendLine("【当前运行时事实】")
         appendLine("- 产品：777 本机 Harness · 工作模式")
@@ -53,7 +55,11 @@ internal fun withWorkRuntimeContext(
             appendLine("- 自检工具和插件以 capability_search 查询的实时注册表及实际连接状态为准；可发现不等于已授权或执行成功。")
         }
         if (asksCode) {
+            appendLine("- 工作区清点先用本轮已暴露的高效目录扫描能力（如受授权范围内的 bash/find）；使用 list_files/glob 时必须跟随分页游标直至完整，不凭截断结果推断文件总数。已知官方文档 URL 优先直接 web_fetch，缺少地址时再 web_search。")
             appendLine("- 需要本机工具操作流程时，先读取 .dsh/tools/777-runtime-guide.md；使用范围明确的文件与执行工具，以实际运行结果验证。")
+        }
+        if (asksPhoneFiles) {
+            appendLine("- Android 下载目录中的其他应用文件需由用户在 Work 文件页点击「导入手机文件」，通过系统选择器授权后读取返回的「导入文件/…」路径；交付成果继续保存到 Download/神言神语，不要求用户开放全盘文件权限。")
         }
         if (asksHistory) {
             appendLine("- 较早精确事实用 session_event_search，完整旧工具输出按 call_id 用 tool_output_read 获取，优先复用已有结果。")

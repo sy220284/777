@@ -287,8 +287,19 @@ internal class LocalToolExecutionCoordinator(
             return LocalToolRouter.capabilityDirectory(registered,
                 synchronized(target) { target.toSet() }, blocked)
         }
-        val matches = LocalToolRouter.search(tools, query)
+        val exactNames = LocalToolRouter.exactSelection(query)
+        val matches = if (exactNames == null) LocalToolRouter.search(tools, query)
+            else exactNames.mapNotNull { name ->
+                tools.firstOrNull { it.name == name && LocalToolRouter.isOptional(it) }
+            }
+        val unavailableNames = exactNames.orEmpty().filter { name ->
+            matches.none { it.name == name }
+        }
         if (matches.isEmpty()) {
+            if (exactNames != null) return buildString {
+                appendLine("指定工具当前无法加载：" + unavailableNames.joinToString(", "))
+                append("请检查实时注册状态、网络开关及工具名；不会自动加载近似名称。")
+            }
             // Don't bounce the user back to guess an internal capability name.
             return "实时工具表没有精确匹配的扩展能力。请勿猜测调用不存在的工具，也不必因此放弃任务。\n" +
                 "在允许联网与写入的 Work 中，可先用 web_search / GitHub 查找可复用实现，" +
@@ -298,6 +309,7 @@ internal class LocalToolExecutionCoordinator(
                 LocalToolRouter.capabilityDirectory(registered,
                     synchronized(target) { target.toSet() }, blocked)
         }
+        val previouslyEnabled = synchronized(target) { target.toSet() }
         val currentEnabled = synchronized(target) {
             // Explicitly discovered capabilities outrank speculative pre-activation. This changes
             // the next tool surface intentionally, so the request projection can update its cache generation.
@@ -319,9 +331,13 @@ internal class LocalToolExecutionCoordinator(
         val omitted = matches.count { it.name !in projected }
         return buildString {
             appendLine("发现 ${matches.size} 个已注册的候选扩展工具；按默认工具定义预算估算 ${matches.size - omitted} 个可在下一步使用：")
+            if (unavailableNames.isNotEmpty()) appendLine(
+                "指定但未能加载：" + unavailableNames.joinToString(", ") + "（未注册、被关闭或不是可选扩展；不会改用相似工具）"
+            )
             // A large live MCP catalog is discoverable, but should not flood a model turn.
             matches.take(MAX_SEARCH_RESULT_PREVIEW).forEach { tool ->
                 append("- ").append(tool.name)
+                if (tool.name in previouslyEnabled && tool.name in projected) append(" [已加载]")
                 selection.omittedReasons[tool.name]?.let { reason ->
                     append(" [当前未装入：").append(reason).append("]")
                 }
@@ -494,6 +510,12 @@ internal class LocalToolExecutionCoordinator(
                     ),
                 )
             }.let { invocation ->
+                // A post-use Hook can fail after the tool has already committed its side effect.
+                // Record this separately; do not convert the real tool outcome into a failure.
+                invocation.postHookFailures.forEach { failure ->
+                    AppLog.warn("LocalToolExecution",
+                        "operation=post_tool_hook_failed session_id=$sessionId call_id=${call.id} tool=${call.name} hook_id=${failure.hookId} cause=${failure.failureType}")
+                }
                 // Observe while the real workspace lease is still held. The caller owns
                 // what to observe; this neutral coordinator never interprets goal semantics.
                 if (invocation.executionStarted && executionLease != null && !invocation.result.isError) {

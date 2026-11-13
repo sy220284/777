@@ -886,4 +886,87 @@ class McpToolBridgePluginTest {
         assertTrue(plugin.connectHttpFromUi(registry.context, "second", "https://example.com/second").contains("已连接"))
     }
 
+
+    @Test fun registeredMcpToolRoutesQuestionsToItsOriginalWorkCall() = runTest {
+        val replies = mutableListOf<JsonObject>()
+        val requests = mutableListOf<McpElicitationRequest>()
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(), json = Json,
+            onElicitation = { session, server, call, req ->
+                assertEquals("work-session", session)
+                assertEquals("origin", server)
+                assertEquals("origin-tool-77", call)
+                requests += req
+                McpElicitationReply("accept", buildJsonObject { put("name", "operator") })
+            },
+            transportFactory = {
+                object : McpTransport {
+                    override suspend fun request(method: String, params: JsonObject): JsonObject {
+                        if (method == "tools/list") return buildJsonObject {
+                            put("result", buildJsonObject {
+                                put("tools", buildJsonArray {
+                                    add(buildJsonObject {
+                                        put("name", "ask")
+                                        put("inputSchema", buildJsonObject { put("type", "object") })
+                                    })
+                                })
+                            })
+                        }
+                        assertEquals("tools/call", method)
+                        replies += params
+                        return if (replies.size == 1) buildJsonObject {
+                            put("result", buildJsonObject {
+                                put("resultType", "input_required")
+                                put("requestState", "opaque-origin")
+                                put("inputRequests", buildJsonObject {
+                                    put("user", buildJsonObject {
+                                        put("method", "elicitation/create")
+                                        put("params", buildJsonObject {
+                                            put("message", "请确认用户名")
+                                            put("requestedSchema", buildJsonObject {
+                                                put("type", "object")
+                                                put("properties", buildJsonObject {
+                                                    put("name", buildJsonObject { put("type", "string") })
+                                                })
+                                                put("required", buildJsonArray { add(JsonPrimitive("name")) })
+                                            })
+                                        })
+                                    })
+                                })
+                            })
+                        } else buildJsonObject {
+                            put("result", buildJsonObject {
+                                put("resultType", "complete")
+                                put("content", buildJsonArray { add(JsonPrimitive("ok")) })
+                            })
+                        }
+                    }
+                    override fun close() = Unit
+                }
+            },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        try {
+            plugin.connectHttpFromUi(registry.context, "origin", "https://example.com/mcp")
+            val outcome = registry.context.tools.execute(
+                "mcp_origin_ask", buildJsonObject { },
+                context = ToolContext(
+                    sessionId = "work-session",
+                    attributes = mapOf("call_id" to "origin-tool-77"),
+                    approval = { true },
+                ),
+            )
+            assertFalse(outcome.isError)
+            assertEquals(1, requests.size)
+            assertEquals("请确认用户名", requests.single().message)
+            assertEquals(2, replies.size)
+            assertEquals("opaque-origin", replies[1]["requestState"]!!.jsonPrimitive.content)
+            val response = replies[1]["inputResponses"]!!.jsonObject["user"]!!.jsonObject
+            assertEquals("operator", response["content"]!!.jsonObject["name"]!!.jsonPrimitive.content)
+        } finally {
+            plugin.uninstall(registry.context)
+        }
+    }
+
 }

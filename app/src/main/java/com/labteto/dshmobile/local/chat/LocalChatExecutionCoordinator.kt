@@ -43,6 +43,10 @@ internal class LocalChatExecutionCoordinator @Inject constructor(
         replacement: String,
     ): LocalChatUserEditResult = timeline.editAndResendUserMessage(messageId, replacement)
 
+    override fun queuedUserInputs() = timeline.queuedUserInputs()
+    override fun removeQueuedUserInput(messageId: String) = timeline.removeQueuedUserInput(messageId)
+    override fun reorderQueuedUserInputs(orderedIds: List<String>) = timeline.reorderQueuedUserInputs(orderedIds)
+
     override fun selectMessageVariant(messageId: String, targetIndex: Int): Boolean =
         branches.selectVariant(messageId, targetIndex)
 

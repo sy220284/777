@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 
 /**
@@ -46,6 +48,12 @@ class McpPluginWorkerService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val instances = ConcurrentHashMap<String, Instance>()
     private val json = Json
+    private val elicitationCapabilities = buildJsonObject {
+        put("elicitation", buildJsonObject {
+            put("form", buildJsonObject { })
+            put("url", buildJsonObject { })
+        })
+    }
     private val http = createMcpWorkerHttpClient()
     private val incoming = Messenger(object : Handler(Looper.getMainLooper()) {
         override fun handleMessage(message: Message) {
@@ -87,7 +95,8 @@ class McpPluginWorkerService : Service() {
                                                 chain.proceed(chain.request().newBuilder().header("Authorization", "Bearer $bearer").build())
                                             }
                                         }.build()
-                                    McpNegotiatingHttpTransport(endpoint, client, json)
+                                    McpNegotiatingHttpTransport(endpoint, client, json,
+                                        modernClientCapabilities = elicitationCapabilities)
                                 }
                                 "stdio" -> {
                                     val command = fields.getStringArrayList("command").orEmpty()
@@ -103,6 +112,7 @@ class McpPluginWorkerService : Service() {
                                         command = command, workingDirectory = cwd,
                                         json = json, commandResolver = { it },
                                         environmentProvider = { environment },
+                                        modernClientCapabilities = elicitationCapabilities,
                                     )
                                 }
                                 else -> error("unknown worker transport")

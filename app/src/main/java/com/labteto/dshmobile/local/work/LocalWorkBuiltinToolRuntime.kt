@@ -56,10 +56,17 @@ internal class LocalWorkBuiltinToolRuntime(
                 progress.createGoal(args.string("description"), artifactPaths, verificationCommands)
             }
             "get_goal" -> progress.getGoal()
-            "update_goal" -> progress.updateGoal(
-                status = args.string("status"),
-                note = args["note"]?.jsonPrimitive?.contentOrNull,
-            )
+            "update_goal" -> {
+                val receipt = progress.updateGoal(
+                    status = args.string("status"),
+                    note = args["note"]?.jsonPrimitive?.contentOrNull,
+                )
+                // Goal acceptance is persisted here; Downloads delivery is a separate
+                // external side effect owned by the turn finalizer for both completion paths.
+                if (run.workState.snapshot().goal?.status == "completed")
+                    "$receipt；目标已通过验收，手机下载交付将在本轮结束时处理"
+                else receipt
+            }
             "ask_user_question" -> run.interactions.awaitQuestion(
                 LocalQuestion(
                     callId = call.id,

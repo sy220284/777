@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.session
 
+import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.agent.LOCAL_QUEUED_USER_TIMELINE_ACTION
 import com.labteto.dshmobile.local.model.LOCAL_MODEL_TOOL_CALLS_EVENT_KEY
 import com.labteto.dshmobile.local.tools.optionalString
 import com.labteto.dshmobile.observability.AppLog
@@ -159,7 +161,10 @@ internal fun projectSessionTranscriptTail(
         .forEach { event ->
             // An unreadable transcript cannot be marked as durably projected.
             if (undecodableTranscript) return@forEach
-            if (event.type == "chat/active-transcript" || event.type == "work/active-transcript") {
+            if (event.type == "chat/active-transcript" || event.type == "work/active-transcript" ||
+                (event.type == LOCAL_AGENT_INBOX_EVENT_TYPE &&
+                    (event.data["action"] as? JsonPrimitive)?.contentOrNull == LOCAL_QUEUED_USER_TIMELINE_ACTION)
+            ) {
                 val decoded = decodeTranscriptMessages(event.data)
                 if (decoded == null) {
                     AppLog.warn("TranscriptRestore",

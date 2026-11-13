@@ -6,6 +6,7 @@ import com.labteto.dshmobile.harness.registry.NamedRegistry
 import com.labteto.dshmobile.harness.registry.RegistryEntries
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolRegistry
+import com.labteto.dshmobile.harness.tools.ToolHookSubscription
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -63,6 +64,7 @@ private data class PendingPluginCleanup(
 
 private data class HarnessRegistrySnapshot(
     val tools: Map<String, HarnessTool>,
+    val hooks: List<ToolHookSubscription>,
     val capabilities: Map<String, Pair<CapabilityDescriptor, Any>>,
     val events: Map<String, Any>,
     val projections: Map<String, Any>,
@@ -73,6 +75,7 @@ private data class HarnessRegistrySnapshot(
 
 private fun HarnessContext.snapshotRegistries(): HarnessRegistrySnapshot = HarnessRegistrySnapshot(
     tools = tools.snapshot(),
+    hooks = tools.snapshotHookSubscriptions(),
     capabilities = capabilities.snapshot(),
     events = events.snapshot(),
     projections = projections.snapshot(),
@@ -83,6 +86,7 @@ private fun HarnessContext.snapshotRegistries(): HarnessRegistrySnapshot = Harne
 
 private fun HarnessContext.restoreRegistries(snapshot: HarnessRegistrySnapshot) {
     tools.restore(snapshot.tools)
+    tools.restoreHookSubscriptions(snapshot.hooks)
     capabilities.restore(snapshot.capabilities)
     events.restore(snapshot.events)
     projections.restore(snapshot.projections)

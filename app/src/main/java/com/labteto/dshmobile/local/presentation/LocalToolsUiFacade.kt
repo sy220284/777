@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.presentation
 import com.labteto.dshmobile.local.tools.LocalToolsRuntime
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -10,6 +12,7 @@ import javax.inject.Singleton
 @Singleton
 class LocalToolsUiFacade @Inject internal constructor(
     private val tools: LocalToolsRuntime,
+    private val skillManager: com.labteto.dshmobile.local.tools.LocalSkillManager,
     private val agentBackends: com.labteto.dshmobile.local.agent.LocalAgentBackendRuntime,
     private val gitHubSkillImporter: com.labteto.dshmobile.local.tools.LocalGitHubSkillImporter,
     private val gitHubBrowser: com.labteto.dshmobile.local.tools.LocalGitHubCredentialManager,
@@ -17,6 +20,7 @@ class LocalToolsUiFacade @Inject internal constructor(
     private val mcpOAuth: com.labteto.dshmobile.local.tools.LocalMcpOAuthCoordinator,
 ) : com.labteto.dshmobile.uicontract.ToolsUiPort {
     suspend fun agentBackendStatus(): String = agentBackends.status()
+    suspend fun probeAgentBackend(): String = agentBackends.probe()
     suspend fun configureAgentBackend(host: String, port: Int, pin: String, token: String, consent: Boolean) =
         agentBackends.configure(host, port, pin, token, consent)
     suspend fun revokeAgentBackend() = agentBackends.revoke()
@@ -94,6 +98,54 @@ class LocalToolsUiFacade @Inject internal constructor(
             com.labteto.dshmobile.interop.mcp.McpServerHealth.UNCONFIRMED ->
                 com.labteto.dshmobile.uicontract.UiMcpHealth.UNCONFIRMED
         }
+    suspend fun remoteGitBranchesForUi(repository: String): List<String> =
+        withContext(Dispatchers.IO) { tools.remoteGitBranches(repository) }
+
+    suspend fun compareLocalGitForUi(repository: String, includeUntracked: Boolean = false): LocalRemoteGitDiffUi = withContext(Dispatchers.IO) {
+        val receipt = tools.compareLocalGit(repository, includeUntracked)
+        LocalRemoteGitDiffUi(
+            trackingRef = (receipt.getValue("tracking_ref") as kotlinx.serialization.json.JsonPrimitive).content,
+            statistics = (receipt.getValue("stat") as kotlinx.serialization.json.JsonPrimitive).content,
+            patch = (receipt.getValue("patch") as kotlinx.serialization.json.JsonPrimitive).content,
+            truncated = receipt.getValue("truncated").toString() == "true",
+            evidenceRevision = (receipt.getValue("head_commit") as kotlinx.serialization.json.JsonPrimitive).content,
+            untrackedFileCount = receipt.getValue("untracked_file_count").toString().toInt(),
+            includesUntrackedFiles = receipt.getValue("includes_untracked_files").toString() == "true",
+        )
+    }
+
+    suspend fun compareRemoteGitForUi(
+        repository: String, remote: String, branch: String,
+    ): LocalRemoteGitDiffUi = withContext(Dispatchers.IO) {
+        val receipt = tools.compareRemoteGit(repository, remote, branch)
+        LocalRemoteGitDiffUi(
+            trackingRef = (receipt.getValue("tracking_ref") as kotlinx.serialization.json.JsonPrimitive).content,
+            statistics = (receipt.getValue("stat") as kotlinx.serialization.json.JsonPrimitive).content,
+            patch = (receipt.getValue("patch") as kotlinx.serialization.json.JsonPrimitive).content,
+            truncated = receipt.getValue("truncated").toString() == "true",
+            evidenceRevision = listOf("head_commit", "tracking_commit", "merge_base")
+                .joinToString(":") { key ->
+                    (receipt.getValue(key) as kotlinx.serialization.json.JsonPrimitive).content
+                },
+        )
+    }
+
+    /** Commit review is pinned to its immutable object rather than a mutable branch name. */
+    suspend fun compareCommitGitForUi(repository: String, commit: String): LocalRemoteGitDiffUi =
+        withContext(Dispatchers.IO) {
+            val receipt = tools.compareCommitGit(repository, commit)
+            LocalRemoteGitDiffUi(
+                trackingRef = (receipt.getValue("tracking_ref") as kotlinx.serialization.json.JsonPrimitive).content,
+                statistics = (receipt.getValue("stat") as kotlinx.serialization.json.JsonPrimitive).content,
+                patch = (receipt.getValue("patch") as kotlinx.serialization.json.JsonPrimitive).content,
+                truncated = receipt.getValue("truncated").toString() == "true",
+                evidenceRevision = listOf("commit", "first_parent")
+                    .joinToString(":") { key ->
+                        (receipt.getValue(key) as kotlinx.serialization.json.JsonPrimitive).content
+                    },
+            )
+        }
+
     override suspend fun githubConfigured() = tools.githubConfigured()
     override suspend fun githubRepositories() = gitHubBrowser.repositories()
     override suspend fun githubEntries(repoFullName: String, directory: String) =
@@ -140,18 +192,42 @@ class LocalToolsUiFacade @Inject internal constructor(
         val hasThirdPartyPlugin = tools.installedPluginIds().any { it != "android-local-builtins" }
         return hasMcpTools to hasThirdPartyPlugin
     }
-    override suspend fun installedSkills() = tools.installedSkills().map {
-        com.labteto.dshmobile.uicontract.UiSkillSnapshot(it.name, it.description, it.modelInvocable, it.displayName)
+    /** Refresh the existing skill inventory when the real on-device skill files change. */
+    fun skillChanges(): kotlinx.coroutines.flow.Flow<Unit> = skillManager.changes()
+    override suspend fun installedSkills() = withContext(Dispatchers.IO) {
+        tools.installedSkills().map { item ->
+            val result = runCatching { gitHubSkillImporter.installedSourceLink(item.name) }
+            result.exceptionOrNull()?.let { failure ->
+                com.labteto.dshmobile.observability.AppLog.warn(
+                    "SkillOrigin", "技能来源证据无效：${item.name}", failure,
+                )
+            }
+            com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+                item.name, item.description, item.modelInvocable, item.displayName,
+                sourceUrl = result.getOrNull(),
+                sourceWarning = if (result.isFailure) "技能来源记录校验失败，请检查或重新安装此技能" else null,
+                rollbackAvailable = gitHubSkillImporter.canRollback(item.name),
+            )
+        }
     }
     override suspend fun presetSkills() = tools.presetSkills().map {
         com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot(it.id, it.title, it.description, it.installed)
     }
     override suspend fun curatedGitHubSkills() = gitHubSkillImporter.curatedSkills()
+    /** The feature owns source validation; UI passes only the name from a visible catalog row. */
+    suspend fun installCuratedSkill(id: String) = gitHubSkillImporter.install(
+        com.labteto.dshmobile.local.tools.curatedGitHubSkillUrl(id),
+    )
     override suspend fun installGitHubSkill(link: String) = gitHubSkillImporter.install(link)
     override suspend fun installPreset(id: String) = tools.installPreset(id)
     override suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         tools.createSkill(id, displayName, description, instructions)
     override suspend fun importSkill(filename: String, bytes: ByteArray) = tools.importSkill(filename, bytes)
+    suspend fun exportSkillPackage(id: String): ByteArray = tools.exportSkillPackage(id)
+    suspend fun checkSkillUpdate(id: String): String? = gitHubSkillImporter.availableUpdate(id)
+    suspend fun upgradeSkill(id: String, revision: String): String =
+        gitHubSkillImporter.updateInstalled(id, revision)
+    suspend fun rollbackSkill(id: String): String = gitHubSkillImporter.rollback(id)
     override suspend fun removeSkill(id: String) = tools.removeSkill(id)
     override suspend fun readSkillDocument(id: String) = tools.readSkillDocument(id)
     override suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)
@@ -201,3 +277,15 @@ class LocalToolsUiFacade @Inject internal constructor(
 internal abstract class LocalToolsUiBindings {
     @dagger.Binds abstract fun bindToolsUiPort(facade: LocalToolsUiFacade): com.labteto.dshmobile.uicontract.ToolsUiPort
 }
+
+/** Read-only Git comparison receipt; process/runtime objects stay behind the UI facade. */
+data class LocalRemoteGitDiffUi(
+    val trackingRef: String,
+    val statistics: String,
+    val patch: String,
+    val truncated: Boolean,
+    /** Version of the Git objects used to produce this patch. */
+    val evidenceRevision: String = "",
+    val untrackedFileCount: Int = 0,
+    val includesUntrackedFiles: Boolean = false,
+)

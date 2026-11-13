@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy
 import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 import com.labteto.dshmobile.local.io.readBoundedBody
 import java.util.concurrent.TimeUnit
@@ -27,6 +28,7 @@ class LocalModelGateway @Inject constructor(
     private val adapters: LocalModelAdapterRegistry,
     private val routes: LocalModelRouteCatalog,
     private val http: OkHttpClient,
+    private val managedPolicy: LocalManagedExecutionPolicy,
 ) {
     // Provider catalogue is credential-bearing discovery; never forward its key via redirect.
     private val catalogHttp = http.newBuilder()
@@ -40,6 +42,11 @@ class LocalModelGateway @Inject constructor(
 
     suspend fun hasChatGptPlanAuthorization(accountId: String): Boolean =
         credentials.hasChatGptPlanAuthorization(accountId)
+
+    /** Check managed requirements before a route becomes the saved or session-selected model. */
+    internal fun requireExecutionPolicy(profile: LocalModelProfile) {
+        managedPolicy.current().requireModelProvider(profile.provider, profile.baseUrl)
+    }
 
     fun activate(profile: LocalModelProfile) = credentials.activate(profile)
     fun clearActive() = credentials.clearActive()
@@ -77,12 +84,56 @@ class LocalModelGateway @Inject constructor(
      * The provider's list is an account-visible catalog, NOT proof of inference entitlement;
      * discovered IDs also do not become runnable routes until configured.
      */
+    /** User-initiated authenticated read against DeepSeek's verified fixed balance endpoint. */
+    suspend fun queryDeepSeekBalance(profile: LocalModelProfile): DeepSeekProviderBalance {
+        val saved = configuredProfiles().firstOrNull { it.id == profile.id }
+            ?: error("模型配置已失效，请刷新")
+        require(saved.routeFingerprint() == profile.routeFingerprint()) {
+            "模型配置已变化，请重新查询余额"
+        }
+        require(saved.authKind == LocalModelAuthKind.API_KEY &&
+            saved.provider.equals("DeepSeek", ignoreCase = true)) {
+            "余额查询仅支持 DeepSeek 官方 API Key 账户"
+        }
+        val origin = URI(normalizeModelBaseUrl(saved.baseUrl))
+        require(origin.scheme.equals("https", true) &&
+            origin.host.equals("api.deepseek.com", true) &&
+            origin.port == -1 && origin.rawUserInfo == null) {
+            "余额查询只能使用 DeepSeek 官方接口，不向代理或自定义域名发送凭据"
+        }
+        managedPolicy.current().requireModelProvider(saved.provider, saved.baseUrl)
+        val token = credentials.resolve(saved.model, saved.baseUrl, saved).bearerToken
+        val request = Request.Builder()
+            .url("https://api.deepseek.com/user/balance")
+            .header("Authorization", "Bearer $token")
+            .header("Accept", "application/json")
+            .get()
+            .build()
+        return withContext(Dispatchers.IO) {
+            withCancellableHttpResponse(catalogHttp.newCall(request)) { response ->
+                check(response.isSuccessful) {
+                    when (response.code) {
+                        401 -> "DeepSeek 密钥无效或已过期，请更新模型凭据"
+                        403 -> "DeepSeek 当前账户没有余额查询权限"
+                        else -> "DeepSeek 余额查询失败（HTTP ${response.code}）"
+                    }
+                }
+                val raw = readBoundedBody(
+                    response.body ?: error("DeepSeek 未返回余额信息"), 131072,
+                )
+                runCatching { parseDeepSeekProviderBalance(raw) }
+                    .getOrElse { throw IllegalStateException("DeepSeek 返回的余额格式无效") }
+            }
+        }
+    }
+
     suspend fun discoverProviderModelIds(profileId: String): List<String> {
         val profile = configuredProfiles().firstOrNull { it.id == profileId }
             ?: error("模型配置已不存在，请刷新模型清单")
         require(profile.authKind == LocalModelAuthKind.API_KEY) {
             "套餐授权模型请通过应用内账户同步获取，不支持 API Key 模型目录查询"
         }
+        managedPolicy.current().requireModelProvider(profile.provider, profile.baseUrl)
         val endpoint = officialModelCatalogEndpoint(profile)
             ?: error("该模型来源没有已验证的官方模型目录接口；不可把密钥发送到猜测的 URL")
         val target = URI(endpoint)
@@ -126,6 +177,7 @@ class LocalModelGateway @Inject constructor(
         } else {
             selectRunModelProfile(availableProfiles(), credentials.active(), selection)
         }
+        managedPolicy.current().requireModelProvider(selected.provider, selected.baseUrl)
         require(credentials.hasCredential(selected)) { "所选模型凭据不可用" }
         return selected
     }
@@ -136,6 +188,7 @@ class LocalModelGateway @Inject constructor(
         baseUrl: String,
     ): LocalModelProfile =
         selectModelRouteProfile(availableProfiles(), profileId, model, baseUrl).also {
+            managedPolicy.current().requireModelProvider(it.provider, it.baseUrl)
             require(credentials.hasCredential(it)) { "所选模型凭据不可用" }
         }
 
@@ -255,9 +308,11 @@ class LocalModelGateway @Inject constructor(
         baseUrl: String,
         profile: LocalModelProfile?,
     ): LocalResolvedModelRoute {
-        val effectiveProfile = profile
-            ?: currentCoroutineContext()[LocalModelRunContext]?.profile
-            ?: profileForRoute(null, model, baseUrl)
+        val inheritedProfile = currentCoroutineContext()[LocalModelRunContext]?.profile
+        val effectiveProfile = profile ?: inheritedProfile ?: profileForRoute(null, model, baseUrl)
+        if (profile != null || inheritedProfile != null) {
+            managedPolicy.current().requireModelProvider(effectiveProfile.provider, effectiveProfile.baseUrl)
+        }
         val resolved = credentials.resolve(model, baseUrl, effectiveProfile)
         val preset = LocalModelPresets.find(model, baseUrl)
         val protocol = resolveLocalModelProtocol(

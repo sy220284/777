@@ -35,11 +35,17 @@ class LocalSessionRuntime @Inject internal constructor(
     internal fun switchSession(sessionId: String) = lifecycle.switchSession(sessionId)
     internal suspend fun deleteSessions(ids: Set<String>): Int = lifecycle.deleteSessions(ids)
     internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment = sessionFiles.importAttachment(uri)
+    internal suspend fun importWorkspaceFileForUi(uri: Uri): String = sessionFiles.importWorkspaceFile(uri)
+    internal suspend fun publishedWorkspaceFileForUi(path: String) = sessionFiles.publishedWorkspaceFile(path)
+    internal suspend fun saveWorkspaceFileToDownloadsForUi(path: String): String =
+        sessionFiles.saveWorkspaceFileToDownloads(path)
     internal suspend fun workspaceFilesForUi(): List<LocalWorkspaceFile> = sessionFiles.workspaceFiles()
     internal suspend fun workspaceDirectoryForUi(path: String) = sessionFiles.workspaceDirectory(path)
     internal suspend fun workspaceDirectoryPageForUi(path: String, offset: Int) = sessionFiles.workspaceDirectoryPage(path, offset)
     internal suspend fun searchWorkspaceFilesForUi(query: String) = sessionFiles.searchWorkspaceFiles(query)
     internal suspend fun searchWorkspacePageForUi(query: String, offset: Int) = sessionFiles.searchWorkspacePage(query, offset)
+    internal suspend fun stopWorkspaceSearchForUi(query: String) = sessionFiles.stopWorkspaceSearch(query)
+    internal fun observeWorkspaceFilesForUi(paths: List<String>) = sessionFiles.observeWorkspaceFiles(paths)
     internal suspend fun conversationFilesForUi(sessionId: String): LocalConversationFiles =
         sessionFiles.conversationFiles(sessionId)
     internal suspend fun previewWorkspaceFileForUi(path: String): LocalWorkspaceFilePreview =

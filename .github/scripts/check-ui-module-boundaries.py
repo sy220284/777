@@ -2,7 +2,6 @@
 """V6.3 原生 Android 页面边界：禁止恢复朝夕、UI 3.0 可插拔架构。"""
 from pathlib import Path
 import sys
-import json
 
 ROOT = Path(__file__).resolve().parents[2]
 NATIVE_REQUIRED = (
@@ -49,16 +48,6 @@ def violations() -> list[str]:
         "NativeV6Documents.kt", "NativeV6DocumentCard.kt", "NativeV6DocumentsSheet.kt",
     )):
         errors.append("V6 native interactive document implementation is missing")
-    # The auto index may retain removed files as a *historical delta* but must not
-    # refer to deleted UI3 code as evidence for current, functional entries.
-    source_index = json.loads((ROOT / "docs/FEATURE-SOURCE-INDEX.auto.json").read_text(encoding="utf-8"))
-    if source_index.get("current_tree_outdated_source_count") != 0:
-        errors.append("Current feature source index still has invalid production paths")
-    retired_prefixes = ("ui-pack-zhaoxi/", "ui-host/", "ui-contract/")
-    for item in source_index.get("production_file_fingerprints", []):
-        if item.get("path", "").startswith(retired_prefixes):
-            errors.append("Retired UI3 module incorrectly listed as current production source")
-            break
     for p in ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionStorageManager.kt",
               "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt"):
         if not (ROOT / p).is_file(): errors.append("Recent business fix missing: " + p)

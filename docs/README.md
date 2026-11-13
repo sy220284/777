@@ -9,7 +9,7 @@
 | 文档 | 内容 |
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 架构 3.0：Feature 所有权、Shared Capability、应用组合根与 Runtime Kernel |
-| [FEATURE-TREE.zh-CN.md](FEATURE-TREE.zh-CN.md)／[交互版](FEATURE-TREE.zh-CN.html) | 历史功能树快照：保留层级与旧代码定位，仅供查阅，不再自动同步或用于验收 |
+| [FEATURE-TREE.zh-CN.md](FEATURE-TREE.zh-CN.md)／[交互版](FEATURE-TREE.zh-CN.html) | 历史中文功能树快照（停止维护；不再表示当前功能与 PR 状态） |
 | [SYSTEM-AUDIT-GUIDE.zh-CN.md](SYSTEM-AUDIT-GUIDE.zh-CN.md) | 全量系统联审权威规范：按功能架构、数据状态、生命周期、外部能力、性能、体验与工程质量分组执行审计 |
 | [SHARED-AUDIT-CONCLUSIONS.zh-CN.md](SHARED-AUDIT-CONCLUSIONS.zh-CN.md) | 可共享审计结论库：按链路闭环、数据字段、配置依赖与所有权归组的可复用审计规则 |
 | [PROTOCOL.md](PROTOCOL.md) | 当前本机 Session / Agent 协议边界 |
@@ -20,10 +20,10 @@
 | [VALIDATION.md](VALIDATION.md) | 本地编译与按需调试命令 |
 | [history/UI-BACKEND-RESET-20261017.zh-CN.md](history/UI-BACKEND-RESET-20261017.zh-CN.md) | 旧后端保留版、UI 清空及禁发标志历史记录（已退出当前状态） |
 
-## 历史归档与扫描证据
+## 历史归档
 
 - [`archive/`](archive/README.md)：已结束阶段的修复、功能退役记录，仅供溯源，不能覆盖现行规范。
-- 已取消仓库级验收矩阵与证明材料生成流程；历史变更从 Git 提交追溯。
+- 功能树仅保留 Markdown 与交互 HTML 两份静态快照；相关维护脚本、数据索引与 CI 绑定已经退役。
 - 当前实际行为以现行权威文档、代码和测试为准；历史版本沿革从根目录 `CHANGELOG.md` 与 Git 提交查看。
 
 ## 其他入口
@@ -38,11 +38,11 @@
 
 文档只写当前真实实现。
 
-当功能、架构、协议、版本或 UI 发生实质变化时：
+当功能、架构、协议、版本、CI 或 UI 发生实质变化时：
 
-1. 按实际改动更新直接相关的当前文档；历史功能树不再作为必须同步的项目或验收依据。
+1. 按功能实际责任修改当前权威文档、源码及测试；历史功能树为静态快照，不要求同步；按真实代码与测试维护当前权威文档。
 2. 删除已经失效的正文，不在当前文档继续叠加“旧版说明”。
 3. 历史变化写入 `CHANGELOG.md`；必须保留的专项溯源记录统一放入 `archive/` 并注明非现行规范。
 4. 文件名不再使用已经结束的阶段编号、旧版本号或临时项目代号。
-5. 文档应准确描述当前代码实现，不附加验收材料要求。
+5. 文档准确描述当前代码实现即可，不附加验收材料要求。
 6. 未列入“当前文档”表的阶段执行计划、迁移记录和历史说明不属于现行规范；需要追溯时使用 Git 历史与 `CHANGELOG.md`。

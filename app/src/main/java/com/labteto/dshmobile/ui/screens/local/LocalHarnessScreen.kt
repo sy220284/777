@@ -163,6 +163,7 @@ fun LocalHarnessScreen(
     val transcriptHistory by viewModel.transcriptHistory.collectAsStateWithLifecycle()
     val pinnedSessionIds by viewModel.pinnedSessionIds.collectAsStateWithLifecycle()
     val sessionTitleOverrides by viewModel.sessionTitleOverrides.collectAsStateWithLifecycle()
+    val sectionCatalog by viewModel.sessionSections.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     // Native drags remain finger-tracked; short, explicit animations handle
     // toolbar taps, completed navigation and returning from drawer pages.
@@ -558,11 +559,28 @@ fun LocalHarnessScreen(
     )
     val workActions = LocalWorkFeatureUiActions(
         workState = viewModel.workState,
+        projectActions = viewModel.projectActions,
+        queuedUserPort = viewModel.queuedUserPort,
         workspaceFiles = viewModel::workspaceFiles,
+        saveWorkspaceFileToDownloads = viewModel::saveWorkspaceFileToDownloads,
+        importWorkspaceFile = viewModel::importWorkspaceFile,
+        publishedWorkspaceFile = viewModel::publishedWorkspaceFile,
         workspaceDirectory = viewModel::workspaceDirectory,
         workspaceDirectoryPage = viewModel::workspaceDirectoryPage,
         searchWorkspaceFiles = viewModel::searchWorkspaceFiles,
         searchWorkspacePage = viewModel::searchWorkspacePage,
+        stopWorkspaceSearch = viewModel::stopWorkspaceSearch,
+        observeWorkspaceFiles = viewModel::observeWorkspaceFiles,
+        remoteGitBranches = viewModel::remoteGitBranchesForUi,
+        compareLocalGit = viewModel::compareLocalGitForUi,
+        compareRemoteGit = viewModel::compareRemoteGitForUi,
+        compareCommitGit = viewModel::compareCommitGitForUi,
+        findIndependentCodeReview = viewModel::findIndependentCodeReviewForUi,
+        runIndependentCodeReview = viewModel::runIndependentCodeReviewForUi,
+        acceptIndependentCodeReview = viewModel::acceptIndependentCodeReviewForUi,
+        findIndependentSecurityReview = viewModel::findIndependentSecurityReviewForUi,
+        runIndependentSecurityReview = viewModel::runIndependentSecurityReviewForUi,
+        approveIndependentSecurityReview = viewModel::approveIndependentSecurityReviewForUi,
         conversationFiles = viewModel::conversationFiles,
         previewWorkspaceFile = viewModel::previewWorkspaceFile,
         previewWorkspaceFilePage = viewModel::previewWorkspaceFilePage,
@@ -914,6 +932,12 @@ fun LocalHarnessScreen(
                 globalSearchOpenRequest = openGlobalSearchRequest,
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
+                sectionCatalog = sectionCatalog,
+                onCreateSection = viewModel::createSessionSection,
+                onRenameSection = viewModel::renameSessionSection,
+                onDeleteSection = viewModel::deleteSessionSection,
+                onMoveSection = viewModel::moveSessionSection,
+                onAssignSessionSection = viewModel::assignSessionSection,
                 currentGalleryId = shell.galleryId,
                 currentGalleryStoryId = shell.galleryStoryId,
                 currentPersonaName = shell.chatPersona.name,

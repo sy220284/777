@@ -36,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -78,7 +80,29 @@ private data class InventoryRow(
     val modelInvocable: Boolean = true,
     val installedSkill: Boolean = false,
     val installablePreset: Boolean = false,
+    val installableCurated: Boolean = false,
+    val sourceUrl: String? = null,
+    val sourceWarning: String? = null,
+    val rollbackAvailable: Boolean = false,
 )
+
+/** Match visible skill names first, then identifiers, then explanatory descriptions. */
+internal fun inventorySearchScore(query: String, name: String, id: String, detail: String): Int? {
+    val term = query.trim().lowercase()
+    if (term.isEmpty()) return 0
+    val title = name.lowercase()
+    val key = id.lowercase()
+    val body = detail.lowercase()
+    return when {
+        title == term || key == term -> 600
+        title.startsWith(term) -> 500
+        key.startsWith(term) -> 450
+        title.contains(term) -> 350
+        key.contains(term) -> 300
+        body.contains(term) -> 120
+        else -> null
+    }
+}
 
 /** Browses real installed/connected plugin inventory; does not advertise unsupported storefront apps. */
 @Composable
@@ -87,6 +111,11 @@ internal fun PluginInventoryBrowser(
     connectedServices: List<McpServerSnapshot> = emptyList(),
     skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
+    curatedSkills: List<String> = emptyList(),
+    curatedLoading: Boolean = false,
+    curatedError: String? = null,
+    pendingSkillUpdates: Map<String, String> = emptyMap(),
+    upToDateSkills: Set<String> = emptySet(),
     createdSkillId: String? = null,
     skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
     savedSkillId: String? = null,
@@ -100,15 +129,22 @@ internal fun PluginInventoryBrowser(
     onReturnToChat: () -> Unit,
     onUseCapability: ((String) -> Unit)? = null,
     onInstallPreset: ((String) -> Unit)? = null,
+    onInstallCurated: ((String) -> Unit)? = null,
+    onRefreshCurated: (() -> Unit)? = null,
     onCreateSkill: ((String, String, String, String) -> Unit)? = null,
     onImportSkill: (() -> Unit)? = null,
     onRemoveSkill: ((String) -> Unit)? = null,
+    onShareSkillPackage: ((String) -> Unit)? = null,
+    onCheckSkillUpdate: ((String) -> Unit)? = null,
+    onUpgradeSkill: ((String, String) -> Unit)? = null,
+    onRollbackSkill: ((String) -> Unit)? = null,
     onOpenSkillEditor: ((String) -> Unit)? = null,
     onCloseSkillEditor: (() -> Unit)? = null,
     onSaveSkillDocument: ((String, String) -> Unit)? = null,
     onSetSkillModelInvocable: ((String, Boolean) -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    val context = LocalContext.current
     val skillCreationPrompt = stringResource(R.string.skills_create_in_chat_prompt)
     var query by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableIntStateOf(0) }
@@ -116,6 +152,9 @@ internal fun PluginInventoryBrowser(
     var selectedRow by remember { mutableStateOf<InventoryRow?>(null) }
     var showCreateSkill by remember { mutableStateOf(false) }
     var removeSkillName by remember { mutableStateOf<String?>(null) }
+    var sharePackageSkillName by remember { mutableStateOf<String?>(null) }
+    var upgradeSkillChoice by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var rollbackSkillChoice by remember { mutableStateOf<String?>(null) }
     var newSkillId by remember { mutableStateOf("") }
     var newSkillDisplayName by remember { mutableStateOf("") }
     var newSkillDescription by remember { mutableStateOf("") }
@@ -179,24 +218,34 @@ internal fun PluginInventoryBrowser(
         val display = skill.displayName
         InventoryRow("skill:" + skill.name, display, skill.description,
             connectedService = false, icon = FeatherIcons.BookOpen,
-            available = true, modelInvocable = skill.modelInvocable, installedSkill = true)
+            available = true, modelInvocable = skill.modelInvocable, installedSkill = true,
+            sourceUrl = skill.sourceUrl, sourceWarning = skill.sourceWarning,
+            rollbackAvailable = skill.rollbackAvailable)
     }
     val availablePresets = presets.filterNot { it.installed }.map { preset ->
         InventoryRow("skill:" + preset.id, preset.title, preset.description,
             connectedService = false, icon = FeatherIcons.BookOpen,
             available = false, installablePreset = true)
     }
-    val list = (if (skillsOnly) installedSkills + availablePresets else when (selectedCategory) {
+    val installedIds = skills.map { it.name }.toSet()
+    val presetIds = presets.map { it.id }.toSet()
+    val curated = curatedSkills.filterNot { it in installedIds || it in presetIds }.map { id ->
+        InventoryRow(
+            id = "curated-skill:$id", name = id,
+            detail = "官方精选 · openai/skills · 安装前校验包内容",
+            connectedService = false, icon = FeatherIcons.BookOpen,
+            available = false, installableCurated = true,
+        )
+    }
+    val list = (if (skillsOnly) installedSkills + availablePresets + curated else when (selectedCategory) {
         1 -> filteredConnections
         2 -> local.filter { it.id in setOf("local:android-runtime", "local:local-language-server", "local:android-local-builtins") }
         3 -> local.filter { it.id in setOf("local:android-device", "local:android-automation", "local:android-webhook") }
         4 -> local.filter { it.id == "local:local-vision" }
         else -> local
-    }).filter { item ->
-            query.isBlank() || item.name.contains(query.trim(), ignoreCase = true) ||
-                item.id.contains(query.trim(), ignoreCase = true) ||
-                item.detail.contains(query.trim(), ignoreCase = true)
-        }
+    }).mapNotNull { item ->
+        inventorySearchScore(query, item.name, item.id, item.detail)?.let { score -> item to score }
+    }.sortedByDescending { it.second }.map { it.first }
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(if (embedded) Modifier.fillMaxSize() else Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -346,6 +395,31 @@ internal fun PluginInventoryBrowser(
                         }
                     }
                 }
+                if (skillsOnly && (curatedLoading || curatedError != null || curated.isNotEmpty())) {
+                    item(key = "curated-status") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                        ) {
+                            Text(
+                                curatedError ?: if (curatedLoading) "正在读取官方精选技能"
+                                    else "官方精选技能 · 可直接安装",
+                                style = DsType.small13.withReadingWeight(),
+                                color = if (curatedError == null) colors.textSecondary else colors.dangerInk,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (!curatedLoading && onRefreshCurated != null) {
+                                SyButton(
+                                    text = stringResource(R.string.tools_refresh),
+                                    size = SyButtonSize.Small,
+                                    variant = SyButtonVariant.Ghost,
+                                    onClick = onRefreshCurated,
+                                )
+                            }
+                        }
+                    }
+                }
                 if (error != null) {
                     item(key = "inventory-error") {
                         Column(
@@ -430,7 +504,8 @@ internal fun PluginInventoryBrowser(
                                 SyButton(
                                     enabled = !loading,
                                     text = stringResource(
-                                        if (item.installablePreset && onInstallPreset != null) R.string.skills_install
+                                        if ((item.installablePreset && onInstallPreset != null) ||
+                                             (item.installableCurated && onInstallCurated != null)) R.string.skills_install
                                         else if (onUseCapability != null && item.available) R.string.plugin_use
                                         else R.string.tools_catalog_details
                                     ),
@@ -439,6 +514,7 @@ internal fun PluginInventoryBrowser(
                                     modifier = Modifier.testTag("plugin-inventory-action-${item.id}"),
                                     onClick = {
                                         if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
+                                         else if (item.installableCurated && onInstallCurated != null) onInstallCurated(item.id.substringAfter(":"))
                                         else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
                                         else selectedRow = item
                                     },
@@ -459,7 +535,8 @@ internal fun PluginInventoryBrowser(
                 val usePrompt = if (item.installedSkill) "@skill:${item.id.substringAfter(":")}\n" else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
                 SyButton(
                     text = stringResource(
-                        if (item.installablePreset && onInstallPreset != null) R.string.skills_install
+                        if ((item.installablePreset && onInstallPreset != null) ||
+                                             (item.installableCurated && onInstallCurated != null)) R.string.skills_install
                         else if (onUseCapability != null && item.available) R.string.plugin_use
                         else if (item.connectedService) R.string.tools_external_services
                         else R.string.tools_catalog_return_chat,
@@ -470,6 +547,7 @@ internal fun PluginInventoryBrowser(
                     onClick = {
                         selectedRow = null
                         if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
+                                         else if (item.installableCurated && onInstallCurated != null) onInstallCurated(item.id.substringAfter(":"))
                         else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
                         else if (item.connectedService) onManageConnections() else onReturnToChat()
                     },
@@ -489,8 +567,95 @@ internal fun PluginInventoryBrowser(
             if (item.installedSkill && !item.modelInvocable) {
                 Text(stringResource(R.string.skills_manual_only), style = DsType.small13.withReadingWeight(), color = colors.textTertiary)
             }
+            item.sourceWarning?.let { warning ->
+                Text(
+                    warning,
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.textSecondary,
+                    modifier = Modifier.testTag("skill-source-warning"),
+                )
+            }
+            if (item.installedSkill && item.sourceUrl != null) {
+                Text(
+                    "已固定 GitHub 来源版本：${item.sourceUrl.substringAfter("/tree/").substringBefore('/').take(12)}",
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.textSecondary,
+                )
+                if (onCheckSkillUpdate != null) {
+                    SyButton(
+                        text = "检查更新",
+                        variant = SyButtonVariant.Info,
+                        enabled = !loading,
+                        modifier = Modifier.testTag("skill-check-update"),
+                        onClick = { onCheckSkillUpdate(item.id.substringAfter(":")) },
+                    )
+                    val skillId = item.id.substringAfter(":")
+                    val revision = pendingSkillUpdates[skillId]
+                    if (revision != null && onUpgradeSkill != null) {
+                        Text(
+                            "发现新版本：${revision.take(12)}",
+                            style = DsType.small13.withReadingWeight(),
+                            color = colors.textSecondary,
+                            modifier = Modifier.testTag("skill-update-available"),
+                        )
+                        SyButton(
+                            text = "升级到此版本",
+                            variant = SyButtonVariant.Info,
+                            enabled = !loading,
+                            modifier = Modifier.testTag("skill-upgrade"),
+                            onClick = {
+                                upgradeSkillChoice = skillId to revision
+                                selectedRow = null
+                            },
+                        )
+                    } else if (skillId in upToDateSkills) {
+                        Text(
+                            "当前已是最新版本",
+                            style = DsType.small13.withReadingWeight(),
+                            color = colors.textSecondary,
+                            modifier = Modifier.testTag("skill-update-current"),
+                        )
+                    }
+                }
+                SyButton(
+                    text = "分享原始来源",
+                    variant = SyButtonVariant.Ghost,
+                    enabled = !loading,
+                    modifier = Modifier.testTag("skill-share-source"),
+                    onClick = {
+                        val share = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, item.sourceUrl)
+                        }
+                        context.startActivity(Intent.createChooser(share, "分享技能来源"))
+                    },
+                )
+            }
 
-
+            if (item.installedSkill && item.rollbackAvailable && onRollbackSkill != null) {
+                SyButton(
+                    text = "恢复上一版本",
+                    variant = SyButtonVariant.Ghost,
+                    enabled = !loading,
+                    modifier = Modifier.testTag("skill-rollback"),
+                    onClick = {
+                        rollbackSkillChoice = item.id.substringAfter(":")
+                        selectedRow = null
+                    },
+                )
+            }
+            if (item.installedSkill && onShareSkillPackage != null) {
+                SyButton(
+                    text = "分享完整技能包",
+                    variant = SyButtonVariant.Info,
+                    enabled = !loading,
+                    modifier = Modifier.testTag("skill-share-package"),
+                    onClick = {
+                        sharePackageSkillName = item.id.substringAfter(":")
+                        selectedRow = null
+                    },
+                )
+            }
 
             if (item.installedSkill && onOpenSkillEditor != null) {
                 SyButton(
@@ -587,6 +752,73 @@ internal fun PluginInventoryBrowser(
                 label = { Text(stringResource(R.string.skills_instruction_label)) },
                 minLines = 5,
                 modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+    upgradeSkillChoice?.let { (id, revision) ->
+        SyResponsiveSheet(
+            title = "确认升级技能",
+            onDismiss = { upgradeSkillChoice = null },
+            footer = {
+                SyButton(
+                    text = "确认升级",
+                    enabled = !loading && pendingSkillUpdates[id] == revision,
+                    modifier = Modifier.fillMaxWidth().testTag("skill-upgrade-confirm"),
+                    onClick = {
+                        onUpgradeSkill?.invoke(id, revision)
+                        upgradeSkillChoice = null
+                    },
+                )
+            },
+        ) {
+            Text(
+                "将升级 $id 到版本 ${revision.take(12)}。安装前会验证新包，并保存当前完整技能作为上一版本；如果修改过本地规则，可通过“恢复上一版本”找回。",
+                style = DsType.std14.withReadingWeight(), color = colors.textSecondary,
+            )
+        }
+    }
+    rollbackSkillChoice?.let { id ->
+        SyResponsiveSheet(
+            title = "恢复上一版本",
+            onDismiss = { rollbackSkillChoice = null },
+            footer = {
+                SyButton(
+                    text = "确认恢复",
+                    enabled = !loading,
+                    modifier = Modifier.fillMaxWidth().testTag("skill-rollback-confirm"),
+                    onClick = {
+                        onRollbackSkill?.invoke(id)
+                        rollbackSkillChoice = null
+                    },
+                )
+            },
+        ) {
+            Text(
+                "将 $id 恢复为上次升级前的完整技能内容。当前版本会保留，可再次恢复回来。",
+                style = DsType.std14.withReadingWeight(), color = colors.textSecondary,
+            )
+        }
+    }
+    sharePackageSkillName?.let { id ->
+        SyResponsiveSheet(
+            title = "分享完整技能包",
+            onDismiss = { sharePackageSkillName = null },
+            footer = {
+                SyButton(
+                    text = "生成并分享",
+                    enabled = !loading,
+                    modifier = Modifier.fillMaxWidth().testTag("skill-share-package-confirm"),
+                    onClick = {
+                        onShareSkillPackage?.invoke(id)
+                        sharePackageSkillName = null
+                    },
+                )
+            },
+        ) {
+            Text(
+                "将导出 SKILL.md 及技能目录下的全部附属资料，请先确认其中没有需要保密的内容。",
+                style = DsType.std14.withReadingWeight(),
+                color = colors.textSecondary,
             )
         }
     }

@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.web
 
 import com.labteto.dshmobile.core.net.withCancellableHttpResponse
+import com.labteto.dshmobile.local.LocalWebException
 import java.net.SocketTimeoutException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -8,31 +9,34 @@ import kotlinx.coroutines.withContext
 import okhttp3.Request
 
 /** DNS/security facts and bounded HTTP/TLS probes; shares the fetch target policy. */
-internal class LocalWebDiagnostics(private val targetResolver: LocalWebTargetResolver) {
+internal class LocalWebDiagnostics(
+    private val targetResolver: LocalWebTargetResolver,
+    private val beforeDns: (java.net.URI) -> Unit = {},
+) {
     suspend fun diagnose(input: String): String = withContext(Dispatchers.IO) {
         val normalized = targetResolver.normalizeInput(input)
-        val uri = targetResolver.parseUri(normalized)
-        val host = requireNotNull(uri.host)
-        val proxy = targetResolver.systemHttpProxy()
-        val vpn = targetResolver.isVpnActive()
-        val interfaces = targetResolver.activeTunnelInterfaces()
-        val addresses = targetResolver.resolve(host)
-        val blocked = addresses.filterNot { targetResolver.isPublicAddress(it) || targetResolver.isAllowedVpnFakeAddress(host, it, vpn) }
-
-        if (blocked.isNotEmpty()) {
+        val target = try {
+            targetResolver.validateTarget(normalized, beforeDns)
+        } catch (blocked: LocalWebException) {
+            if (blocked.code != "SSRF_BLOCKED") throw blocked
             return@withContext buildString {
                 appendLine("网络诊断")
                 appendLine("目标：$normalized")
-                appendLine("域名：$host")
-                appendLine("解析：${addresses.joinToString { it.hostAddress ?: it.toString() }}")
+                val proxy = targetResolver.systemHttpProxy()
+                val vpn = targetResolver.isVpnActive()
+                val interfaces = targetResolver.activeTunnelInterfaces()
                 appendLine("系统代理：${proxy?.let { "${it.host}:${it.port}" } ?: "未检测到"}")
                 appendLine("VPN/TUN：${if (vpn) "已启用" else "未检测到"}${if (interfaces.isNotEmpty()) "（${interfaces.joinToString()}）" else ""}")
-                appendLine("命中受保护地址：${blocked.joinToString { it.hostAddress ?: it.toString() }}")
-                append("结论：安全策略会主动拦截。${targetResolver.blockedHint(host, blocked, vpn)}")
-            }.trimEnd()
+                appendLine(blocked.message ?: "目标解析到受保护地址")
+                append("结论：地址安全策略已拦截")
+            }
         }
-
-        val target = LocalWebTargetResolver.ValidatedTarget(uri, addresses, vpn)
+        val uri = target.uri
+        val host = uri.host
+        val proxy = targetResolver.systemHttpProxy()
+        val vpn = target.vpn
+        val interfaces = targetResolver.activeTunnelInterfaces()
+        val addresses = target.addresses
         val probe = probeConnectivity(target)
         buildString {
             appendLine("网络诊断")
@@ -87,7 +91,7 @@ internal class LocalWebDiagnostics(private val targetResolver: LocalWebTargetRes
                 .url(route.url)
                 .header("User-Agent", LOCAL_WEB_USER_AGENT)
                 .head()
-            route.hostHeader?.let { builder.header("Host", it) }
+            route.attachValidatedOrigin(builder, target)
             withCancellableHttpResponse(route.client.newCall(builder.build())) { response ->
                 val classification = classifyProbeStatus(response.code)
                 ConnectivityProbe(

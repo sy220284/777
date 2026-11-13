@@ -1111,6 +1111,34 @@ internal class LocalWorkAgentTurnExecutor(
         } finally {
             if (ownerJob != null) {
                 workRunRegistry.releaseCompletedTurn(binding, ownerJob)
+                // One delivery owner for explicit update_goal and auto-completed goals.
+                // Persisted artifact/published and artifact/publication-failed events record
+                // the real phone delivery outcome independently of verified Goal status.
+                val completed = binding.workState.snapshot().goal?.takeIf {
+                    it.status == "completed"
+                }
+                if (completed != null) {
+                    try {
+                        val delivered = withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                            sessionStorage.files.publishVerifiedDeliverables(
+                                binding.sessionId, completed.artifactPaths,
+                                localWorkTaskFolderPaths(completed.description, completed.id).deliverables,
+                            )
+                        }
+                        // Clear the previous delivery failure only if an artifact was published.
+                        if (delivered.isNotEmpty()) binding.state.update { current ->
+                            if (current.error?.startsWith("目标验收完成，但手机下载交付失败：") == true)
+                                current.copy(error = null)
+                            else current
+                        }
+                    } catch (error: Exception) {
+                        AppLog.failure("WorkAgentTurn", "publish_downloads", error,
+                            sessionId = binding.sessionId)
+                        binding.state.update { current -> current.copy(
+                            error = "目标验收完成，但手机下载交付失败：${error.message}；文件保留在工作区，可在文件页重试保存",
+                        ) }
+                    }
+                }
                 // Derived archive refresh does not change the completed Work result.
                 settledRunId?.let { runId -> onTurnSettled(binding, runId, settledImprovement) }
             }

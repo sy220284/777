@@ -37,6 +37,7 @@ internal class MemorySettingsController(
     private val read: (MemoryManagementQuery) -> MemoryManagementPage,
     private val updateRecord: (MemoryRecord, String, Boolean) -> MemoryRecord,
     private val forgetRecord: (MemoryRecord) -> Boolean,
+    private val restoreRecord: (MemoryRecord) -> MemoryRecord,
 ) {
     private val mutable = MutableStateFlow(MemoryManagementUiState())
     val state = mutable.asStateFlow()
@@ -91,6 +92,9 @@ internal class MemorySettingsController(
         mutate(id, onDone) { updateRecord(it, content, pinned); true }
 
     fun forget(id: String, onDone: (String?) -> Unit = {}) = mutate(id, onDone, forgetRecord)
+
+    fun restore(id: String, onDone: (String?) -> Unit = {}) =
+        mutate(id, onDone) { restoreRecord(it); true }
 
     private fun mutate(id: String, onDone: (String?) -> Unit, write: (MemoryRecord) -> Boolean) {
         if (id in state.value.busyIds) return

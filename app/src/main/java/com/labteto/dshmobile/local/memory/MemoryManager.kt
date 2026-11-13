@@ -84,6 +84,13 @@ class MemoryManager @Inject constructor(
         )
     }
 
+    /** Restore a user edit with the same sensitive-data and CAS rules as normal editing. */
+    fun restoreManualEdit(existing: MemoryRecord): MemoryRecord {
+        val previous = requireNotNull(existing.previousManualRevision) { "没有可恢复的手动修改版本" }
+        require(!policy.containsSensitiveData(previous.content)) { "上一版本包含敏感信息，拒绝恢复" }
+        return store.restoreManualEdit(existing.id, existing.updatedAt)
+    }
+
     fun remember(
         content: String,
         scope: MemoryScope,

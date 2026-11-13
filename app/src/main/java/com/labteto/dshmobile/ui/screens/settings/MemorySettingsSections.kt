@@ -424,6 +424,19 @@ internal fun MemoryManagementCard(
                             variant = SyButtonVariant.Ghost,
                         )
                     }
+                    if (record.previousManualRevision != null) {
+                        SyButton(
+                            text = "恢复上一版本",
+                            enabled = record.id !in page.busyIds,
+                            onClick = {
+                                viewModel.restoreMemory(record.id) { error ->
+                                    report(error ?: "上一版本已恢复")
+                                }
+                            },
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                        )
+                    }
                 }
             }
         }

@@ -6,6 +6,13 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Context
+import android.content.ClipData
+import android.content.Intent
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.nio.file.AtomicMoveNotSupportedException
+import androidx.core.content.FileProvider
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
@@ -93,6 +100,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -114,6 +123,11 @@ data class ToolsUiState(
     val localPlugins: List<String> = emptyList(),
     val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     val presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
+    val curatedSkills: List<String> = emptyList(),
+    val curatedLoading: Boolean = false,
+    val curatedError: String? = null,
+    val pendingSkillUpdates: Map<String, String> = emptyMap(),
+    val upToDateSkills: Set<String> = emptySet(),
     val createdSkillId: String? = null,
     val skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
     val savedSkillId: String? = null,
@@ -159,6 +173,15 @@ class ToolsViewModel @Inject constructor(
         try { _agentBackendStatus.value = localTools.agentBackendStatus() }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { _agentBackendStatus.value = "执行器设置读取失败，原授权已保留" }
+    } }
+    fun probeAgentBackend() { viewModelScope.launch {
+        _agentBackendStatus.value = "正在验证 TLS 证书、连接口令与服务授权…"
+        try {
+            _agentBackendStatus.value = localTools.probeAgentBackend()
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            _agentBackendStatus.value = "远端连接验证失败：" + (failure.message ?: "连接中断")
+        }
     } }
     fun configureAgentBackend(host: String, port: Int, pin: String, token: String, consent: Boolean) { viewModelScope.launch {
         try {
@@ -251,6 +274,22 @@ class ToolsViewModel @Inject constructor(
 
     init {
         refresh()
+        viewModelScope.launch {
+            localTools.skillChanges().collectLatest {
+                // A directory may be created just before its SKILL.md is written.
+                delay(220)
+                operationGate.run {
+                    val skills = localTools.installedSkills()
+                    val presets = localTools.presetSkills()
+                    val activeIds = skills.map { it.name }.toSet()
+                    _state.value = _state.value.copy(
+                        skills = skills, presets = presets,
+                        pendingSkillUpdates = _state.value.pendingSkillUpdates.filterKeys { it in activeIds },
+                        upToDateSkills = _state.value.upToDateSkills.filterTo(mutableSetOf()) { it in activeIds },
+                    )
+                }
+            }
+        }
     }
 
     fun acknowledgeNotice(notice: ToolsNotice) {
@@ -278,6 +317,9 @@ class ToolsViewModel @Inject constructor(
                     localPlugins = plugins,
                     skills = skills,
                     presets = presets,
+                    curatedSkills = _state.value.curatedSkills,
+                    curatedLoading = _state.value.curatedLoading,
+                    curatedError = _state.value.curatedError,
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -300,6 +342,8 @@ class ToolsViewModel @Inject constructor(
                     loading = false,
                     skills = localTools.installedSkills(),
                     presets = localTools.presetSkills(),
+                    pendingSkillUpdates = emptyMap(),
+                    upToDateSkills = emptySet(),
                     createdSkillId = createdId,
                     feedbackRes = R.string.skills_saved,
                 )
@@ -311,6 +355,117 @@ class ToolsViewModel @Inject constructor(
                     feedback = error.message,
                     feedbackRes = if (error.message == null) R.string.skills_operation_failed else null,
                 )
+            }
+        }
+    }
+
+    /** Fetch on user entry to Skills; discovery never installs a package. */
+    fun refreshCuratedSkills() {
+        if (_state.value.curatedLoading) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(curatedLoading = true, curatedError = null)
+            try {
+                val names = localTools.curatedGitHubSkills()
+                    .filter { it.matches(Regex("[a-z][a-z0-9-]{1,47}")) }
+                    .distinct().sorted()
+                _state.value = _state.value.copy(curatedLoading = false, curatedSkills = names)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(curatedLoading = false,
+                    curatedError = "官方精选目录读取失败：" + (error.message ?: "请检查网络"))
+            }
+        }
+    }
+
+    fun installCuratedSkill(id: String) {
+        if (id !in _state.value.curatedSkills) return
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val installedId = localTools.installCuratedSkill(id)
+                _state.value = _state.value.copy(
+                    loading = false,
+                    skills = localTools.installedSkills(),
+                    presets = localTools.presetSkills(),
+                    createdSkillId = installedId,
+                    feedback = "官方精选技能已安装：$installedId")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false,
+                    feedback = "精选技能安装失败：" + (error.message ?: "请检查网络或技能包"))
+            }
+        }
+    }
+
+    /** Network access happens only after the user explicitly asks to check one source. */
+    fun checkSkillUpdate(id: String) {
+        if (_state.value.skills.none { it.name == id && it.sourceUrl != null }) return
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val revision = localTools.checkSkillUpdate(id)
+                val previous = _state.value.pendingSkillUpdates.toMutableMap()
+                val current = _state.value.upToDateSkills.toMutableSet()
+                if (revision != null) {
+                    previous[id] = revision
+                    current.remove(id)
+                } else {
+                    previous.remove(id)
+                    current.add(id)
+                }
+                _state.value = _state.value.copy(loading = false,
+                    pendingSkillUpdates = previous, upToDateSkills = current,
+                    feedback = if (revision == null) "技能已是最新版本" else "发现新版本：${revision.take(12)}")
+            } catch (cancelled: CancellationException) {
+                _state.value = _state.value.copy(loading = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false,
+                    feedback = "检查技能更新失败：" + (error.message ?: "网络连接异常"))
+            }
+        }
+    }
+
+    fun upgradeSkill(id: String, revision: String) {
+        if (_state.value.pendingSkillUpdates[id] != revision) return
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                localTools.upgradeSkill(id, revision)
+                _state.value = _state.value.copy(loading = false,
+                    skills = localTools.installedSkills(),
+                    pendingSkillUpdates = _state.value.pendingSkillUpdates - id,
+                    upToDateSkills = _state.value.upToDateSkills + id,
+                    feedback = "已升级技能 $id，上一版本可在技能详情恢复")
+            } catch (cancelled: CancellationException) {
+                _state.value = _state.value.copy(loading = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false,
+                    feedback = "升级失败：" + (error.message ?: "请重新检查技能版本"))
+            }
+        }
+    }
+
+    fun rollbackSkill(id: String) {
+        if (_state.value.skills.none { it.name == id && it.rollbackAvailable }) return
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                localTools.rollbackSkill(id)
+                _state.value = _state.value.copy(loading = false,
+                    skills = localTools.installedSkills(),
+                    pendingSkillUpdates = _state.value.pendingSkillUpdates - id,
+                    upToDateSkills = _state.value.upToDateSkills - id,
+                    feedback = "已恢复上一版本：$id")
+            } catch (cancelled: CancellationException) {
+                _state.value = _state.value.copy(loading = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false,
+                    feedback = "恢复失败：" + (error.message ?: "请检查技能存储"))
             }
         }
     }
@@ -355,6 +510,54 @@ class ToolsViewModel @Inject constructor(
                     loading = false,
                     feedback = error.message ?: appContext.getString(R.string.skills_import_failed),
                 )
+            }
+        }
+    }
+
+    fun shareSkillPackage(id: String) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val file = withContext(Dispatchers.IO) {
+                    val bytes = localTools.exportSkillPackage(id)
+                    val folder = File(appContext.cacheDir, "skill-package-shares")
+                    require(!Files.isSymbolicLink(folder.toPath()) &&
+                        (folder.isDirectory || folder.mkdirs())) { "无法创建技能分享缓存" }
+                    val pending = Files.createTempFile(folder.toPath(), "skill-", ".partial")
+                    try {
+                        Files.write(pending, bytes)
+                        val target = File(folder, "$id.zip").toPath()
+                        try {
+                            Files.move(pending, target, StandardCopyOption.ATOMIC_MOVE,
+                                StandardCopyOption.REPLACE_EXISTING)
+                        } catch (_: AtomicMoveNotSupportedException) {
+                            Files.move(pending, target, StandardCopyOption.REPLACE_EXISTING)
+                        }
+                        target.toFile()
+                    } finally {
+                        Files.deleteIfExists(pending)
+                    }
+                }
+                val uri = FileProvider.getUriForFile(
+                    appContext, "${appContext.packageName}.files", file,
+                )
+                val send = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/zip"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    clipData = ClipData.newRawUri(file.name, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                appContext.startActivity(Intent.createChooser(send, "分享完整技能包").apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+                _state.value = _state.value.copy(loading = false,
+                    feedback = "技能包已生成，可选择分享目标")
+            } catch (cancelled: CancellationException) {
+                _state.value = _state.value.copy(loading = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false,
+                    feedback = error.message ?: "技能包分享失败")
             }
         }
     }
@@ -661,8 +864,11 @@ fun ToolsScreen(
     var stdioWorkingDirectory by remember { mutableStateOf("") }
     var githubToken by remember { mutableStateOf("") }
     var showGitHubConfig by remember { mutableStateOf(false) }
+    var editGitHubCredentials by remember { mutableStateOf(false) }
     var showGitHubBrowser by remember { mutableStateOf(false) }
     var showExternalConfig by remember { mutableStateOf(false) }
+    var showMcpAdvanced by rememberSaveable { mutableStateOf(false) }
+    var showMcpStdio by rememberSaveable { mutableStateOf(false) }
     var expandedMcpServer by remember { mutableStateOf<String?>(null) }
     var showAgentSettings by remember { mutableStateOf(false) }
     var confirmClearGitHub by remember { mutableStateOf(false) }
@@ -672,6 +878,10 @@ fun ToolsScreen(
     }
     // Switching tabs must not discard the plugin/skill search and filter context.
     val inventoryTabStates = rememberSaveableStateHolder()
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == 1 && state.curatedSkills.isEmpty() &&
+            !state.curatedLoading && state.curatedError == null) viewModel.refreshCuratedSkills()
+    }
 
     val noticeMessage = state.notice?.let { notice ->
         stringResource(
@@ -689,7 +899,11 @@ fun ToolsScreen(
     BackHandler(enabled = showGitHubBrowser || showGitHubConfig || showAgentSettings || handleRootSystemBack) {
         when {
             showGitHubBrowser -> showGitHubBrowser = false
-            showGitHubConfig -> showGitHubConfig = false
+            showGitHubConfig -> {
+                showGitHubConfig = false
+                editGitHubCredentials = false
+                githubToken = ""
+            }
             showAgentSettings -> showAgentSettings = false
             else -> onClose()
         }
@@ -704,6 +918,7 @@ fun ToolsScreen(
                 stdioWorkingDirectory = ""
                 githubToken = ""
                 showGitHubConfig = false
+                editGitHubCredentials = false
                 showExternalConfig = false
                 noticeMessage?.let(toast.second)
             }
@@ -771,6 +986,11 @@ fun ToolsScreen(
                                     connectedServices = state.servers,
                                     skills = state.skills,
                                     presets = state.presets,
+                                    curatedSkills = state.curatedSkills,
+                                    curatedLoading = state.curatedLoading,
+                                    curatedError = state.curatedError,
+                                    pendingSkillUpdates = state.pendingSkillUpdates,
+                                    upToDateSkills = state.upToDateSkills,
                                     createdSkillId = state.createdSkillId,
                                     skillEditor = state.skillEditor,
                                     savedSkillId = state.savedSkillId,
@@ -785,9 +1005,15 @@ fun ToolsScreen(
                                     onReturnToChat = onClose,
                                     onUseCapability = onUseCapability,
                                     onInstallPreset = viewModel::installPreset,
+                                    onInstallCurated = viewModel::installCuratedSkill,
+                                    onRefreshCurated = viewModel::refreshCuratedSkills,
                                     onCreateSkill = viewModel::createSkill,
                                     onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
                                     onRemoveSkill = viewModel::removeSkill,
+                                    onShareSkillPackage = viewModel::shareSkillPackage,
+                                    onCheckSkillUpdate = viewModel::checkSkillUpdate,
+                                    onUpgradeSkill = viewModel::upgradeSkill,
+                                    onRollbackSkill = viewModel::rollbackSkill,
                                     onOpenSkillEditor = viewModel::openSkillEditor,
                                     onCloseSkillEditor = viewModel::closeSkillEditor,
                                     onSaveSkillDocument = viewModel::saveSkillDocument,
@@ -947,7 +1173,11 @@ fun ToolsScreen(
         SyResponsiveSheet(
             title = stringResource(R.string.tools_github_connector),
             subtitle = stringResource(R.string.tools_github_connector_hint),
-            onDismiss = { showGitHubConfig = false },
+            onDismiss = {
+                showGitHubConfig = false
+                editGitHubCredentials = false
+                githubToken = ""
+            },
         ) {
             Text(
                 stringResource(R.string.tools_github_capabilities),
@@ -964,6 +1194,8 @@ fun ToolsScreen(
                     text = "浏览 GitHub 仓库",
                     onClick = {
                         showGitHubConfig = false
+                        editGitHubCredentials = false
+                        githubToken = ""
                         showGitHubBrowser = true
                         viewModel.loadGitHubRepositories()
                     },
@@ -971,6 +1203,25 @@ fun ToolsScreen(
                     variant = SyButtonVariant.Ghost,
                 )
             }
+            if (state.githubConfigured && !editGitHubCredentials) {
+                Text(
+                    "GitHub 已连接。需要更新或撤销凭据时再展开操作。",
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.textSecondary,
+                )
+                SyButton(
+                    text = "更新访问凭据",
+                    onClick = { editGitHubCredentials = true },
+                    variant = SyButtonVariant.Outline,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                SyButton(
+                    text = stringResource(R.string.tools_github_clear),
+                    onClick = { confirmClearGitHub = true },
+                    variant = SyButtonVariant.Ghost,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
             SyTextField(
                 value = githubToken,
                 onValueChange = { githubToken = it.take(4096) },
@@ -1004,6 +1255,7 @@ fun ToolsScreen(
                     )
                 }
             }
+            }
         }
     }
 
@@ -1015,7 +1267,10 @@ fun ToolsScreen(
                 pendingLocalNetworkAction = null
                 viewModel.cancelMcpLogin()
                 showExternalConfig = false
+                showMcpAdvanced = false
+                showMcpStdio = false
                 mcpBearer = ""
+                mcpClientId = ""
             },
         ) {
             if (state.servers.isEmpty()) {
@@ -1112,6 +1367,13 @@ fun ToolsScreen(
             localNetworkPermissionFeedback?.let { message ->
                 Text(message, style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
             }
+            SyButton(
+                text = if (showMcpAdvanced) "收起高级连接选项" else "高级连接选项",
+                onClick = { showMcpAdvanced = !showMcpAdvanced },
+                variant = SyButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth().testTag("mcp_advanced_toggle"),
+            )
+            if (showMcpAdvanced) {
             SyTextField(
                 value = mcpClientId,
                 onValueChange = { mcpClientId = it },
@@ -1120,12 +1382,13 @@ fun ToolsScreen(
                 supportingText = { Text("可填写预注册 ID 或客户端元数据 HTTPS 地址；留空尝试服务支持的自动注册。") },
                 enabled = !state.loading, singleLine = true, shape = DsShapes.row,
             )
+            }
             SyButton(
                 text = if (state.mcpLoginServerId != null) "等待浏览器授权…" else "浏览器登录并连接",
                 onClick = {
                     val id = serverId.trim()
                     val url = endpoint.trim()
-                    val client = mcpClientId.trim()
+                    val client = if (showMcpAdvanced) mcpClientId.trim() else ""
                     connectWithLocalNetworkPermission(url) { viewModel.loginMcp(id, url, client) }
                 },
                 enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
@@ -1135,6 +1398,7 @@ fun ToolsScreen(
                 SyButton(text = "取消登录", onClick = viewModel::cancelMcpLogin,
                     variant = SyButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
             }
+            if (showMcpAdvanced) {
             Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
                 SyButton(text = "刷新登录", onClick = {
                     val id = serverId.trim()
@@ -1151,6 +1415,8 @@ fun ToolsScreen(
                     enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
                     variant = SyButtonVariant.Ghost, modifier = Modifier.weight(1f))
             }
+            }
+            if (showMcpAdvanced) {
             SyTextField(
                 value = mcpBearer,
                 onValueChange = { mcpBearer = it.take(4096) },
@@ -1162,6 +1428,7 @@ fun ToolsScreen(
                 visualTransformation = PasswordVisualTransformation(),
                 shape = DsShapes.row,
             )
+            }
             SyButton(
                 text = stringResource(
                     if (state.loading) R.string.tools_processing else R.string.tools_connect,
@@ -1169,7 +1436,7 @@ fun ToolsScreen(
                 onClick = {
                     val id = serverId.trim()
                     val url = endpoint.trim()
-                    val bearer = mcpBearer
+                    val bearer = if (showMcpAdvanced) mcpBearer else ""
                     connectWithLocalNetworkPermission(url) { viewModel.connectHttp(id, url, bearer) }
                 },
                 enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
@@ -1177,13 +1444,20 @@ fun ToolsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 icon = SyEntryIcons.Connections,
             )
-            SyButton(
+            if (showMcpAdvanced) SyButton(
                 text = "清除该 MCP 服务的认证信息",
                 onClick = { viewModel.clearMcpCredential(serverId.trim()) },
                 enabled = !state.loading && serverId.isNotBlank(),
                 variant = SyButtonVariant.Ghost,
                 modifier = Modifier.fillMaxWidth(),
             )
+            SyButton(
+                text = if (showMcpStdio) "收起本机命令连接" else "通过本机命令连接（高级）",
+                onClick = { showMcpStdio = !showMcpStdio },
+                variant = SyButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth().testTag("mcp_stdio_toggle"),
+            )
+            if (showMcpStdio) {
             Text(
                 stringResource(R.string.tools_stdio_title),
                 style = DsType.std14Strong.withReadingWeight(),
@@ -1230,6 +1504,7 @@ fun ToolsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 icon = SyEntryIcons.Tools,
             )
+            }
         }
     }
 

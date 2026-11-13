@@ -31,16 +31,44 @@ class LocalWorkspaceIntermediateMaintenanceTest {
             val pendingResume = fixture("repository/src/.module.kt.write-in-progress", 400)
             val userSource = fixture("repository/src/module.kt", 500)
             val output = fixture("repository/src/notes.tmp", 500)
+            val staleFetch = fixture(".dsh/fetches/fetch-1794574067369-24d64294.txt", 31)
+            val freshFetch = fixture(".dsh/fetches/fetch-1794574067370-24d64295.txt", 2)
+            val oldUserFile = fixture(".dsh/fetches/notes.txt", 200)
+            val staleQuery = fixture(".dsh/queries/query-1794574067369-24d64294.json", 40)
+            val lockMarker = fixture(".dsh/write-locks/a1.lck", 365)
             val report = LocalWorkspaceIntermediateMaintenance(root).cleanup(now)
-            assertEquals(4, report.deletedFiles)
-            listOf(staleIndex, staleIndexTemp, staleImport, nestedTemp).forEach { assertFalse(it.exists()) }
+            assertEquals(6, report.deletedFiles)
+            listOf(staleIndex, staleIndexTemp, staleImport, nestedTemp, staleFetch, staleQuery)
+                .forEach { assertFalse(it.exists()) }
             listOf(recentIndex, publishedAttachment, activeTemp, pendingResume,
-                userSource, output, userLookalike).forEach { assertTrue(it.exists()) }
+                userSource, output, userLookalike, freshFetch, oldUserFile, lockMarker)
+                .forEach { assertTrue(it.exists()) }
             assertTrue(report.deletedBytes > 0)
             assertEquals(recentIndex.length(), report.remainingCacheBytes)
             assertEquals(0, LocalWorkspaceIntermediateMaintenance(root).cleanup(now).deletedFiles)
         } finally {
             root.deleteRecursively()
+        }
+    }
+
+    @Test fun symlinkedGeneratedResponseDirectoryIsNeverTraversed() {
+        val root = Files.createTempDirectory("fetch-maintenance-links-").toFile()
+        val outside = Files.createTempDirectory("fetch-outside-").toFile()
+        try {
+            val secret = File(outside, "fetch-1794574067369-24d64294.txt")
+                .apply { writeText("user content"); setLastModified(1L) }
+            val dsh = File(root, ".dsh").apply { mkdirs() }
+            Files.createSymbolicLink(File(dsh, "fetches").toPath(), outside.toPath())
+            try {
+                LocalWorkspaceIntermediateMaintenance(root).cleanup()
+                throw AssertionError("symbolic link must be refused")
+            } catch (expected: IllegalArgumentException) {
+                assertTrue(expected.message.orEmpty().contains("工具缓存目录不安全"))
+            }
+            assertTrue(secret.isFile)
+        } finally {
+            root.deleteRecursively()
+            outside.deleteRecursively()
         }
     }
 

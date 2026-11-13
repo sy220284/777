@@ -4,6 +4,10 @@ import kotlinx.coroutines.flow.Flow
 
 const val UI_CONTRACT_VERSION = 1
 
+/** Conversation kind is part of an owner-issued identity: Chat and Work never share queue authority. */
+@kotlinx.serialization.Serializable
+enum class UiConversationMode { CHAT, WORK }
+
 /** Opaque owner-issued activation identity; UI cannot derive execution authority from this value. */
 @kotlinx.serialization.Serializable
 data class UiSessionIdentity(
@@ -12,6 +16,7 @@ data class UiSessionIdentity(
     val contextGeneration: Long,
     val profileId: String?,
     val projectId: String?,
+    val mode: UiConversationMode = UiConversationMode.CHAT,
 ) {
     init { require(sessionId.isNotBlank() && activationId.isNotBlank()) }
 }
@@ -130,6 +135,21 @@ sealed interface WorkConversationUiCommand {
         val pendingId: String,
         val approved: Boolean,
     ) : WorkConversationUiCommand
+}
+
+/** One active session's user-queued input, never an internal continuation or tool payload. */
+data class UiQueuedUserInput(val id: String, val preview: String)
+data class UiQueuedUserSnapshot(
+    val identity: UiSessionIdentity?,
+    val inputs: List<UiQueuedUserInput>,
+)
+
+/** Queue operations have owner identity checks and durable admission; UI receives only receipts. */
+interface UiQueuedUserPort {
+    fun snapshot(): UiQueuedUserSnapshot
+    fun edit(identity: UiSessionIdentity, messageId: String, replacement: String): UiCommandReceipt
+    fun remove(identity: UiSessionIdentity, messageId: String): UiCommandReceipt
+    fun reorder(identity: UiSessionIdentity, orderedIds: List<String>): UiCommandReceipt
 }
 
 interface WorkConversationUiPort {
