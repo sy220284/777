@@ -1334,10 +1334,15 @@ internal fun LocalWorkspaceFilesDialog(
                             style = DsType.caption11, color = colors.textSecondary)
                     }
                 }
-                Text(if (result.includesUntrackedFiles) {
-                    "已纳入所选未跟踪文件；忽略规则仍生效。超出范围会标记截断并停止审查。"
-                } else {
-                    "当前只检查已跟踪文件；开启上方选项后可审查新建文件。"
+                Text(when {
+                    gitIsCommit ->
+                        "指定提交只包含该次提交的历史差异，不包含当前工作区的未提交修改。"
+                    !gitIsLocal ->
+                        "远端分支比较包含当前已跟踪文件的工作区变化，不包含未跟踪文件。"
+                    result.includesUntrackedFiles ->
+                        "已纳入所选新建文件；忽略规则仍生效，超出范围时会停止完整审查。"
+                    else ->
+                        "当前仅检查已跟踪文件；需要检查新建文件时可开启上方选项。"
                 }, style = DsType.caption11, color = colors.textSecondary)
             }
         }
