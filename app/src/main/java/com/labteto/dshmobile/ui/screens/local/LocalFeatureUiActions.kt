@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
+import com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
@@ -114,6 +115,8 @@ internal data class LocalWorkFeatureUiActions(
     val stopWorkspaceSearch: suspend (String) -> Boolean = { false },
     val observeWorkspaceFiles: (List<String>) -> kotlinx.coroutines.flow.Flow<com.labteto.dshmobile.local.files.LocalWorkspaceFileChange> =
         { kotlinx.coroutines.flow.emptyFlow() },
+    val remoteGitBranches: (suspend (String) -> List<String>)? = null,
+    val compareRemoteGit: (suspend (String, String, String) -> LocalRemoteGitDiffUi)? = null,
     val conversationFiles: suspend (String) -> LocalConversationFiles,
     val previewWorkspaceFile: suspend (String) -> LocalWorkspaceFilePreview,
     val previewWorkspaceFilePage: suspend (String, Long) -> LocalWorkspaceFilePreview = { path, _ -> previewWorkspaceFile(path) },

@@ -41,6 +41,8 @@ internal fun localWorkFeatureUiContribution(
             loadSearchPage = actions.searchWorkspacePage,
             stopSearch = actions.stopWorkspaceSearch,
             observeChanges = actions.observeWorkspaceFiles,
+            remoteGitBranches = actions.remoteGitBranches,
+            compareRemoteGit = actions.compareRemoteGit,
             loadConversation = actions.conversationFiles,
             loadPreview = actions.previewWorkspaceFile,
             loadPreviewPage = actions.previewWorkspaceFilePage,

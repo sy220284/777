@@ -567,6 +567,8 @@ fun LocalHarnessScreen(
         searchWorkspacePage = viewModel::searchWorkspacePage,
         stopWorkspaceSearch = viewModel::stopWorkspaceSearch,
         observeWorkspaceFiles = viewModel::observeWorkspaceFiles,
+        remoteGitBranches = viewModel::remoteGitBranchesForUi,
+        compareRemoteGit = viewModel::compareRemoteGitForUi,
         conversationFiles = viewModel::conversationFiles,
         previewWorkspaceFile = viewModel::previewWorkspaceFile,
         previewWorkspaceFilePage = viewModel::previewWorkspaceFilePage,

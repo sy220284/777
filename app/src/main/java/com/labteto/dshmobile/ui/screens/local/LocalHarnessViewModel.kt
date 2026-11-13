@@ -320,6 +320,10 @@ class LocalHarnessViewModel @Inject constructor(
         return deleted
     }
     suspend fun importAttachment(uri: Uri): LocalImportedAttachment = runtime.session.importAttachment(uri)
+    internal suspend fun remoteGitBranchesForUi(repository: String) =
+        toolsUi.remoteGitBranchesForUi(repository)
+    internal suspend fun compareRemoteGitForUi(repository: String, remote: String, branch: String) =
+        toolsUi.compareRemoteGitForUi(repository, remote, branch)
     suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
     suspend fun workspaceDirectory(path: String) = runtime.session.workspaceDirectoryForUi(path)
     suspend fun workspaceDirectoryPage(path: String, offset: Int) = runtime.session.workspaceDirectoryPageForUi(path, offset)
