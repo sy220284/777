@@ -14,16 +14,49 @@ import org.junit.Test
 
 class LocalWorkImprovementArchiveTest {
     @Test
-    fun createsSevenWorkspaceDocumentsAndPreservesUserNotesAcrossRefreshes() = withArchive { workspace, logs, archive ->
+    fun createsEightWorkspaceDocumentsAndPreservesUserNotesAcrossRefreshes() = withArchive { workspace, logs, archive ->
         archive.ensureInitialized()
         val names = workspace.files().map { it.path }.filter { it.startsWith("自我改进/") }
-        assertEquals(7, names.size)
+        assertEquals(8, names.size)
         workspace.write("自我改进/06-我的备注.md", "# 我的意见\n请优先修复工作区体验。\n")
         archive.refresh()
         assertEquals("# 我的意见\n请优先修复工作区体验。\n",
             workspace.readRaw("自我改进/06-我的备注.md"))
         assertTrue(workspace.readRaw("自我改进/00-自我改进总览.md").contains("Work 已结算回合：0"))
     }
+
+    @Test
+    fun sourcedFindingsAreProjectedAsRevisableLocalInvestigationHistory() =
+        withArchive { workspace, logs, archive ->
+            val log = logs.get("finding-session")
+            log.append("work/finding", buildJsonObject {
+                put("finding_id", "finding-1")
+                put("goal_id", "goal-1")
+                put("status", "hypothesis")
+                put("summary", "发现重复实现，待核查")
+                put("source_call_id", "read-1")
+                put("next_action", "补读源码")
+            })
+            archive.refresh()
+            var document = workspace.readRaw("自我改进/07-调查发现.md")
+            assertTrue(document.contains("发现重复实现"))
+            assertTrue(document.contains("待核查"))
+            log.append("work/finding", buildJsonObject {
+                put("finding_id", "finding-1")
+                put("goal_id", "goal-1")
+                put("status", "supported")
+                put("summary", "找到已存在的公共组件")
+                put("source_call_id", "read-2")
+                put("next_action", "复查调用关系")
+            })
+            archive.refresh()
+            document = workspace.readRaw("自我改进/07-调查发现.md")
+            assertTrue(document.contains("找到已存在的公共组件"))
+            assertTrue(document.contains("有来源支持"))
+            assertFalse(document.contains("发现重复实现"))
+            assertTrue(workspace.readRaw("自我改进/00-自我改进总览.md")
+                .contains("当前保留的调查发现：1"))
+        }
 
     @Test
     fun onlyReportsGroundedWorkFactsAndDoesNotClaimUnimplementedLearning() = withArchive { workspace, logs, archive ->
