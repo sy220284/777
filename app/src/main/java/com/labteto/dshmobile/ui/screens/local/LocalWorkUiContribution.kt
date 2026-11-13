@@ -45,6 +45,7 @@ internal fun localWorkFeatureUiContribution(
             remoteGitBranches = actions.remoteGitBranches,
             compareLocalGit = actions.compareLocalGit,
             compareRemoteGit = actions.compareRemoteGit,
+            compareCommitGit = actions.compareCommitGit,
             findIndependentCodeReview = actions.findIndependentCodeReview,
             runIndependentCodeReview = actions.runIndependentCodeReview,
             acceptIndependentCodeReview = actions.acceptIndependentCodeReview,
