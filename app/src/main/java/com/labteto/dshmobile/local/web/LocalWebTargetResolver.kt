@@ -30,9 +30,11 @@ internal class LocalWebTargetResolver(
     private val context: Context,
     private val http: OkHttpClient,
 ) {
-    fun validateTarget(input: String): ValidatedTarget {
+    fun validateTarget(input: String, beforeDns: (URI) -> Unit = {}): ValidatedTarget {
         val normalized = normalizeInput(input)
         val uri = parseUri(normalized)
+        // Parse once and verify caller policy before the DNS lookup.
+        beforeDns(uri)
         val host = requireNotNull(uri.host)
         val addresses = resolve(host)
         val vpn = isVpnActive()

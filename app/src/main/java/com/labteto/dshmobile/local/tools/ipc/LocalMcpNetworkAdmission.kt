@@ -23,11 +23,9 @@ internal fun requireMcpWorkerNetworkAdmission(
             policy.requireNetworkDestination(url.scheme, url.host)
         }
         "stdio" -> {
-            // A local child process inherits the app UID. It can open sockets outside OkHttp.
-            // When a managed network restriction exists it cannot be correctly confined here.
-            require(policy.networkEnabled && policy.allowedHosts == null && policy.deniedHosts.isEmpty()) {
-                "网络策略限制下，无法证明 stdio 插件的网络目的地，已拒绝执行"
-            }
+            // An arbitrary child process cannot be confined by HTTP hostname lists.
+            // Keep local tools available while honoring the explicit network off switch.
+            check(policy.networkEnabled) { "网络已关闭，无法启动 stdio 插件" }
         }
         else -> error("未知 MCP 执行方式：" + kind)
     }

@@ -8,10 +8,14 @@ import kotlinx.coroutines.withContext
 import okhttp3.Request
 
 /** DNS/security facts and bounded HTTP/TLS probes; shares the fetch target policy. */
-internal class LocalWebDiagnostics(private val targetResolver: LocalWebTargetResolver) {
+internal class LocalWebDiagnostics(
+    private val targetResolver: LocalWebTargetResolver,
+    private val beforeDns: (java.net.URI) -> Unit = {},
+) {
     suspend fun diagnose(input: String): String = withContext(Dispatchers.IO) {
         val normalized = targetResolver.normalizeInput(input)
         val uri = targetResolver.parseUri(normalized)
+        beforeDns(uri)
         val host = requireNotNull(uri.host)
         val proxy = targetResolver.systemHttpProxy()
         val vpn = targetResolver.isVpnActive()

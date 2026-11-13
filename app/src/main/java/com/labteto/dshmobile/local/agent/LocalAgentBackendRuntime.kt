@@ -45,7 +45,6 @@ internal class LocalAgentBackendRuntime @Inject constructor(
     suspend fun status(): String = peer()?.let { "已保存远端授权 ${it.host}:${it.port}（待连接验证，证书 ${it.pin.take(12)}…）" } ?: "尚未授权远端执行器"
     suspend fun probe(): String {
         val selected = requireNotNull(peer()) { "尚未配置远端执行器" }
-        managedPolicy.current().requireNetworkDestination("https", selected.host)
         val revision = selected.revision
         AgentTlsBackend(selected.host, selected.port, selected.pin, selected.token,
             requireGrantCurrent = {
@@ -60,7 +59,6 @@ internal class LocalAgentBackendRuntime @Inject constructor(
         require(host.isNotBlank() && host == host.trim() && host.none { it.isWhitespace() || it in "/@?#" })
         require(port in 1..65535 && pin.matches(Regex("[0-9a-fA-F]{64}")))
         require(token.isNotBlank() && token.all { it.code in 33..126 } && token.length <= 4096)
-        managedPolicy.current().requireNetworkDestination("https", host)
         store.put(buildJsonObject {
             put("revision", UUID.randomUUID().toString()); put("host", host); put("port", port)
             put("pin", pin.lowercase()); put("token", token)
@@ -96,7 +94,7 @@ internal class LocalAgentBackendRuntime @Inject constructor(
                 withContext(AgentBackendExecutionContext(checkGrant) + com.labteto.dshmobile.runtime.ProcessIsolationContext() + LocalAgentBackendSelectionContext(capabilities)) {
                     coroutineScope {
                         val monitor = launch { store.changes().collect { checkGrant() } }
-                        try { checkGrant(); driver.run(request, services) } finally { monitor.cancel() }
+                        try { driver.run(request, services) } finally { monitor.cancel() }
                     }
                 }
             }

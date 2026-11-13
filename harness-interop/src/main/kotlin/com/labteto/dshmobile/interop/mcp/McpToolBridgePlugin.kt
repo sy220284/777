@@ -650,7 +650,6 @@ class McpToolBridgePlugin(
 
     private suspend fun connectHttp(context: HarnessContext, rawId: String, rawEndpoint: String): String {
         val endpoint = validateEndpoint(rawEndpoint)
-        verifyHttpEndpoint(endpoint)
         val serverId = validateServerId(rawId)
         return connect(
             context = context,

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.web
 
+import com.labteto.dshmobile.di.enforceManagedNetworkDestinations
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -9,20 +10,19 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Every outbound search request must recheck the active managed policy before OkHttp. */
+/** Search adapters reuse the shared OkHttp admission instead of adding another gate. */
 class LocalWebManagedPolicyGateTest {
     @Test fun paidSearchPolicyDenialHappensBeforeAnyHttpRequest() = runBlocking {
         val attempts = AtomicInteger()
-        val http = OkHttpClient.Builder().addInterceptor { chain ->
-            attempts.incrementAndGet()
-            chain.proceed(chain.request())
-        }.build()
-        val client = LocalWebSearchClient(
-            http, Json, verifyEndpoint = { endpoint ->
-                assertTrue(endpoint.startsWith("https://api.deepseek.com/"))
-                throw IllegalStateException("管理策略拒绝DeepSeek")
-            },
-        )
+        val http = OkHttpClient.Builder()
+            .enforceManagedNetworkDestinations { _, host ->
+                check(host != "api.deepseek.com") { "管理策略拒绝DeepSeek" }
+            }
+            .addInterceptor { chain ->
+                attempts.incrementAndGet()
+                chain.proceed(chain.request())
+            }.build()
+        val client = LocalWebSearchClient(http, Json)
         val rejected = runCatching { client.search("secret", listOf("example")) }
         assertTrue(rejected.exceptionOrNull() is IllegalStateException)
         assertEquals(0, attempts.get())
@@ -52,14 +52,15 @@ class LocalWebManagedPolicyGateTest {
 
     @Test fun freeSearchPolicyDenialHappensBeforeAnyHttpRequest() = runBlocking {
         val attempts = AtomicInteger()
-        val http = OkHttpClient.Builder().addInterceptor { chain ->
-            attempts.incrementAndGet()
-            chain.proceed(chain.request())
-        }.build()
-        val client = LocalKeylessWebSearchClient(http, verifyEndpoint = { endpoint ->
-            assertTrue(endpoint.startsWith("https://www.bing.com/search"))
-            throw IllegalStateException("管理策略拒绝公共搜索")
-        })
+        val http = OkHttpClient.Builder()
+            .enforceManagedNetworkDestinations { _, host ->
+                check(host != "www.bing.com") { "管理策略拒绝公共搜索" }
+            }
+            .addInterceptor { chain ->
+                attempts.incrementAndGet()
+                chain.proceed(chain.request())
+            }.build()
+        val client = LocalKeylessWebSearchClient(http)
         val rejected = runCatching { client.search(listOf("example")) }
         assertTrue(rejected.exceptionOrNull() is IllegalStateException)
         assertEquals(0, attempts.get())

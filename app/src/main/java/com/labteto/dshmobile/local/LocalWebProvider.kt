@@ -48,12 +48,10 @@ class LocalWebProvider @Inject constructor(
     private val networkSettings: LocalNetworkSearchSettings,
     private val managedPolicy: LocalManagedExecutionPolicy,
 ) {
-    private val searchClient = LocalWebSearchClient(http, json,
-        { searchUsage.record("deepseek", it) }, ::requirePolicyTarget)
-    private val keylessSearchClient = LocalKeylessWebSearchClient(http,
-        { searchUsage.record("bing", "search") }, ::requirePolicyTarget)
+    private val searchClient = LocalWebSearchClient(http, json) { searchUsage.record("deepseek", it) }
+    private val keylessSearchClient = LocalKeylessWebSearchClient(http) { searchUsage.record("bing", "search") }
     private val targetResolver = com.labteto.dshmobile.local.web.LocalWebTargetResolver(context, http)
-    private val diagnostics = LocalWebDiagnostics(targetResolver)
+    private val diagnostics = LocalWebDiagnostics(targetResolver, ::requirePolicyTarget)
 
     suspend fun fetch(
         input: String,
@@ -295,10 +293,7 @@ class LocalWebProvider @Inject constructor(
     }
 
     /** Human-readable diagnosis used by both the UI and the local Harness tool. */
-    suspend fun diagnose(input: String): String {
-        requirePolicyTarget(normalizeInput(input))
-        return diagnostics.diagnose(input)
-    }
+    suspend fun diagnose(input: String): String = diagnostics.diagnose(input)
 
     suspend fun search(
         apiKey: String,
@@ -414,19 +409,14 @@ class LocalWebProvider @Inject constructor(
         }
     }
 
-    private fun requirePolicyTarget(input: String) {
-        val uri = targetResolver.parseUri(input)
+    private fun requirePolicyTarget(uri: java.net.URI) {
         managedPolicy.current().requireNetworkDestination(uri.scheme.orEmpty(), uri.host.orEmpty())
     }
 
     private fun validateTarget(
         input: String,
-    ): com.labteto.dshmobile.local.web.LocalWebTargetResolver.ValidatedTarget {
-        val normalized = targetResolver.normalizeInput(input)
-        // Check policy before DNS resolution; each redirect is validated afresh.
-        requirePolicyTarget(normalized)
-        return targetResolver.validateTarget(normalized)
-    }
+    ): com.labteto.dshmobile.local.web.LocalWebTargetResolver.ValidatedTarget =
+        targetResolver.validateTarget(input, ::requirePolicyTarget)
     private fun normalizeInput(input: String): String = targetResolver.normalizeInput(input)
     private fun requestRoute(
         target: com.labteto.dshmobile.local.web.LocalWebTargetResolver.ValidatedTarget,

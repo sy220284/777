@@ -101,9 +101,7 @@ class LocalModelGateway @Inject constructor(
             origin.port == -1 && origin.rawUserInfo == null) {
             "余额查询只能使用 DeepSeek 官方接口，不向代理或自定义域名发送凭据"
         }
-        val policy = managedPolicy.current()
-        policy.requireModelProvider(saved.provider, saved.baseUrl)
-        policy.requireNetworkDestination("https", "api.deepseek.com")
+        managedPolicy.current().requireModelProvider(saved.provider, saved.baseUrl)
         val token = credentials.resolve(saved.model, saved.baseUrl, saved).bearerToken
         val request = Request.Builder()
             .url("https://api.deepseek.com/user/balance")
@@ -310,10 +308,11 @@ class LocalModelGateway @Inject constructor(
         baseUrl: String,
         profile: LocalModelProfile?,
     ): LocalResolvedModelRoute {
-        val effectiveProfile = profile
-            ?: currentCoroutineContext()[LocalModelRunContext]?.profile
-            ?: profileForRoute(null, model, baseUrl)
-        managedPolicy.current().requireModelProvider(effectiveProfile.provider, effectiveProfile.baseUrl)
+        val inheritedProfile = currentCoroutineContext()[LocalModelRunContext]?.profile
+        val effectiveProfile = profile ?: inheritedProfile ?: profileForRoute(null, model, baseUrl)
+        if (profile != null || inheritedProfile != null) {
+            managedPolicy.current().requireModelProvider(effectiveProfile.provider, effectiveProfile.baseUrl)
+        }
         val resolved = credentials.resolve(model, baseUrl, effectiveProfile)
         val preset = LocalModelPresets.find(model, baseUrl)
         val protocol = resolveLocalModelProtocol(
