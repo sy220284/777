@@ -35,7 +35,7 @@ class PermissionSetupFlowAndroidTest {
         compose.onNodeWithTag("permissionSetupStatus").assertExists()
         compose.onNodeWithText("跳过这一项").performScrollTo().performClick()
         compose.onNodeWithText("权限设置结果").assertExists()
-        compose.onNodeWithText("完成，进入应用").performScrollTo().performClick()
+        compose.onNodeWithText("完成").performScrollTo().performClick()
         compose.runOnIdle { assertEquals(1, finished) }
     }
 }
