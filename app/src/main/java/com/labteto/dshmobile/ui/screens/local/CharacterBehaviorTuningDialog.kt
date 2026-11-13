@@ -203,7 +203,7 @@ private fun BehaviorSlider(
             Text(
                 displayValue ?: "$valueLabel · $clean",
                 style = DsType.small13Strong.withReadingWeight(),
-                color = colors.lilac,
+                color = colors.personaInk,
             )
         }
         SySlider(

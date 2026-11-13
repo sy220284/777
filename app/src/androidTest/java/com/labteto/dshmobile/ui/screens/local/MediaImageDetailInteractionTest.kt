@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.io.File
@@ -197,4 +199,17 @@ class MediaImageDetailInteractionTest {
         compose.onNodeWithText("分享链接").assertIsDisplayed()
         compose.onNodeWithText("保存").assertDoesNotExist()
     }
+    @Test fun studioTabsPreserveFortyEightDpTouchTargets() {
+        compose.setContent {
+            DshTheme {
+                MediaStudioFlatTabs(
+                    labels = listOf("图片", "视频"), selected = 0,
+                    onSelect = {}, tag = "studio-touch",
+                )
+            }
+        }
+        compose.onNodeWithTag("studio-touch:0").assertHeightIsAtLeast(48.dp)
+        compose.onNodeWithTag("studio-touch:1").assertHeightIsAtLeast(48.dp)
+    }
+
 }

@@ -791,6 +791,14 @@ fun SettingsScreen(
                                 reservedEntryHeight = 80.dp,
                                 onClick = { openPage(SettingsDestination.USAGE) },
                             )
+                            if (localHarness.miniMaxQuotaProfile != null) {
+                                AppSettingsRow(
+                                    icon = SyEntryIcons.Quota,
+                                    title = stringResource(R.string.minimax_quota_title),
+                                    reservedEntryHeight = 80.dp,
+                                    onClick = { openPage(SettingsDestination.MINIMAX_QUOTA) },
+                                )
+                            }
                         }
                     }
 

@@ -279,7 +279,7 @@ internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
                         Icon(
                             FeatherIcons.Check,
                             contentDescription = null,
-                            tint = colors.primary,
+                            tint = colors.linkInk,
                             modifier = Modifier.size(14.dp),
                         )
                     }

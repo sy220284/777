@@ -79,7 +79,7 @@ internal fun ThemePreviewBlock(
                 Icon(
                     FeatherIcons.Check,
                     contentDescription = null,
-                    tint = colors.primary,
+                    tint = colors.linkInk,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)

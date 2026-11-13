@@ -468,7 +468,7 @@ private fun buildInlineContent(
             ) { append(segment.text) }
             is InlineSegment.Link -> {
                 builder.pushStringAnnotation("url", segment.url)
-                builder.withStyle(SpanStyle(color = colors.primary)) { append(segment.text) }
+                builder.withStyle(SpanStyle(color = colors.linkInk)) { append(segment.text) }
                 builder.pop()
             }
         }

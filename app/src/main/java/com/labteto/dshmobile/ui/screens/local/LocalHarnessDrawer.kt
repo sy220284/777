@@ -153,8 +153,6 @@ internal fun LocalModeDrawer(
     onTasks: () -> Unit,
     onTools: () -> Unit,
     onSettings: () -> Unit,
-    onMiniMaxQuota: (() -> Unit)? = null,
-    onUsage: (() -> Unit)? = null,
     globalSearchOpenRequest: Int = 0,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
@@ -470,8 +468,6 @@ internal fun LocalModeDrawer(
                             onTasks = onTasks,
                             onWorkspaceFiles = onWorkspaceFiles,
                             onTools = onTools,
-                            onMiniMaxQuota = onMiniMaxQuota,
-                            onUsage = onUsage,
                         )
                     }
                 }

@@ -125,7 +125,7 @@ jobs:
                 require_true "$RUN_STATIC" "static-gates" "$path"
                 require_true "$RUN_ARCHITECTURE" "architecture-3-gates" "$path"
                 ;;
-              .github/scripts/verify-android16-apk.sh|.github/scripts/run-android-instrumentation.sh|.github/scripts/smoke-test-android-startup.sh|.github/scripts/check-apk-runtime-layout.py|.github/scripts/wait-android-device-artifacts.sh)
+              .github/scripts/verify-android16-apk.sh|.github/scripts/run-android-instrumentation.sh|.github/scripts/prepare-android16-emulator.sh|.github/scripts/smoke-test-android-startup.sh|.github/scripts/check-apk-runtime-layout.py|.github/scripts/wait-android-device-artifacts.sh)
                 require_true "$RUN_STATIC" "static-gates" "$path"
                 require_true "$RUN_ARCHITECTURE" "architecture-3-gates" "$path"
                 require_true "$RUN_UNIT" "unit-tests" "$path"
@@ -207,6 +207,7 @@ jobs:
           python3 .github/scripts/check-v3-refactor-ledger.py
           bash .github/scripts/run-android-instrumentation.sh --self-test
           bash .github/scripts/wait-android-device-artifacts.sh --self-test
+          bash .github/scripts/prepare-android16-emulator.sh --self-test
           python3 tools/runtime/compact-runtime-assets.py --self-test
       - name: Validate release version format
         run: |
@@ -362,12 +363,17 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk .ci/device-apks/app-debug.apk
           cp "$TEST_APK" .ci/device-apks/app-debug-androidTest.apk
           cp app/build/outputs/apk/optimized/app-optimized.apk .ci/device-apks/app-optimized.apk
+          # Fail closed if another workflow tries to reuse an old or cross-PR APK.
+          git rev-parse HEAD > .ci/device-apks/source-sha.txt
+          printf '%s\n' '${{ github.event.pull_request.head.sha || github.sha }}' > .ci/device-apks/head-sha.txt
+          (cd .ci/device-apks && sha256sum app-debug.apk app-debug-androidTest.apk app-optimized.apk > SHA256SUMS.txt)
+          bash .github/scripts/wait-android-device-artifacts.sh --self-test
       - name: Upload shared Android test artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: android-x86_64-test-apks
-          path: .ci/device-apks/*.apk
-          retention-days: 1
+          path: .ci/device-apks/
+          retention-days: 3
           if-no-files-found: error
 
   android-16-instrumented:
@@ -381,6 +387,8 @@ jobs:
       - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools'
+      - name: Preinstall complete Android 16 emulator and image with verified retries
+        run: bash .github/scripts/prepare-android16-emulator.sh
       - name: Enable KVM acceleration
         run: |
           if [ -e /dev/kvm ]; then

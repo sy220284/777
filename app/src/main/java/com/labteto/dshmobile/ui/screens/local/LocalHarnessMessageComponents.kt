@@ -150,17 +150,22 @@ internal fun LocalMessageRow(
     onSelectVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
     streaming: Boolean = false,
+    isLatestAssistant: Boolean = false,
     skillDisplayNames: Map<String, String> = emptyMap(),
     onLocateSourceMemory: ((LocalHarnessMessage) -> Unit)? = null,
     onCreateMedia: ((LocalHarnessMessage, LocalMediaKind) -> Unit)? = null,
     onEditGeneratedImage: ((LocalHarnessMessage) -> Unit)? = null,
     onConvertToWork: ((LocalHarnessMessage) -> Unit)? = null,
     onCreateDocument: ((LocalHarnessMessage) -> Unit)? = null,
+    onFeedback: ((String) -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val pulse = rememberHapticPulse()
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
+    val showFeedback = onFeedback ?: { text: String ->
+        Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+    }
     val copiedMessage = stringResource(R.string.chat_copy_success)
     val regenerateFailedMessage = stringResource(R.string.local_regenerate_reply_failed)
     val variantSelectionFailedMessage = stringResource(R.string.local_select_variant_failed)
@@ -180,7 +185,7 @@ internal fun LocalMessageRow(
                 try {
                     val selected = onSelectVariant(id, index)
                     if (!selected) {
-                        Toast.makeText(context, variantSelectionFailedMessage, Toast.LENGTH_SHORT).show()
+                        showFeedback(variantSelectionFailedMessage)
                     }
                 } finally {
                     selectingVariant = false
@@ -226,7 +231,7 @@ internal fun LocalMessageRow(
                                         icon = FeatherIcons.Copy,
                                         onClick = {
                                             clipboard.setText(AnnotatedString(copyText))
-                                            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                                            showFeedback(copiedMessage)
                                         },
                                     ),
                                 )
@@ -302,6 +307,7 @@ internal fun LocalMessageRow(
 
         else -> {
             var actionsOpen by remember(message.id) { mutableStateOf(false) }
+            var actionsExpanded by remember(message.id) { mutableStateOf(false) }
             val readingLayer = chatMode
             val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
             val copyableContent = if (chatMode) extractLocalCharacterThought(visibleContent, streaming).second else visibleContent
@@ -330,18 +336,8 @@ internal fun LocalMessageRow(
                 }
             }
             val readingModifier = if (readingLayer) {
-                Modifier
-                    .fillMaxWidth(0.91f)
-                    .background(
-                        com.shenyan.designsystem.components.syMaterialColor(SyMaterialTier.L3_CARD),
-                        DsShapes.characterBubble,
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = colors.border,
-                        shape = DsShapes.characterBubble,
-                    )
-                    .padding(horizontal = 16.dp, vertical = 13.dp)
+                // Full-width text restores the continuous reading rhythm in character chat.
+                Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd)
             } else {
                 Modifier.fillMaxWidth()
             }
@@ -351,9 +347,13 @@ internal fun LocalMessageRow(
             ) {
                 Column(
                     readingModifier.testTag("messageActionSurface:${message.id}").combinedClickable(
-                        onClick = {},
+                        onClick = { actionsExpanded = !actionsExpanded },
                         onLongClick = if (secondaryActions.isNotEmpty()) {
-                            { pulse(); actionsOpen = true }
+                            {
+                                pulse()
+                                actionsExpanded = true
+                                actionsOpen = true
+                            }
                         } else null,
                     ),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
@@ -363,7 +363,7 @@ internal fun LocalMessageRow(
                         Text(
                             speaker,
                             style = DsType.small13Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                            color = colors.lilac,
+                            color = colors.personaInk,
                         )
                     }
                 }
@@ -375,7 +375,24 @@ internal fun LocalMessageRow(
                     chatMode = chatMode,
                 )
                 }
-                FlowRow(
+                // Selectable Markdown can consume taps inside its text area. Keep a small,
+                // explicit 48dp action control for older replies so tools remain reachable
+                // without interfering with text selection or embedded links.
+                if (chatMode && !isLatestAssistant && !streaming) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        Box(modifier = Modifier.testTag("messageActionToggle:${message.id}")) {
+                            CompactMessageAction(
+                                icon = FeatherIcons.MoreVertical,
+                                contentDescription = if (actionsExpanded) "收起回复操作" else "展开回复操作",
+                                onClick = { actionsExpanded = !actionsExpanded },
+                            )
+                        }
+                    }
+                }
+                if (!chatMode || (isLatestAssistant && !streaming) || actionsExpanded) FlowRow(
                     modifier = Modifier.fillMaxWidth().testTag("messageActionToolbar:${message.id}"),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -399,7 +416,7 @@ internal fun LocalMessageRow(
                             onClick = {
                                 clipboard.setText(AnnotatedString(copyableContent))
                                 copied = true
-                                Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                                showFeedback(copiedMessage)
                             },
                         )
                     }
@@ -409,12 +426,12 @@ internal fun LocalMessageRow(
                         contentDescription = stringResource(R.string.local_regenerate_reply),
                         onClick = {
                             if (!onRegenerate(message.id)) {
-                                Toast.makeText(context, regenerateFailedMessage, Toast.LENGTH_SHORT).show()
+                                showFeedback(regenerateFailedMessage)
                             }
                         },
                     )
                     // 创作是独立的明确入口；正文长按继续保留原生选词能力。
-                    onCreateMedia?.takeIf { !streaming && copyableContent.isNotBlank() }?.let { create ->
+                    onCreateMedia?.takeIf { (!chatMode || actionsExpanded) && !streaming && copyableContent.isNotBlank() }?.let { create ->
                         SyButton(
                             text = stringResource(R.string.fluid_message_create),
                             icon = FeatherIcons.Sparkles,
@@ -425,7 +442,7 @@ internal fun LocalMessageRow(
                         )
                     }
                     // Shared anchored menu for both long press and the visible overflow.
-                    if (secondaryActions.isNotEmpty()) {
+                    if (secondaryActions.isNotEmpty() && (!chatMode || actionsExpanded)) {
                         Box {
                             CompactMessageAction(
                                 icon = FeatherIcons.MoreVertical,
