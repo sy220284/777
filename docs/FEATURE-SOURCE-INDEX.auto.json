@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1930,
-  "production_source_count": 1128,
-  "test_code_file_count": 658,
+  "repository_code_file_count": 1932,
+  "production_source_count": 1129,
+  "test_code_file_count": 659,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -2412,7 +2412,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
-      "sha256": "748d03fd208377f1"
+      "sha256": "aa91818e550b53f0"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSandboxBoundary.kt",
@@ -4411,6 +4411,10 @@
       "sha256": "3617156979256cea"
     },
     {
+      "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/CodeModePlugin.kt",
+      "sha256": "7d2879a54b552dbe"
+    },
+    {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/JsonSchemaValidator.kt",
       "sha256": "df4ea6ebd4bb11b1"
     },
@@ -4576,14 +4580,15 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "6737ca3fb021",
+  "source_snapshot": "30239c867685",
   "observed_delta": {
-    "baseline": "abcb60940039",
-    "added_production_files": [],
+    "baseline": "6737ca3fb021",
+    "added_production_files": [
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/CodeModePlugin.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalUiSessionIdentityProjection.kt",
-      "app/src/main/java/com/labteto/dshmobile/uicontract/ConversationUiPort.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
