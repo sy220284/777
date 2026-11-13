@@ -2,6 +2,7 @@ package com.labteto.dshmobile.harness.tools
 
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -72,6 +73,8 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
     }
 
     private suspend fun executePlan(original: ToolContext, script: JsonObject): ToolResult {
+        if (kotlinx.coroutines.currentCoroutineContext()[CodeModeStepScope] != null)
+            return rejection("CODE_MODE_RECURSION_DENIED", "编排子工具不能再次发起 Code Mode")
         if (script.toString().length > MAX_SCRIPT_CHARS)
             return rejection("CODE_MODE_BAD_PLAN", "编排脚本超过长度限制")
         val steps = (script["steps"] as? JsonArray)?.toList()
@@ -80,6 +83,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             return rejection("CODE_MODE_BAD_PLAN", "编排步骤数量需为 1—$MAX_STEPS")
 
         // Validate the complete script before running the first side-effecting step.
+        val sampled = kotlinx.coroutines.currentCoroutineContext()[ToolBindingSnapshot]
         val validated = mutableListOf<Triple<String, HarnessTool, JsonObject>>()
         for ((index, element) in steps.withIndex()) {
             val step = element as? JsonObject
@@ -92,6 +96,8 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 ?: return rejection("CODE_MODE_TOOL_MISSING", "步骤 ${index + 1} 的工具不可用：$name")
             if (handler.exposure != ToolExposure.CORE)
                 return rejection("CODE_MODE_UNAUTHORIZED_TOOL", "步骤 ${index + 1} 未获工具发现授权：$name")
+            if (sampled != null && sampled.codeModeChild(name) !== handler)
+                return rejection("CODE_MODE_UNSAMPLED_TOOL", "步骤 ${index + 1} 的工具未在本轮采样时锁定：$name")
             val arguments = step["args"] as? JsonObject
                 ?: return rejection("CODE_MODE_BAD_PLAN", "步骤 ${index + 1} 缺少对象类型的参数")
             validateReferencePlan(arguments, index + 1)?.let { problem ->
@@ -123,7 +129,11 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             val child = original.copy(attributes = attrs, expectedRegistration = handler)
             val outcome = try {
                 withTimeoutOrNull(STEP_TIMEOUT_MILLIS) {
-                    liveTools.executeTracked(name, resolvedArguments, resolvedArguments.toString(), child)
+                    if (sampled == null) {
+                        liveTools.executeTracked(name, resolvedArguments, resolvedArguments.toString(), child)
+                    } else withContext(CodeModeStepScope(sampled, handler)) {
+                        liveTools.executeTracked(name, resolvedArguments, resolvedArguments.toString(), child)
+                    }
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled

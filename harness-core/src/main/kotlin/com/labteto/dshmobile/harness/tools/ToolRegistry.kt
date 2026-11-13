@@ -106,7 +106,12 @@ class ToolRegistry private constructor(
             val function = (schema as? JsonObject)?.get("function") as? JsonObject
             (function?.get("name") as? JsonPrimitive)?.content
         }.toSet()
-        return ToolBindingSnapshot(registered.filterKeys { it in names })
+        val codeModeChildren = if ("code_mode_run" in names && registered["code_mode_run"] != null) {
+            registered.filter { (name, tool) ->
+                name != "code_mode_run" && tool.exposure == ToolExposure.CORE
+            }
+        } else emptyMap()
+        return ToolBindingSnapshot(registered.filterKeys { it in names }, codeModeChildren)
     }
     internal fun schemas(): JsonArray = JsonArray(
         tools.snapshot().values
@@ -179,7 +184,13 @@ class ToolRegistry private constructor(
             return registrationChanged(name)
         }
         val sampled = currentCoroutineContext()[ToolBindingSnapshot]
-        if (sampled != null && sampled.registration(name) !== tool) return registrationChanged(name)
+        if (sampled != null && sampled.registration(name) !== tool) {
+            val child = currentCoroutineContext()[CodeModeStepScope]
+            if (child == null || child.snapshot !== sampled ||
+                child.registration !== tool || sampled.codeModeChild(name) !== tool) {
+                return registrationChanged(name)
+            }
+        }
         validateToolInput(tool, input)?.let { problem ->
             return ToolInvocationResult(
                 result = ToolResult(
