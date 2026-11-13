@@ -184,7 +184,7 @@ internal fun PermissionSetupFlow(
                                 style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
                         }
                         if (feature == PermissionSetupFeature.SCREEN_CONTROL && feature in visited &&
-                            !state.accessibilityGranted) {
+                            !state.accessibilityGranted && Build.VERSION.SDK_INT >= 33) {
                             Spacer(Modifier.height(8.dp))
                             Text(stringResource(R.string.permission_setup_restricted_hint),
                                 style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
@@ -201,6 +201,22 @@ internal fun PermissionSetupFlow(
                             onClick = { open(feature) },
                             modifier = Modifier.fillMaxWidth().testTag("permissionSetupOpen"),
                         )
+                        if (feature == PermissionSetupFeature.SCREEN_CONTROL && feature in visited &&
+                            !state.accessibilityGranted && Build.VERSION.SDK_INT >= 33) {
+                            SyButton(
+                                text = stringResource(R.string.permission_setup_app_info),
+                                onClick = {
+                                    openError = null
+                                    try { controller.openAppDetails() }
+                                    catch (failure: RuntimeException) {
+                                        openError = failure.localizedMessage
+                                            ?: context.getString(R.string.permission_setup_open_failed)
+                                    }
+                                },
+                                variant = SyButtonVariant.Outline,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                         SyButton(text = stringResource(R.string.permission_setup_refresh),
                             onClick = controller::refresh, variant = SyButtonVariant.Outline,
                             modifier = Modifier.fillMaxWidth())
