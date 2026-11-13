@@ -81,7 +81,8 @@ class LocalWorkspaceShareSelectionUiTest {
                     sessionId = "local-git-review",
                     workspacePath = File(context.filesDir, "local-harness/workspace").absolutePath,
                     loadWorkspace = { emptyList() },
-                    compareLocalGit = { directory ->
+                    compareLocalGit = { directory, includeUntracked ->
+                        assertEquals(false, includeUntracked)
                         scanned += directory
                         com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi(
                             "worktree/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -116,6 +117,90 @@ class LocalWorkspaceShareSelectionUiTest {
             assertEquals(listOf("."), scanned)
             assertEquals(listOf("local-git-review:.:worktree/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), recovered)
         }
+    }
+
+    @Test
+    fun securityReviewApprovalRequiresExplicitConfirmation() {
+        var approvals = 0
+        compose.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(
+                    mode = LocalFilesMode.WORKSPACE,
+                    sessionId = "security-review",
+                    workspacePath = File(context.filesDir, "local-harness/workspace").absolutePath,
+                    loadWorkspace = { emptyList() },
+                    compareLocalGit = { _, _ ->
+                        com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi(
+                            "worktree/head-a", "1 file changed", "@@ -1 +1 @@\\n+secure = true",
+                            truncated = false,
+                        )
+                    },
+                    findIndependentSecurityReview = { _, _, diff ->
+                        com.labteto.dshmobile.local.work.LocalSecurityReview(
+                            "security-1", diff.trackingRef, "digest", "审查安全结论",
+                            "allow", 9L,
+                        )
+                    },
+                    approveIndependentSecurityReview = { _, _, _, _ ->
+                        approvals++
+                        true
+                    },
+                    loadConversation = { error("不应查询会话") },
+                    loadPreview = { error("不应预览") },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithText("检查本地修改").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("审查安全结论").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("人工批准当前变更").performClick()
+        compose.runOnIdle { assertEquals(0, approvals) }
+        compose.onNodeWithText("确认安全放行").assertExists()
+        compose.onNodeWithText("批准当前变更").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("当前版本已人工批准；修改代码后需重新审核。")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.runOnIdle { assertEquals(1, approvals) }
+    }
+
+    @Test
+    fun blockingSecurityVerdictCannotBeApprovedFromUi() {
+        compose.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(
+                    mode = LocalFilesMode.WORKSPACE,
+                    sessionId = "security-review-block",
+                    workspacePath = File(context.filesDir, "local-harness/workspace").absolutePath,
+                    loadWorkspace = { emptyList() },
+                    compareLocalGit = { _, _ ->
+                        com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi(
+                            "worktree/head-b", "1 file changed", "@@ -1 +1 @@\\n+unsafe = true",
+                            truncated = false,
+                        )
+                    },
+                    findIndependentSecurityReview = { _, _, diff ->
+                        com.labteto.dshmobile.local.work.LocalSecurityReview(
+                            "security-blocked", diff.trackingRef, "digest",
+                            "发现高危操作", "block", 10L,
+                        )
+                    },
+                    approveIndependentSecurityReview = { _, _, _, _ ->
+                        error("风险裁决禁止放行")
+                    },
+                    loadConversation = { error("不应查询会话") },
+                    loadPreview = { error("不应预览") },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithText("检查本地修改").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("发现高危操作").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("人工批准当前变更").assertDoesNotExist()
     }
 
     @Test
