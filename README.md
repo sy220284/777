@@ -18,7 +18,7 @@
 
 <p align="center">
   <a href="https://github.com/sy220284/777/releases/latest"><strong>下载 Android APK</strong></a>
-  · <a href="docs/FEATURE-TREE.zh-CN.md">查看完整功能树</a>
+  · <a href="docs/FEATURE-TREE.zh-CN.md">历史功能树快照（已停止维护）</a>
   · <a href="docs/README.md">阅读项目文档</a>
   · <a href="CHANGELOG.md">更新记录</a>
 </p>
@@ -44,7 +44,7 @@
 | **在对话中创作** | 在符合模型和账户条件时，使用图片、视频、配音、语音转写等多模态能力 |
 | **掌握模型和消耗** | 多模型配置、模型能力路由、聊天/工作模式预算、Token 用量与历史记录 |
 
-这里列的是**当前主分支登记的能力范围**，不代表每项功能在任何手机、模型和权限组合下都可用。具体入口与代码位置见[功能树](docs/FEATURE-TREE.zh-CN.md)，已知测试范围与限制见[验证说明](docs/VALIDATION.md)。
+这里列的是**当前主分支登记的能力范围**，不代表每项功能在任何手机、模型和权限组合下都可用。现行功能与代码入口以实际生产源码及测试为准；[历史功能树快照](docs/FEATURE-TREE.zh-CN.md)已停止维护，实际验收参考[验证说明](docs/VALIDATION.md)。
 
 ### 聊天模式：人物与故事持续下去
 
@@ -170,7 +170,7 @@ CI 根据改动风险选择对应门禁：文档检查、静态与架构规则�
 
 ## 文档导航
 
-- [功能树与代码定位](docs/FEATURE-TREE.zh-CN.md) · [功能审计](docs/FUNCTION-AUDIT.zh-CN.md)
+- [历史功能树快照（已停更）](docs/FEATURE-TREE.zh-CN.md) · [功能审计](docs/FUNCTION-AUDIT.zh-CN.md)
 - [系统架构](docs/ARCHITECTURE.md) · [原生 Harness 当前状态](docs/ANDROID-HARNESS-STATUS.zh-CN.md)
 - [UI / UX 规范](docs/UI-UX.zh-CN.md) · [开发工具链](docs/DEVELOPMENT.md)
 - [安全说明](docs/SECURITY.md) · [兼容性](docs/COMPATIBILITY.md) · [验证规则](docs/VALIDATION.md)

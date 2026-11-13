@@ -249,8 +249,7 @@ def classify(
             audit_index = True
             continue
 
-        if path in {"docs/FEATURE-TREE.zh-CN.md", "docs/FEATURE-TREE.zh-CN.html",
-                    "docs/ACCEPTANCE-MATRIX.json", "docs/FUNCTION-AUDIT.zh-CN.md"}:
+        if path == "docs/FUNCTION-AUDIT.zh-CN.md":
             audit_index = True
             continue
 
@@ -456,8 +455,6 @@ def self_test() -> None:
            release=True)
     verify(["app/src/main/assets/prompts/system.md"], main=True, full=True,
            release=True)
-    verify(["docs/FEATURE-TREE.zh-CN.md"], required=("static",),
-           excluded=("unit", "build", "device"), release=False)
     verify(["docs/UI-SCENE-MATRIX.json"], required=("static",),
            excluded=("unit", "build", "device"), release=False)
     verify(["docs/design/ui3/R4-CODE-TASKS.json"], required=("static",),
@@ -481,8 +478,6 @@ def self_test() -> None:
            required=("unit",), excluded=("build", "device"), release=False)
     verify(["ui-pack-v6/src/main/kotlin/com/shenyan/designsystem/components/ShenyanMotion.kt"],
            main=True, full=True, release=True)
-    verify(["docs/ACCEPTANCE-MATRIX.json"], required=("static",),
-           excluded=("unit", "build"), release=False)
     verify(["docs/agent-engine4/PR705-KOTLIN-REBUILD-TASKS.json"],
            required=("static",), excluded=("unit", "build"), release=False)
     verify(["app/src/androidTest/java/com/labteto/dshmobile/local/ExampleTest.kt"],

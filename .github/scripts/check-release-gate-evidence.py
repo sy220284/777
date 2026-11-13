@@ -78,9 +78,9 @@ def release_equivalent(paths: list[str]) -> bool:
 
 for paths in (
     ["README.md", "docs/README.md"],
-    ["docs/ACCEPTANCE-MATRIX.json", "docs/ACCEPTANCE-PLAYBOOK.zh-CN.md"],
-    ["app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt",
-     "docs/ACCEPTANCE-MATRIX.json"],
+    ["docs/ACCEPTANCE-PLAYBOOK.zh-CN.md"],
+    ["app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt"],
+
     [".github/workflows/release.yml"],
     ["tools/dev/install.sh"],
 ):
@@ -91,7 +91,7 @@ for paths in (
     [".github/release-version"],
     ["app/src/main/AndroidManifest.xml"],
     ["app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalComposer.kt"],
-    ["docs/ACCEPTANCE-MATRIX.json", "app/src/main/java/com/labteto/dshmobile/MainActivity.kt"],
+    ["docs/ACCEPTANCE-PLAYBOOK.zh-CN.md", "app/src/main/java/com/labteto/dshmobile/MainActivity.kt"],
     ["tools/dev/toolchain-versions.env"],
     ["unrecognized/binary-impacting-source"],
 ):
