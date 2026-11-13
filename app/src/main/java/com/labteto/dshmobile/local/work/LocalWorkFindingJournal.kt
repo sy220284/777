@@ -23,7 +23,13 @@ internal object LocalWorkFindingJournal {
     private fun JsonObject.text(key: String): String =
         (get(key) as? JsonPrimitive)?.contentOrNull.orEmpty()
 
-    fun execute(log: LocalSessionEventLog, goalId: String, args: JsonObject): String =
+    fun execute(
+        log: LocalSessionEventLog,
+        goalId: String,
+        args: JsonObject,
+        projectId: String = "",
+        sourceMessageId: String? = null,
+    ): String =
         log.withWriterLease {
             when (val action = args.text("action")) {
                 "list" -> list(log, goalId)
@@ -62,6 +68,8 @@ internal object LocalWorkFindingJournal {
                     log.append(EVENT, buildJsonObject {
                         put("finding_id", findingId)
                         put("goal_id", goalId)
+                        put("project_id", projectId)
+                        put("source_message_id", sourceMessageId.orEmpty())
                         put("action", action)
                         put("summary", summary)
                         put("status", status)
