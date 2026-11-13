@@ -11,6 +11,8 @@ import com.labteto.dshmobile.local.model.LocalModelRuntime
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.MiniMaxProviderQuotaClient
+import com.labteto.dshmobile.local.model.DeepSeekProviderBalance
+import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
 import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
@@ -33,6 +35,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     private val diagnostics: LocalDiagnosticsPort,
     private val chatGpt: ChatGptSettingsController,
     private val modelRuntime: LocalModelRuntime,
+    private val modelGateway: LocalModelGateway,
     private val miniMaxQuota: MiniMaxProviderQuotaClient,
     private val modelSettings: LocalModelSettingsCoordinator,
     private val settingsCoordinator: LocalHarnessSettingsCoordinator,
@@ -69,6 +72,8 @@ class LocalSettingsRuntime @Inject internal constructor(
     override suspend fun removeChatGptAccount(id: String): String? = chatGpt.remove(id)
     override fun configureModel(apiKey: String, model: String, baseUrl: String) = modelRuntime.configure(apiKey, model, baseUrl)
     override suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol?, profileId: String?, contextWindowTokensOverride: Int?, credentialSourceProfileId: String?) = modelRuntime.saveConfiguration(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride, credentialSourceProfileId)
+    override suspend fun queryDeepSeekBalance(profile: LocalModelProfile): DeepSeekProviderBalance =
+        modelGateway.queryDeepSeekBalance(profile)
     override suspend fun queryMiniMaxQuota(profile: LocalModelProfile): MiniMaxProviderUsage = miniMaxQuota.query(profile)
     override fun selectModel(id: String) = modelRuntime.selectModel(id)
     override fun removeModel(id: String) = modelRuntime.removeModel(id)
