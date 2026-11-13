@@ -136,7 +136,7 @@ internal object LocalWorkInvestigationRuntime {
             }
         }
         val findings = lastFindings.values.filter { it.text("status") != "rejected" }.takeLast(4)
-        val sources = recentSources.values.takeLast(5)
+        val sources = recentSources.values.toList().takeLast(5)
         if (findings.isEmpty() && sources.isEmpty()) return ""
         return buildString {
             appendLine("【当前调查事实：以下来源仅证明已执行的读取范围，不能推断整个文件或全部数据已检查】")
