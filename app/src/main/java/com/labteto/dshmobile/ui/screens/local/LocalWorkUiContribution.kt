@@ -43,6 +43,7 @@ internal fun localWorkFeatureUiContribution(
             observeChanges = actions.observeWorkspaceFiles,
             remoteGitBranches = actions.remoteGitBranches,
             compareRemoteGit = actions.compareRemoteGit,
+            findIndependentCodeReview = actions.findIndependentCodeReview,
             runIndependentCodeReview = actions.runIndependentCodeReview,
             acceptIndependentCodeReview = actions.acceptIndependentCodeReview,
             loadConversation = actions.conversationFiles,
