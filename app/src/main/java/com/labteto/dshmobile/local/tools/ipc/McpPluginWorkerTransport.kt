@@ -184,7 +184,7 @@ internal class McpPluginWorkerTransport(
 
     private suspend fun rpc(kind: Int, payload: Bundle): Bundle {
         if (closed.get()) throw IOException("MCP worker closed; outcome unknown")
-        requireMcpWorkerNetworkAdmission(managedPolicy.current(), kind, endpoint)
+        requireMcpWorkerNetworkAdmission(managedPolicy.current(), this.kind, endpoint)
         if (pending.size >= McpWorkerWire.MAX_PENDING_CALLS)
             throw IOException("MCP IPC concurrent-call limit exceeded")
         val seq = ids.getAndIncrement()
