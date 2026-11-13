@@ -3700,7 +3700,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupFlow.kt",
-      "sha256": "0b47f5779a18ef3b"
+      "sha256": "955d5df07237d0a6"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupModel.kt",
@@ -4544,12 +4544,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "2a604cb1ed2c",
+  "source_snapshot": "8d134bf71eb4",
   "observed_delta": {
-    "baseline": "51447ab5cab8",
+    "baseline": "2a604cb1ed2c",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupFlow.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
