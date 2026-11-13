@@ -61,6 +61,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -191,6 +193,7 @@ fun SettingsScreen(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val toast = rememberSyToast()
     val context = LocalContext.current
+    var showPermissionSetup by rememberSaveable { mutableStateOf(false) }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { viewModel.refreshDeviceCapabilities() }
@@ -404,6 +407,20 @@ fun SettingsScreen(
         SettingsDestination.DIAGNOSTICS -> stringResource(R.string.settings_runtime_diagnostics)
     }
 
+    if (showPermissionSetup) {
+        Dialog(
+            onDismissRequest = { showPermissionSetup = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            PermissionSetupFlow(
+                onFinished = {
+                    showPermissionSetup = false
+                    viewModel.refreshDeviceCapabilities()
+                },
+                onBack = { showPermissionSetup = false },
+            )
+        }
+    }
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Box {
             Column(
@@ -934,7 +951,10 @@ fun SettingsScreen(
                                 color = colors.textSecondary,
                             )
                         }
-                        DeviceCapabilitiesCard(deviceCapabilities, viewModel, requestPostingPermission)
+                        DeviceCapabilitiesCard(
+                            deviceCapabilities, viewModel, requestPostingPermission,
+                            onOpenPermissionGuide = { showPermissionSetup = true },
+                        )
                     }
 
                     SettingsDestination.NOTIFICATIONS -> {
