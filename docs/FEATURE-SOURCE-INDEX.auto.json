@@ -1928,7 +1928,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
-      "sha256": "2ac523db33f03fb2"
+      "sha256": "c673d8f01b2a39c1"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTranscriptHistoryLoader.kt",
@@ -3812,7 +3812,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
-      "sha256": "b6383ebdaedf9b08"
+      "sha256": "5c1c6de1bb4747a0"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/shenyan/ShenyanTheme.kt",
@@ -4580,13 +4580,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "ecb95361af4c",
+  "source_snapshot": "8b5fc932b1f7",
   "observed_delta": {
-    "baseline": "7332b980a0a1",
+    "baseline": "ecb95361af4c",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubSkillImporter.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
