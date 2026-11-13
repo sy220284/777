@@ -407,15 +407,13 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                     kernel = running.kernel.copy(queuedInputCount = update.pendingCount),
                 )
             }
-            runtimeStateStore.projection.update { visible ->
-                if (visible.sessionId != state.sessionId || visible.usageMode != LocalUsageMode.WORK)
-                    visible
-                else visible.copy(
-                    messages = update.hotMessages(),
-                    transcriptIndex = update.transcriptIndex,
-                    kernel = visible.kernel.copy(queuedInputCount = update.pendingCount),
-                )
-            }
+            runtimeStateStore.projection.projectWorkQueuedUserTimeline(
+                sessionId = state.sessionId,
+                messages = update.hotMessages(),
+                index = update.transcriptIndex,
+                pendingCount = update.pendingCount,
+                clearError = false,
+            )
             if (!enqueueSnapshot(state.sessionId)) {
                 runtimeStateStore.projection.publishError(
                     "排队消息已持久移除，快照保存排队失败；重新打开会话可恢复",
@@ -468,16 +466,13 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                             kernel = running.kernel.copy(queuedInputCount = edited.pendingCount),
                         )
                     }
-                    runtimeStateStore.projection.update { visible ->
-                        if (visible.sessionId != state.sessionId || visible.usageMode != LocalUsageMode.WORK)
-                            visible
-                        else visible.copy(
-                            messages = edited.hotMessages(),
-                            transcriptIndex = edited.transcriptIndex,
-                            kernel = visible.kernel.copy(queuedInputCount = edited.pendingCount),
-                            error = null,
-                        )
-                    }
+                    runtimeStateStore.projection.projectWorkQueuedUserTimeline(
+                        sessionId = state.sessionId,
+                        messages = edited.hotMessages(),
+                        index = edited.transcriptIndex,
+                        pendingCount = edited.pendingCount,
+                        clearError = true,
+                    )
                     if (!enqueueSnapshot(state.sessionId)) {
                         runtimeStateStore.projection.publishError(
                             "排队消息已持久保存，当前快照保存失败；重新打开会话可从事件记录恢复",
