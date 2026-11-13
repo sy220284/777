@@ -136,6 +136,8 @@ class McpToolBridgePlugin(
     },
     private val credentialAwareHttpTransportFactory: ((String, String, String?) -> McpTransport)? = null,
     private val httpCredentialProvider: suspend (String, String) -> String? = { _, _ -> null },
+    /** Enforced by Android policy owner, evaluated again for every remote tool invocation. */
+    private val verifyHttpEndpoint: (String) -> Unit = {},
     private val authorizedTransportFactory: (String, String) -> McpTransport = { endpoint, bearer ->
         val uri = URI(endpoint)
         val scheme = uri.scheme?.lowercase()
@@ -175,6 +177,7 @@ class McpToolBridgePlugin(
         val transport: String,
         val displayTarget: String,
         val clientFactory: suspend () -> McpClient,
+        val beforeCall: () -> Unit,
         val client: McpClient,
         val toolNames: List<String>,
         val definitionBytes: Int,
@@ -647,13 +650,16 @@ class McpToolBridgePlugin(
 
     private suspend fun connectHttp(context: HarnessContext, rawId: String, rawEndpoint: String): String {
         val endpoint = validateEndpoint(rawEndpoint)
+        verifyHttpEndpoint(endpoint)
         val serverId = validateServerId(rawId)
         return connect(
             context = context,
             rawId = serverId,
             transport = "http",
             displayTarget = displayEndpoint(endpoint),
+            beforeCall = { verifyHttpEndpoint(endpoint) },
             clientFactory = {
+                verifyHttpEndpoint(endpoint)
                 val bearer = httpCredentialProvider(serverId, endpoint)
                 McpClient(credentialAwareHttpTransportFactory?.invoke(serverId, endpoint, bearer)
                     ?: if (bearer == null) transportFactory(endpoint)
@@ -686,6 +692,7 @@ class McpToolBridgePlugin(
         transport: String,
         displayTarget: String,
         clientFactory: suspend () -> McpClient,
+        beforeCall: () -> Unit = {},
         fromReconnect: Boolean = false,
     ): String {
         val serverId = validateServerId(rawId)
@@ -734,6 +741,7 @@ class McpToolBridgePlugin(
                 transport = transport,
                 displayTarget = displayTarget,
                 clientFactory = clientFactory,
+                beforeCall = beforeCall,
                 client = client,
                 toolNames = names,
                 definitionBytes = definitionBytes,
@@ -801,6 +809,7 @@ class McpToolBridgePlugin(
                                     } else {
                                         var failedCleanup: ServerBinding.DisconnectTicket? = null
                                         try {
+                                            binding.beforeCall()
                                             val result = when (resourceMethods[definition.name]) {
                                                 "resources/list" -> client.listResources((input["cursor"] as? JsonPrimitive)?.contentOrNull)
                                                 "resources/templates/list" -> client.listResourceTemplates((input["cursor"] as? JsonPrimitive)?.contentOrNull)
@@ -915,7 +924,7 @@ class McpToolBridgePlugin(
             // Cancel and drain the old binding before reconnecting; never replay tools/call.
             disconnect(context, serverId, fromReconnect = true)
             return connect(context, serverId, existing.transport, existing.displayTarget,
-                existing.clientFactory, fromReconnect = true)
+                existing.clientFactory, beforeCall = existing.beforeCall, fromReconnect = true)
         } finally {
             withContext(NonCancellable) { mutex.withLock { if (reconnectingIds.remove(serverId)) signalLifecycleChangedLocked() } }
         }
