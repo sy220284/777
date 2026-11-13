@@ -40,7 +40,7 @@ internal suspend fun mcpCallWithInputRequired(
     onElicitation: suspend (McpElicitationRequest) -> McpElicitationReply,
 ): JsonObject {
     var next = buildJsonObject { put("name", name); put("arguments", arguments) }
-    repeat(8) {
+    while (true) {
         currentCoroutineContext().ensureActive()
         val result = request(next)
         val kind = result["resultType"]?.jsonPrimitive?.contentOrNull ?: "complete"
@@ -57,7 +57,6 @@ internal suspend fun mcpCallWithInputRequired(
         require(inputs.isNotEmpty() || opaqueState != null) {
             "MCP 追问缺少输入请求及延续状态"
         }
-        require(inputs.size <= 12) { "MCP 同一轮追问字段过多" }
         val repliesByKey = linkedMapOf<String, JsonObject>()
         // The server can issue independent prompts in one round. There is exactly
         // one user interaction at a time through the existing Work owner.
@@ -106,7 +105,6 @@ internal suspend fun mcpCallWithInputRequired(
             opaqueState?.let { put("requestState", it) }
         }
     }
-    error("MCP 追问次数超过协议安全上限，请重新发起工具调用")
 }
 
 /** Restricted MCP enum values; labels are UI-only and never sent to the server. */
@@ -130,7 +128,6 @@ private fun validateMcpElicitationSchema(schema: JsonObject) {
     }
     val properties = schema["properties"] as? JsonObject
         ?: error("MCP 表单缺少字段定义")
-    require(properties.size <= 12) { "MCP 表单字段过多" }
     val required = (schema["required"] as? JsonArray)?.map { it.jsonPrimitive.content }?.toSet()
         ?: emptySet()
     require(required.all { it in properties }) { "MCP 必填字段与表单不一致" }
