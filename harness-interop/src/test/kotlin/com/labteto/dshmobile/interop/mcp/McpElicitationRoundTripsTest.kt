@@ -184,6 +184,21 @@ class McpElicitationRoundTripsTest {
         assertEquals(1, calls)
     }
 
+    @Test fun cancellationStopsFurtherServerPromptsWithoutReopeningTheUI() = runTest {
+        var calls = 0
+        var prompts = 0
+        val stopped = runCatching {
+            mcpCallWithInputRequired(
+                request = { calls++; required() },
+                name = "write", arguments = input,
+                onElicitation = { prompts++; McpElicitationReply("cancel") },
+            )
+        }
+        assertTrue(stopped.isFailure)
+        assertEquals(2, calls)
+        assertEquals(1, prompts)
+    }
+
     @Test fun moreThanEightLegitimateElicitationRoundsCanFinish() = runTest {
         var calls = 0
         var prompts = 0
