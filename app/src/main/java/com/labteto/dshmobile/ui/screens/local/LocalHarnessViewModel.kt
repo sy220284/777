@@ -60,6 +60,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val networkSearchSettings: LocalNetworkSearchSettings,
     private val sectionStore: LocalSessionSectionUiFacade,
     private val reviewFacade: com.labteto.dshmobile.local.presentation.LocalIndependentCodeReviewUiFacade,
+    private val workProjectUi: com.labteto.dshmobile.local.presentation.LocalWorkProjectsUiFacade,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -168,6 +169,19 @@ class LocalHarnessViewModel @Inject constructor(
     val pinnedSessionIds = conversationUiState.pinnedSessionIds
     val sessionTitleOverrides = conversationUiState.sessionTitleOverrides
     val sessionSections = sectionStore.snapshots
+    internal val projectActions = LocalWorkProjectsUiActions(
+        snapshots = workProjectUi.snapshots,
+        create = { name, root -> workProjectUi.create(name, root); Unit },
+        importExisting = { name, root, sessionId -> workProjectUi.importExisting(name, root, sessionId); Unit },
+        rename = workProjectUi::rename,
+        changeRoot = workProjectUi::changeRoot,
+        move = workProjectUi::move,
+        delete = workProjectUi::delete,
+        assignCurrentSession = { sessionId, projectId ->
+            if (state.value.usageMode != LocalUsageMode.WORK || state.value.sessionId != sessionId) false
+            else workProjectUi.assign(setOf(sessionId), projectId)
+        },
+    )
     suspend fun saveCurrentToGallery(
         notes: String,
         existingId: String? = null,
@@ -317,7 +331,10 @@ class LocalHarnessViewModel @Inject constructor(
     }
     suspend fun deleteSessions(ids: Set<String>): Int {
         val deleted = conversationUiState.deleteSessions(ids, runtime.session::deleteSessions)
-        if (deleted == ids.size) sectionStore.forgetDeletedSessions(ids)
+        if (deleted == ids.size) {
+            sectionStore.forgetDeletedSessions(ids)
+            workProjectUi.forgetDeletedSessions(ids)
+        }
         return deleted
     }
     suspend fun importAttachment(uri: Uri): LocalImportedAttachment = runtime.session.importAttachment(uri)

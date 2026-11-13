@@ -559,6 +559,7 @@ fun LocalHarnessScreen(
     )
     val workActions = LocalWorkFeatureUiActions(
         workState = viewModel.workState,
+        projectActions = viewModel.projectActions,
         queuedUserPort = viewModel.queuedUserPort,
         workspaceFiles = viewModel::workspaceFiles,
         workspaceDirectory = viewModel::workspaceDirectory,

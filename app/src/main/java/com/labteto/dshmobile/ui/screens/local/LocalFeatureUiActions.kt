@@ -102,6 +102,7 @@ internal data class LocalWorkUiActionResult(
 
 internal data class LocalWorkFeatureUiActions(
     val workState: StateFlow<LocalWorkUiState>,
+    val projectActions: LocalWorkProjectsUiActions? = null,
     val queuedUserPort: com.labteto.dshmobile.uicontract.UiQueuedUserPort? = null,
     val workspaceFiles: suspend () -> List<LocalWorkspaceFile>,
     val workspaceDirectory: suspend (String) -> List<LocalWorkspaceDirectoryEntry> = { emptyList() },

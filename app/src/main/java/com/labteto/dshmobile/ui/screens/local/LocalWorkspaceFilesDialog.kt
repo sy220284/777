@@ -117,6 +117,7 @@ internal fun LocalWorkspaceFilesDialog(
         else LocalWorkspaceSearchPage(emptyList(), null)
     },
     stopSearch: suspend (String) -> Boolean = { false },
+    projectActions: LocalWorkProjectsUiActions? = null,
     observeChanges: (List<String>) -> kotlinx.coroutines.flow.Flow<LocalWorkspaceFileChange> =
         { kotlinx.coroutines.flow.emptyFlow() },
     remoteGitBranches: (suspend (String) -> List<String>)? = null,
@@ -174,6 +175,7 @@ internal fun LocalWorkspaceFilesDialog(
     var shareError by remember(mode, sessionId, section, directory) { mutableStateOf<String?>(null) }
     var gitSheetOpen by remember(mode, sessionId) { mutableStateOf(false) }
     var gitIsLocal by remember(mode, sessionId) { mutableStateOf(false) }
+    var projectsSheetOpen by remember(mode, sessionId) { mutableStateOf(false) }
     var gitIncludeUntracked by remember(mode, sessionId) { mutableStateOf(false) }
     var gitLoading by remember(mode, sessionId) { mutableStateOf(false) }
     var gitError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
@@ -676,6 +678,21 @@ internal fun LocalWorkspaceFilesDialog(
                     )
                 }
 
+                if (mode == LocalFilesMode.WORKSPACE && preview == null && !selecting && projectActions != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        SyButton(
+                            text = "管理项目",
+                            onClick = { projectsSheetOpen = true },
+                            enabled = !loading,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                            modifier = Modifier.testTag("work_projects_open"),
+                        )
+                    }
+                }
                 if (mode == LocalFilesMode.WORKSPACE && preview == null && !selecting &&
                     (compareLocalGit != null || (remoteGitBranches != null && compareRemoteGit != null))) {
                     Row(
@@ -884,6 +901,14 @@ internal fun LocalWorkspaceFilesDialog(
                 }
             }
         }
+    if (projectsSheetOpen && mode == LocalFilesMode.WORKSPACE && projectActions != null) {
+        LocalWorkProjectsSheet(
+            actions = projectActions,
+            sessionId = sessionId,
+            currentFolder = directory.takeIf { it.isNotBlank() && it != "任务" && it != "交付成果" } ?: ".",
+            onDismiss = { projectsSheetOpen = false },
+        )
+    }
     if (codeReviewConfirm && codeReview != null && gitResult != null) {
         SyResponsiveSheet(
             title = "确认接纳审查结论",
