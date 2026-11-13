@@ -160,9 +160,34 @@ class LocalSessionFilesRuntime @Inject internal constructor(
         }
 
     /** The durable event makes automatic publication and its exact user-visible location auditable. */
-    internal suspend fun publishVerifiedDeliverables(sessionId: String, paths: List<String>): List<String> {
+    internal suspend fun publishVerifiedDeliverables(
+        sessionId: String,
+        paths: List<String>,
+        deliverablesDirectory: String? = null,
+    ): List<String> {
+        val finalPaths = withContext(Dispatchers.IO) {
+            val root = java.nio.file.Path.of(workspace.path)
+            val folderFiles = deliverablesDirectory?.let { subfolder ->
+                require(subfolder.startsWith("交付成果/") &&
+                    subfolder.split('/').none { it.isBlank() || it == "." || it == ".." }) {
+                    "交付成果目录无效"
+                }
+                val directory = root.resolve(subfolder)
+                if (!java.nio.file.Files.isDirectory(directory, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                    emptyList()
+                } else {
+                    java.nio.file.Files.walk(directory).use { entries ->
+                        entries.filter { java.nio.file.Files.isRegularFile(it, java.nio.file.LinkOption.NOFOLLOW_LINKS) }
+                            .map { root.relativize(it).toString().replace('\\', '/') }
+                            .filter { workspace.workspaceFileAt(it) != null }
+                            .toList()
+                    }
+                }
+            }.orEmpty()
+            (paths + folderFiles).distinct()
+        }
         val locations = ArrayList<String>()
-        for (path in paths.distinct()) {
+        for (path in finalPaths) {
             val location = try {
                 saveWorkspaceFileToDownloads(path)
             } catch (error: Exception) {
