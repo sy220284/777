@@ -498,7 +498,17 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 after = args.int("after", 0),
                 offsetChars = args.int("offset_chars", 0),
             )
-            "present" -> workspace.present(args.string("path"))
+            "present" -> {
+                val path = args.string("path")
+                val receipt = workspace.present(path)
+                // Child worktrees publish only after the parent integrates their final files.
+                if (workspace.path == this.workspace.path) {
+                    sessionStorage.files.publishVerifiedDeliverables(
+                        captured.sessionId, listOf(path),
+                    )
+                }
+                receipt
+            }
             else -> "未知工具：${call.name}"
         }
     }
