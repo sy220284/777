@@ -128,6 +128,37 @@ class WorkExperienceBootstrapTest {
     }
 
     @Test
+    fun rejectedDiscoveryBeforeGoalCompletionDoesNotTeachAFalseSuccess() {
+        val root = Files.createTempDirectory("777-finding-rejected").toFile()
+        try {
+            val log = LocalSessionEventLogRegistry(root, Json).get("rejected-finding")
+            log.append("goal/state", buildJsonObject {
+                put("id", "research"); put("revision", 1); put("status", "active")
+            })
+            val start = log.latestSequence()
+            log.append("work/finding", buildJsonObject {
+                put("finding_id", "finding-one")
+                put("status", "supported")
+            })
+            log.append("work/finding", buildJsonObject {
+                put("finding_id", "finding-one")
+                put("status", "rejected")
+            })
+            log.append("goal/state", buildJsonObject {
+                put("id", "research"); put("revision", 2)
+                put("status", "completed"); put("startedAtSequence", start)
+            })
+            val signals = WorkExperienceBootstrap.collect(log,
+                LocalGoal("研究结论", status = "completed", id = "research",
+                    revision = 2, startedAtSequence = start))
+            assertEquals(0, signals.supportedFindings)
+            assertFalse(signals.supports("finding_supported"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun completedGoalMetricsExcludeLaterGoalsAndTheirToolFailures() {
         val root = Files.createTempDirectory("777-goal-isolation").toFile()
         try {
@@ -167,6 +198,53 @@ class WorkExperienceBootstrapTest {
             assertEquals(0, signals.toolContractErrors)
             assertEquals(0, signals.goalRejections)
             assertFalse(signals.canReflect)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun verifiedGoalWithSourcedFindingCanYieldAReviewCandidateWithoutCopyingDetails() {
+        val root = Files.createTempDirectory("777-finding-learning").toFile()
+        try {
+            val log = LocalSessionEventLogRegistry(root, Json).get("finding-reflection")
+            log.append("goal/state", buildJsonObject {
+                put("id", "goal-finding"); put("revision", 1); put("status", "active")
+            })
+            val start = log.latestSequence()
+            log.append("work/finding", buildJsonObject {
+                put("finding_id", "finding-one")
+                put("source_call_id", "read-one")
+                put("status", "supported")
+                put("summary", "PRIVATE_DISCOVERY_TEXT")
+            })
+            log.append("goal/state", buildJsonObject {
+                put("id", "goal-finding")
+                put("revision", 2)
+                put("status", "completed")
+                put("startedAtSequence", start)
+            })
+            val signals = WorkExperienceBootstrap.collect(
+                log, LocalGoal("深入调查", status = "completed", id = "goal-finding",
+                    revision = 2, startedAtSequence = start),
+            )
+            assertEquals(1, signals.supportedFindings)
+            assertTrue(signals.supports("finding_supported"))
+            assertTrue(signals.canReflect)
+            val prompt = WorkExperienceBootstrap.reviewPrompt("深入调查", signals, true, true)
+            assertTrue(prompt.contains("finding_supported: 1"))
+            assertFalse(prompt.contains("PRIVATE_DISCOVERY_TEXT"))
+            log.append("work/finding", buildJsonObject {
+                put("finding_id", "finding-one")
+                put("status", "rejected")
+            })
+            val revised = WorkExperienceBootstrap.collect(
+                log, LocalGoal("深入调查", status = "completed", id = "goal-finding",
+                    revision = 2, startedAtSequence = start),
+            )
+            // The completed Goal's event boundary is frozen. Edits after completion
+            // do not rewrite the settled evaluation; historical findings are versioned.
+            assertEquals(1, revised.supportedFindings)
         } finally {
             root.deleteRecursively()
         }

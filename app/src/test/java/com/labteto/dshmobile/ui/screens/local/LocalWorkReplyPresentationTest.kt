@@ -129,6 +129,52 @@ class LocalWorkReplyPresentationTest {
             listOf(activity, other), running = false).size)
     }
 
+    @Test fun manySuccessfulToolCallsCollapseWithoutLosingReceiptsOrArtifactOwnership() {
+        val first = message("one", "tool", "读取源码", "mcp__GitHub__fetch_file", false)
+            .copy(toolCallId = "one", toolExecutionId = "execution-one")
+        val second = message("two", "tool", "取得文件结构", "mcp__GitHub__fetch_file", false)
+            .copy(toolCallId = "two", toolExecutionId = "execution-two")
+        val third = message("three", "tool", "完成调用分析", "mcp__GitHub__search", false)
+            .copy(toolCallId = "three")
+        val progress = message("note", "progress", "发现共同的实现入口，正在交叉核对。")
+        val after = message("four", "tool", "完成验证", "mcp__GitHub__search", false)
+            .copy(toolCallId = "four")
+        val grouped = groupConsecutiveWorkOperations(buildLocalTranscript(
+            listOf(first, second, third, progress, after),
+        ))
+        assertEquals(3, grouped.size)
+        val batch = grouped.first() as LocalTranscriptItem.WorkStep
+        assertTrue(batch.operationGroup)
+        assertEquals(3, batch.repeatCount)
+        assertEquals(listOf("two", "three"), batch.groupedMessages.map { it.id })
+        assertEquals("work-tool:message:one", batch.key)
+        assertEquals("work-step:note", grouped[1].key)
+
+        val artifact = LocalTranscriptItem.WorkArtifact(
+            com.labteto.dshmobile.local.presentation.LocalArtifactUiItem(
+                "report.md", "file", "two", 7L, sourceExecutionId = "execution-two",
+            ),
+        )
+        val attached = composeLocalReplyAttachments(grouped + artifact)
+        assertEquals(batch.key,
+            attached.filterIsInstance<LocalTranscriptItem.WorkArtifact>().single().attachedTo)
+    }
+
+    @Test fun failedAndUncertainToolsRemainVisibleBetweenGroupedSuccesses() {
+        val good = message("a", "tool", "完成", "read", false)
+        val failure = message("b", "tool", "失败", "read", true)
+        val unknown = message("c", "tool", "待核实", "write", true)
+            .copy(toolErrorCode = "TOOL_OUTCOME_UNKNOWN")
+        val output = groupConsecutiveWorkOperations(buildLocalTranscript(
+            listOf(good, good.copy(id = "a2"), failure,
+                good.copy(id = "a3"), unknown, good.copy(id = "a4")),
+        ))
+        assertEquals(6, output.size)
+        assertFalse(output.filterIsInstance<LocalTranscriptItem.WorkStep>().any { it.operationGroup })
+        assertEquals(listOf("a", "a2", "b", "a3", "c", "a4"),
+            output.filterIsInstance<LocalTranscriptItem.WorkStep>().map { it.message.id })
+    }
+
     @Test fun independentToolCallsKeepSeparateChronologicalRows() {
         val events = listOf(
             message("read-one", "tool", "ok", "mcp_github_fetch_file", false),

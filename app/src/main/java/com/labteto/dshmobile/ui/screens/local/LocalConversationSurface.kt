@@ -650,7 +650,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             appendPendingWorkToolActivities(withArtifacts, workToolActivities, state.running)
         else withArtifacts
     }
-    val transcriptItems = remember(withActivities) { composeLocalReplyAttachments(withActivities) }
+    val groupedActivities = remember(withActivities, state.usageMode) {
+        if (state.usageMode == LocalUsageMode.WORK) groupConsecutiveWorkOperations(withActivities)
+        else withActivities
+    }
+    val transcriptItems = remember(groupedActivities) { composeLocalReplyAttachments(groupedActivities) }
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
     val loadingOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
@@ -1423,6 +1427,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 repeatCount = transcriptItem.repeatCount,
                                 activity = transcriptItem.activity,
                                 groupedMessages = transcriptItem.groupedMessages,
+                                operationGroup = transcriptItem.operationGroup,
                                 active = state.running && transcriptItem.message.role != "tool" &&
                                     transcriptItem.key == transcriptItems.lastOrNull()?.key,
                             )
