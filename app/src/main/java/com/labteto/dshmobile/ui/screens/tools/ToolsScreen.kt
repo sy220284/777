@@ -864,8 +864,11 @@ fun ToolsScreen(
     var stdioWorkingDirectory by remember { mutableStateOf("") }
     var githubToken by remember { mutableStateOf("") }
     var showGitHubConfig by remember { mutableStateOf(false) }
+    var editGitHubCredentials by remember { mutableStateOf(false) }
     var showGitHubBrowser by remember { mutableStateOf(false) }
     var showExternalConfig by remember { mutableStateOf(false) }
+    var showMcpAdvanced by rememberSaveable { mutableStateOf(false) }
+    var showMcpStdio by rememberSaveable { mutableStateOf(false) }
     var expandedMcpServer by remember { mutableStateOf<String?>(null) }
     var showAgentSettings by remember { mutableStateOf(false) }
     var confirmClearGitHub by remember { mutableStateOf(false) }
@@ -911,6 +914,7 @@ fun ToolsScreen(
                 stdioWorkingDirectory = ""
                 githubToken = ""
                 showGitHubConfig = false
+                editGitHubCredentials = false
                 showExternalConfig = false
                 noticeMessage?.let(toast.second)
             }
@@ -1189,6 +1193,25 @@ fun ToolsScreen(
                     variant = SyButtonVariant.Ghost,
                 )
             }
+            if (state.githubConfigured && !editGitHubCredentials) {
+                Text(
+                    "GitHub 已连接。需要更新或撤销凭据时再展开操作。",
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.textSecondary,
+                )
+                SyButton(
+                    text = "更新访问凭据",
+                    onClick = { editGitHubCredentials = true },
+                    variant = SyButtonVariant.Outline,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                SyButton(
+                    text = stringResource(R.string.tools_github_clear),
+                    onClick = { confirmClearGitHub = true },
+                    variant = SyButtonVariant.Ghost,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
             SyTextField(
                 value = githubToken,
                 onValueChange = { githubToken = it.take(4096) },
@@ -1221,6 +1244,7 @@ fun ToolsScreen(
                         variant = SyButtonVariant.Ghost,
                     )
                 }
+            }
             }
         }
     }
@@ -1330,6 +1354,13 @@ fun ToolsScreen(
             localNetworkPermissionFeedback?.let { message ->
                 Text(message, style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
             }
+            SyButton(
+                text = if (showMcpAdvanced) "收起高级连接选项" else "高级连接选项",
+                onClick = { showMcpAdvanced = !showMcpAdvanced },
+                variant = SyButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth().testTag("mcp_advanced_toggle"),
+            )
+            if (showMcpAdvanced) {
             SyTextField(
                 value = mcpClientId,
                 onValueChange = { mcpClientId = it },
@@ -1338,6 +1369,7 @@ fun ToolsScreen(
                 supportingText = { Text("可填写预注册 ID 或客户端元数据 HTTPS 地址；留空尝试服务支持的自动注册。") },
                 enabled = !state.loading, singleLine = true, shape = DsShapes.row,
             )
+            }
             SyButton(
                 text = if (state.mcpLoginServerId != null) "等待浏览器授权…" else "浏览器登录并连接",
                 onClick = {
@@ -1353,6 +1385,7 @@ fun ToolsScreen(
                 SyButton(text = "取消登录", onClick = viewModel::cancelMcpLogin,
                     variant = SyButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
             }
+            if (showMcpAdvanced) {
             Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
                 SyButton(text = "刷新登录", onClick = {
                     val id = serverId.trim()
@@ -1369,6 +1402,8 @@ fun ToolsScreen(
                     enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
                     variant = SyButtonVariant.Ghost, modifier = Modifier.weight(1f))
             }
+            }
+            if (showMcpAdvanced) {
             SyTextField(
                 value = mcpBearer,
                 onValueChange = { mcpBearer = it.take(4096) },
@@ -1380,6 +1415,7 @@ fun ToolsScreen(
                 visualTransformation = PasswordVisualTransformation(),
                 shape = DsShapes.row,
             )
+            }
             SyButton(
                 text = stringResource(
                     if (state.loading) R.string.tools_processing else R.string.tools_connect,
@@ -1402,6 +1438,13 @@ fun ToolsScreen(
                 variant = SyButtonVariant.Ghost,
                 modifier = Modifier.fillMaxWidth(),
             )
+            SyButton(
+                text = if (showMcpStdio) "收起本机命令连接" else "通过本机命令连接（高级）",
+                onClick = { showMcpStdio = !showMcpStdio },
+                variant = SyButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth().testTag("mcp_stdio_toggle"),
+            )
+            if (showMcpStdio) {
             Text(
                 stringResource(R.string.tools_stdio_title),
                 style = DsType.std14Strong.withReadingWeight(),
@@ -1448,6 +1491,7 @@ fun ToolsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 icon = SyEntryIcons.Tools,
             )
+            }
         }
     }
 
