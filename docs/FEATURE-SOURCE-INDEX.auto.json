@@ -2600,7 +2600,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalKeylessWebSearchClient.kt",
-      "sha256": "a6cf1509c2595e00"
+      "sha256": "d98444a35797828a"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/web/LocalSearchUsageStore.kt",
@@ -4624,13 +4624,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "0b0d39413c50",
+  "source_snapshot": "2940a823bdc2",
   "observed_delta": {
-    "baseline": "d46d7353eb4d",
+    "baseline": "0b0d39413c50",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebSearchClient.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/web/LocalKeylessWebSearchClient.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
