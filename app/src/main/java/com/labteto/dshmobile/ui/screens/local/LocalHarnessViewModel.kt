@@ -29,7 +29,7 @@ import com.labteto.dshmobile.local.presentation.projectWorkState
 import com.labteto.dshmobile.local.presentation.projectWorkSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationMode
-import com.labteto.dshmobile.local.session.LocalSessionSectionStore
+import com.labteto.dshmobile.local.presentation.LocalSessionSectionUiFacade
 import com.labteto.dshmobile.ui.screens.settings.readDeviceCapabilityState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -58,7 +58,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val conversationPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val approvalPreferences: LocalApprovalPreferences,
     private val networkSearchSettings: LocalNetworkSearchSettings,
-    private val sectionStore: LocalSessionSectionStore,
+    private val sectionStore: LocalSessionSectionUiFacade,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 

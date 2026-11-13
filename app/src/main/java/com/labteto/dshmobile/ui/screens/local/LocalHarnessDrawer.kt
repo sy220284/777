@@ -803,12 +803,19 @@ internal fun LocalModeDrawer(
         }
         }
         if (sectionError != null) {
-            androidx.compose.material3.AlertDialog(
-                onDismissRequest = { sectionError = null },
-                title = { Text("分区操作未完成") },
-                text = { Text(sectionError.orEmpty()) },
-                confirmButton = { TextButton(onClick = { sectionError = null }) { Text("确定") } },
-            )
+            com.labteto.dshmobile.ui.shenyan.SyDialog(
+                title = "分区操作未完成",
+                onDismiss = { sectionError = null },
+            ) {
+                Text(sectionError.orEmpty(), style = DsType.std14.withReadingWeight())
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    SyButton(
+                        text = "确定",
+                        onClick = { sectionError = null },
+                        variant = SyButtonVariant.Primary,
+                    )
+                }
+            }
         }
         if (createSectionDialog) {
             RenameDialog(
@@ -881,26 +888,29 @@ internal fun LocalModeDrawer(
                     sectionError = failure.message ?: "会话分区移动失败"
                 }
             }
-            androidx.compose.material3.AlertDialog(
-                onDismissRequest = { moveSelectedDialog = false },
-                title = { Text("移动 ${selected.size} 个会话") },
-                text = {
-                    LazyColumn(modifier = Modifier.height(320.dp)) {
-                        item(key = "none") {
-                            TextButton(onClick = { commitMove(null) }) { Text("移出分区（最近记录）") }
-                        }
-                        items(sectionCatalog.sections, key = LocalSessionSection::id) { section ->
-                            TextButton(
-                                onClick = { commitMove(section.id) },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) { Text(section.title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                        }
+            com.labteto.dshmobile.ui.shenyan.SyDialog(
+                title = "移动 ${selected.size} 个会话",
+                onDismiss = { moveSelectedDialog = false },
+            ) {
+                LazyColumn(modifier = Modifier.height(320.dp)) {
+                    item(key = "none") {
+                        TextButton(onClick = { commitMove(null) }) { Text("移出分区（最近记录）") }
                     }
-                },
-                confirmButton = {
-                    TextButton(onClick = { moveSelectedDialog = false }) { Text("取消") }
-                },
-            )
+                    items(sectionCatalog.sections, key = LocalSessionSection::id) { section ->
+                        TextButton(
+                            onClick = { commitMove(section.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(section.title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    SyButton(
+                        text = "取消",
+                        onClick = { moveSelectedDialog = false },
+                        variant = SyButtonVariant.Ghost,
+                    )
+                }
+            }
         }
         renameTargetId?.let { id ->
             RenameDialog(
