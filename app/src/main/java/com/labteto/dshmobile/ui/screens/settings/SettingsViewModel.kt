@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.TokenUsageGroupKind
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.memory.MemoryRecord
+import com.labteto.dshmobile.local.model.DeepSeekProviderBalance
 import com.labteto.dshmobile.local.model.DeepSeekPricingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
@@ -210,6 +211,9 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null, credentialSourceProfileId: String? = null) =
         withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride, credentialSourceProfileId) }
+
+    internal suspend fun queryDeepSeekBalance(profile: LocalModelProfile): DeepSeekProviderBalance =
+        withContext(Dispatchers.IO) { localHarness.queryDeepSeekBalance(profile) }
 
     internal suspend fun queryMiniMaxQuota(profile: LocalModelProfile): MiniMaxProviderUsage =
         withContext(Dispatchers.IO) { localHarness.queryMiniMaxQuota(profile) }
