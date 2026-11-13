@@ -80,7 +80,7 @@ internal object LocalWorkFindingJournal {
             }
         }
         if (current.isEmpty()) return "当前目标没有调查线索"
-        return current.values.takeLast(20).joinToString("\n") {
+        return current.values.toList().takeLast(20).joinToString("\n") {
             "ID=${it.text("finding_id")}；状态=${it.text("status")}；" +
                 "发现=${it.text("summary")}；来源=${it.text("source_call_id")}；" +
                 "下一步=${it.text("next_action")}"
