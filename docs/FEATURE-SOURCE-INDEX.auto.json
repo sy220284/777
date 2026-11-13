@@ -4548,7 +4548,7 @@
     },
     {
       "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackend.kt",
-      "sha256": "206f8bd028a13268"
+      "sha256": "572a2f70428a261f"
     },
     {
       "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AgentTlsWorkerServer.kt",
@@ -4616,12 +4616,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "4214ff764ff7",
+  "source_snapshot": "db29572ad4c2",
   "observed_delta": {
-    "baseline": "611f1e1ae163",
+    "baseline": "4214ff764ff7",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackend.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
