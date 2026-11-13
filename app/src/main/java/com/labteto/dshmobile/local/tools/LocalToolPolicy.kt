@@ -58,7 +58,7 @@ internal object LocalToolPolicy {
         "file_version", "file_write_if_version" -> ToolExposure.OPTIONAL
         "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect", "list_files",
         "glob", "grep", "bash", "capability_search", "update_plan", "exit_plan_mode",
-        "ask_user_question", "subagent", "list_subagent_models", "list_agent_roles", "session_event_search" -> ToolExposure.CORE
+        "ask_user_question", "work_finding", "subagent", "list_subagent_models", "list_agent_roles", "session_event_search" -> ToolExposure.CORE
         else -> error("内置工具尚未声明模型暴露策略：$name")
     }
 
@@ -106,7 +106,7 @@ internal object LocalToolPolicy {
         "write", "edit", "write_chunk", "file_write_if_version", "apply_patch", "download_file", "present",
         "skill_create", "skill_update", "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local" -> ToolAccess.WORKSPACE_WRITE
         "update_plan", "exit_plan_mode", "todo_write", "create_goal", "update_goal",
-        "ask_user_question", "memory_remember", "memory_update", "memory_forget" -> ToolAccess.SESSION_WRITE
+        "ask_user_question", "work_finding", "memory_remember", "memory_update", "memory_forget" -> ToolAccess.SESSION_WRITE
         "bash", "job_kill" -> ToolAccess.PROCESS
         "subagent", "subagent_fork", "workflow", "send_message", "interrupt_agent", "agent_resume", "agent_close",
         "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown", "team_respond_shutdown", "team_ack_message",
@@ -134,7 +134,7 @@ internal object LocalToolPolicy {
             "media_image_options", "media_image_create", "media_image_status" -> "媒体创作"
             "environment_info", "capability_search" -> "环境"
             "update_plan", "exit_plan_mode", "todo_write", "create_goal", "get_goal", "update_goal",
-            "ask_user_question" -> "任务"
+            "ask_user_question", "work_finding" -> "任务"
             "skill", "skill_create", "skill_update", "skill_rollback" -> "技能"
             "extension_record", "extension_inspect", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local" -> "扩展能力"
             "subagent", "subagent_fork", "workflow", "list_subagent_models", "list_agent_roles", "list_agents", "agent_tree",
@@ -178,6 +178,7 @@ internal object LocalToolPolicy {
             )
             "todo_write" -> setOf("待办", "任务清单", "todo")
             "create_goal", "get_goal", "update_goal" -> setOf("目标", "goal")
+            "work_finding" -> setOf("发现", "调查", "线索", "假说", "finding", "investigation")
             "skill" -> setOf("技能", "skill")
             "skill_create" -> setOf("技能创建", "自创技能", "创建技能", "skill")
             "skill_update", "skill_rollback" -> setOf("技能优化", "技能版本", "版本回退", "skill")
