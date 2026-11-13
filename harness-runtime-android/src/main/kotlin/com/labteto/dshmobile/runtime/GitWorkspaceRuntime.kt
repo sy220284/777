@@ -75,14 +75,14 @@ class GitWorkspaceRuntime(
     }
 
     internal fun install(context: HarnessContext) {
-        for (action in listOf("fork", "list", "status", "compare_merge", "preview_merge", "merge", "discard")) {
+        for (action in listOf("fork", "list", "status", "compare_merge", "preview_merge", "merge", "recover_merge", "discard")) {
             val name = "workspace_$action"
             val mutates = action !in setOf("status", "compare_merge", "preview_merge", "list")
             val properties = buildJsonObject {
                 if (action == "fork") put("repository", buildJsonObject {
                     put("type", "string"); put("description", "工作区内 Git 仓库根目录，默认 .；包含当前未提交及未跟踪文件作为起点")
                 }) else if (action != "list") put("workspace_id", buildJsonObject { put("type", "string") })
-                if (action in setOf("compare_merge", "preview_merge", "merge", "discard")) put("expected_tree", buildJsonObject {
+                if (action in setOf("compare_merge", "preview_merge", "merge", "recover_merge", "discard")) put("expected_tree", buildJsonObject {
                     put("type", "string"); put("description", "最近 workspace_status 返回的 tree；变化后必须重新审阅")
                 })
                 if (action == "preview_merge") {
@@ -131,6 +131,7 @@ class GitWorkspaceRuntime(
                 "preview_merge" -> "只读预览 Git 自动合并、父实现优先、子实现优先或逐文件择优的精确结果；冲突或超限须继续审查"
                 "list" -> "列出本会话工作区及创建/删除状态；找回取消或中断时未返回的 workspace_id 与基线"
                 "merge" -> "基于三方质量决策与精确预览执行择优合并；版本变化、缺少比较理由或超限则拒绝，保留父目录 HEAD 和暂存区"
+                "recover_merge" -> "从持久集成记录恢复中断的三方合并：完成已提交写入或只回滚本次变更，不重新执行未审查合并"
                 else -> "确认 tree 未变化后删除本会话独立 worktree；保留父目录和删除回执"
             }
             context.tools.register(HarnessTool(
@@ -138,7 +139,7 @@ class GitWorkspaceRuntime(
                 schema = functionToolSchema(name, description, properties, required = when (action) {
                     "fork", "list" -> emptySet()
                     "status" -> setOf("workspace_id")
-                    "compare_merge", "preview_merge", "discard" -> setOf("workspace_id", "expected_tree")
+                    "compare_merge", "preview_merge", "recover_merge", "discard" -> setOf("workspace_id", "expected_tree")
                     else -> setOf("workspace_id", "expected_tree", "expected_source_tree", "expected_merged_tree", "resolution", "quality_decision")
                 }),
                 access = if (mutates) ToolAccess.WORKSPACE_WRITE else ToolAccess.READ_ONLY,
@@ -177,6 +178,6 @@ class GitWorkspaceRuntime(
     }
 
     internal fun uninstall(context: HarnessContext) {
-        listOf("fork", "list", "status", "compare_merge", "preview_merge", "merge", "discard").forEach { context.tools.unregister("workspace_$it") }
+        listOf("fork", "list", "status", "compare_merge", "preview_merge", "merge", "recover_merge", "discard").forEach { context.tools.unregister("workspace_$it") }
     }
 }
