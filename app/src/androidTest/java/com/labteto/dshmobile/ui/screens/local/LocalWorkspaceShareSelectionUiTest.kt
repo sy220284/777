@@ -484,4 +484,45 @@ class LocalWorkspaceShareSelectionUiTest {
         compose.onNodeWithText(context.getString(R.string.common_cancel)).performClick()
         compose.onNodeWithText(context.getString(R.string.local_files_select)).assertExists()
     }
+
+    @Test
+    fun selectedArtifactsSaveToChineseDownloadsAndReportActualResult() {
+        val files = listOf(
+            LocalWorkspaceFile("成果/第一份.md", 5L, 1L),
+            LocalWorkspaceFile("成果/第二份.pdf", 10L, 2L),
+        )
+        val saved = java.util.Collections.synchronizedList(mutableListOf<String>())
+        compose.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(
+                    mode = LocalFilesMode.CONVERSATION,
+                    sessionId = "downloads-selection-test",
+                    workspacePath = File(context.filesDir, "local-harness/workspace").absolutePath,
+                    loadWorkspace = { emptyList() },
+                    saveToDownloads = { path ->
+                        saved += path
+                        "Download/神言神语/${path.substringAfterLast('/')}"
+                    },
+                    loadConversation = { LocalConversationFiles(artifacts = files) },
+                    loadPreview = { path -> LocalWorkspaceFilePreview(files.first { it.path == path }) },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("第一份.md").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(context.getString(R.string.local_files_select)).performClick()
+        compose.onNodeWithText("第一份.md").performClick()
+        compose.onNodeWithText("第二份.pdf").performClick()
+        compose.onNodeWithText("保存到下载").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("已保存 2 个文件到 Download/神言神语")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.runOnIdle {
+            assertEquals(listOf("成果/第一份.md", "成果/第二份.pdf"), saved)
+        }
+        compose.onNodeWithText("查看下载").assertExists()
+    }
 }
