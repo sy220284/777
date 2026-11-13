@@ -107,6 +107,25 @@ class CodeModePluginTest {
         assertTrue(actual.content.contains("TOOL_TIMEOUT"))
     }
 
+
+    @Test fun childPostHookFailureIsVisibleWithoutMarkingScriptFailed() = runTest {
+        val registry = ToolRegistry()
+        register(registry, "read") { ToolResult("read success") }
+        registry.registerHook(ToolHookSubscription("audit-failed", object : ToolLifecycleHook {
+            override suspend fun afterUse(event: ToolPostUseEvent) {
+                error("internal diagnostics")
+            }
+        }, setOf("read")))
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val actual = registry.execute("code_mode_run", plan("read"),
+            context = ToolContext(approval = { true }))
+        assertFalse(actual.isError)
+        assertTrue(actual.content.contains("\"completed_steps\":1"))
+        assertTrue(actual.content.contains("\"post_hook_failures\""))
+        assertTrue(actual.content.contains("audit-failed"))
+        assertFalse(actual.content.contains("internal diagnostics"))
+    }
+
     @Test fun internalToolsCannotBeSmuggledIntoScript() = runTest {
         val registry = ToolRegistry()
         var called = false

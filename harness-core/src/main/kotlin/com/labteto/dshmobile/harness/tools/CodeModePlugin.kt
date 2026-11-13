@@ -216,6 +216,17 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 put("status", if (result.isError) "error" else "completed")
                 put("execution_started", outcome.executionStarted)
                 result.errorCode?.let { put("error_code", it) }
+                // Nested tool calls must not lose Hook diagnostics when the wrapper succeeds.
+                if (outcome.postHookFailures.isNotEmpty()) {
+                    put("post_hook_failures", buildJsonArray {
+                        outcome.postHookFailures.forEach { failure ->
+                            add(buildJsonObject {
+                                put("hook_id", failure.hookId)
+                                put("failure_type", failure.failureType)
+                            })
+                        }
+                    })
+                }
                 if (result.retention == ToolResultRetention.DURABLE) {
                     put("content", result.content.take(MAX_RESULT_CHARS))
                     if (result.content.length > MAX_RESULT_CHARS) put("content_truncated", true)
