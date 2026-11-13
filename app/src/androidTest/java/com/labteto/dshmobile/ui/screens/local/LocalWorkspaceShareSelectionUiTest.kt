@@ -71,6 +71,54 @@ class LocalWorkspaceShareSelectionUiTest {
     }
 
     @Test
+    fun workspaceLocalGitDiffRestoresSavedReviewWithoutRemote() {
+        val scanned = mutableListOf<String>()
+        val recovered = mutableListOf<String>()
+        compose.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(
+                    mode = LocalFilesMode.WORKSPACE,
+                    sessionId = "local-git-review",
+                    workspacePath = File(context.filesDir, "local-harness/workspace").absolutePath,
+                    loadWorkspace = { emptyList() },
+                    compareLocalGit = { directory ->
+                        scanned += directory
+                        com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi(
+                            "worktree/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                            "1 file changed, 1 insertion(+)",
+                            "@@ -1 +1 @@\\n+fixed",
+                            truncated = false,
+                        )
+                    },
+                    findIndependentCodeReview = { session, repository, diff ->
+                        recovered += "$session:$repository:${diff.trackingRef}"
+                        com.labteto.dshmobile.local.work.LocalIndependentCodeReview(
+                            "review-1", diff.trackingRef, "digest",
+                            "已保存的历史审查报告", 7L, humanAccepted = true,
+                        )
+                    },
+                    loadConversation = { error("不应查询会话") },
+                    loadPreview = { error("不应预览文件") },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("检查本地修改").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("检查本地修改").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("已保存的历史审查报告")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("人工接纳已记录").assertExists()
+        compose.runOnIdle {
+            assertEquals(listOf("."), scanned)
+            assertEquals(listOf("local-git-review:.:worktree/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), recovered)
+        }
+    }
+
+    @Test
     fun workspaceGitWithoutTrackingRefsExplainsWhatToDoInsteadOfPretendingSuccess() {
         compose.setContent {
             DshTheme {
