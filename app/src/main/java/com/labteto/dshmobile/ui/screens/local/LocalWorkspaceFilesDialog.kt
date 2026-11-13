@@ -278,11 +278,17 @@ internal fun LocalWorkspaceFilesDialog(
                 if (!diff.truncated && diff.patch.isNotBlank()) {
                     try {
                         codeReview = findIndependentCodeReview?.invoke(sessionId, gitRepository, diff)
-                        securityReview = findIndependentSecurityReview?.invoke(sessionId, gitRepository, diff)
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (failure: Exception) {
                         codeReviewError = failure.message ?: "读取历史代码审查记录失败"
+                    }
+                    try {
+                        securityReview = findIndependentSecurityReview?.invoke(sessionId, gitRepository, diff)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        securityReviewError = failure.message ?: "读取历史安全审查记录失败"
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -349,11 +355,17 @@ internal fun LocalWorkspaceFilesDialog(
                 if (!diff.truncated && diff.patch.isNotBlank()) {
                     try {
                         codeReview = findIndependentCodeReview?.invoke(sessionId, gitRepository, diff)
-                        securityReview = findIndependentSecurityReview?.invoke(sessionId, gitRepository, diff)
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (failure: Exception) {
                         codeReviewError = failure.message ?: "读取历史代码审查记录失败"
+                    }
+                    try {
+                        securityReview = findIndependentSecurityReview?.invoke(sessionId, gitRepository, diff)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        securityReviewError = failure.message ?: "读取历史安全审查记录失败"
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -1092,7 +1104,7 @@ internal fun LocalWorkspaceFilesDialog(
                         text = if (codeReviewBusy) "独立审查中…" else "独立代码审查",
                         onClick = {
                             val review = runIndependentCodeReview
-                            if (review != null && !codeReviewBusy) {
+                            if (review != null && !codeReviewBusy && !securityReviewBusy) {
                                 gitJob?.cancel()
                                 gitJob = scope.launch {
                                     codeReviewBusy = true
@@ -1110,7 +1122,7 @@ internal fun LocalWorkspaceFilesDialog(
                                 }
                             }
                         },
-                        enabled = !gitLoading && !codeReviewBusy && !result.truncated,
+                        enabled = !gitLoading && !codeReviewBusy && !securityReviewBusy && !result.truncated,
                         modifier = Modifier.fillMaxWidth().testTag("work_code_review_start"),
                     )
                     codeReviewError?.let { Text(it, color = colors.dangerInk) }
