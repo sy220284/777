@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy
 import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 import com.labteto.dshmobile.local.io.readBoundedBody
 import java.util.concurrent.TimeUnit
@@ -27,6 +28,7 @@ class LocalModelGateway @Inject constructor(
     private val adapters: LocalModelAdapterRegistry,
     private val routes: LocalModelRouteCatalog,
     private val http: OkHttpClient,
+    private val managedPolicy: LocalManagedExecutionPolicy,
 ) {
     // Provider catalogue is credential-bearing discovery; never forward its key via redirect.
     private val catalogHttp = http.newBuilder()
@@ -83,6 +85,7 @@ class LocalModelGateway @Inject constructor(
         require(profile.authKind == LocalModelAuthKind.API_KEY) {
             "套餐授权模型请通过应用内账户同步获取，不支持 API Key 模型目录查询"
         }
+        managedPolicy.current().requireModelProvider(profile.provider, profile.baseUrl)
         val endpoint = officialModelCatalogEndpoint(profile)
             ?: error("该模型来源没有已验证的官方模型目录接口；不可把密钥发送到猜测的 URL")
         val target = URI(endpoint)
@@ -126,6 +129,7 @@ class LocalModelGateway @Inject constructor(
         } else {
             selectRunModelProfile(availableProfiles(), credentials.active(), selection)
         }
+        managedPolicy.current().requireModelProvider(selected.provider, selected.baseUrl)
         require(credentials.hasCredential(selected)) { "所选模型凭据不可用" }
         return selected
     }
@@ -136,6 +140,7 @@ class LocalModelGateway @Inject constructor(
         baseUrl: String,
     ): LocalModelProfile =
         selectModelRouteProfile(availableProfiles(), profileId, model, baseUrl).also {
+            managedPolicy.current().requireModelProvider(it.provider, it.baseUrl)
             require(credentials.hasCredential(it)) { "所选模型凭据不可用" }
         }
 
@@ -258,6 +263,7 @@ class LocalModelGateway @Inject constructor(
         val effectiveProfile = profile
             ?: currentCoroutineContext()[LocalModelRunContext]?.profile
             ?: profileForRoute(null, model, baseUrl)
+        managedPolicy.current().requireModelProvider(effectiveProfile.provider, effectiveProfile.baseUrl)
         val resolved = credentials.resolve(model, baseUrl, effectiveProfile)
         val preset = LocalModelPresets.find(model, baseUrl)
         val protocol = resolveLocalModelProtocol(
