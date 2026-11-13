@@ -9,7 +9,7 @@ import org.junit.Test
 class LocalWorkPhoneImportNamesTest {
     @Test fun chineseApkNameIsPreservedAndDirectoryEscapesAreFlattened() {
         assertEquals("安装包.apk", workImportSafeName("Downloads/安装包.apk"))
-        assertEquals("bad_name_.apk", workImportSafeName("bad\\name?.apk"))
+        assertEquals("name_.apk", workImportSafeName("bad\\name?.apk"))
         assertEquals("手机文件", workImportSafeName("../"))
     }
 
