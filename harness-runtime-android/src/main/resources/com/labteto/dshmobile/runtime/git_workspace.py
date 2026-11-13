@@ -607,6 +607,15 @@ def locked(root, store, owner, action, arguments):
         if any(not any(path == scope or path.startswith(scope + "/") for scope in allowed)
                for path in actual_paths):
             raise ValueError("chosen integration changes outside declared outputs")
+    if "required_outputs" in arguments:
+        required = arguments["required_outputs"]
+        if (not isinstance(required, list) or not required or
+                any(not isinstance(path, str) or not path or path.startswith("/") or
+                    any(part in ("", ".", "..") for part in path.split("/")) for path in required)):
+            raise ValueError("invalid required output paths")
+        results = tree_entries(source, merged_tree, required)
+        if any(path not in results for path in required):
+            raise ValueError("chosen integration drops a required output artifact")
     if len(proposal["patch"]) > MAX_REVIEW_BYTES:
         patch_bytes = proposal["patch"]
         receipts = arguments.get("review_receipts")
