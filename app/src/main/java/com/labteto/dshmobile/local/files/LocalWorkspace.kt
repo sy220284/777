@@ -49,6 +49,9 @@ internal class LocalFileObservationCache(
 private const val MAX_MODEL_SKILL_LIST = 128
 private const val MAX_SKILL_BYTES = 128 * 1024
 
+/** A file version is the content hash used for conditional, conflict-safe local writes. */
+data class LocalWorkspaceVersion(val revision: String, val bytes: Long)
+
 /** One immediate child of a workspace directory, never a recursive search result. */
 data class LocalWorkspaceDirectoryEntry(
     val path: String,
@@ -187,11 +190,67 @@ class LocalWorkspace(
     }
 
     /** Replace one UTF-8 file, creating its parent directories. */
-    fun write(relativePath: String, content: String): String {
+    fun write(relativePath: String, content: String): String = synchronized(fileWriteLock) {
         val file = resolveForWrite(relativePath)
         val bytes = LocalLargeFileIO.writeText(file, content, canonicalRoot)
         observations.remove(file.path)
-        return "已写入 " + relativePath + "（" + bytes + " 字节）"
+        "已写入 " + relativePath + "（" + bytes + " 字节）"
+    }
+
+    /**
+     * Local authorized callers can atomically check the version they actually read before writing.
+     * The special revision "absent" is valid only for creating a new file.
+     * Use the existing workspace FileObserver subscription to observe subsequent changes.
+     */
+    fun fileVersion(relativePath: String): LocalWorkspaceVersion = synchronized(fileWriteLock) {
+        val file = resolveVersionedFile(relativePath)
+        versionAt(file)
+    }
+
+    fun writeIfVersion(relativePath: String, expectedRevision: String, content: String): LocalWorkspaceVersion =
+        synchronized(fileWriteLock) {
+            require(expectedRevision == "absent" ||
+                Regex("^sha256:[0-9a-f]{64}$").matches(expectedRevision)) {
+                "文件版本格式无效；必须使用 file_version 返回的 revision"
+            }
+            val file = resolveVersionedFile(relativePath)
+            val actual = versionAt(file)
+            require(actual.revision == expectedRevision) {
+                "文件已变化：$relativePath；期望 $expectedRevision，当前 ${actual.revision}，请重新读取"
+            }
+            LocalLargeFileIO.writeText(file, content, canonicalRoot)
+            observations.remove(file.path)
+            versionAt(file)
+        }
+
+    private fun versionAt(file: File): LocalWorkspaceVersion {
+        if (!file.exists()) return LocalWorkspaceVersion("absent", 0L)
+        require(file.isFile) { "版本接口只接受普通文件" }
+        val before = Files.readAttributes(file.toPath(), java.nio.file.attribute.BasicFileAttributes::class.java)
+        val hash = fingerprint(file)
+        val after = Files.readAttributes(file.toPath(), java.nio.file.attribute.BasicFileAttributes::class.java)
+        check(before.size() == after.size() &&
+            before.lastModifiedTime() == after.lastModifiedTime() &&
+            before.fileKey() == after.fileKey()) { "读取文件版本时文件发生变化，请重试" }
+        return LocalWorkspaceVersion("sha256:" + hash, after.size())
+    }
+
+    /** This callable API is intentionally restricted to the app's workspace, not user shared storage. */
+    private fun resolveVersionedFile(relativePath: String): File {
+        require(relativePath.isNotBlank() && !File(relativePath).isAbsolute &&
+            relativePath.split('/').none { it.isEmpty() || it == "." || it == ".." }) {
+            "版本文件接口只接受工作区内的规范相对路径"
+        }
+        val file = resolve(relativePath)
+        require(boundary.isWorkspace(file) && file != canonicalRoot) {
+            "文件版本接口仅允许应用工作区文件"
+        }
+        var current = canonicalRoot.toPath()
+        for (part in relativePath.split('/')) {
+            current = current.resolve(part)
+            require(!Files.isSymbolicLink(current)) { "版本接口拒绝符号链接" }
+        }
+        return file
     }
 
     /** Stream arbitrary-sized binary artifacts through one bounded buffer. */
@@ -292,7 +351,7 @@ class LocalWorkspace(
         return observed
     }
     /** Replace one unique literal after the caller has observed the file. */
-    fun edit(relativePath: String, oldText: String, newText: String): String {
+    fun edit(relativePath: String, oldText: String, newText: String): String = synchronized(fileWriteLock) {
         require(oldText.isNotEmpty()) { "待替换内容不能为空" }
         val file = resolveForWrite(relativePath)
         require(file.isFile) { "文件不存在：$relativePath" }
@@ -303,7 +362,7 @@ class LocalWorkspace(
             }
         }
         observations.put(file.path, fingerprint(file))
-        return "已编辑 " + relativePath
+        "已编辑 " + relativePath
     }
 
     /** Glob-style file discovery, paged instead of silently cutting off a large workspace. */

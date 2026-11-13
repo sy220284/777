@@ -28,6 +28,14 @@ object LocalToolCatalog {
             "path" to string("相对工作区的路径；任务中间文件优先保存到 create_goal 返回的任务目录，普通文档默认中文文件名，扩展名不变"),
             "content" to string("完整文件内容"),
         ), listOf("path", "content")))
+        add(tool("file_version", "读取本机工作区文件的 SHA-256 版本标识；不存在返回 absent，供条件写入使用", properties(
+            "path" to string("仅限工作区规范相对路径"),
+        ), listOf("path")))
+        add(tool("file_write_if_version", "仅当文件版本与预期一致时原子替换；新建必须期望 absent，版本不同明确拒绝", properties(
+            "path" to string("仅限工作区规范相对路径"),
+            "expected_revision" to string("file_version 返回的 revision 或 absent"),
+            "content" to string("替换后的全部 UTF-8 内容"),
+        ), listOf("path", "expected_revision", "content")))
         add(tool("read_chunk", "按字节偏移读取大文件，返回有界 Base64 页和下一字节位置", properties(
             "path" to string("工作区文件路径"),
             "start_byte" to integerRange("起始字节偏移，默认 0", min = 0),

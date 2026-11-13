@@ -14,6 +14,52 @@ import org.junit.Test
 
 class LocalWorkspaceTest {
     @Test
+    fun localVersionedFileApiCreatesUpdatesAndRejectsStaleRevision() {
+        val missing = workspace.fileVersion("成果/文档.md")
+        assertEquals("absent", missing.revision)
+        val first = workspace.writeIfVersion("成果/文档.md", "absent", "第一稿")
+        assertTrue(first.revision.startsWith("sha256:"))
+        assertEquals("第一稿".toByteArray().size.toLong(), first.bytes)
+        assertEquals(first, workspace.fileVersion("成果/文档.md"))
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.writeIfVersion("成果/文档.md", "absent", "错误覆盖")
+        }
+        val second = workspace.writeIfVersion("成果/文档.md", first.revision, "第二稿")
+        assertTrue(second.revision != first.revision)
+        assertEquals("第二稿", workspace.readRaw("成果/文档.md"))
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.writeIfVersion("成果/文档.md", first.revision, "迟到提交")
+        }
+        assertEquals("第二稿", workspace.readRaw("成果/文档.md"))
+    }
+
+    @Test
+    fun localVersionedFileApiObservesNormalWorkspaceWrites() {
+        workspace.write("a.txt", "旧")
+        val previous = workspace.fileVersion("a.txt")
+        workspace.write("a.txt", "新")
+        assertTrue(previous.revision != workspace.fileVersion("a.txt").revision)
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.writeIfVersion("a.txt", previous.revision, "覆盖")
+        }
+    }
+
+    @Test
+    fun localVersionedFileApiRejectsInvalidPathsAndSymbolicLinks() {
+        val external = Files.createTempFile("version-api-external", ".txt")
+        try {
+            for (path in listOf("../outside", "/tmp/file", "folder/../a", "folder//a")) {
+                assertThrows(IllegalArgumentException::class.java) { workspace.fileVersion(path) }
+            }
+            Files.createSymbolicLink(root.resolve("linked.txt").toPath(), external)
+            assertThrows(IllegalArgumentException::class.java) {
+                workspace.writeIfVersion("linked.txt", "absent", "forbidden")
+            }
+        } finally {
+            Files.deleteIfExists(external)
+        }
+    }
+    @Test
     fun resourceSizeUsesSandboxIdentityAndRejectsOutsideFiles() {
         val target = root.resolve("large-budget.txt").apply { writeText("abc") }
         assertEquals(target.length(), workspace.fileSizeForResourceBudget("large-budget.txt"))

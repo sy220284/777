@@ -165,6 +165,19 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 endLine = args.int("end_line", args.int("start_line", 1) + 399),
                 startChar = args.int("start_char", 0),
             ) } } }
+            "file_version" -> withContext(Dispatchers.IO) {
+                val file = workspace.fileVersion(args.string("path"))
+                "revision=" + file.revision + "；bytes=" + file.bytes
+            }
+            "file_write_if_version" -> {
+                require(allowMutation) { "该子任务处于只读模式" }
+                withContext(Dispatchers.IO) {
+                    val file = workspace.writeIfVersion(
+                        args.string("path"), args.string("expected_revision"), args.string("content"),
+                    )
+                    "条件写入已提交；revision=" + file.revision + "；bytes=" + file.bytes
+                }
+            }
             "read_chunk" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
                 HarnessResourceKind.FILE_IO, "tool:read_chunk"
             ) {
