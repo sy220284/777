@@ -33,6 +33,9 @@ class GitWorkspaceRuntime(
     suspend fun remoteTrackingBranches(repository: String): List<String> =
         GitRemoteDiff(workspaceRoot, processRuntime).trackingBranches(repository)
 
+    suspend fun compareLocal(repository: String): JsonObject =
+        GitRemoteDiff(workspaceRoot, processRuntime).compareUncommitted(repository)
+
     suspend fun compareRemote(repository: String, remote: String, branch: String): JsonObject =
         GitRemoteDiff(workspaceRoot, processRuntime).compare(repository, remote, branch)
 
