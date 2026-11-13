@@ -12,7 +12,7 @@
 |---|---|---|---|---|
 | 缺少 | 会话分区管理 | Chat / Session | 本地持久分区目录与侧栏入口已接通；编译及设备回归待验收 | 分区创建/编辑/移动/删除；重启后恢复、会话隔离、UI 可见 |
 | 缺少 | 会话预测与示例采样 | Shared Model / Chat | 尚未实施 | 模型选路固定；独立请求、取消、费用计量及可见结果 |
-| 缺少 | 项目管理完整生命周期 | Project Feature | 尚未实施 | 建项目/导入/更新/移动/删除/会话绑定；文件引用与恢复一致 |
+| 缺少 | 项目管理完整生命周期 | Project Feature | 已接本地项目创建（自动分配目录）、已有目录导入、重命名/根目录更新、列表排序、删除记录与会话归属及 Android 原生操作界面；真实目录迁移、完整恢复和最新 HEAD 设备验收仍待验证 | 建项目/导入/更新/移动/删除/会话绑定；文件引用与恢复一致 |
 | 缺少 | 外部编码代理历史与配置迁移 | Work / Import | 尚未实施 | 校验来源、格式兼容、冲突处理和可追溯导入 |
 | 缺少 | 插件市场、搜索、升级、分享 | Tools Feature | 已接官方 GitHub 精选目录/检索/导入、固定来源版本与原生分享来源链接；通用插件市场、版本升级与回滚、完整技能包分享已接入源码、CI 与设备验收待完成 | 签名与来源、安装/回滚、依赖权限、失败恢复和 UI |
 | 缺少 | 工具生命周期 Hooks | Shared ToolRegistry | 核心钩子已接入，产品配置未接入 | 受信登记、前置拒绝/审批后代次栅栏、后置回执、插件装配与安全策略 |
@@ -114,3 +114,41 @@
 - 新增持久化恢复、过时摘要拒绝、风险意见与准许结论矛盾拒绝、Compose 双确认/拒绝 UI 与秘密遮盖回归。现有代码审查与安全审查的历史读取已改为独立失败处理，互不掩盖状态。
 - 本轮 CI 首次真实发现：Android 仪表测试 `LocalRecursiveSubagentRunnerAndroidTest` 构造 `LocalModelGateway` 遗漏新加 `managedPolicy`；已补齐。两个联网搜索单测使用尾随 lambda，新增 `verifyEndpoint` 后误绑定为政策回调而非计费回调；改为显式 `onBillableResult`。搜索重定向异常已增加实际异常类型/请求次数诊断断言，等待最新 CI 确定根因。
 - **待闭环**：本轮安全审查尚不是 Codex 对某次敏感工具调用的 Guardian；也不绕过 ToolRegistry 原有审批，更不凭模型断言替代真实测试成功及 Goal 证据。其余多环境、MCP 宿主、供应商额度、设备控制、网络代理、Agent UID、长期记忆、托管配置仍按上表逐项执行端到端验收。
+
+## 2026-11-13 PR #895 全量变更审计：功能优先、统一复用与最小必要复杂度
+
+**审计基准**：截至 `166d8d1805061d0afdd8a71da1fecd30bacc1764` 的 #895 草稿；包含约 170 个变更文件。逐文件读取 PR 差异（生成的 HTML 以源文件和索引为准），并沿 ToolRegistry、Code Mode、MCP、工作区、Git、项目、会话队列、记忆、模型、权限策略、网络、Android UI、Work 交付、CI 关键链路核对生产实现。审计标准采用当前 `AGENTS.md` 第 2—6.2、11、13、16 节；仅按证据区分**已证实代码问题**、**职责重复待收敛**、**产品交付缺口**及**验证未闭环**。
+
+**行为规范安装确认**：`AGENTS.md` 已有“6.1 功能优先与合法能力完整性”和“6.2 新增机制准入：最小必要复杂度”，对所有功能生效，并已把原重复 6.3 合并；无需再安装第二套规则。网络专项案例继续位于 `docs/NETWORK-ACCESS-IMPLEMENTATION-GUIDE.zh-CN.md`。
+
+### A. 已确认的问题及整改建议
+
+| 等级 | 位置 | 代码事实与问题 | 建议与验收 |
+|---|---|---|---|
+| P1 | `LocalWorkspaceFilesDialog.kt:406–435` | “指定提交”历史读取把代码审查与安全审查放在同一个 `try` 块；安全审查读取失败时错误被记入 `codeReviewError`，与“本地修改/远端分支”两条独立错误路径不一致。三处模式还复制了历史读取流程。 | 抽取**一个**共用历史报告恢复函数，代码审查和安全审查分别捕获、分别显示错误；为三种模式增加一组共享回归测试，要求任何一侧失败时另一侧仍可展示。 |
+| P1 | `LocalManagedExecutionPolicy.kt:35–78`、`LocalManagedDeviceProvider.kt:17–28`、`LocalSettingsRuntime.kt:104–125` | 浏览器历史/上传/下载/控制有管理策略字段及设置页状态，但本 PR 的实际 `requireBrowserOrigin` 生产调用仅为 `android_open_uri` 的 `read` 操作。其他四项策略没有接入实际执行动作，状态容易被理解成已经管控真实浏览器能力。 | 逐项对接对应 Android Device 执行边界，或在具备真实执行入口前把这些未生效状态标注为“尚未接入”；优先复用设备能力 Owner 和现有审批，避免再建一套浏览器管控系统。 |
+| P1 | `LocalWorkBuiltinToolRuntime.kt:60–70`、`LocalWorkProgressCoordinator.kt:151–170`、`LocalWorkAgentTurnExecutor.kt:1115–1135` | Work Goal 会先持久化 `completed` 再将成果发布至系统下载；失败时目标仍完成，另有明确错误反馈，存在“任务完成/成果交付”状态不同步。Work 工具适配器的发布回调还允许默认返回空列表，可能造成空结果仍提示发布。 | 目标验收完成与公开下载交付使用不同、可查询的真实状态；发布失败保留工作区成果并提供明确重试/补发。生产发布回调设为必需依赖；同一目标多次执行不得重复创建内容相同的公开文件。 |
+| P2 | `.github/workflows/v6-feature-index-refresh.yml:67–85`、`.github/workflows/ci.yml:3–18` | 功能树同步成功且**无索引改动**时，仍手动触发完整 CI 与 Android 矩阵；PR 事件自身也会运行 CI，同分支最新任务的取消策略会使验证不断重启。 | 只在自动索引提交真正产生新 HEAD、而 GitHub PR 事件未覆盖该提交时派发对应验证；无改动直接复用正常 PR 流程。用同一提交 SHA 证明只保留一套完整有效验证。 |
+| P2 | `LocalWebDiagnostics.kt:15–39`、`LocalWebTargetResolver.kt:34–55` | 诊断入口重新执行解析、DNS 与公网/SSRF 检查，网页解析器已有相同逻辑；两处修改可能漂移。 | 将原解析器提供的有效/拒绝原因作为诊断数据使用；保留诊断特有的代理/VPN 信息，删除复制的核心校验。 |
+| P2 | `LocalManagedExecutionPolicy.kt:175–188`、`ManagedNetworkPolicyInterceptors.kt:29–38` | 每次 `current()` 读取并解析三个策略 JSON 文件；应用层及网络层拦截均可调用当前策略，其他业务入口亦有前置检查，存在重复磁盘读取。具体性能损耗尚未实测。 | 权威策略所有者统一持有可失效快照，并在配置变更时刷新；按真实网络目标变化/重定向检查，避免同一请求无变化时重复读取。保留缓存响应、重定向和授权撤销对应的真实边界。 |
+| P2 | `McpToolBridgePlugin.kt:651–667`、`McpPluginWorkerTransport.kt:185–193`、`LocalMcpNetworkAdmission.kt:12–24` | MCP 静态 URL 在连接入口解析过，工作进程 RPC 仍会逐次解析相同字符串；真实 RPC 的动态策略检查有必要，静态格式重复解析可精简。 | 建连时生成已校验地址事实，实际 OPEN/REQUEST 只复核当前权限及目标身份，不重新复制静态解析器。 |
+
+### B. 产品交付差距
+
+- **范围明确仍缺**：会话预测/示例采样、外部编码代理历史与配置迁移、实时双向语音，均在 29 项清单中尚未实施。保持待办，不把有其他相似入口视为完成。
+- **Code Mode**：现有 `CodeModePlugin.kt` 提供至多 8 步 JSON 顺序编排、结果引用、审批/回执，尚非需求中的完整受限脚本执行能力。是否扩大步骤/超时应从真实需求、运行取消与资源约束核定，避免任意阈值。
+- **Hooks / 插件 / MCP**：已有 ToolRegistry 前后钩子、MCP 工具/进程与追问机制；产品级 Hook 配置、插件宿主权限隔离和完整重启恢复，以及部分 MCP 高级表单场景仍需按真实 Android 消费者完成，不额外复制插件管理系统。
+- **项目管理状态更正**：此前台账的“尚未实施”已过期。代码中 `LocalWorkProjectCatalog`、`LocalWorkProjectsUiFacade`、`LocalWorkProjectsSheet` 和相应测试已有创建/导入/更新/排序/删除/绑定实现；文件夹真正移动与恢复、设备端验证仍待闭环。
+- **Android 下载交付**：新增 `LocalDownloadsPublisher`，通过 MediaStore 将已存在的工作区文件发布至手机“下载/神言神语”，并带内容版本复用。已有 `LocalDownloadsPublisherAndroidTest` 覆盖中文名、相同字节复用、内容变化与目录越界；必须等设备测试真实通过才可宣布交付。
+
+### C. 按系统归属验证矩阵
+
+| 模块 | 已核查的调用/源码 | 剩余交付证据 |
+|---|---|---|
+| Shared Tools / Code Mode | ToolRegistry、Hooks、快照、脚本执行和工具回执 | 审批前后版本变化、取消、跨工具副作用、真实模型调用 |
+| MCP / 技能 | MCP transport、worker、elicitation、技能 ZIP 更新/回退/来源与 Android 入口 | HTTP/stdio 实际运行、跨进程错误恢复、技能包更新回退设备测试 |
+| Work / Session / Files | 队列编辑/重排、工作区版本写入、文件观察、项目/分区、Git diff、Goal、下载交付 | 用户成功路径、跨会话归属、重启恢复、下载幂等及异常提示 |
+| Model / Memory / Network | 模型配置和余额、记忆版本、网络策略、代理固定路由 | 多供应商真实调用、长期记忆恢复、代理/VPN、策略变更与 Android 设备 |
+| Android UI / CI | 设置、工具页、Work/Files、审查、项目、技能、诊断界面与新增 JVM/仪表测试；索引自动同步 | 当前最终 SHA 的构建/单测/Android 16/17/页面矩阵完整成功回执 |
+
+**验收状态**：对本审计提交前的 PR HEAD，源码审阅已经覆盖当前差异清单；**最新 HEAD 的 CI/Android 完整结果尚未取得，不能将 #895 标为可合并**。历史较旧提交的 static-gates、architecture-3-gates、unit-tests 通过，仅对该历史 SHA 成立；若本审计文档写入新提交，应重新按新 HEAD 查询验证。以上 P1/P2 均未在此文档审计提交中改动生产代码，需按权威 Owner 修复并取得回归证据。
