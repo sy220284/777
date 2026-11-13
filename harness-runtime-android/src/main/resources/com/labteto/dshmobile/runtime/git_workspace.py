@@ -43,15 +43,15 @@ MAX_REVIEW_BYTES = 262144
 
 def changed_paths(source, before, after):
     data = git(source, "diff", "--name-only", "--no-renames", "-z", before, after).stdout
-    return {os.fsdecode(part) for part in data.split(b"\\0") if part}
+    return {os.fsdecode(part) for part in data.split(b"\0") if part}
 
 
 def tree_blobs(source, tree):
     entries = {}
-    for record in git(source, "ls-tree", "-r", "-z", tree).stdout.split(b"\\0"):
+    for record in git(source, "ls-tree", "-r", "-z", tree).stdout.split(b"\0"):
         if not record:
             continue
-        header, path = record.split(b"\\t", 1)
+        header, path = record.split(b"\t", 1)
         mode, kind, oid = header.decode().split()
         entries[os.fsdecode(path)] = (mode, kind, oid)
     return entries
@@ -98,7 +98,7 @@ def choose_file_versions(source, parent_tree, child_tree, comparison, resolution
             if entry is not None and entry[1] != "blob":
                 raise ValueError("non-file merge needs a reworked workspace: " + path)
             mode, oid = (entry[0], entry[2]) if entry else ("0", "0" * 40)
-            instructions.extend(f"{mode} {oid}\\t".encode() + os.fsencode(path) + b"\\0")
+            instructions.extend(f"{mode} {oid}\t".encode() + os.fsencode(path) + b"\0")
         git(source, "update-index", "-z", "--index-info", data=bytes(instructions), env=env)
         return git(source, "write-tree", env=env).stdout.decode().strip()
 
