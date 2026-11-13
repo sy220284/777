@@ -83,6 +83,7 @@ private data class InventoryRow(
     val installableCurated: Boolean = false,
     val sourceUrl: String? = null,
     val sourceWarning: String? = null,
+    val rollbackAvailable: Boolean = false,
 )
 
 /** Browses real installed/connected plugin inventory; does not advertise unsupported storefront apps. */
@@ -95,6 +96,8 @@ internal fun PluginInventoryBrowser(
     curatedSkills: List<String> = emptyList(),
     curatedLoading: Boolean = false,
     curatedError: String? = null,
+    pendingSkillUpdates: Map<String, String> = emptyMap(),
+    upToDateSkills: Set<String> = emptySet(),
     createdSkillId: String? = null,
     skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
     savedSkillId: String? = null,
@@ -114,6 +117,9 @@ internal fun PluginInventoryBrowser(
     onImportSkill: (() -> Unit)? = null,
     onRemoveSkill: ((String) -> Unit)? = null,
     onShareSkillPackage: ((String) -> Unit)? = null,
+    onCheckSkillUpdate: ((String) -> Unit)? = null,
+    onUpgradeSkill: ((String, String) -> Unit)? = null,
+    onRollbackSkill: ((String) -> Unit)? = null,
     onOpenSkillEditor: ((String) -> Unit)? = null,
     onCloseSkillEditor: (() -> Unit)? = null,
     onSaveSkillDocument: ((String, String) -> Unit)? = null,
@@ -129,6 +135,8 @@ internal fun PluginInventoryBrowser(
     var showCreateSkill by remember { mutableStateOf(false) }
     var removeSkillName by remember { mutableStateOf<String?>(null) }
     var sharePackageSkillName by remember { mutableStateOf<String?>(null) }
+    var upgradeSkillChoice by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var rollbackSkillChoice by remember { mutableStateOf<String?>(null) }
     var newSkillId by remember { mutableStateOf("") }
     var newSkillDisplayName by remember { mutableStateOf("") }
     var newSkillDescription by remember { mutableStateOf("") }
@@ -193,7 +201,8 @@ internal fun PluginInventoryBrowser(
         InventoryRow("skill:" + skill.name, display, skill.description,
             connectedService = false, icon = FeatherIcons.BookOpen,
             available = true, modelInvocable = skill.modelInvocable, installedSkill = true,
-            sourceUrl = skill.sourceUrl, sourceWarning = skill.sourceWarning)
+            sourceUrl = skill.sourceUrl, sourceWarning = skill.sourceWarning,
+            rollbackAvailable = skill.rollbackAvailable)
     }
     val availablePresets = presets.filterNot { it.installed }.map { preset ->
         InventoryRow("skill:" + preset.id, preset.title, preset.description,
@@ -556,6 +565,42 @@ internal fun PluginInventoryBrowser(
                     style = DsType.small13.withReadingWeight(),
                     color = colors.textSecondary,
                 )
+                if (onCheckSkillUpdate != null) {
+                    SyButton(
+                        text = "检查更新",
+                        variant = SyButtonVariant.Info,
+                        enabled = !loading,
+                        modifier = Modifier.testTag("skill-check-update"),
+                        onClick = { onCheckSkillUpdate(item.id.substringAfter(":")) },
+                    )
+                    val skillId = item.id.substringAfter(":")
+                    val revision = pendingSkillUpdates[skillId]
+                    if (revision != null && onUpgradeSkill != null) {
+                        Text(
+                            "发现新版本：${revision.take(12)}",
+                            style = DsType.small13.withReadingWeight(),
+                            color = colors.textSecondary,
+                            modifier = Modifier.testTag("skill-update-available"),
+                        )
+                        SyButton(
+                            text = "升级到此版本",
+                            variant = SyButtonVariant.Info,
+                            enabled = !loading,
+                            modifier = Modifier.testTag("skill-upgrade"),
+                            onClick = {
+                                upgradeSkillChoice = skillId to revision
+                                selectedRow = null
+                            },
+                        )
+                    } else if (skillId in upToDateSkills) {
+                        Text(
+                            "当前已是最新版本",
+                            style = DsType.small13.withReadingWeight(),
+                            color = colors.textSecondary,
+                            modifier = Modifier.testTag("skill-update-current"),
+                        )
+                    }
+                }
                 SyButton(
                     text = "分享原始来源",
                     variant = SyButtonVariant.Ghost,
@@ -571,6 +616,18 @@ internal fun PluginInventoryBrowser(
                 )
             }
 
+            if (item.installedSkill && item.rollbackAvailable && onRollbackSkill != null) {
+                SyButton(
+                    text = "恢复上一版本",
+                    variant = SyButtonVariant.Ghost,
+                    enabled = !loading,
+                    modifier = Modifier.testTag("skill-rollback"),
+                    onClick = {
+                        rollbackSkillChoice = item.id.substringAfter(":")
+                        selectedRow = null
+                    },
+                )
+            }
             if (item.installedSkill && onShareSkillPackage != null) {
                 SyButton(
                     text = "分享完整技能包",
@@ -679,6 +736,50 @@ internal fun PluginInventoryBrowser(
                 label = { Text(stringResource(R.string.skills_instruction_label)) },
                 minLines = 5,
                 modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+    upgradeSkillChoice?.let { (id, revision) ->
+        SyResponsiveSheet(
+            title = "确认升级技能",
+            onDismiss = { upgradeSkillChoice = null },
+            footer = {
+                SyButton(
+                    text = "确认升级",
+                    enabled = !loading && pendingSkillUpdates[id] == revision,
+                    modifier = Modifier.fillMaxWidth().testTag("skill-upgrade-confirm"),
+                    onClick = {
+                        onUpgradeSkill?.invoke(id, revision)
+                        upgradeSkillChoice = null
+                    },
+                )
+            },
+        ) {
+            Text(
+                "将升级 $id 到版本 ${revision.take(12)}。安装前会验证新包，并保存当前完整技能作为上一版本；如果修改过本地规则，可通过“恢复上一版本”找回。",
+                style = DsType.std14.withReadingWeight(), color = colors.textSecondary,
+            )
+        }
+    }
+    rollbackSkillChoice?.let { id ->
+        SyResponsiveSheet(
+            title = "恢复上一版本",
+            onDismiss = { rollbackSkillChoice = null },
+            footer = {
+                SyButton(
+                    text = "确认恢复",
+                    enabled = !loading,
+                    modifier = Modifier.fillMaxWidth().testTag("skill-rollback-confirm"),
+                    onClick = {
+                        onRollbackSkill?.invoke(id)
+                        rollbackSkillChoice = null
+                    },
+                )
+            },
+        ) {
+            Text(
+                "将 $id 恢复为上次升级前的完整技能内容。当前版本会保留，可再次恢复回来。",
+                style = DsType.std14.withReadingWeight(), color = colors.textSecondary,
             )
         }
     }

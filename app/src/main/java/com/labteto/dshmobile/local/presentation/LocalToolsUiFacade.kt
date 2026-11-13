@@ -154,6 +154,7 @@ class LocalToolsUiFacade @Inject internal constructor(
                 item.name, item.description, item.modelInvocable, item.displayName,
                 sourceUrl = result.getOrNull(),
                 sourceWarning = if (result.isFailure) "技能来源记录校验失败，请检查或重新安装此技能" else null,
+                rollbackAvailable = gitHubSkillImporter.canRollback(item.name),
             )
         }
     }
@@ -171,6 +172,10 @@ class LocalToolsUiFacade @Inject internal constructor(
         tools.createSkill(id, displayName, description, instructions)
     override suspend fun importSkill(filename: String, bytes: ByteArray) = tools.importSkill(filename, bytes)
     suspend fun exportSkillPackage(id: String): ByteArray = tools.exportSkillPackage(id)
+    suspend fun checkSkillUpdate(id: String): String? = gitHubSkillImporter.availableUpdate(id)
+    suspend fun upgradeSkill(id: String, revision: String): String =
+        gitHubSkillImporter.updateInstalled(id, revision)
+    suspend fun rollbackSkill(id: String): String = gitHubSkillImporter.rollback(id)
     override suspend fun removeSkill(id: String) = tools.removeSkill(id)
     override suspend fun readSkillDocument(id: String) = tools.readSkillDocument(id)
     override suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)

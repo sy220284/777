@@ -124,6 +124,8 @@ data class ToolsUiState(
     val curatedSkills: List<String> = emptyList(),
     val curatedLoading: Boolean = false,
     val curatedError: String? = null,
+    val pendingSkillUpdates: Map<String, String> = emptyMap(),
+    val upToDateSkills: Set<String> = emptySet(),
     val createdSkillId: String? = null,
     val skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
     val savedSkillId: String? = null,
@@ -313,6 +315,8 @@ class ToolsViewModel @Inject constructor(
                     loading = false,
                     skills = localTools.installedSkills(),
                     presets = localTools.presetSkills(),
+                    pendingSkillUpdates = emptyMap(),
+                    upToDateSkills = emptySet(),
                     createdSkillId = createdId,
                     feedbackRes = R.string.skills_saved,
                 )
@@ -364,6 +368,77 @@ class ToolsViewModel @Inject constructor(
             } catch (error: Exception) {
                 _state.value = _state.value.copy(loading = false,
                     feedback = "精选技能安装失败：" + (error.message ?: "请检查网络或技能包"))
+            }
+        }
+    }
+
+    /** Network access happens only after the user explicitly asks to check one source. */
+    fun checkSkillUpdate(id: String) {
+        if (_state.value.skills.none { it.name == id && it.sourceUrl != null }) return
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val revision = localTools.checkSkillUpdate(id)
+                val previous = _state.value.pendingSkillUpdates.toMutableMap()
+                val current = _state.value.upToDateSkills.toMutableSet()
+                if (revision != null) {
+                    previous[id] = revision
+                    current.remove(id)
+                } else {
+                    previous.remove(id)
+                    current.add(id)
+                }
+                _state.value = _state.value.copy(loading = false,
+                    pendingSkillUpdates = previous, upToDateSkills = current,
+                    feedback = if (revision == null) "技能已是最新版本" else "发现新版本：${revision.take(12)}")
+            } catch (cancelled: CancellationException) {
+                _state.value = _state.value.copy(loading = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false,
+                    feedback = "检查技能更新失败：" + (error.message ?: "网络连接异常"))
+            }
+        }
+    }
+
+    fun upgradeSkill(id: String, revision: String) {
+        if (_state.value.pendingSkillUpdates[id] != revision) return
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                localTools.upgradeSkill(id, revision)
+                _state.value = _state.value.copy(loading = false,
+                    skills = localTools.installedSkills(),
+                    pendingSkillUpdates = _state.value.pendingSkillUpdates - id,
+                    upToDateSkills = _state.value.upToDateSkills + id,
+                    feedback = "已升级技能 $id，上一版本可在技能详情恢复")
+            } catch (cancelled: CancellationException) {
+                _state.value = _state.value.copy(loading = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false,
+                    feedback = "升级失败：" + (error.message ?: "请重新检查技能版本"))
+            }
+        }
+    }
+
+    fun rollbackSkill(id: String) {
+        if (_state.value.skills.none { it.name == id && it.rollbackAvailable }) return
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                localTools.rollbackSkill(id)
+                _state.value = _state.value.copy(loading = false,
+                    skills = localTools.installedSkills(),
+                    pendingSkillUpdates = _state.value.pendingSkillUpdates - id,
+                    upToDateSkills = _state.value.upToDateSkills - id,
+                    feedback = "已恢复上一版本：$id")
+            } catch (cancelled: CancellationException) {
+                _state.value = _state.value.copy(loading = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false,
+                    feedback = "恢复失败：" + (error.message ?: "请检查技能存储"))
             }
         }
     }
@@ -424,7 +499,7 @@ class ToolsViewModel @Inject constructor(
                     val pending = Files.createTempFile(folder.toPath(), "skill-", ".partial")
                     try {
                         Files.write(pending, bytes)
-                        val target = File(folder, "$"+"id.zip").toPath()
+                        val target = File(folder, "$id.zip").toPath()
                         try {
                             Files.move(pending, target, StandardCopyOption.ATOMIC_MOVE,
                                 StandardCopyOption.REPLACE_EXISTING)
@@ -437,7 +512,7 @@ class ToolsViewModel @Inject constructor(
                     }
                 }
                 val uri = FileProvider.getUriForFile(
-                    appContext, "$"+"{appContext.packageName}.files", file,
+                    appContext, "${appContext.packageName}.files", file,
                 )
                 val send = Intent(Intent.ACTION_SEND).apply {
                     type = "application/zip"
@@ -879,6 +954,8 @@ fun ToolsScreen(
                                     curatedSkills = state.curatedSkills,
                                     curatedLoading = state.curatedLoading,
                                     curatedError = state.curatedError,
+                                    pendingSkillUpdates = state.pendingSkillUpdates,
+                                    upToDateSkills = state.upToDateSkills,
                                     createdSkillId = state.createdSkillId,
                                     skillEditor = state.skillEditor,
                                     savedSkillId = state.savedSkillId,
@@ -899,6 +976,9 @@ fun ToolsScreen(
                                     onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
                                     onRemoveSkill = viewModel::removeSkill,
                                     onShareSkillPackage = viewModel::shareSkillPackage,
+                                    onCheckSkillUpdate = viewModel::checkSkillUpdate,
+                                    onUpgradeSkill = viewModel::upgradeSkill,
+                                    onRollbackSkill = viewModel::rollbackSkill,
                                     onOpenSkillEditor = viewModel::openSkillEditor,
                                     onCloseSkillEditor = viewModel::closeSkillEditor,
                                     onSaveSkillDocument = viewModel::saveSkillDocument,
