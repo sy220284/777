@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1936,
-  "production_source_count": 1129,
-  "test_code_file_count": 662,
+  "repository_code_file_count": 1938,
+  "production_source_count": 1130,
+  "test_code_file_count": 663,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -284,7 +284,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
-      "sha256": "ce9ad6146411d976"
+      "sha256": "aaa20c73630bfeec"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
@@ -1928,7 +1928,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
-      "sha256": "84c944cf02c1670a"
+      "sha256": "6a973780f0d2a2ad"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTranscriptHistoryLoader.kt",
@@ -2424,11 +2424,15 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
-      "sha256": "45cb317e4cb35cb5"
+      "sha256": "4c6e3a0e0c2f857c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackage.kt",
       "sha256": "f0fb6f79d3a55b97"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackageExporter.kt",
+      "sha256": "0fa1e04c2c1e3fa3"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTaskCapabilityReadiness.kt",
@@ -2492,7 +2496,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsManagementPort.kt",
-      "sha256": "824470a3e36328c4"
+      "sha256": "5b554c872825c40d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsModels.kt",
@@ -2500,7 +2504,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt",
-      "sha256": "e0ccc921aae35875"
+      "sha256": "13d967f72abc88c2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTurnSettlement.kt",
@@ -3808,11 +3812,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
-      "sha256": "bbd33e972a289944"
+      "sha256": "aa878a681eb355ba"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
-      "sha256": "5c1c6de1bb4747a0"
+      "sha256": "2bd7b12ffbf7fd09"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/shenyan/ShenyanTheme.kt",
@@ -4580,13 +4584,21 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "132b5cc7ffd0",
+  "source_snapshot": "574e87e220fe",
   "observed_delta": {
-    "baseline": "9a1aad748dbc",
-    "added_production_files": [],
+    "baseline": "132b5cc7ffd0",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackageExporter.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/CodeModePlugin.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsManagementPort.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
