@@ -25,6 +25,9 @@ internal fun AgentBackendSettings(viewModel: ToolsViewModel) {
         Text("代理执行器")
         Text("远端负责控制循环；模型请求、审批和工具执行保留在本机。")
         Text(status)
+        if (status.contains("已保存远端授权") || status.contains("验证成功") || status.contains("连接验证失败")) {
+            SyButton(text = "检查远端连接和证书", onClick = viewModel::probeAgentBackend)
+        }
         SyButton(text = if (expanded) "收起远端设置" else "配置远端执行器", onClick = { expanded = !expanded; token = "" })
         if (expanded) {
             SyTextField(value = host, onValueChange = { host = it }, label = { Text("主机名") }, singleLine = true)
