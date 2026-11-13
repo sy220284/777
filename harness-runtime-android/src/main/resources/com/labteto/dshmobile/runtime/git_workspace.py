@@ -1,5 +1,6 @@
 """Local Git worktree lifecycle. Snapshot indexes never replace the user's index."""
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -128,6 +129,14 @@ def merge_proposal(source, admission, child_tree, resolution="auto", choices=Non
     patch = git(source, "diff", "--binary", "--full-index", parent_tree, merged_tree).stdout
     return dict(state="ready", source_tree=parent_tree, merged_tree=merged_tree, patch=patch,
                 resolution=resolution, comparison=comparison)
+
+
+def review_receipt(proposal, offset, page):
+    digest = hashlib.sha256()
+    digest.update(proposal["source_tree"].encode() + b"\\0" +
+                  proposal["merged_tree"].encode() + b"\\0" +
+                  str(offset).encode() + b"\\0" + page)
+    return digest.hexdigest()
 
 
 def validate_quality_decision(decision, resolution, comparison):
@@ -521,14 +530,25 @@ def locked(root, store, owner, action, arguments):
             return dict(workspace_id=workspace_id, tree=child_tree, **proposal)
         patch = proposal["patch"]
         truncated = len(patch) > MAX_REVIEW_BYTES
+        offset = arguments.get("review_offset", 0)
+        if (not isinstance(offset, int) or isinstance(offset, bool) or offset < 0 or
+                offset % MAX_REVIEW_BYTES != 0 or (offset and offset >= len(patch))):
+            raise ValueError("invalid review page offset")
+        page = patch[offset:offset + MAX_REVIEW_BYTES]
+        next_offset = offset + len(page)
         receipt = dict(workspace_id=workspace_id, tree=child_tree,
                        source_tree=proposal["source_tree"],
                        resolution=resolution, path_choices=choices,
                        comparison=proposal["comparison"],
                        state="needs_full_review" if truncated else "ready",
-                       diff=patch[:MAX_REVIEW_BYTES].decode(errors="replace"),
-                       diff_bytes=len(patch), diff_truncated=truncated)
-        if not truncated:
+                       diff=page.decode(errors="replace"),
+                       diff_bytes=len(patch), diff_truncated=next_offset < len(patch),
+                       diff_offset=offset, next_offset=next_offset if next_offset < len(patch) else None)
+        if truncated:
+            # Every page is bound to the same exact source/result pair. Collect them
+            # all before the reviewed merge can be committed.
+            receipt["review_receipt"] = review_receipt(proposal, offset, page)
+        if not truncated or next_offset == len(patch):
             receipt["merged_tree"] = proposal["merged_tree"]
         return receipt
     if action == "discard":
@@ -568,7 +588,12 @@ def locked(root, store, owner, action, arguments):
     if arguments["expected_merged_tree"] != merged_tree:
         raise ValueError("integration result changed since merge preview; inspect again")
     if len(proposal["patch"]) > MAX_REVIEW_BYTES:
-        raise ValueError("full merge review required for large changes")
+        patch_bytes = proposal["patch"]
+        receipts = arguments.get("review_receipts")
+        expected_receipts = [review_receipt(proposal, offset, patch_bytes[offset:offset + MAX_REVIEW_BYTES])
+                             for offset in range(0, len(patch_bytes), MAX_REVIEW_BYTES)]
+        if not isinstance(receipts, list) or receipts != expected_receipts:
+            raise ValueError("full merge review requires every exact diff page receipt")
     decision = arguments.get("quality_decision")
     validate_quality_decision(decision, resolution, proposal["comparison"])
     patch = proposal["patch"]
