@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import android.app.Activity
 import android.os.Build
 import android.os.Bundle
 import android.os.Debug
@@ -21,10 +20,9 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
-import androidx.test.runner.lifecycle.Stage
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.io.File
@@ -38,7 +36,7 @@ import org.junit.Test
  * Measurements are diagnostic; CI must not fail due solely to virtualized host speed.
  */
 class DeviceScrollFrameAndMemoryTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test fun workTimelineScrollReportsFrameRateJankAndPeakPss() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -77,15 +75,11 @@ class DeviceScrollFrameAndMemoryTest {
         }
         assertTrue("Work list must be long enough to scroll", listState.canScrollForward)
 
-        lateinit var activity: Activity
-        instrumentation.runOnMainSync {
-            // Android 16 may keep multiple activities RESUMED. Frame metrics and
-            // real touch input must target the Compose host with window focus.
-            activity = ActivityLifecycleMonitorRegistry.getInstance()
-                .getActivitiesInStage(Stage.RESUMED)
-                .firstOrNull { it.hasWindowFocus() }
-                ?: error("Work timeline test activity has no focused window")
-        }
+        // The test rule owns the exact Compose host; searching every RESUMED Activity on
+        // Android 16 can choose an unrelated activity or race window-focus delivery.
+        val activity = compose.activity
+        compose.runOnUiThread { activity.window.decorView.requestFocus() }
+        compose.waitUntil(timeoutMillis = 15_000) { activity.hasWindowFocus() }
         var refreshRate = 60f
         instrumentation.runOnMainSync {
             refreshRate = (activity.display?.refreshRate ?: 60f).coerceAtLeast(30f)

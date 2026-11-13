@@ -165,7 +165,7 @@ internal class LocalSkillStore(
             Files.size(source.toPath()) in 1L..8192L) {
             "GitHub 技能来源记录损坏，请检查本地 .github-source.json"
         }
-        return Files.readString(source.toPath(), Charsets.UTF_8)
+        return source.readText(Charsets.UTF_8)
     }
 
     fun presets(): List<LocalPresetSkill> {
