@@ -88,6 +88,20 @@ class LocalWorkFindingJournalTest {
                     put("summary", "不能修改不属于当前目标的发现记录")
                 })
             }.isFailure)
+            history.append("tool/call", buildJsonObject {
+                put("id", "reused"); put("goal_id", "goal-a")
+            })
+            history.append("tool/result", buildJsonObject {
+                put("id", "reused"); put("is_error", false)
+                put("tool_declared_sequence", 999999)
+            })
+            assertTrue(runCatching {
+                LocalWorkFindingJournal.execute(history, "goal-a", buildJsonObject {
+                    put("action", "record")
+                    put("source_call_id", "reused")
+                    put("summary", "不能把不匹配的调用回执当成有效来源")
+                })
+            }.isFailure)
             assertTrue(history.eventsOfTypesAfter(-1L, setOf("work/finding")).isEmpty())
         } finally {
             history.close()
