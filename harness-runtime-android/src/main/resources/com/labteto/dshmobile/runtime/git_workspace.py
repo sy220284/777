@@ -1,4 +1,5 @@
 """Local Git worktree lifecycle. Snapshot indexes never replace the user's index."""
+import base64
 import fcntl
 import hashlib
 import json
@@ -206,7 +207,8 @@ def tree_entries(source, tree, paths):
             continue
         header, path = record.split(b"\t", 1)
         name = os.fsdecode(path)
-        if name in wanted:
+        if any(name == path.rstrip("/") or name.startswith(path.rstrip("/") + "/")
+               for path in wanted):
             mode, kind, oid = header.decode().split()
             if kind != "blob":
                 raise ValueError("integration requires file-level changes: " + name)
@@ -527,9 +529,33 @@ def locked(root, store, owner, action, arguments):
             child_diff = git(source, "diff", "--binary", "--full-index",
                              base_tree, child_tree).stdout
             if len(parent_diff) > MAX_REVIEW_BYTES or len(child_diff) > MAX_REVIEW_BYTES:
-                return dict(state="needs_full_review", workspace_id=workspace_id,
-                            tree=child_tree, source_tree=parent_tree, comparison=comparison,
-                            parent_diff_bytes=len(parent_diff), child_diff_bytes=len(child_diff))
+                versions = dict(state="needs_full_review", workspace_id=workspace_id,
+                                tree=child_tree, source_tree=parent_tree, comparison=comparison,
+                                parent_diff_bytes=len(parent_diff), child_diff_bytes=len(child_diff),
+                                parent_diff_sha256=hashlib.sha256(parent_diff).hexdigest(),
+                                child_diff_sha256=hashlib.sha256(child_diff).hexdigest())
+                side = arguments.get("review_side")
+                if side is None:
+                    if "review_offset" in arguments:
+                        raise ValueError("comparison page offset requires a review side")
+                    return versions
+                if side not in ("parent", "child"):
+                    raise ValueError("comparison review side must be parent or child")
+                patch = parent_diff if side == "parent" else child_diff
+                offset = arguments.get("review_offset", 0)
+                if (not isinstance(offset, int) or isinstance(offset, bool) or offset < 0 or
+                        offset % MAX_REVIEW_BYTES != 0 or
+                        (offset and offset >= len(patch))):
+                    raise ValueError("invalid comparison page offset")
+                page = patch[offset:offset + MAX_REVIEW_BYTES]
+                end = offset + len(page)
+                return dict(versions, review_side=side, diff_offset=offset,
+                            diff_base64=base64.b64encode(page).decode("ascii"),
+                            diff_bytes=len(patch),
+                            next_offset=end if end < len(patch) else None,
+                            last_page=end == len(patch))
+            if "review_side" in arguments or "review_offset" in arguments:
+                raise ValueError("comparison fits in a single complete response")
             return dict(state="ready", workspace_id=workspace_id, tree=child_tree,
                         source_tree=parent_tree, comparison=comparison,
                         parent_diff=parent_diff.decode(errors="replace"),
@@ -613,10 +639,13 @@ def locked(root, store, owner, action, arguments):
         required = arguments["required_outputs"]
         if (not isinstance(required, list) or not required or
                 any(not isinstance(path, str) or not path or path.startswith("/") or
-                    any(part in ("", ".", "..") for part in path.split("/")) for path in required)):
+                    any(part in ("", ".", "..") for part in path.rstrip("/").split("/"))
+                    for path in required)):
             raise ValueError("invalid required output paths")
         results = tree_entries(source, merged_tree, required)
-        if any(path not in results for path in required):
+        if any(not any((name == path and not path.endswith("/")) or
+                       name.startswith(path.rstrip("/") + "/") for name in results)
+               for path in required):
             raise ValueError("chosen integration drops a required output artifact")
     if len(proposal["patch"]) > MAX_REVIEW_BYTES:
         patch_bytes = proposal["patch"]
