@@ -56,6 +56,9 @@ internal class LocalWorkBuiltinToolRuntime(
                 progress.createGoal(args.string("description"), artifactPaths, verificationCommands)
             }
             "get_goal" -> progress.getGoal()
+            "work_finding" -> LocalWorkFindingJournal.execute(
+                run.eventLog, run.workState.snapshot().goal?.id.orEmpty(), args,
+            )
             "update_goal" -> {
                 val receipt = progress.updateGoal(
                     status = args.string("status"),
@@ -90,6 +93,7 @@ internal class LocalWorkBuiltinToolRuntime(
             "create_goal",
             "get_goal",
             "update_goal",
+            "work_finding",
             "ask_user_question",
         )
     }
