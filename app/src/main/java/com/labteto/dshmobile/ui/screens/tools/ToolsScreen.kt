@@ -174,6 +174,15 @@ class ToolsViewModel @Inject constructor(
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { _agentBackendStatus.value = "执行器设置读取失败，原授权已保留" }
     } }
+    fun probeAgentBackend() { viewModelScope.launch {
+        _agentBackendStatus.value = "正在验证 TLS 证书、连接口令与服务授权…"
+        try {
+            _agentBackendStatus.value = localTools.probeAgentBackend()
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            _agentBackendStatus.value = "远端连接验证失败：" + (failure.message ?: "连接中断")
+        }
+    } }
     fun configureAgentBackend(host: String, port: Int, pin: String, token: String, consent: Boolean) { viewModelScope.launch {
         try {
             operationGate.run { localTools.configureAgentBackend(host, port, pin, token, consent) }
