@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "snapshot": "2d510f0bc340",
+  "snapshot": "6ca3e0b539af",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1959,
+  "code_files_scanned": 1960,
   "production_sources_scanned": 1140,
   "feature_nodes": 553,
   "functional_leaves": 456,
@@ -9326,10 +9326,8 @@
   "followup_production_or_compatibility": 7,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "e55e4aaea7de",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalGitDiffPreview.kt"
-    ],
+    "baseline": "2d510f0bc340",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [],
     "moved_unchanged_files": [],
