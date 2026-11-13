@@ -116,6 +116,7 @@ class LocalModelRuntime @Inject constructor(
                         if (pendingSelections[originSessionId] != request) return@run
                         val current = configuration.readProfiles().firstOrNull { it.id == id }
                             ?: error("所选模型已被删除，请重新选择")
+                        gateway.requireExecutionPolicy(current)
                         check(gateway.hasCredential(current)) { "所选模型凭据不可用，请检查模型账户" }
                         if (pendingSelections[originSessionId] != request) return@run
                         sessionStorage.eventLogs.get(originSessionId).recordLocalModelSelection(id)
