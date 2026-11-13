@@ -533,14 +533,13 @@
    ├─ 构建与持续集成
    │  ├─ Kotlin／Gradle 多模块构建
    │  ├─ 代码格式与静态检查
-   │  ├─ 架构 3.0 所有权门禁
-   │  ├─ 性能、资源和安全门禁
+   │  ├─ 架构 3.0 所有权检查
+   │  ├─ 性能、资源和安全检查
    │  ├─ ARM64／x86_64 运行时与安装包构建
    │  ├─ Android 16／17 设备回归
    │  ├─ 运行时缓存的构建前校验保存
    │  ├─ 缓存命中与构建耗时汇总
-   │  ├─ 安装包大小、签名和运行时完整性
-   │  └─ 合并前多阶段门禁
+   │  └─ 安装包大小、签名和运行时完整性
    ├─ 测试与语义验证
    │  ├─ Android 应用单元测试
    │  ├─ 核心智能体循环测试
@@ -594,7 +593,7 @@
 - **Android 本机运行时**：`harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/`、`harness-device-android/src/main/java/com/labteto/dshmobile/device/`
 - **底层协议与兼容**：`app/src/main/java/com/labteto/dshmobile/local/model/`（本机模型协议）；`core/` 保留的旧远程协议代码不属于当前产品入口
 - **外部互通适配**：`harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/`
-- **构建与持续集成**：`.github/workflows/ci.yml`、`.github/scripts/`、`docs/VALIDATION.md`
+- **构建与调试**：`gradlew`、`docs/VALIDATION.md`
 - **测试与语义验证**：`reference-validation/src/`、`harness-core/src/test/`、`app/src/test/`
 - **发布与升级**：`app/src/main/java/com/labteto/dshmobile/update/`、`.github/workflows/`
 ## PR #610 实现来源与验证边界（2026-10-10）
