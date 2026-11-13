@@ -527,65 +527,14 @@ Kernel 不承担具体产品 Feature、Model Provider、Tool 领域、Settings �
 - Token ledger 单一账本；
 - Plugin lifecycle 继续由 PluginManager 管理。
 
-## 15. 架构门禁
+## 15. 架构实现参考
 
-CI 已将架构 3.0 从通用静态检查中独立为 `architecture-3-gates`。范围分类器识别 Feature / Shared Capability / Runtime Kernel 及架构控制文件；完整产品改动必须通过该 lane，main push 也必须重新执行对应控制面验证。
+Feature、Shared Capability 和 Runtime Kernel 继续保持既定所有权、依赖方向与唯一事实源。现有静态脚本可用于开发时定位结构性问题，但不作为合并、发布和交付的验收门槛。
 
-`scope` 在动态分类前固定自举范围分类器与仓库 CI 完整性检查，分类后再独立复核关键控制文件的最低 lane；`check-*.py` 门禁脚本必须能从 workflow / 自动化链路真实到达，`merge-gate` 必须持续依赖并核对全部当前 lane 的选择结果与执行结果。架构权威文件、CI 主流程和架构门禁本身发生变化时，不能通过调整分类规则让自身跳过 `static-gates` 或 `architecture-3-gates`。
+## 16. 调试方式
 
-架构 3.0 不设置 Kotlin 文件数量门禁，也不设置单文件行数门禁。拆成几个文件、每个文件多少行都不能证明所有权正确；CI 约束真实的 Feature / Shared Capability / Runtime Kernel 边界、依赖方向、状态归属、生产装配和运行不变量。若存在临时架构债务，必须单独记录消费文件、具体依赖边、退出条件和删除条件。
+发现架构问题后以实际调用链定位、修正并按需测试。仓库不再要求同 SHA 的 CI、测试结果、设备证明或额外签收材料作为工作完成条件。
 
-Feature Catalog 与路由门禁现包括：
-
-- Chat / Work / Automation / Tools / Settings 一级模块存在性；
-- 重复路由注册拒绝；
-- 所有路由必须唯一归属；
-- 导航必须通过 Catalog 解析；
-- Shell 页面状态枚举必须来自 Catalog。
-
-架构门禁持续验证以下当前边界：
-
-- Local 生产源码的 Kotlin package 必须与物理目录一致；
-- Local 架构敏感源码禁止 wildcard import；
-- 根层 `LocalHarnessModels.kt` 仅声明 `LocalHarnessState` 与跨 Feature 的 `LocalUsageMode`；
-- Work 的计划、目标和任务清单归 WorkFeature；审批/问答与后台任务类型分别归共享 Interaction / Jobs 契约；
-- 模型响应、会话/消息、附件、工具文件、Automation 结果与资源状态位于对应契约目录，序列化字段与枚举值保持兼容；
-- Feature 不互相导入 internal package；
-- UI 不引用领域 Store / Coordinator 等内部实现，只通过 presentation / Feature API / projection 消费；
-- Chat / Work 不持有完整 `LocalHarnessState` 可写聚合状态；领域事实由所属 Feature / Shared Capability 单一拥有，聚合适配只存在于应用组合根 / Runtime-owned 兼容投影边界；
-- Session ownership、Agent run identity、迟到提交栅栏与 recovery coordination 归共享 Runtime 单一持有；
-- 全局审批配置由 `LocalApprovalPreferences` 单一持有，Work 通过流式投影消费；
-- Chat / Work / Automation / Tools / Settings 的领域状态、规则和公开 API 均由所属 Feature 单一拥有；
-- Session / Model / Agent / Tool / Memory / Resource / Usage / Event / Persistence 等共享能力保持中立单一事实源；
-- 应用组合根负责 Feature / Provider 构造装配，`LocalRuntimeKernel` 只承担进程生命周期边界；
-- `LocalHarnessState` 只保留 Runtime-owned 兼容聚合与只读投影用途，领域写入通过所属 Owner 完成；
-- CI 以所有权、依赖方向、唯一事实源、生产装配、运行不变量和投影边界作为架构放行条件。
-
-## 16. 验证与持续完成标准
-
-任何架构变更都必须完成以下闭环：
-
-```text
-实现
-→ 单元测试
-→ 架构门禁
-→ 关联回归
-→ Android 构建/设备验证
-→ 最新 main + 当前 PR head 完整 CI
-```
-
-架构 3.0 长期成立必须同时满足：
-
-- 每个 Feature 拥有自己的领域状态、规则、写入与公开 API；
-- Feature 之间只通过稳定能力契约 / Port 协作；
-- Shared Capability 保持中立且每项共享事实只有一个 Owner；
-- Session ownership、Agent run identity、资源调度与恢复协调保持单一共享运行事实源；
-- `LocalRuntimeKernel` 只承担进程生命周期和 bootstrap / recovery 触发；
-- Feature / Provider 构造集中在应用组合根；
-- FeatureCatalog 的 route owner 与 UI contribution 归属唯一；
-- UI 只通过 presentation / Feature API / projection 消费；
-- `LocalHarnessState` 只承担兼容聚合 / 只读投影，不成为领域写入口；
-- 架构门禁持续验证上述所有权、依赖、装配和运行不变量。
 
 ## 17. 相关权威文档
 
