@@ -199,6 +199,24 @@ class McpElicitationRoundTripsTest {
         assertEquals(1, prompts)
     }
 
+    @Test fun repeatedEmptyPromptWithUnchangedStateStopsWithoutBusyLoop() = runTest {
+        var calls = 0
+        val stuck = buildJsonObject {
+            put("resultType", "input_required")
+            put("requestState", "same")
+            put("inputRequests", buildJsonObject {})
+        }
+        val result = runCatching {
+            mcpCallWithInputRequired(
+                request = { calls++; stuck },
+                name = "read", arguments = input,
+                onElicitation = { error("无输入请求不应弹窗") },
+            )
+        }
+        assertTrue(result.isFailure)
+        assertEquals(2, calls)
+    }
+
     @Test fun moreThanEightLegitimateElicitationRoundsCanFinish() = runTest {
         var calls = 0
         var prompts = 0
