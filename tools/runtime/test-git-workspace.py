@@ -214,7 +214,8 @@ class GitWorkspaceTest(unittest.TestCase):
         last = self.call("preview_merge", expected_tree=tree,
                          review_offset=first["next_offset"])
         self.assertEqual("needs_full_review", last["state"])
-        self.assertFalse(last["diff_truncated"])
+        self.assertTrue(last["diff_truncated"])
+        self.assertTrue(last["last_page"])
         self.assertIsNone(last["next_offset"])
         self.assertIn("merged_tree", last)
         with self.assertRaisesRegex(ValueError, "every exact diff page receipt"):
