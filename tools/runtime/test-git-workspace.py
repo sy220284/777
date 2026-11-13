@@ -383,7 +383,6 @@ class GitWorkspaceTest(unittest.TestCase):
                       expected_merged_tree=preview["merged_tree"])
         with self.assertRaisesRegex(ValueError, "drops a required output"):
             self.call("merge", expected_tree=tree, required_outputs=["results-sibling"],
-                      allowed_paths=["results"],
                       expected_source_tree=preview["source_tree"],
                       expected_merged_tree=preview["merged_tree"])
         with self.assertRaisesRegex(ValueError, "drops a required output"):
