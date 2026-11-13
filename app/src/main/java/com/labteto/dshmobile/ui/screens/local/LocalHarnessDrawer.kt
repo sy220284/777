@@ -331,17 +331,15 @@ internal fun LocalModeDrawer(
             preSortedByUpdatedAt = true,
         )
     }
-    val visibleSectionGroups = remember(sectionCatalog, sessionSections, searchOpen, historyQuery) {
-        sectionCatalog.sections.mapNotNull { section ->
-            val grouped = sessionSections.recent.filter { sectionCatalog.assignments[it.id] == section.id }
-            if (searchOpen && historyQuery.isNotBlank() && grouped.isEmpty()) null
-            else section to grouped
-        }
+    val groupedHistory = remember(sectionCatalog, sessionSections, searchOpen, historyQuery) {
+        localDrawerGroupSessions(
+            unpinnedRecent = sessionSections.recent,
+            catalog = sectionCatalog,
+            includeEmptyGroups = !searchOpen || historyQuery.isBlank(),
+        )
     }
-    val ungroupedRecent = remember(sectionCatalog, sessionSections) {
-        val knownIds = sectionCatalog.sections.mapTo(hashSetOf()) { it.id }
-        sessionSections.recent.filter { sectionCatalog.assignments[it.id] !in knownIds }
-    }
+    val visibleSectionGroups = groupedHistory.groups
+    val ungroupedRecent = groupedHistory.ungrouped
     val matchedPersonas = remember(gallery, historyQuery, crossModeSearch) {
         if (crossModeSearch) localDrawerMatchingPersonas(gallery, historyQuery) else emptyList()
     }
