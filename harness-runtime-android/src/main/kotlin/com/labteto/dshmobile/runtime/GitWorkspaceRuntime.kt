@@ -85,6 +85,17 @@ class GitWorkspaceRuntime(
                 if (action in setOf("compare_merge", "preview_merge", "merge", "recover_merge", "discard")) put("expected_tree", buildJsonObject {
                     put("type", "string"); put("description", "最近 workspace_status 返回的 tree；变化后必须重新审阅")
                 })
+                if (action == "compare_merge") {
+                    put("review_side", buildJsonObject {
+                        put("type", "string")
+                        put("enum", kotlinx.serialization.json.JsonArray(listOf("parent", "child").map { kotlinx.serialization.json.JsonPrimitive(it) }))
+                        put("description", "父子差异超出单页时，按 parent / child 分别读取每页 Base64 差异")
+                    })
+                    put("review_offset", buildJsonObject {
+                        put("type", "integer")
+                        put("description", "读取指定版本差异时的分页偏移；使用上一页 next_offset")
+                    })
+                }
                 if (action == "preview_merge") {
                     put("review_offset", buildJsonObject {
                         put("type", "integer")
@@ -125,7 +136,7 @@ class GitWorkspaceRuntime(
                     put("required_outputs", buildJsonObject {
                         put("type", "array")
                         put("items", buildJsonObject { put("type", "string") })
-                        put("description", "若存在必需交付文件，检查最终候选树真实包含每一个结果文件；任务图自动传入")
+                        put("description", "必需交付文件或非空目录；目录按子文件路径判断，支持末尾 /；任务图自动传入")
                     })
                 }
             }
