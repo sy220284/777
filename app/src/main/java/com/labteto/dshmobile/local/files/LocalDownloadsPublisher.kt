@@ -11,6 +11,9 @@ import java.io.FileNotFoundException
 import java.io.OutputStream
 import java.security.DigestOutputStream
 import java.security.MessageDigest
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.util.concurrent.TimeUnit
 
 internal data class LocalPublishedDownload(val location: String, val uri: Uri, val currentVersion: Boolean)
 
@@ -52,7 +55,7 @@ internal class LocalDownloadsPublisher(context: Context, private val workspace: 
             ?.removePrefix("交付成果/")?.substringBeforeLast('/', "").orEmpty()
         val destination = if (folder.isEmpty()) ROOT else "$ROOT$folder/"
         return publishInternal("work:${source.canonicalPath}", source.name, destination,
-            source.length(), source.lastModified()) { output ->
+            source.length(), modifiedStamp(source)) { output ->
             owner.exportFileForUi(item.path, output)
         }.location
     }
@@ -61,7 +64,7 @@ internal class LocalDownloadsPublisher(context: Context, private val workspace: 
     fun publishOwnedFile(source: File): String {
         val file = requireOwned(source)
         return publishInternal("media:${file.path}", file.name, ROOT,
-            file.length(), file.lastModified()) { output ->
+            file.length(), modifiedStamp(file)) { output ->
             file.inputStream().buffered().use { it.copyTo(output) }
         }.location
     }
@@ -71,13 +74,13 @@ internal class LocalDownloadsPublisher(context: Context, private val workspace: 
         val item = owner.workspaceFileAt(relativePath) ?: return null
         val file = File(owner.path, item.path)
         val id = "work:${file.canonicalPath}"
-        return cached(id)?.copy(currentVersion = sameSource(id, file.length(), file.lastModified()))
+        return cached(id)?.copy(currentVersion = sameSource(id, file.length(), modifiedStamp(file)))
     }
 
     fun publishedOwnedFile(source: File): LocalPublishedDownload? {
         val file = requireOwned(source)
         val id = "media:${file.path}"
-        return cached(id)?.copy(currentVersion = sameSource(id, file.length(), file.lastModified()))
+        return cached(id)?.copy(currentVersion = sameSource(id, file.length(), modifiedStamp(file)))
     }
 
     private fun requireOwned(file: File): File = file.canonicalFile.also {
@@ -158,6 +161,9 @@ internal class LocalDownloadsPublisher(context: Context, private val workspace: 
         }
         }
     }
+
+    private fun modifiedStamp(file: File): Long =
+        Files.getLastModifiedTime(file.toPath(), LinkOption.NOFOLLOW_LINKS).to(TimeUnit.NANOSECONDS)
 
     private fun hash(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
