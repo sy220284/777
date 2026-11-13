@@ -236,7 +236,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalModelConfigurationCoordinator.kt",
-      "sha256": "53f41c5ca9584f7a"
+      "sha256": "62df3330e13990b3"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalModelException.kt",
@@ -1548,7 +1548,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt",
-      "sha256": "d4194b603d9996dc"
+      "sha256": "267da7dd07d8cde7"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelSelectionStateBusinessValues.kt",
@@ -4624,14 +4624,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "f923dcb51328",
+  "source_snapshot": "d46d7353eb4d",
   "observed_delta": {
-    "baseline": "6ca3e0b539af",
+    "baseline": "f923dcb51328",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelGateway.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/LocalModelConfigurationCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
