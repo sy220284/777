@@ -42,6 +42,27 @@ class LocalSecurityReviewLedgerTest {
         }
     }
 
+    @Test fun structuredSecurityDecisionNeverAllowsReportedRisks() {
+        val allowed = parseIndependentSecurityReviewDecision(
+            """{"verdict":"allow","reason":"代码没有明确高危风险","findings":"未发现明确风险"}""",
+        )
+        assertEquals("allow", allowed.verdict)
+        val blocked = parseIndependentSecurityReviewDecision(
+            """{"verdict":"block","reason":"存在越权操作","findings":"高危：授权检查缺失"}""",
+        )
+        assertEquals("block", blocked.verdict)
+        for (invalid in listOf(
+            """{"verdict":"allow","reason":"安全","findings":"高危：越权操作"}""",
+            """{"verdict":"allow","reason":"","findings":"未发现明确风险"}""",
+            """{"verdict":"allow","reason":"安全","findings":"未发现明确风险","ignored":true}""",
+        )) {
+            var refused = false
+            try { parseIndependentSecurityReviewDecision(invalid) }
+            catch (_: IllegalArgumentException) { refused = true }
+            assertTrue("矛盾或不完整的安全裁决必须拒绝", refused)
+        }
+    }
+
     @Test fun riskVerdictCannotReceiveHumanApprovalAndNewReviewCannotInheritOldApproval() {
         val root = Files.createTempDirectory("security-review-block-").toFile()
         val log = LocalSessionEventLog(root.resolve("session.events.jsonl"), Json)
