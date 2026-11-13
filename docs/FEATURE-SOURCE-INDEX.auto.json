@@ -4412,7 +4412,7 @@
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/CodeModePlugin.kt",
-      "sha256": "7d2879a54b552dbe"
+      "sha256": "8ee8219acbbd0e4f"
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/JsonSchemaValidator.kt",
@@ -4580,15 +4580,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "a063176a7417",
+  "source_snapshot": "7332b980a0a1",
   "observed_delta": {
-    "baseline": "30239c867685",
+    "baseline": "a063176a7417",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubSkillImporter.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowser.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/CodeModePlugin.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
