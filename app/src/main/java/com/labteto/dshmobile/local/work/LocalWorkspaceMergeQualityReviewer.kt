@@ -14,6 +14,36 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+/** Validate the complete resolution independently of the model gateway or Android runtime. */
+internal fun parseWorkspaceMergeQualityDecision(
+    body: String, overlap: Set<String>, autoConflict: Boolean,
+): JsonObject {
+    val decision = Json.parseToJsonElement(body).jsonObject
+    val resolution = decision["resolution"]?.jsonPrimitive?.contentOrNull
+    require(resolution in setOf("auto", "prefer_parent", "prefer_child", "select")) {
+        "质量审查未选择有效的整合方案"
+    }
+    require(!(autoConflict && resolution == "auto")) { "Git 自动合并存在冲突，必须明确选择或重构" }
+    val reason = decision["reason"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
+    require(reason.length >= 12 && reason.length <= 4000 && !reason.startsWith("需要重构：")) {
+        "应先重构改进的实现，再重新审查合并"
+    }
+    val criteria = decision["criteria"] as? JsonObject ?: error("质量比较缺少检查项目")
+    require(setOf("correctness", "experience", "maintainability").all {
+        criteria[it]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true
+    }) { "质量比较未覆盖正确性、体验和可维护性" }
+    require(decision["reviewed_both"]?.jsonPrimitive?.content == "true") {
+        "必须比较父子两个版本的实现"
+    }
+    val choices = decision["path_choices"] as? JsonObject ?: error("缺少逐文件择优选择")
+    if (resolution == "select") {
+        require(choices.keys == overlap && choices.values.all {
+            it.jsonPrimitive.content in setOf("parent", "child")
+        }) { "逐文件择优必须覆盖全部父子共同改动路径" }
+    } else require(choices.isEmpty()) { "非逐文件选择模式不得提供路径覆盖" }
+    return decision
+}
+
 /**
  * Compares both implementations before a worktree is admitted to the parent.
  * Model judgment is stored as a review, never misrepresented as a device or test result.
@@ -67,29 +97,7 @@ select 时 path_choices 必须列出全部共同修改路径，每个值只能�
         val body = requireNotNull(reply.content?.trim()?.takeIf { it.isNotEmpty() }) {
             "择优审查没有提供比较结论"
         }
-        val decision = Json.parseToJsonElement(body).jsonObject
-        val resolution = decision["resolution"]?.jsonPrimitive?.contentOrNull
-        require(resolution in setOf("auto", "prefer_parent", "prefer_child", "select")) {
-            "质量审查未选择有效的整合方案"
-        }
-        require(!(autoConflict && resolution == "auto")) { "Git 自动合并存在冲突，必须明确选择或重构" }
-        val reason = decision["reason"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
-        require(reason.length >= 12 && reason.length <= 4000 && !reason.startsWith("需要重构：")) {
-            "应先重构改进的实现，再重新审查合并"
-        }
-        val criteria = decision["criteria"] as? JsonObject ?: error("质量比较缺少检查项目")
-        require(setOf("correctness", "experience", "maintainability").all {
-            criteria[it]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true
-        }) { "质量比较未覆盖正确性、体验和可维护性" }
-        require(decision["reviewed_both"]?.jsonPrimitive?.content == "true") {
-            "必须比较父子两个版本的实现"
-        }
-        val choices = decision["path_choices"] as? JsonObject ?: error("缺少逐文件择优选择")
-        if (resolution == "select") {
-            require(choices.keys == overlap && choices.values.all {
-                it.jsonPrimitive.content in setOf("parent", "child")
-            }) { "逐文件择优必须覆盖全部父子共同改动路径" }
-        } else require(choices.isEmpty()) { "非逐文件选择模式不得提供路径覆盖" }
+        val decision = parseWorkspaceMergeQualityDecision(body, overlap, autoConflict)
         events.get(sessionId).append("work/merge-quality-reviewed", buildJsonObject {
             put("source_tree", comparison.getValue("source_tree"))
             put("child_tree", comparison.getValue("tree"))
