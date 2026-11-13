@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1934,
+  "repository_code_file_count": 1936,
   "production_source_count": 1129,
-  "test_code_file_count": 661,
+  "test_code_file_count": 662,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -3260,7 +3260,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/Markdown.kt",
-      "sha256": "5f3d9977c1682137"
+      "sha256": "04d12db43efe4a86"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/NavigationEntryState.kt",
@@ -3284,7 +3284,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterBehaviorTuningDialog.kt",
-      "sha256": "25d470b42e07ddf1"
+      "sha256": "120f3484af08f866"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryScreen.kt",
@@ -3316,7 +3316,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/GroupAnnouncementSheet.kt",
-      "sha256": "614166ae9bf9f7ab"
+      "sha256": "ffb8f056d2f40546"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/GroupChatMemberPicker.kt",
@@ -3360,7 +3360,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalComposerCapabilityControls.kt",
-      "sha256": "5b2404758341bf1b"
+      "sha256": "cc656964f4cef911"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationActionsMenu.kt",
@@ -3368,11 +3368,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
-      "sha256": "66803b0cc4450733"
+      "sha256": "21906b548cd9c1b5"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposerActions.kt",
-      "sha256": "1260fc082b7291d3"
+      "sha256": "a290c401ac2ad44d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationDraftCache.kt",
@@ -3384,11 +3384,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaders.kt",
-      "sha256": "9891bad35536d923"
+      "sha256": "d45ae09e5bb42c4a"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "sha256": "04e6aed5eb238df2"
+      "sha256": "2a90faa2b44ffa2c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationTemperatureUi.kt",
@@ -3436,23 +3436,23 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDialogs.kt",
-      "sha256": "d863ca30fd88dc1b"
+      "sha256": "c715156408179d98"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
-      "sha256": "426ef6ff37b37a6c"
+      "sha256": "161433d472f7be8e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawerComponents.kt",
-      "sha256": "b2b4c44b5c5c1a37"
+      "sha256": "ba88c8b43e7da182"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt",
-      "sha256": "7ac043a0be59bbfa"
+      "sha256": "5146f5c71838f69e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "sha256": "acef3595ede17b43"
+      "sha256": "bf26456fe7c86193"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStreamingComponents.kt",
@@ -3468,7 +3468,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioSheet.kt",
-      "sha256": "656cb24f300e9592"
+      "sha256": "8f16d1aae3c2958a"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioViewModel.kt",
@@ -3480,7 +3480,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalModelPickerSheet.kt",
-      "sha256": "c604ac3ff07a8781"
+      "sha256": "685090e29fe65b63"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt",
@@ -3572,7 +3572,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkTimelineStepRow.kt",
-      "sha256": "bfe367357458a30b"
+      "sha256": "026d0eefb9e9232c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkTimelineSupport.kt",
@@ -3684,11 +3684,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AppearanceSettingsComponents.kt",
-      "sha256": "6cd7fe9445e5da08"
+      "sha256": "4dff8b30efc6b0eb"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AppearanceThemePreview.kt",
-      "sha256": "41e99057fdf37c52"
+      "sha256": "ee9d2b31802cf104"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/ChatGptAccountPanel.kt",
@@ -3748,7 +3748,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "sha256": "185c5119c7c05b59"
+      "sha256": "0751071594d915e0"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
@@ -3756,7 +3756,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationComponents.kt",
-      "sha256": "fe7273e0ca4f1a4f"
+      "sha256": "ae02fb5acc65ae45"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationPage.kt",
@@ -4104,7 +4104,7 @@
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanBasics.kt",
-      "sha256": "95fca2ff77a55b21"
+      "sha256": "315e32b7b3092b27"
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanChrome.kt",
@@ -4136,11 +4136,11 @@
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterial.kt",
-      "sha256": "65bec552ef1e959e"
+      "sha256": "ca8069f292e9c8f9"
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterialColor.kt",
-      "sha256": "2e64bde2ecfda338"
+      "sha256": "168622180e5e1811"
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/components/ShenyanMessage.kt",
@@ -4164,7 +4164,7 @@
     },
     {
       "path": "app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt",
-      "sha256": "62eb317d3647d799"
+      "sha256": "de1ffbd030db5568"
     },
     {
       "path": "core/src/main/kotlin/com/labteto/dshmobile/core/net/CancellableHttpResponse.kt",
@@ -4580,14 +4580,36 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "8b5fc932b1f7",
+  "source_snapshot": "c93d64cb336e",
   "observed_delta": {
-    "baseline": "ecb95361af4c",
+    "baseline": "8b5fc932b1f7",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/components/Markdown.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterBehaviorTuningDialog.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/GroupAnnouncementSheet.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalComposerCapabilityControls.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposerActions.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaders.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDialogs.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawerComponents.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioSheet.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalModelPickerSheet.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkTimelineStepRow.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AppearanceSettingsComponents.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AppearanceThemePreview.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationComponents.kt",
+      "app/src/main/java/com/shenyan/designsystem/components/ShenyanBasics.kt",
+      "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterial.kt",
+      "app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterialColor.kt",
+      "app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
