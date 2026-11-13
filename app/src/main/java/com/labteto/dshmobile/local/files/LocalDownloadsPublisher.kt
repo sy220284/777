@@ -24,7 +24,7 @@ internal class LocalDownloadsPublisher(context: Context, private val workspace: 
     companion object {
         const val DIRECTORY = "神言神语"
         const val RELATIVE_DIRECTORY = "Download/$DIRECTORY"
-        private const val ROOT = "${Environment.DIRECTORY_DOWNLOADS}/$DIRECTORY/"
+        private val ROOT = "${Environment.DIRECTORY_DOWNLOADS}/$DIRECTORY/"
     }
 
     /** An explanatory first-run file makes the public folder visible before any task completes. */
