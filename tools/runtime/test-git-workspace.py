@@ -457,10 +457,16 @@ module.operate({str(self.root)!r},{str(self.store)!r},'session','merge',{reviewe
                 process.kill(); process.wait(timeout=5)
             process.stdout.close(); process.stderr.close()
         self.assertEqual("applying", self.call("status")["integration"]["state"])
-        recovered = self.call("merge", expected_tree=reviewed)
+        recovered = self.call("recover_merge", expected_tree=reviewed)
         self.assertEqual("rolled_back", recovered["state"])
         self.assertEqual("first\nsecond\nthird\n", (self.root / "code.txt").read_text())
         self.assertEqual("merged", self.call("merge", expected_tree=reviewed)["state"])
+
+    def test_recovery_entry_rejects_non_pending_integration(self):
+        self.fork()
+        reviewed = self.call("status")["tree"]
+        with self.assertRaisesRegex(ValueError, "no pending merge integration"):
+            self.call("recover_merge", expected_tree=reviewed)
 
     def test_binary_rename_symlink_publish_failure_restores_original_files(self):
         child = self.fork()
