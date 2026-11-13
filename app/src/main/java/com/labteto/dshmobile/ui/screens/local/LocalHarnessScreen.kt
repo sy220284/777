@@ -569,6 +569,7 @@ fun LocalHarnessScreen(
         observeWorkspaceFiles = viewModel::observeWorkspaceFiles,
         remoteGitBranches = viewModel::remoteGitBranchesForUi,
         compareRemoteGit = viewModel::compareRemoteGitForUi,
+        findIndependentCodeReview = viewModel::findIndependentCodeReviewForUi,
         runIndependentCodeReview = viewModel::runIndependentCodeReviewForUi,
         acceptIndependentCodeReview = viewModel::acceptIndependentCodeReviewForUi,
         conversationFiles = viewModel::conversationFiles,
