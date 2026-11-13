@@ -54,8 +54,10 @@ internal class LocalDownloadsPublisher(context: Context, private val workspace: 
         val folder = item.path.takeIf { it.startsWith("交付成果/") }
             ?.removePrefix("交付成果/")?.substringBeforeLast('/', "").orEmpty()
         val destination = if (folder.isEmpty()) ROOT else "$ROOT$folder/"
+        val size = source.length()
+        val stamp = modifiedStamp(source)
         return publishInternal("work:${source.canonicalPath}", source.name, destination,
-            source.length(), modifiedStamp(source)) { output ->
+            size, stamp, stable = { source.length() == size && modifiedStamp(source) == stamp }) { output ->
             owner.exportFileForUi(item.path, output)
         }.location
     }
@@ -63,8 +65,10 @@ internal class LocalDownloadsPublisher(context: Context, private val workspace: 
     /** Caller passes an app-owned generated file (Studio or inline media). */
     fun publishOwnedFile(source: File): String {
         val file = requireOwned(source)
+        val size = file.length()
+        val stamp = modifiedStamp(file)
         return publishInternal("media:${file.path}", file.name, ROOT,
-            file.length(), modifiedStamp(file)) { output ->
+            size, stamp, stable = { file.length() == size && modifiedStamp(file) == stamp }) { output ->
             file.inputStream().buffered().use { it.copyTo(output) }
         }.location
     }
@@ -112,6 +116,7 @@ internal class LocalDownloadsPublisher(context: Context, private val workspace: 
     /** Unchanged sources require zero data reads; changed sources are streamed exactly once. */
     private fun publishInternal(
         id: String, filename: String, directory: String, size: Long, modified: Long,
+        stable: () -> Boolean = { true },
         copy: (OutputStream) -> Long,
     ): LocalPublishedDownload {
         synchronized(publicationLock) {
@@ -132,7 +137,7 @@ internal class LocalDownloadsPublisher(context: Context, private val workspace: 
             val written = resolver.openOutputStream(uri, "w")?.use { target ->
                 DigestOutputStream(target, digest).use(copy)
             } ?: error("无法写入公共下载目录")
-            check(written == size) { "成果在复制过程中发生变化，请重试保存" }
+            check(written == size && stable()) { "成果在复制过程中发生变化，请重试保存" }
             val contentHash = digest.digest().joinToString("") { "%02x".format(it) }
             val k = key(id)
             if (old != null && catalog.getString("$k.sha256", null) == contentHash) {
