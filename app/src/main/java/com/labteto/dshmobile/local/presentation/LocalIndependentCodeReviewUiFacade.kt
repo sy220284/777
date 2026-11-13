@@ -46,6 +46,9 @@ class LocalIndependentCodeReviewUiFacade @Inject internal constructor(
 
     internal suspend fun currentDiff(repository: String, ref: String, includeUntracked: Boolean): LocalRemoteGitDiffUi {
         if (ref.startsWith("worktree/")) return tools.compareLocalGitForUi(repository, includeUntracked)
+        if (ref.startsWith("commit/")) {
+            return tools.compareCommitGitForUi(repository, ref.removePrefix("commit/"))
+        }
         val (remote, branch) = splitGitReviewTrackingRef(ref)
         return tools.compareRemoteGitForUi(repository, remote, branch)
     }
