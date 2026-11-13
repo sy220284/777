@@ -27,6 +27,24 @@ class LocalWebManagedPolicyGateTest {
         assertEquals(0, attempts.get())
     }
 
+    @Test fun paidSearchRejectsRedirectWithoutRetryingOrFollowing() = runBlocking {
+        val calls = AtomicInteger()
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            calls.incrementAndGet()
+            okhttp3.Response.Builder()
+                .request(chain.request())
+                .protocol(okhttp3.Protocol.HTTP_1_1)
+                .code(302)
+                .message("Found")
+                .header("Location", "https://untrusted.example/mcp")
+                .build()
+        }.build()
+        val client = LocalWebSearchClient(http, Json)
+        val failure = runCatching { client.search("test-key", listOf("test")) }.exceptionOrNull()
+        assertTrue(failure is com.labteto.dshmobile.local.LocalWebException)
+        assertEquals(1, calls.get())
+    }
+
     @Test fun freeSearchPolicyDenialHappensBeforeAnyHttpRequest() = runBlocking {
         val attempts = AtomicInteger()
         val http = OkHttpClient.Builder().addInterceptor { chain ->
