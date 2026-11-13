@@ -24,8 +24,9 @@ internal data class LocalIndependentCodeReview(
     val humanAccepted: Boolean = false,
 )
 
-internal fun codeReviewDigest(repository: String, ref: String, stat: String, patch: String): String {
-    val bytes = listOf(repository, ref, stat, patch).joinToString("\u0000").toByteArray(Charsets.UTF_8)
+internal fun codeReviewDigest(repository: String, ref: String, stat: String, patch: String,
+    evidenceRevision: String = ""): String {
+    val bytes = listOf(repository, ref, stat, patch, evidenceRevision).joinToString("\u0000").toByteArray(Charsets.UTF_8)
     return MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 }
 
@@ -90,14 +91,15 @@ internal class LocalIndependentCodeReviewCoordinator @Inject constructor(
     private val events: LocalSessionEventLogRegistry,
 ) {
     suspend fun review(sessionId: String, repository: String, ref: String,
-        statistics: String, patch: String, truncated: Boolean): LocalIndependentCodeReview {
+        statistics: String, patch: String, truncated: Boolean,
+        evidenceRevision: String = ""): LocalIndependentCodeReview {
         require(sessionId.matches(Regex("[A-Za-z0-9_.-]{1,128}"))) { "审查会话标识无效" }
         require(!truncated && patch.isNotBlank() && patch.length <= 120_000) {
             "Git 差异为空或已截断，请缩小范围后重新审查"
         }
         require(repository.isNotBlank() && ref.contains('/')) { "缺少 Git 差异来源" }
         val id = UUID.randomUUID().toString()
-        val digest = codeReviewDigest(repository, ref, statistics, patch)
+        val digest = codeReviewDigest(repository, ref, statistics, patch, evidenceRevision)
         val ledger = LocalCodeReviewLedger(events.get(sessionId))
         val profile = model.profileForRun()
         ledger.request(id, ref, digest)
@@ -125,19 +127,21 @@ internal class LocalIndependentCodeReviewCoordinator @Inject constructor(
 
     /** A read-only lookup: reopening a review never sends another billable model request. */
     fun findForDiff(sessionId: String, repository: String, ref: String,
-        statistics: String, patch: String, truncated: Boolean): LocalIndependentCodeReview? {
+        statistics: String, patch: String, truncated: Boolean,
+        evidenceRevision: String = ""): LocalIndependentCodeReview? {
         require(sessionId.matches(Regex("[A-Za-z0-9_.-]{1,128}"))) { "审查会话标识无效" }
         if (truncated || patch.isBlank() || patch.length > 120_000) return null
         return LocalCodeReviewLedger(events.get(sessionId)).latestForDigest(
-            ref, codeReviewDigest(repository, ref, statistics, patch),
+            ref, codeReviewDigest(repository, ref, statistics, patch, evidenceRevision),
         )
     }
 
     fun accept(sessionId: String, reviewId: String, sequence: Long,
-        repository: String, ref: String, stat: String, patch: String, truncated: Boolean): Boolean {
+        repository: String, ref: String, stat: String, patch: String, truncated: Boolean,
+        evidenceRevision: String = ""): Boolean {
         require(!truncated) { "不能接纳截断的 Git 差异" }
         return LocalCodeReviewLedger(events.get(sessionId)).accept(
-            reviewId, sequence, codeReviewDigest(repository, ref, stat, patch),
+            reviewId, sequence, codeReviewDigest(repository, ref, stat, patch, evidenceRevision),
         )
     }
 }
