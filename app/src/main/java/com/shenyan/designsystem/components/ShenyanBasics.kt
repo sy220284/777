@@ -96,18 +96,14 @@ fun SyButton(
         enabled = enabled && !loading,
         interactionSource = interaction,
         modifier = modifier.sizeIn(minWidth = SyMetric.touch, minHeight = height.coerceAtLeast(SyMetric.touch)).scale(scale),
-        color = if (style == SyButtonStyle.PRIMARY && enabled) Color.Transparent else fill,
+        color = fill,
         contentColor = foreground,
         shape = RoundedCornerShape(SyMetric.radiusControl),
         border = if (style == SyButtonStyle.SECONDARY || style == SyButtonStyle.OUTLINE || style == SyButtonStyle.INFO)
             BorderStroke(1.dp, c.border) else null,
     ) {
         Row(
-            Modifier.then(
-                if (style == SyButtonStyle.PRIMARY && enabled)
-                    Modifier.background(Brush.horizontalGradient(listOf(c.primary, c.primaryPressed)))
-                else Modifier
-            ).padding(horizontal = if (compact) 12.dp else 16.dp, vertical = if (compact) 8.dp else 11.dp),
+            Modifier.padding(horizontal = if (compact) 12.dp else 16.dp, vertical = if (compact) 8.dp else 11.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {

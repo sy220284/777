@@ -941,6 +941,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         }
     }
 
+    val toastFeedback = com.labteto.dshmobile.ui.shenyan.rememberSyToast()
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().background(rootSurfaceColor).safeDrawingPadding().imePadding()) {
         Column(
             Modifier.fillMaxWidth()
@@ -974,16 +976,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             groupMembers = state.groupChat.members,
                             activeSpeakerName = state.groupActiveSpeakerName,
                             running = state.running || state.loading,
-                            behaviorTuningCustomized = !state.chatState.behaviorTuning.isNatural(),
-                            tuningEnabled = hasSelectedPersona,
                             onContextClick = {
                                 if (state.groupChat.enabled) showGroupMemberPicker = true
                                 else showPersonaPicker = true
-                            },
-                            onOpenCharacterTuning = { showCharacterTuning = true },
-                            modelLabel = state.model,
-                            onModelClick = {
-                                if (state.modelProfiles.isNotEmpty()) showModelPicker = true else onConfigure()
                             },
                             onExitGroupChat = onExitGroupChat,
                             onNewSession = onNewSession,
@@ -994,11 +989,22 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         )
                     } else {
                         WorkSurfaceHeader(
-                            modelLabel = state.model,
-                            configured = state.configured,
-                            running = state.running,
-                            onModelClick = {
-                                if (state.configured) showModelPicker = true else onConfigure()
+                            sessionTitle = sessionTitle,
+                            statusText = when {
+                                state.pendingApproval != null -> "等待工具授权"
+                                state.pendingQuestion != null -> "等待确认"
+                                workToolReadFailures > 0 -> "执行状态读取异常"
+                                state.running -> workToolActivities.lastOrNull {
+                                    it.phase == com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING ||
+                                        it.phase == com.labteto.dshmobile.local.presentation.LocalToolUiPhase.DECLARED
+                                }?.let { "正在执行 · " + (userFacingWorkToolAction(it.name) ?: "当前步骤") } ?: "正在执行"
+                                state.loading -> "正在加载"
+                                !state.error.isNullOrBlank() -> "执行异常 · " + state.error
+                                workToolActivities.lastOrNull()?.phase ==
+                                    com.labteto.dshmobile.local.presentation.LocalToolUiPhase.FAILED ->
+                                        "任务步骤失败 · 可查看工作记录"
+                                !state.configured -> "未配置模型"
+                                else -> "就绪"
                             },
                             onNewSession = onNewSession,
                             sessionPinned = sessionPinned,
@@ -1228,7 +1234,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     transcriptItem.message.copy(content = visibleAssistantText(transcriptItem.message.content))
                                 else transcriptItem.message,
                                 chatMode = state.usageMode == LocalUsageMode.CHAT,
+                                isLatestAssistant = transcriptItem.message.role == "assistant" &&
+                                    state.messages.lastOrNull { it.role == "assistant" }?.id == transcriptItem.message.id,
                                 workspacePath = state.workspacePath,
+                                onFeedback = toastFeedback.second,
                                 skillDisplayNames = skillDisplayNames,
                                 groupMode = state.groupChat.enabled,
                                 canEdit = messageEditingEnabled &&
@@ -1599,6 +1608,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             onRemoveAttachment = { index -> attachments.removeAt(index) },
             onClearAttachments = attachments::clear,
             onOpenAttachmentPicker = { showAttachmentPicker = true },
+            onOpenModelPicker = {
+                if (state.modelProfiles.isNotEmpty()) showModelPicker = true else onConfigure()
+            },
             onShowReplySuggestions = { showReplySuggestions = true },
             onGenerateReplySuggestions = onGenerateReplySuggestions,
             onSend = onSend,
@@ -1668,6 +1680,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             },
         )
 
+    }
+    com.labteto.dshmobile.ui.shenyan.SyToastHost(
+        toastFeedback,
+        modifier = Modifier.align(Alignment.TopCenter).safeDrawingPadding(),
+    )
     }
 
     if (state.usageMode == LocalUsageMode.WORK) {
@@ -1767,6 +1784,12 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 showPersonaPicker = false
                 personaEditorDraft = state.chatPersona
                 showPersonaEditor = true
+            },
+            onOpenTuning = if (state.chatPersona.isUnboundChatPersona()) null else {
+                {
+                    showPersonaPicker = false
+                    showCharacterTuning = true
+                }
             },
             onDismiss = { showPersonaPicker = false },
         )

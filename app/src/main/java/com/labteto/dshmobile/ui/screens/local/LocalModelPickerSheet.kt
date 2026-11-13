@@ -123,7 +123,7 @@ internal fun LocalModelPickerSheet(
                         Icon(
                             painter = painterResource(R.drawable.ic_ui_check),
                             contentDescription = null,
-                            tint = colors.primary,
+                            tint = colors.linkInk,
                             modifier = Modifier.size(18.dp),
                         )
                     }

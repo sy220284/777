@@ -115,19 +115,19 @@ fun SyMaterialSurface(
         materialFill.compositeOver(c.canvas) else materialFill
     // Opaque Matte surfaces must never sample or blur the supplied backdrop.
     val blurRadius = if (resolved == SyMaterialTier.L5_SOLID || fill.alpha == 1f) 0.dp else when (resolved) {
-        SyMaterialTier.L1_SECTION -> 18.dp
-        SyMaterialTier.L2_BAR -> 28.dp
-        SyMaterialTier.L3_CARD -> 20.dp
+        SyMaterialTier.L1_SECTION -> 0.dp
+        SyMaterialTier.L2_BAR -> 24.dp
+        SyMaterialTier.L3_CARD -> 0.dp
         SyMaterialTier.L4_OVERLAY -> 32.dp
         SyMaterialTier.L5_SOLID -> 0.dp
     }
     val elevation = when (resolved) {
-        SyMaterialTier.L1_SECTION, SyMaterialTier.L5_SOLID -> 1.dp
-        SyMaterialTier.L2_BAR -> 3.dp
-        SyMaterialTier.L3_CARD -> 7.dp
+        SyMaterialTier.L1_SECTION, SyMaterialTier.L5_SOLID -> 0.dp
+        SyMaterialTier.L2_BAR -> 2.dp
+        SyMaterialTier.L3_CARD -> 1.dp
         SyMaterialTier.L4_OVERLAY -> 16.dp
     }
-    val rim = if (materialFill.alpha < 1f) BorderStroke(1.dp, Brush.linearGradient(
+    val rim = if (materialFill.alpha < 1f && resolved in setOf(SyMaterialTier.L2_BAR, SyMaterialTier.L4_OVERLAY)) BorderStroke(1.dp, Brush.linearGradient(
         listOf(c.materialSheen, c.border.copy(alpha = c.border.alpha * .45f), c.materialSheen.copy(alpha = .12f)),
     )) else BorderStroke(1.dp, c.border)
     @Composable fun Interior() {
@@ -149,7 +149,7 @@ fun SyMaterialSurface(
             CompositionLocalProvider(LocalSyGlassDepth provides (nested + 1)) {
                 content()
             }
-            if (materialFill.alpha < 1f) {
+            if (materialFill.alpha < 1f && resolved in setOf(SyMaterialTier.L2_BAR, SyMaterialTier.L4_OVERLAY)) {
                 // A decorative highlight must never participate in Box measurement.
                 // fillMaxWidth() here made compact surfaces stretch to the entire Row,
                 // squeezing adjacent labels into single-character vertical columns.

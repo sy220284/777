@@ -963,10 +963,6 @@ fun LocalHarnessScreen(
                 onTasks = { openDrawerEntry(LocalFeatureDrawerEntry.TASKS) },
                 onTools = { openDrawerEntry(LocalFeatureDrawerEntry.TOOLS) },
                 onSettings = { openDrawerEntry(LocalFeatureDrawerEntry.SETTINGS) },
-                onUsage = { openDrawerEntry(LocalFeatureDrawerEntry.USAGE) },
-                onMiniMaxQuota = if (activeModelProfile?.canQueryMiniMaxQuota() == true) {
-                    { openDrawerEntry(LocalFeatureDrawerEntry.MINIMAX_QUOTA) }
-                } else null,
             )
     }
     val sySceneContent: @Composable () -> Unit = {
