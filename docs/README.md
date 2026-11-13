@@ -9,7 +9,7 @@
 | 文档 | 内容 |
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 架构 3.0：Feature 所有权、Shared Capability、应用组合根与 Runtime Kernel |
-| [FEATURE-TREE.zh-CN.md](FEATURE-TREE.zh-CN.md)／[交互版](FEATURE-TREE.zh-CN.html) | 全功能中文树：模块、功能、子功能、细分能力、代码定位及未合并 PR 标记；随代码同步维护 |
+| [FEATURE-TREE.zh-CN.md](FEATURE-TREE.zh-CN.md)／[交互版](FEATURE-TREE.zh-CN.html) | 历史功能树快照：保留层级与旧代码定位，仅供查阅，不再自动同步或用于验收 |
 | [SYSTEM-AUDIT-GUIDE.zh-CN.md](SYSTEM-AUDIT-GUIDE.zh-CN.md) | 全量系统联审权威规范：按功能架构、数据状态、生命周期、外部能力、性能、体验与工程质量分组执行审计 |
 | [SHARED-AUDIT-CONCLUSIONS.zh-CN.md](SHARED-AUDIT-CONCLUSIONS.zh-CN.md) | 可共享审计结论库：按链路闭环、数据字段、配置依赖与所有权归组的可复用审计规则 |
 | [PROTOCOL.md](PROTOCOL.md) | 当前本机 Session / Agent 协议边界 |
@@ -38,9 +38,9 @@
 
 文档只写当前真实实现。
 
-当功能、架构、协议、版本、CI 或 UI 发生实质变化时：
+当功能、架构、协议、版本或 UI 发生实质变化时：
 
-1. 同步修改对应当前文档；若功能层级、归属、入口或共享能力有变化，必须同时更新中文功能树与交互视图，并核对未合并 PR 标记。
+1. 按实际改动更新直接相关的当前文档；历史功能树不再作为必须同步的项目或验收依据。
 2. 删除已经失效的正文，不在当前文档继续叠加“旧版说明”。
 3. 历史变化写入 `CHANGELOG.md`；必须保留的专项溯源记录统一放入 `archive/` 并注明非现行规范。
 4. 文件名不再使用已经结束的阶段编号、旧版本号或临时项目代号。
