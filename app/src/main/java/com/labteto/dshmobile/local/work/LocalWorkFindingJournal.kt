@@ -77,7 +77,7 @@ internal object LocalWorkFindingJournal {
                         put("source_sequence", source.sequence)
                         put("next_action", nextAction)
                     })
-                    "已记录调查线索 ID=$findingId；状态=$status；来源回执=$sourceCallId" +
+                    "已记录调查线索 ID=$findingId；状态=$status；发现=$summary；来源回执=$sourceCallId" +
                         if (nextAction.isBlank()) "" else "；后续调查=$nextAction"
                 }
                 else -> error("未知发现操作：$action")
