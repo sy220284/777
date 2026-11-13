@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1914,
-  "production_source_count": 1118,
-  "test_code_file_count": 651,
+  "repository_code_file_count": 1917,
+  "production_source_count": 1120,
+  "test_code_file_count": 652,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -3272,7 +3272,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/FirstLaunchOnboarding.kt",
-      "sha256": "ca2f28d5fc6a690b"
+      "sha256": "d0e405209ef529fe"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/FluidDesignNavigation.kt",
@@ -3636,7 +3636,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AgentDeviceSettingsSections.kt",
-      "sha256": "91ac31dce8c64ab4"
+      "sha256": "78b23de407640981"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AgentRuntimeSettingsCard.kt",
@@ -3664,7 +3664,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt",
-      "sha256": "3fd20ff8f37ce273"
+      "sha256": "aaa3689c10c1d891"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalModelContextWindowField.kt",
@@ -3699,6 +3699,14 @@
       "sha256": "28bf32a8137c7995"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupFlow.kt",
+      "sha256": "0b47f5779a18ef3b"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupModel.kt",
+      "sha256": "0c9a66299c8a847b"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PersonalizationRulesEditor.kt",
       "sha256": "dcca8b5d08f4682f"
     },
@@ -3716,7 +3724,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "sha256": "0751071594d915e0"
+      "sha256": "52a77d4ef64a59e3"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
@@ -4536,12 +4544,20 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "47ab379f7681",
+  "source_snapshot": "51447ab5cab8",
   "observed_delta": {
-    "baseline": "aae6a1b86fad",
-    "added_production_files": [],
+    "baseline": "47ab379f7681",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupFlow.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupModel.kt"
+    ],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/FirstLaunchOnboarding.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AgentDeviceSettingsSections.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
