@@ -99,7 +99,7 @@ class GitWorkspaceRuntime(
                     })
                     put("path_choices", buildJsonObject {
                         put("type", "object")
-                        put("description", "select 模式下，每个父子共同改动文件明确选择 parent 或 child；保留双方其余独立改动")
+                        put("description", "select 模式必须明确选择全部共同改动路径；可额外选择单方改动路径以主动覆盖或舍弃有依赖冲突的实现")
                         put("additionalProperties", buildJsonObject {
                             put("type", "string")
                             put("enum", kotlinx.serialization.json.JsonArray(listOf("parent", "child").map { kotlinx.serialization.json.JsonPrimitive(it) }))
