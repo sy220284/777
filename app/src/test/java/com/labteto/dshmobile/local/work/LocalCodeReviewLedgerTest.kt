@@ -38,6 +38,19 @@ class LocalCodeReviewLedgerTest {
         }
     }
 
+    @Test fun gitBaseRevisionChangeInvalidatesAnOtherwiseIdenticalPatch() {
+        val previous = codeReviewDigest("repo", "origin/main", "1 file", "@@ +fixed",
+            "head-a:remote-a:base-a")
+        for (revision in listOf(
+            "head-b:remote-a:base-a",
+            "head-a:remote-b:base-a",
+            "head-a:remote-a:base-b",
+        )) {
+            assertFalse(previous == codeReviewDigest("repo", "origin/main",
+                "1 file", "@@ +fixed", revision))
+        }
+    }
+
     @Test fun newestMatchingEvidenceWinsAndStaleAcceptanceCannotAffectIt() {
         val root = Files.createTempDirectory("code-review-snapshots-").toFile()
         val log = LocalSessionEventLog(root.resolve("session.events.jsonl"), Json)
