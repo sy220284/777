@@ -303,7 +303,10 @@ class LocalHarnessViewModel @Inject constructor(
     }
     fun toggleSessionPinned(sessionId: String) = conversationUiState.toggleSessionPinned(sessionId)
     fun renameSession(sessionId: String, title: String): Boolean = conversationUiState.renameSession(sessionId, title)
-    fun createSessionSection(title: String) = sectionStore.create(title)
+    fun createSessionSection(title: String): Boolean {
+        sectionStore.create(title)
+        return true
+    }
     fun renameSessionSection(id: String, title: String) = sectionStore.rename(id, title)
     fun deleteSessionSection(id: String) = sectionStore.delete(id)
     fun moveSessionSection(id: String, targetIndex: Int) = sectionStore.move(id, targetIndex)
