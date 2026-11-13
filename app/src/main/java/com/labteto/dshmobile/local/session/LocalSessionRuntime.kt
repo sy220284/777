@@ -35,6 +35,7 @@ class LocalSessionRuntime @Inject internal constructor(
     internal fun switchSession(sessionId: String) = lifecycle.switchSession(sessionId)
     internal suspend fun deleteSessions(ids: Set<String>): Int = lifecycle.deleteSessions(ids)
     internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment = sessionFiles.importAttachment(uri)
+    internal suspend fun importWorkspaceFileForUi(uri: Uri): String = sessionFiles.importWorkspaceFile(uri)
     internal suspend fun publishedWorkspaceFileForUi(path: String) = sessionFiles.publishedWorkspaceFile(path)
     internal suspend fun saveWorkspaceFileToDownloadsForUi(path: String): String =
         sessionFiles.saveWorkspaceFileToDownloads(path)

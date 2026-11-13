@@ -36,6 +36,7 @@ internal fun localWorkFeatureUiContribution(
             workspacePath = shell.workspacePath,
             loadWorkspace = actions.workspaceFiles,
             saveToDownloads = actions.saveWorkspaceFileToDownloads,
+            importFromPhone = actions.importWorkspaceFile,
             loadDirectory = actions.workspaceDirectory,
             loadDirectoryPage = actions.workspaceDirectoryPage,
             loadSearch = actions.searchWorkspaceFiles,

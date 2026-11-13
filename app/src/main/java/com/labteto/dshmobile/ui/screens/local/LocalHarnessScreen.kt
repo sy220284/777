@@ -563,6 +563,7 @@ fun LocalHarnessScreen(
         queuedUserPort = viewModel.queuedUserPort,
         workspaceFiles = viewModel::workspaceFiles,
         saveWorkspaceFileToDownloads = viewModel::saveWorkspaceFileToDownloads,
+        importWorkspaceFile = viewModel::importWorkspaceFile,
         publishedWorkspaceFile = viewModel::publishedWorkspaceFile,
         workspaceDirectory = viewModel::workspaceDirectory,
         workspaceDirectoryPage = viewModel::workspaceDirectoryPage,

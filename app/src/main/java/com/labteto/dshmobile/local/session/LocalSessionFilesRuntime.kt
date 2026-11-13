@@ -104,6 +104,15 @@ class LocalSessionFilesRuntime @Inject internal constructor(
             } else attachmentImporter.import(uri)
         } }
 
+    override suspend fun importWorkspaceFile(uri: Uri): String {
+        require(com.labteto.dshmobile.local.isSupportedPickerAttachmentUri(uri.scheme, uri.authority)) {
+            "只能导入 Android 文件选择器授权的文档"
+        }
+        // Reuse the sole attachment importer: SAF's one-time grant is consumed immediately,
+        // and Work tools receive the durable workspace-relative path (including APK files).
+        return importAttachment(uri).relativePath
+    }
+
     internal suspend fun importToolImages(content: com.labteto.dshmobile.harness.tools.ToolRichContent?): List<LocalImportedAttachment> =
         withContext(Dispatchers.IO) {
             content?.images.orEmpty().map { image ->

@@ -23,6 +23,10 @@ interface FilesUiPort {
         if (offset == 0L) previewWorkspaceFile(path)
         else throw UnsupportedOperationException("当前文件入口不支持分页预览")
 
+    /** Import a file explicitly chosen in Android's document picker into the private Work workspace. */
+    suspend fun importWorkspaceFile(uri: android.net.Uri): String =
+        throw UnsupportedOperationException("手机文件导入未连接")
+
     /** Publish a confirmed workspace file to the phone's Downloads/神言神语 directory. */
     suspend fun saveWorkspaceFileToDownloads(path: String): String =
         throw UnsupportedOperationException("手机下载成果发布暂不可用")
