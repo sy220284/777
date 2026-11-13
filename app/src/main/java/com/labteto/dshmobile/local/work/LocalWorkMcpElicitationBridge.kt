@@ -59,14 +59,28 @@ internal object LocalWorkMcpElicitationBridge {
             ?.map { it.jsonPrimitive.content }?.toSet().orEmpty()
         return properties.map { (name, raw) ->
             val spec = raw.jsonObject
+            val kind = spec["type"]?.jsonPrimitive?.content ?: "string"
+            val choices = if (kind == "array") spec["items"]?.jsonObject else spec
+            val titled = (choices?.get(if (kind == "array") "anyOf" else "oneOf") as? JsonArray)
+                ?.map { entry ->
+                    val option = entry.jsonObject
+                    val value = requireNotNull(option["const"]).jsonPrimitive.content
+                    value to (option["title"]?.jsonPrimitive?.contentOrNull ?: value)
+                }.orEmpty()
+            val options = if (titled.isNotEmpty()) titled.map { it.first } else
+                (choices?.get("enum") as? JsonArray)?.map { it.jsonPrimitive.content }.orEmpty()
             LocalQuestionFormField(
                 name = name,
                 title = spec["title"]?.jsonPrimitive?.contentOrNull
                     ?: spec["description"]?.jsonPrimitive?.contentOrNull ?: name,
-                kind = spec["type"]?.jsonPrimitive?.content ?: "string",
+                kind = kind,
                 required = name in required,
-                options = (spec["enum"] as? JsonArray)?.map { it.jsonPrimitive.content }.orEmpty(),
-                defaultValue = spec["default"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                options = options,
+                optionLabels = titled.toMap(),
+                defaultValue = if (kind == "array") spec["default"]?.toString().orEmpty()
+                    else spec["default"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                minItems = spec["minItems"]?.jsonPrimitive?.content?.toIntOrNull(),
+                maxItems = spec["maxItems"]?.jsonPrimitive?.content?.toIntOrNull(),
                 minLength = spec["minLength"]?.jsonPrimitive?.content?.toIntOrNull(),
                 maxLength = spec["maxLength"]?.jsonPrimitive?.content?.toIntOrNull(),
                 minimum = spec["minimum"]?.jsonPrimitive?.content?.toDoubleOrNull(),
