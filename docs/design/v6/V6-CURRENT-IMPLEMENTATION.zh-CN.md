@@ -1,6 +1,6 @@
 # 神言神语 V6 · 现行实现反向设计规范
 
-> **状态：候选 V6.1 设计基线（文档 PR，待合并）** · 基准主线：`3cdd12f3395876b2d495721336d5d378b562a03c`（2026-10-14）
+> **实现事实基准：** `02544aa4b8d96fbd0e0aac5d7bf1a3e9f581df6a`（2026-11-13，V6.3 原生 Compose）。本文件记录当前实现；下一轮视觉与材质优化目标参见 [V6.4 待实施设计规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)。
 > **判定顺序：真实生产 Compose + 已合并代码 > 本 V6 设计规范/交互原型 > Figma、截图及素材 > 历史方案。** UI 3.0 跨包体系已退役；业务事实与权限遵守架构 3.0。这里不是一套要求旧代码反向符合的“新 UI 构想”。
 >
 > **适用：Android 手机 V6 包。** 393dp / 412dp 为既有设计参考尺寸，另需检查 320/360dp、系统字体放大、手势导航、IME。离线原型是可编辑的视觉/流程投影，不能当作 Compose 渲染截图或真机验证。
@@ -39,15 +39,17 @@
 
 通用强调色在 `SyColors`：primary `#E8A87C`、按下 `#D9926B`、mint `#7FBFA8`、lilac `#B9A0D4`、warning `#E0A458`、danger `#D9705F`。成功/警告/错误必须结合文字和真实状态表达，不能只靠色点。哑光黑材质全实心，不应为模拟玻璃而模糊壁纸。
 
-**材质层级**：L1 分区、L2 顶栏/承载、L3 常规卡片/选中项、L4 弹层、L5 不透明保底。原生模糊半径依次 `18 / 28 / 20 / 32 / 0 dp`；高度层次 `1 / 3 / 7 / 16 / 1 dp`。连续嵌套达到三层、系统减少透明度时使用 L5 兜底。真正背景模糊只允许模糊对齐后的 **背景层**，不得模糊文本或靠透明叠加模拟“真毛玻璃”。
+**材质层级（当前代码事实）**：L1 分区、L2 顶栏/承载、L3 常规卡片/选中项、L4 弹层、L5 不透明保底。`SyMaterialSurface` 模糊半径依次为 `0 / 24 / 0 / 32 / 0 dp`，默认阴影高度 `0 / 2 / 1 / 16 / 0 dp`；仅在具备场景/显式背景层且最外层符合条件时绘制对应模糊。连续嵌套达到三层或系统减少透明度时使用 L5（哑光已为实心）。优化目标另见 [V6.4 材质规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md#4-l1l5-材质语法先说职责再说效果)。
 
-**壁纸与透明度**：`AppBackgroundHost` 产生实际裁切区域采样（上/中/下），`syResolveMaterialFill` 保留壁纸色相并做最小文字对比保护；L1–L4 不强制变纯白。高级透明度 `0..1` 经 `SyMaterialPolicy.adjustment(t) = (0.5 - t) × 0.46` 再参与自适应对比；不能把调节旋钮变成无效的“假设置”，也不能用保护算法令所有透明度无差别。无壁纸、复杂高对比壁纸、壁纸切换瞬间及主题切换都要可用。加号面板的同源背景采用 `SySceneBackgroundSurface`，**不是纯白底、也不是直接看穿到聊天文本**。
+**壁纸与透明度（当前实现）**：`AppBackgroundHost` 产生实际裁切区域采样（上/中/下），`syResolveMaterialFill` 保留壁纸色相并做最小文字对比保护；L1–L4 不强制变纯白。高级透明度 `0..1` 经 `SyMaterialPolicy.adjustment(t) = (0.5 - t) × 0.46` 再参与自适应对比；不能把调节旋钮变成无效的“假设置”，也不能用保护算法令所有透明度无差别。无壁纸、复杂高对比壁纸、壁纸切换瞬间及主题切换都要可用。加号面板的同源背景采用 `SySceneBackgroundSurface`，**不是纯白底、也不是直接看穿到聊天文本**。
 
 ## 3. 几何 / 字体 / 动效 / 触觉
 
+> **设计目标与当前实现区分：** 优化后应按控件最终合成背景测试对比度，并使选中的强调色前景、取色区域与浮层语义外观一致；这些仍属于 [V6.4 待实施规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)，本节时间与材质数字只描述主线。
+
 `SyMetric`：触控最小 `48dp`，间距 `2/6/10/14/22/34/54dp`（xs/sm/md/lg/section/page/hero），圆角 `9/13/18/24dp`（sm/control/card/sheet），导航 push/peer 位移 `20/6dp`。不把 48dp 触控尺寸误当图标绘制尺寸；紧凑图标可以更小，点击区域不能跟着缩。排版遵守系统 sp/用户阅读字号与粗细、原生 `ui/theme/Type.kt`，而非 HTML 浏览器后备字体。严禁为追旧截图修改字体或取消无障碍扩字。
 
-`SyMotion` 使用 `cubic-bezier(.22, 1, .36, 1)`，按压缩放 `0.985`，标准时长（ms）：按压 80、选择 200、Dialog 280、Sheet 380、层级前进 360、返回 320、同级切换 160、侧栏 280、工具展开 200、输入区展开 190/淡入 120、折叠箭头 150、颜色反馈 140、普通淡入 150、Toast 200、实时脉冲 900。用户高级节奏仅作用于允许的非必要动效，倍率 `0.7..1.3`；系统减少动画优先置零。真实工作进度、等待/已停止语义不得因为减少动画而消失。重复振动受统一间隔 `45ms` 约束，长按延迟 `420ms`/重复 `90ms`。
+`SyMotion` 使用 `cubic-bezier(.22, 1, .36, 1)`，按压缩放 `0.985`。**2026-11-13 实现时长（ms）**：按压 70、选择 150、Dialog 220、Sheet 280、层级前进 260、返回 220、同级 140、侧栏 180、工具展开 170、输入区展开 155/淡入 95、折叠箭头 130、颜色反馈 120、普通淡入 130、Toast 170、实时脉冲 900。高级节奏倍率 `0.7..1.3`，减少动效时非必要时长归零；长按延迟 `420ms`/重复 `90ms`。下一轮以丰富真实状态微动效为优化方向，参见 [动态体验规范](V6-MOTION-EXPERIENCE.zh-CN.md)。
 
 动画用于 **位置层级变化、按压确认与真实正在运行**，不能为了好看制造“伪运行”，也不能为已移除的工作分栏保留完成共享转场。Material3 框架内部无法控制的时序不能伪称已经统一。
 
@@ -110,13 +112,13 @@
 - [主线功能路由](../../../app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt)；[V6 视觉令牌](../../../app/src/main/java/com/shenyan/designsystem/foundation/ShenyanFoundation.kt)；[材质](../../../app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterial.kt)；[材质取色](../../../app/src/main/java/com/shenyan/designsystem/components/ShenyanMaterialColor.kt)。
 - [设置导航](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt)、[输入框](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt)、[消息](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt)、[工具技能](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt)。
 - 已合并：[#693](https://github.com/sy220284/777/pull/693)、[#694](https://github.com/sy220284/777/pull/694)、[#696–#704](https://github.com/sy220284/777/pulls?q=is%3Apr+is%3Amerged+693..704)、[#708](https://github.com/sy220284/777/pull/708)、[#709](https://github.com/sy220284/777/pull/709)、[#710](https://github.com/sy220284/777/pull/710)。
-- **已合并**：[#711 技能/插件布局](https://github.com/sy220284/777/pull/711)。**未合并**：[#705 UI 3.0 R4](https://github.com/sy220284/777/pull/705)。R4 独立 UI Pack、双包接管和动态交互能力仍在迁移中，不能写成本版本生产已完成。
+- **已合并**：[#711 技能/插件布局](https://github.com/sy220284/777/pull/711)、[#896 阅读与工作交互优化](https://github.com/sy220284/777/pull/896)。#705 曾于 2026-10-17 合并，之后的独立 UI Pack 架构已由原生 V6.3 回退改造处理，当前运行以主线 Compose 为准。**本轮设计文档中的 V6.4 目标均未实施到生产代码。**
 
-### Figma 状态
+### Figma / Canva 状态
 
-已查到项目中的 Figma 设计文件链接（如 [外观文件](https://www.figma.com/design/XRzRhpaBU7nwiy0iZQndB1)）；但当前 Figma Starter 账号的 MCP 调用额度已满，**本次没有修改任何 Figma 可编辑画布，也没有原生画板截图验收**。GitHub 的 V6 规范和 HTML 原型完成不等于 Figma 已同步。待权限/配额恢复后，必须按已合并源码逐个对齐 variables、组件、页面和动效，再以 Figma 节点及截图为证据关闭该项。
+项目历史设计链接包括 [Figma 外观文件](https://www.figma.com/design/XRzRhpaBU7nwiy0iZQndB1)。2026-11-13 调用 Figma MCP 返回 Starter 限额错误，Canva 未找到 777/神言/V6 同名设计稿及品牌包；**本轮仅更新 GitHub 设计文档，未修改 Figma、Canva 在线设计层**。后续应根据 [V6.4 目标规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)与已实现 Compose 核对变量、组件和页面截图后，再确认在线设计完成。
 
-## 2026-10-15 本地审计修复候选
+## 历史附录：2026-10-15 本地审计修复候选（非当前实现证明）
 
 基于 `45bb1f54`（已整合 #726、#727、#729）的 PR 候选实现，尚未合并；保留现有七条产品路由。工作会话菜单增加“工作记录与交付”弹层：完整历史游标分页、工具真实阶段和原始事件详情、当前目标与步骤、选定成果版本的手动来源关联。关联只证明来源，不代表验收通过。文件元数据观察用于刷新预览，显式核验和关联才计算内容哈希。
 
