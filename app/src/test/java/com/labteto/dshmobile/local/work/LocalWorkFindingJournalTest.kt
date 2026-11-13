@@ -43,6 +43,7 @@ class LocalWorkFindingJournalTest {
             })
             val id = recorded.substringAfter("ID=").substringBefore("；")
             assertTrue(id.startsWith("finding-"))
+            assertFalse(LocalWorkFindingJournal.supportedForReplan(history, "goal-a", id))
             assertTrue(LocalWorkFindingJournal.execute(history, "goal-a", buildJsonObject {
                 put("action", "list")
             }).contains("模块存在重复功能"))
@@ -60,7 +61,18 @@ class LocalWorkFindingJournalTest {
             })
             assertTrue(list.contains("找到可复用的公共实现"))
             assertFalse(list.contains("模块存在重复功能"))
-            assertEquals(2, history.eventsOfTypesAfter(-1L, setOf("work/finding")).size)
+            assertTrue(LocalWorkFindingJournal.supportedForReplan(history, "goal-a", id))
+            assertFalse(LocalWorkFindingJournal.supportedForReplan(history, "another-goal", id))
+            history.tool("read-3")
+            LocalWorkFindingJournal.execute(history, "goal-a", buildJsonObject {
+                put("action", "revise")
+                put("finding_id", id)
+                put("source_call_id", "read-3")
+                put("summary", "进一步检查后确认此前的公共实现不适用")
+                put("status", "rejected")
+            })
+            assertFalse(LocalWorkFindingJournal.supportedForReplan(history, "goal-a", id))
+            assertEquals(3, history.eventsOfTypesAfter(-1L, setOf("work/finding")).size)
         } finally {
             history.close()
         }

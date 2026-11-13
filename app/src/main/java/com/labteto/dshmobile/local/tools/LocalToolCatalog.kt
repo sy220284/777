@@ -356,7 +356,8 @@ object LocalToolCatalog {
             },
             "allow_mutation" to boolean("仅在当前主代理拥有写授权时，显式授权本图节点使用原有受控写工具；中断且副作用未知时停止，不自动重放"),
             "resume_graph_id" to string("可选；按未结算图编号显式恢复原完整不可变计划，不需要重传 tasks；新用户请求优先，恢复写图还需本次 allow_mutation=true"),
-            "replan_graph_id" to string("显式替换现存未结算只读 DAG：需同时提供新 tasks/dependencies；新建独立图与执行 ID，旧结果不复制；可写图必须经 Lead 单独核验"),
+            "replan_graph_id" to string("显式替换现存未结算只读 DAG：需同时提供新 tasks/dependencies；新建独立图与执行 ID，旧结果保留来源但不冒充新执行的验收；可写图须单独核验"),
+            "origin_finding_id" to string("因调查发现改变任务图时填写 work_finding 返回的 ID；仅接受当前目标仍受真实来源支持的发现，并关联到新旧图的事件记录"),
             "node_input_files" to buildJsonObject {
                 put("type", "array"); put("description", "与 tasks 等长的逐节点输入文件路径数组；恢复时按节点内容版本校验")
                 put("items", buildJsonObject { put("type", "array"); put("items", buildJsonObject { put("type", "string") }) })

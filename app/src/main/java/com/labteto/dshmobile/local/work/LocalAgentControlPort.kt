@@ -67,6 +67,7 @@ internal data class LocalAgentWorkflowRequest(
     val nodeOutputFiles: List<List<String>> = emptyList(),
     val resumeGraphId: String? = null,
     val replanGraphId: String? = null,
+    val originFindingId: String? = null,
     val workspaceRepository: String? = null,
     val executionBackend: LocalAgentExecutionBackend = LocalAgentExecutionBackend.IN_PROCESS,
 )
@@ -140,6 +141,7 @@ internal class LocalWorkAgentControlRuntime(
         inputFiles = request.inputFiles, nodeInputFiles = request.nodeInputFiles,
         nodeOutputFiles = request.nodeOutputFiles, resumeGraphId = request.resumeGraphId,
         replanGraphId = request.replanGraphId,
+        originFindingId = request.originFindingId,
         workspaceRepository = request.workspaceRepository,
         executionBackend = request.executionBackend,
     )

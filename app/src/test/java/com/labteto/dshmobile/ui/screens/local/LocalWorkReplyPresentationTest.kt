@@ -178,6 +178,22 @@ class LocalWorkReplyPresentationTest {
         assertEquals("TOOL_OUTCOME_UNKNOWN", steps[3].message.toolErrorCode)
     }
 
+    @Test fun meaningfulFindingRemainsVisibleBetweenCollapsedRoutineToolCalls() {
+        val first = message("read-one", "tool", "读取完成", "read", false)
+        val second = message("read-two", "tool", "读取完成", "read", false)
+        val discovery = message("finding", "tool",
+            "已记录调查线索 ID=finding-1；状态=hypothesis；发现=模块调用不符合预期；来源回执=read-one",
+            "work_finding", false)
+        val last = message("read-three", "tool", "补读完成", "read", false)
+        val rows = groupConsecutiveWorkOperations(
+            buildLocalTranscript(listOf(first, second, discovery, last)))
+        assertEquals(3, rows.size)
+        assertTrue((rows[0] as LocalTranscriptItem.WorkStep).operationGroup)
+        assertEquals("work_finding", (rows[1] as LocalTranscriptItem.WorkStep).message.toolName)
+        assertFalse((rows[1] as LocalTranscriptItem.WorkStep).operationGroup)
+        assertEquals("整理调查发现", userFacingWorkToolAction("work_finding"))
+    }
+
     @Test fun independentToolCallsKeepSeparateChronologicalRows() {
         val events = listOf(
             message("read-one", "tool", "ok", "mcp_github_fetch_file", false),

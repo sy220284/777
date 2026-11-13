@@ -59,6 +59,46 @@ class LocalWorkImprovementArchiveTest {
         }
 
     @Test
+    fun reusesOnlyCurrentProjectsSupportedRelevantFindings() =
+        withArchive { _, logs, archive ->
+            val log = logs.get("related-work")
+            log.append("work/finding", buildJsonObject {
+                put("finding_id", "finding-project-a")
+                put("goal_id", "goal-one")
+                put("project_id", "project-A")
+                put("status", "supported")
+                put("summary", "代码架构审查中发现通用接口可以复用")
+                put("source_call_id", "read-original")
+                put("next_action", "检查调用链")
+            })
+            log.append("work/finding", buildJsonObject {
+                put("finding_id", "finding-project-b")
+                put("goal_id", "goal-two")
+                put("project_id", "project-B")
+                put("status", "supported")
+                put("summary", "代码架构审查发现用户资料")
+                put("source_call_id", "private-source")
+            })
+            archive.refresh()
+            val recalled = archive.relevantDiscoveries("project-A", "深入审查代码架构及公共接口")
+            assertTrue(recalled.contains("通用接口可以复用"))
+            assertTrue(recalled.contains("read-original"))
+            assertFalse(recalled.contains("用户资料"))
+            assertTrue(archive.relevantDiscoveries("project-B", "完全无关的其他事件").isEmpty())
+            assertTrue(archive.relevantDiscoveries("", "深入审查代码架构").isEmpty())
+            log.append("work/finding", buildJsonObject {
+                put("finding_id", "finding-project-a")
+                put("goal_id", "goal-one")
+                put("project_id", "project-A")
+                put("status", "rejected")
+                put("summary", "进一步核对后发现不适用")
+                put("source_call_id", "read-recheck")
+            })
+            archive.refresh()
+            assertTrue(archive.relevantDiscoveries("project-A", "深入审查代码架构及公共接口").isEmpty())
+        }
+
+    @Test
     fun onlyReportsGroundedWorkFactsAndDoesNotClaimUnimplementedLearning() = withArchive { workspace, logs, archive ->
         val log = logs.get("one")
         log.append("agent/run-checkpoint", buildJsonObject { put("mode", "chat") })

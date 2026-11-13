@@ -317,6 +317,7 @@ internal fun groupConsecutiveWorkOperations(
     for (item in items) {
         if (item is LocalTranscriptItem.WorkStep &&
             item.message.role == "tool" &&
+            item.message.toolName != "work_finding" &&
             item.message.toolIsError == false &&
             item.message.toolErrorCode == null &&
             item.groupedMessages.all { it.toolIsError == false && it.toolErrorCode == null } &&
@@ -328,6 +329,7 @@ internal fun groupConsecutiveWorkOperations(
             // A failed/unknown/cancelled operation and every narration remain visible.
             if (item is LocalTranscriptItem.WorkStep &&
                 item.message.role == "tool" &&
+                item.message.toolName != "work_finding" &&
                 item.message.toolIsError == false &&
                 item.message.toolErrorCode == null &&
                 item.groupedMessages.all { it.toolIsError == false && it.toolErrorCode == null } &&

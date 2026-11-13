@@ -23,7 +23,13 @@ internal object LocalWorkFindingJournal {
     private fun JsonObject.text(key: String): String =
         (get(key) as? JsonPrimitive)?.contentOrNull.orEmpty()
 
-    fun execute(log: LocalSessionEventLog, goalId: String, args: JsonObject): String =
+    fun execute(
+        log: LocalSessionEventLog,
+        goalId: String,
+        args: JsonObject,
+        projectId: String = "",
+        sourceMessageId: String? = null,
+    ): String =
         log.withWriterLease {
             when (val action = args.text("action")) {
                 "list" -> list(log, goalId)
@@ -62,6 +68,8 @@ internal object LocalWorkFindingJournal {
                     log.append(EVENT, buildJsonObject {
                         put("finding_id", findingId)
                         put("goal_id", goalId)
+                        put("project_id", projectId)
+                        put("source_message_id", sourceMessageId.orEmpty())
                         put("action", action)
                         put("summary", summary)
                         put("status", status)
@@ -69,12 +77,20 @@ internal object LocalWorkFindingJournal {
                         put("source_sequence", source.sequence)
                         put("next_action", nextAction)
                     })
-                    "已记录调查线索 ID=$findingId；状态=$status；来源回执=$sourceCallId" +
+                    "已记录调查线索 ID=$findingId；状态=$status；发现=$summary；来源回执=$sourceCallId" +
                         if (nextAction.isBlank()) "" else "；后续调查=$nextAction"
                 }
                 else -> error("未知发现操作：$action")
             }
         }
+
+    fun supportedForReplan(log: LocalSessionEventLog, goalId: String, findingId: String): Boolean {
+        if (goalId.isBlank() || findingId.isBlank()) return false
+        val latest = log.latestMatching(setOf(EVENT)) {
+            it.text("finding_id") == findingId && it.text("goal_id") == goalId
+        } ?: return false
+        return latest.data.text("status") == "supported"
+    }
 
     private fun list(log: LocalSessionEventLog, goalId: String): String {
         val current = linkedMapOf<String, JsonObject>()

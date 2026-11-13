@@ -124,6 +124,8 @@ internal fun driveLocalWorkGoalAfterTurn(
         planMode = work.planMode,
         hadSuccessfulTool = hadSuccessfulTool,
         hadToolFailure = hadToolFailure,
+        recoveredReadOnlyFailure = hadToolFailure &&
+            LocalWorkInvestigationRuntime.recoveredReadOnlyFailure(binding.eventLog),
         runtimeHealthy = binding.state.value.error == null,
         cancelled = binding.runHandle.cancellationRequested,
         pendingInputs = binding.runHandle.pendingInputs.size(),
