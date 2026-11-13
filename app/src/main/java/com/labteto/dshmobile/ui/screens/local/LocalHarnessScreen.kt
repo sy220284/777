@@ -163,6 +163,7 @@ fun LocalHarnessScreen(
     val transcriptHistory by viewModel.transcriptHistory.collectAsStateWithLifecycle()
     val pinnedSessionIds by viewModel.pinnedSessionIds.collectAsStateWithLifecycle()
     val sessionTitleOverrides by viewModel.sessionTitleOverrides.collectAsStateWithLifecycle()
+    val sectionCatalog by viewModel.sessionSections.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     // Native drags remain finger-tracked; short, explicit animations handle
     // toolbar taps, completed navigation and returning from drawer pages.
@@ -917,6 +918,12 @@ fun LocalHarnessScreen(
                 globalSearchOpenRequest = openGlobalSearchRequest,
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
+                sectionCatalog = sectionCatalog,
+                onCreateSection = viewModel::createSessionSection,
+                onRenameSection = viewModel::renameSessionSection,
+                onDeleteSection = viewModel::deleteSessionSection,
+                onMoveSection = viewModel::moveSessionSection,
+                onAssignSessionSection = viewModel::assignSessionSection,
                 currentGalleryId = shell.galleryId,
                 currentGalleryStoryId = shell.galleryStoryId,
                 currentPersonaName = shell.chatPersona.name,
