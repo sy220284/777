@@ -571,6 +571,7 @@ fun LocalHarnessScreen(
         remoteGitBranches = viewModel::remoteGitBranchesForUi,
         compareLocalGit = viewModel::compareLocalGitForUi,
         compareRemoteGit = viewModel::compareRemoteGitForUi,
+        compareCommitGit = viewModel::compareCommitGitForUi,
         findIndependentCodeReview = viewModel::findIndependentCodeReviewForUi,
         runIndependentCodeReview = viewModel::runIndependentCodeReviewForUi,
         acceptIndependentCodeReview = viewModel::acceptIndependentCodeReviewForUi,
