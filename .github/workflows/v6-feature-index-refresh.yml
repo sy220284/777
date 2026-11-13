@@ -64,8 +64,10 @@ jobs:
           done
           echo "::error::最新分支索引同步连续发生冲突"
           exit 1
-      - name: 对机器人写回的最新提交直接触发完整代码和设备验收
-        if: steps.sync.outputs.updated == 'true'
+      - name: 对索引同步后分支的最新提交执行完整代码和设备验收
+        # Index source changes produce a bot commit; docs-only or already-synced
+        # changes do not. Both cases must validate the final branch HEAD.
+        if: steps.sync.outputs.updated == 'true' || steps.sync.outputs.updated == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
