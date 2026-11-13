@@ -375,6 +375,23 @@ internal fun LocalMessageRow(
                     chatMode = chatMode,
                 )
                 }
+                // Selectable Markdown can consume taps inside its text area. Keep a small,
+                // explicit 48dp action control for older replies so tools remain reachable
+                // without interfering with text selection or embedded links.
+                if (chatMode && !isLatestAssistant && !streaming) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        Box(modifier = Modifier.testTag("messageActionToggle:${message.id}")) {
+                            CompactMessageAction(
+                                icon = FeatherIcons.MoreVertical,
+                                contentDescription = if (actionsExpanded) "收起回复操作" else "展开回复操作",
+                                onClick = { actionsExpanded = !actionsExpanded },
+                            )
+                        }
+                    }
+                }
                 if (!chatMode || (isLatestAssistant && !streaming) || actionsExpanded) FlowRow(
                     modifier = Modifier.fillMaxWidth().testTag("messageActionToolbar:${message.id}"),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
