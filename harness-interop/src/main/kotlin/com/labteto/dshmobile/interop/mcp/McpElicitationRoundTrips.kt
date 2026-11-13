@@ -40,12 +40,14 @@ internal suspend fun mcpCallWithInputRequired(
     onElicitation: suspend (McpElicitationRequest) -> McpElicitationReply,
 ): JsonObject {
     var next = buildJsonObject { put("name", name); put("arguments", arguments) }
+    var cancelledByUser = false
     while (true) {
         currentCoroutineContext().ensureActive()
         val result = request(next)
         val kind = result["resultType"]?.jsonPrimitive?.contentOrNull ?: "complete"
         if (kind == "complete") return result
         require(kind == "input_required") { "MCP 返回未知的完成状态" }
+        check(!cancelledByUser) { "MCP 服务未终止已取消的追问" }
         val inputs = result["inputRequests"] as? JsonObject ?: JsonObject(emptyMap())
         val opaqueState = result["requestState"]?.let {
             val primitive = it as? JsonPrimitive
@@ -86,7 +88,11 @@ internal suspend fun mcpCallWithInputRequired(
                     } ?: error("MCP 外部追问缺少地址")
                 } else null
                 schema?.let(::validateMcpElicitationSchema)
-                val answer = onElicitation(McpElicitationRequest(key, message, mode, schema, url))
+                // Cancel is a terminal user decision for the whole round. Send a
+                // cancel reply for remaining prompts without reopening the UI.
+                val answer = if (cancelledByUser) McpElicitationReply("cancel")
+                    else onElicitation(McpElicitationRequest(key, message, mode, schema, url))
+                if (answer.action == "cancel") cancelledByUser = true
                 if (answer.action == "accept") {
                     if (mode == "url") require(answer.content == null) {
                         "MCP 外部追问禁止通过客户端提交信息"
