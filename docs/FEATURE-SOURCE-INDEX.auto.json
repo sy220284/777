@@ -1920,7 +1920,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
-      "sha256": "f4b61a3397288f43"
+      "sha256": "75fc94b90bed38e9"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTaskRuntime.kt",
@@ -3784,11 +3784,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "sha256": "581dd6f05120e6d5"
+      "sha256": "5dd35bc8db81294a"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
-      "sha256": "1534fbb2f16340b0"
+      "sha256": "3161ffdf34e58746"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationComponents.kt",
@@ -4056,7 +4056,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/uicontract/SettingsUiPort.kt",
-      "sha256": "2ade53a3395ddc3e"
+      "sha256": "d6ca2190f1e5cc21"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/uicontract/ToolsUiPort.kt",
@@ -4620,13 +4620,16 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "36d5be2059cb",
+  "source_snapshot": "4a80c5408563",
   "observed_delta": {
-    "baseline": "e612f941423c",
+    "baseline": "36d5be2059cb",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/uicontract/SettingsUiPort.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
