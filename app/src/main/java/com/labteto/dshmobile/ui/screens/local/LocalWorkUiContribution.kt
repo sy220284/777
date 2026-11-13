@@ -35,6 +35,7 @@ internal fun localWorkFeatureUiContribution(
             sessionId = shell.sessionId,
             workspacePath = shell.workspacePath,
             loadWorkspace = actions.workspaceFiles,
+            saveToDownloads = actions.saveWorkspaceFileToDownloads,
             loadDirectory = actions.workspaceDirectory,
             loadDirectoryPage = actions.workspaceDirectoryPage,
             loadSearch = actions.searchWorkspaceFiles,
