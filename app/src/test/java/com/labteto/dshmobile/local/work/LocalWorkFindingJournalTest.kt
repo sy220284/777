@@ -22,11 +22,12 @@ class LocalWorkFindingJournalTest {
     )
 
     private fun LocalSessionEventLog.tool(id: String, goal: String = "goal-a", failed: Boolean = false) {
-        append("tool/call", buildJsonObject {
+        val declaration = append("tool/call", buildJsonObject {
             put("id", id); put("goal_id", goal); put("execution_started", false)
         })
         append("tool/result", buildJsonObject {
             put("id", id); put("is_error", failed)
+            put("tool_declared_sequence", declaration.sequence)
         })
     }
 
