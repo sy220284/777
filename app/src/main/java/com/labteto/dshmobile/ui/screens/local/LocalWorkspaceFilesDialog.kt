@@ -5,6 +5,7 @@ import com.shenyan.designsystem.foundation.SyMetric
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -47,6 +48,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,6 +70,7 @@ import com.shenyan.designsystem.components.SyLoadingState
 import com.labteto.dshmobile.ui.shenyan.SySearchField
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
@@ -956,7 +959,9 @@ internal fun LocalWorkspaceFilesDialog(
                             Modifier.fillMaxWidth().heightIn(max = 360.dp)
                                 .verticalScroll(rememberScrollState()),
                         ) {
-                            Text(result.patch.take(24_000), style = DsType.small13, color = colors.text)
+                            Text(result.patch.take(24_000), style = DsType.small13, color = colors.text,
+                                    fontFamily = FontFamily.Monospace, softWrap = false,
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()))
                         }
                     }
                     if (result.patch.length > 24_000) {
@@ -1010,7 +1015,7 @@ internal fun LocalWorkspaceFilesDialog(
                                 Modifier.fillMaxWidth().heightIn(max = 360.dp)
                                     .verticalScroll(rememberScrollState()),
                             ) {
-                                Text(saved.report, style = DsType.small13, color = colors.text,
+                                MarkdownText(saved.report,
                                     modifier = Modifier.testTag("work_code_review_report"))
                             }
                         }
