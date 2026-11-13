@@ -22,6 +22,11 @@ internal class LocalWebDiagnostics(
             return@withContext buildString {
                 appendLine("网络诊断")
                 appendLine("目标：$normalized")
+                val proxy = targetResolver.systemHttpProxy()
+                val vpn = targetResolver.isVpnActive()
+                val interfaces = targetResolver.activeTunnelInterfaces()
+                appendLine("系统代理：${proxy?.let { "${it.host}:${it.port}" } ?: "未检测到"}")
+                appendLine("VPN/TUN：${if (vpn) "已启用" else "未检测到"}${if (interfaces.isNotEmpty()) "（${interfaces.joinToString()}）" else ""}")
                 appendLine(blocked.message ?: "目标解析到受保护地址")
                 append("结论：地址安全策略已拦截")
             }

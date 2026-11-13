@@ -1119,14 +1119,14 @@ internal class LocalWorkAgentTurnExecutor(
                 }
                 if (completed != null) {
                     try {
-                        withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                        val delivered = withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
                             sessionStorage.files.publishVerifiedDeliverables(
                                 binding.sessionId, completed.artifactPaths,
                                 localWorkTaskFolderPaths(completed.description, completed.id).deliverables,
                             )
                         }
-                        // An earlier failed delivery may have been retried successfully.
-                        binding.state.update { current ->
+                        // Clear the previous delivery failure only if an artifact was published.
+                        if (delivered.isNotEmpty()) binding.state.update { current ->
                             if (current.error?.startsWith("目标验收完成，但手机下载交付失败：") == true)
                                 current.copy(error = null)
                             else current
