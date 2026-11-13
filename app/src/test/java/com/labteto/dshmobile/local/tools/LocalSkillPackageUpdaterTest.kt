@@ -164,4 +164,22 @@ class LocalSkillPackageUpdaterTest {
             folder.deleteRecursively()
         }
     }
+
+    @Test fun recoveryCannotDeleteOutsideFilesThroughAbandonedUpdateLinks() {
+        val folder = Files.createTempDirectory("skill-update-recover-link").toFile()
+        val outside = Files.createTempDirectory("skill-update-external")
+        try {
+            val abandoned = folder.resolve(".dsh/.skill-update-unfinished").toPath()
+            Files.createDirectories(abandoned)
+            Files.createSymbolicLink(abandoned.resolve("outside"), outside)
+            assertThrows(IllegalArgumentException::class.java) {
+                LocalSkillPackageUpdater(LocalWorkspace(folder)).recoverInterruptedTransactions()
+            }
+            assertTrue(Files.exists(outside))
+            assertTrue(Files.exists(abandoned.resolve("outside")))
+        } finally {
+            folder.deleteRecursively()
+            Files.deleteIfExists(outside)
+        }
+    }
 }

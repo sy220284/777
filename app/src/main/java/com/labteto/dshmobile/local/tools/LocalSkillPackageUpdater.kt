@@ -20,7 +20,7 @@ internal class LocalSkillPackageUpdater(private val workspace: LocalWorkspace) {
         require(LOCAL_SKILL_ID_PATTERN.matches(id)) { "技能标识无效" }
     }
 
-    private fun requireSafeTree(directory: File) {
+    private fun requireNoLinks(directory: File) {
         require(directory.isDirectory && !Files.isSymbolicLink(directory.toPath())) {
             "技能目录不存在或不安全"
         }
@@ -32,6 +32,10 @@ internal class LocalSkillPackageUpdater(private val workspace: LocalWorkspace) {
                 }
             }
         }
+    }
+
+    private fun requireSafeTree(directory: File) {
+        requireNoLinks(directory)
         val skill = File(directory, "SKILL.md")
         require(Files.isRegularFile(skill.toPath()) && !Files.isSymbolicLink(skill.toPath())) {
             "技能规则文件不存在"
@@ -162,9 +166,7 @@ internal class LocalSkillPackageUpdater(private val workspace: LocalWorkspace) {
         systemRoot.listFiles().orEmpty().filter {
             it.name.startsWith(".skill-update-")
         }.forEach { abandoned ->
-            require(abandoned.isDirectory && !Files.isSymbolicLink(abandoned.toPath())) {
-                "技能更新临时目录不安全"
-            }
+            requireNoLinks(abandoned)
             require(abandoned.deleteRecursively()) { "未完成的技能更新临时文件清理失败" }
         }
     }
