@@ -28,6 +28,29 @@ class LocalWorkspaceShareSelectionUiTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
+    fun workRootShowsSystemDocumentImportWithoutExtraConfiguration() {
+        compose.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(
+                    mode = LocalFilesMode.WORKSPACE,
+                    sessionId = "phone-import",
+                    workspacePath = File(context.filesDir, "local-harness/workspace").absolutePath,
+                    loadWorkspace = { emptyList() },
+                    importFromPhone = { uri -> uri.toString() },
+                    loadConversation = { LocalConversationFiles() },
+                    loadPreview = { error("文件选择器尚未返回文档") },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("导入手机文件").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("work_import_phone_file").assertExists()
+        compose.onNodeWithText("打开下载").assertExists()
+    }
+
+    @Test
     fun gitReviewScopeTabsReuseOneEntryWithoutExposingExtraForms() {
         val calls = mutableListOf<String>()
         compose.setContent {
