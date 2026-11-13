@@ -126,6 +126,9 @@ internal fun LocalWorkspaceFilesDialog(
     findIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview?)? = null,
     runIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview)? = null,
     acceptIndependentCodeReview: (suspend (String, String, com.labteto.dshmobile.local.work.LocalIndependentCodeReview, LocalRemoteGitDiffUi) -> Boolean)? = null,
+    findIndependentSecurityReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalSecurityReview?)? = null,
+    runIndependentSecurityReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalSecurityReview)? = null,
+    approveIndependentSecurityReview: (suspend (String, String, com.labteto.dshmobile.local.work.LocalSecurityReview, LocalRemoteGitDiffUi) -> Boolean)? = null,
     loadConversation: suspend (String) -> LocalConversationFiles,
     loadPreview: suspend (String) -> LocalWorkspaceFilePreview,
     loadPreviewPage: suspend (String, Long) -> LocalWorkspaceFilePreview = { path, _ -> loadPreview(path) },
@@ -188,6 +191,10 @@ internal fun LocalWorkspaceFilesDialog(
     var codeReviewBusy by remember(mode, sessionId) { mutableStateOf(false) }
     var codeReviewError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
     var codeReviewConfirm by remember(mode, sessionId) { mutableStateOf(false) }
+    var securityReview by remember(mode, sessionId) { mutableStateOf<com.labteto.dshmobile.local.work.LocalSecurityReview?>(null) }
+    var securityReviewBusy by remember(mode, sessionId) { mutableStateOf(false) }
+    var securityReviewError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
+    var securityReviewConfirm by remember(mode, sessionId) { mutableStateOf(false) }
     var gitJob by remember(mode, sessionId) { mutableStateOf<Job?>(null) }
     val chooserTitle = stringResource(R.string.local_files_share_chooser)
     val failedText = stringResource(R.string.local_files_share_failed)
@@ -261,6 +268,8 @@ internal fun LocalWorkspaceFilesDialog(
         gitError = null
         codeReview = null
         codeReviewError = null
+        securityReview = null
+        securityReviewError = null
         gitJob = scope.launch {
             gitLoading = true
             try {
@@ -269,6 +278,7 @@ internal fun LocalWorkspaceFilesDialog(
                 if (!diff.truncated && diff.patch.isNotBlank()) {
                     try {
                         codeReview = findIndependentCodeReview?.invoke(sessionId, gitRepository, diff)
+                        securityReview = findIndependentSecurityReview?.invoke(sessionId, gitRepository, diff)
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (failure: Exception) {
@@ -296,6 +306,8 @@ internal fun LocalWorkspaceFilesDialog(
         gitResult = null
         codeReview = null
         codeReviewError = null
+        securityReview = null
+        securityReviewError = null
         gitBranches = emptyList()
         gitBranchQuery = ""
         gitJob = scope.launch {
@@ -327,6 +339,8 @@ internal fun LocalWorkspaceFilesDialog(
             gitResult = null
             codeReview = null
             codeReviewError = null
+            securityReview = null
+            securityReviewError = null
             gitError = null
             try {
                 val diff = compare(gitRepository, remote, branch)
@@ -335,6 +349,7 @@ internal fun LocalWorkspaceFilesDialog(
                 if (!diff.truncated && diff.patch.isNotBlank()) {
                     try {
                         codeReview = findIndependentCodeReview?.invoke(sessionId, gitRepository, diff)
+                        securityReview = findIndependentSecurityReview?.invoke(sessionId, gitRepository, diff)
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (failure: Exception) {
@@ -952,6 +967,49 @@ internal fun LocalWorkspaceFilesDialog(
                 variant = SyButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
         }
     }
+    if (securityReviewConfirm && securityReview != null && gitResult != null) {
+        SyResponsiveSheet(
+            title = "确认安全放行",
+            subtitle = "仅批准此份 Git 变更的安全审核结论；变更后自动失效。工具执行仍需原有权限与审批。",
+            onDismiss = { if (!securityReviewBusy) securityReviewConfirm = false },
+        ) {
+            SyButton(
+                text = "批准当前变更",
+                enabled = !securityReviewBusy,
+                onClick = {
+                    val saved = securityReview
+                    val diff = gitResult
+                    val approve = approveIndependentSecurityReview
+                    if (saved != null && saved.verdict == "allow" && diff != null && approve != null) {
+                        gitJob?.cancel()
+                        gitJob = scope.launch {
+                            securityReviewBusy = true
+                            securityReviewError = null
+                            try {
+                                if (approve(sessionId, gitRepository, saved, diff)) {
+                                    securityReview = saved.copy(humanApproved = true)
+                                } else {
+                                    securityReviewError = "代码、风险裁决或审批版本已变化，请重新安全审查。"
+                                }
+                                securityReviewConfirm = false
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                securityReviewError = failure.message ?: "安全放行记录失败"
+                                securityReviewConfirm = false
+                            } finally {
+                                securityReviewBusy = false
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().testTag("work_security_review_approve_confirm"),
+            )
+            SyButton("取消", onClick = { securityReviewConfirm = false },
+                enabled = !securityReviewBusy, variant = SyButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth())
+        }
+    }
     if (gitSheetOpen) {
         val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
         SyResponsiveSheet(
@@ -971,6 +1029,7 @@ internal fun LocalWorkspaceFilesDialog(
                             if (!gitLoading && !codeReviewBusy) {
                                 gitIncludeUntracked = selected
                                 codeReview = null
+                                securityReview = null
                                 openLocalGitComparison()
                             }
                         },
@@ -1080,6 +1139,65 @@ internal fun LocalWorkspaceFilesDialog(
                         } else if (saved.humanAccepted) {
                             Text("人工接纳已记录", color = colors.textSecondary)
                         }
+                    }
+                }
+                if (mode == LocalFilesMode.WORKSPACE && runIndependentSecurityReview != null &&
+                    result.patch.isNotBlank()) {
+                    SyButton(
+                        text = if (securityReviewBusy) "安全审查中…" else "独立安全审核",
+                        onClick = {
+                            val start = runIndependentSecurityReview
+                            if (start != null && !securityReviewBusy && !codeReviewBusy) {
+                                gitJob?.cancel()
+                                gitJob = scope.launch {
+                                    securityReviewBusy = true
+                                    securityReviewError = null
+                                    securityReview = null
+                                    try {
+                                        securityReview = start(sessionId, gitRepository, result)
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (failure: Exception) {
+                                        securityReviewError = failure.message ?: "独立安全审核失败"
+                                    } finally {
+                                        securityReviewBusy = false
+                                    }
+                                }
+                            }
+                        },
+                        enabled = !gitLoading && !securityReviewBusy && !codeReviewBusy &&
+                            !result.truncated,
+                        modifier = Modifier.fillMaxWidth().testTag("work_security_review_start"),
+                        variant = SyButtonVariant.Outline,
+                    )
+                    securityReviewError?.let { Text(it, color = colors.dangerInk) }
+                    securityReview?.let { saved ->
+                        Text("安全审查 · " + saved.trackingRef,
+                            style = DsType.small13Strong, color = colors.text)
+                        SelectionContainer {
+                            Column(Modifier.fillMaxWidth().heightIn(max = 360.dp)
+                                .verticalScroll(rememberScrollState())) {
+                                MarkdownText(saved.report,
+                                    modifier = Modifier.testTag("work_security_review_report"))
+                            }
+                        }
+                        if (saved.verdict == "block") {
+                            Text("审核存在待处理风险，当前版本不可放行。修复后重新检查。",
+                                style = DsType.caption11, color = colors.warningInk)
+                        } else if (saved.humanApproved) {
+                            Text("当前版本已人工批准；修改代码后需重新审核。",
+                                style = DsType.caption11, color = colors.successInk)
+                        } else if (approveIndependentSecurityReview != null) {
+                            SyButton(
+                                text = "人工批准当前变更",
+                                onClick = { securityReviewConfirm = true },
+                                enabled = !securityReviewBusy && !codeReviewBusy,
+                                modifier = Modifier.fillMaxWidth().testTag("work_security_review_approve"),
+                                variant = SyButtonVariant.Outline,
+                            )
+                        }
+                        Text("安全审核基于只读 Git 快照；批准记录与代码版本绑定，执行仍需工具权限。",
+                            style = DsType.caption11, color = colors.textSecondary)
                     }
                 }
                 Text(if (result.includesUntrackedFiles) {
