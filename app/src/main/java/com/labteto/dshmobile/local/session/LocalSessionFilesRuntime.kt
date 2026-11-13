@@ -11,6 +11,7 @@ import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourcePriority
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.local.files.LocalDownloadsPublisher
+import com.labteto.dshmobile.local.files.LocalPublishedDownload
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
 import com.labteto.dshmobile.local.files.LocalWorkspaceSearchPage
@@ -30,6 +31,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.put
 
 /**
@@ -61,6 +63,10 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     private val downloadsPublisher by lazy { LocalDownloadsPublisher(context, workspace) }
 
     init {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO).launch {
+            try { downloadsPublisher.ensureDirectory() }
+            catch (failure: Exception) { AppLog.failure("DownloadsPublisher", "initialize_folder", failure) }
+        }
         runCatching { LocalWorkspaceToolGuide.ensure(context, File(workspace.path)) }
             .onFailure { AppLog.failure("WorkspaceToolGuide", "create_readme", it) }
     }
@@ -149,6 +155,9 @@ class LocalSessionFilesRuntime @Inject internal constructor(
             HarnessResourceKind.FILE_IO, "file:preview_page", priority = HarnessResourcePriority.INTERACTIVE
         ) { workspace.preview(path, offset = offset) } }
 
+    internal suspend fun publishedWorkspaceFile(path: String): LocalPublishedDownload? =
+        withContext(Dispatchers.IO) { downloadsPublisher.publishedWorkspace(path) }
+
     override suspend fun saveWorkspaceFileToDownloads(path: String): String =
         withContext(Dispatchers.IO) {
             val units = com.labteto.dshmobile.harness.resource.harnessFileIoUnitsForBytes(
@@ -176,11 +185,26 @@ class LocalSessionFilesRuntime @Inject internal constructor(
                 if (!java.nio.file.Files.isDirectory(directory, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
                     emptyList()
                 } else {
-                    java.nio.file.Files.walk(directory).use { entries ->
-                        entries.filter { java.nio.file.Files.isRegularFile(it, java.nio.file.LinkOption.NOFOLLOW_LINKS) }
-                            .map { root.relativize(it).toString().replace('\\', '/') }
-                            .filter { workspace.workspaceFileAt(it) != null }
-                            .collect(java.util.stream.Collectors.toList())
+                    java.nio.file.Files.walk(directory, 8).use { entries ->
+                        val visited = entries.limit(2001).collect(java.util.stream.Collectors.toList())
+                        require(visited.size <= 2000) {
+                            "交付目录文件过多，请在工作区选择需要发布的文件"
+                        }
+                        val files = visited.filter {
+                            java.nio.file.Files.isRegularFile(it, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                        }.map { root.relativize(it).toString().replace('\\', '/') }
+                            .filter { path ->
+                                val name = path.substringAfterLast('/')
+                                !name.startsWith('.') && !name.endsWith('~') &&
+                                    !name.endsWith(".tmp", true) && !name.endsWith(".part", true) &&
+                                    !name.endsWith(".bak", true) &&
+                                    path.split('/').none { it.startsWith('.') } &&
+                                    workspace.workspaceFileAt(path) != null
+                            }
+                        require(files.size <= 512) {
+                            "本次交付文件超过 512 项，请在工作区批量选择后保存"
+                        }
+                        files
                     }
                 }
             }.orEmpty()
