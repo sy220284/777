@@ -14,6 +14,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -67,6 +69,20 @@ internal fun requireGitHubSkillChildPath(parent: String, name: String, advertise
     return advertisedPath
 }
 
+/** Source provenance is imported atomically with the ZIP contents. */
+internal fun githubSkillSourceEvidence(source: PublicGitHubSkillLocation, commit: String): ByteArray {
+    require(commit.matches(Regex("[0-9a-fA-F]{40}"))) { "GitHub 固定提交无效" }
+    return buildJsonObject {
+        put("source_type", "github")
+        put("owner", source.owner)
+        put("repository", source.repository)
+        put("source_ref", source.ref)
+        put("directory", source.directory)
+        put("commit", commit.lowercase())
+        put("source_url", "https://github.com/${source.owner}/${source.repository}/tree/${commit.lowercase()}/${source.directory}")
+    }.toString().toByteArray(Charsets.UTF_8)
+}
+
 /** Fetches a single public GitHub skill folder, then delegates admission to the existing
  * ZIP importer. No desktop Python, Git binary, remote execution or hidden cloud service. */
 @Singleton
@@ -77,11 +93,14 @@ internal class LocalGitHubSkillImporter @Inject constructor(
 ) {
     suspend fun install(link: String): String = withContext(Dispatchers.IO) {
         val source = PublicGitHubSkillLocation.parse(link)
+        // Pin the branch before downloading files; a branch update cannot mix revisions.
+        val commit = resolveCommit(source)
+        val pinned = source.copy(ref = commit)
         val files = linkedMapOf<String, ByteArray>()
         var totalBytes = 0L
         suspend fun collect(path: String, relative: String, depth: Int) {
             require(depth <= 10 && files.size < 128) { "技能目录过大或嵌套过深" }
-            val root = get(source, path)
+            val root = get(pinned, path)
             val entries = when (root) {
                 is JsonArray -> root.toList()
                 is JsonObject -> listOf(root)
@@ -96,7 +115,7 @@ internal class LocalGitHubSkillImporter @Inject constructor(
                     "dir" -> collect(childPath, childRelative, depth + 1)
                     "file" -> {
                         require(childRelative !in files) { "技能目录包含重复文件，拒绝覆盖" }
-                        val blob = get(source, childPath).jsonObject
+                        val blob = get(pinned, childPath).jsonObject
                         require(blob.string("encoding") == "base64") { "技能文件不可按 Base64 读取" }
                         val value = blob.string("content").replace("\n", "")
                         val bytes = Base64.getDecoder().decode(value)
@@ -111,6 +130,9 @@ internal class LocalGitHubSkillImporter @Inject constructor(
         }
         collect(source.directory, "", 0)
         require("SKILL.md" in files) { "所选 GitHub 目录中没有 SKILL.md" }
+        require(".github-source.json" !in files) { "源技能包包含保留的来源证据文件" }
+        require(files.size < 128) { "附加来源证据后技能文件数量超出限制" }
+        files[".github-source.json"] = githubSkillSourceEvidence(source, commit)
         val zipped = ByteArrayOutputStream()
         ZipOutputStream(zipped).use { zip ->
             files.forEach { (name, bytes) ->
@@ -129,6 +151,22 @@ internal class LocalGitHubSkillImporter @Inject constructor(
             val obj = it.jsonObject
             obj["name"]?.jsonPrimitive?.contentOrNull.takeIf { obj["type"]?.jsonPrimitive?.contentOrNull == "dir" }
         }.sorted()
+    }
+
+    private fun resolveCommit(source: PublicGitHubSkillLocation): String {
+        val url = "https://api.github.com/repos/${source.owner}/${source.repository}/commits/${source.ref}"
+        val request = Request.Builder().url(url)
+            .header("Accept", "application/vnd.github+json").get().build()
+        val sha = http.newCall(request).execute().use { response ->
+            require(response.isSuccessful) { "GitHub 技能版本无法固定（HTTP ${response.code}）" }
+            val bytes = response.body?.byteStream()?.use { it.readNBytes(128 * 1024 + 1) }
+                ?: error("GitHub 没有返回版本信息")
+            require(bytes.size <= 128 * 1024) { "GitHub 版本信息过大" }
+            json.parseToJsonElement(bytes.toString(Charsets.UTF_8))
+                .jsonObject.string("sha")
+        }
+        require(sha.matches(Regex("[0-9a-fA-F]{40}"))) { "GitHub 返回的提交编号无效" }
+        return sha.lowercase()
     }
 
     private fun JsonObject.string(key: String): String =
