@@ -175,6 +175,7 @@ internal class LocalAgentControlPlane(
                 executionBackend = LocalAgentExecutionBackend.fromWire(args.optionalString("execution_backend")),
                 resumeGraphId = args.optionalString("resume_graph_id"),
                 replanGraphId = args.optionalString("replan_graph_id"),
+                originFindingId = args.optionalString("origin_finding_id"),
                 workspaceRepository = decodeAgentWorkspaceRepository(args),
                 allowMutation = args.boolean("allow_mutation", false).also { requested ->
                     require(!requested || allowMutation) { "当前执行范围不允许可写任务图" }
