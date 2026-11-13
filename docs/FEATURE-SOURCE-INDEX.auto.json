@@ -4552,7 +4552,7 @@
     },
     {
       "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
-      "sha256": "6b1b3525b1893686"
+      "sha256": "80570a82da43bf52"
     },
     {
       "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AgentTlsBackend.kt",
@@ -4624,12 +4624,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "4dfda623f1bb",
+  "source_snapshot": "69adbb5fc950",
   "observed_delta": {
-    "baseline": "3d80c9016227",
+    "baseline": "4dfda623f1bb",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
