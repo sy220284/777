@@ -174,6 +174,7 @@ class LocalHarnessViewModel @Inject constructor(
         create = { name, root -> workProjectUi.create(name, root); Unit },
         importExisting = { name, root, sessionId -> workProjectUi.importExisting(name, root, sessionId); Unit },
         rename = workProjectUi::rename,
+        update = workProjectUi::update,
         changeRoot = workProjectUi::changeRoot,
         move = workProjectUi::move,
         delete = workProjectUi::delete,

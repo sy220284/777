@@ -84,6 +84,24 @@ internal class LocalWorkProjectCatalog(
         initialSessionId: String? = null): LocalWorkProject =
         create(name, root, requestId, initialSessionId)
 
+    /** Update both user-visible fields as a single durable transaction. */
+    fun update(id: String, name: String, root: String): Boolean = synchronized(lock) {
+        val title = checkedName(name)
+        val normalized = checkedRoot(root)
+        val old = mutable.value
+        val project = old.projects.firstOrNull { it.id == id } ?: error("项目不存在")
+        if (project.name == title && project.root == normalized) return@synchronized false
+        require(old.projects.none { it.id != id && it.name.equals(title, ignoreCase = true) }) {
+            "项目名称已存在"
+        }
+        commit(old.copy(projects = old.projects.map {
+            if (it.id == id) it.copy(
+                name = title, root = normalized, updatedAtMs = System.currentTimeMillis(),
+            ) else it
+        }))
+        true
+    }
+
     fun rename(id: String, name: String): Boolean = synchronized(lock) {
         val title = checkedName(name)
         val old = mutable.value
@@ -254,6 +272,7 @@ class LocalWorkProjectStore @Inject internal constructor(
     fun importExisting(name: String, root: String, sessionId: String?) =
         catalog.importExisting(name, root, initialSessionId = sessionId)
     fun rename(id: String, name: String) = catalog.rename(id, name)
+    fun update(id: String, name: String, root: String) = catalog.update(id, name, root)
     fun changeRoot(id: String, root: String) = catalog.changeRoot(id, root)
     fun move(id: String, newIndex: Int) = catalog.move(id, newIndex)
     fun delete(id: String) = catalog.delete(id)

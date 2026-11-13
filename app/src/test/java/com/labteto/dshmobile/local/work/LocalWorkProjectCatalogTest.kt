@@ -28,7 +28,7 @@ class LocalWorkProjectCatalogTest {
         assertEquals(imported.id, catalog.snapshots.value.sessionProjects["work-1"])
         assertEquals(project, catalog.create("写作", ".", requestId = project.requestId))
         assertTrue(catalog.rename(project.id, "长篇写作"))
-        assertTrue(catalog.changeRoot(project.id, "repo"))
+        assertTrue(catalog.update(project.id, "长篇写作", "repo"))
         assertTrue(catalog.assign(setOf("work-1"), project.id))
         assertTrue(catalog.move(imported.id, 0))
         val recovered = LocalWorkProjectCatalog(file, root, Json).snapshots.value

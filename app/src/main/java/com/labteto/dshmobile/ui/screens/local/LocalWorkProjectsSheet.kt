@@ -30,6 +30,7 @@ internal data class LocalWorkProjectsUiActions(
     val create: (String, String) -> Unit,
     val importExisting: (String, String, String?) -> Unit,
     val rename: (String, String) -> Boolean,
+    val update: (String, String, String) -> Boolean,
     val changeRoot: (String, String) -> Boolean,
     val move: (String, Int) -> Boolean,
     val delete: (String) -> Boolean,
@@ -115,8 +116,7 @@ internal fun LocalWorkProjectsSheet(
                             if (importing) actions.importExisting(name, folder, sessionId.takeIf(String::isNotBlank))
                             else actions.create(name, folder)
                         } else if (editing != null) {
-                            actions.rename(editing.id, name)
-                            actions.changeRoot(editing.id, folder)
+                            actions.update(editing.id, name, folder)
                         }
                         editorId = null
                         creating = false
