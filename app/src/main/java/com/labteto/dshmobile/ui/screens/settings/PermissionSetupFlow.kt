@@ -56,6 +56,7 @@ internal fun PermissionSetupFlow(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val openFailureText = stringResource(R.string.permission_setup_open_failed)
     val controller = remember(context) { DeviceCapabilitiesController(context.applicationContext) }
     val state by controller.state.collectAsStateWithLifecycle()
     var page by rememberSaveable { mutableIntStateOf(0) } // choose, one-by-one, summary
@@ -88,7 +89,7 @@ internal fun PermissionSetupFlow(
             }
             visitedNames = (visitedNames + feature.name).distinct()
         } catch (failure: RuntimeException) {
-            openError = failure.localizedMessage ?: context.getString(R.string.permission_setup_open_failed)
+            openError = failure.localizedMessage ?: openFailureText
         }
     }
     fun startWalk(
@@ -213,7 +214,7 @@ internal fun PermissionSetupFlow(
                                     try { controller.openAppDetails() }
                                     catch (failure: RuntimeException) {
                                         openError = failure.localizedMessage
-                                            ?: context.getString(R.string.permission_setup_open_failed)
+                                            ?: openFailureText
                                     }
                                 },
                                 variant = SyButtonVariant.Outline,
