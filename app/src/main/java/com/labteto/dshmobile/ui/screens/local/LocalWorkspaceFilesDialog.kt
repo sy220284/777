@@ -119,6 +119,7 @@ internal fun LocalWorkspaceFilesDialog(
         { kotlinx.coroutines.flow.emptyFlow() },
     remoteGitBranches: (suspend (String) -> List<String>)? = null,
     compareRemoteGit: (suspend (String, String, String) -> LocalRemoteGitDiffUi)? = null,
+    findIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview?)? = null,
     runIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview)? = null,
     acceptIndependentCodeReview: (suspend (String, String, com.labteto.dshmobile.local.work.LocalIndependentCodeReview, LocalRemoteGitDiffUi) -> Boolean)? = null,
     loadConversation: suspend (String) -> LocalConversationFiles,
@@ -281,7 +282,18 @@ internal fun LocalWorkspaceFilesDialog(
             codeReviewError = null
             gitError = null
             try {
-                gitResult = compare(gitRepository, remote, branch)
+                val diff = compare(gitRepository, remote, branch)
+                gitResult = diff
+                // Reopening the same diff reuses its durable report instead of charging for another review.
+                if (!diff.truncated && diff.patch.isNotBlank()) {
+                    try {
+                        codeReview = findIndependentCodeReview?.invoke(sessionId, gitRepository, diff)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        codeReviewError = failure.message ?: "读取历史代码审查记录失败"
+                    }
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
