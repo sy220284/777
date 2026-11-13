@@ -47,20 +47,48 @@ class GitWorkspaceRuntimeTest {
             java.io.File(admission.getValue("root").jsonPrimitive.content, "code.txt").writeText("child\n")
             val status = registry.context.tools.execute("workspace_status", buildJsonObject { put("workspace_id", id) }, context = context)
             val tree = Json.parseToJsonElement(status.content).jsonObject.getValue("tree").jsonPrimitive.content
+            fun preview() = registry.context.tools.execute("workspace_preview_merge", buildJsonObject {
+                put("workspace_id", id)
+                put("expected_tree", tree)
+            }, context = ToolContext(sessionId = "session"))
+            val initial = preview()
+            assertFalse(initial.content, initial.isError)
+            val initialProposal = Json.parseToJsonElement(initial.content).jsonObject
+            assertEquals("ready", initialProposal.getValue("state").jsonPrimitive.content)
             assertEquals("parent\n", root.resolve("code.txt").readText())
+            fun merge(sourceTree: String, mergedTree: String) = buildJsonObject {
+                put("workspace_id", id)
+                put("expected_tree", tree)
+                put("expected_source_tree", sourceTree)
+                put("expected_merged_tree", mergedTree)
+            }
+            val initialArgs = merge(
+                initialProposal.getValue("source_tree").jsonPrimitive.content,
+                initialProposal.getValue("merged_tree").jsonPrimitive.content,
+            )
             withContext(WorkspaceExecutionContext(root, java.io.File(admission.getValue("root").jsonPrimitive.content), id)) {
                 val refused = runCatching {
-                    registry.context.tools.execute("workspace_merge", buildJsonObject {
-                        put("workspace_id", id); put("expected_tree", tree)
-                    }, context = context)
+                    registry.context.tools.execute("workspace_merge", initialArgs, context = context)
                 }
                 assertTrue(refused.isFailure)
                 assertTrue(refused.exceptionOrNull()?.message.orEmpty().contains("父任务"))
             }
-            val merged = registry.context.tools.execute("workspace_merge", buildJsonObject {
-                put("workspace_id", id); put("expected_tree", tree)
-            }, context = context)
+            root.resolve("parent-extra.txt").writeText("new parent change\n")
+            val stale = runCatching {
+                registry.context.tools.execute("workspace_merge", initialArgs, context = context)
+            }
+            assertTrue("Old parent preview must never authorize a changed source", stale.isFailure)
+            assertTrue(stale.exceptionOrNull()?.message.orEmpty().contains("source changed since merge preview"))
+            assertEquals("parent\n", root.resolve("code.txt").readText())
+            val updated = preview()
+            assertFalse(updated.content, updated.isError)
+            val updatedProposal = Json.parseToJsonElement(updated.content).jsonObject
+            val merged = registry.context.tools.execute("workspace_merge", merge(
+                updatedProposal.getValue("source_tree").jsonPrimitive.content,
+                updatedProposal.getValue("merged_tree").jsonPrimitive.content,
+            ), context = context)
             assertFalse(merged.content, merged.isError)
+            assertEquals("new parent change\n", root.resolve("parent-extra.txt").readText())
             assertEquals("child\n", root.resolve("code.txt").readText())
         } finally {
             home.deleteRecursively()
