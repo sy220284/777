@@ -29,6 +29,13 @@ class GitWorkspaceRuntime(
     private val processRuntime: AndroidProcessRuntime,
 ) {
     private val store = workspaceRoot.canonicalFile.let { File(it.parentFile, it.name + "-agent-worktrees") }
+    /** Native UI reuses the registered, read-only remote Git comparison engine. */
+    suspend fun remoteTrackingBranches(repository: String): List<String> =
+        GitRemoteDiff(workspaceRoot, processRuntime).trackingBranches(repository)
+
+    suspend fun compareRemote(repository: String, remote: String, branch: String): JsonObject =
+        GitRemoteDiff(workspaceRoot, processRuntime).compare(repository, remote, branch)
+
 
     suspend fun fork(sessionId: String, invocationId: String, repository: String = "."): JsonObject {
         val id = MessageDigest.getInstance("SHA-256").digest("$sessionId\u0000$invocationId".toByteArray())

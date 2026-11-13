@@ -45,6 +45,13 @@ class GitRemoteDiffTest {
             git("add", ".")
             git("commit", "-qm", "baseline")
             git("update-ref", "refs/remotes/origin/main", "HEAD")
+            git("update-ref", "refs/remotes/origin/release/v2", "HEAD")
+            assertEquals(listOf("origin/main", "origin/release/v2"),
+                GitRemoteDiff(root, process).trackingBranches("."))
+            assertTrue(runCatching {
+                GitRemoteDiff(root, process).trackingBranches("../")
+            }.isFailure)
+
             val expectedIndex = git("status", "--porcelain")
             root.resolve("source.txt").writeText("after\n")
             root.resolve("untracked.txt").writeText("hidden-new-file\n")

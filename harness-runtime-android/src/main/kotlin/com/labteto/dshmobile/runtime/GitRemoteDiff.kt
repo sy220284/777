@@ -80,39 +80,65 @@ internal class GitRemoteDiff(
         context.tools.unregister("git_diff_remote")
     }
 
-    internal suspend fun compare(repository: String, remote: String, branch: String): JsonObject {
-        require(validGitDiffRemoteName(remote) && validGitDiffBranchName(branch)) {
-            "远端名称或分支包含无效字符"
+    /** Return only genuine local tracking refs; no implicit network requests. */
+    internal suspend fun trackingBranches(repository: String): List<String> {
+        val target = repositoryDirectory(repository)
+        verifiedRepositoryRoot(target)
+        return runGit(target, "for-each-ref", "--format=%(refname:short)", "refs/remotes")
+            .lineSequence().map(String::trim)
+            .filter { it.isNotEmpty() && '/' in it }
+            .filter { ref ->
+                val remote = ref.substringBefore('/')
+                val branch = ref.substringAfter('/')
+                branch != "HEAD" && validGitDiffRemoteName(remote) && validGitDiffBranchName(branch)
+            }.distinct().take(100).toList()
+    }
+
+    private fun repositoryDirectory(repository: String): File {
+        require(repository.isNotBlank() && !File(repository).isAbsolute) {
+            "仓库路径必须为工作区内的相对路径"
         }
-        require(repository.isNotBlank() && !File(repository).isAbsolute) { "仓库路径必须为工作区内的相对路径" }
         val workspace = workspaceRoot.canonicalFile
         val target = File(workspace, repository).canonicalFile
         require(target == workspace || target.toPath().startsWith(workspace.toPath())) {
             "拒绝访问工作区之外的 Git 仓库"
         }
         require(target.isDirectory) { "Git 仓库目录不存在" }
-        suspend fun run(vararg args: String): String {
-            val result = processRuntime.execute(ProcessRequest(
-                command = listOf("git", "-c", "core.fsmonitor=false", "-C", target.path) + args,
-                workingDirectory = target.path,
-                timeoutMillis = 20_000L,
-            ))
-            check(!result.timedOut) { "Git 查询超时" }
-            check(result.exitCode == 0) { "Git 查询失败：" + result.stderr.take(480) }
-            return result.stdout.trimEnd()
-        }
+        return target
+    }
 
-        val root = File(run("rev-parse", "--show-toplevel")).canonicalFile
+    private suspend fun verifiedRepositoryRoot(target: File): File {
+        val workspace = workspaceRoot.canonicalFile
+        val root = File(runGit(target, "rev-parse", "--show-toplevel")).canonicalFile
         require(root == workspace || root.toPath().startsWith(workspace.toPath())) {
             "Git 仓库根目录越过授权工作区"
         }
+        return root
+    }
+
+    private suspend fun runGit(target: File, vararg args: String): String {
+        val result = processRuntime.execute(ProcessRequest(
+            command = listOf("git", "-c", "core.fsmonitor=false", "-C", target.path) + args,
+            workingDirectory = target.path, timeoutMillis = 20_000L,
+        ))
+        check(!result.timedOut) { "Git 查询超时" }
+        check(result.exitCode == 0) { "Git 查询失败：" + result.stderr.take(480) }
+        return result.stdout.trimEnd()
+    }
+
+    internal suspend fun compare(repository: String, remote: String, branch: String): JsonObject {
+        require(validGitDiffRemoteName(remote) && validGitDiffBranchName(branch)) {
+            "远端名称或分支包含无效字符"
+        }
+        val target = repositoryDirectory(repository)
+        val root = verifiedRepositoryRoot(target)
         val trackingRef = "refs/remotes/" + remote + "/" + branch
-        val trackedCommit = run("rev-parse", "--verify", "--end-of-options", trackingRef + "^{commit}").trim()
-        val headCommit = run("rev-parse", "--verify", "HEAD^{commit}").trim()
-        val base = run("merge-base", headCommit, trackedCommit).trim()
+        val trackedCommit = runGit(target, "rev-parse", "--verify", "--end-of-options", trackingRef + "^{commit}").trim()
+        val headCommit = runGit(target, "rev-parse", "--verify", "HEAD^{commit}").trim()
+        val base = runGit(target, "merge-base", headCommit, trackedCommit).trim()
         require(base.matches(Regex("[0-9a-f]{40,64}"))) { "Git 合并基线异常" }
-        val stat = run("diff", "--no-ext-diff", "--no-textconv", "--stat", base, "--")
-        val patch = run("diff", "--no-ext-diff", "--no-textconv", "--unified=3", base, "--")
+        val stat = runGit(target, "diff", "--no-ext-diff", "--no-textconv", "--stat", base, "--")
+        val patch = runGit(target, "diff", "--no-ext-diff", "--no-textconv", "--unified=3", base, "--")
         val cap = 128 * 1024
         return buildJsonObject {
             put("repository", root.path)
