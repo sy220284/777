@@ -45,7 +45,7 @@ internal object LocalToolPolicy {
         "web_search", "web_fetch", "http_request", "download_file", "network_diagnose",
         "media_image_options", "media_image_create", "media_image_status",
         "job_list", "job_output", "job_kill", "json_query", "environment_info",
-        "todo_write", "create_goal", "get_goal", "update_goal",
+        "todo_write", "create_goal", "get_goal", "update_goal", "work_finding",
         "skill", "skill_create", "skill_update", "skill_rollback", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local", "extension_record", "extension_inspect", "subagent_fork", "list_agents", "agent_tree", "send_message",
         "interrupt_agent", "agent_inspect", "agent_watch", "agent_resume", "agent_close", "workflow", "team_members", "team_member_status",
         "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown", "team_respond_shutdown", "team_ack_message",
@@ -58,7 +58,7 @@ internal object LocalToolPolicy {
         "file_version", "file_write_if_version" -> ToolExposure.OPTIONAL
         "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect", "list_files",
         "glob", "grep", "bash", "capability_search", "update_plan", "exit_plan_mode",
-        "ask_user_question", "work_finding", "subagent", "list_subagent_models", "list_agent_roles", "session_event_search" -> ToolExposure.CORE
+        "ask_user_question", "subagent", "list_subagent_models", "list_agent_roles", "session_event_search" -> ToolExposure.CORE
         else -> error("内置工具尚未声明模型暴露策略：$name")
     }
 
