@@ -88,7 +88,7 @@ class GitWorkspaceRuntime(
                 if (action in setOf("preview_merge", "merge")) {
                     put("resolution", buildJsonObject {
                         put("type", "string")
-                        put("enum", kotlinx.serialization.json.JsonArray(listOf("auto", "prefer_parent", "prefer_child", "select").map(::kotlinx.serialization.json.JsonPrimitive)))
+                        put("enum", kotlinx.serialization.json.JsonArray(listOf("auto", "prefer_parent", "prefer_child", "select").map { kotlinx.serialization.json.JsonPrimitive(it) }))
                         put("description", "经质量比较选择自动合并、保留父实现、采用子实现或逐文件择优")
                     })
                     put("path_choices", buildJsonObject {
@@ -96,7 +96,7 @@ class GitWorkspaceRuntime(
                         put("description", "select 模式下，每个父子共同改动文件明确选择 parent 或 child；保留双方其余独立改动")
                         put("additionalProperties", buildJsonObject {
                             put("type", "string")
-                            put("enum", kotlinx.serialization.json.JsonArray(listOf("parent", "child").map(::kotlinx.serialization.json.JsonPrimitive)))
+                            put("enum", kotlinx.serialization.json.JsonArray(listOf("parent", "child").map { kotlinx.serialization.json.JsonPrimitive(it) }))
                         })
                     })
                 }
