@@ -26,6 +26,7 @@ internal class GitRemoteDiff(
     private val processRuntime: AndroidProcessRuntime,
 ) {
     internal fun install(context: HarnessContext) {
+        installLocalDiff(context)
         context.tools.register(
             HarnessTool(
                 name = "git_diff_remote",
@@ -76,8 +77,35 @@ internal class GitRemoteDiff(
         )
     }
 
+    /** A second source for Codex-style reviews: staged and unstaged tracked files. */
+    internal fun installLocalDiff(context: HarnessContext) {
+        context.tools.register(HarnessTool(
+            name = "git_diff_uncommitted",
+            schema = functionToolSchema("git_diff_uncommitted",
+                "查看当前工作区已跟踪文件的暂存与未暂存修改；只读、无需远端分支",
+                buildJsonObject { put("repository", buildJsonObject { put("type", "string") }) }),
+            access = ToolAccess.READ_ONLY, approvalPolicy = ToolApprovalPolicy.NEVER,
+            exposure = ToolExposure.OPTIONAL, timeoutMillis = 30_000L,
+            metadata = ToolMetadata(family = "文件", environmentBound = true,
+                discoveryKeywords = setOf("git", "未提交", "本地修改", "差异", "代码审查")),
+            executor = HarnessToolExecutor { _, input, _ ->
+                val repository = input["repository"]?.jsonPrimitive?.contentOrNull ?: "."
+                try {
+                    ToolResult(compareUncommitted(repository).toString())
+                } catch (failure: IllegalArgumentException) {
+                    ToolResult("本地 Git 修改请求无效：" + failure.message.orEmpty(),
+                        isError = true, errorCode = "INVALID_GIT_DIFF_REQUEST")
+                } catch (failure: IllegalStateException) {
+                    ToolResult("读取本地 Git 修改失败：" + failure.message.orEmpty().take(512),
+                        isError = true, errorCode = "GIT_DIFF_UNAVAILABLE")
+                }
+            },
+        ))
+    }
+
     internal fun uninstall(context: HarnessContext) {
         context.tools.unregister("git_diff_remote")
+        context.tools.unregister("git_diff_uncommitted")
     }
 
     /** Return only genuine local tracking refs; no implicit network requests. */
@@ -124,6 +152,31 @@ internal class GitRemoteDiff(
         check(!result.timedOut) { "Git 查询超时" }
         check(result.exitCode == 0) { "Git 查询失败：" + result.stderr.take(480) }
         return result.stdout.trimEnd()
+    }
+
+    /** Stable, versioned local diff; no git add, fetch, checkout, or untracked file inclusion. */
+    internal suspend fun compareUncommitted(repository: String): JsonObject {
+        val target = repositoryDirectory(repository)
+        val root = verifiedRepositoryRoot(target)
+        val headCommit = runGit(target, "rev-parse", "--verify", "HEAD^{commit}").trim()
+        require(headCommit.matches(Regex("[0-9a-f]{40,64}"))) { "Git HEAD 版本异常" }
+        val stat = runGit(target, "diff", "--no-ext-diff", "--no-textconv", "--stat", "HEAD", "--")
+        val patch = runGit(target, "diff", "--no-ext-diff", "--no-textconv", "--unified=3", "HEAD", "--")
+        val untracked = runGit(target, "ls-files", "--others", "--exclude-standard", "--")
+            .lineSequence().count { it.isNotBlank() }
+        val cap = 128 * 1024
+        return buildJsonObject {
+            put("repository", root.path)
+            put("tracking_ref", "worktree/" + headCommit)
+            put("head_commit", headCommit)
+            put("stat", stat.take(12_000))
+            put("patch", patch.take(cap))
+            put("truncated", patch.length > cap)
+            put("includes_tracked_worktree_changes", true)
+            put("includes_untracked_files", false)
+            put("untracked_file_count", untracked)
+            put("network_requested", false)
+        }
     }
 
     internal suspend fun compare(repository: String, remote: String, branch: String): JsonObject {
