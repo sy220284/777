@@ -66,6 +66,13 @@ internal class LocalToolCompositionRoot @Inject constructor(
     )
     internal val agentWorkspaces = com.labteto.dshmobile.runtime.GitWorkspaceRuntime(File(workspace.path), process)
 
+    override suspend fun remoteGitBranches(repository: String): List<String> =
+        agentWorkspaces.remoteTrackingBranches(repository)
+
+    override suspend fun compareRemoteGit(
+        repository: String, remote: String, branch: String,
+    ): kotlinx.serialization.json.JsonObject = agentWorkspaces.compareRemote(repository, remote, branch)
+
     internal suspend fun resolveAgentWorkspace(sessionId: String, identity: String): com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext {
         val admission = agentWorkspaces.operate(sessionId, "locate", buildJsonObject { put("workspace_id", identity) })
         return com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext(

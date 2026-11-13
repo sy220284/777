@@ -97,6 +97,21 @@ class LocalToolsUiFacade @Inject internal constructor(
             com.labteto.dshmobile.interop.mcp.McpServerHealth.UNCONFIRMED ->
                 com.labteto.dshmobile.uicontract.UiMcpHealth.UNCONFIRMED
         }
+    suspend fun remoteGitBranchesForUi(repository: String): List<String> =
+        withContext(Dispatchers.IO) { tools.remoteGitBranches(repository) }
+
+    suspend fun compareRemoteGitForUi(
+        repository: String, remote: String, branch: String,
+    ): LocalRemoteGitDiffUi = withContext(Dispatchers.IO) {
+        val receipt = tools.compareRemoteGit(repository, remote, branch)
+        LocalRemoteGitDiffUi(
+            trackingRef = (receipt.getValue("tracking_ref") as kotlinx.serialization.json.JsonPrimitive).content,
+            statistics = (receipt.getValue("stat") as kotlinx.serialization.json.JsonPrimitive).content,
+            patch = (receipt.getValue("patch") as kotlinx.serialization.json.JsonPrimitive).content,
+            truncated = receipt.getValue("truncated").toString() == "true",
+        )
+    }
+
     override suspend fun githubConfigured() = tools.githubConfigured()
     override suspend fun githubRepositories() = gitHubBrowser.repositories()
     override suspend fun githubEntries(repoFullName: String, directory: String) =
@@ -228,3 +243,11 @@ class LocalToolsUiFacade @Inject internal constructor(
 internal abstract class LocalToolsUiBindings {
     @dagger.Binds abstract fun bindToolsUiPort(facade: LocalToolsUiFacade): com.labteto.dshmobile.uicontract.ToolsUiPort
 }
+
+/** Read-only Git comparison receipt; process/runtime objects stay behind the UI facade. */
+data class LocalRemoteGitDiffUi(
+    val trackingRef: String,
+    val statistics: String,
+    val patch: String,
+    val truncated: Boolean,
+)
