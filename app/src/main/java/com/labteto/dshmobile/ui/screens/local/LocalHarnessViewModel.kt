@@ -59,6 +59,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val approvalPreferences: LocalApprovalPreferences,
     private val networkSearchSettings: LocalNetworkSearchSettings,
     private val sectionStore: LocalSessionSectionUiFacade,
+    private val independentCodeReview: com.labteto.dshmobile.local.work.LocalIndependentCodeReviewCoordinator,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -324,6 +325,30 @@ class LocalHarnessViewModel @Inject constructor(
         toolsUi.remoteGitBranchesForUi(repository)
     internal suspend fun compareRemoteGitForUi(repository: String, remote: String, branch: String) =
         toolsUi.compareRemoteGitForUi(repository, remote, branch)
+    internal suspend fun runIndependentCodeReviewForUi(
+        sessionId: String, repository: String,
+        diff: com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi,
+    ): com.labteto.dshmobile.local.work.LocalIndependentCodeReview {
+        require(runtime.state.value.sessionId == sessionId &&
+            runtime.state.value.usageMode == LocalUsageMode.WORK) { "已离开当前工作会话，审查中止" }
+        return independentCodeReview.review(sessionId, repository, diff.trackingRef,
+            diff.statistics, diff.patch, diff.truncated)
+    }
+
+    internal suspend fun acceptIndependentCodeReviewForUi(
+        sessionId: String, repository: String,
+        review: com.labteto.dshmobile.local.work.LocalIndependentCodeReview,
+        diff: com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi,
+    ): Boolean {
+        if (runtime.state.value.sessionId != sessionId ||
+            runtime.state.value.usageMode != LocalUsageMode.WORK) return false
+        val ref = diff.trackingRef
+        val current = toolsUi.compareRemoteGitForUi(repository,
+            ref.substringBefore('/'), ref.substringAfter('/'))
+        return independentCodeReview.accept(sessionId, review.id, review.evidenceSequence,
+            repository, current.trackingRef, current.statistics, current.patch, current.truncated)
+    }
+
     suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
     suspend fun workspaceDirectory(path: String) = runtime.session.workspaceDirectoryForUi(path)
     suspend fun workspaceDirectoryPage(path: String, offset: Int) = runtime.session.workspaceDirectoryPageForUi(path, offset)
