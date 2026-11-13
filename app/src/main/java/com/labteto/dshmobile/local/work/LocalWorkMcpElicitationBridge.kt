@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local.tools
+package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.interop.mcp.McpElicitationReply
 import com.labteto.dshmobile.interop.mcp.McpElicitationRequest
@@ -16,7 +16,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /** Bind one remote prompt to the originating Work run; do not create a second UI owner. */
-internal object LocalMcpElicitationUiBridge {
+internal object LocalWorkMcpElicitationBridge {
     suspend fun answer(
         runs: LocalWorkRunRegistry,
         sessionId: String?,

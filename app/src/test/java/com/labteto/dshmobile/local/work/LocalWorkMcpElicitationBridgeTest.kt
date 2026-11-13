@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local.tools
+package com.labteto.dshmobile.local.work
 
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -7,7 +7,7 @@ import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class LocalMcpElicitationUiBridgeTest {
+class LocalWorkMcpElicitationBridgeTest {
     @Test fun serverSchemaBecomesTypedNativeFieldPresentation() {
         val schema = buildJsonObject {
             put("type", "object")
@@ -24,7 +24,7 @@ class LocalMcpElicitationUiBridgeTest {
             })
             put("required", buildJsonArray { add(JsonPrimitive("person")) })
         }
-        val fields = LocalMcpElicitationUiBridge.fromSchema(schema)
+        val fields = LocalWorkMcpElicitationBridge.fromSchema(schema)
         assertEquals(listOf("person", "count", "agree"), fields.map { it.name })
         assertEquals("用户昵称", fields[0].title)
         assertEquals(true, fields[0].required)
