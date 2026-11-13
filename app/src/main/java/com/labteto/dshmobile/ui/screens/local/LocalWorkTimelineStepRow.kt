@@ -72,6 +72,7 @@ internal fun userFacingWorkToolActionRes(toolName: String?): Int? {
 internal fun userFacingWorkToolAction(toolName: String?): String? {
     val name = toolName?.lowercase().orEmpty()
     when (name) {
+        "work_finding" -> return "整理调查发现"
         "read", "read_file", "file_inspect" -> return "读取文件"
         "grep", "search" -> return "搜索文件内容"
         "glob", "find", "list_files" -> return "查找工作区文件"
@@ -152,15 +153,39 @@ internal fun WorkTimelineStepRow(
     val hasDetails = operationGroup || message.content.isNotBlank() || message.blocks.isNotEmpty() ||
         groupedMessages.any { it.content.isNotBlank() || it.blocks.isNotEmpty() }
     val activities = receipts.mapNotNull { userFacingWorkToolAction(it.toolName) }.distinct()
+    val isFinding = !operationGroup && message.toolName == "work_finding" &&
+        phase == LocalToolUiPhase.COMPLETED
+    val findingText = if (isFinding && message.content.contains("；发现="))
+        message.content.substringAfter("；发现=").substringBefore("；来源回执=").trim().take(280)
+    else ""
+    val findingStatus = if (isFinding && message.content.contains("状态="))
+        message.content.substringAfter("状态=").substringBefore("；")
+    else ""
+    val findingLabel = when (findingStatus) {
+        "supported" -> "调查线索 · 有来源支持"
+        "rejected" -> "调查修正 · 已排除假说"
+        "hypothesis" -> "发现新线索 · 待核查"
+        else -> if (isFinding) "调查发现已整理" else null
+    }
     val groupLabel = if (operationGroup) {
         val summary = activities.take(2).joinToString("、").ifBlank { "工具操作" }
         "$summary · 已完成 ${receipts.size} 项"
-    } else null
+    } else findingLabel
     WorkToolStatusRow(message.toolName, phase, argumentsPreview = activity?.argumentsPreview,
         repeatCount = if (operationGroup) 1 else repeatCount,
         labelOverride = groupLabel,
         modifier = Modifier.testTag(message.toolCallId?.let { "work-tool:$it" } ?: "work-tool:${message.id}"),
         onClick = if (hasDetails) ({ detailsOpen = true }) else null)
+    if (findingText.isNotBlank()) {
+        Text(
+            findingText,
+            modifier = Modifier.fillMaxWidth().padding(start = 24.dp, top = 2.dp, bottom = 8.dp),
+            style = DsType.std14.withReadingWeight(),
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
+            maxLines = 3,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        )
+    }
     if (detailsOpen) {
         SyResponsiveSheet(title = if (operationGroup) "操作记录 · ${receipts.size} 项" else "工具回执 · $action",
             onDismiss = { detailsOpen = false },
