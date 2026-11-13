@@ -42,6 +42,23 @@ class LocalDownloadsPublisherAndroidTest {
     }
 
     @Test
+    fun preservesFinalDeliveryProjectFoldersUnderChineseDownloads() {
+        val workspaceRoot = File(context.cacheDir, "downloads-project-${UUID.randomUUID()}").apply { mkdirs() }
+        val file = File(workspaceRoot, "交付成果/项目示例/图片/插图-${UUID.randomUUID()}.svg")
+        file.parentFile!!.mkdirs()
+        try {
+            file.writeText("<svg xmlns=\"http://www.w3.org/2000/svg\"/>")
+            val location = LocalDownloadsPublisher(context, LocalWorkspace(workspaceRoot))
+                .publish("交付成果/项目示例/图片/${file.name}")
+            assertTrue(location.startsWith("Download/神言神语/项目示例/图片/"))
+            assertEquals(file.readText(), readPublished(location))
+        } finally {
+            removePublished(file.name.substringBeforeLast('.'), "Download/神言神语/项目示例/图片/")
+            workspaceRoot.deleteRecursively()
+        }
+    }
+
+    @Test
     fun refusesToPublishWorkspaceParentPath() {
         val root = File(context.cacheDir, "downloads-invalid-${UUID.randomUUID()}").apply { mkdirs() }
         try {
@@ -53,12 +70,15 @@ class LocalDownloadsPublisherAndroidTest {
         }
     }
 
-    private fun matchingIds(prefix: String): List<Pair<Long, String>> {
+    private fun matchingIds(
+        prefix: String,
+        directory: String = "Download/神言神语/",
+    ): List<Pair<Long, String>> {
         val result = mutableListOf<Pair<Long, String>>()
         val selection = "${MediaStore.MediaColumns.RELATIVE_PATH}=?"
         context.contentResolver.query(downloads,
             arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME),
-            selection, arrayOf("Download/神言神语/"), null)?.use { cursor ->
+            selection, arrayOf(directory), null)?.use { cursor ->
             while (cursor.moveToNext()) {
                 val name = cursor.getString(1)
                 if (name.startsWith(prefix)) result += cursor.getLong(0) to name
@@ -71,14 +91,15 @@ class LocalDownloadsPublisherAndroidTest {
 
     private fun readPublished(path: String): String {
         val name = path.substringAfterLast('/')
-        val id = matchingIds(name).firstOrNull { it.second == name }?.first
+        val directory = path.substringBeforeLast('/') + "/"
+        val id = matchingIds(name, directory).firstOrNull { it.second == name }?.first
             ?: error("成果没有发布到公共下载目录：$path")
         return context.contentResolver.openInputStream(ContentUris.withAppendedId(downloads, id))!!
             .bufferedReader().use { it.readText() }
     }
 
-    private fun removePublished(prefix: String) {
-        matchingIds(prefix).forEach { (id, _) ->
+    private fun removePublished(prefix: String, directory: String = "Download/神言神语/") {
+        matchingIds(prefix, directory).forEach { (id, _) ->
             context.contentResolver.delete(ContentUris.withAppendedId(downloads, id), null, null)
         }
     }
