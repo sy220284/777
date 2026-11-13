@@ -63,7 +63,7 @@ internal class LocalWorkBuiltinToolRuntime(
                     note = args["note"]?.jsonPrimitive?.contentOrNull,
                 )
                 val completed = run.workState.snapshot().goal?.takeIf { it.status == "completed" }
-                if (completed != null && completed.artifactPaths.isNotEmpty()) {
+                if (completed != null) {
                     val folder = localWorkTaskFolderPaths(completed.description, completed.id).deliverables
                     val saved = publishVerifiedDeliverables(run.sessionId, completed.artifactPaths, folder)
                     "$receipt；成果已发布到手机下载目录：${saved.joinToString()}"
