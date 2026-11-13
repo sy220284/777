@@ -67,6 +67,22 @@ class AgentTlsBackendTest {
             assertEquals("done", result.answer)
         } finally { fixture.server.close(); server.cancelAndJoin() }
     }
+    @Test fun healthProbeAuthenticatesWithoutStartingAnAgentTurn() = runBlocking {
+        val fixture = fixture()
+        val server = launch(Dispatchers.IO) { fixture.server.serve() }
+        try {
+            withTimeout(20_000) {
+                AgentTlsBackend("localhost", fixture.port, fixture.pin, "connector-token") { }.probe()
+            }
+            val wrong = withTimeout(20_000) {
+                runCatching {
+                    AgentTlsBackend("localhost", fixture.port, "0".repeat(64), "connector-token") { }.probe()
+                }
+            }
+            assertTrue(wrong.isFailure)
+        } finally { fixture.server.close(); server.cancelAndJoin() }
+    }
+
     @Test fun wrongCertificateOrConnectorTokenCannotContactTheModel() = runBlocking {
         val fixture = fixture()
         val server = launch(Dispatchers.IO) { fixture.server.serve() }
