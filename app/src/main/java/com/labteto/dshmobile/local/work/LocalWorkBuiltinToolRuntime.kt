@@ -58,6 +58,9 @@ internal class LocalWorkBuiltinToolRuntime(
             "get_goal" -> progress.getGoal()
             "work_finding" -> LocalWorkFindingJournal.execute(
                 run.eventLog, run.workState.snapshot().goal?.id.orEmpty(), args,
+                run.aggregateSnapshot().projectId.orEmpty(),
+                run.eventLog.latestMatching(setOf("turn/start")) { true }
+                    ?.data?.get("source_message_id")?.let { (it as? JsonPrimitive)?.contentOrNull },
             )
             "update_goal" -> {
                 val receipt = progress.updateGoal(
