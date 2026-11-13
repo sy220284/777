@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.presentation
 import com.labteto.dshmobile.local.tools.LocalToolsRuntime
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -140,8 +142,20 @@ class LocalToolsUiFacade @Inject internal constructor(
         val hasThirdPartyPlugin = tools.installedPluginIds().any { it != "android-local-builtins" }
         return hasMcpTools to hasThirdPartyPlugin
     }
-    override suspend fun installedSkills() = tools.installedSkills().map {
-        com.labteto.dshmobile.uicontract.UiSkillSnapshot(it.name, it.description, it.modelInvocable, it.displayName)
+    override suspend fun installedSkills() = withContext(Dispatchers.IO) {
+        tools.installedSkills().map { item ->
+            val result = runCatching { gitHubSkillImporter.installedSourceLink(item.name) }
+            result.exceptionOrNull()?.let { failure ->
+                com.labteto.dshmobile.observability.AppLog.warn(
+                    "SkillOrigin", "技能来源证据无效：${item.name}", failure,
+                )
+            }
+            com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+                item.name, item.description, item.modelInvocable, item.displayName,
+                sourceUrl = result.getOrNull(),
+                sourceWarning = if (result.isFailure) "技能来源记录校验失败，请检查或重新安装此技能" else null,
+            )
+        }
     }
     override suspend fun presetSkills() = tools.presetSkills().map {
         com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot(it.id, it.title, it.description, it.installed)

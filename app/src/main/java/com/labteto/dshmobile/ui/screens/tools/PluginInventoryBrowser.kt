@@ -36,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -79,6 +81,8 @@ private data class InventoryRow(
     val installedSkill: Boolean = false,
     val installablePreset: Boolean = false,
     val installableCurated: Boolean = false,
+    val sourceUrl: String? = null,
+    val sourceWarning: String? = null,
 )
 
 /** Browses real installed/connected plugin inventory; does not advertise unsupported storefront apps. */
@@ -115,6 +119,7 @@ internal fun PluginInventoryBrowser(
     onSetSkillModelInvocable: ((String, Boolean) -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    val context = LocalContext.current
     val skillCreationPrompt = stringResource(R.string.skills_create_in_chat_prompt)
     var query by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableIntStateOf(0) }
@@ -185,7 +190,8 @@ internal fun PluginInventoryBrowser(
         val display = skill.displayName
         InventoryRow("skill:" + skill.name, display, skill.description,
             connectedService = false, icon = FeatherIcons.BookOpen,
-            available = true, modelInvocable = skill.modelInvocable, installedSkill = true)
+            available = true, modelInvocable = skill.modelInvocable, installedSkill = true,
+            sourceUrl = skill.sourceUrl, sourceWarning = skill.sourceWarning)
     }
     val availablePresets = presets.filterNot { it.installed }.map { preset ->
         InventoryRow("skill:" + preset.id, preset.title, preset.description,
@@ -534,8 +540,34 @@ internal fun PluginInventoryBrowser(
             if (item.installedSkill && !item.modelInvocable) {
                 Text(stringResource(R.string.skills_manual_only), style = DsType.small13.withReadingWeight(), color = colors.textTertiary)
             }
-
-
+            item.sourceWarning?.let { warning ->
+                Text(
+                    warning,
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.textSecondary,
+                    modifier = Modifier.testTag("skill-source-warning"),
+                )
+            }
+            if (item.installedSkill && item.sourceUrl != null) {
+                Text(
+                    "已固定 GitHub 来源版本：${item.sourceUrl.substringAfter("/tree/").substringBefore('/').take(12)}",
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.textSecondary,
+                )
+                SyButton(
+                    text = "分享原始来源",
+                    variant = SyButtonVariant.Ghost,
+                    enabled = !loading,
+                    modifier = Modifier.testTag("skill-share-source"),
+                    onClick = {
+                        val share = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, item.sourceUrl)
+                        }
+                        context.startActivity(Intent.createChooser(share, "分享技能来源"))
+                    },
+                )
+            }
 
             if (item.installedSkill && onOpenSkillEditor != null) {
                 SyButton(

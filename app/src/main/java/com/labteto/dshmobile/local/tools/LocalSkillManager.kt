@@ -155,6 +155,19 @@ internal class LocalSkillStore(
         }
     }
 
+    /** Read the provenance from the same admitted skill directory; never follow a source-file symlink. */
+    fun githubSourceEvidence(id: String): String? {
+        require(LOCAL_SKILL_ID_PATTERN.matches(id)) { "技能编号无效" }
+        requireInstalled(id)
+        val source = File(skillsDir, "$id/.github-source.json")
+        if (Files.notExists(source.toPath(), LinkOption.NOFOLLOW_LINKS)) return null
+        require(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+            Files.size(source.toPath()) in 1L..8192L) {
+            "GitHub 技能来源记录损坏，请检查本地 .github-source.json"
+        }
+        return Files.readString(source.toPath(), Charsets.UTF_8)
+    }
+
     fun presets(): List<LocalPresetSkill> {
         val names = workspace.skills().toSet()
         return LocalPresetSkillCatalog.entries.map { it.copy(installed = it.id in names) }
@@ -464,6 +477,7 @@ internal class LocalSkillManager @Inject constructor(
     }
     fun initializeDefaults() = store.seedOnce()
     fun installed(): List<LocalInstalledSkill> = store.installed()
+    fun githubSourceEvidence(id: String): String? = store.githubSourceEvidence(id)
     fun presets(): List<LocalPresetSkill> = store.presets()
     fun install(id: String) = store.install(id)
     fun create(id: String, displayName: String, description: String, instructions: String) =

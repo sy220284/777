@@ -83,6 +83,35 @@ internal fun githubSkillSourceEvidence(source: PublicGitHubSkillLocation, commit
     }.toString().toByteArray(Charsets.UTF_8)
 }
 
+/**
+ * Validate the immutable source receipt before constructing a share URL. The untrusted JSON
+ * cannot choose a different host, revision, repository, or directory for a share action.
+ */
+internal fun parseGitHubSkillSourceLink(document: String): String {
+    require(document.toByteArray(Charsets.UTF_8).size in 1..8192) { "技能来源记录长度无效" }
+    val value = Json.parseToJsonElement(document).jsonObject
+    fun field(name: String): String =
+        (value[name] as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it.isString }?.content
+            ?: throw IllegalArgumentException("技能来源缺少 $name")
+    require(field("source_type") == "github") { "技能来源类型不受支持" }
+    val owner = field("owner")
+    val repository = field("repository")
+    val directory = field("directory")
+    val ref = field("source_ref")
+    val commit = field("commit")
+    require(owner.matches(Regex("[A-Za-z0-9-]{1,39}")) &&
+        repository.matches(Regex("[A-Za-z0-9_.-]{1,100}")) &&
+        repository !in setOf(".", "..") &&
+        ref.matches(Regex("[A-Za-z0-9._-]{1,100}")) &&
+        commit.matches(Regex("[0-9a-f]{40}")) &&
+        directory.isNotBlank() && directory.split('/').all {
+            it.matches(Regex("[A-Za-z0-9._-]{1,100}")) && it !in setOf(".", "..")
+        }) { "GitHub 技能来源字段无效" }
+    val canonical = "https://github.com/$owner/$repository/tree/$commit/$directory"
+    require(field("source_url") == canonical) { "技能来源链接与固定版本不符" }
+    return canonical
+}
+
 /** Fetches a single public GitHub skill folder, then delegates admission to the existing
  * ZIP importer. No desktop Python, Git binary, remote execution or hidden cloud service. */
 @Singleton
@@ -143,6 +172,10 @@ internal class LocalGitHubSkillImporter @Inject constructor(
         }
         skills.importSkill("github-skill.zip", zipped.toByteArray())
     }
+
+    /** A share link is a read-only local fact; it never fetches a branch or installs anything. */
+    fun installedSourceLink(id: String): String? =
+        skills.githubSourceEvidence(id)?.let(::parseGitHubSkillSourceLink)
 
     suspend fun curatedSkills(): List<String> = withContext(Dispatchers.IO) {
         val official = PublicGitHubSkillLocation(
