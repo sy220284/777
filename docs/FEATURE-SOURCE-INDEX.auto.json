@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1933,
+  "repository_code_file_count": 1934,
   "production_source_count": 1129,
-  "test_code_file_count": 660,
+  "test_code_file_count": 661,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -2376,7 +2376,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubSkillImporter.kt",
-      "sha256": "05c40b0926890c91"
+      "sha256": "dfaa62a255d09535"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalJsonQuery.kt",
@@ -4580,13 +4580,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "7332b980a0a1",
+  "source_snapshot": "ecb95361af4c",
   "observed_delta": {
-    "baseline": "a063176a7417",
+    "baseline": "7332b980a0a1",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/CodeModePlugin.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalGitHubSkillImporter.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
