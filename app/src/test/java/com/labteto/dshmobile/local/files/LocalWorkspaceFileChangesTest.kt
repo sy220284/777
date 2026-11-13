@@ -26,6 +26,22 @@ class LocalWorkspaceFileChangesTest {
         } finally { dir.deleteRecursively() }
     }
 
+    @Test fun dynamicSkillFolderTargetsObserveNewDirectoriesAndSkillFiles() {
+        val directory = Files.createTempDirectory("skill-hot-watch-").toFile()
+        try {
+            val workspace = directory.resolve("workspace").apply { mkdirs() }
+            val skillRoot = workspace.resolve(".dsh/skills").apply { mkdirs() }
+            val before = workspaceFileWatchTargets(workspace, listOf(".dsh/skills"))
+            assertEquals(setOf("*"), before.getValue(skillRoot.canonicalFile))
+            val custom = skillRoot.resolve("new-skill").apply { mkdirs() }
+            val updated = workspaceFileWatchTargets(workspace,
+                listOf(".dsh/skills", ".dsh/skills/new-skill"))
+            assertEquals(setOf("*"), updated.getValue(custom.canonicalFile))
+            custom.resolve("SKILL.md").writeText("---\\nname: new-skill\\n---")
+            assertEquals(setOf("*"), updated.getValue(custom.canonicalFile))
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun rejectsSymlinksAndTraversalWithoutWatchingOutsideFiles() {
         val dir = Files.createTempDirectory("workspace-observer-security-").toFile()
         try {

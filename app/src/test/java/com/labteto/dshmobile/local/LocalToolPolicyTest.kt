@@ -24,6 +24,16 @@ class LocalToolPolicyTest {
         assertTrue(runCatching { LocalToolPolicy.exposure("new_undeclared_tool") }.isFailure)
     }
 
+    @Test fun fileVersionProtocolReusesExistingWorkspaceAuthorization() {
+        assertEquals(ToolAccess.READ_ONLY, LocalToolPolicy.access("file_version"))
+        assertEquals(ToolApprovalPolicy.NEVER, LocalToolPolicy.approval("file_version"))
+        assertTrue(LocalToolPolicy.metadata("file_version").parallelReadSafe)
+        assertEquals(ToolAccess.WORKSPACE_WRITE, LocalToolPolicy.access("file_write_if_version"))
+        assertEquals(ToolApprovalPolicy.ALWAYS, LocalToolPolicy.approval("file_write_if_version"))
+        assertEquals(LocalAutoApprovalScope.WORKSPACE, LocalToolPolicy.autoApprovalScope("file_write_if_version"))
+        assertEquals(ToolExposure.OPTIONAL, LocalToolPolicy.exposure("file_write_if_version"))
+    }
+
     @Test fun ordinaryExecutionToolsStayCoreWhileNarrowCapabilitiesAreDeferred() {
         for (name in listOf(
             "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect",
