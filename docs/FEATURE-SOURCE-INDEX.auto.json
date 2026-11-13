@@ -284,7 +284,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
-      "sha256": "b01d88982dccd132"
+      "sha256": "ffb9b555661aa24c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
@@ -1928,7 +1928,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
-      "sha256": "68dd3ae379110af2"
+      "sha256": "8037c9db2cd9c8c1"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTranscriptHistoryLoader.kt",
@@ -2500,7 +2500,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsManagementPort.kt",
-      "sha256": "5b554c872825c40d"
+      "sha256": "15291873757a939c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsModels.kt",
@@ -2508,7 +2508,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt",
-      "sha256": "13d967f72abc88c2"
+      "sha256": "fee60bba306d98cc"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTurnSettlement.kt",
@@ -4600,14 +4600,16 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "bef22f1f329a",
+  "source_snapshot": "d23ec7d6cfec",
   "observed_delta": {
-    "baseline": "44a6234a3fa0",
+    "baseline": "bef22f1f329a",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/GitRemoteDiff.kt",
-      "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/GitWorkspaceRuntime.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalToolsUiFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsManagementPort.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
