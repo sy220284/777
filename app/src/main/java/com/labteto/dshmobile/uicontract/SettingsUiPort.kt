@@ -37,10 +37,6 @@ data class UiExecutionPolicySnapshot(
     val allowedHosts: List<String>?,
     val deniedHosts: List<String>,
     val allowedModelProviders: List<String>?,
-    val browserHistoryEnabled: Boolean,
-    val browserUploadEnabled: Boolean,
-    val browserDownloadEnabled: Boolean,
-    val browserControlEnabled: Boolean,
     val managedRestrictions: List<String>,
 )
 

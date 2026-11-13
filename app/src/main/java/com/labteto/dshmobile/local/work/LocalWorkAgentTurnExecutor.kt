@@ -1111,8 +1111,9 @@ internal class LocalWorkAgentTurnExecutor(
         } finally {
             if (ownerJob != null) {
                 workRunRegistry.releaseCompletedTurn(binding, ownerJob)
-                // Auto-admitted goals can complete after the final tool call; publish the same
-                // verified artifact paths that update_goal uses, before declaring the run settled.
+                // One delivery owner for explicit update_goal and auto-completed goals.
+                // Persisted artifact/published and artifact/publication-failed events record
+                // the real phone delivery outcome independently of verified Goal status.
                 val completed = binding.workState.snapshot().goal?.takeIf {
                     it.status == "completed"
                 }
@@ -1124,11 +1125,17 @@ internal class LocalWorkAgentTurnExecutor(
                                 localWorkTaskFolderPaths(completed.description, completed.id).deliverables,
                             )
                         }
+                        // An earlier failed delivery may have been retried successfully.
+                        binding.state.update { current ->
+                            if (current.error?.startsWith("目标验收完成，但手机下载交付失败：") == true)
+                                current.copy(error = null)
+                            else current
+                        }
                     } catch (error: Exception) {
                         AppLog.failure("WorkAgentTurn", "publish_downloads", error,
                             sessionId = binding.sessionId)
                         binding.state.update { current -> current.copy(
-                            error = "任务已完成，但成果保存到下载目录失败：${error.message}；可在工作区重新保存",
+                            error = "目标验收完成，但手机下载交付失败：${error.message}；文件保留在工作区，可在文件页重试保存",
                         ) }
                     }
                 }

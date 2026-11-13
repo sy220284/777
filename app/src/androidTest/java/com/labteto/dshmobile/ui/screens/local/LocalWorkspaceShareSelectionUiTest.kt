@@ -4,6 +4,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.performScrollToIndex
@@ -175,6 +176,55 @@ class LocalWorkspaceShareSelectionUiTest {
             assertEquals(listOf("."), scanned)
             assertEquals(listOf("local-git-review:.:worktree/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), recovered)
         }
+    }
+
+    @Test
+    fun commitReviewHistoryFailuresStayIndependentAcrossReviewTypes() {
+        compose.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(
+                    mode = LocalFilesMode.WORKSPACE,
+                    sessionId = "commit-review-independent",
+                    workspacePath = File(context.filesDir, "local-harness/workspace").absolutePath,
+                    loadWorkspace = { emptyList() },
+                    compareLocalGit = { _, _ ->
+                        com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi(
+                            "worktree/source", "local changes", "@@ -1 +1 @@\\n+local", truncated = false,
+                        )
+                    },
+                    compareCommitGit = { _, commit ->
+                        com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi(
+                            "commit/$commit", "commit changes", "@@ -1 +1 @@\\n+commit", truncated = false,
+                        )
+                    },
+                    findIndependentCodeReview = { _, _, diff ->
+                        com.labteto.dshmobile.local.work.LocalIndependentCodeReview(
+                            "saved-code", diff.trackingRef, "digest",
+                            "独立代码历史仍可查看", 12L,
+                        )
+                    },
+                    findIndependentSecurityReview = { _, _, _ ->
+                        error("安全历史记录读取失败")
+                    },
+                    loadConversation = { error("不读取会话") },
+                    loadPreview = { error("不读取预览") },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithText("代码审查").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("独立代码历史仍可查看").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("指定提交").performClick()
+        compose.onNodeWithTag("work_git_commit_input").performTextInput("abcdef1234567")
+        compose.onNodeWithTag("work_git_commit_load").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("独立代码历史仍可查看").fetchSemanticsNodes().isNotEmpty() &&
+                compose.onAllNodesWithText("安全历史记录读取失败").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("独立代码历史仍可查看").assertExists()
+        compose.onNodeWithText("安全历史记录读取失败").assertExists()
     }
 
     @Test

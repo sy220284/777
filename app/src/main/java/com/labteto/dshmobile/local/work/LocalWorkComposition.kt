@@ -249,7 +249,6 @@ internal class LocalWorkComposition @Inject constructor(
     private val taskBuiltins = LocalWorkBuiltinToolRuntime(
         workspaceRoot = File(sessionStorage.files.workspace.path),
         persist = { binding -> sessionStorage.coordinator.enqueue(binding.persistenceSnapshot()) },
-        publishVerifiedDeliverables = sessionStorage.files::publishVerifiedDeliverables,
     )
     private val agentTeams: LocalAgentTeamRuntime by lazy {
         LocalAgentTeamRuntime(

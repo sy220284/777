@@ -295,6 +295,25 @@ internal fun LocalWorkspaceFilesDialog(
         }
     }
 
+    /** Restore two independent durable reports for every Git comparison mode. */
+    suspend fun restoreReviewHistory(diff: LocalRemoteGitDiffUi) {
+        if (diff.truncated || diff.patch.isBlank()) return
+        try {
+            codeReview = findIndependentCodeReview?.invoke(sessionId, gitRepository, diff)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            codeReviewError = failure.message ?: "读取历史代码审查记录失败"
+        }
+        try {
+            securityReview = findIndependentSecurityReview?.invoke(sessionId, gitRepository, diff)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            securityReviewError = failure.message ?: "读取历史安全审查记录失败"
+        }
+    }
+
     /** Review current tracked edits directly, even when the repo has no remote. */
     fun openLocalGitComparison() {
         val compare = compareLocalGit ?: return
@@ -316,22 +335,7 @@ internal fun LocalWorkspaceFilesDialog(
             try {
                 val diff = compare(gitRepository, gitIncludeUntracked)
                 gitResult = diff
-                if (!diff.truncated && diff.patch.isNotBlank()) {
-                    try {
-                        codeReview = findIndependentCodeReview?.invoke(sessionId, gitRepository, diff)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (failure: Exception) {
-                        codeReviewError = failure.message ?: "读取历史代码审查记录失败"
-                    }
-                    try {
-                        securityReview = findIndependentSecurityReview?.invoke(sessionId, gitRepository, diff)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (failure: Exception) {
-                        securityReviewError = failure.message ?: "读取历史安全审查记录失败"
-                    }
-                }
+                restoreReviewHistory(diff)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
@@ -394,22 +398,7 @@ internal fun LocalWorkspaceFilesDialog(
                 val diff = compare(gitRepository, remote, branch)
                 gitResult = diff
                 // Reopening the same diff reuses its durable report instead of charging for another review.
-                if (!diff.truncated && diff.patch.isNotBlank()) {
-                    try {
-                        codeReview = findIndependentCodeReview?.invoke(sessionId, gitRepository, diff)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (failure: Exception) {
-                        codeReviewError = failure.message ?: "读取历史代码审查记录失败"
-                    }
-                    try {
-                        securityReview = findIndependentSecurityReview?.invoke(sessionId, gitRepository, diff)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (failure: Exception) {
-                        securityReviewError = failure.message ?: "读取历史安全审查记录失败"
-                    }
-                }
+                restoreReviewHistory(diff)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
@@ -461,16 +450,7 @@ internal fun LocalWorkspaceFilesDialog(
                 val diff = compare(gitRepository, commit)
                 gitResult = diff
                 gitSelectedRef = diff.trackingRef
-                if (!diff.truncated && diff.patch.isNotBlank()) {
-                    try {
-                        codeReview = findIndependentCodeReview?.invoke(sessionId, gitRepository, diff)
-                        securityReview = findIndependentSecurityReview?.invoke(sessionId, gitRepository, diff)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (failure: Exception) {
-                        codeReviewError = failure.message ?: "读取历史审查失败"
-                    }
-                }
+                restoreReviewHistory(diff)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {

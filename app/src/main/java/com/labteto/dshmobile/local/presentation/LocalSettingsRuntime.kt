@@ -108,20 +108,16 @@ class LocalSettingsRuntime @Inject internal constructor(
             "network.allowedHosts" to "可连接域名",
             "network.deniedHosts" to "禁止连接域名",
             "model.allowedProviders" to "模型供应商",
-            "browser.history" to "浏览历史访问",
-            "browser.upload" to "浏览器上传",
-            "browser.download" to "浏览器下载",
-            "browser.control" to "浏览器操作",
+            "browser.history" to "浏览历史（策略已配置，执行控制未接入）",
+            "browser.upload" to "浏览器上传（策略已配置，执行控制未接入）",
+            "browser.download" to "浏览器下载（策略已配置，执行控制未接入）",
+            "browser.control" to "浏览器控制（策略已配置，执行控制未接入）",
         )
         return UiExecutionPolicySnapshot(
             networkEnabled = policy.networkEnabled,
             allowedHosts = policy.allowedHosts?.sorted(),
             deniedHosts = policy.deniedHosts.sorted(),
             allowedModelProviders = policy.allowedModelProviders?.sorted(),
-            browserHistoryEnabled = policy.browserHistoryAllowed,
-            browserUploadEnabled = policy.browserUploadAllowed,
-            browserDownloadEnabled = policy.browserDownloadAllowed,
-            browserControlEnabled = policy.browserControlAllowed,
             managedRestrictions = policy.managedFields.sorted().map { names.getValue(it) },
         )
     }

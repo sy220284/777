@@ -1102,15 +1102,13 @@ fun SettingsScreen(
                                 )
                                 else -> {
                                     Text(
-                                        "网络：${if (policy.networkEnabled) "可用" else "已限制"}；" +
-                                            "浏览器控制：${if (policy.browserControlEnabled) "允许" else "未授权"}",
+                                        "网络：${if (policy.networkEnabled) "可用" else "已限制"}",
                                         style = DsType.std14.withReadingWeight(),
                                         color = colors.text,
                                     )
                                     Text(
-                                        "浏览器上传 / 下载 / 历史：${if (policy.browserUploadEnabled) "允许" else "限制"} / " +
-                                            "${if (policy.browserDownloadEnabled) "允许" else "限制"} / " +
-                                            "${if (policy.browserHistoryEnabled) "允许" else "限制"}",
+                                        "浏览器历史、上传、下载、控制的独立管理策略尚未接入实际执行；" +
+                                            "当前设备操作仍按 Android 系统权限和工具审批执行。",
                                         style = DsType.caption11.withReadingWeight(),
                                         color = colors.textSecondary,
                                     )

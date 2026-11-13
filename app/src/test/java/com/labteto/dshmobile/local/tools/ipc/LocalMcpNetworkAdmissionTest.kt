@@ -10,32 +10,32 @@ class LocalMcpNetworkAdmissionTest {
         val managed = mergeLocalExecutionPolicy(
             managed = LocalPolicyLayer(allowedHosts = setOf("trusted.example.com")),
         )
-        requireMcpWorkerNetworkAdmission(managed, "http", "https://trusted.example.com/mcp")
-        assertDenied { requireMcpWorkerNetworkAdmission(managed, "http", "http://trusted.example.com/mcp") }
-        assertDenied { requireMcpWorkerNetworkAdmission(managed, "http", "https://other.example.com/mcp") }
-        assertDenied { requireMcpWorkerNetworkAdmission(managed, "http", "https://user@trusted.example.com/mcp") }
-        assertDenied { requireMcpWorkerNetworkAdmission(managed, "http", "https://trusted.example.com/mcp#fragment") }
+        LocalMcpNetworkAdmission("http", "https://trusted.example.com/mcp").requireAllowed(managed)
+        assertDenied { LocalMcpNetworkAdmission("http", "http://trusted.example.com/mcp").requireAllowed(managed) }
+        assertDenied { LocalMcpNetworkAdmission("http", "https://other.example.com/mcp").requireAllowed(managed) }
+        assertDenied { LocalMcpNetworkAdmission("http", "https://user@trusted.example.com/mcp").requireAllowed(managed) }
+        assertDenied { LocalMcpNetworkAdmission("http", "https://trusted.example.com/mcp#fragment").requireAllowed(managed) }
     }
 
     @Test fun domainListsDoNotBlockLocalStdioToolsButNetworkOffDoes() {
         val unrestricted = mergeLocalExecutionPolicy()
-        requireMcpWorkerNetworkAdmission(unrestricted, "stdio", null)
+        LocalMcpNetworkAdmission("stdio", null).requireAllowed(unrestricted)
         val disabled = mergeLocalExecutionPolicy(managed = LocalPolicyLayer(networkEnabled = false))
-        assertDenied { requireMcpWorkerNetworkAdmission(disabled, "stdio", null) }
+        assertDenied { LocalMcpNetworkAdmission("stdio", null).requireAllowed(disabled) }
         val constrained = mergeLocalExecutionPolicy(
             managed = LocalPolicyLayer(deniedHosts = setOf("bad.example.com")),
         )
-        requireMcpWorkerNetworkAdmission(constrained, "stdio", null)
+        LocalMcpNetworkAdmission("stdio", null).requireAllowed(constrained)
         val allowed = mergeLocalExecutionPolicy(
             managed = LocalPolicyLayer(allowedHosts = setOf("trusted.example.com")),
         )
-        requireMcpWorkerNetworkAdmission(allowed, "stdio", null)
+        LocalMcpNetworkAdmission("stdio", null).requireAllowed(allowed)
     }
 
     @Test fun onlyLoopbackAllowsPlainHttp() {
         val unrestricted = mergeLocalExecutionPolicy()
-        requireMcpWorkerNetworkAdmission(unrestricted, "http", "http://localhost:7777/mcp")
-        assertDenied { requireMcpWorkerNetworkAdmission(unrestricted, "http", "http://192.0.2.10/mcp") }
+        LocalMcpNetworkAdmission("http", "http://localhost:7777/mcp").requireAllowed(unrestricted)
+        assertDenied { LocalMcpNetworkAdmission("http", "http://192.0.2.10/mcp").requireAllowed(unrestricted) }
     }
 
     private inline fun assertDenied(action: () -> Unit) {

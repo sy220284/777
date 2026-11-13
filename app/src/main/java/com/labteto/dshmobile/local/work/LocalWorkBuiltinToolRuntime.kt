@@ -21,7 +21,6 @@ import kotlinx.serialization.json.jsonPrimitive
 internal class LocalWorkBuiltinToolRuntime(
     private val persist: (LocalWorkRunBinding) -> Unit,
     private val workspaceRoot: java.io.File? = null,
-    private val publishVerifiedDeliverables: suspend (String, List<String>, String?) -> List<String> = { _, _, _ -> error("Work 成果发布能力未接入") },
 ) {
     internal suspend fun execute(
         call: LocalToolCall,
@@ -62,17 +61,11 @@ internal class LocalWorkBuiltinToolRuntime(
                     status = args.string("status"),
                     note = args["note"]?.jsonPrimitive?.contentOrNull,
                 )
-                val completed = run.workState.snapshot().goal?.takeIf { it.status == "completed" }
-                if (completed != null) {
-                    val folder = localWorkTaskFolderPaths(completed.description, completed.id).deliverables
-                    try {
-                        val saved = publishVerifiedDeliverables(run.sessionId, completed.artifactPaths, folder)
-                        if (saved.isEmpty()) "$receipt；交付目录中没有需要发布的文件"
-                        else "$receipt；成果已发布到手机下载目录：${saved.joinToString()}"
-                    } catch (failure: Exception) {
-                        "$receipt；成果自动发布失败：${failure.message}。文件仍保留在工作区，可手动重新保存。"
-                    }
-                } else receipt
+                // Goal acceptance is persisted here; Downloads delivery is a separate
+                // external side effect owned by the turn finalizer for both completion paths.
+                if (run.workState.snapshot().goal?.status == "completed")
+                    "$receipt；目标已通过验收，手机下载交付将在本轮结束时处理"
+                else receipt
             }
             "ask_user_question" -> run.interactions.awaitQuestion(
                 LocalQuestion(

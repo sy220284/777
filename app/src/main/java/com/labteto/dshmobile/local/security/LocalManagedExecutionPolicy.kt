@@ -5,6 +5,10 @@ import java.net.URI
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.NoSuchFileException
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.attribute.FileTime
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -172,11 +176,33 @@ class LocalManagedExecutionPolicy @Inject constructor(
     private val workspaceFile = File(policyRoot, "workspace-execution-policy.json")
     private val managedFile = File(policyRoot, "managed-execution-requirements.json")
 
-    internal fun current(): LocalEffectiveExecutionPolicy = mergeLocalExecutionPolicy(
-        user = load(userFile),
-        workspace = load(workspaceFile),
-        managed = load(managedFile),
+    // Compare file metadata on each request; only re-read and parse policy JSON
+    // when the underlying file changes. Keep file checks authoritative and current.
+    private data class PolicyVersion(
+        val size: Long, val modified: FileTime, val identity: Any?,
+        val isRegular: Boolean,
     )
+    private var cached: Pair<List<PolicyVersion?>, LocalEffectiveExecutionPolicy>? = null
+
+    @Synchronized
+    internal fun current(): LocalEffectiveExecutionPolicy {
+        val versions = listOf(userFile, workspaceFile, managedFile).map(::version)
+        cached?.let { if (it.first == versions) return it.second }
+        val effective = mergeLocalExecutionPolicy(
+            user = load(userFile),
+            workspace = load(workspaceFile),
+            managed = load(managedFile),
+        )
+        cached = versions to effective
+        return effective
+    }
+
+    private fun version(file: File): PolicyVersion? = try {
+        Files.readAttributes(file.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+            .let { PolicyVersion(it.size(), it.lastModifiedTime(), it.fileKey(), it.isRegularFile) }
+    } catch (_: NoSuchFileException) {
+        null
+    }
 
     private fun load(file: File): LocalPolicyLayer {
         if (!file.exists() && !Files.isSymbolicLink(file.toPath())) return LocalPolicyLayer()
