@@ -105,6 +105,24 @@ internal class LocalToolCompositionRoot @Inject constructor(
     internal suspend fun integrateAgentWorkspace(
         sessionId: String, identity: String, tree: String, allowedPaths: List<String>, beforeCommit: suspend () -> Unit,
     ): kotlinx.serialization.json.JsonObject {
+        // A crash may have left a previously authorized integration half-published.
+        // Restore from its durable write record first, without rerunning the old review.
+        val status = agentWorkspaces.operate(sessionId, "status", buildJsonObject {
+            put("workspace_id", identity)
+        })
+        check(status["tree"]?.jsonPrimitive?.content == tree) { "子工作区版本在合并前已变化" }
+        val pending = (status["integration"] as? kotlinx.serialization.json.JsonObject)
+            ?.get("state")?.jsonPrimitive?.content
+        if (pending in setOf("staging", "applying", "needs_inspection")) {
+            val recoveryTool = requireNotNull(registry.get("workspace_recover_merge")) { "合并恢复运行时未启用" }
+            val recoveryLease = workspaceGate.acquire(recoveryTool)
+            try {
+                check(registry.get("workspace_recover_merge") === recoveryTool) { "合并恢复工具已更新" }
+                return agentWorkspaces.operate(sessionId, "recover_merge", buildJsonObject {
+                    put("workspace_id", identity); put("expected_tree", tree)
+                })
+            } finally { recoveryLease?.close() }
+        }
         // Run expensive model comparison outside the shared-workspace write gate. Pin the
         // original source and child trees; any concurrent edit requires a fresh review.
         val comparison = agentWorkspaces.operate(sessionId, "compare_merge", buildJsonObject {
