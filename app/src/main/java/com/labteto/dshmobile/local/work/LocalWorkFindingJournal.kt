@@ -84,6 +84,14 @@ internal object LocalWorkFindingJournal {
             }
         }
 
+    fun supportedForReplan(log: LocalSessionEventLog, goalId: String, findingId: String): Boolean {
+        if (goalId.isBlank() || findingId.isBlank()) return false
+        val latest = log.latestMatching(setOf(EVENT)) {
+            it.text("finding_id") == findingId && it.text("goal_id") == goalId
+        } ?: return false
+        return latest.data.text("status") == "supported"
+    }
+
     private fun list(log: LocalSessionEventLog, goalId: String): String {
         val current = linkedMapOf<String, JsonObject>()
         log.forEachOfTypesAfter(-1L, setOf(EVENT)) { event ->
