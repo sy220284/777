@@ -1924,7 +1924,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
-      "sha256": "75fc94b90bed38e9"
+      "sha256": "2aaa2b36147351f4"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTaskRuntime.kt",
@@ -3796,7 +3796,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
-      "sha256": "8d1ac7017529cb29"
+      "sha256": "87ce3cff40bbc754"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationComponents.kt",
@@ -4628,13 +4628,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "00f0c8803352",
+  "source_snapshot": "6da1829baeec",
   "observed_delta": {
-    "baseline": "a6e03758eba1",
+    "baseline": "00f0c8803352",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/uicontract/SettingsUiPort.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
