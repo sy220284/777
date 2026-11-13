@@ -36,3 +36,7 @@ PR #897 增加首次启动与设置页共用授权向导。纯 Kotlin 单元测�
 ## 权限向导最终复核项目
 
 设备权限按用户选择逐项触发，已访问设置、系统授权和服务连接区分记录；Compose 仪表用例覆盖跳过及结果汇总。Android 受限制设置通过独立应用信息入口解决，且不会在没有授权时误报已完成。验收以 CI 与真机回执为准。
+
+## 编译复核记录
+
+Android Instrumentation Kotlin 编译中发现新测试导入错误；已移除无效导入，改为 Compose SemanticsNodeInteraction 自带的 assertExists() 调用。后续以最新分支 CI 验证为准。
