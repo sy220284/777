@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1963,
-  "production_source_count": 1141,
+  "repository_code_file_count": 1964,
+  "production_source_count": 1142,
   "test_code_file_count": 677,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
@@ -3739,6 +3739,10 @@
       "sha256": "1d429ccac8d10ee5"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeepSeekBalanceCard.kt",
+      "sha256": "fd120890504d9952"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt",
       "sha256": "3fd20ff8f37ce273"
     },
@@ -4628,15 +4632,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "6da1829baeec",
+  "source_snapshot": "22ed6c45e454",
   "observed_delta": {
-    "baseline": "00f0c8803352",
-    "added_production_files": [],
-    "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt"
+    "baseline": "6da1829baeec",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeepSeekBalanceCard.kt"
     ],
+    "removed_production_files": [],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
