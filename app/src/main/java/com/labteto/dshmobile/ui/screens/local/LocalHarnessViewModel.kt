@@ -354,8 +354,22 @@ class LocalHarnessViewModel @Inject constructor(
     ): com.labteto.dshmobile.local.work.LocalIndependentCodeReview {
         require(runtime.state.value.sessionId == sessionId &&
             runtime.state.value.usageMode == LocalUsageMode.WORK) { "已离开当前工作会话，审查中止" }
-        return independentCodeReview.review(sessionId, repository, diff.trackingRef,
+        val report = independentCodeReview.review(sessionId, repository, diff.trackingRef,
             diff.statistics, diff.patch, diff.truncated)
+        // The model may have spent time reviewing a snapshot while the repository changed.
+        // Preserve that report in EventLog, but do not present it as a review of newer files.
+        val current = if (diff.trackingRef.startsWith("worktree/"))
+            toolsUi.compareLocalGitForUi(repository)
+        else {
+            val (remote, branch) = splitGitReviewTrackingRef(diff.trackingRef)
+            toolsUi.compareRemoteGitForUi(repository, remote, branch)
+        }
+        check(!current.truncated && report.digest ==
+            com.labteto.dshmobile.local.work.codeReviewDigest(repository, current.trackingRef,
+                current.statistics, current.patch)) {
+            "审查期间代码修改已变化，旧审查报告已保存；请刷新差异并重新审查当前版本。"
+        }
+        return report
     }
 
     internal suspend fun acceptIndependentCodeReviewForUi(
