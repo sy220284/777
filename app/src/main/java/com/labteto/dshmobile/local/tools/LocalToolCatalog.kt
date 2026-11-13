@@ -207,6 +207,14 @@ object LocalToolCatalog {
             "status" to string("active、paused、completed 或 blocked"),
             "note" to string("状态说明"),
         ), listOf("status")))
+        add(tool("work_finding", "从真实工具回执记录调查发现；提出假说、补充依据、推翻错误判断，或列出当前目标的发现。仅在遇到有价值的新线索时调用；发现记录不等于已独立验证", properties(
+            "action" to string("record 新发现、revise 修改已有发现、list 列出当前目标记录"),
+            "finding_id" to string("revise 必填：由 record 返回的发现 ID"),
+            "summary" to string("record/revise 必填：基于来源的具体观察或假说，8—500 字"),
+            "source_call_id" to string("record/revise 必填：当前目标已成功完成的真实工具调用 ID"),
+            "status" to string("hypothesis 初步假说、supported 有来源支持、rejected 已被调查推翻"),
+            "next_action" to string("准备补查或验证的下一步；可选"),
+        ), listOf("action")))
         add(tool("ask_user_question", "暂停当前轮次并向用户询问无法自行确定的选择", properties(
             "question" to string("清晰、可直接回答的问题"),
             "options" to buildJsonObject {
