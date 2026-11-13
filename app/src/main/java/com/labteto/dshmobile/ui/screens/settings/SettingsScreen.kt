@@ -1099,7 +1099,7 @@ fun SettingsScreen(
                                         "网络：${if (policy.networkEnabled) "可用" else "已限制"}；" +
                                             "浏览器控制：${if (policy.browserControlEnabled) "允许" else "未授权"}",
                                         style = DsType.std14.withReadingWeight(),
-                                        color = colors.textPrimary,
+                                        color = colors.text,
                                     )
                                     Text(
                                         "浏览器上传 / 下载 / 历史：${if (policy.browserUploadEnabled) "允许" else "限制"} / " +
