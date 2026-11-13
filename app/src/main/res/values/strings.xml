@@ -2283,8 +2283,8 @@
     <string name="shenyan_onboarding_work">工作与任务</string>
     <string name="shenyan_onboarding_work_hint">运行任务、管理工具、查看真实执行状态</string>
     <string name="shenyan_onboarding_selected">已选择</string>
-    <string name="shenyan_onboarding_permission_later">需要时再授权</string>
-    <string name="shenyan_onboarding_privacy_intro">聊天和基础功能无需先授予设备管理权限。只有使用通知、无障碍或其他设备功能时，才会解释用途并请求对应权限。</string>
+    <string name="shenyan_onboarding_permission_later">由你决定授权</string>
+    <string name="shenyan_onboarding_privacy_intro">下一步选择需要的手机能力。按功能申请系统权限，未选择的能力以后也可以开启。</string>
     <string name="shenyan_onboarding_try_chat">先开始体验</string>
     <string name="shenyan_onboarding_continue">继续</string>
     <string name="shenyan_onboarding_start">进入应用</string>
@@ -2420,7 +2420,7 @@
     <string name="permission_setup_restricted_hint">如果无障碍开关为灰色，请先进入 777 的系统应用信息，允许受限制的设置，再返回开启服务。</string>
     <string name="permission_setup_summary">权限设置结果</string>
     <string name="permission_setup_summary_hint">点击任意未完成项目，可以继续授权。已去过设置但没有授权的项目会保持未完成。</string>
-    <string name="permission_setup_finish">完成，进入应用</string>
+    <string name="permission_setup_finish">完成</string>
     <string name="permission_setup_retry">继续处理未完成项目</string>
     <string name="permission_setup_entry">一键检查与授权</string>
     <string name="permission_setup_app_info">打开 777 应用信息，允许受限制的设置</string>
