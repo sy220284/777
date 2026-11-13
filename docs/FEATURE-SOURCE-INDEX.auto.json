@@ -2740,7 +2740,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalIndependentSecurityReviewCoordinator.kt",
-      "sha256": "e75eb0804e8ec796"
+      "sha256": "40ae4fc59359cc6c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalNestedAgentDispatcher.kt",
@@ -4656,12 +4656,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "d33ec08dcc8d",
+  "source_snapshot": "7a7f877ec5ec",
   "observed_delta": {
-    "baseline": "bcf64b56ced4",
+    "baseline": "d33ec08dcc8d",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalIndependentSecurityReviewCoordinator.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
