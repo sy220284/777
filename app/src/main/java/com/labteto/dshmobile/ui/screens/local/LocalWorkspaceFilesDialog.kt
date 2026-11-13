@@ -119,6 +119,8 @@ internal fun LocalWorkspaceFilesDialog(
         { kotlinx.coroutines.flow.emptyFlow() },
     remoteGitBranches: (suspend (String) -> List<String>)? = null,
     compareRemoteGit: (suspend (String, String, String) -> LocalRemoteGitDiffUi)? = null,
+    runIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview)? = null,
+    acceptIndependentCodeReview: (suspend (String, String, com.labteto.dshmobile.local.work.LocalIndependentCodeReview, LocalRemoteGitDiffUi) -> Boolean)? = null,
     loadConversation: suspend (String) -> LocalConversationFiles,
     loadPreview: suspend (String) -> LocalWorkspaceFilePreview,
     loadPreviewPage: suspend (String, Long) -> LocalWorkspaceFilePreview = { path, _ -> loadPreview(path) },
@@ -173,6 +175,10 @@ internal fun LocalWorkspaceFilesDialog(
     var gitBranches by remember(mode, sessionId) { mutableStateOf(emptyList<String>()) }
     var gitSelectedRef by remember(mode, sessionId) { mutableStateOf<String?>(null) }
     var gitResult by remember(mode, sessionId) { mutableStateOf<LocalRemoteGitDiffUi?>(null) }
+    var codeReview by remember(mode, sessionId) { mutableStateOf<com.labteto.dshmobile.local.work.LocalIndependentCodeReview?>(null) }
+    var codeReviewBusy by remember(mode, sessionId) { mutableStateOf(false) }
+    var codeReviewError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
+    var codeReviewConfirm by remember(mode, sessionId) { mutableStateOf(false) }
     var gitJob by remember(mode, sessionId) { mutableStateOf<Job?>(null) }
     val chooserTitle = stringResource(R.string.local_files_share_chooser)
     val failedText = stringResource(R.string.local_files_share_failed)
@@ -241,6 +247,8 @@ internal fun LocalWorkspaceFilesDialog(
         gitError = null
         gitSelectedRef = null
         gitResult = null
+        codeReview = null
+        codeReviewError = null
         gitBranches = emptyList()
         gitJob = scope.launch {
             gitLoading = true
@@ -269,6 +277,8 @@ internal fun LocalWorkspaceFilesDialog(
             gitLoading = true
             gitSelectedRef = reference
             gitResult = null
+            codeReview = null
+            codeReviewError = null
             gitError = null
             try {
                 gitResult = compare(gitRepository, remote, branch)
@@ -809,6 +819,49 @@ internal fun LocalWorkspaceFilesDialog(
                 }
             }
         }
+    if (codeReviewConfirm && codeReview != null && gitResult != null) {
+        SyResponsiveSheet(
+            title = "确认接纳审查结论",
+            subtitle = "只保存人工接纳记录，不执行修改，也不会把审查意见当作测试通过。",
+            onDismiss = { if (!codeReviewBusy) codeReviewConfirm = false },
+        ) {
+            SyButton(
+                text = "确认接纳",
+                enabled = !codeReviewBusy,
+                onClick = {
+                    val saved = codeReview
+                    val diff = gitResult
+                    val accept = acceptIndependentCodeReview
+                    if (saved != null && diff != null && accept != null) {
+                        gitJob?.cancel()
+                        gitJob = scope.launch {
+                            codeReviewBusy = true
+                            codeReviewError = null
+                            try {
+                                if (accept(sessionId, gitRepository, saved, diff)) {
+                                    codeReview = saved.copy(humanAccepted = true)
+                                    codeReviewConfirm = false
+                                } else {
+                                    codeReviewError = "Git 差异或审查版本已变化，请重新审查。"
+                                    codeReviewConfirm = false
+                                }
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                codeReviewError = failure.message ?: "接纳审查结论失败"
+                                codeReviewConfirm = false
+                            } finally {
+                                codeReviewBusy = false
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            SyButton("取消", onClick = { codeReviewConfirm = false }, enabled = !codeReviewBusy,
+                variant = SyButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
+        }
+    }
     if (gitSheetOpen) {
         val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
         SyResponsiveSheet(
@@ -859,6 +912,61 @@ internal fun LocalWorkspaceFilesDialog(
                 if (result.truncated) {
                     Text("差异超过 128KB，当前结果仅包含前 128KB。",
                         style = DsType.caption11, color = colors.warningInk)
+                }
+                if (mode == LocalFilesMode.WORKSPACE && runIndependentCodeReview != null &&
+                    result.patch.isNotBlank()) {
+                    SyButton(
+                        text = if (codeReviewBusy) "独立审查中…" else "独立代码审查",
+                        onClick = {
+                            val review = runIndependentCodeReview
+                            if (review != null && !codeReviewBusy) {
+                                gitJob?.cancel()
+                                gitJob = scope.launch {
+                                    codeReviewBusy = true
+                                    codeReviewError = null
+                                    codeReview = null
+                                    try {
+                                        codeReview = review(sessionId, gitRepository, result)
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (failure: Exception) {
+                                        codeReviewError = failure.message ?: "独立代码审查失败"
+                                    } finally {
+                                        codeReviewBusy = false
+                                    }
+                                }
+                            }
+                        },
+                        enabled = !gitLoading && !codeReviewBusy && !result.truncated,
+                        modifier = Modifier.fillMaxWidth().testTag("work_code_review_start"),
+                    )
+                    codeReviewError?.let { Text(it, color = colors.dangerInk) }
+                    codeReview?.let { saved ->
+                        Text("审查结论 · " + saved.trackingRef,
+                            style = DsType.small13Strong, color = colors.text)
+                        SelectionContainer {
+                            Column(
+                                Modifier.fillMaxWidth().heightIn(max = 360.dp)
+                                    .verticalScroll(rememberScrollState()),
+                            ) {
+                                Text(saved.report, style = DsType.small13, color = colors.text,
+                                    modifier = Modifier.testTag("work_code_review_report"))
+                            }
+                        }
+                        Text("只读模型审查独立留痕；人工接纳仅确认已阅读此份结论。",
+                            style = DsType.caption11, color = colors.textSecondary)
+                        if (!saved.humanAccepted && acceptIndependentCodeReview != null) {
+                            SyButton(
+                                text = "人工接纳审查结论",
+                                onClick = { codeReviewConfirm = true },
+                                enabled = !codeReviewBusy,
+                                modifier = Modifier.fillMaxWidth().testTag("work_code_review_accept"),
+                                variant = SyButtonVariant.Outline,
+                            )
+                        } else if (saved.humanAccepted) {
+                            Text("人工接纳已记录", color = colors.textSecondary)
+                        }
+                    }
                 }
                 Text("仅比较已跟踪文件，未跟踪的新文件不在本次差异内。",
                     style = DsType.caption11, color = colors.textSecondary)
