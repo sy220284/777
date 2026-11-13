@@ -68,6 +68,21 @@ class LocalWorkspaceMergeQualityReviewerTest {
         }.isFailure)
     }
 
+    @Test fun disjointFilesCanStillRepresentCompetingImplementations() {
+        val choice = parseWorkspaceMergeQualityDecision(proposal("select", buildJsonObject {
+            put("ui/duplicate.kt", "parent")
+        }), emptySet(), autoConflict = false,
+            availablePaths = setOf("ui/duplicate.kt", "ui/preferred.kt"))
+        assertEquals("select", choice.getValue("resolution").jsonPrimitive.content)
+        val invalid = runCatching {
+            parseWorkspaceMergeQualityDecision(proposal("select", buildJsonObject {
+                put("ui/unrelated.kt", "child")
+            }), emptySet(), autoConflict = false,
+                availablePaths = setOf("ui/duplicate.kt", "ui/preferred.kt"))
+        }
+        assertTrue(invalid.isFailure)
+    }
+
     @Test fun reviewMustCompareBothAndRequestReworkWhenNeeded() {
         val overlap = setOf("core/engine.kt")
         assertTrue(runCatching {
