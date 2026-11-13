@@ -70,6 +70,7 @@ import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.local.session.LocalSessionSectionSnapshot
+import com.labteto.dshmobile.local.session.LocalSessionSection
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -769,6 +770,13 @@ internal fun LocalModeDrawer(
                                 modifier = Modifier.weight(1f),
                             )
                             SyButton(
+                                text = "移动到分区",
+                                onClick = { moveSelectedDialog = true },
+                                enabled = selectedIds.isNotEmpty() && !deleteInFlight,
+                                variant = SyButtonVariant.Secondary,
+                                size = SyButtonSize.Small,
+                            )
+                            SyButton(
                                 text = stringResource(R.string.local_delete_session),
                                 onClick = { deleteCandidateIds = selectedIds.toSet() },
                                 enabled = selectedIds.isNotEmpty() && !deleteInFlight,
@@ -795,6 +803,106 @@ internal fun LocalModeDrawer(
                 }
             }
         }
+        }
+        if (sectionError != null) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { sectionError = null },
+                title = { Text("分区操作未完成") },
+                text = { Text(sectionError.orEmpty()) },
+                confirmButton = { TextButton(onClick = { sectionError = null }) { Text("确定") } },
+            )
+        }
+        if (createSectionDialog) {
+            RenameDialog(
+                initial = "",
+                title = "新建分区",
+                onDismiss = { createSectionDialog = false },
+                onConfirm = { name ->
+                    try {
+                        if (onCreateSection(name)) {
+                            createSectionDialog = false
+                            sectionError = null
+                        }
+                    } catch (failure: Exception) {
+                        sectionError = failure.message ?: "分区保存失败"
+                    }
+                },
+            )
+        }
+        renameSectionId?.let { id ->
+            val section = sectionCatalog.sections.firstOrNull { it.id == id }
+            if (section != null) {
+                RenameDialog(
+                    initial = section.title,
+                    title = "重命名分区",
+                    onDismiss = { renameSectionId = null },
+                    onConfirm = { name ->
+                        try {
+                            if (onRenameSection(id, name) || section.title == name.trim()) {
+                                renameSectionId = null
+                                sectionError = null
+                            }
+                        } catch (failure: Exception) {
+                            sectionError = failure.message ?: "分区重命名失败"
+                        }
+                    },
+                )
+            }
+        }
+        deleteSectionId?.let { id ->
+            ConfirmDialog(
+                title = "删除分区",
+                body = "分区内的会话会移回最近记录，会话内容不会删除。",
+                confirmLabel = "删除分区",
+                onDismiss = { deleteSectionId = null },
+                onConfirm = {
+                    try {
+                        if (onDeleteSection(id)) {
+                            deleteSectionId = null
+                            sectionError = null
+                        }
+                    } catch (failure: Exception) {
+                        sectionError = failure.message ?: "删除分区失败"
+                    }
+                },
+            )
+        }
+        if (moveSelectedDialog) {
+            val selected = selectedIds.toSet()
+            fun commitMove(targetId: String?) {
+                try {
+                    if (onAssignSessionSection(selected, targetId)) {
+                        moveSelectedDialog = false
+                        selectedIds.clear()
+                        selectionOpen = false
+                        sectionError = null
+                    } else {
+                        sectionError = "选择的会话已变化或无需移动，请刷新后重试"
+                    }
+                } catch (failure: Exception) {
+                    sectionError = failure.message ?: "会话分区移动失败"
+                }
+            }
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { moveSelectedDialog = false },
+                title = { Text("移动 ${selected.size} 个会话") },
+                text = {
+                    LazyColumn(modifier = Modifier.height(320.dp)) {
+                        item(key = "none") {
+                            TextButton(onClick = { commitMove(null) }) { Text("移出分区（最近记录）") }
+                        }
+                        items(sectionCatalog.sections, key = LocalSessionSection::id) { section ->
+                            TextButton(
+                                onClick = { commitMove(section.id) },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text(section.title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { moveSelectedDialog = false }) { Text("取消") }
+                },
+            )
         }
         renameTargetId?.let { id ->
             RenameDialog(
