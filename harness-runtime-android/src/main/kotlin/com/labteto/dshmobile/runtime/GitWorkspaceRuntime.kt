@@ -158,11 +158,14 @@ class GitWorkspaceRuntime(
                         input["repository"]?.jsonPrimitive?.contentOrNull ?: ".",
                     ) else operate(session, action, input)
                     val outcome = response["state"]?.jsonPrimitive?.contentOrNull
-                    val incomplete = outcome in setOf("conflict", "rolled_back", "needs_inspection", "not_started", "needs_full_review")
+                    val pagedReview = action == "preview_merge" && outcome == "needs_full_review" &&
+                        response["review_receipt"] != null
+                    val incomplete = (outcome in setOf("conflict", "rolled_back", "needs_inspection", "not_started", "needs_full_review")) &&
+                        !pagedReview
                     ToolResult(response.toString(), isError = incomplete,
                         errorCode = if (incomplete) "WORKSPACE_INTEGRATION_INCOMPLETE" else null,
                         recoveryHint = when (outcome) {
-                            "needs_full_review" -> "合并补丁超出完整预览限制，未生成可用合并凭据；需要完整检查后再决定修改。"
+                            "needs_full_review" -> if (pagedReview) "继续按 next_offset 分页审查，收齐全部页面回执后提交质量决策。" else "父子实现过大，需要完整审查后再决定修改。"
                             "conflict" -> "父子工作区修改冲突；先解决冲突并重新生成预览。"
                             "rolled_back", "needs_inspection", "not_started" ->
                                 "检查 workspace_status 的 integration；已回滚不等于已合并，外部新修改会保留。"
