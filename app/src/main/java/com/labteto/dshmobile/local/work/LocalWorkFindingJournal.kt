@@ -45,7 +45,7 @@ internal object LocalWorkFindingJournal {
                     val sourceDeclaration = (source.data["tool_declared_sequence"] as? JsonPrimitive)?.longOrNull
                     require(declaration != null && declaration.sequence < source.sequence &&
                         declaration.data.text("name") != "work_finding" &&
-                        (sourceDeclaration == null || sourceDeclaration == declaration.sequence)) {
+                        sourceDeclaration == declaration.sequence) {
                         "来源工具不属于当前目标或尚未结算"
                     }
                     val findingId = if (action == "record") {
