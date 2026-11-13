@@ -62,6 +62,16 @@ internal class LocalCodeReviewLedger(private val log: LocalSessionEventLog) {
         )
     }
 
+    /** Recover the latest review for exactly this immutable Git evidence, including a prior acceptance. */
+    fun latestForDigest(ref: String, digest: String): LocalIndependentCodeReview? = log.withWriterLease {
+        val result = log.latestMatching(setOf("work/code-review-result")) {
+            it["ref"]?.jsonPrimitive?.contentOrNull == ref &&
+                it["digest"]?.jsonPrimitive?.contentOrNull == digest
+        } ?: return@withWriterLease null
+        val id = result.data["id"]?.jsonPrimitive?.contentOrNull ?: return@withWriterLease null
+        read(id)?.takeIf { it.evidenceSequence == result.sequence && it.digest == digest }
+    }
+
     fun accept(id: String, expectedSequence: Long, freshDigest: String): Boolean = log.withWriterLease {
         val review = read(id) ?: return@withWriterLease false
         if (review.humanAccepted || review.evidenceSequence != expectedSequence || review.digest != freshDigest)
@@ -111,6 +121,16 @@ internal class LocalIndependentCodeReviewCoordinator @Inject constructor(
         val report = requireNotNull(reply.content?.trim()?.takeIf(String::isNotBlank)) { "审查没有输出结论" }
         require(report.length <= 16_384) { "审查结论过长，请缩小差异范围" }
         return ledger.complete(id, ref, digest, report, profile.id)
+    }
+
+    /** A read-only lookup: reopening a review never sends another billable model request. */
+    fun findForDiff(sessionId: String, repository: String, ref: String,
+        statistics: String, patch: String, truncated: Boolean): LocalIndependentCodeReview? {
+        require(sessionId.matches(Regex("[A-Za-z0-9_.-]{1,128}"))) { "审查会话标识无效" }
+        if (truncated || patch.isBlank() || patch.length > 120_000) return null
+        return LocalCodeReviewLedger(events.get(sessionId)).latestForDigest(
+            ref, codeReviewDigest(repository, ref, statistics, patch),
+        )
     }
 
     fun accept(sessionId: String, reviewId: String, sequence: Long,
