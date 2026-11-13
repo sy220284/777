@@ -41,8 +41,10 @@ class LocalWebManagedPolicyGateTest {
         }.build()
         val client = LocalWebSearchClient(http, Json)
         val failure = runCatching { client.search("test-key", listOf("test")) }.exceptionOrNull()
-        assertTrue(failure is com.labteto.dshmobile.local.LocalWebException)
-        assertEquals(1, calls.get())
+        assertTrue("拒绝重定向须返回受控错误，实际类型：" +
+            (failure?.javaClass?.name ?: "无异常") + "；请求次数：" + calls.get(),
+            failure is com.labteto.dshmobile.local.LocalWebException)
+        assertEquals("敏感搜索不得自动重放到重定向地址", 1, calls.get())
     }
 
     @Test fun freeSearchPolicyDenialHappensBeforeAnyHttpRequest() = runBlocking {
