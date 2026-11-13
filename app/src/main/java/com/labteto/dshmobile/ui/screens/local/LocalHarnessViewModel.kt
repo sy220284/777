@@ -39,6 +39,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Git produces refs/remotes/<remote>/<branch>; preserve branch slashes exactly. */
+internal fun splitGitReviewTrackingRef(ref: String): Pair<String, String> {
+    require(ref.startsWith("refs/remotes/")) { "不是远端跟踪分支引用" }
+    val suffix = ref.removePrefix("refs/remotes/")
+    val remote = suffix.substringBefore('/')
+    val branch = suffix.substringAfter('/', missingDelimiterValue = "")
+    require(remote.isNotBlank() && branch.isNotBlank()) { "远端分支引用不完整" }
+    return remote to branch
+}
+
 /** A user/tool row must not become the source of a generated assistant document. */
 internal fun nativeV6SourceAssistantMessageId(
     messages: List<com.labteto.dshmobile.local.session.LocalHarnessMessage>,
@@ -357,8 +367,10 @@ class LocalHarnessViewModel @Inject constructor(
             runtime.state.value.usageMode != LocalUsageMode.WORK) return false
         val ref = diff.trackingRef
         val current = if (ref.startsWith("worktree/")) toolsUi.compareLocalGitForUi(repository)
-            else toolsUi.compareRemoteGitForUi(repository,
-                ref.substringBefore('/'), ref.substringAfter('/'))
+            else {
+                val (remote, branch) = splitGitReviewTrackingRef(ref)
+                toolsUi.compareRemoteGitForUi(repository, remote, branch)
+            }
         return independentCodeReview.accept(sessionId, review.id, review.evidenceSequence,
             repository, current.trackingRef, current.statistics, current.patch, current.truncated)
     }
