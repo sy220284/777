@@ -43,6 +43,38 @@ class LocalWorkProjectCatalogTest {
         assertTrue(File(root, "repo").isDirectory)
     }
 
+    @Test fun createsDedicatedLocalFoldersAndKeepsThemWhenRemovingProjects() =
+        testCatalog { file, root, catalog ->
+            val requestId = "44444444-4444-4444-4444-444444444444"
+            val first = catalog.createWithNewFolder("界面/设计", requestId = requestId,
+                initialSessionId = "session-1")
+            assertTrue(first.root.startsWith("项目/界面-设计-44444444"))
+            assertTrue(File(root, first.root).isDirectory)
+            assertEquals(first.id, catalog.snapshots.value.sessionProjects["session-1"])
+            assertEquals(first, catalog.createWithNewFolder("界面/设计", requestId = requestId))
+            val second = catalog.createWithNewFolder("代码", requestId =
+                "55555555-5555-5555-5555-555555555555")
+            assertTrue(second.root != first.root)
+            assertTrue(File(root, second.root).isDirectory)
+            val recovered = LocalWorkProjectCatalog(file, root, Json)
+            assertEquals(2, recovered.snapshots.value.projects.size)
+            assertTrue(catalog.delete(first.id))
+            assertTrue(File(root, first.root).isDirectory)
+        }
+
+    @Test fun failedNewProjectCatalogCommitCleansTheAllocatedDirectory() =
+        testCatalog { file, root, catalog ->
+            assertTrue(file.mkdir())
+            File(file, "prevent-replace").writeText("existing")
+            assertTrue(runCatching {
+                catalog.createWithNewFolder("失败项目",
+                    requestId = "66666666-6666-6666-6666-666666666666")
+            }.isFailure)
+            assertTrue(catalog.snapshots.value.projects.isEmpty())
+            assertFalse(File(root, "项目/失败项目-66666666").exists())
+            assertFalse(File(root, "项目").exists())
+        }
+
     @Test fun rejectsTraversalOrDuplicateIdWithoutChangingProject() = testCatalog { file, root, catalog ->
         val child = File(root, "source").apply { mkdirs() }
         val first = catalog.create("first", "source", requestId = "33333333-3333-3333-3333-333333333333")
