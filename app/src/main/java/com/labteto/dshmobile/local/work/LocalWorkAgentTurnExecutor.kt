@@ -1114,7 +1114,7 @@ internal class LocalWorkAgentTurnExecutor(
                 // Auto-admitted goals can complete after the final tool call; publish the same
                 // verified artifact paths that update_goal uses, before declaring the run settled.
                 val completed = binding.workState.snapshot().goal?.takeIf {
-                    it.status == "completed" && it.artifactPaths.isNotEmpty()
+                    it.status == "completed"
                 }
                 if (completed != null) {
                     try {
