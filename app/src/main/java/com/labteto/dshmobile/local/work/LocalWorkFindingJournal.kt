@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.util.UUID
 
@@ -41,8 +42,10 @@ internal object LocalWorkFindingJournal {
                     val declaration = log.latestMatching(setOf("tool/call")) { data ->
                         data.text("id") == sourceCallId && data.text("goal_id") == goalId
                     }
+                    val sourceDeclaration = (source.data["tool_declared_sequence"] as? JsonPrimitive)?.longOrNull
                     require(declaration != null && declaration.sequence < source.sequence &&
-                        declaration.data.text("name") != "work_finding") {
+                        declaration.data.text("name") != "work_finding" &&
+                        (sourceDeclaration == null || sourceDeclaration == declaration.sequence)) {
                         "来源工具不属于当前目标或尚未结算"
                     }
                     val findingId = if (action == "record") {
