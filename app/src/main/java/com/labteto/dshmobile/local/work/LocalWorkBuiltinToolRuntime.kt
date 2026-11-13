@@ -65,8 +65,13 @@ internal class LocalWorkBuiltinToolRuntime(
                 val completed = run.workState.snapshot().goal?.takeIf { it.status == "completed" }
                 if (completed != null) {
                     val folder = localWorkTaskFolderPaths(completed.description, completed.id).deliverables
-                    val saved = publishVerifiedDeliverables(run.sessionId, completed.artifactPaths, folder)
-                    "$receipt；成果已发布到手机下载目录：${saved.joinToString()}"
+                    try {
+                        val saved = publishVerifiedDeliverables(run.sessionId, completed.artifactPaths, folder)
+                        if (saved.isEmpty()) "$receipt；交付目录中没有需要发布的文件"
+                        else "$receipt；成果已发布到手机下载目录：${saved.joinToString()}"
+                    } catch (failure: Exception) {
+                        "$receipt；成果自动发布失败：${failure.message}。文件仍保留在工作区，可手动重新保存。"
+                    }
                 } else receipt
             }
             "ask_user_question" -> run.interactions.awaitQuestion(
