@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1961,
+  "repository_code_file_count": 1962,
   "production_source_count": 1140,
-  "test_code_file_count": 676,
+  "test_code_file_count": 677,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -3788,7 +3788,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "sha256": "5dd35bc8db81294a"
+      "sha256": "3fb36dd3c16c6173"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
@@ -4624,13 +4624,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "b45b1ef563f4",
+  "source_snapshot": "b1bb13c4221f",
   "observed_delta": {
-    "baseline": "69adbb5fc950",
+    "baseline": "b45b1ef563f4",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
