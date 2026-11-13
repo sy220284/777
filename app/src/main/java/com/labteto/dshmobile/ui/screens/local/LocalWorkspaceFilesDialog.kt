@@ -799,6 +799,24 @@ internal fun LocalWorkspaceFilesDialog(
                     placeholder = stringResource(R.string.fluid_files_search),
                     modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd))
 
+                if (mode == LocalFilesMode.WORKSPACE && section == -1 &&
+                    preview == null && query.isBlank()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                    ) {
+                        Text("完成的成果：手机存储/Download/神言神语",
+                            modifier = Modifier.weight(1f),
+                            style = DsType.small13.withReadingWeight())
+                        SyButton(
+                            text = "打开下载",
+                            onClick = ::openDownloads,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                        )
+                    }
+                }
                 if (preview == null && query.isNotBlank() && mode == LocalFilesMode.WORKSPACE) {
                     Text(
                         stringResource(R.string.local_workspace_search_scope),
