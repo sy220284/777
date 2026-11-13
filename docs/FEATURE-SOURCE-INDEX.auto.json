@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1929,
-  "production_source_count": 1127,
+  "repository_code_file_count": 1930,
+  "production_source_count": 1128,
   "test_code_file_count": 658,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
@@ -1899,6 +1899,10 @@
       "sha256": "22f72851dd0b12f2"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSessionSectionUiFacade.kt",
+      "sha256": "897a484d495c9f52"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSessionUiFacade.kt",
       "sha256": "22896b8ce075274e"
     },
@@ -3436,7 +3440,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
-      "sha256": "c57ec5ae3ba86c53"
+      "sha256": "426ef6ff37b37a6c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawerComponents.kt",
@@ -3456,7 +3460,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt",
-      "sha256": "ef01560c9f5ab2d1"
+      "sha256": "b424490f7d75d33b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModelDefaults.kt",
@@ -4572,12 +4576,17 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "8c7e6f53a785",
+  "source_snapshot": "abcb60940039",
   "observed_delta": {
-    "baseline": "48734c68c9db",
-    "added_production_files": [],
+    "baseline": "8c7e6f53a785",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSessionSectionUiFacade.kt"
+    ],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
