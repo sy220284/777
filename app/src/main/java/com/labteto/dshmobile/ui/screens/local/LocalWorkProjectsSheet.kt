@@ -63,7 +63,7 @@ internal fun LocalWorkProjectsSheet(
         importing = useCurrent
         editorId = null
         name = ""
-        folder = if (useCurrent) currentFolder else "."
+        folder = if (useCurrent) currentFolder else ""
         error = null
     }
 
@@ -92,24 +92,29 @@ internal fun LocalWorkProjectsSheet(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().testTag("work_project_name"),
             )
-            SyTextField(
-                value = folder,
-                onValueChange = { folder = it },
-                label = { Text("关联文件夹（工作区内相对路径）") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text("已存在的工作区目录直接关联；项目移除时不会删除文件。",
-                style = DsType.caption11, color = colors.textSecondary)
-            SyButton(
-                text = "使用当前目录",
-                onClick = { folder = currentFolder },
-                variant = SyButtonVariant.Ghost,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (!creating || importing) {
+                SyTextField(
+                    value = folder,
+                    onValueChange = { folder = it },
+                    label = { Text("关联已有文件夹") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text("沿用当前工作区的原有文件夹，移除项目时仍保留文件。",
+                    style = DsType.caption11, color = colors.textSecondary)
+                SyButton(
+                    text = "使用当前目录",
+                    onClick = { folder = currentFolder },
+                    variant = SyButtonVariant.Ghost,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                Text("将自动创建独立的本地项目文件夹，直接保存即可。",
+                    style = DsType.caption11, color = colors.textSecondary)
+            }
             SyButton(
                 text = if (creating) "保存项目" else "保存修改",
-                enabled = name.trim().isNotEmpty() && folder.trim().isNotEmpty(),
+                enabled = name.trim().isNotEmpty() && ((!creating || importing) && folder.trim().isNotEmpty() || creating && !importing),
                 onClick = {
                     try {
                         if (creating) {
