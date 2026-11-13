@@ -228,6 +228,32 @@ class GitWorkspaceTest(unittest.TestCase):
         self.assertFalse((self.root / "child-only.txt").exists())
         self.assertFalse((self.root / "parent-only.txt").exists())
 
+    def test_chosen_merge_must_keep_declared_deliverables(self):
+        child = self.fork()
+        (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
+        (child / "required.txt").write_text("new deliverable")
+        tree = self.call("status")["tree"]
+        choices = {"required.txt": "parent"}
+        preview = self.call("preview_merge", expected_tree=tree, resolution="select",
+                            path_choices=choices)
+        with self.assertRaisesRegex(ValueError, "drops a required output"):
+            self.call("merge", expected_tree=tree, resolution="select",
+                      path_choices=choices,
+                      required_outputs=["required.txt"],
+                      allowed_paths=["code.txt", "required.txt"],
+                      expected_source_tree=preview["source_tree"],
+                      expected_merged_tree=preview["merged_tree"])
+        self.assertFalse((self.root / "required.txt").exists())
+        self.assertEqual("first\nsecond\nthird\n", (self.root / "code.txt").read_text())
+        kept = self.call("preview_merge", expected_tree=tree, resolution="auto")
+        result = self.call("merge", expected_tree=tree, resolution="auto",
+                           required_outputs=["required.txt"],
+                           allowed_paths=["code.txt", "required.txt"],
+                           expected_source_tree=kept["source_tree"],
+                           expected_merged_tree=kept["merged_tree"])
+        self.assertEqual("merged", result["state"])
+        self.assertEqual("new deliverable", (self.root / "required.txt").read_text())
+
     def test_quality_choice_cannot_revert_parent_files_outside_declared_outputs(self):
         child = self.fork()
         (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
