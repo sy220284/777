@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1972,
-  "production_source_count": 1147,
+  "repository_code_file_count": 1973,
+  "production_source_count": 1148,
   "test_code_file_count": 680,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
@@ -2767,6 +2767,10 @@
       "sha256": "c44832fe3d94e9b0"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalReviewOutboundEvidence.kt",
+      "sha256": "e803da66096d4629"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalRuntimeOwnershipPolicy.kt",
       "sha256": "9326a53abbb55a4f"
     },
@@ -4652,10 +4656,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "a95b171d5593",
+  "source_snapshot": "aeca237f227c",
   "observed_delta": {
-    "baseline": "48ef9da1c23e",
-    "added_production_files": [],
+    "baseline": "a95b171d5593",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalReviewOutboundEvidence.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [],
     "moved_unchanged_files": [],
