@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import com.labteto.dshmobile.local.work.LocalWorkProject
 import com.labteto.dshmobile.local.work.LocalWorkProjectSnapshot
 import com.labteto.dshmobile.ui.theme.DshTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,9 +21,24 @@ class LocalWorkProjectsSheetUiTest {
 
     @Test fun newProjectNeedsOnlyNameAndUsesAutomaticWorkspaceDirectory() {
         var created: Pair<String, String>? = null
+        var opened: String? = null
+        val snapshots = MutableStateFlow(LocalWorkProjectSnapshot())
         val actions = LocalWorkProjectsUiActions(
-            snapshots = MutableStateFlow(LocalWorkProjectSnapshot()),
-            create = { name, root -> created = name to root },
+            snapshots = snapshots,
+            create = { name, root ->
+                created = name to root
+                snapshots.value = LocalWorkProjectSnapshot(
+                    projects = listOf(LocalWorkProject(
+                        id = "11111111-1111-1111-1111-111111111111",
+                        name = name,
+                        root = "项目/测试项目-11111111",
+                        createdAtMs = 1,
+                        updatedAtMs = 1,
+                        requestId = "11111111-1111-1111-1111-111111111111",
+                    )),
+                    revision = 1,
+                )
+            },
             importExisting = { _, _, _ -> },
             rename = { _, _ -> false },
             update = { _, _, _ -> false },
@@ -37,6 +53,7 @@ class LocalWorkProjectsSheetUiTest {
                     actions = actions,
                     sessionId = "project-create",
                     currentFolder = ".",
+                    onOpenProject = { opened = it },
                     onDismiss = {},
                 )
             }
@@ -47,5 +64,7 @@ class LocalWorkProjectsSheetUiTest {
         compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("测试项目")
         compose.onNodeWithText("保存项目").performClick()
         compose.runOnIdle { assertEquals("测试项目" to "", created) }
+        compose.onNodeWithText("打开项目文件").performClick()
+        compose.runOnIdle { assertEquals("项目/测试项目-11111111", opened) }
     }
 }

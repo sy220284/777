@@ -999,6 +999,19 @@ internal fun LocalWorkspaceFilesDialog(
             actions = projectActions,
             sessionId = sessionId,
             currentFolder = directory.takeIf { it.isNotBlank() && it != "任务" && it != "交付成果" } ?: ".",
+            onOpenProject = { projectRoot ->
+                projectsSheetOpen = false
+                query = ""
+                directory = if (projectRoot == ".") "" else projectRoot
+                section = when {
+                    projectRoot == "." -> -1
+                    projectRoot == "任务" || projectRoot.startsWith("任务/") -> 0
+                    projectRoot == "交付成果" || projectRoot.startsWith("交付成果/") -> 1
+                    else -> 2
+                }
+                loading = true
+                scope.launch { reload() }
+            },
             onDismiss = { projectsSheetOpen = false },
         )
     }

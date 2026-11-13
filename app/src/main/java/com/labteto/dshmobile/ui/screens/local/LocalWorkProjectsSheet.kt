@@ -46,6 +46,7 @@ internal fun LocalWorkProjectsSheet(
     actions: LocalWorkProjectsUiActions,
     sessionId: String,
     currentFolder: String,
+    onOpenProject: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val snapshot by actions.snapshots.collectAsStateWithLifecycle()
@@ -161,6 +162,13 @@ internal fun LocalWorkProjectsSheet(
                     Text("文件夹：" + project.root +
                         if (associated) " · 当前会话已关联" else "",
                         style = DsType.caption11, color = colors.textSecondary)
+                    SyButton(
+                        text = "打开项目文件",
+                        onClick = { onOpenProject(project.root) },
+                        size = SyButtonSize.Small,
+                        variant = SyButtonVariant.Outline,
+                        modifier = Modifier.fillMaxWidth().testTag("work_project_open"),
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
                         SyButton(
                             text = if (associated) "移出会话" else "关联会话",
