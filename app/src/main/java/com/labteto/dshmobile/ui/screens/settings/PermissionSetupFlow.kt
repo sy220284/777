@@ -91,8 +91,11 @@ internal fun PermissionSetupFlow(
             openError = failure.localizedMessage ?: context.getString(R.string.permission_setup_open_failed)
         }
     }
-    fun startWalk(fromIndex: Int = 0) {
-        val next = nextPermissionSetupIndex(chosen, fromIndex, skipped) {
+    fun startWalk(
+        fromIndex: Int = 0,
+        skippedForWalk: Set<PermissionSetupFeature> = skipped,
+    ) {
+        val next = nextPermissionSetupIndex(chosen, fromIndex, skippedForWalk) {
             permissionSetupStatus(it, state)
         }
         if (next == null) {
@@ -158,7 +161,7 @@ internal fun PermissionSetupFlow(
                     SyButton(text = stringResource(R.string.permission_setup_begin), onClick = {
                         visitedNames = emptyList()
                         skippedNames = emptyList()
-                        startWalk()
+                        startWalk(skippedForWalk = emptySet())
                     }, modifier = Modifier.fillMaxWidth())
                     SyButton(text = stringResource(R.string.permission_setup_later), onClick = onFinished,
                         variant = SyButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
