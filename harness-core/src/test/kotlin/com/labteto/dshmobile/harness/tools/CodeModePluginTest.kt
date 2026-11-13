@@ -186,6 +186,89 @@ class CodeModePluginTest {
         assertTrue(actual.content.contains("completed_steps"))
     }
 
+    @Test fun conditionalStepsSkipWithoutExecutingMutations() = runTest {
+        val registry = ToolRegistry()
+        var writes = 0
+        register(registry, "check") { ToolResult("""{"approved":false}""") }
+        register(registry, "write", ToolAccess.WORKSPACE_WRITE) {
+            writes++
+            ToolResult("changed")
+        }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val script = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject { put("tool", "check"); put("args", buildJsonObject {}) })
+                add(buildJsonObject {
+                    put("tool", "write")
+                    put("args", buildJsonObject {})
+                    put("when", buildJsonObject {
+                        put("step", 1); put("path", "approved"); put("equals", true)
+                    })
+                })
+            })
+        }
+        val actual = registry.execute("code_mode_run", script,
+            context = ToolContext(approval = { true }))
+        assertFalse(actual.isError)
+        assertEquals(0, writes)
+        assertTrue(actual.content.contains("\"skipped_steps\":1"))
+        assertTrue(actual.content.contains("\"execution_started\":false"))
+    }
+
+    @Test fun conditionalStepsUseExactTypedValuesAndPreserveStepOrdinals() = runTest {
+        val registry = ToolRegistry()
+        var writes = 0
+        register(registry, "check") { ToolResult("""{"approved":true}""") }
+        register(registry, "write", ToolAccess.WORKSPACE_WRITE) {
+            writes++
+            ToolResult("""{"allowed":true}""")
+        }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val script = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject { put("tool", "check"); put("args", buildJsonObject {}) })
+                add(buildJsonObject {
+                    put("tool", "write"); put("args", buildJsonObject {})
+                    put("when", buildJsonObject { put("step", 1); put("path", "approved"); put("equals", true) })
+                })
+                add(buildJsonObject {
+                    put("tool", "write"); put("args", buildJsonObject {})
+                    put("when", buildJsonObject { put("step", 2); put("path", "allowed"); put("equals", false) })
+                })
+            })
+        }
+        val actual = registry.execute("code_mode_run", script,
+            context = ToolContext(approval = { true }))
+        assertFalse(actual.isError)
+        assertEquals(1, writes)
+        assertTrue(actual.content.contains("\"completed_steps\":2"))
+        assertTrue(actual.content.contains("\"skipped_steps\":1"))
+    }
+
+    @Test fun invalidConditionalForwardReferenceStopsBeforeAnyMutation() = runTest {
+        val registry = ToolRegistry()
+        var calls = 0
+        register(registry, "write", ToolAccess.WORKSPACE_WRITE) {
+            calls++
+            ToolResult("changed")
+        }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val script = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject { put("tool", "write"); put("args", buildJsonObject {}) })
+                add(buildJsonObject {
+                    put("tool", "write"); put("args", buildJsonObject {})
+                    put("when", buildJsonObject { put("step", 2); put("equals", true) })
+                })
+            })
+        }
+        val actual = registry.execute("code_mode_run", script,
+            context = ToolContext(approval = { true }))
+        assertTrue(actual.isError)
+        assertEquals("CODE_MODE_BAD_CONDITION", actual.errorCode)
+        assertEquals(0, calls)
+    }
+
     @Test fun invalidForwardReferenceCannotTriggerAnEarlierWrite() = runTest {
         val registry = ToolRegistry()
         var writes = 0
