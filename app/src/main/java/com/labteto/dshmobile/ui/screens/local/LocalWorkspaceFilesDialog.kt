@@ -179,6 +179,7 @@ internal fun LocalWorkspaceFilesDialog(
     var gitError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
     var gitRepository by remember(mode, sessionId) { mutableStateOf(".") }
     var gitBranches by remember(mode, sessionId) { mutableStateOf(emptyList<String>()) }
+    var gitBranchQuery by remember(mode, sessionId) { mutableStateOf("") }
     var gitSelectedRef by remember(mode, sessionId) { mutableStateOf<String?>(null) }
     var gitResult by remember(mode, sessionId) { mutableStateOf<LocalRemoteGitDiffUi?>(null) }
     var codeReview by remember(mode, sessionId) { mutableStateOf<com.labteto.dshmobile.local.work.LocalIndependentCodeReview?>(null) }
@@ -294,6 +295,7 @@ internal fun LocalWorkspaceFilesDialog(
         codeReview = null
         codeReviewError = null
         gitBranches = emptyList()
+        gitBranchQuery = ""
         gitJob = scope.launch {
             gitLoading = true
             try {
@@ -937,7 +939,15 @@ internal fun LocalWorkspaceFilesDialog(
             Text("仓库目录：$gitRepository", style = DsType.small13, color = colors.textSecondary)
             if (gitLoading) Text("正在读取 Git 结果…", color = colors.textSecondary)
             gitError?.let { Text(it, color = colors.dangerInk) }
-            gitBranches.forEach { reference ->
+            if (gitBranches.size > 8) SySearchField(
+                gitBranchQuery, { gitBranchQuery = it },
+                placeholder = "搜索远端分支",
+                modifier = Modifier.fillMaxWidth().testTag("work_git_branch_search"),
+            )
+            val visibleGitBranches = gitBranches.filter {
+                gitBranchQuery.isBlank() || it.contains(gitBranchQuery.trim(), ignoreCase = true)
+            }
+            visibleGitBranches.take(20).forEach { reference ->
                 SyButton(
                     text = if (gitSelectedRef == reference) "已选择 · $reference" else reference,
                     onClick = { compareGitReference(reference) },
@@ -946,6 +956,10 @@ internal fun LocalWorkspaceFilesDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+            if (visibleGitBranches.size > 20) Text(
+                "还有 ${visibleGitBranches.size - 20} 条分支，请缩小搜索范围。",
+                style = DsType.caption11, color = colors.textSecondary,
+            )
             gitResult?.let { result ->
                 Text(result.trackingRef, style = DsType.small13Strong, color = colors.text)
                 SelectionContainer {
