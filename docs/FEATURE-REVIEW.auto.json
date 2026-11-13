@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "2a14f594b4ce",
+  "snapshot": "d9ba14ca2c9f",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1974,
   "production_sources_scanned": 1148,
@@ -9326,13 +9326,10 @@
   "followup_production_or_compatibility": 7,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "62ba8be101ef",
+    "baseline": "2a14f594b4ce",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalIndependentCodeReviewCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalIndependentSecurityReviewCoordinator.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
