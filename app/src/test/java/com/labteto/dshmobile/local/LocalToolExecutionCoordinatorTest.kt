@@ -140,7 +140,7 @@ class LocalToolExecutionCoordinatorTest {
         val registry = ToolRegistry().apply {
             register(tool(name = "mcp_lookup", access = ToolAccess.READ_ONLY,
                 approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "扩展") { ToolResult("ok") })
+                family = "扩展", keywords = setOf("公共搜索")) { ToolResult("ok") })
         }
         val coordinator = coordinator(registry)
         coordinator.searchCapabilities("select:mcp_lookup")
