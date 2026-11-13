@@ -128,6 +128,37 @@ class WorkExperienceBootstrapTest {
     }
 
     @Test
+    fun rejectedDiscoveryBeforeGoalCompletionDoesNotTeachAFalseSuccess() {
+        val root = Files.createTempDirectory("777-finding-rejected").toFile()
+        try {
+            val log = LocalSessionEventLogRegistry(root, Json).get("rejected-finding")
+            log.append("goal/state", buildJsonObject {
+                put("id", "research"); put("revision", 1); put("status", "active")
+            })
+            val start = log.latestSequence()
+            log.append("work/finding", buildJsonObject {
+                put("finding_id", "finding-one")
+                put("status", "supported")
+            })
+            log.append("work/finding", buildJsonObject {
+                put("finding_id", "finding-one")
+                put("status", "rejected")
+            })
+            log.append("goal/state", buildJsonObject {
+                put("id", "research"); put("revision", 2)
+                put("status", "completed"); put("startedAtSequence", start)
+            })
+            val signals = WorkExperienceBootstrap.collect(log,
+                LocalGoal("研究结论", status = "completed", id = "research",
+                    revision = 2, startedAtSequence = start))
+            assertEquals(0, signals.supportedFindings)
+            assertFalse(signals.supports("finding_supported"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun completedGoalMetricsExcludeLaterGoalsAndTheirToolFailures() {
         val root = Files.createTempDirectory("777-goal-isolation").toFile()
         try {
