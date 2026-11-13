@@ -18,6 +18,13 @@ import kotlinx.serialization.json.put
  * Every step re-enters the original registry, so a script cannot bypass tools, approvals or Hooks.
  */
 class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
+    private data class CodeModeStepPlan(
+        val name: String,
+        val handler: HarnessTool,
+        val args: JsonObject,
+        val condition: JsonObject?,
+    )
+
     override val id: String = "code-mode-orchestration"
 
     override suspend fun install(context: HarnessContext) {
@@ -25,7 +32,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             name = TOOL_NAME,
             schema = functionToolSchema(
                 TOOL_NAME,
-                "受控串行工具编排。按顺序执行最多8步；每步单独经过工具权限、审批及审计。遇到失败即停止。不能执行任意脚本、访问内部工具或自动重试未知副作用。",
+                "受控串行工具编排。最多8步，支持前序持久结果引用与 when 条件跳过；每步经过原工具权限、审批及审计。遇失败停止，不执行任意脚本或自动重试未知副作用。",
                 parameterSchema = buildJsonObject {
                     put("type", "object")
                     put("properties", buildJsonObject {
@@ -40,6 +47,20 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                                     put("args", buildJsonObject {
                                         put("type", "object")
                                         put("additionalProperties", true)
+                                    })
+                                    put("when", buildJsonObject {
+                                        put("type", "object")
+                                        put("description", "前序持久结果匹配 equals 才执行，否则跳过")
+                                        put("properties", buildJsonObject {
+                                            put("step", buildJsonObject { put("type", "integer") })
+                                            put("path", buildJsonObject { put("type", "string") })
+                                            put("equals", buildJsonObject {})
+                                        })
+                                        put("required", buildJsonArray {
+                                            add(JsonPrimitive("step"))
+                                            add(JsonPrimitive("equals"))
+                                        })
+                                        put("additionalProperties", false)
                                     })
                                 })
                                 put("required", buildJsonArray {
@@ -84,7 +105,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
 
         // Validate the complete script before running the first side-effecting step.
         val sampled = kotlinx.coroutines.currentCoroutineContext()[ToolBindingSnapshot]
-        val validated = mutableListOf<Triple<String, HarnessTool, JsonObject>>()
+        val validated = mutableListOf<CodeModeStepPlan>()
         for ((index, element) in steps.withIndex()) {
             val step = element as? JsonObject
                 ?: return rejection("CODE_MODE_BAD_PLAN", "步骤 ${index + 1} 不是对象")
@@ -103,13 +124,56 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             validateReferencePlan(arguments, index + 1)?.let { problem ->
                 return rejection("CODE_MODE_BAD_REFERENCE", "步骤 ${index + 1} 的结果引用无效：$problem")
             }
-            validated += Triple(name, handler, arguments)
+            val condition = step["when"]
+            if (condition != null) {
+                val rule = condition as? JsonObject
+                    ?: return rejection("CODE_MODE_BAD_CONDITION", "步骤 ${index + 1} 的 when 必须是对象")
+                val source = (rule["step"] as? JsonPrimitive)?.content?.toIntOrNull()
+                val path = rule["path"]
+                if (rule.keys.any { it != "step" && it != "path" && it != "equals" } ||
+                    source == null || source !in 1..index || rule["equals"] == null ||
+                    (path != null && (path !is JsonPrimitive || !path.isString ||
+                        (path.content.isNotEmpty() && !REFERENCE_PATH.matches(path.content)))))
+                    return rejection("CODE_MODE_BAD_CONDITION",
+                        "步骤 ${index + 1} 的条件必须引用前序步骤及可验证字段")
+            }
+            validated += CodeModeStepPlan(name, handler, arguments, condition as? JsonObject)
         }
 
         val observations = mutableListOf<JsonObject>()
-        val completedResults = mutableListOf<ToolResult>()
+        // Preserve original ordinals even when a conditional step is skipped.
+        val completedResults = mutableListOf<ToolResult?>()
         for ((index, entry) in validated.withIndex()) {
-            val (name, handler, arguments) = entry
+            val (name, handler, arguments, condition) = entry
+            if (condition != null) {
+                val sourceStep = (condition.getValue("step") as JsonPrimitive).content.toInt()
+                val reference = buildJsonObject {
+                    put(RESULT_REFERENCE_KEY, sourceStep)
+                    condition["path"]?.let { put("path", it) }
+                }
+                val observed = try {
+                    resolveReferences(reference, completedResults)
+                } catch (error: StepReferenceException) {
+                    observations += buildJsonObject {
+                        put("index", index + 1)
+                        put("tool", name)
+                        put("status", "reference_failed")
+                        put("hint", error.message ?: "条件来源没有持久结果")
+                    }
+                    return receipt(observations, "stopped", "CODE_MODE_REFERENCE_FAILED")
+                }
+                if (observed != condition.getValue("equals")) {
+                    observations += buildJsonObject {
+                        put("index", index + 1)
+                        put("tool", name)
+                        put("status", "skipped")
+                        put("condition_step", sourceStep)
+                        put("execution_started", false)
+                    }
+                    completedResults += null
+                    continue
+                }
+            }
             val resolvedArguments = try {
                 resolveReferences(arguments, completedResults) as JsonObject
             } catch (error: StepReferenceException) {
@@ -199,7 +263,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
 
     /** Only durable results can be reused. Resolved inputs pass through ToolRegistry again,
      * retaining schema validation, approval, registration identity and Hooks. */
-    private fun resolveReferences(node: JsonElement, history: List<ToolResult>): JsonElement = when (node) {
+    private fun resolveReferences(node: JsonElement, history: List<ToolResult?>): JsonElement = when (node) {
         is JsonObject -> if (RESULT_REFERENCE_KEY in node) {
             val ordinal = (node[RESULT_REFERENCE_KEY] as JsonPrimitive).content.toInt()
             val source = history.getOrNull(ordinal - 1)
@@ -240,6 +304,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             content = buildJsonObject {
                 put("status", status)
                 put("completed_steps", steps.count { it["status"]?.jsonPrimitive?.content == "completed" })
+                put("skipped_steps", steps.count { it["status"]?.jsonPrimitive?.content == "skipped" })
                 put("steps", JsonArray(steps))
             }.toString(),
             isError = failureCode != null,
