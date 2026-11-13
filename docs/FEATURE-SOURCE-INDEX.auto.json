@@ -1276,7 +1276,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryValues.kt",
-      "sha256": "383b652a8721ec95"
+      "sha256": "dd5b6f621356b01b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryVaultProjection.kt",
@@ -4624,13 +4624,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "b4de92fee483",
+  "source_snapshot": "c0ad87f03bd0",
   "observed_delta": {
-    "baseline": "2940a823bdc2",
+    "baseline": "b4de92fee483",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryValues.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
