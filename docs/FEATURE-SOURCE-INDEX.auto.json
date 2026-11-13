@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1928,
+  "repository_code_file_count": 1929,
   "production_source_count": 1127,
-  "test_code_file_count": 657,
+  "test_code_file_count": 658,
   "workflow_files": [
     ".github/workflows/android-page-matrix.yml",
     ".github/workflows/ci.yml",
@@ -4572,14 +4572,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "48734c68c9db",
+  "source_snapshot": "8c7e6f53a785",
   "observed_delta": {
-    "baseline": "0522ed4fbd87",
+    "baseline": "48734c68c9db",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
