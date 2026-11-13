@@ -475,7 +475,10 @@ internal class LocalSkillManager @Inject constructor(
         readDirectory("")
         files
     }
-    fun initializeDefaults() = store.seedOnce()
+    fun initializeDefaults() {
+        LocalSkillPackageUpdater(storageWorkspace).recoverInterruptedTransactions()
+        store.seedOnce()
+    }
     fun installed(): List<LocalInstalledSkill> = store.installed()
     fun githubSourceEvidence(id: String): String? = store.githubSourceEvidence(id)
     fun presets(): List<LocalPresetSkill> = store.presets()
@@ -488,7 +491,10 @@ internal class LocalSkillManager @Inject constructor(
         LocalSkillPackageUpdater(storageWorkspace).replace(id, archive)
     fun canRollbackSkill(id: String): Boolean = LocalSkillPackageUpdater(storageWorkspace).canRollback(id)
     fun rollbackSkill(id: String): String = LocalSkillPackageUpdater(storageWorkspace).rollback(id)
-    fun remove(id: String) = store.remove(id)
+    fun remove(id: String) {
+        store.remove(id)
+        LocalSkillPackageUpdater(storageWorkspace).forgetRollback(id)
+    }
     fun readDocument(id: String) = store.readDocument(id)
     fun updateDocument(id: String, document: String) = store.updateDocument(id, document)
     fun setModelInvocable(id: String, enabled: Boolean) = store.setModelInvocable(id, enabled)

@@ -91,4 +91,77 @@ class LocalSkillPackageUpdaterTest {
             Files.deleteIfExists(outside)
         }
     }
+
+    @Test fun interruptedFirstUpgradeRestoresTheInstalledSkillOnRestart() {
+        val folder = Files.createTempDirectory("skill-update-recover-first").toFile()
+        try {
+            val workspace = LocalWorkspace(folder)
+            LocalSkillPackageImporter(workspace).install("first.zip", archive("revision-demo", "第一版"))
+            val current = folder.resolve(".dsh/skills/revision-demo").toPath()
+            val rollback = folder.resolve(".dsh/skill-rollback/revision-demo").toPath()
+            Files.createDirectories(rollback.parent)
+            Files.move(current, rollback)
+            LocalSkillPackageUpdater(workspace).recoverInterruptedTransactions()
+            assertTrue(workspace.readRaw(".dsh/skills/revision-demo/SKILL.md").contains("第一版"))
+            assertFalse(Files.exists(rollback))
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+
+    @Test fun interruptedSecondUpgradeRestoresBothActiveAndOlderRevision() {
+        val folder = Files.createTempDirectory("skill-update-recover-second").toFile()
+        try {
+            val workspace = LocalWorkspace(folder)
+            LocalSkillPackageImporter(workspace).install("first.zip", archive("revision-demo", "第一版"))
+            val manager = LocalSkillPackageUpdater(workspace)
+            manager.replace("revision-demo", archive("revision-demo", "第二版"))
+            val active = folder.resolve(".dsh/skills/revision-demo").toPath()
+            val previous = folder.resolve(".dsh/skill-rollback/revision-demo").toPath()
+            val parked = folder.resolve(".dsh/.previous-revision-demo-12345678-1234-4234-8234-123456789abc").toPath()
+            Files.move(previous, parked)
+            Files.move(active, previous)
+            manager.recoverInterruptedTransactions()
+            assertTrue(workspace.readRaw(".dsh/skills/revision-demo/SKILL.md").contains("第二版"))
+            assertTrue(workspace.readRaw(".dsh/skill-rollback/revision-demo/SKILL.md").contains("第一版"))
+            assertFalse(Files.exists(parked))
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+
+    @Test fun interruptedRollbackCompletesTheReversibleSwap() {
+        val folder = Files.createTempDirectory("skill-update-recover-rollback").toFile()
+        try {
+            val workspace = LocalWorkspace(folder)
+            LocalSkillPackageImporter(workspace).install("first.zip", archive("revision-demo", "第一版"))
+            val manager = LocalSkillPackageUpdater(workspace)
+            manager.replace("revision-demo", archive("revision-demo", "第二版"))
+            val active = folder.resolve(".dsh/skills/revision-demo").toPath()
+            val previous = folder.resolve(".dsh/skill-rollback/revision-demo").toPath()
+            val parked = folder.resolve(".dsh/.active-revision-demo-12345678-1234-4234-8234-123456789abc").toPath()
+            Files.move(active, parked)
+            Files.move(previous, active)
+            manager.recoverInterruptedTransactions()
+            assertTrue(workspace.readRaw(".dsh/skills/revision-demo/SKILL.md").contains("第一版"))
+            assertTrue(workspace.readRaw(".dsh/skill-rollback/revision-demo/SKILL.md").contains("第二版"))
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+
+    @Test fun confirmedRemovalClearsTheRollbackArchive() {
+        val folder = Files.createTempDirectory("skill-update-removed").toFile()
+        try {
+            val workspace = LocalWorkspace(folder)
+            LocalSkillPackageImporter(workspace).install("first.zip", archive("revision-demo", "第一版"))
+            val manager = LocalSkillPackageUpdater(workspace)
+            manager.replace("revision-demo", archive("revision-demo", "第二版"))
+            assertTrue(manager.canRollback("revision-demo"))
+            manager.forgetRollback("revision-demo")
+            assertFalse(manager.canRollback("revision-demo"))
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
 }

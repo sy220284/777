@@ -101,6 +101,83 @@ internal class LocalSkillPackageUpdater(private val workspace: LocalWorkspace) {
         }
     }
 
+
+    /** Repair an interrupted two-directory swap before exposing skills after process restart. */
+    fun recoverInterruptedTransactions() {
+        if (!systemRoot.exists()) return
+        require(!Files.isSymbolicLink(systemRoot.toPath()) &&
+            !Files.isSymbolicLink(skillsRoot.toPath()) &&
+            !Files.isSymbolicLink(rollbackRoot.toPath())) { "技能恢复目录含不安全链接" }
+        require(skillsRoot.isDirectory || skillsRoot.mkdirs()) { "无法恢复技能目录" }
+        require(rollbackRoot.isDirectory || rollbackRoot.mkdirs()) { "无法恢复技能历史目录" }
+
+        val idSuffix = "([a-z][a-z0-9-]{1,47})-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
+        val parkedActivePattern = Regex("^\\.active-$idSuffix$")
+        val parkedPreviousPattern = Regex("^\\.previous-$idSuffix$")
+        val rootItems = systemRoot.listFiles().orEmpty()
+        // An interrupted rollback parks current content before swapping directories.
+        rootItems.forEach { parked ->
+            val match = parkedActivePattern.matchEntire(parked.name) ?: return@forEach
+            val id = match.groupValues[1]
+            val active = File(skillsRoot, id)
+            val previous = File(rollbackRoot, id)
+            requireSafeTree(parked)
+            when {
+                !active.exists() -> move(parked, active)
+                !previous.exists() -> move(parked, previous)
+                else -> error("技能 $id 恢复时检测到重复的版本目录")
+            }
+        }
+        // An interrupted update may have moved the former rollback revision aside.
+        rootItems.forEach { parked ->
+            val match = parkedPreviousPattern.matchEntire(parked.name) ?: return@forEach
+            val id = match.groupValues[1]
+            val active = File(skillsRoot, id)
+            val previous = File(rollbackRoot, id)
+            requireSafeTree(parked)
+            when {
+                !active.exists() && previous.exists() -> {
+                    requireSafeTree(previous)
+                    move(previous, active)
+                    move(parked, previous)
+                }
+                !previous.exists() && active.exists() -> move(parked, previous)
+                previous.exists() && active.exists() -> {
+                    requireSafeTree(previous)
+                    require(parked.deleteRecursively()) { "旧技能回滚记录清理失败" }
+                }
+                else -> error("技能 $id 恢复时缺少两个版本目录")
+            }
+        }
+        // First-time updates have no older rollback revision parked aside.
+        rollbackRoot.listFiles().orEmpty().forEach { previous ->
+            if (!LOCAL_SKILL_ID_PATTERN.matches(previous.name)) return@forEach
+            val active = File(skillsRoot, previous.name)
+            if (!active.exists()) {
+                requireSafeTree(previous)
+                move(previous, active)
+            }
+        }
+        // An update candidate only becomes visible after the final atomic directory move.
+        systemRoot.listFiles().orEmpty().filter {
+            it.name.startsWith(".skill-update-")
+        }.forEach { abandoned ->
+            require(abandoned.isDirectory && !Files.isSymbolicLink(abandoned.toPath())) {
+                "技能更新临时目录不安全"
+            }
+            require(abandoned.deleteRecursively()) { "未完成的技能更新临时文件清理失败" }
+        }
+    }
+
+    /** Confirmed uninstallation must also discard the hidden rollback revision. */
+    fun forgetRollback(id: String) {
+        validateId(id)
+        val previous = File(rollbackRoot, id)
+        if (!previous.exists()) return
+        requireSafeTree(previous)
+        require(previous.deleteRecursively()) { "技能旧版本删除失败" }
+    }
+
     fun rollback(id: String): String {
         validateId(id)
         require(!Files.isSymbolicLink(systemRoot.toPath()) &&
