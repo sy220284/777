@@ -203,6 +203,32 @@ class GitWorkspaceTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "explicit comparison"):
             workspace.operate(self.root, self.store, "session", "merge", args)
 
+    def test_different_files_competing_for_same_feature_can_choose_one(self):
+        child = self.fork()
+        (self.root / "parent-impl.py").write_text("def draw_screen(): return 'preferred UX'")
+        (child / "child-impl.py").write_text("def draw_screen(): return 'duplicate UX'")
+        tree = self.call("status")["tree"]
+        compared = self.call("compare_merge", expected_tree=tree)
+        self.assertEqual([], compared["comparison"]["overlap_paths"])
+        self.assertEqual(["parent-impl.py"], compared["comparison"]["parent_only_paths"])
+        self.assertEqual(["child-impl.py"], compared["comparison"]["child_only_paths"])
+        choices = {"child-impl.py": "parent"}
+        preview = self.call("preview_merge", expected_tree=tree, resolution="select",
+                            path_choices=choices)
+        decision = self.quality_decision("select")
+        decision["reviewed_both"] = False
+        with self.assertRaisesRegex(ValueError, "competing implementations"):
+            workspace.operate(self.root, self.store, "session", "merge", dict(
+                workspace_id=self.identity, expected_tree=tree,
+                expected_source_tree=preview["source_tree"], expected_merged_tree=preview["merged_tree"],
+                resolution="select", path_choices=choices, quality_decision=decision))
+        outcome = self.call("merge", expected_tree=tree, resolution="select", path_choices=choices,
+                            expected_source_tree=preview["source_tree"],
+                            expected_merged_tree=preview["merged_tree"])
+        self.assertEqual("already_present", outcome["state"])
+        self.assertTrue((self.root / "parent-impl.py").exists())
+        self.assertFalse((self.root / "child-impl.py").exists())
+
     def test_select_can_drop_dependent_child_files_and_replace_parent_only_files(self):
         child = self.fork()
         (self.root / "code.txt").write_text("PARENT\nsecond\nthird\n")
