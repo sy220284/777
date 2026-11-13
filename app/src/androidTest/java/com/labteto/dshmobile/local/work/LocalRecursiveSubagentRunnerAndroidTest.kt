@@ -158,6 +158,7 @@ class LocalRecursiveSubagentRunnerAndroidTest {
                 OpenAiResponsesAdapter(OpenAiResponsesClient(http, json)),
                 AnthropicMessagesAdapter(AnthropicMessagesClient(http, json))),
             LocalModelRouteCatalog(context, json), http,
+            com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy(context),
         )
         val scheduler = HarnessResourceScheduler(HarnessResourceBudget(maxModelRequests = 1, maxAgents = 4))
         val state = MutableStateFlow(LocalHarnessState(sessionId = "integration", loading = false,
