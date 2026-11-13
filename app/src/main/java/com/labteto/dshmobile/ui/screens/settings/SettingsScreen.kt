@@ -196,6 +196,7 @@ fun SettingsScreen(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val toast = rememberSyToast()
     val context = LocalContext.current
+    var showPermissionSetup by rememberSaveable { mutableStateOf(false) }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { viewModel.refreshDeviceCapabilities() }
@@ -407,7 +408,7 @@ fun SettingsScreen(
         }
     }
 
-    BackHandler(enabled = handleRootSystemBack || page != SettingsDestination.ROOT) { navigateBack() }
+    BackHandler(enabled = !showPermissionSetup && (handleRootSystemBack || page != SettingsDestination.ROOT)) { navigateBack() }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         if (page == SettingsDestination.ACCOUNT) viewModel.refreshChatGpt()
     }
@@ -473,6 +474,16 @@ fun SettingsScreen(
         SettingsDestination.DIAGNOSTICS -> stringResource(R.string.settings_runtime_diagnostics)
     }
 
+    if (showPermissionSetup) {
+        PermissionSetupFlow(
+            onFinished = {
+                showPermissionSetup = false
+                viewModel.refreshDeviceCapabilities()
+            },
+            onBack = { showPermissionSetup = false },
+        )
+        return
+    }
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Box {
             Column(
@@ -561,13 +572,18 @@ fun SettingsScreen(
                             AppSettingsRow(
                                 icon = SyEntryIcons.Permissions,
                                 title = stringResource(R.string.settings_page_permissions),
-                                value = stringResource(when {
-                                    deviceCapabilities.loading -> R.string.common_loading
-                                    deviceCapabilities.error != null -> R.string.settings_permissions_check_failed
-                                    deviceCapabilities.accessibility && deviceCapabilities.notifications &&
-                                        deviceCapabilities.postingNotifications == true -> R.string.settings_permissions_ready
-                                    else -> R.string.settings_permissions_needs_setup
-                                }),
+                                value = when {
+                                    deviceCapabilities.loading -> stringResource(R.string.common_loading)
+                                    deviceCapabilities.error != null -> stringResource(R.string.settings_permissions_check_failed)
+                                    else -> stringResource(
+                                        R.string.permission_setup_enabled_count,
+                                        listOf(
+                                            deviceCapabilities.accessibility,
+                                            deviceCapabilities.notifications,
+                                            deviceCapabilities.postingNotifications == true,
+                                        ).count { it },
+                                    )
+                                },
                                 onClick = { openPage(SettingsDestination.PERMISSIONS) },
                                 compact = true,
                             )
@@ -1009,7 +1025,10 @@ fun SettingsScreen(
                                 color = colors.textSecondary,
                             )
                         }
-                        DeviceCapabilitiesCard(deviceCapabilities, viewModel, requestPostingPermission)
+                        DeviceCapabilitiesCard(
+                            deviceCapabilities, viewModel, requestPostingPermission,
+                            onOpenPermissionGuide = { showPermissionSetup = true },
+                        )
                     }
 
                     SettingsDestination.NOTIFICATIONS -> {
