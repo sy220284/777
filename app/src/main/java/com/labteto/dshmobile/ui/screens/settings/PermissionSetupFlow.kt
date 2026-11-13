@@ -75,7 +75,6 @@ internal fun PermissionSetupFlow(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { controller.refresh() }
 
     fun open(feature: PermissionSetupFeature) {
-        visitedNames = (visitedNames + feature.name).distinct()
         openError = null
         try {
             when (feature) {
@@ -87,6 +86,7 @@ internal fun PermissionSetupFlow(
                     } else controller.openAppNotificationSettings()
                 }
             }
+            visitedNames = (visitedNames + feature.name).distinct()
         } catch (failure: RuntimeException) {
             openError = failure.localizedMessage ?: context.getString(R.string.permission_setup_open_failed)
         }
