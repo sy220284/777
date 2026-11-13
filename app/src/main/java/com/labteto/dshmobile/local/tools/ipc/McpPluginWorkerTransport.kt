@@ -12,6 +12,7 @@ import android.os.Message
 import android.os.Messenger
 import android.os.ParcelFileDescriptor
 import com.labteto.dshmobile.interop.mcp.McpHttpException
+import com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy
 import com.labteto.dshmobile.interop.mcp.McpTerminationSource
 import com.labteto.dshmobile.interop.mcp.McpTransport
 import java.io.File
@@ -48,6 +49,7 @@ internal class McpPluginWorkerTransport(
     private val authChallenge: ((String?, String?) -> Unit)? = null,
 ) : McpTransport, McpTerminationSource {
     private val token = UUID.randomUUID().toString()
+    private val managedPolicy by lazy { LocalManagedExecutionPolicy(app.applicationContext ?: app) }
     private val ids = AtomicInteger(1)
     private val pending = ConcurrentHashMap<Int, CompletableDeferred<Bundle>>()
     private val connected = CompletableDeferred<Messenger>()
@@ -182,6 +184,7 @@ internal class McpPluginWorkerTransport(
 
     private suspend fun rpc(kind: Int, payload: Bundle): Bundle {
         if (closed.get()) throw IOException("MCP worker closed; outcome unknown")
+        requireMcpWorkerNetworkAdmission(managedPolicy.current(), kind, endpoint)
         if (pending.size >= McpWorkerWire.MAX_PENDING_CALLS)
             throw IOException("MCP IPC concurrent-call limit exceeded")
         val seq = ids.getAndIncrement()
