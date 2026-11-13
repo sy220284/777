@@ -119,6 +119,7 @@ internal data class LocalWorkFeatureUiActions(
     val remoteGitBranches: (suspend (String) -> List<String>)? = null,
     val compareLocalGit: (suspend (String, Boolean) -> LocalRemoteGitDiffUi)? = null,
     val compareRemoteGit: (suspend (String, String, String) -> LocalRemoteGitDiffUi)? = null,
+    val compareCommitGit: (suspend (String, String) -> LocalRemoteGitDiffUi)? = null,
     val findIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview?)? = null,
     val runIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview)? = null,
     val acceptIndependentCodeReview: (suspend (String, String, com.labteto.dshmobile.local.work.LocalIndependentCodeReview, LocalRemoteGitDiffUi) -> Boolean)? = null,
