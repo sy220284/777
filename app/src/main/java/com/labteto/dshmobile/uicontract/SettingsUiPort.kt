@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.uicontract
 
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
+import com.labteto.dshmobile.local.model.DeepSeekProviderBalance
 import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelPreset
@@ -65,6 +66,7 @@ interface SettingsUiPort {
     fun configureModel(apiKey: String, model: String, baseUrl: String)
     suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null,
         profileId: String? = null, contextWindowTokensOverride: Int? = null, credentialSourceProfileId: String? = null)
+    suspend fun queryDeepSeekBalance(profile: LocalModelProfile): DeepSeekProviderBalance
     suspend fun queryMiniMaxQuota(profile: LocalModelProfile): MiniMaxProviderUsage
     fun selectModel(id: String)
     fun removeModel(id: String)
