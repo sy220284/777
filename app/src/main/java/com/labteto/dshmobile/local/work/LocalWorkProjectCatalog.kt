@@ -79,6 +79,64 @@ internal class LocalWorkProjectCatalog(
         item
     }
 
+    /**
+     * New projects receive a dedicated local directory. Import and re-association use existing
+     * directory paths, while ordinary creation needs only the user-visible project name.
+     * A failed catalog commit removes the newly allocated empty folder.
+     */
+    fun createWithNewFolder(
+        name: String,
+        requestId: String = UUID.randomUUID().toString(),
+        initialSessionId: String? = null,
+    ): LocalWorkProject = synchronized(lock) {
+        val title = checkedName(name)
+        require(requestId.matches(ID_PATTERN)) { "项目创建编号无效" }
+        initialSessionId?.let(::validateSession)
+        mutable.value.projects.firstOrNull { it.requestId == requestId }?.let { previous ->
+            require(previous.name == title) { "相同项目创建编号关联了其他内容" }
+            return@synchronized previous
+        }
+        require(mutable.value.projects.size < MAX_PROJECTS) { "项目数量达到上限" }
+        require(mutable.value.projects.none { it.name.equals(title, ignoreCase = true) }) {
+            "项目名称已存在"
+        }
+        val safeName = title.replace('/', '-').replace('\\', '-')
+            .trim(' ', '.').take(40).ifBlank { "项目" }
+        val leaf = "$safeName-${requestId.take(8)}"
+        val root = workspace.canonicalFile.toPath()
+        require(Files.isDirectory(root)) { "工作区不存在" }
+        val parent = root.resolve("项目")
+        val parentExists = Files.exists(parent)
+        if (parentExists) {
+            require(Files.isDirectory(parent) && !Files.isSymbolicLink(parent)) {
+                "项目目录不可用"
+            }
+        } else {
+            Files.createDirectory(parent)
+        }
+        val directory = parent.resolve(leaf)
+        try {
+            Files.createDirectory(directory)
+            try {
+                create(title, "项目/$leaf", requestId, initialSessionId)
+            } catch (failure: Exception) {
+                try {
+                    Files.deleteIfExists(directory)
+                } catch (cleanup: Exception) {
+                    failure.addSuppressed(cleanup)
+                }
+                throw failure
+            }
+        } finally {
+            if (!parentExists) {
+                // The shared project root is retained once any project is committed.
+                if (Files.isDirectory(parent) && Files.list(parent).use { !it.findAny().isPresent }) {
+                    Files.deleteIfExists(parent)
+                }
+            }
+        }
+    }
+
     /** Import is a project registration against a pre-existing authorized local folder. */
     fun importExisting(name: String, root: String, requestId: String = UUID.randomUUID().toString(),
         initialSessionId: String? = null): LocalWorkProject =
@@ -268,7 +326,8 @@ class LocalWorkProjectStore @Inject internal constructor(
         json,
     )
     val snapshots = catalog.snapshots
-    fun create(name: String, root: String) = catalog.create(name, root)
+    fun create(name: String, root: String) =
+        if (root.isBlank()) catalog.createWithNewFolder(name) else catalog.create(name, root)
     fun importExisting(name: String, root: String, sessionId: String?) =
         catalog.importExisting(name, root, initialSessionId = sessionId)
     fun rename(id: String, name: String) = catalog.rename(id, name)
