@@ -3636,7 +3636,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AgentDeviceSettingsSections.kt",
-      "sha256": "78b23de407640981"
+      "sha256": "e5e258b09563c44e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AgentRuntimeSettingsCard.kt",
@@ -3700,11 +3700,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupFlow.kt",
-      "sha256": "978506227a0b923f"
+      "sha256": "f18a9b63d5fc76b5"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupModel.kt",
-      "sha256": "0c9a66299c8a847b"
+      "sha256": "f5d77c4cceeee7fc"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PersonalizationRulesEditor.kt",
@@ -3724,7 +3724,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "sha256": "52a77d4ef64a59e3"
+      "sha256": "b88dadc6fb1676f3"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
@@ -4544,13 +4544,16 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "3f7307087f7f",
+  "source_snapshot": "d8fbac6dc0a7",
   "observed_delta": {
-    "baseline": "8d134bf71eb4",
+    "baseline": "3f7307087f7f",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupFlow.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AgentDeviceSettingsSections.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupFlow.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/PermissionSetupModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
