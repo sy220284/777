@@ -43,6 +43,11 @@ class LocalModelGateway @Inject constructor(
     suspend fun hasChatGptPlanAuthorization(accountId: String): Boolean =
         credentials.hasChatGptPlanAuthorization(accountId)
 
+    /** Check managed requirements before a route becomes the saved or session-selected model. */
+    internal fun requireExecutionPolicy(profile: LocalModelProfile) {
+        managedPolicy.current().requireModelProvider(profile.provider, profile.baseUrl)
+    }
+
     fun activate(profile: LocalModelProfile) = credentials.activate(profile)
     fun clearActive() = credentials.clearActive()
     fun activeProfile(): LocalModelProfile? = credentials.active()
