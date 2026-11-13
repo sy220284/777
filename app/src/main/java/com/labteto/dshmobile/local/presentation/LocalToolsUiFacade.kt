@@ -130,6 +130,22 @@ class LocalToolsUiFacade @Inject internal constructor(
         )
     }
 
+    /** Commit review is pinned to its immutable object rather than a mutable branch name. */
+    suspend fun compareCommitGitForUi(repository: String, commit: String): LocalRemoteGitDiffUi =
+        withContext(Dispatchers.IO) {
+            val receipt = tools.compareCommitGit(repository, commit)
+            LocalRemoteGitDiffUi(
+                trackingRef = (receipt.getValue("tracking_ref") as kotlinx.serialization.json.JsonPrimitive).content,
+                statistics = (receipt.getValue("stat") as kotlinx.serialization.json.JsonPrimitive).content,
+                patch = (receipt.getValue("patch") as kotlinx.serialization.json.JsonPrimitive).content,
+                truncated = receipt.getValue("truncated").toString() == "true",
+                evidenceRevision = listOf("commit", "first_parent")
+                    .joinToString(":") { key ->
+                        (receipt.getValue(key) as kotlinx.serialization.json.JsonPrimitive).content
+                    },
+            )
+        }
+
     override suspend fun githubConfigured() = tools.githubConfigured()
     override suspend fun githubRepositories() = gitHubBrowser.repositories()
     override suspend fun githubEntries(repoFullName: String, directory: String) =
