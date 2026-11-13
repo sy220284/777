@@ -80,6 +80,47 @@ class ToolHookRegistryTest {
         assertEquals(listOf("pre1", "pre2", "started", "execute", "receipt", "post1", "post2"), sequence)
     }
 
+    @Test fun reorderingHooksInvalidatesAdmissionEvenWhenSameEntriesRemain() = runTest {
+        val order = mutableListOf<String>()
+        val first = ToolHookSubscription("first", object : ToolLifecycleHook {
+            override suspend fun beforeUse(request: ToolPreUseRequest): ToolPreUseDecision {
+                order += "first"
+                return ToolPreUseDecision.Allow
+            }
+        })
+        val second = ToolHookSubscription("second", object : ToolLifecycleHook {
+            override suspend fun beforeUse(request: ToolPreUseRequest): ToolPreUseDecision {
+                order += "second"
+                return ToolPreUseDecision.Allow
+            }
+        })
+        val registry = ToolRegistry()
+        var executed = 0
+        registry.register(tool(approval = ToolApprovalPolicy.ALWAYS) {
+            executed++
+            ToolResult("executed")
+        })
+        registry.registerHook(first)
+        registry.registerHook(second)
+        val stale = registry.executeTracked("patch", JsonObject(emptyMap()), context = ToolContext(
+            approval = {
+                registry.restoreHookSubscriptions(listOf(second, first))
+                true
+            },
+        ))
+        assertFalse(stale.executionStarted)
+        assertEquals("TOOL_HOOKS_CHANGED", stale.result.errorCode)
+        assertEquals(0, executed)
+        assertEquals(listOf("first", "second"), order)
+        order.clear()
+        val current = registry.executeTracked("patch", JsonObject(emptyMap()), context = ToolContext(
+            approval = { true },
+        ))
+        assertTrue(current.executionStarted)
+        assertEquals(listOf("second", "first"), order)
+        assertEquals(1, executed)
+    }
+
     @Test fun preHookFailuresAreExplicitAndKeepExecutorOut() = runTest {
         var calls = 0
         val registry = ToolRegistry()
