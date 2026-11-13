@@ -10,6 +10,7 @@ import com.labteto.dshmobile.uicontract.UiAttachmentInspectionReceipt
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourcePriority
 import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.files.LocalDownloadsPublisher
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
 import com.labteto.dshmobile.local.files.LocalWorkspaceSearchPage
@@ -29,6 +30,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.put
 
 /**
  * Session/File capability owning the app-private workspace views used by local conversations.
@@ -45,6 +47,7 @@ class LocalSessionFilesRuntime @Inject internal constructor(
 ) : com.labteto.dshmobile.uicontract.FilesUiPort {
     private val resourceScheduler = runtimeStateStore.resourceScheduler
     private val context = context
+    private val eventLogs = eventLogs
     internal val workspace = LocalWorkspace(
         root = File(context.filesDir, "local-harness/workspace"),
         extraSearchPaths = bundledRuntimeManager::searchPaths,
@@ -54,6 +57,8 @@ class LocalSessionFilesRuntime @Inject internal constructor(
             userRoots = localSharedStorageRoots(),
         ),
     )
+
+    private val downloadsPublisher by lazy { LocalDownloadsPublisher(context, workspace) }
 
     init {
         runCatching { LocalWorkspaceToolGuide.ensure(context, File(workspace.path)) }
@@ -143,6 +148,40 @@ class LocalSessionFilesRuntime @Inject internal constructor(
         withContext(Dispatchers.IO) { resourceScheduler.withResource(
             HarnessResourceKind.FILE_IO, "file:preview_page", priority = HarnessResourcePriority.INTERACTIVE
         ) { workspace.preview(path, offset = offset) } }
+
+    override suspend fun saveWorkspaceFileToDownloads(path: String): String =
+        withContext(Dispatchers.IO) {
+            val units = com.labteto.dshmobile.harness.resource.harnessFileIoUnitsForBytes(
+                workspace.fileSizeForResourceBudget(path))
+            resourceScheduler.withResource(HarnessResourceKind.FILE_IO, "file:publish_downloads",
+                units = units, priority = HarnessResourcePriority.BACKGROUND) {
+                downloadsPublisher.publish(path)
+            }
+        }
+
+    /** The durable event makes automatic publication and its exact user-visible location auditable. */
+    internal suspend fun publishVerifiedDeliverables(sessionId: String, paths: List<String>): List<String> {
+        val locations = ArrayList<String>()
+        for (path in paths.distinct()) {
+            val location = try {
+                saveWorkspaceFileToDownloads(path)
+            } catch (error: Exception) {
+                eventLogs.get(sessionId).append("artifact/publication-failed",
+                    kotlinx.serialization.json.buildJsonObject {
+                        put("path", path)
+                        put("reason", error.message ?: error::class.java.simpleName)
+                    })
+                throw error
+            }
+            eventLogs.get(sessionId).append("artifact/published",
+                kotlinx.serialization.json.buildJsonObject {
+                    put("path", path)
+                    put("location", location)
+                })
+            locations += location
+        }
+        return locations
+    }
 
     override suspend fun exportWorkspaceFile(path: String, output: java.io.OutputStream): Long =
         withContext(Dispatchers.IO) {
