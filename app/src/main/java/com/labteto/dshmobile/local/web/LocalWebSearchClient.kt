@@ -120,6 +120,7 @@ internal class LocalWebSearchClient(
                             404 -> "NOT_FOUND"
                             408 -> "TIMEOUT"
                             413 -> "REQUEST_TOO_LARGE"
+                            in 300..399 -> "UNSAFE_REDIRECT"
                             429 -> "RATE_LIMITED"
                             in 400..499 -> "HTTP_4XX"
                             else -> "HTTP_5XX"
