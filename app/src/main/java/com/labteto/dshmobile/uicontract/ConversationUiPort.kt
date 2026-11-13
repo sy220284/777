@@ -4,6 +4,10 @@ import kotlinx.coroutines.flow.Flow
 
 const val UI_CONTRACT_VERSION = 1
 
+/** Conversation kind is part of an owner-issued identity: Chat and Work never share queue authority. */
+@kotlinx.serialization.Serializable
+enum class UiConversationMode { CHAT, WORK }
+
 /** Opaque owner-issued activation identity; UI cannot derive execution authority from this value. */
 @kotlinx.serialization.Serializable
 data class UiSessionIdentity(
@@ -12,6 +16,7 @@ data class UiSessionIdentity(
     val contextGeneration: Long,
     val profileId: String?,
     val projectId: String?,
+    val mode: UiConversationMode = UiConversationMode.CHAT,
 ) {
     init { require(sessionId.isNotBlank() && activationId.isNotBlank()) }
 }

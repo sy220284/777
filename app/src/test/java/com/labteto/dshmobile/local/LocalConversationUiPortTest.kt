@@ -273,6 +273,10 @@ class LocalConversationUiPortTest {
         assertEquals(listOf("chat-2"), fixture.port.queuedUsers.snapshot().inputs.map { it.id })
 
         fixture.state.value = fixture.state.value.copy(usageMode = LocalUsageMode.WORK)
+        val workIdentityAfterSwitch = requireNotNull(fixture.port.queuedUsers.snapshot().identity)
+        assertEquals(com.labteto.dshmobile.uicontract.UiConversationMode.CHAT, chatIdentity.mode)
+        assertEquals(com.labteto.dshmobile.uicontract.UiConversationMode.WORK, workIdentityAfterSwitch.mode)
+        assertTrue(chatIdentity != workIdentityAfterSwitch)
         assertEquals(UiCommandReceipt.Rejected(UiCommandRejection.STALE_IDENTITY),
             fixture.port.queuedUsers.remove(chatIdentity, "work-1"))
         val workIdentity = requireNotNull(fixture.port.queuedUsers.snapshot().identity)
