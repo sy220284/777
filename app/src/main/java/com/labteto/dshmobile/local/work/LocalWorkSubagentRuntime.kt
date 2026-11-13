@@ -97,12 +97,13 @@ internal class LocalWorkSubagentRuntime(
         nodeInputFiles: List<List<String>> = emptyList(), nodeOutputFiles: List<List<String>> = emptyList(),
         resumeGraphId: String? = null,
         replanGraphId: String? = null,
+        originFindingId: String? = null,
         workspaceRepository: String? = null,
         executionBackend: com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend = com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend.IN_PROCESS,
     ): String = taskGraphs.runWorkflow(
         tasks, mode, requiredEvidence, modelOverride, outputSchema, toolAllowlist, binding,
         dependencies, allowMutation, requiredFiles, inputFiles, nodeInputFiles, nodeOutputFiles,
-        resumeGraphId, replanGraphId, workspaceRepository, factory.pinBackend(executionBackend),
+        resumeGraphId, replanGraphId, originFindingId, workspaceRepository, factory.pinBackend(executionBackend),
     )
 
     internal suspend fun resumePendingWorkflows(binding: LocalWorkRunBinding) =
