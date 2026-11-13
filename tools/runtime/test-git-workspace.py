@@ -201,6 +201,34 @@ class GitWorkspaceTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "explicit comparison"):
             workspace.operate(self.root, self.store, "session", "merge", args)
 
+    def test_large_diff_requires_every_page_before_quality_merge(self):
+        child = self.fork()
+        (child / "large.txt").write_text("X" * 270000)
+        tree = self.call("status")["tree"]
+        first = self.call("preview_merge", expected_tree=tree)
+        self.assertEqual("needs_full_review", first["state"])
+        self.assertTrue(first["diff_truncated"])
+        self.assertNotIn("merged_tree", first)
+        last = self.call("preview_merge", expected_tree=tree,
+                         review_offset=first["next_offset"])
+        self.assertEqual("needs_full_review", last["state"])
+        self.assertFalse(last["diff_truncated"])
+        self.assertIsNone(last["next_offset"])
+        self.assertIn("merged_tree", last)
+        with self.assertRaisesRegex(ValueError, "every exact diff page receipt"):
+            workspace.operate(self.root, self.store, "session", "merge",
+                              dict(workspace_id=self.identity, expected_tree=tree,
+                                   expected_source_tree=first["source_tree"],
+                                   expected_merged_tree=last["merged_tree"],
+                                   resolution="auto", quality_decision=self.quality_decision(),
+                                   review_receipts=[last["review_receipt"]]))
+        merged = self.call("merge", expected_tree=tree,
+                           expected_source_tree=first["source_tree"],
+                           expected_merged_tree=last["merged_tree"],
+                           review_receipts=[first["review_receipt"], last["review_receipt"]])
+        self.assertEqual("merged", merged["state"])
+        self.assertEqual("X" * 270000, (self.root / "large.txt").read_text())
+
     def test_conflict_never_modifies_shared_files_or_index(self):
         child = self.fork()
         (child / "code.txt").write_text("CHILD\nsecond\nthird\n")
