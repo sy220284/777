@@ -115,6 +115,26 @@ class WorkReplyTimelineVisualTest {
         saveScreenshot("chat-style-semantic-work-320dp")
     }
 
+    @Test fun groupedActionsShowOneReadableRowWithEveryOriginalReceiptInDetails() {
+        val first = result.copy(id = "scan-1", toolCallId = "scan-1", content = "读取配置 A")
+        val second = result.copy(id = "scan-2", toolCallId = "scan-2", content = "读取配置 B")
+        val third = result.copy(id = "scan-3", toolCallId = "scan-3", content = "比对完成")
+        compose.setContent {
+            DshTheme(preference = ThemePreference.LIGHT) {
+                Column(Modifier.width(320.dp)) {
+                    WorkTimelineStepRow(first, repeatCount = 3, groupedMessages = listOf(second, third),
+                        operationGroup = true)
+                }
+            }
+        }
+        compose.onNodeWithText("已完成 3 项", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("读取配置 B").assertDoesNotExist()
+        compose.onNodeWithTag("work-tool:scan-1").performClick()
+        compose.onNodeWithText("读取配置 A").assertIsDisplayed()
+        compose.onNodeWithText("读取配置 B").assertIsDisplayed()
+        compose.onNodeWithText("比对完成").assertIsDisplayed()
+    }
+
     @Test fun darkLargeTextKeepsFailureAndRunningStatusReadable() {
         compose.setContent { DshTheme(preference = ThemePreference.DARK, textScale = 1.3f) { Timeline() } }
         compose.onNodeWithText("结果待确认").assertIsDisplayed()
