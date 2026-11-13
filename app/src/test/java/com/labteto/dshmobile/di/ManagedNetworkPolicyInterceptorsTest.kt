@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.di
 
 import com.sun.net.httpserver.HttpServer
+import com.labteto.dshmobile.local.web.PinnedWebRequestOrigin
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicInteger
 import okhttp3.OkHttpClient
@@ -11,6 +12,45 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ManagedNetworkPolicyInterceptorsTest {
+
+    @Test fun approvedProxyOriginIsNotMistakenForPinnedIp() {
+        val reached = AtomicInteger()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/pinned") { exchange ->
+            reached.incrementAndGet()
+            exchange.sendResponseHeaders(200, -1)
+            exchange.close()
+        }
+        server.start()
+        try {
+            val client = OkHttpClient.Builder()
+                .enforceManagedNetworkDestinations { scheme, host ->
+                    check(scheme == "http" && host == "allowed.example") {
+                        "未授权目标"
+                    }
+                }.build()
+            val request = Request.Builder()
+                .url("http://127.0.0.1:${server.address.port}/pinned")
+                .header("Host", "allowed.example")
+                .tag(PinnedWebRequestOrigin::class.java, PinnedWebRequestOrigin(
+                    "http", "allowed.example", "127.0.0.1"))
+                .build()
+            client.newCall(request).execute().use { response ->
+                assertTrue(response.isSuccessful)
+            }
+            assertEquals(1, reached.get())
+            val tampered = request.newBuilder()
+                .tag(PinnedWebRequestOrigin::class.java, PinnedWebRequestOrigin(
+                    "http", "allowed.example", "192.0.2.1"))
+                .build()
+            val rejected = runCatching { client.newCall(tampered).execute().close() }
+            assertTrue("改写后的连接目标必须与已验证的固定 IP 一致", rejected.isFailure)
+            assertEquals(1, reached.get())
+        } finally {
+            server.stop(0)
+        }
+    }
+
     @Test fun redirectToNewHostIsDeniedBeforeAuthorizationHeaderLeavesDevice() {
         val reached = AtomicInteger()
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)

@@ -18,6 +18,13 @@ import javax.net.ssl.SSLSocketFactory
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 
+/** The network allowlist applies to this already-validated origin, not the pinned proxy IP. */
+internal data class PinnedWebRequestOrigin(
+    val scheme: String,
+    val host: String,
+    val pinnedHost: String,
+)
+
 /** Owns URL normalization, DNS/SSRF validation and pinned transport routing. */
 internal class LocalWebTargetResolver(
     private val context: Context,
@@ -54,8 +61,8 @@ internal class LocalWebTargetResolver(
         if (uri.host == null || uri.userInfo != null) {
             throw LocalWebException("INVALID_URL", "网址缺少有效主机或包含用户信息")
         }
-        if (uri.port != -1 && uri.port !in setOf(80, 443)) {
-            throw LocalWebException("SSRF_BLOCKED", "网页获取只允许 80 或 443 端口")
+        if (uri.port != -1 && uri.port !in 1..65535) {
+            throw LocalWebException("INVALID_URL", "网络端口超出有效范围")
         }
         return uri
     }
