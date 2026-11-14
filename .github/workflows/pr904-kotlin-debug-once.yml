@@ -47,6 +47,7 @@ jobs:
             --tests 'com.labteto.dshmobile.local.work.LocalWorkIntegrationDecisionTest' \
             --tests 'com.labteto.dshmobile.local.work.LocalWorkProgressCoordinatorTest' \
             --tests 'com.labteto.dshmobile.local.LocalWorkRuntimeContextTest' \
+            --tests 'com.labteto.dshmobile.local.work.LocalWorkProjectCatalogTest' \
             --stacktrace --console=plain
       - name: 编译 Android 应用
         run: |
@@ -55,3 +56,5 @@ jobs:
 # 复跑：非法 URI 修复、Goal 审查恢复与 Tools Hook 状态
 
 # 完整整改代码最后一次专项编译
+
+# 项目连续迁移、历史会话预览与现有工具链复核
