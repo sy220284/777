@@ -62,7 +62,7 @@ internal class LocalSkillPackageUpdater(private val workspace: LocalWorkspace) {
 
     fun replace(id: String, archive: ByteArray): String = ByteArrayInputStream(archive).use { replace(id, it) }
 
-    fun replace(id: String, archive: InputStream): String {
+    fun replace(id: String, archive: InputStream, beforePublish: () -> Unit = {}): String {
         validateId(id)
         require(!Files.isSymbolicLink(systemRoot.toPath()) &&
             !Files.isSymbolicLink(skillsRoot.toPath()) &&
@@ -82,6 +82,7 @@ internal class LocalSkillPackageUpdater(private val workspace: LocalWorkspace) {
             }
             val previous = File(rollbackRoot, id)
             if (previous.exists()) requireSafeTree(previous)
+            beforePublish()
             val displaced = File(systemRoot, ".previous-$id-${UUID.randomUUID()}")
             var parkedOldRevision = false
             var parkedActive = false
