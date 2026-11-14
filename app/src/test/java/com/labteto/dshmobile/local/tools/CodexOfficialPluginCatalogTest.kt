@@ -50,6 +50,28 @@ class CodexOfficialPluginCatalogTest {
         }
     }
 
+    @Test fun extractsOfficialHttpsMcpWithoutCopyingSecrets() {
+        val endpoint = parseCodexOfficialMcpEndpoint("""
+            {"mcpServers":{"github":{
+              "type":"http","url":"https://api.githubcopilot.com/mcp/",
+              "oauth":{"client_id":"Iv23ExamplePublicId", "client_secret":"do-not-expose"}
+            }}}
+        """.trimIndent(), "github")
+        assertEquals("github", endpoint?.serverId)
+        assertEquals("https://api.githubcopilot.com/mcp/", endpoint?.url)
+        assertEquals("Iv23ExamplePublicId", endpoint?.clientId)
+        assertFalse(endpoint.toString().contains("do-not-expose"))
+    }
+
+    @Test fun rejectsPlaintextOrLocalMcpDestinations() {
+        assertEquals(null, parseCodexOfficialMcpEndpoint("""
+            {"mcpServers":{"local":{"type":"http","url":"http://127.0.0.1:3000"}}}
+        """.trimIndent(), "local"))
+        assertEquals(null, parseCodexOfficialMcpEndpoint("""
+            {"mcpServers":{"local":{"type":"http","url":"https://127.0.0.1/mcp"}}}
+        """.trimIndent(), "local"))
+    }
+
     @Test fun readsActualPluginManifestAssets() {
         val detail = parseCodexOfficialPluginDetail("""
             {
