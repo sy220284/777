@@ -52,11 +52,15 @@ class LocalToolExecutionCoordinatorTest {
         })
         CodeModePlugin(registry).install(HarnessContext(registry))
         val started = mutableListOf<String>()
+        val lineage = mutableListOf<Triple<String, String, String?>>()
         val authorized = mutableListOf<String>()
         val approvals = mutableListOf<String>()
         val run = coordinator(
             registry,
-            recordExecutionStarted = { _, call, _ -> started += call.id + ":" + call.name },
+            recordExecutionStarted = { _, call, identity ->
+                started += call.id + ":" + call.name
+                lineage += Triple(identity.rootCallId, identity.executionId, identity.parentExecutionId)
+            },
             recordAuthorizationDecision = { _, call, _, _ -> authorized += call.id + ":" + call.name },
             executionIdFactory = object : () -> String {
                 private var counter = 0
@@ -91,6 +95,10 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(listOf("script-1:code_mode_run", "script-1/step-1:read",
             "script-1/step-2:bash"), started)
         assertEquals(started, authorized)
+        assertEquals(listOf("script-1", "script-1", "script-1"), lineage.map { it.first })
+        assertEquals(null, lineage[0].third)
+        assertEquals("exec-1", lineage[1].third)
+        assertEquals("exec-1", lineage[2].third)
         assertEquals(listOf("script-1/step-2:bash"), approvals) // no redundant wrapper prompt
     }
 
