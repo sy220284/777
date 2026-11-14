@@ -229,6 +229,13 @@ internal class LocalWorkProjectCatalog(
                     project.root.startsWith(other.root + "/")
             )
         }) { "其他项目也引用了此文件夹或其上级目录，请先调整项目关联" }
+        require(old.projects.none { other ->
+            other.id != id && other.root != "." && (
+                other.root == newRoot ||
+                    other.root.startsWith(newRoot + "/") ||
+                    newRoot.startsWith(other.root + "/")
+            )
+        }) { "目标目录与其他项目的工作区重叠，请先调整目标路径" }
         require(!Files.exists(moveJournal.toPath(), LinkOption.NOFOLLOW_LINKS)) {
             "上次目录迁移尚未恢复，请重新打开项目管理"
         }
