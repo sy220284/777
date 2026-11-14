@@ -104,6 +104,35 @@ class CodexOfficialPluginCatalogTest {
         assertEquals("Design and code", detail.description)
         assertTrue(detail.hasSkills)
         assertTrue(detail.hasApp)
+        assertEquals(listOf("skills"), detail.skillRoots)
         assertFalse(detail.hasMcp)
     }
+    @Test fun pluginManifestPathsFollowActualDeclaration() {
+        val detail = parseCodexOfficialPluginDetail("""
+          {
+            "name": "custom",
+            "skills": ["./resources/skills", "../other-repository"],
+            "mcpServers": "./config/mcp-services.json"
+          }
+        """.trimIndent())
+        assertEquals(listOf("resources/skills"), detail.skillRoots)
+        assertEquals("config/mcp-services.json", detail.mcpPath)
+        assertTrue(detail.hasSkills)
+        assertTrue(detail.hasMcp)
+    }
+
+    @Test fun inlinePluginMcpDefinitionPreservesDeclaredServer() {
+        val detail = parseCodexOfficialPluginDetail("""
+          {
+            "name": "example",
+            "mcpServers": {
+              "example": {"type":"http","url":"https://mcp.example.com/mcp"}
+            }
+          }
+        """.trimIndent())
+        val endpoint = parseCodexOfficialMcpEndpoint(requireNotNull(detail.inlineMcpConfig), "example")
+        assertEquals("https://mcp.example.com/mcp", endpoint?.url)
+        assertEquals(null, detail.mcpPath)
+    }
+
 }
