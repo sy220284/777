@@ -118,7 +118,9 @@ class ToolRegistry private constructor(
         }.toSet()
         val codeModeChildren = if ("code_mode_run" in names && registered["code_mode_run"] != null) {
             registered.filter { (name, tool) ->
-                name != "code_mode_run" && tool.exposure == ToolExposure.CORE
+                name != "code_mode_run" &&
+                    (tool.exposure == ToolExposure.CORE ||
+                        (tool.exposure == ToolExposure.OPTIONAL && name in names))
             }
         } else emptyMap()
         return ToolBindingSnapshot(registered.filterKeys { it in names }, codeModeChildren)
