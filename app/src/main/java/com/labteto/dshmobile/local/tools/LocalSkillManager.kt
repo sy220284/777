@@ -506,6 +506,7 @@ internal class LocalSkillManager @Inject constructor(
         .mapToSkillRefresh(): kotlinx.coroutines.flow.Flow<Unit> = map { Unit }
 
     fun githubSourceEvidence(id: String): String? = store.githubSourceEvidence(id)
+    fun dependencies(id: String): List<CodexSkillDependency> = store.dependencies(id)
     fun presets(): List<LocalPresetSkill> = store.presets()
     fun install(id: String) = store.install(id)
     fun create(id: String, displayName: String, description: String, instructions: String) =
