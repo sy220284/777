@@ -168,11 +168,17 @@ internal class AnthropicMessagesClient @Inject constructor(
         temperature: Double?,
         reasoningEffort: String? = null,
     ): JsonObject {
-        val system = messages
+        // Keep instruction provenance until wire serialization: Claude caches tools -> system
+        // -> messages, so the stable system prefix can be reused across changing turn context.
+        val systemFragments = messages.asSequence()
             .filter { it.role == LocalCanonicalRole.SYSTEM || it.role == LocalCanonicalRole.DEVELOPER }
-            .flatMap { it.content }
-            .filterIsInstance<LocalCanonicalContent.Text>()
-            .joinToString("\n\n") { it.text }
+            .flatMap { message ->
+                message.content.asSequence().filterIsInstance<LocalCanonicalContent.Text>()
+                    .map { it.text to message.instructionScope }
+            }
+            .filter { it.first.isNotBlank() }
+            .toList()
+        val system = systemFragments.joinToString("\n\n") { it.first }
         return buildJsonObject {
             put("model", route.model)
             put("max_tokens", route.capabilities.defaultMaxOutputTokens ?: DEFAULT_MAX_TOKENS)
@@ -180,7 +186,43 @@ internal class AnthropicMessagesClient @Inject constructor(
                 LocalMiniMaxPolicy.writeThinking(this, route.model, reasoningEffort, anthropic = true)
             }
             put("stream", true)
-            if (system.isNotBlank()) put("system", system)
+            if (system.isNotBlank()) {
+                if (isOfficialAnthropicCachingRoute(route.baseUrl)) {
+                    // Never cache an ephemeral per-turn/approval/agent instruction as a stable rule.
+                    val firstVolatile = systemFragments.indexOfFirst { (_, scope) ->
+                        scope == LocalInstructionScope.TURN.name ||
+                            scope == LocalInstructionScope.APPROVAL.name ||
+                            scope == LocalInstructionScope.AGENT.name
+                    }
+                    val stableCount = if (firstVolatile < 0) systemFragments.size else firstVolatile
+                    val stableBytes = systemFragments.take(stableCount).sumOf {
+                        it.first.toByteArray(Charsets.UTF_8).size.toLong()
+                    }
+                    val toolBytes = tools.sumOf { tool ->
+                        (tool.name.length + tool.description.length +
+                            tool.parameters.toString().length).toLong()
+                    }
+                    // A short transient prompt is not worth writing to the provider cache.
+                    val cacheBreakpoint = if (stableCount > 0 &&
+                        stableBytes + toolBytes >= MIN_CACHEABLE_PREFIX_BYTES) stableCount - 1 else -1
+                    put("system", buildJsonArray {
+                        systemFragments.forEachIndexed { index, (content, _) ->
+                            add(buildJsonObject {
+                                put("type", "text")
+                                put("text", content)
+                                if (index == cacheBreakpoint) {
+                                    put("cache_control", buildJsonObject {
+                                        put("type", "ephemeral")
+                                    })
+                                }
+                            })
+                        }
+                    })
+                } else {
+                    // Other Anthropic-compatible servers may not implement Claude cache controls.
+                    put("system", system)
+                }
+            }
             put("messages", mergeAdjacentTurns(buildJsonArray {
                 messages.forEach { message ->
                     if (message.role == LocalCanonicalRole.SYSTEM || message.role == LocalCanonicalRole.DEVELOPER) {
@@ -221,6 +263,16 @@ internal class AnthropicMessagesClient @Inject constructor(
             temperature?.takeIf { route.capabilities.temperature }?.let { put("temperature", it) }
         }
     }
+
+    private companion object {
+        const val MIN_CACHEABLE_PREFIX_BYTES = 4_096L
+    }
+
+    private fun isOfficialAnthropicCachingRoute(baseUrl: String): Boolean =
+        java.net.URI(baseUrl).let { uri ->
+            uri.scheme.equals("https", ignoreCase = true) &&
+                uri.host.equals("api.anthropic.com", ignoreCase = true)
+        }
 
     private fun assistantContent(
         message: LocalCanonicalMessage,
