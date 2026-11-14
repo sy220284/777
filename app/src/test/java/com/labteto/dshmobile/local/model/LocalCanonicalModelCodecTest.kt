@@ -197,6 +197,29 @@ class LocalCanonicalModelCodecTest {
     }
 
     @Test
+    fun malformedMultimodalBlocksAreRejectedBeforeRequestInsteadOfSilentlyDropped() {
+        val payloads = listOf(
+            """{"role":"user","content":[true]}""",
+            """{"role":"user","content":[{"type":"text"}]}""",
+            """{"role":"user","content":[{"type":"input_image"}]}""",
+            """{"role":"user","content":{"type":"image_url","image_url":"unsafe"}}""",
+        )
+        payloads.forEach { raw ->
+            val error = assertThrows(LocalModelException::class.java) {
+                LocalCanonicalModelCodec.message(Json.parseToJsonElement(raw).jsonObject)
+            }
+            assertEquals("MODEL_HISTORY_INVALID", error.code)
+            assertEquals(com.labteto.dshmobile.local.LocalModelFailureOrigin.LOCAL_PREFLIGHT, error.origin)
+        }
+        val unknown = LocalCanonicalModelCodec.message(
+            Json.parseToJsonElement(
+                """{"role":"user","content":[{"type":"video_url","video_url":{"url":"data:video/mp4;base64,AAAA"}}]}"""
+            ).jsonObject,
+        )
+        assertTrue(unknown.content.single() is LocalCanonicalContent.Raw)
+    }
+
+    @Test
     fun malformedToolFieldsAreRejectedInsteadOfBeingSilentlyNormalized() {
         val badParameters = buildJsonArray {
             add(buildJsonObject {
