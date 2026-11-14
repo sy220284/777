@@ -9,6 +9,17 @@ import kotlinx.coroutines.ensureActive
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** A connected dependency is a live registered service, not merely a saved connection record. */
+internal fun isRegisteredMcpSkillRequirement(
+    name: String,
+    servers: List<com.labteto.dshmobile.uicontract.UiMcpServerSnapshot>,
+): Boolean = servers.any { server ->
+    server.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED &&
+        server.connection == com.labteto.dshmobile.uicontract.UiToolConnection.HEALTH_UNCHECKED &&
+        server.tools.isNotEmpty() &&
+        (server.id == name || name in server.tools)
+}
+
 /** Tools page boundary; plugin/runtime implementations stay outside UI. */
 @Singleton
 class LocalToolsUiFacade @Inject internal constructor(
@@ -220,9 +231,7 @@ class LocalToolsUiFacade @Inject internal constructor(
                 rollbackAvailable = gitHubSkillImporter.canRollback(item.name),
                 requirements = dependencyResult.getOrNull()?.map { requirement ->
                     val registered = when (requirement.type.lowercase()) {
-                        "mcp" -> connected.any { server ->
-                            server.id == requirement.value || requirement.value in server.tools
-                        }
+                        "mcp" -> isRegisteredMcpSkillRequirement(requirement.value, connected)
                         "tool" -> requirement.value in registeredTools ||
                             connected.any { requirement.value in it.tools }
                         else -> false
