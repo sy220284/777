@@ -359,7 +359,15 @@ internal fun PluginInventoryBrowser(
             else "Codex · ${plugin.sourceKind} · 第三方仓库",
             marketState = support)
     }
-    val catalogue = local + connected + installedSkills + availablePresets + curated + officialPlugins
+    // The marketplace represents an official plugin bundle once. Its installed
+    // member skills remain individually accessible on the Skills page.
+    val pluginPageSkills = if (skillsOnly) installedSkills else installedSkills.filterNot { installed ->
+        codexPlugins.any { plugin ->
+            !plugin.codexOnly && plugin.installPolicy != "NOT_AVAILABLE" &&
+                codexOfficialPluginSourceMatches(installed.sourceUrl, plugin.sourcePath)
+        }
+    }
+    val catalogue = local + connected + pluginPageSkills + availablePresets + curated + officialPlugins
     val list = catalogue.asSequence().filter { item ->
         marketplaceTabAllows(
             selectedTab = selectedCategory, skillsOnly = skillsOnly,

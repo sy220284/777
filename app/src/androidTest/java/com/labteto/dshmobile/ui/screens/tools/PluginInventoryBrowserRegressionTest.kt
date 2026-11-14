@@ -548,6 +548,9 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
+        // Member skills belong inside the bundle detail, not as duplicate cards.
+        compose.onNodeWithTag("plugin-inventory-card-skill:zoom-general")
+            .assertDoesNotExist()
         compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
             .performScrollTo().performClick()
         compose.onNodeWithTag("codex-plugin-skills-summary").performClick()
