@@ -19,6 +19,31 @@ class LocalTeamMemberControlResultTest {
         assertEquals("自己的任务已完成", valid.content)
     }
 
+    @Test fun competingClaimAndStaleResultAreToolErrorsInsteadOfFatalRuns() = runTest {
+        val busy = teamMemberControlResult {
+            throw IllegalArgumentException("TEAM_MEMBER_TASK_BUSY：member-1")
+        }
+        assertTrue(busy.isError)
+        assertEquals("TEAM_MEMBER_TASK_BUSY", busy.errorCode)
+        val stale = teamMemberControlResult {
+            error("TEAM_TASK_RESULT_STALE：结果归属或版本不符")
+        }
+        assertTrue(stale.isError)
+        assertEquals("TEAM_TASK_RESULT_STALE", stale.errorCode)
+        assertEquals("继续执行当前任务", teamMemberControlResult {
+            "继续执行当前任务"
+        }.content)
+    }
+
+    @Test fun supersededRootAuthorityStillStopsTheRun() = runTest {
+        val failure = runCatching {
+            teamMemberControlResult {
+                error("TEAM_TASK_ROOT_INSTRUCTION_SUPERSEDED：用户授权已变化")
+            }
+        }.exceptionOrNull()
+        assertTrue(failure is IllegalStateException)
+    }
+
     @Test fun ownerMismatchAndUnrelatedFailuresStillTerminateNormally() = runTest {
         val failure = runCatching {
             teamMemberControlResult { error("TEAM_CALLER_STALE：成员运行已失效") }

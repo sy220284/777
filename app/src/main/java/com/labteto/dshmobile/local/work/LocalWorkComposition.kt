@@ -459,27 +459,41 @@ internal class LocalWorkComposition @Inject constructor(
 }
 
 /**
- * A member touching another member's task is a rejected tool invocation.
- * Do not turn that single permission mistake into a terminal failed job.
- * Caller identity/lease failures and unrelated runtime errors remain fatal.
+ * A rejected task command is a failed tool call, never an automatic failed Agent turn.
+ * Only explicit, user-correctable Team command errors are handled here. Identity, root
+ * authorization, execution leases, cancellation and other failures still propagate.
  */
+private val recoverableTeamMemberToolErrors = setOf(
+    "TEAM_MEMBER_PERMISSION_DENIED",
+    "TEAM_MEMBER_TASK_BUSY",
+    "TEAM_TASK_REVISION_CONFLICT",
+    "TEAM_TASK_STATUS_INVALID",
+    "TEAM_TASK_RESULT_REQUIRED",
+    "TEAM_TASK_RESULT_STALE",
+    "TEAM_TASK_BLOCKED",
+    "TEAM_TASK_EDIT_REQUIRED",
+    "TEAM_TASK_OWNER_REQUIRED",
+    "TEAM_TASK_DEPENDENCIES_REQUIRED",
+    "TEAM_TASK_ACTION_INVALID",
+    "TEAM_TASK_NOT_FOUND",
+    "TEAM_TASK_DELETED",
+    "TEAM_MEMBER_NOT_FOUND",
+    "TEAM_MAILBOX_LIMIT",
+    "TEAM_MESSAGE_REQUIRED",
+    "TEAM_WRITE_SCOPE_CONFLICT",
+)
+
 internal suspend fun teamMemberControlResult(invoke: suspend () -> String): AgentToolResult =
     try {
         AgentToolResult(invoke())
-    } catch (failure: IllegalArgumentException) {
-        if (!failure.message.orEmpty().startsWith("TEAM_MEMBER_PERMISSION_DENIED")) throw failure
+    } catch (failure: RuntimeException) {
+        val message = failure.message.orEmpty()
+        val code = message.substringBefore('：').substringBefore(':')
+        if (code !in recoverableTeamMemberToolErrors) throw failure
         AgentToolResult(
-            content = failure.message.orEmpty() + "；本次操作未执行。请先读取当前成员可见的任务并只操作自己领取的任务。",
+            content = message + "；本次操作未执行。请读取最新任务 revision、成员状态或消息结果后重新选择操作。",
             isError = true,
-            errorCode = "TEAM_MEMBER_PERMISSION_DENIED",
-            retryable = false,
-        )
-    } catch (failure: IllegalStateException) {
-        if (!failure.message.orEmpty().startsWith("TEAM_MEMBER_PERMISSION_DENIED")) throw failure
-        AgentToolResult(
-            content = failure.message.orEmpty() + "；本次操作未执行。请先读取当前成员可见的任务并只操作自己领取的任务。",
-            isError = true,
-            errorCode = "TEAM_MEMBER_PERMISSION_DENIED",
+            errorCode = code,
             retryable = false,
         )
     }

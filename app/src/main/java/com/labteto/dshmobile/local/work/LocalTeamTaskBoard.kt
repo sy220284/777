@@ -147,8 +147,10 @@ internal class LocalTeamTaskBoard(
                         ?: error("TEAM_TASK_RESULT_REQUIRED：complete 必须提供已核验的 result_id")
                     val owner = state.members.singleOrNull { it.id == current.ownerId }
                         ?: error("TEAM_TASK_OWNER_REQUIRED：任务负责人不存在")
-                    val evidence = verification.findFreshTaskResult(sessionId, current, owner.jobId, verifiedResultId)
-                        ?: error("TEAM_TASK_RESULT_STALE：结果必须属于当前负责人且晚于当前任务 revision")
+                    val evidence = verification.findFreshTaskResult(
+                        sessionId, current, owner.jobId, verifiedResultId, allowMemberMessages = true,
+                    )
+                        ?: error("TEAM_TASK_RESULT_STALE：结果必须是当前负责人在任务认领后发给 Lead 的消息或模型执行检查点")
                     next.copy(
                         status = LocalTeamTaskStatus.COMPLETED, autoDispatchMessageId = null,
                         completionResultId = verifiedResultId,
