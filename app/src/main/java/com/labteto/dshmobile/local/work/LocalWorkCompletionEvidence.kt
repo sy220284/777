@@ -129,6 +129,7 @@ internal fun LocalWorkCompletionEvidence.toDiagnosticJson(): JsonObject = buildJ
     put("awaiting_review_members", awaitingReviewMembers)
     put("unreviewed_team_results", unreviewedTeamResults)
     put("rejected_team_results", rejectedTeamResults)
+    put("outstanding_independent_reviews", JsonArray(deliveryEvidence?.outstandingReviews.orEmpty().map(::JsonPrimitive)))
     put("team_has_failure", teamFailure)
     put("team_rebuilding", teamRebuilding)
     put("blocked_goal", blockedGoal)
