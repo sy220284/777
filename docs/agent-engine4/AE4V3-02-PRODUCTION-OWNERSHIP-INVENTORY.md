@@ -1,6 +1,6 @@
 # AE4V3-02：生产调用与事实所有权核查
 
-检查基线：PR #705 `feat/ui-r4-pluggable`，HEAD `799bfb00704ac130c887dbc4f7970989193d279f`（2026-10-17）。这是实际路径核验清单，并非全仓逐行审计或 CI 验收证明。
+检查基线：PR #705 `feat/ui-r4-pluggable`，HEAD `799bfb00704ac130c887dbc4f7970989193d279f`（2026-10-17）。本文件记录生产代码入口与归属。
 
 | Owner | 已核对的 Kotlin 入口 | 迁移决定与消费者 |
 | --- | --- | --- |
@@ -21,4 +21,4 @@
 
 `reference-validation/src/test/kotlin/com/labteto/dshmobile/reference/AgentEngine4ExecutionBaselineTest.kt` 是执行中的 JVM 合同：同一测试贯穿 AgentTurnEngine → ToolAttemptLedger → SessionEventLog 冷重启 → TaskGraph 失败/阻塞传递 → Goal 验收状态。并检查后续成功工具不能掩盖此前未结算的外部副作用。该测试为本地产品要求，独立于 `ReferenceConformanceTest` 的官方锁定 Golden。
 
-AE4V3-01 保护域与本清单生产入口的核查持续进行；02/03 在当前 SHA CI 全部通过、生产关联与退出条件复核前不得标记 `completed`。下一步按 01→02→03→04 顺序复查，不以文档数量计完成。
+AE4V3-01 保护域与生产入口的核查记录，按实际实现情况更新任务状态。

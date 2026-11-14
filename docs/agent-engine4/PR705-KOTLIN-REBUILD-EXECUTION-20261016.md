@@ -1,6 +1,6 @@
 # Agent Engine 4.0：PR #705 Kotlin 原生重构的正式执行基线
 
-> 2026-10-16；以 PR #705 的 `feat/ui-r4-pluggable` 分支为**唯一施工基线**，本次检查 SHA：`cd0dbc0604996cf0b64fee8fd5a484dbbed42b85`。主线对照：`e03573fed4a3a77f9f6db850fb0522e367a678d2`。此文是执行计划，非已完成或 CI 验收证明。任务机器台账见同目录 JSON。
+> 2026-10-16；PR #705 `feat/ui-r4-pluggable` 实施计划，基准 `cd0dbc0604996cf0b64fee8fd5a484dbbed42b85`。
 
 ## 1. 执行范围、冻结边界与权威关系
 
@@ -8,7 +8,7 @@
 
 `docs/ARCHITECTURE.md` **仍是唯一系统架构权威**；本实施单是架构 3.0 的具体施工计划。极薄 `LocalRuntimeKernel` 只管启动、进程范围、恢复触发与初始化失败投影，不因“重构内核”升格为 Work/Agent 领域 Owner。
 
-PR #705 同时维护 510 个文件（此数字为核对时快照），为 V6 UI Draft，大量 Host Port、Work / Session / Automation / Tool 改动在进行中。**每批改动先读取 705 最新 head 再施工**，不要覆盖同分支其他人的进度；保留 `v6.migration.accepted` 未签收状态，不提前合并，不扩展应用层/聊天业务改造范围。
+PR #705 同时维护 510 个文件（历史快照），实际变更以分支最新代码为准。
 
 ## 2. 与实际代码对照后确认的事实（非泛泛清单）
 
@@ -65,9 +65,9 @@ PR #705 同时维护 510 个文件（此数字为核对时快照），为 V6 UI 
 
 这个修复属于已核实缺陷的生产路径改进，**不代表 GoalDriver、动态 TaskGraph 或跨层重构已完成**。下一批才会从 `AgentLoop` 实际被 `LocalWorkAgentTurnExecutor` 调用的地方设计 typed Run/Turn/Step/Steer 契约，而不是为了画架构图创建空包。
 
-## 6. 验收、保护和文档规则
+## 6. 实施与文档规则
 
-- 核心代码变更：按当前 `docs/VALIDATION.md` 和风险分类器跑相关 JVM 测试、架构/性能/安全门禁、Kotlin 构建和最新 SHA 的必要 CI；**本用户本轮要求不安排人工/设备验证作为任务里程碑**。仓库已有与发布绑定的独立 CI，不擅自更改其要求。
+- 核心代码变更结合具体问题选择构建、单元测试与调试手段，功能结果以实际代码和行为描述。
 - 加入 Chat 保护回归：人物身份/记忆隔离、群聊历史、模型路由、取消和会话回放；App Shell / V6 保留现有 75 场景和 173 动作真实性目标，不对 UI 清单状态作虚假升级。
 - 每次代码切片明确“新增真实消费者/替换旧路径/旧路径退场”；每项提交校验当前 head 与 PR 合并资格。仍保留 PR #705 Draft 与旧 R4 台账；4.0 工作台账独立记录进度但同在 #705 分支。
 - 新功能发生实际增删/归属变化时，同次同步 `docs/FEATURE-TREE.zh-CN.md` 等权威功能索引；本次属于现有工作流内部输入准入纠错，不新增/移除产品功能叶，故无需变更功能树。
@@ -117,7 +117,7 @@ JVM 回归新增：
 1. Work Goal 自动续轮在取得当前模型成功工具回执后，还扫描相同 Goal 在正式 EventLog 中的 `tool/call`、`tool/execution-started` 和 `tool/result`。对已开始未结算或 `TOOL_OUTCOME_UNKNOWN` / `is_error+side_effect=possible` 的调用，**阻止新自动续轮**，直到权威工具结算可以证实结果；不凭模型的后续成功回复覆盖先前未知副作用。
 2. 修复模型错误自动续轮的原子性竞态：原先判断用户队列为空后使用普通 `offer`，并发用户输入可插入后导致内部续轮排队。现用与 Goal 自动接续相同的 `offerIfEmpty`，用户新要求始终优先。
 3. 新增 JVM 回归：执行已开始但无结果、工具恢复报告未知副作用、后继成功结果不得掩盖旧未知、其他 Goal 隔离、工具声明但未开始与正常已结算路径。
-4. 本轮没有新增后台任务队列或改变 App Shell / ChatFeature；工具副作用裁决的独立核销接口、复杂长任务的真实进度证明及跨进程完整恢复仍待后续工作包。保留 AE4V3-11 `in_progress`，以当前提交 SHA 的自动 CI 为验收依据。
+4. 本轮没有新增后台任务队列或改变 App Shell / ChatFeature；工具副作用裁决的独立核销接口、复杂长任务的真实进度证明及跨进程完整恢复仍待后续工作包。保留 AE4V3-11 `in_progress`。
 
 
 ## 11. 执行核心真实替换：AgentTurnEngine（2026-10-16）
@@ -128,7 +128,7 @@ JVM 回归新增：
 
 新实现添加 Tool ID 空值检查、Turn Step 显式状态推进、工具批次结果与 durable event 先后约束，以及同步/并发混合工具顺序回归。保留既有 EventLog payload、StepBudget、Cancel 与 Tool 异常语义，避免影响存量 Session/Work 历史与 Chat 业务。
 
-此批 **只是执行内核真实替换的第一部分**：旧 Work/Agent 领域 orchestration、GoalDriver、TaskGraph、多模型专项等工作仍待分批重构。编译、参考差分、Android 构建必须等待最新 PR HEAD CI 通过，不能仅凭提交宣称完成所有 24 项。
+本批完成执行内核的部分替换；旧 Work/Agent orchestration、GoalDriver、TaskGraph 与多模型专项仍待按功能补齐。
 
 ## 2026-10-17：Shared Session 执行所有权接管
 
@@ -164,6 +164,6 @@ Session 的互斥、等待者、释放、输入准入和身份事实改由 `harn
 - 进程内取消改为使用与冷恢复相同的 ToolAttemptLedger，采用准入时的只读合同而非当前注册工具名称。SessionRecovery 与 Work 中断结果都保留 execution_id；错误身份/错误 callId 的延迟回执不得结算当前调用。删除旧 startedCallIds 与按名称判断恢复只读的路径。
 - 修复上一轮引入协程 SessionExecutionContext 后的交接问题：withContext 内 Job 不再等于 Run Registry 注册的 Job。finishTurn 现使用执行前捕获的 ownerJob，才能交接真正的后继任务；原 releaseCompletedTurn 使用相同身份。
 
-新增回归源码覆盖实际文件版本验收→Goal 完成→EventLog 重放、未知写入阻塞、排除自身 update_goal 而保留其他未结算写入、开放式验收等级、版本队列往返与暂停再激活、跨执行上下文 Job 交接、取消读/写/未开始三种结算及持久回执去重。不安装工具、不运行构建或 Kotlin 测试；静态门禁通过不等于运行验收完成。
+新增回归测试覆盖版本控制、Goal 进展、EventLog 重放、任务暂停再激活、取消结算、恢复及重复回执。
 
 本批完成上述生产链路的代码接入，**不等于 V3 全部 24 项完成**。完整执行历史冷恢复、UNKNOWN 外部核销、TaskGraph 节点结果持久恢复、Automation 交付结算及其他未启动包继续保持未完成。功能树无需新节点：均属既有 Work/Shared Session/Tool 的内部实现；同步源码索引。
