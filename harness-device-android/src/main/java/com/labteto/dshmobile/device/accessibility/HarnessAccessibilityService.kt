@@ -321,7 +321,12 @@ class HarnessAccessibilityService : AccessibilityService() {
         while (queue.isNotEmpty()) {
             val (node, depth) = queue.removeFirst()
             if (rebindEditable) {
-                liveSnapshots!!.add(describeNode(cursor, node, depth))
+                val live = describeNode(cursor, node, depth)
+                // Stable fields are the common case: stop as soon as the original
+                // editable control is confirmed, without traversing the full tree.
+                if (cursor == index && nodeSelection.matchesCurrentEditable(
+                        index, root.windowId, live)) return node
+                liveSnapshots!!.add(live)
                 if (node.isEditable) editableNodes[cursor] = node
             } else if (cursor == index) {
                 nodeSelection.requireCurrent(
