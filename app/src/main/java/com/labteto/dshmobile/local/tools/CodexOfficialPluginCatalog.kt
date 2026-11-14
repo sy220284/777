@@ -122,6 +122,7 @@ internal data class CodexOfficialPluginDetail(
     val mcpPath: String? = null,
     val inlineMcpConfig: String? = null,
     val logoPath: String? = null,
+    val samplePrompts: List<String> = emptyList(),
 )
 
 internal data class CodexOfficialMcpEndpoint(
@@ -173,6 +174,11 @@ internal fun parseCodexOfficialPluginDetail(document: String): CodexOfficialPlug
     val inlineMcp = (mcpEntry as? JsonObject)?.let {
         JsonObject(mapOf("mcpServers" to it)).toString()
     }
+    val samplePrompts = when (val raw = interfaceData?.get("defaultPrompt")) {
+        is kotlinx.serialization.json.JsonPrimitive -> listOfNotNull(raw.contentOrNull)
+        is JsonArray -> raw.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull }
+        else -> emptyList()
+    }.map(String::trim).filter { it.isNotBlank() && it.length <= 512 }.take(3)
     return CodexOfficialPluginDetail(
         name = name,
         displayName = interfaceData?.get("displayName")?.jsonPrimitive?.contentOrNull ?: name,
@@ -188,6 +194,7 @@ internal fun parseCodexOfficialPluginDetail(document: String): CodexOfficialPlug
         mcpPath = mcpFile, inlineMcpConfig = inlineMcp,
         logoPath = interfaceData?.get("logo")?.jsonPrimitive?.contentOrNull
             ?.let(::codexPluginRelativeAsset),
+        samplePrompts = samplePrompts,
     )
 }
 
