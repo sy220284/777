@@ -121,6 +121,28 @@ class LocalWorkTaskGraphPlanTest {
                 log, temporary.root, "revised-graph", "revised-execution", "goal-v1", revised))
             assertEquals(initialOutput,
                 revised.recoveredResults(log, "revised-execution", temporary.root).getValue("a").output)
+            val third = LocalWorkTaskGraphPlan(JsonObject(revised.value.toMutableMap().apply {
+                put("reuses_graph_id", JsonPrimitive("revised-graph"))
+                put("reuses_graph_execution_id", JsonPrimitive("revised-execution"))
+                put("nodes", buildJsonArray {
+                    add(buildJsonObject {
+                        put("node_id", "a"); put("task", "研究")
+                        put("depends_on", buildJsonArray {})
+                    })
+                    add(buildJsonObject {
+                        put("node_id", "b"); put("task", "第三次核实")
+                        put("depends_on", buildJsonArray { add(JsonPrimitive("a")) })
+                    })
+                })
+            }))
+            log.append("taskgraph/start", buildJsonObject {
+                put("graph_id", "third-graph"); put("graph_execution_id", "third-execution")
+                put("goal_fingerprint", "goal-v1"); put("plan", third.value)
+            })
+            assertEquals(1, seedReusableReadOnlyGraphResults(
+                log, temporary.root, "third-graph", "third-execution", "goal-v1", third))
+            assertEquals(initialOutput,
+                third.recoveredResults(log, "third-execution", temporary.root).getValue("a").output)
         } finally { log.close() }
     }
 
