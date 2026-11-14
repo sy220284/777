@@ -313,9 +313,13 @@ internal fun PluginInventoryBrowser(
             "productivity", "communication", "finance" -> ExtensionGroup.OFFICE
             else -> ExtensionGroup.GENERAL
         }
-        val matchingService = connectedServices.firstOrNull {
-            it.id == plugin.name || it.id == codexDetails[plugin.id]?.mcpServerId
-        }
+        val officialDetail = codexDetails[plugin.id]
+        val officialConnection = com.labteto.dshmobile.uicontract.uiMcpDeclaredConnection(
+            connectedServices, officialDetail?.mcpServerId, officialDetail?.mcpUrl)
+        val matchingService = if (officialConnection !=
+            com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.TARGET_CONFLICT)
+            connectedServices.firstOrNull { it.id == officialDetail?.mcpServerId }
+        else null
         val installedFromPlugin = skills.any {
             codexOfficialPluginSourceMatches(it.sourceIdentity, plugin.sourcePath)
         }
@@ -328,6 +332,9 @@ internal fun PluginInventoryBrowser(
             plugin.sourceKind != "local" -> ExtensionMarketState(
                 ExtensionMarketStatus.UNSUPPORTED, "第三方 Git 来源",
                 "Codex 使用 Git 插件安装器部署此插件；777 可以单独导入公开技能目录")
+            officialConnection == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.TARGET_CONFLICT ->
+                ExtensionMarketState(ExtensionMarketStatus.FAILED, "服务标识冲突",
+                    "已有同名 MCP 服务，但连接地址与官方插件不一致；请在连接器中核对")
             matchingService != null -> connectorMarketState(matchingService.registration, matchingService.connection)
             installedFromPlugin -> ExtensionMarketState(
                 ExtensionMarketStatus.INSTALLED, "已安装可用技能",
