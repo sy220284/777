@@ -15,6 +15,9 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
+import com.labteto.dshmobile.ui.theme.ThemePreference
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot as McpServerSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -216,6 +219,37 @@ class PluginInventoryBrowserRegressionTest {
         }
     }
 
+
+    @Test
+    fun extensionListRemainsReadableAcrossFourWidthsAndThreeThemes() {
+        val width = mutableIntStateOf(320)
+        val appearance = mutableStateOf(ThemePreference.LIGHT)
+        compose.setContent {
+            DshTheme(preference = appearance.value, textScale = 1.3f) {
+                Box(Modifier.width(width.intValue.dp)) {
+                    PluginInventoryBrowser(
+                        localIds = listOf("android-runtime"),
+                        onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    )
+                }
+            }
+        }
+        for (mode in listOf(ThemePreference.LIGHT, ThemePreference.DARK, ThemePreference.MATTE_BLACK)) {
+            for (widthDp in listOf(320, 360, 393, 412)) {
+                compose.runOnIdle {
+                    appearance.value = mode
+                    width.intValue = widthDp
+                }
+                val card = compose.onNodeWithTag("plugin-inventory-card-local:android-runtime")
+                    .assertIsDisplayed().getUnclippedBoundsInRoot()
+                val title = compose.onNodeWithTag("plugin-inventory-title-local:android-runtime")
+                    .assertIsDisplayed().getUnclippedBoundsInRoot()
+                assertTrue("Title must fit within the $widthDp dp card in $mode", title.right <= card.right)
+                assertTrue("Card must fit within available width $widthDp dp",
+                    card.right - card.left <= widthDp.dp)
+            }
+        }
+    }
 
     @Test
     fun pluginCardsKeepCompactIconsAndReadableText() {
@@ -522,6 +556,123 @@ class PluginInventoryBrowserRegressionTest {
     }
 
     @Test
+    fun registeredMcpWithNoToolsOffersInspectionInsteadOfRepeatedOauth() {
+        var openedConnectionManager = 0
+        var oauthAttempts = 0
+        val pluginId = "figma@openai-curated"
+        val plugin = com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            pluginId, "figma", "Creativity", "plugins/figma", "AVAILABLE", "ON_INSTALL", false,
+        )
+        val detail = com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            pluginId, "Figma", "设计协作", "Figma", "2.0",
+            emptyList(), true, false, false, "figma", "https://mcp.figma.com/mcp",
+        )
+        val service = com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(
+            "figma", "http", "https://mcp.figma.com/mcp", emptyList(),
+            registration = com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED,
+        )
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), codexPlugins = listOf(plugin),
+                    codexDetails = mapOf(pluginId to detail),
+                    connectedServices = listOf(service),
+                    onBack = {}, onManageConnections = { openedConnectionManager++ },
+                    onReturnToChat = {},
+                    onConnectCodexPlugin = { oauthAttempts++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action")
+            .assertIsDisplayed().performClick()
+        compose.runOnIdle {
+            assertEquals(1, openedConnectionManager)
+            assertEquals(0, oauthAttempts)
+        }
+    }
+
+    @Test
+    fun collidingMcpIdWithDifferentEndpointGoesToRepairWithoutOauth() {
+        var repairs = 0
+        var logins = 0
+        val pluginId = "figma@openai-curated"
+        val plugin = com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            pluginId, "figma", "Creativity", "plugins/figma",
+            "AVAILABLE", "ON_INSTALL", false,
+        )
+        val detail = com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            pluginId, "Figma", "设计", "Figma", "2.0",
+            emptyList(), true, false, false,
+            "figma", "https://mcp.figma.com/mcp",
+        )
+        val unrelated = com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(
+            "figma", "http", "https://unrelated.example/mcp", listOf("read"))
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), codexPlugins = listOf(plugin),
+                    codexDetails = mapOf(pluginId to detail),
+                    connectedServices = listOf(unrelated),
+                    onBack = {}, onReturnToChat = {},
+                    onManageConnections = { repairs++ },
+                    onConnectCodexPlugin = { logins++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
+        compose.runOnIdle {
+            assertEquals(1, repairs)
+            assertEquals(0, logins)
+        }
+    }
+
+    @Test
+    fun incompletePluginDependenciesNeverOfferUseUntilResolved() {
+        var usages = 0
+        val pluginId = "draw@openai-curated"
+        val plugin = com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            pluginId, "draw", "Creativity", "plugins/draw",
+            "AVAILABLE", "ON_INSTALL", false,
+        )
+        val detail = com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            pluginId, "Draw", "绘图", "OpenAI", "1.0",
+            listOf("draw"), false, false, false,
+            skillDirectories = mapOf("draw" to "skills/draw"),
+            samplePrompts = listOf("帮我绘图"),
+        )
+        val installed = com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+            "draw-local", "绘图", true,
+            requirements = listOf(com.labteto.dshmobile.uicontract.UiSkillRequirement(
+                "tool", "render", "绘图运行工具", false,
+            )),
+            sourceIdentity = com.labteto.dshmobile.uicontract.UiSkillSourceIdentity(
+                "openai", "plugins", "0123456789012345678901234567890123456789",
+                "plugins/draw/skills/draw",
+            ),
+        )
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), codexPlugins = listOf(plugin),
+                    codexDetails = mapOf(pluginId to detail), skills = listOf(installed),
+                    onBack = {}, onReturnToChat = {}, onManageConnections = {},
+                    onUseCapability = { usages++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithText("使用这个示例").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
+        compose.onNodeWithText("绘图运行工具").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(0, usages) }
+    }
+
+    @Test
     fun installedPluginSkillRecognizesPinnedOriginWhenFolderAndSkillNameDiffer() {
         var installRequests = 0
         val pluginId = "zoom@openai-curated"
@@ -542,6 +693,9 @@ class PluginInventoryBrowserRegressionTest {
                     skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
                         "zoom-general", "Use Zoom", true,
                         sourceUrl = "https://github.com/openai/plugins/tree/0123456789012345678901234567890123456789/plugins/zoom/skills/general",
+                        sourceIdentity = com.labteto.dshmobile.uicontract.UiSkillSourceIdentity(
+                            "openai", "plugins", "0123456789012345678901234567890123456789",
+                            "plugins/zoom/skills/general"),
                     )),
                     onBack = {}, onManageConnections = {}, onReturnToChat = {},
                     onInstallCodexPluginSkill = { _, _ -> installRequests++ },
@@ -590,6 +744,86 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithTag("plugin-detail-primary-action").performClick()
         compose.runOnIdle {
             assertEquals("figma" to "https://mcp.figma.com/mcp", authorized)
+        }
+    }
+
+    @Test
+    fun installedSkillWithKnownMcpWithoutToolsOpensHealthInsteadOfOauth() {
+        var connectedManagerOpens = 0
+        var authAttempts = 0
+        val required = com.labteto.dshmobile.uicontract.UiSkillRequirement(
+            type = "mcp", value = "figma", description = "设计服务",
+            registered = false, transport = "http", url = "https://mcp.figma.com/mcp",
+        )
+        val known = com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(
+            "figma", "http", "https://mcp.figma.com/mcp", emptyList(),
+        )
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), skillsOnly = true,
+                    skills = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+                        "figma-use", "设计", true, requirements = listOf(required),
+                    )),
+                    connectedServices = listOf(known),
+                    onBack = {}, onReturnToChat = {},
+                    onManageConnections = { connectedManagerOpens++ },
+                    onConnectSkillMcp = { _, _ -> authAttempts++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-skill:figma-use")
+            .performScrollTo().performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
+        compose.runOnIdle {
+            assertEquals(1, connectedManagerOpens)
+            assertEquals(0, authAttempts)
+        }
+    }
+
+    @Test
+    fun installedBundleResumesOnlyRemainingAccountAuthorization() {
+        var resumed = 0
+        var reinstalledSingle = 0
+        val pluginId = "design@openai-curated"
+        val plugin = com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            pluginId, "design", "Creativity", "plugins/design",
+            "AVAILABLE", "ON_INSTALL", false,
+        )
+        val detail = com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            pluginId, "Design", "设计插件", "OpenAI", "1.0",
+            listOf("create"), false, false, false,
+            skillDirectories = mapOf("create" to "skills/create"),
+        )
+        val installed = com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+            "create-local", "设计", true,
+            sourceIdentity = com.labteto.dshmobile.uicontract.UiSkillSourceIdentity(
+                "openai", "plugins", "0123456789012345678901234567890123456789",
+                "plugins/design/skills/create",
+            ),
+            requirements = listOf(com.labteto.dshmobile.uicontract.UiSkillRequirement(
+                "mcp", "design-mcp", "设计平台登录", false, "http",
+                url = "https://design.example.com/mcp",
+            )),
+        )
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), codexPlugins = listOf(plugin),
+                    codexDetails = mapOf(pluginId to detail), skills = listOf(installed),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onInstallCodexPlugin = { resumed++ },
+                    onInstallCodexPluginSkill = { _, _ -> reinstalledSingle++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithText("继续完成授权").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
+        compose.runOnIdle {
+            assertEquals(1, resumed)
+            assertEquals(0, reinstalledSingle)
         }
     }
 

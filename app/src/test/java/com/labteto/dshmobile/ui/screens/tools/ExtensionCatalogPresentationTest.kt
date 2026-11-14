@@ -66,10 +66,14 @@ class ExtensionCatalogPresentationTest {
             com.labteto.dshmobile.uicontract.UiSkillSnapshot(
                 "figma-use", "Same name from a different source", true,
                 sourceUrl = "https://github.com/example/something/tree/0123456789012345678901234567890123456789/skills/figma-use",
+                sourceIdentity = com.labteto.dshmobile.uicontract.UiSkillSourceIdentity(
+                    "example", "something", "0123456789012345678901234567890123456789", "skills/figma-use"),
             ),
             com.labteto.dshmobile.uicontract.UiSkillSnapshot(
                 "other-id", "Official pinned skill with a different local name", true,
                 sourceUrl = "https://github.com/openai/plugins/tree/0123456789012345678901234567890123456789/plugins/figma/skills/figma-use",
+                sourceIdentity = com.labteto.dshmobile.uicontract.UiSkillSourceIdentity(
+                    "openai", "plugins", "0123456789012345678901234567890123456789", "plugins/figma/skills/figma-use"),
             ),
         )
         assertTrue(codexPluginSkillInstalled(items, "plugins/figma", "skills/figma-use"))
@@ -78,15 +82,29 @@ class ExtensionCatalogPresentationTest {
         val spoofedSource = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
             "other", "Impersonation attempt", true,
             sourceUrl = "https://github.com/another/plugins/tree/0123456789012345678901234567890123456789/plugins/figma/skills/figma-use",
+            sourceIdentity = com.labteto.dshmobile.uicontract.UiSkillSourceIdentity(
+                "another", "plugins", "0123456789012345678901234567890123456789", "plugins/figma/skills/figma-use"),
         ))
         assertTrue(!codexPluginSkillInstalled(spoofedSource, "plugins/figma", "skills/figma-use"))
         val unpinnedSource = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
             "other", "Mutable branch is not provenance", true,
             sourceUrl = "https://github.com/openai/plugins/tree/main/plugins/figma/skills/figma-use",
+            sourceIdentity = com.labteto.dshmobile.uicontract.UiSkillSourceIdentity(
+                "openai", "plugins", "main", "plugins/figma/skills/figma-use"),
         ))
         assertTrue(!codexPluginSkillInstalled(unpinnedSource, "plugins/figma", "skills/figma-use"))
-        assertTrue(codexOfficialPluginSourceMatches(items.last().sourceUrl, "plugins/figma"))
-        assertTrue(!codexOfficialPluginSourceMatches(spoofedSource.first().sourceUrl, "plugins/figma"))
+        val urlOnlyImpersonation = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+            "url-only", "Unverified URL cannot grant plugin ownership", true,
+            sourceUrl = "https://github.com/openai/plugins/tree/0123456789012345678901234567890123456789/plugins/figma/skills/figma-use",
+        ))
+        assertTrue(!codexPluginSkillInstalled(urlOnlyImpersonation, "plugins/figma", "skills/figma-use"))
+        assertTrue(codexOfficialPluginSourceMatches(items.last().sourceIdentity, "plugins/figma"))
+        assertTrue(codexOfficialPluginSourceMatches(
+            com.labteto.dshmobile.uicontract.UiSkillSourceIdentity(
+                "OpenAI", "Plugins", "0123456789012345678901234567890123456789",
+                "plugins/figma/skills/figma-use",
+            ), "plugins/figma"))
+        assertTrue(!codexOfficialPluginSourceMatches(spoofedSource.first().sourceIdentity, "plugins/figma"))
     }
 
 }

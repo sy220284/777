@@ -62,6 +62,16 @@
 
 已安装状态依据本机技能导入器的固定版本来源记录判定：GitHub 主机须为 `github.com`，仓库须为 `openai/plugins`，版本须为完整 40 位提交 SHA，目录须与插件清单声明的技能目录一致。其他仓库的同名技能、仅路径相同的链接或可变的 `main` 分支均不会被识别为官方已安装。列表和详情统一采用这项核验规则。
 
+## #921 跨模块结构性整改（以最终 PR 提交和 CI 为验收依据）
+
+- **来源事实：** `LocalGitHubSkillImporter.installedSourceIdentity` 读取并验证 `.github-source.json`；`UiSkillSourceIdentity` 只携带真正的 GitHub 仓库、固定提交与目录。官方插件的列表、详情、批量安装、技能归属都共用这一字段。用户改写文本 URL 无法改变身份。
+- **授权入口：** `LocalMcpOAuthCoordinator.authorize` 只交换并暂存授权结果；`LocalToolsUiFacade.switchMcpHttpConnection` 负责预检、凭据原子轮换、真正连接和失败恢复。手动 Bearer、OAuth 登录与 OAuth 刷新共享同一切换路径，取消浏览器授权期间保留旧服务。
+- **实际服务状态：** 已登记的 MCP 服务即使发现 0 个工具也不触发自动再次授权；详情提示检查连接。工具可用、服务健康和单次调用审批仍需分别验证。失败或取消时提供清楚的恢复操作。
+- **UI 职责：** `ToolsViewModel` 以 `ToolsManagementUiPort` 注入，实现仍由 `LocalToolsUiFacade` 持有，源码与页面接口彻底分离；已装技能包的剩余 OAuth 依赖可从插件详情「继续完成授权」，不重新下载。
+- **会话与质量：** V6 原生及通用 UI 历史视图使用唯一 `TranscriptHistoryPager` 有界分页引擎，实时与历史一律由 `projectTranscriptHistoryMessage` 投影；`UiMessageSnapshot` 保留图片、附件、未知内容块、工具状态及身份信息。原生 V6 继续渲染完整 `LocalHarnessMessage`，避免重构期间丢失复杂媒体交互。退出只有定义与单测引用的空转质量管线，Work 继续采用领域证据实际验收成果。
+- **真实隔离边界：** Android MCP Worker 已验证服务的真实 Messenger Binder 调用 UID，并延续每条传输的 owner Binder 校验。当前仍是独立进程、同应用 UID；其 HTTP 与 stdio 执行依赖宿主权限，直接改为 `isolatedProcess` 会破坏网络及工作区功能。独立 UID 需要受控网络、进程和文件代理端到端支持并进行设备验收，当前按实际权限模型标明「进程/故障隔离」，不称为「权限沙盒」。
+- **验证：** 回归覆盖不同仓库同路径、无来源收据、无工具已登记服务、OAuth/Bearer 凭据原子替换与回滚、分页去重及富媒体字段。最终 Android JVM、模拟器、运行时连接、取消/断网/重启和三主题 UI 按 PR 最新运行回执报告。
+
 ## 图标规则
 
 官方清单中的 `interface.logo` 是优先来源。通过受约束的本地官方插件路径和 `raw.githubusercontent.com/openai/plugins` 读取；图标大小限制 256 KiB、尺寸最多 1024×1024，在可见条目首次请求并只驻留内存。无法取得已验证品牌素材时，回退到仓库内置的专属矢量图标；未知品牌按技能语义使用精细图标。官方来源名称与身份由清单保持，不改写持久化标识。

@@ -64,7 +64,7 @@ import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot as McpServerSnapshot
-import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
+import com.labteto.dshmobile.uicontract.ToolsManagementUiPort
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.network.requiresAndroid17LocalNetworkPermission
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
@@ -168,7 +168,7 @@ internal class ToolsOperationGate {
 
 @HiltViewModel
 class ToolsViewModel @Inject constructor(
-    private val localTools: LocalToolsUiFacade,
+    private val localTools: ToolsManagementUiPort,
     @ApplicationContext private val appContext: Context,
     private val networkSearchSettings: LocalNetworkSearchSettings,
 ) : ViewModel() {
@@ -408,76 +408,104 @@ class ToolsViewModel @Inject constructor(
             presets = localTools.presetSkills(),
             createdSkillId = installedId,
         )
-        // Official plugin metadata is an authoritative source of its OAuth endpoint
-        // and client registration. A skill's YAML may not duplicate that declaration.
+        // The official catalog and installed-skill metadata feed one dependency batch.
+        // Service identity and user consent stay owned by ToolsFeature; this page projects progress.
         val officialDetail = officialPluginId?.let { _state.value.codexDetails[it] }
-        if (officialDetail?.mcpUrl != null && officialPluginId != null) {
-            val serverId = requireNotNull(officialDetail.mcpServerId)
-            val alreadyConnected = localTools.servers().any {
-                it.id == serverId && it.tools.isNotEmpty()
-            }
-            if (!alreadyConnected) {
-                _state.value = _state.value.copy(
-                    mcpLoginServerId = serverId,
-                    feedback = "技能已安装；正在打开 ${serverId} 账号授权。",
-                )
-                try {
-                    localTools.connectCodexPlugin(officialPluginId)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (failure: Exception) {
-                    synchronizeExtensionInventory()
-                    _state.value = _state.value.copy(
-                        feedback = "技能 ${installedId} 已安装；${serverId} 授权未完成："
-                            + (failure.message ?: "可在技能详情中重新授权"),
-                    )
-                    return
-                } finally {
-                    _state.value = _state.value.copy(mcpLoginServerId = null)
+        val officialRequest = officialDetail?.mcpUrl?.let { endpoint ->
+            com.labteto.dshmobile.local.presentation.LocalExtensionMcpAuthorization(
+                requireNotNull(officialDetail.mcpServerId) {
+                    "插件声明了 MCP 地址，但缺少服务标识"
+                }, endpoint)
+        }
+        val declared = buildList {
+            officialRequest?.let(::add)
+            localTools.installedSkills()
+                .filter { it.name in bundledSkillIds }
+                .flatMap { it.requirements }
+                .filter { it.type.equals("mcp", ignoreCase = true) && !it.registered }
+                .forEach { requirement ->
+                    skillMcpHttpsEndpoint(requirement)?.let { endpoint ->
+                        add(com.labteto.dshmobile.local.presentation.LocalExtensionMcpAuthorization(
+                            requirement.value, endpoint))
+                    }
                 }
-            }
         }
-        // Re-read after OAuth so a newly connected official server is never
-        // requested a second time through the skill's dependency metadata.
-        val pending = localTools.installedSkills()
-            .filter { it.name in bundledSkillIds }
-            .flatMap { it.requirements }
-            .filterNot { it.registered }
-        val connections = pending.mapNotNull { requirement ->
-            skillMcpHttpsEndpoint(requirement)?.let { endpoint ->
-                requirement.value to endpoint
-            }
-        }.distinctBy { it.first }
-        for ((serverId, endpoint) in connections) {
-            _state.value = _state.value.copy(
-                mcpLoginServerId = serverId,
-                feedback = "技能已安装；正在打开 ${serverId} 授权。",
+        val endpointConflicts = declared.groupBy { it.serverId }.filterValues { sources ->
+            sources.map { it.endpoint }.distinct().size > 1
+        }
+        require(endpointConflicts.isEmpty()) {
+            "同一 MCP 服务标识声明了不同端点，请核对插件和技能依赖来源"
+        }
+        val currentServers = localTools.servers()
+        val connectionStates = declared.distinctBy { it.serverId }.associateWith { request ->
+            com.labteto.dshmobile.uicontract.uiMcpDeclaredConnection(
+                currentServers, request.serverId, request.endpoint)
+        }
+        val requests = connectionStates.filterValues {
+            it == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.ABSENT
+        }.keys.toList()
+        val collisions = connectionStates.filterValues {
+            it == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.TARGET_CONFLICT
+        }.keys.map { request ->
+            com.labteto.dshmobile.local.presentation.LocalExtensionMcpAuthorizationFailure(
+                request.serverId, "已有同名但目标地址不同的服务，请在连接器中处理标识冲突")
+        }
+
+        val failures = collisions + try {
+            com.labteto.dshmobile.local.presentation.authorizeLocalExtensionMcpBatch(
+                requests = requests,
+                authorize = { request ->
+                    if (officialRequest != null && request.serverId == officialRequest.serverId &&
+                        officialPluginId != null) {
+                        localTools.connectCodexPlugin(officialPluginId)
+                    } else {
+                        localTools.loginMcp(request.serverId, request.endpoint, null)
+                    }
+                    Unit
+                },
+                onStart = { request, index, total ->
+                    _state.value = _state.value.copy(
+                        mcpLoginServerId = request.serverId,
+                        feedback = "已安装技能；正在授权 ${request.serverId}（${index}/${total}）",
+                    )
+                },
+                onFinish = {
+                    _state.value = _state.value.copy(mcpLoginServerId = null)
+                },
             )
-            try {
-                localTools.loginMcp(serverId, endpoint, null)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Exception) {
-                synchronizeExtensionInventory()
-                _state.value = _state.value.copy(
-                    feedback = "技能 ${installedId} 已安装；${serverId} 授权未完成："
-                        + (failure.message ?: "可在技能详情中重新授权"),
-                )
-                return
-            } finally {
-                _state.value = _state.value.copy(mcpLoginServerId = null)
-            }
+        } catch (cancelled: CancellationException) {
+            synchronizeExtensionInventory()
+            _state.value = _state.value.copy(
+                mcpLoginServerId = null,
+                feedback = "用户已取消授权；已安装技能和已完成的服务连接均已保留，可从详情继续",
+            )
+            throw cancelled
         }
+
         synchronizeExtensionInventory()
         val unresolved = _state.value.skills.filter { it.name in bundledSkillIds }
             .flatMap { it.requirements }
             .count { !it.registered }
         val scope = if (bundledSkillIds.size > 1) "插件 ${officialPluginId ?: installedId} 的 ${bundledSkillIds.size} 项技能"
             else "技能 ${installedId}"
+        val officialStatus = com.labteto.dshmobile.uicontract.uiMcpDeclaredConnection(
+            localTools.servers(), officialDetail?.mcpServerId, officialDetail?.mcpUrl)
         _state.value = _state.value.copy(
-            feedback = if (unresolved == 0)
-                "${scope}已安装，可直接使用"
-            else "${scope}已安装，还有 ${unresolved} 项运行依赖可在详情中查看",
+            feedback = when {
+                failures.isNotEmpty() -> "${scope}已安装；${failures.size} 项服务授权未完成（" +
+                    failures.joinToString("；") { "${it.serverId}：${it.message.take(140)}" } +
+                    "），已成功的连接保留。可在详情继续"
+                officialStatus == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.TARGET_CONFLICT ->
+                    "${scope}已安装，但 MCP 标识已由其他地址占用；请在连接器中核对"
+                officialStatus == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.REGISTERED_UNREADY ->
+                    "${scope}已安装，服务已登记但尚未确认工具可用；请在连接器中检查"
+                officialDetail?.mcpUrl != null &&
+                    officialStatus == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.ABSENT ->
+                    "${scope}已安装，服务尚未登记；请进入详情连接账号"
+                unresolved != 0 ->
+                    "${scope}已安装，还有 ${unresolved} 项运行依赖需在详情中处理"
+                else -> "${scope}已安装，可直接使用"
+            },
         )
     }
 
@@ -655,7 +683,7 @@ class ToolsViewModel @Inject constructor(
                 }
                 val allIds = localTools.installedSkills().filter { skill ->
                     detail.skillDirectories.values.any { folder ->
-                        skill.sourceUrl?.endsWith("/${plugin.sourcePath}/$folder") == true
+                        codexOfficialPluginSourceMatches(skill.sourceIdentity, plugin.sourcePath, folder)
                     }
                 }.map { it.name }.distinct()
                 if (allIds.isEmpty()) error("插件没有可安装的 Android 技能")

@@ -1,20 +1,8 @@
 package com.labteto.dshmobile.local.quality
 
-import com.labteto.dshmobile.local.LocalUsageMode
-
-internal data class LocalOutputQualityContext(
-    val usageMode: LocalUsageMode? = null,
-)
-
+/** A domain-owned delivery assessment; Work verifies concrete Goal and artifact evidence. */
 internal data class LocalOutputQualityResult(
     val text: String,
     val findings: List<String> = emptyList(),
     val changed: Boolean = false,
 )
-
-internal fun interface LocalOutputQualityGuard {
-    fun inspect(
-        text: String,
-        context: LocalOutputQualityContext,
-    ): LocalOutputQualityResult
-}

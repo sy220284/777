@@ -92,6 +92,60 @@ class LocalMcpCredentialStore @Inject constructor(
             Json.encodeToString(LocalMcpOAuthCredential.serializer(), credential))
     }
 
+    /** A versioned Keystore change receipt; the previous value stays in memory only. */
+    internal data class CredentialRotationReceipt(
+        val previous: String?,
+        val committed: String,
+    )
+
+    private suspend fun replaceRecord(
+        serverId: String, committed: String,
+    ): CredentialRotationReceipt = lock(serverId).withLock {
+        currentCoroutineContext().ensureActive()
+        val store = secret(serverId)
+        val previous = store.get()
+        store.put(committed)
+        CredentialRotationReceipt(previous, committed)
+    }
+
+    internal suspend fun rotateOAuth(
+        serverId: String, endpoint: String, credential: LocalMcpOAuthCredential,
+    ): CredentialRotationReceipt = replaceRecord(
+        serverId,
+        endpointIdentity(endpoint) + "\noauth:\n" +
+            Json.encodeToString(LocalMcpOAuthCredential.serializer(), credential),
+    )
+
+    internal suspend fun rotateBearer(
+        serverId: String, endpoint: String, bearer: String,
+    ): CredentialRotationReceipt {
+        require(bearer.length in 1..4096 && bearer.all { it.code in 0x21..0x7e }) {
+            "MCP 凭据必须是非空 ASCII 可见字符且不能超过 4096 字符"
+        }
+        return replaceRecord(serverId, endpointIdentity(endpoint) + "\n" + bearer)
+    }
+
+    /** Reject stale rollback instead of silently clobbering a newer credential. */
+    internal suspend fun rollbackCredentialRotation(
+        serverId: String, receipt: CredentialRotationReceipt,
+    ) = lock(serverId).withLock {
+        val store = secret(serverId)
+        check(store.get() == receipt.committed) { "MCP 凭据已由另一操作更新，不能覆盖新凭据" }
+        if (receipt.previous == null) store.clear() else store.put(receipt.previous)
+    }
+
+    /** Refresh in memory first; the connection owner commits only after staging succeeds. */
+    internal suspend fun stageOAuthRefresh(
+        serverId: String, endpoint: String,
+    ): LocalMcpOAuthCredential = lock(serverId).withLock {
+        val value = storedValue(serverId, endpoint)
+            ?: error("当前服务没有可刷新的 OAuth 凭据")
+        require(value.startsWith("oauth:\n")) { "此服务使用手动凭据，无需 OAuth 刷新" }
+        val saved = decodeOAuth(value)
+        require(saved.refreshToken != null) { "当前 OAuth 令牌没有刷新凭据，请重新登录" }
+        oauthProtocol.refresh(saved)
+    }
+
     suspend fun forEndpoint(serverId: String, endpoint: String): String? = resolve(serverId, endpoint, false)
 
     internal suspend fun refresh(serverId: String, endpoint: String): String? = resolve(serverId, endpoint, true)

@@ -58,11 +58,39 @@ enum class UiMessageEditOutcome {
 }
 enum class UiMessageRole { USER, ASSISTANT, SYSTEM, TOOL }
 data class UiMessageBranch(val index: Int, val count: Int)
+
+/** Display-only block projection. No mutable Session domain objects or binary image bodies cross UI. */
+enum class UiMessageMediaSource { USER, MODEL, TOOL }
+sealed interface UiMessageContentBlock {
+    data class Text(val text: String) : UiMessageContentBlock
+    data class Image(
+        val relativePath: String, val mediaType: String, val name: String, val bytes: Long,
+        val attachmentId: String?, val width: Int?, val height: Int?,
+        val source: UiMessageMediaSource,
+    ) : UiMessageContentBlock
+    data class File(
+        val relativePath: String, val mediaType: String, val name: String, val bytes: Long,
+        val attachmentId: String?, val source: UiMessageMediaSource,
+    ) : UiMessageContentBlock
+    /** Retain unknown future block data for fidelity without giving it execution authority. */
+    data class Unknown(val kind: String, val payload: kotlinx.serialization.json.JsonObject) : UiMessageContentBlock
+}
+
+/** A tool execution's identity and outcome are evidence, not a new UI permission grant. */
+data class UiMessageToolState(
+    val name: String?, val isError: Boolean?, val errorCode: String?,
+    val callId: String?, val executionId: String?,
+    val declaredAt: Long?, val declaredSequence: Long?,
+)
+
 /** Transient owner-scoped model text. Durable transcript replaces it when committed. */
 data class UiStreamingReplyPreview(val requestId: String, val text: String)
 data class UiMessageSnapshot(val id: String, val role: UiMessageRole, val text: String, val createdAt: Long,
     val editableText: String? = null, val branch: UiMessageBranch? = null, val proactive: Boolean = false,
-    val progressive: Boolean = false)
+    val progressive: Boolean = false,
+    val speakerId: String? = null, val speakerName: String? = null,
+    val tool: UiMessageToolState? = null,
+    val blocks: List<UiMessageContentBlock> = emptyList())
 
 /** Chat-owned read-only group facts; there is no implicit group administration command. */
 data class UiChatGroupSummary(val memberNames: List<String>)
