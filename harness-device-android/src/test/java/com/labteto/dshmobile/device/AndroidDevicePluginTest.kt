@@ -195,6 +195,15 @@ class AndroidDevicePluginTest {
     }
 
     @Test
+    fun emptyAccessibilityTextIsAValidExplicitValueButMissingFieldIsNot() {
+        assertEquals("", mapOf("search_text" to "").deviceStringIncludingEmpty("search_text"))
+        assertEquals("", mapOf("value" to "").deviceStringIncludingEmpty("value"))
+        assertThrows(IllegalArgumentException::class.java) {
+            emptyMap<String, String>().deviceStringIncludingEmpty("value")
+        }
+    }
+
+    @Test
     fun deviceNumericAndBooleanArgumentsRejectMalformedValuesInsteadOfFallingBack() {
         assertThrows(IllegalArgumentException::class.java) {
             mapOf("duration_ms" to "abc").deviceOptionalLong("duration_ms", 60L, 1L..60_000L)
