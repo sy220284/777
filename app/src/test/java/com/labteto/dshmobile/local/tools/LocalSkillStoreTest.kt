@@ -251,4 +251,14 @@ class LocalSkillStoreTest {
         assertTrue(store.readDocument("writing-polish").length > 128 * 1024)
     }
 
+    @Test fun manuallyCreatedSkillSupportsLongInstructions() = inWorkspace { store, workspace, _ ->
+        val instructions = "长篇技能规则。".repeat(20_000)
+        store.create("long-custom-skill", "大型自定义技能", "包含大量引用和操作步骤", instructions)
+        assertTrue(workspace.readSkill("long-custom-skill").contains(instructions))
+        store.setModelInvocable("long-custom-skill", false)
+        assertTrue(!workspace.skillMetadata("long-custom-skill").modelInvocable)
+        store.setModelInvocable("long-custom-skill", true)
+        assertTrue(workspace.readSkill("long-custom-skill").contains(instructions))
+    }
+
 }
