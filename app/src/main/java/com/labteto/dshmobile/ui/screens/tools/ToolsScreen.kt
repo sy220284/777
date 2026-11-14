@@ -1162,6 +1162,9 @@ fun ToolsScreen(
                                     onCreateSkill = viewModel::createSkill,
                                     onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
                                      onInstallGitHubSkill = viewModel::installGitHubSkill,
+                                    onConnectSkillMcp = { serverId, url ->
+                                        viewModel.loginMcp(serverId, url, "")
+                                    },
                                     onRemoveSkill = viewModel::removeSkill,
                                     onShareSkillPackage = viewModel::shareSkillPackage,
                                     onCheckSkillUpdate = viewModel::checkSkillUpdate,
