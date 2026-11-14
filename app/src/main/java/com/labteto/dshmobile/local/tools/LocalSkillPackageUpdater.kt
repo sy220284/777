@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import java.io.File
+import java.io.InputStream
+import java.io.ByteArrayInputStream
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -58,7 +60,9 @@ internal class LocalSkillPackageUpdater(private val workspace: LocalWorkspace) {
             target.isDirectory && File(target, "SKILL.md").isFile
     }
 
-    fun replace(id: String, archive: ByteArray): String {
+    fun replace(id: String, archive: ByteArray): String = ByteArrayInputStream(archive).use { replace(id, it) }
+
+    fun replace(id: String, archive: InputStream): String {
         validateId(id)
         require(!Files.isSymbolicLink(systemRoot.toPath()) &&
             !Files.isSymbolicLink(skillsRoot.toPath()) &&
