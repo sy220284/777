@@ -22,7 +22,7 @@ internal fun localWorkOutstandingRequiredReviews(
         val prefix = "work/" + type + "-review"
         val start = log.latestMatching(setOf("$prefix-start")) { fields ->
             fields.reviewValue("goal_id") == goal.id &&
-                fields.reviewValue("goal_revision") == goal.revision.toString()
+                fields.reviewValue("goal_start_sequence") == goal.startedAtSequence.toString()
         }?.takeIf { it.sequence > goal.startedAtSequence }
         if (start == null) {
             add(if (type == "security") "目标要求的独立安全审查尚未开始" else "目标要求的独立代码审查尚未开始")
@@ -33,7 +33,7 @@ internal fun localWorkOutstandingRequiredReviews(
         val result = log.latestMatching(setOf("$prefix-result")) { fields ->
             fields.reviewValue("id") == id && fields.reviewValue("digest") == digest &&
                 fields.reviewValue("goal_id") == goal.id &&
-                fields.reviewValue("goal_revision") == goal.revision.toString()
+                fields.reviewValue("goal_start_sequence") == goal.startedAtSequence.toString()
         }?.takeIf { it.sequence > start.sequence }
         if (result == null) {
             add(if (type == "security") "独立安全审查尚无完整结果" else "独立代码审查尚无完整结果")
@@ -49,7 +49,7 @@ internal fun localWorkOutstandingRequiredReviews(
                 fields.reviewValue("digest") == digest &&
                 fields.reviewValue("sequence") == result.sequence.toString() &&
                 fields.reviewValue("goal_id") == goal.id &&
-                fields.reviewValue("goal_revision") == goal.revision.toString()
+                fields.reviewValue("goal_start_sequence") == goal.startedAtSequence.toString()
         }?.takeIf { it.sequence > result.sequence }
         if (accepted == null) {
             add(if (type == "security") "当前安全审查尚待人工确认" else "当前代码审查尚待人工接纳")
