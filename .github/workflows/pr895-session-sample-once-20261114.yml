@@ -1,4 +1,5 @@
 name: PR895 会话采样定向回归（单次）
+# 第二次：验证 Hilt 可见性修复及用量显示
 on:
   push:
     branches: [feat/codex-capability-alignment-20261112]
