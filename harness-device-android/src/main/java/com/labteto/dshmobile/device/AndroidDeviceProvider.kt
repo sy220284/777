@@ -78,6 +78,7 @@ class AndroidDeviceProvider(
         "notification_list",
         "clipboard_get",
         "clipboard_set",
+        "clipboard_clear",
         "vscreen_create",
         "vscreen_list",
         "vscreen_status",
@@ -141,6 +142,7 @@ class AndroidDeviceProvider(
             "notification_list" -> notificationList()
             "clipboard_get" -> clipboardGet()
             "clipboard_set" -> clipboardSet(arguments.required("text"))
+            "clipboard_clear" -> clipboardClear()
             "vscreen_create" -> {
                 val lease = resourceScheduler?.acquire(
                     HarnessResourceKind.VIRTUAL_DISPLAY,
@@ -426,6 +428,12 @@ class AndroidDeviceProvider(
         val manager = context.getSystemService(ClipboardManager::class.java)
         manager.setPrimaryClip(ClipData.newPlainText("777 Harness", text))
         return "已写入剪贴板"
+    }
+
+    private fun clipboardClear(): String {
+        val manager = context.getSystemService(ClipboardManager::class.java)
+        manager.clearPrimaryClip()
+        return "已清空剪贴板"
     }
 
     private fun virtualStatus(status: com.labteto.dshmobile.device.vscreen.VirtualDisplayStatus): String =
