@@ -5,6 +5,8 @@ import com.labteto.dshmobile.local.recordForeground
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.withTimeout
@@ -66,6 +68,40 @@ internal fun localSessionSampleMessages(
 
 private fun <T> Sequence<T>.takeLastSampleContext(limit: Int): Sequence<T> =
     toList().takeLast(limit).asSequence()
+/**
+ * Snapshot the model's actual, already-compacted conversation instead of the latest sixteen
+ * display messages. The fork keeps completed tool-call pairs and active Work instructions.
+ * No tool schema or writable state is supplied to the auxiliary inference request.
+ */
+internal fun localSessionSampleModelMessages(
+    history: List<JsonObject>,
+    prompt: String,
+): List<JsonObject> {
+    val instruction = validateLocalSessionSamplePrompt(prompt)
+    require(history.isNotEmpty()) { "当前会话缺少可用的模型上下文" }
+    val stable = durableModelHistorySnapshot(history)
+    require(stable.any {
+        (it["role"] as? JsonPrimitive)?.contentOrNull in setOf("user", "assistant")
+    }) { "当前模型历史没有可采样的对话" }
+    val guard = "这是对当前模型上下文进行的一次只读会话采样。模拟下一条助手回复；不要调用工具、修改任何文件或声称已完成外部操作。采样结果不会写入原会话。"
+    val first = stable.first()
+    val existingSystem = if ((first["role"] as? JsonPrimitive)?.contentOrNull == "system")
+        (first["content"] as? JsonPrimitive)?.contentOrNull else null
+    val fork = if (existingSystem != null) {
+        listOf(JsonObject(first + ("content" to JsonPrimitive(existingSystem + "\n\n" + guard)))) +
+            stable.drop(1)
+    } else {
+        listOf(buildJsonObject {
+            put("role", "system")
+            put("content", guard)
+        }) + stable
+    }
+    return fork + buildJsonObject {
+        put("role", "user")
+        put("content", instruction)
+    }
+}
+
 
 /** An edited message keeps its ID; freshness must compare the captured message bytes. */
 internal fun localSessionSampleContextIsCurrent(
@@ -100,6 +136,13 @@ class LocalConversationSampleCoordinator @Inject internal constructor(
             val sourceMessages = snapshot.messages.toList()
             val lastMessageId = sourceMessages.lastOrNull()?.id
             check(lastMessageId != null) { "当前会话没有可供采样的历史" }
+            val sourceModelHistory = synchronized(stateStore.foregroundRunHandle.lock) {
+                check(stateStore.foregroundRunHandle.sessionId == expectedSessionId) {
+                    "会话运行上下文已切换，请重新采样"
+                }
+                stateStore.foregroundRunHandle.modelHistory.snapshot()
+            }
+            val sampleMessages = localSessionSampleModelMessages(sourceModelHistory, prompt)
             val profile = modelGateway.profileForRoute(
                 profileId = snapshot.modelState.modelSelection.activeProfileId,
                 model = snapshot.modelState.model,
@@ -110,7 +153,7 @@ class LocalConversationSampleCoordinator @Inject internal constructor(
                 auxiliary.complete(
                     modelAttempts = snapshot.modelState.modelAttempts,
                     profile = profile,
-                    messages = localSessionSampleMessages(sourceMessages, prompt),
+                    messages = sampleMessages,
                     eventLog = eventLog,
                     operation = "session/sample",
                 )
@@ -131,6 +174,8 @@ class LocalConversationSampleCoordinator @Inject internal constructor(
             check(localSessionSampleContextIsCurrent(
                 expectedSessionId, sourceMessages, current.sessionId, current.messages,
             ) && current.messages.lastOrNull()?.id == lastMessageId &&
+                stateStore.foregroundRunHandle.sessionId == expectedSessionId &&
+                stateStore.foregroundRunHandle.modelHistory.snapshot() == sourceModelHistory &&
                 !current.kernel.running && !current.loading
             ) { "会话内容已变化，旧采样结果已失效" }
             eventLog.append("session/sample", buildJsonObject {
@@ -140,6 +185,7 @@ class LocalConversationSampleCoordinator @Inject internal constructor(
                 put("input_tokens", reply.usage.promptTokens)
                 put("output_tokens", reply.usage.completionTokens)
                 put("usage_reported", reply.usage.reported)
+                put("source_model_message_count", sourceModelHistory.size)
             })
             return LocalConversationSampleResult(
                 sessionId = expectedSessionId,
