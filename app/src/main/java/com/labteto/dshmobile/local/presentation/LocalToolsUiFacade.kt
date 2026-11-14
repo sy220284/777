@@ -17,6 +17,7 @@ internal fun isRegisteredMcpSkillRequirement(
 ): Boolean = servers.any { server ->
     server.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED &&
         server.connection == com.labteto.dshmobile.uicontract.UiToolConnection.HEALTH_UNCHECKED &&
+        server.tools.isNotEmpty() &&
         (server.id == name || name in server.tools)
 }
 
