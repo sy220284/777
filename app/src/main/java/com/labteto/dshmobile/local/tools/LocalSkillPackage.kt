@@ -19,7 +19,7 @@ internal class LocalSkillPackageImporter(private val workspace: LocalWorkspace) 
     fun install(filename: String, bytes: ByteArray): String =
         ByteArrayInputStream(bytes).use { install(filename, it) }
 
-    fun install(filename: String, input: InputStream): String {
+    fun install(filename: String, input: InputStream, beforePublish: () -> Unit = {}): String {
         require(filename.endsWith(".zip", true) || filename.endsWith(".md", true)) {
             "请选择 SKILL.md 或 ZIP 技能包"
         }
@@ -50,6 +50,7 @@ internal class LocalSkillPackageImporter(private val workspace: LocalWorkspace) 
             }
             require(skillsRoot.isDirectory || skillsRoot.mkdirs()) { "无法创建技能目录" }
             require(!destination.exists()) { "同名技能已经存在：$id" }
+            beforePublish()
             try {
                 Files.move(selected.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE)
             } catch (_: AtomicMoveNotSupportedException) {
