@@ -544,4 +544,78 @@ class CodeModePluginTest {
         assertFalse(actual.content.contains("private"))
     }
 
+
+    @Test fun schemaTeachesRawResultPathsToEveryModel() = runTest {
+        val registry = ToolRegistry()
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val exposed = registry.get("code_mode_run")!!.schema.toString()
+        assertTrue(exposed.contains("steps[0].content"))
+        assertTrue(exposed.contains("前序工具返回正文"))
+        assertTrue(exposed.contains("省略 path"))
+    }
+
+    @Test fun plainTextConditionWorksWithoutInventingResultFields() = runTest {
+        val registry = ToolRegistry()
+        var reads = 0
+        register(registry, "status") { ToolResult("ready") }
+        register(registry, "next") { reads++; ToolResult("done") }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val script = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject { put("tool", "status"); put("args", buildJsonObject {}) })
+                add(buildJsonObject {
+                    put("tool", "next"); put("args", buildJsonObject {})
+                    put("when", buildJsonObject { put("step", 1); put("equals", "ready") })
+                })
+            })
+        }
+        val result = registry.execute("code_mode_run", script)
+        assertFalse(result.isError)
+        assertEquals(1, reads)
+    }
+
+    @Test fun wrongPathReportsActualJsonFieldsForModelCorrection() = runTest {
+        val registry = ToolRegistry()
+        var reads = 0
+        register(registry, "status") { ToolResult("""{"approved":true,"count":2}""") }
+        register(registry, "next") { reads++; ToolResult("done") }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val script = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject { put("tool", "status"); put("args", buildJsonObject {}) })
+                add(buildJsonObject {
+                    put("tool", "next"); put("args", buildJsonObject {})
+                    put("when", buildJsonObject {
+                        put("step", 1); put("path", "steps[0].content"); put("equals", true)
+                    })
+                })
+            })
+        }
+        val result = registry.execute("code_mode_run", script)
+        assertTrue(result.isError)
+        assertEquals("CODE_MODE_REFERENCE_FAILED", result.errorCode)
+        assertEquals(0, reads)
+        assertTrue(result.content.contains("可用字段"))
+        assertTrue(result.content.contains("approved"))
+    }
+
+    @Test fun scalarPathErrorSaysToCompareWholeResult() = runTest {
+        val registry = ToolRegistry()
+        register(registry, "status") { ToolResult("plain text") }
+        register(registry, "next") { ToolResult("done") }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val script = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject { put("tool", "status"); put("args", buildJsonObject {}) })
+                add(buildJsonObject {
+                    put("tool", "next"); put("args", buildJsonObject {})
+                    put("when", buildJsonObject { put("step", 1); put("path", "content"); put("equals", "plain text") })
+                })
+            })
+        }
+        val result = registry.execute("code_mode_run", script)
+        assertTrue(result.isError)
+        assertTrue(result.content.contains("省略 path"))
+    }
+
 }
