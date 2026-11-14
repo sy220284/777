@@ -211,7 +211,7 @@ class LocalToolsUiFacade @Inject internal constructor(
                 sourceUrl = result.getOrNull(),
                 sourceWarning = if (result.isFailure) "技能来源记录校验失败，请检查或重新安装此技能" else null,
                 rollbackAvailable = gitHubSkillImporter.canRollback(item.name),
-                requirements = skillManager.requirements(item.name).map { requirement ->
+                requirements = skillManager.dependencies(item.name).map { requirement ->
                     val registered = when (requirement.type.lowercase()) {
                         "mcp" -> connected.any { server ->
                             server.id == requirement.value || requirement.value in server.tools
