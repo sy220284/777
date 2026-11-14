@@ -589,7 +589,7 @@ fun LocalHarnessScreen(
         previewWorkspaceFile = { path -> viewModel.previewWorkspaceFileForSession(shell.sessionId, path) },
         previewWorkspaceFilePage = { path, offset ->
             viewModel.previewWorkspaceFilePageForSession(shell.sessionId, path, offset)
-        }
+        },
         artifactsForUi = viewModel::artifactsForUi,
         eventSequenceForUi = viewModel::eventSequenceForUi,
         eventChanges = viewModel::workEventChangesForUi,
