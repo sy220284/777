@@ -199,7 +199,8 @@ class LocalToolExecutionCoordinatorTest {
                     }
                 }
                 register(tool(name, ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
-                    exposure = ToolExposure.OPTIONAL) { ToolResult("ok") }
+                    exposure = ToolExposure.OPTIONAL,
+                    keywords = setOf("批量工具")) { ToolResult("ok") }
                     .copy(schema = functionToolSchema(name, "扩展工具", properties)))
             }
         }
