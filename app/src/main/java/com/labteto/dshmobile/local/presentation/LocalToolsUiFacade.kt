@@ -238,6 +238,17 @@ class LocalToolsUiFacade @Inject internal constructor(
             item.installPolicy, item.authPolicy, item.codexOnly,
         )
     }
+    override suspend fun codexPluginDetail(id: String):
+        com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot {
+        val info = codexOfficialPlugins.detail(id)
+        return com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            id, info.displayName, info.description, info.developerName, info.version,
+            if (info.hasSkills) codexOfficialPlugins.pluginSkills(id) else emptyList(),
+            info.hasMcp, info.hasApp, info.hasHooks,
+        )
+    }
+    override suspend fun installCodexPluginSkill(pluginId: String, skillId: String): String =
+        codexOfficialPlugins.installPluginSkill(pluginId, skillId)
     /** The feature owns source validation; UI passes only the name from a visible catalog row. */
     suspend fun installCuratedSkill(id: String) = gitHubSkillImporter.install(
         com.labteto.dshmobile.local.tools.curatedGitHubSkillUrl(id),
