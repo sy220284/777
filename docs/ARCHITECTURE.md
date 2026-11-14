@@ -357,6 +357,9 @@ UI 继续只消费窄投影，例如 Chat surface、Work surface、Shell state�
 ## 9. UI 与导航
 
 UI 只依赖 Feature API / projection，不依赖 Store、Coordinator 或 Kernel 内部实现。
+ 
+当前 Tools 页面以 `ToolsManagementUiPort` 作为注入的功能接口，`LocalToolsUiFacade` 负责实现与 DI 绑定。页面仅持有经过身份校验的技能来源、连接及可用状态投影，不能绕过接口调用工具内部 Store。Chat/Work 的实时消息与历史读取统一经 `projectTranscriptHistoryMessage` 映射到 `UiMessageSnapshot`；其只读契约完整投影说话人、富媒体块、未知块原始数据、工具调用及结果身份。V6 原生历史仍保留原消息的完整表现力，并与独立 UI 共用唯一 `TranscriptHistoryPager`，直至等效 UI 渲染完整验证。
+
 
 目标导航链：
 
