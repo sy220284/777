@@ -503,14 +503,15 @@ internal class LocalSkillManager @Inject constructor(
     fun create(id: String, displayName: String, description: String, instructions: String) =
         store.create(id, displayName, description, instructions)
     fun importSkill(filename: String, bytes: ByteArray): String = LocalSkillPackageImporter(storageWorkspace).install(filename, bytes)
-    fun importSkill(filename: String, input: java.io.InputStream): String = LocalSkillPackageImporter(storageWorkspace).install(filename, input)
+    fun importSkill(filename: String, input: java.io.InputStream, beforePublish: () -> Unit = {}): String =
+        LocalSkillPackageImporter(storageWorkspace).install(filename, input, beforePublish)
     fun exportSkillPackage(id: String): ByteArray = LocalSkillPackageExporter(storageWorkspace).export(id)
     fun exportSkillPackageToFile(id: String, destination: File) =
         LocalSkillPackageExporter(storageWorkspace).exportToFile(id, destination)
     fun replaceSkillPackage(id: String, archive: ByteArray): String =
         LocalSkillPackageUpdater(storageWorkspace).replace(id, archive)
-    fun replaceSkillPackage(id: String, archive: java.io.InputStream): String =
-        LocalSkillPackageUpdater(storageWorkspace).replace(id, archive)
+    fun replaceSkillPackage(id: String, archive: java.io.InputStream, beforePublish: () -> Unit = {}): String =
+        LocalSkillPackageUpdater(storageWorkspace).replace(id, archive, beforePublish)
     fun canRollbackSkill(id: String): Boolean = LocalSkillPackageUpdater(storageWorkspace).canRollback(id)
     fun rollbackSkill(id: String): String = LocalSkillPackageUpdater(storageWorkspace).rollback(id)
     fun remove(id: String) {
