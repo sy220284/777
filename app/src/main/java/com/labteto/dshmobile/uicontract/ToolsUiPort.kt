@@ -69,6 +69,7 @@ interface ToolsUiPort {
     fun pluginLifecycleSnapshots(): List<UiPluginLifecycle> = emptyList()
     suspend fun recoverFailedPlugin(id: String): List<String> =
         error("当前工具 Owner 不支持插件恢复")
+    fun activeToolHookIds(): List<String> = emptyList()
     fun installedPluginIds(): List<String>
     suspend fun installedSkills(): List<UiSkillSnapshot>
     suspend fun presetSkills(): List<UiPresetSkillSnapshot>
