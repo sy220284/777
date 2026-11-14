@@ -120,7 +120,7 @@ class LocalWorkProjectCatalogTest {
                 catalog.moveDirectory(child.id, "repo/a", "output/new-repo")
             }.isSuccess)
             assertTrue(runCatching {
-                catalog.moveDirectory(project.id, "repo", "output")
+                catalog.moveDirectory(project.id, "repo", "output/new-repo/nested")
             }.isFailure)
             assertEquals(revision + 1, catalog.snapshots.value.revision)
             assertTrue(File(root, "repo/a").isDirectory)
