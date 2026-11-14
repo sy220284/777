@@ -514,8 +514,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.runOnIdle {
             assertEquals(pluginId to "figma-use", selectedSkill)
         }
-        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
-            .performScrollTo().performClick()
+        // Installation keeps the detail destination alive for a connected next step.
         compose.onNodeWithText("授权并连接 figma").performScrollTo().performClick()
         compose.runOnIdle {
             assertEquals(pluginId, connectedPlugin)
@@ -622,6 +621,35 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithTag("plugin-detail-primary-action").assertIsDisplayed()
         compose.onNodeWithText("安装包含的 2 项技能").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(pluginId, installedPlugin) }
+    }
+
+    @Test
+    fun installingAPresetKeepsDetailOpenAndReprojectsLiveInstalledState() {
+        val installed = androidx.compose.runtime.mutableStateOf(false)
+        var usePrompt: String? = null
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    presets = listOf(com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot(
+                        "research-check", "资料研究与核实", "核查来源", installed.value,
+                    )),
+                    skills = if (installed.value) listOf(
+                        com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+                            "research-check", "核查来源", true,
+                        )) else emptyList(),
+                    skillsOnly = true,
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onInstallPreset = { installed.value = true },
+                    onUseCapability = { usePrompt = it },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-skill:research-check").performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
+        compose.onNodeWithText("已安装").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-detail-primary-action").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals("@skill:research-check\\n", usePrompt) }
     }
 
 }
