@@ -18,7 +18,7 @@
 | Work/世界状态压缩 | `compact.rs`、`session/rollout_reconstruction.rs` 对压缩窗口、world-state baseline、替换历史有专门的恢复规则 | `LocalWorkHistoryCheckpoint.kt`、`LocalStructuredWorkStateProjection.kt`、`SessionEventLog.kt` | **部分对齐**：777 已有约束撤销、决策来源、工具 ID、Checkpoint，但 Work 事实投影与 Codex world-state 更新并非同构；避免旧规则复活需继续测试多次压缩/授权重新授予。 |
 | 模型请求/重复计费 | Codex `client/`、`session/` 保存每一步请求配置、响应元数据并做恢复 | `LocalModelRequestCoordinator.kt`、`model/ModelAdmissionSafety.kt`、`LocalModelRequestAttemptPolicy.kt` | **核心安全语义已对齐**：777 已冻结路由、追踪 NOT_SENT/MAYBE_ADMITTED/ADMITTED，并对无法证明未发送的故障禁止盲目整请求重放；单次尝试证据独立可测。Coordinator 仍较庞大，但仅凭文件行数不构成拆分理由。 |
 | 持久执行与恢复 | Codex `session/rollout_reconstruction.rs` 及 agent graph store，恢复不冒充当前 runtime | `LocalAgentRunCoordinator.kt`、`LocalPersistentJobRecoveryCoordinator.kt`、`PersistentTerminal.kt` | **部分对齐**：777 有事件高水位恢复、旧终端运行代次、未知工具副作用阻断；还缺全执行宿主（shell/MCP/虚拟屏）的统一 epoch 证明和真实设备重启回放。 |
-| 独立工作树隔离 | Codex 子代理配置独立 `cwd`/sandbox/profile；运行时按调用边界生效 | `LocalSubagentRunnerFactory.kt` 固定 `workspacePath`，文件/Shell/MCP 工具共用执行根 | **未实现**：777 的 Team `write_scopes` 是协调提示，不是文件沙箱。单纯 git worktree 命令不会隔离工具；必须在所有工具路由、规范化 realpath、MCP 和后台任务恢复中强制对应 root，验收前不得宣传为“隔离”。 |
+| 独立工作树隔离 | Codex 子代理配置独立 `cwd`/sandbox/profile；运行时按调用边界生效 | `LocalSubagentRunnerFactory.kt` 固定 `workspacePath`，文件/Shell/MCP 工具共用执行根 | **未实现**：777 的 Team `write_scopes` 是协调提示，不是文件沙箱。单纯 git worktree 命令不会隔离工具；必须在所有工具路由、规范化 realpath、MCP 和后台任务恢复中强制对应 root，实际工具级隔离尚未完善。 |
 
 ## 1. 关键状态转移对照
 
@@ -67,11 +67,11 @@ Codex：读取持久 rollout、最近有效 compaction 和 WorldState baseline�
 | 可选 | 真正 per-agent worktree sandbox | 未达强制执行条件前**不提供假隔离** |
 | 不做 | 用一个 777 模块对应一个 Codex Rust 文件、增加第二个 Goal/任务状态所有者 | 破坏现有 Android 架构与单一事件事实源，收益不足 |
 
-## 3. 验收合同
+## 3. 已有测试与功能范围
 
 本分支以 `LocalSubagentContextTest` 验证：无效 fork call-id 不能扩大继承范围；父级 tool/result、tool_calls、隐藏 reasoning/replay 字段不进入 child 模型输入；用户可见父对话与当前子任务仍保留。
 
-最终合并需以**本分支最新 head** 的 Kotlin 单测、静态/架构、Android ARM64 与需要的仪表测试为准，不得拿此前 #651/#656/#658 的 CI 代替。本报告是静态源码语义对照，不代表实测出具体性能加速或完整平台沙箱隔离。
+本报告是静态源码语义对照，不代表实测出具体性能加速或完整平台沙箱隔离。
 
 ## 4. 执行器复审后的实装修复：注册身份、审批及资源锁三阶段一致性
 
