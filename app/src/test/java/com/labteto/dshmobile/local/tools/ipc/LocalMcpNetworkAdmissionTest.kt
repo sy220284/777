@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.tools.ipc
 import com.labteto.dshmobile.local.security.LocalPolicyLayer
 import com.labteto.dshmobile.local.security.mergeLocalExecutionPolicy
 import org.junit.Assert.assertTrue
+import java.net.URI
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.Test
 
 class LocalMcpNetworkAdmissionTest {
@@ -36,6 +38,17 @@ class LocalMcpNetworkAdmissionTest {
         val unrestricted = mergeLocalExecutionPolicy()
         LocalMcpNetworkAdmission("http", "http://localhost:7777/mcp").requireAllowed(unrestricted)
         assertDenied { LocalMcpNetworkAdmission("http", "http://192.0.2.10/mcp").requireAllowed(unrestricted) }
+    }
+
+    @Test fun workerRejectsCrossOriginRequestsEvenWithoutAuthentication() {
+        val endpoint = URI("https://trusted.example.com/mcp")
+        requireMcpWorkerSameOrigin(endpoint, "https://trusted.example.com/events".toHttpUrl())
+        assertDenied { requireMcpWorkerSameOrigin(endpoint, "https://other.example.com/mcp".toHttpUrl()) }
+        assertDenied { requireMcpWorkerSameOrigin(endpoint, "http://trusted.example.com/mcp".toHttpUrl()) }
+        assertDenied { requireMcpWorkerSameOrigin(endpoint, "https://trusted.example.com:8443/mcp".toHttpUrl()) }
+        requireMcpWorkerSameOrigin(URI("http://localhost:7777/mcp"), "http://localhost:7777/events".toHttpUrl())
+        assertDenied { requireMcpWorkerSameOrigin(URI("http://remote.example.com/mcp"),
+            "http://remote.example.com/mcp".toHttpUrl()) }
     }
 
     private inline fun assertDenied(action: () -> Unit) {

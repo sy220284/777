@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.tools.ipc
 
 import com.labteto.dshmobile.local.security.LocalEffectiveExecutionPolicy
 import java.net.URI
+import java.util.Locale
+import okhttp3.HttpUrl
 
 /** One-time worker endpoint validation; dynamic policy is checked only at real RPC boundaries. */
 internal class LocalMcpNetworkAdmission(kind: String, endpoint: String?) {
@@ -30,5 +32,23 @@ internal class LocalMcpNetworkAdmission(kind: String, endpoint: String?) {
         } else {
             policy.requireNetworkDestination(target.first, target.second)
         }
+    }
+}
+
+/**
+ * Every worker HTTP exchange must stay on the originally admitted origin.
+ * Enforced even when the MCP endpoint has no bearer credential.
+ */
+internal fun requireMcpWorkerSameOrigin(endpoint: URI, request: HttpUrl) {
+    val host = endpoint.host ?: error("MCP 地址缺少可核实主机")
+    val scheme = endpoint.scheme?.lowercase(Locale.ROOT).orEmpty()
+    val loopback = host.lowercase(Locale.ROOT) in setOf("localhost", "127.0.0.1", "::1", "[::1]")
+    require(endpoint.rawUserInfo == null && endpoint.rawFragment == null &&
+        (scheme == "https" || (scheme == "http" && loopback))) {
+        "MCP 请求来源不符合 HTTPS 或本地环回限制"
+    }
+    val port = if (endpoint.port >= 0) endpoint.port else if (scheme == "https") 443 else 80
+    require(request.scheme == scheme && request.host.equals(host, true) && request.port == port) {
+        "MCP HTTP 请求不能跳转到其他来源"
     }
 }

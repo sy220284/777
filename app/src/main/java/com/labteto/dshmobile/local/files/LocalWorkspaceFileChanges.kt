@@ -60,6 +60,12 @@ internal fun workspaceFileWatchTargets(
     return watchers.mapValues { (_, names) -> names.toSet() }
 }
 
+/** The set of watched child names is part of a native observer's registration. */
+internal fun workspaceWatchersToReplace(
+    active: Map<File, Set<String>>,
+    desired: Map<File, Set<String>>,
+): Set<File> = active.keys.filterTo(linkedSetOf()) { active[it] != desired[it] }
+
 /**
  * Single native FileObserver authority used by Work and the shared workspace.
  * New intermediate directories automatically acquire watchers without polling.
@@ -76,14 +82,16 @@ internal fun watchWorkspaceFileChanges(
 ): Flow<LocalWorkspaceFileChange> = callbackFlow {
     val root = workspace.canonicalFile
     val lock = Any()
-    val active = linkedMapOf<File, FileObserver>()
+    val active = linkedMapOf<File, Pair<FileObserver, Set<String>>>()
     var closed = false
     fun refresh() {
         synchronized(lock) {
             if (closed) return
             val targets = workspaceFileWatchTargets(root, paths())
-            active.keys.filter { it !in targets }.forEach { folder ->
-                active.remove(folder)?.stopWatching()
+            // A directory can remain the same while its accepted filenames change.
+            // Replace the native observer so the callback uses the current target set.
+            workspaceWatchersToReplace(active.mapValues { it.value.second }, targets).forEach { folder ->
+                active.remove(folder)?.first?.stopWatching()
             }
             targets.forEach { (directory, acceptedNames) ->
                 if (directory in active) return@forEach
@@ -109,7 +117,7 @@ internal fun watchWorkspaceFileChanges(
                             FileObserver.DELETE_SELF) != 0) refresh()
                     }
                 }
-                active[directory] = watcher
+                active[directory] = watcher to acceptedNames
                 watcher.startWatching()
             }
         }
@@ -118,7 +126,7 @@ internal fun watchWorkspaceFileChanges(
     awaitClose {
         synchronized(lock) {
             closed = true
-            active.values.forEach(FileObserver::stopWatching)
+            active.values.forEach { it.first.stopWatching() }
             active.clear()
         }
     }
