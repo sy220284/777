@@ -48,6 +48,23 @@ class LocalRequestMessageSurfaceTest {
         assertTrue("checkpoint count=$checkpoints", checkpoints in 3..7)
     }
 
+    @Test fun committedFullCheckpointDoesNotRetainMutableCallerHistory() {
+        val callerOwnedMessages = mutableListOf(message("system", "initial"))
+        val initial = callerOwnedMessages.toList()
+        val digest = stableJsonSha256(JsonArray(initial))
+        val committed = encodeLocalRequestMessageSurface(
+            callerOwnedMessages, digest, redacted = false,
+        )
+        callerOwnedMessages += message("user", "later")
+        assertEquals(JsonArray(initial), committed.payload["messages"])
+        val issues = mutableListOf<String>()
+        val event = LocalSessionEventLog.Event(
+            0L, "request/message-surface", 1L, committed.payload,
+        )
+        assertEquals(initial, replayLocalRequestMessageSurface(event, { null }, issues))
+        assertTrue(issues.toString(), issues.isEmpty())
+    }
+
     @Test fun processRestartReusesDurableDeltaChainAndPreservesRedactionIdentity() {
         val folder = Files.createTempDirectory("message-delta-restart").toFile()
         val logFile = folder.resolve("events.jsonl")
