@@ -213,7 +213,7 @@ PluginRegistry / PluginManager 由运行时插件体系持有，产品 Feature �
 
 语言服务器是可选能力。不存在合适 server 时，Agent 继续使用 read / grep / build / test。
 
-按需组件安装（PR #617，未合并，设备实测待验证）：
+按需组件安装（PR #617，未合并
 
 - TypeScript / JavaScript：首次语义查询时，经用户许可后按需下载安装固定版本的 TypeScript Language Server 及 TypeScript；不在 APK 中预装。
 - Python：同样按需安装 Pyright，使用 APK 内置 Node.js 运行，不依赖额外 Python 语言服务进程。

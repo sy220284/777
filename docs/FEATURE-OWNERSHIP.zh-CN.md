@@ -4,7 +4,7 @@
 >
 > 现行入口由 `LocalFeatureCatalog` 与 `LocalUiSceneCatalog` 决定，UI 3.0 的独立渲染器由 `ui-pack-v6/V6ApplicationScenePack` 负责。下表仅用于追溯旧 PR 合并决策。
 
-> 本文记录现有功能与 #513—#517 集成后的逻辑归属、入口和唯一事实源。架构约束仍以 [架构 3.0](ARCHITECTURE.md) 为准。本整合分支须以最新代码的完整 CI 与 Android 设备测试结果验收。
+> 本文记录现有功能及 #513—#517 集成后的归属、入口和唯一事实源；架构约束见 [架构 3.0](ARCHITECTURE.md)。
 
 ## 一级业务边界
 

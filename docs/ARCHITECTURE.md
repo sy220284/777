@@ -529,11 +529,11 @@ Kernel 不承担具体产品 Feature、Model Provider、Tool 领域、Settings �
 
 ## 15. 架构实现参考
 
-Feature、Shared Capability 和 Runtime Kernel 继续保持既定所有权、依赖方向与唯一事实源。现有静态脚本可用于开发时定位结构性问题，但不作为合并、发布和交付的验收门槛。
+Feature、Shared Capability 和 Runtime Kernel 继续保持既定所有权、依赖方向与唯一事实源。静态脚本用于定位结构问题。
 
 ## 16. 调试方式
 
-发现架构问题后以实际调用链定位、修正并按需测试。仓库不再要求同 SHA 的 CI、测试结果、设备证明或额外签收材料作为工作完成条件。
+发现架构问题后以实际调用链定位、修正并按需测试。
 
 
 ## 17. 相关权威文档
