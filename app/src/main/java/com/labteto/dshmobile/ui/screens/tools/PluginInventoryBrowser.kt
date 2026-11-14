@@ -370,11 +370,7 @@ internal fun PluginInventoryBrowser(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(
-                    if (skillsOnly) "技能" else "插件",
-                    style = DsType.headline17.withReadingWeight(), color = colors.text,
-                    modifier = Modifier.weight(1f),
-                )
+                androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
                 IconButton(
                     onClick = {
                         showSearch = !showSearch
@@ -555,7 +551,13 @@ internal fun PluginInventoryBrowser(
                 val pluginId = item.id.removePrefix("codex-plugin:")
                 val pluginDetail = if (item.id.startsWith("codex-plugin:")) codexDetails[pluginId] else null
                 val oneSkill = pluginDetail?.skills?.singleOrNull()
-                val oneSkillInstalled = oneSkill != null && skills.any { it.name == oneSkill }
+                val officialRoot = codexPlugins.firstOrNull { it.id == pluginId }?.sourcePath
+                val officialFolder = oneSkill?.let { pluginDetail?.skillDirectories?.get(it) }
+                val oneSkillInstalled = oneSkill != null && skills.any { installed ->
+                    installed.name == oneSkill || (officialRoot != null &&
+                        officialFolder != null && installed.sourceUrl?.endsWith(
+                            "/$officialRoot/$officialFolder") == true)
+                }
                 val endpoint = item.requirements.firstNotNullOfOrNull {
                     if (!it.registered) skillMcpHttpsEndpoint(it)?.let { url -> it.value to url }
                     else null
