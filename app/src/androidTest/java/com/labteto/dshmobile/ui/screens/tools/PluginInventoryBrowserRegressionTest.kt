@@ -95,7 +95,7 @@ class PluginInventoryBrowserRegressionTest {
             }
         }
         compose.onNodeWithTag("plugin-category-list").performScrollToIndex(4)
-        compose.onNodeWithText("创意与设计").performClick()
+        compose.onNodeWithText("创意设计").performClick()
         compose.onNodeWithText("视觉理解").assertIsDisplayed()
         compose.onNodeWithText("终端与运行环境").assertDoesNotExist()
     }
@@ -113,7 +113,7 @@ class PluginInventoryBrowserRegressionTest {
         }
         compose.onNodeWithText("报告生成").assertIsDisplayed()
         compose.onNodeWithText("整理资料并制作报告").assertIsDisplayed()
-        compose.onNodeWithText("已安装").assertIsDisplayed()
+        compose.onNodeWithText("已安装 · 1").assertIsDisplayed()
     }
 
     @Test
@@ -132,7 +132,7 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithText("精选").assertIsDisplayed().performClick()
+        compose.onNodeWithText("发现 · 1").assertIsDisplayed()
         compose.onNodeWithText("资料研究与核实").assertIsDisplayed()
         compose.onNodeWithText("安装").performClick()
         compose.runOnIdle { assertEquals("research-check", selected) }
