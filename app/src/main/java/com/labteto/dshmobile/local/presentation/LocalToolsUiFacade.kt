@@ -333,57 +333,76 @@ class LocalToolsUiFacade @Inject internal constructor(
     override suspend fun setSkillModelInvocable(id: String, enabled: Boolean) = tools.setSkillModelInvocable(id, enabled)
     override suspend fun connectHttp(serverId: String, endpoint: String): String =
         mcpConnectionGate.withLock { tools.connectHttp(serverId, endpoint) }
-    /** One Feature-owned connection switch for browser OAuth, refresh and manual Bearer.
-     * The existing service remains registered until new credentials are ready. */
+    /** Browser OAuth and remote refresh are cancellable preparation; Keystore write and
+     * connection replacement form one atomic-looking, fully restored transaction. */
+    private sealed interface PreparedMcpCredential {
+        data class OAuth(val value: com.labteto.dshmobile.local.tools.LocalMcpOAuthCredential) :
+            PreparedMcpCredential
+        data class Bearer(val value: String) : PreparedMcpCredential
+    }
     private val mcpConnectionGate = kotlinx.coroutines.sync.Mutex()
 
     private suspend fun switchMcpHttpConnection(
-        serverId: String,
-        endpoint: String,
-        stage: suspend () -> com.labteto.dshmobile.local.tools.LocalMcpCredentialStore.CredentialRotationReceipt,
+        serverId: String, endpoint: String,
+        prepare: suspend () -> PreparedMcpCredential,
     ): String = mcpConnectionGate.withLock {
         val existing = tools.servers().firstOrNull { it.id == serverId }
         if (existing != null) {
             val uri = java.net.URI(endpoint)
-            val advertised = java.net.URI(
-                uri.scheme, null, uri.host, uri.port,
-                uri.path?.ifBlank { "/" } ?: "/", null, null,
-            ).toString()
+            val advertised = java.net.URI(uri.scheme, null, uri.host, uri.port,
+                uri.path?.ifBlank { "/" } ?: "/", null, null).toString()
             require(existing.transport == "http" && existing.target == advertised) {
                 "服务标识已被不同连接占用；请先在连接器中管理原服务"
             }
         }
-        // No live service mutation before the remote grant is available.
-        val rotation = stage()
-        try {
-            if (existing != null) tools.disconnect(serverId)
-            tools.connectHttp(serverId, endpoint)
-        } catch (failure: Throwable) {
-            val restorationFailure = kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                try {
+        val prepared = prepare()
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        val afterPreparation = tools.servers().firstOrNull { it.id == serverId }
+        check(existing?.id == afterPreparation?.id &&
+            existing?.transport == afterPreparation?.transport &&
+            existing?.target == afterPreparation?.target &&
+            existing?.lifecycle == afterPreparation?.lifecycle) {
+            "MCP 连接在授权期间已变化，请根据最新连接状态重试"
+        }
+        // DataStore writes can suspend. Once committed, either publish a live connection
+        // or restore both the old encrypted credential and its previous registration.
+        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+            val rotation = when (prepared) {
+                is PreparedMcpCredential.OAuth ->
+                    mcpCredentials.rotateOAuth(serverId, endpoint, prepared.value)
+                is PreparedMcpCredential.Bearer ->
+                    mcpCredentials.rotateBearer(serverId, endpoint, prepared.value)
+            }
+            try {
+                if (existing != null) tools.disconnect(serverId)
+                tools.connectHttp(serverId, endpoint)
+            } catch (failure: Throwable) {
+                val restoreError = try {
                     if (tools.servers().any { it.id == serverId }) tools.disconnect(serverId)
                     mcpCredentials.rollbackCredentialRotation(serverId, rotation)
                     if (existing != null) tools.connectHttp(serverId, endpoint)
                     null
-                } catch (restoration: Throwable) {
-                    restoration
+                } catch (error: Throwable) {
+                    error
                 }
+                if (restoreError != null) {
+                    val error = IllegalStateException(
+                        "MCP 连接切换失败，且恢复原服务失败：${restoreError.message}", failure)
+                    error.addSuppressed(restoreError)
+                    throw error
+                }
+                throw failure
             }
-            if (restorationFailure != null) {
-                val error = IllegalStateException(
-                    "MCP 连接切换失败，且恢复原服务失败：${restorationFailure.message}", failure)
-                error.addSuppressed(restorationFailure)
-                throw error
-            }
-            throw failure
         }
     }
 
-    override suspend fun connectHttpWithCredential(serverId: String, endpoint: String, bearer: String): String =
-        if (bearer.isEmpty()) mcpConnectionGate.withLock { tools.connectHttp(serverId, endpoint) }
-        else switchMcpHttpConnection(serverId, endpoint) {
-            mcpCredentials.rotateBearer(serverId, endpoint, bearer)
-        }
+    override suspend fun connectHttpWithCredential(
+        serverId: String, endpoint: String, bearer: String,
+    ): String = if (bearer.isEmpty())
+        mcpConnectionGate.withLock { tools.connectHttp(serverId, endpoint) }
+    else switchMcpHttpConnection(serverId, endpoint) {
+        PreparedMcpCredential.Bearer(bearer)
+    }
 
     private suspend fun disconnectMcpIfConnected(serverId: String) {
         if (tools.servers().any { it.id == serverId }) tools.disconnect(serverId)
@@ -391,18 +410,12 @@ class LocalToolsUiFacade @Inject internal constructor(
 
     override suspend fun loginMcp(serverId: String, endpoint: String, clientId: String?): String =
         switchMcpHttpConnection(serverId, endpoint) {
-            val grant = mcpOAuth.authorize(serverId, endpoint, clientId)
-            kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            mcpCredentials.rotateOAuth(serverId, endpoint, grant)
+            PreparedMcpCredential.OAuth(mcpOAuth.authorize(serverId, endpoint, clientId))
         }
-
     fun cancelMcpLogin(serverId: String) = mcpOAuth.cancel(serverId)
-
     override suspend fun refreshMcpLogin(serverId: String, endpoint: String): String =
         switchMcpHttpConnection(serverId, endpoint) {
-            val refreshed = mcpCredentials.stageOAuthRefresh(serverId, endpoint)
-            kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            mcpCredentials.rotateOAuth(serverId, endpoint, refreshed)
+            PreparedMcpCredential.OAuth(mcpCredentials.stageOAuthRefresh(serverId, endpoint))
         }
 
     override suspend fun revokeMcpLogin(serverId: String, endpoint: String): Boolean {
