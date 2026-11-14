@@ -31,7 +31,7 @@ class LocalIndependentReviewCoordinatorReceiptTest {
     @Test fun codeReviewStoresOnlyCompleteModelReceiptAndPreservesExactRawDigest() = runTest {
         val events = log()
         try {
-            val rawPatch = "+password=secret-value\n+val safe = 1"
+            val rawPatch = "+api_key=sk-abcdefghijklmnopqrstuvwxyz\n+val safe = 1"
             var outbound = ""
             val receipt = runIndependentCodeReview(
                 log = events, repository = "repo", ref = "worktree/HEAD",
@@ -41,7 +41,7 @@ class LocalIndependentReviewCoordinatorReceiptTest {
                 outbound = it
                 reply("发现一个问题")
             }
-            assertFalse(outbound.contains("secret-value"))
+            assertFalse(outbound.contains("sk-abcdefghijklmnopqrstuvwxyz"))
             assertEquals(codeReviewDigest("repo", "worktree/HEAD", "1 file", rawPatch), receipt.digest)
             assertEquals("发现一个问题", receipt.report)
             assertEquals(receipt.evidenceSequence, LocalCodeReviewLedger(events).read(receipt.id)?.evidenceSequence)
