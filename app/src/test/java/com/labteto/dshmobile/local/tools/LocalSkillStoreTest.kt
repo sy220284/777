@@ -243,6 +243,12 @@ class LocalSkillStoreTest {
         store.seedOnce()
         assertEquals(modified, workspace.readSkill("writing-polish"))
         assertEquals(modified, store.readDocument("writing-polish"))
+        store.setModelInvocable("writing-polish", false)
+        assertTrue(!workspace.skillMetadata("writing-polish").modelInvocable)
+        assertTrue(store.readDocument("writing-polish").contains("用户扩展规则"))
+        store.setModelInvocable("writing-polish", true)
+        assertTrue(workspace.skillMetadata("writing-polish").modelInvocable)
+        assertTrue(store.readDocument("writing-polish").length > 128 * 1024)
     }
 
 }
