@@ -88,6 +88,25 @@ class CodeModePluginTest {
         assertTrue(outcome.content.contains("\"completed_steps\":2"))
     }
 
+    @Test fun eachChildRechecksCurrentRunBeforeEnteringExecutor() = runTest {
+        val registry = ToolRegistry()
+        var checks = 0
+        var calls = 0
+        register(registry, "read") { calls++; ToolResult("ok") }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val actual = registry.execute("code_mode_run", plan("read", "read"),
+            context = ToolContext(
+                approval = { true },
+                beforeExecution = {
+                    checks++
+                    check(checks < 3) { "原任务已被更新，禁止执行后续工具" }
+                },
+            ))
+        assertEquals("CODE_MODE_STEP_EXCEPTION", actual.errorCode)
+        assertEquals(1, calls)
+        assertTrue(actual.content.contains("\"completed_steps\":1"))
+    }
+
     @Test fun scriptsWithMoreThanEightStepsCompleteUsingOriginalToolRules() = runTest {
         val registry = ToolRegistry()
         var completed = 0
