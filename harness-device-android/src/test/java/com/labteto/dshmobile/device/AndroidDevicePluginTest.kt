@@ -136,7 +136,9 @@ class AndroidDevicePluginTest {
         }
     }
 
-    private class RecordingProvider : HarnessDeviceProvider {
+    private class RecordingProvider(
+        private val response: (String) -> String = { "ok:$it" },
+    ) : HarnessDeviceProvider {
         override val capabilities: Set<String> = emptySet()
         val calls = mutableListOf<Pair<String, Map<String, String>>>()
         var closed: Boolean = false
@@ -146,12 +148,39 @@ class AndroidDevicePluginTest {
             arguments: Map<String, String>,
         ): String {
             calls += capability to arguments
-            return "ok:$capability"
+            return response(capability)
         }
 
         override fun close() {
             closed = true
         }
+    }
+
+    @Test
+    fun unconfirmedDeviceActionsBecomeFailedToolReceipts() = runTest {
+        val provider = RecordingProvider { capability ->
+            if (capability == "accessibility_tap" || capability == "accessibility_click_node") "false"
+            else "ok:$capability"
+        }
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(provider))
+        val tap = registry.context.tools.execute(
+            "android_tap",
+            buildJsonObject { put("x", 8); put("y", 12) },
+            context = ToolContext(approval = { true }),
+        )
+        val click = registry.context.tools.execute(
+            "android_click_node",
+            buildJsonObject { put("node", 2) },
+            context = ToolContext(approval = { true }),
+        )
+        assertTrue(tap.isError)
+        assertTrue(click.isError)
+        assertEquals("ANDROID_ACTION_UNCONFIRMED", tap.errorCode)
+        assertFalse(tap.retryable)
+        assertTrue(tap.recoveryHint.orEmpty().contains("重新检查"))
+        assertFalse(androidDeviceToolResult("device_info", "false").isError)
+        assertFalse(androidDeviceToolResult("accessibility_tap", "true").isError)
     }
 
     @Test

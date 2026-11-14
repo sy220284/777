@@ -27,4 +27,15 @@ class AndroidNotificationPrivacyTest {
         assertEquals(33, sanitized.length)
         assertTrue(sanitized.endsWith("…"))
     }
+
+    @Test
+    fun notificationGrantAndConnectionAreIndependentlyReported() {
+        assertTrue(notificationCapabilityStatus(false, false).contains("authorized=false\nconnected=false"))
+        val disconnected = notificationCapabilityStatus(true, false)
+        assertTrue(disconnected.contains("authorized=true\nconnected=false"))
+        assertTrue(disconnected.contains("重新连接"))
+        assertFalse(disconnected.contains("设置中授权"))
+        assertEquals("authorized=true\nconnected=true", notificationCapabilityStatus(true, true))
+    }
+
 }

@@ -127,6 +127,8 @@ class McpToolBridgePlugin(
     private val http: OkHttpClient,
     private val json: Json,
     private val workspaceRoot: File? = null,
+    private val onElicitation: suspend (String?, String, String, McpElicitationRequest) -> McpElicitationReply =
+        { _, _, _, _ -> McpElicitationReply("cancel") },
     private val stdioCommandResolver: (List<String>) -> List<String> = { it },
     private val stdioEnvironmentProvider: () -> Map<String, String> = { emptyMap() },
     private val transportFactory: (String) -> McpTransport = { endpoint ->
@@ -134,6 +136,8 @@ class McpToolBridgePlugin(
     },
     private val credentialAwareHttpTransportFactory: ((String, String, String?) -> McpTransport)? = null,
     private val httpCredentialProvider: suspend (String, String) -> String? = { _, _ -> null },
+    /** Enforced by Android policy owner, evaluated again for every remote tool invocation. */
+    private val verifyHttpEndpoint: (String) -> Unit = {},
     private val authorizedTransportFactory: (String, String) -> McpTransport = { endpoint, bearer ->
         val uri = URI(endpoint)
         val scheme = uri.scheme?.lowercase()
@@ -173,6 +177,7 @@ class McpToolBridgePlugin(
         val transport: String,
         val displayTarget: String,
         val clientFactory: suspend () -> McpClient,
+        val beforeCall: () -> Unit,
         val client: McpClient,
         val toolNames: List<String>,
         val definitionBytes: Int,
@@ -651,7 +656,9 @@ class McpToolBridgePlugin(
             rawId = serverId,
             transport = "http",
             displayTarget = displayEndpoint(endpoint),
+            beforeCall = { verifyHttpEndpoint(endpoint) },
             clientFactory = {
+                verifyHttpEndpoint(endpoint)
                 val bearer = httpCredentialProvider(serverId, endpoint)
                 McpClient(credentialAwareHttpTransportFactory?.invoke(serverId, endpoint, bearer)
                     ?: if (bearer == null) transportFactory(endpoint)
@@ -684,6 +691,7 @@ class McpToolBridgePlugin(
         transport: String,
         displayTarget: String,
         clientFactory: suspend () -> McpClient,
+        beforeCall: () -> Unit = {},
         fromReconnect: Boolean = false,
     ): String {
         val serverId = validateServerId(rawId)
@@ -732,6 +740,7 @@ class McpToolBridgePlugin(
                 transport = transport,
                 displayTarget = displayTarget,
                 clientFactory = clientFactory,
+                beforeCall = beforeCall,
                 client = client,
                 toolNames = names,
                 definitionBytes = definitionBytes,
@@ -788,7 +797,7 @@ class McpToolBridgePlugin(
                                 usageNotes = listOf("远端工具声明视为不可信元数据；每次调用都按高权限工具审批"),
                             ),
                             timeoutMillis = REMOTE_TOOL_TIMEOUT_MILLIS,
-                            executor = HarnessToolExecutor { _, input, _ ->
+                            executor = HarnessToolExecutor { toolContext, input, _ ->
                                 coroutineScope {
                                     val callJob = currentCoroutineContext().job
                                     if (!binding.beginCall(callJob)) {
@@ -799,11 +808,17 @@ class McpToolBridgePlugin(
                                     } else {
                                         var failedCleanup: ServerBinding.DisconnectTicket? = null
                                         try {
+                                            binding.beforeCall()
                                             val result = when (resourceMethods[definition.name]) {
                                                 "resources/list" -> client.listResources((input["cursor"] as? JsonPrimitive)?.contentOrNull)
                                                 "resources/templates/list" -> client.listResourceTemplates((input["cursor"] as? JsonPrimitive)?.contentOrNull)
                                                 "resources/read" -> client.readResource(input.required("uri"))
-                                                else -> client.callTool(definition.name, input)
+                                                else -> client.callToolWithElicitation(definition.name, input) { prompt ->
+                                                    check(binding.isAcceptingCalls()) { "MCP 连接已失效，追问已取消" }
+                                                    val originCallId = toolContext.attributes["call_id"] as? String
+                                                        ?: currentCoroutineContext().job.toString()
+                                                    onElicitation(toolContext.sessionId, serverId, originCallId, prompt)
+                                                }
                                             }
                                             val remoteError = result["isError"]?.jsonPrimitive?.booleanOrNull == true
                                             ToolResult(
@@ -908,7 +923,7 @@ class McpToolBridgePlugin(
             // Cancel and drain the old binding before reconnecting; never replay tools/call.
             disconnect(context, serverId, fromReconnect = true)
             return connect(context, serverId, existing.transport, existing.displayTarget,
-                existing.clientFactory, fromReconnect = true)
+                existing.clientFactory, beforeCall = existing.beforeCall, fromReconnect = true)
         } finally {
             withContext(NonCancellable) { mutex.withLock { if (reconnectingIds.remove(serverId)) signalLifecycleChangedLocked() } }
         }

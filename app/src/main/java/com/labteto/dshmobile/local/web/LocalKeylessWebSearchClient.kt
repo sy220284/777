@@ -40,7 +40,7 @@ internal class LocalKeylessWebSearchClient(
             .get()
             .build()
         return try {
-            withCancellableHttpResponse(http.newCall(request)) { response ->
+            withCancellableHttpResponse(http.newBuilder().followRedirects(false).followSslRedirects(false).build().newCall(request)) { response ->
                 if (!response.isSuccessful) {
                     throw LocalWebException("SEARCH_HTTP", "公共网页搜索返回 HTTP " + response.code)
                 }

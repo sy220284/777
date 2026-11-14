@@ -82,4 +82,36 @@ class LocalWorkHistoryProjectionTest {
             assertTrue(projectLocalWorkHistoryPage(log, null).invalidated)
         } finally { log.close(); other.close() }
     }
+    @Test fun independentReviewsAndHumanApprovalsRemainDistinctSafeHistoryRows() {
+        val log = LocalSessionEventLog(File(temporary.root, "review-events.jsonl"), Json)
+        try {
+            val started = log.append("work/code-review-start", buildJsonObject {
+                put("id", "review-1"); put("digest", "hash-1")
+            })
+            val model = log.append("work/code-review-result", buildJsonObject {
+                put("id", "review-1")
+                put("report", "保密代码与内部分析详情")
+                put("digest", "hash-1")
+            })
+            val accepted = log.append("work/code-review-accepted", buildJsonObject {
+                put("id", "review-1")
+                put("digest", "hash-1")
+                put("sequence", model.sequence)
+            })
+            val blocked = log.append("work/security-review-result", buildJsonObject {
+                put("id", "review-2")
+                put("report", "敏感安全报告全文")
+                put("verdict", "block")
+            })
+            val all = projectLocalWorkHistoryPage(log, null).records
+            assertEquals(listOf(blocked.sequence, accepted.sequence, model.sequence, started.sequence),
+                all.map { it.sequence })
+            assertEquals("模型已生成代码审查报告，等待用户确认",
+                all.single { it.sequence == model.sequence }.content)
+            assertEquals("用户已接纳该版本的代码审查结果",
+                all.single { it.sequence == accepted.sequence }.content)
+            assertTrue(all.single { it.sequence == blocked.sequence }.content.contains("阻止"))
+            assertTrue(all.none { it.content.contains("保密代码") || it.content.contains("敏感安全报告") })
+        } finally { log.close() }
+    }
 }

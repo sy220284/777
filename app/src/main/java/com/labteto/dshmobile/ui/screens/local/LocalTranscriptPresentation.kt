@@ -73,6 +73,7 @@ internal sealed interface LocalTranscriptItem {
         val repeatCount: Int = 1,
         val activity: LocalToolActivityUiItem? = null,
         val groupedMessages: List<LocalHarnessMessage> = emptyList(),
+        val operationGroup: Boolean = false,
     ) : LocalTranscriptItem {
         override val key: String =
             if (message.role == "tool" && message.toolCallId != null) workToolRowKey(message.toolCallId, message.toolDeclaredSequence,
@@ -287,6 +288,59 @@ internal fun compactRepeatedWorkStatusChecks(
     return compact
 }
 
+/**
+ * Present a run of successful tool receipts as a single expandable activity row.
+ * This is a UI projection only: chronological receipts, original call identities,
+ * errors, pending calls and narrative milestones remain in their existing stores.
+ * The first receipt supplies the stable LazyColumn key, avoiding scroll jumps.
+ */
+internal fun groupConsecutiveWorkOperations(
+    items: List<LocalTranscriptItem>,
+): List<LocalTranscriptItem> {
+    val grouped = ArrayList<LocalTranscriptItem>(items.size)
+    val batch = ArrayList<LocalTranscriptItem.WorkStep>()
+    fun flush() {
+        if (batch.isEmpty()) return
+        if (batch.size == 1) {
+            grouped += batch.single()
+        } else {
+            val first = batch.first()
+            val receipts = batch.flatMap { listOf(it.message) + it.groupedMessages }
+            grouped += first.copy(
+                repeatCount = receipts.size,
+                groupedMessages = receipts.drop(1),
+                operationGroup = true,
+            )
+        }
+        batch.clear()
+    }
+    for (item in items) {
+        if (item is LocalTranscriptItem.WorkStep &&
+            item.message.role == "tool" &&
+            item.message.toolName != "work_finding" &&
+            item.message.toolIsError == false &&
+            item.message.toolErrorCode == null &&
+            item.groupedMessages.all { it.toolIsError == false && it.toolErrorCode == null } &&
+            !item.operationGroup && batch.size < 16
+        ) {
+            batch += item
+        } else {
+            flush()
+            // A failed/unknown/cancelled operation and every narration remain visible.
+            if (item is LocalTranscriptItem.WorkStep &&
+                item.message.role == "tool" &&
+                item.message.toolName != "work_finding" &&
+                item.message.toolIsError == false &&
+                item.message.toolErrorCode == null &&
+                item.groupedMessages.all { it.toolIsError == false && it.toolErrorCode == null } &&
+                !item.operationGroup
+            ) batch += item else grouped += item
+        }
+    }
+    flush()
+    return grouped
+}
+
 internal fun userVisibleDialogueMessageCount(
     messages: List<LocalHarnessMessage>,
 ): Int = buildLocalTranscript(
@@ -496,9 +550,15 @@ internal fun composeLocalReplyAttachments(
         .associate { it.message.id to it.key }
     val toolSteps = timeline.filterIsInstance<LocalTranscriptItem.WorkStep>()
         .filter { it.message.role == "tool" && it.message.toolCallId != null }
-    val toolOwners = toolSteps.groupBy { it.message.toolCallId }
-    val executionOwners = toolSteps.filter { it.message.toolExecutionId != null }
-        .associate { it.message.toolExecutionId!! to it.key }
+    val allToolReceipts = toolSteps.flatMap { row ->
+        (listOf(row.message) + row.groupedMessages).map { it to row }
+    }
+    val toolOwners = allToolReceipts.filter { it.first.toolCallId != null }
+        .groupBy({ it.first.toolCallId }, { it.second }).mapValues { (_, rows) ->
+            rows.distinctBy { it.key }
+        }
+    val executionOwners = allToolReceipts.filter { it.first.toolExecutionId != null }
+        .associate { it.first.toolExecutionId!! to it.second.key }
     if (messageOwners.isEmpty() && toolOwners.isEmpty()) return timeline
 
     val attachments = linkedMapOf<String, MutableList<LocalTranscriptItem>>()

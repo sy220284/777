@@ -81,6 +81,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
             val draft = resolveLocalModelApiKeyDraft(suppliedKey, model.trim(), baseUrl, protocol,
                 existingProfiles, apiKeys::getFor, profileId, contextWindowTokensOverride)
             val profile = draft.profile
+            gateway.requireExecutionPolicy(profile)
             val all = existingProfiles.filterNot { it.id == profile.id } + profile
             val result = LocalModelConfigurationResult(true, profile.model, profile.baseUrl, all, profile.id)
             persistConfiguration(
@@ -105,7 +106,10 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         } else null
         // An explicit plan selection must have a usable account, as the previous
         // select() transaction required. Never publish an unauthorized route.
-        if (selected != null) require(gateway.hasCredential(selected)) { credentialError(selected) }
+        if (selected != null) {
+            gateway.requireExecutionPolicy(selected)
+            require(gateway.hasCredential(selected)) { credentialError(selected) }
+        }
         // Foreground gateway activation is session-scoped; the saved default is not.
         // Background catalog refresh must not promote another session's route to default.
         val storedModel = preferences.getString(
@@ -129,6 +133,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         transactions.recover()
         val current = profiles.read()
         val selected = current.firstOrNull { it.id == id } ?: return@run null
+        gateway.requireExecutionPolicy(selected)
         require(gateway.hasCredential(selected)) { credentialError(selected) }
         persistConfiguration(current, selected)
         LocalModelConfigurationResult(true, selected.model, selected.baseUrl, current, selected.id)

@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.LocalWebProvider
+import com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy
+import com.labteto.dshmobile.uicontract.UiExecutionPolicySnapshot
 import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
@@ -9,6 +11,8 @@ import com.labteto.dshmobile.local.model.LocalModelRuntime
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.MiniMaxProviderQuotaClient
+import com.labteto.dshmobile.local.model.DeepSeekProviderBalance
+import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
 import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
@@ -31,6 +35,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     private val diagnostics: LocalDiagnosticsPort,
     private val chatGpt: ChatGptSettingsController,
     private val modelRuntime: LocalModelRuntime,
+    private val modelGateway: LocalModelGateway,
     private val miniMaxQuota: MiniMaxProviderQuotaClient,
     private val modelSettings: LocalModelSettingsCoordinator,
     private val settingsCoordinator: LocalHarnessSettingsCoordinator,
@@ -38,6 +43,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     private val web: LocalWebProvider,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val approvalPreferences: LocalApprovalPreferences,
+    private val executionPolicy: LocalManagedExecutionPolicy,
     runtimeStateStore: LocalRuntimeStateStore,
 ) : com.labteto.dshmobile.uicontract.SettingsUiPort {
     private val runtimeState = runtimeStateStore.state
@@ -66,6 +72,8 @@ class LocalSettingsRuntime @Inject internal constructor(
     override suspend fun removeChatGptAccount(id: String): String? = chatGpt.remove(id)
     override fun configureModel(apiKey: String, model: String, baseUrl: String) = modelRuntime.configure(apiKey, model, baseUrl)
     override suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol?, profileId: String?, contextWindowTokensOverride: Int?, credentialSourceProfileId: String?) = modelRuntime.saveConfiguration(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride, credentialSourceProfileId)
+    override suspend fun queryDeepSeekBalance(profile: LocalModelProfile): DeepSeekProviderBalance =
+        modelGateway.queryDeepSeekBalance(profile)
     override suspend fun queryMiniMaxQuota(profile: LocalModelProfile): MiniMaxProviderUsage = miniMaxQuota.query(profile)
     override fun selectModel(id: String) = modelRuntime.selectModel(id)
     override fun removeModel(id: String) = modelRuntime.removeModel(id)
@@ -92,6 +100,27 @@ class LocalSettingsRuntime @Inject internal constructor(
     override suspend fun cancelStagedSessionRestore() = sessionStorage.cancelStagedRestore()
     override suspend fun stageLegacySessionRestore(archive: java.io.InputStream) =
         sessionStorage.stageLegacyRestoreStorage(archive)
+    /** Read the current effective policy each time; never cache a stale grant or expose secrets. */
+    internal fun executionPolicySummary(): UiExecutionPolicySnapshot {
+        val policy = executionPolicy.current()
+        val names = mapOf(
+            "network.enabled" to "网络访问开关",
+            "network.allowedHosts" to "可连接域名",
+            "network.deniedHosts" to "禁止连接域名",
+            "model.allowedProviders" to "模型供应商",
+            "browser.history" to "浏览历史（策略已配置，执行控制未接入）",
+            "browser.upload" to "浏览器上传（策略已配置，执行控制未接入）",
+            "browser.download" to "浏览器下载（策略已配置，执行控制未接入）",
+            "browser.control" to "浏览器控制（策略已配置，执行控制未接入）",
+        )
+        return UiExecutionPolicySnapshot(
+            networkEnabled = policy.networkEnabled,
+            allowedHosts = policy.allowedHosts?.sorted(),
+            deniedHosts = policy.deniedHosts.sorted(),
+            allowedModelProviders = policy.allowedModelProviders?.sorted(),
+            managedRestrictions = policy.managedFields.sorted().map { names.getValue(it) },
+        )
+    }
     override suspend fun environmentInfo() = diagnostics.environmentInfo()
     override suspend fun diagnosticReport() = diagnostics.diagnosticReport()
     override fun clearCredential() = modelRuntime.clearCredential()

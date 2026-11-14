@@ -60,6 +60,11 @@ class LocalWorkReplyPresentationTest {
         assertEquals("运行本地任务", userFacingWorkToolAction("cordis_run"))
         assertEquals("运行本地任务", userFacingWorkToolAction("process_exec"))
         assertEquals("修改文件", userFacingWorkToolAction("edit"))
+        assertEquals("检查手机界面状态", userFacingWorkToolAction("android_find"))
+        assertEquals("点击手机界面", userFacingWorkToolAction("android_click_node"))
+        assertEquals("向手机界面输入", userFacingWorkToolAction("android_set_text_node"))
+        assertEquals("滑动虚拟屏界面", userFacingWorkToolAction("android_vscreen_swipe"))
+        assertEquals("读取虚拟屏画面", userFacingWorkToolAction("android_vscreen_screenshot"))
     }
 
     @Test fun completedStepUsesItsOriginalDeclaredActionEvenWhenNotRunning() {
@@ -127,6 +132,71 @@ class LocalWorkReplyPresentationTest {
         assertEquals(2, appendPendingWorkToolActivities(
             inputs.map { it.copy(message = it.message.copy(toolIsError = false)) },
             listOf(activity, other), running = false).size)
+    }
+
+    @Test fun manySuccessfulToolCallsCollapseWithoutLosingReceiptsOrArtifactOwnership() {
+        val first = message("one", "tool", "读取源码", "mcp__GitHub__fetch_file", false)
+            .copy(toolCallId = "one", toolExecutionId = "execution-one")
+        val second = message("two", "tool", "取得文件结构", "mcp__GitHub__fetch_file", false)
+            .copy(toolCallId = "two", toolExecutionId = "execution-two")
+        val third = message("three", "tool", "完成调用分析", "mcp__GitHub__search", false)
+            .copy(toolCallId = "three")
+        val progress = message("note", "progress", "发现共同的实现入口，正在交叉核对。")
+        val after = message("four", "tool", "完成验证", "mcp__GitHub__search", false)
+            .copy(toolCallId = "four")
+        val grouped = groupConsecutiveWorkOperations(buildLocalTranscript(
+            listOf(first, second, third, progress, after),
+        ))
+        assertEquals(3, grouped.size)
+        val batch = grouped.first() as LocalTranscriptItem.WorkStep
+        assertTrue(batch.operationGroup)
+        assertEquals(3, batch.repeatCount)
+        assertEquals(listOf("two", "three"), batch.groupedMessages.map { it.id })
+        assertEquals("work-tool:execution:execution-one", batch.key)
+        assertEquals("work-step:note", grouped[1].key)
+
+        val artifact = LocalTranscriptItem.WorkArtifact(
+            com.labteto.dshmobile.local.presentation.LocalArtifactUiItem(
+                "report.md", "file", "two", 7L, sourceExecutionId = "execution-two",
+            ),
+        )
+        val attached = composeLocalReplyAttachments(grouped + artifact)
+        assertEquals(batch.key,
+            attached.filterIsInstance<LocalTranscriptItem.WorkArtifact>().single().attachedTo)
+    }
+
+    @Test fun failedAndUncertainToolsRemainVisibleBetweenGroupedSuccesses() {
+        val good = message("a", "tool", "完成", "read", false)
+        val failure = message("b", "tool", "失败", "read", true)
+        val unknown = message("c", "tool", "待核实", "write", true)
+            .copy(toolErrorCode = "TOOL_OUTCOME_UNKNOWN")
+        val output = groupConsecutiveWorkOperations(buildLocalTranscript(
+            listOf(good, good.copy(id = "a2"), failure,
+                good.copy(id = "a3"), unknown, good.copy(id = "a4")),
+        ))
+        assertEquals(5, output.size)
+        val steps = output.filterIsInstance<LocalTranscriptItem.WorkStep>()
+        assertTrue(steps.first().operationGroup)
+        assertEquals(listOf("a2"), steps.first().groupedMessages.map { it.id })
+        assertEquals(listOf("a", "b", "a3", "c", "a4"), steps.map { it.message.id })
+        assertTrue(steps[1].message.toolIsError == true)
+        assertEquals("TOOL_OUTCOME_UNKNOWN", steps[3].message.toolErrorCode)
+    }
+
+    @Test fun meaningfulFindingRemainsVisibleBetweenCollapsedRoutineToolCalls() {
+        val first = message("read-one", "tool", "读取完成", "read", false)
+        val second = message("read-two", "tool", "读取完成", "read", false)
+        val discovery = message("finding", "tool",
+            "已记录调查线索 ID=finding-1；状态=hypothesis；发现=模块调用不符合预期；来源回执=read-one",
+            "work_finding", false)
+        val last = message("read-three", "tool", "补读完成", "read", false)
+        val rows = groupConsecutiveWorkOperations(
+            buildLocalTranscript(listOf(first, second, discovery, last)))
+        assertEquals(3, rows.size)
+        assertTrue((rows[0] as LocalTranscriptItem.WorkStep).operationGroup)
+        assertEquals("work_finding", (rows[1] as LocalTranscriptItem.WorkStep).message.toolName)
+        assertFalse((rows[1] as LocalTranscriptItem.WorkStep).operationGroup)
+        assertEquals("整理调查发现", userFacingWorkToolAction("work_finding"))
     }
 
     @Test fun independentToolCallsKeepSeparateChronologicalRows() {

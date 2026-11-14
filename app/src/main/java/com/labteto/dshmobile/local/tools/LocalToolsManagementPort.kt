@@ -18,6 +18,12 @@ internal interface LocalToolsManagementPort {
         emptyList()
     suspend fun recoverFailedPlugin(id: String): List<String> =
         error("当前工具 Owner 不支持插件恢复")
+    suspend fun remoteGitBranches(repository: String): List<String>
+    suspend fun compareLocalGit(repository: String, includeUntracked: Boolean = false): kotlinx.serialization.json.JsonObject
+    suspend fun compareRemoteGit(repository: String, remote: String, branch: String): kotlinx.serialization.json.JsonObject
+    suspend fun compareCommitGit(repository: String, commit: String): kotlinx.serialization.json.JsonObject
+
+    fun activeToolHookIds(): List<String> = emptyList()
     fun installedPluginIds(): List<String>
     fun capabilityCatalogue(): List<LocalToolCatalogueEntry>
     fun validateCapabilityDraft(
@@ -30,6 +36,7 @@ internal interface LocalToolsManagementPort {
     fun installPreset(id: String)
     fun createSkill(id: String, displayName: String, description: String, instructions: String)
     fun importSkill(filename: String, bytes: ByteArray): String
+    fun exportSkillPackage(id: String): ByteArray
     fun removeSkill(id: String)
     fun readSkillDocument(id: String): String
     fun updateSkillDocument(id: String, document: String)

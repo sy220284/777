@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -418,4 +419,58 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithText("当前标签:0").assertIsDisplayed()
     }
 
+
+    @Test
+    fun githubSkillUpdateIsCheckedAndConfirmedFromExistingDetails() {
+        val revision = "abcdef0123456789abcdef0123456789abcdef01"
+        var checked: String? = null
+        var upgraded: Pair<String, String>? = null
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                        "upgrade-demo", "示例技能", true,
+                        sourceUrl = "https://github.com/openai/skills/tree/$revision/skills/.curated/upgrade-demo",
+                    )),
+                    pendingSkillUpdates = mapOf("upgrade-demo" to revision),
+                    skillsOnly = true,
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onCheckSkillUpdate = { checked = it },
+                    onUpgradeSkill = { id, sha -> upgraded = id to sha },
+                )
+            }
+        }
+        compose.onNodeWithText("upgrade-demo").performClick()
+        compose.onNodeWithTag("skill-check-update").assertExists().performScrollTo().performClick()
+        compose.runOnIdle { assertEquals("upgrade-demo", checked) }
+        compose.onNodeWithTag("skill-upgrade").assertExists().performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(null, upgraded) }
+        compose.onNodeWithTag("skill-upgrade-confirm").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals("upgrade-demo" to revision, upgraded) }
+    }
+
+    @Test
+    fun rollbackIsAvailableOnlyAfterAnInstalledRevisionExists() {
+        var restored: String? = null
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                        "rollback-demo", "具备已保存版本", true,
+                        rollbackAvailable = true,
+                    )),
+                    skillsOnly = true,
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onRollbackSkill = { restored = it },
+                )
+            }
+        }
+        compose.onNodeWithText("rollback-demo").performClick()
+        compose.onNodeWithTag("skill-rollback").assertExists().performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(null, restored) }
+        compose.onNodeWithTag("skill-rollback-confirm").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals("rollback-demo", restored) }
+    }
 }

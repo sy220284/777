@@ -42,6 +42,10 @@ internal interface LocalWorkExecutionPort {
         replacement: String,
     ): com.labteto.dshmobile.local.session.LocalUserMessageEditResult
 
+    fun queuedUserInputs(): List<com.labteto.dshmobile.local.agent.LocalQueuedUserPreview>
+    fun removeQueuedUserInput(messageId: String): Boolean
+    fun reorderQueuedUserInputs(orderedIds: List<String>): Boolean
+
     fun regenerateReply(messageId: String): Boolean
 
     suspend fun prepareSession(

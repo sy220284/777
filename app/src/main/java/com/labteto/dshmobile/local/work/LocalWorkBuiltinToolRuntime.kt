@@ -53,13 +53,27 @@ internal class LocalWorkBuiltinToolRuntime(
             "todo_write" -> progress.updateTodos(args)
             "create_goal" -> {
                 val (artifactPaths, verificationCommands) = parseWorkGoalAcceptanceArguments(args)
-                progress.createGoal(args.string("description"), artifactPaths, verificationCommands)
+                progress.createGoal(args.string("description"), artifactPaths, verificationCommands,
+                    parseWorkGoalReviewRequirements(args))
             }
             "get_goal" -> progress.getGoal()
-            "update_goal" -> progress.updateGoal(
-                status = args.string("status"),
-                note = args["note"]?.jsonPrimitive?.contentOrNull,
+            "work_finding" -> LocalWorkFindingJournal.execute(
+                run.eventLog, run.workState.snapshot().goal?.id.orEmpty(), args,
+                run.aggregateSnapshot().projectId.orEmpty(),
+                run.eventLog.latestMatching(setOf("turn/start")) { true }
+                    ?.data?.get("source_message_id")?.let { (it as? JsonPrimitive)?.contentOrNull },
             )
+            "update_goal" -> {
+                val receipt = progress.updateGoal(
+                    status = args.string("status"),
+                    note = args["note"]?.jsonPrimitive?.contentOrNull,
+                )
+                // Goal acceptance is persisted here; Downloads delivery is a separate
+                // external side effect owned by the turn finalizer for both completion paths.
+                if (run.workState.snapshot().goal?.status == "completed")
+                    "$receipt；目标已通过验收，手机下载交付将在本轮结束时处理"
+                else receipt
+            }
             "ask_user_question" -> run.interactions.awaitQuestion(
                 LocalQuestion(
                     callId = call.id,
@@ -83,6 +97,7 @@ internal class LocalWorkBuiltinToolRuntime(
             "create_goal",
             "get_goal",
             "update_goal",
+            "work_finding",
             "ask_user_question",
         )
     }
@@ -93,6 +108,19 @@ internal class LocalWorkBuiltinToolRuntime(
  * Absence is NOT equivalent to "the user requested no artifact or verification": otherwise
  * update_goal can accept a false completion claim without its intended evidence.
  */
+internal fun parseWorkGoalReviewRequirements(args: JsonObject): List<String> {
+    val values = args["review_requirements"] ?: return emptyList()
+    val items = values as? JsonArray
+        ?: error("create_goal.review_requirements 必须是字符串数组")
+    require(items.size <= 2) { "独立审查类型最多 2 项" }
+    return items.map { item ->
+        val value = (item as? JsonPrimitive)?.takeIf { it.isString }?.content
+            ?: error("独立审查类型无效")
+        require(value in setOf("code", "security")) { "独立审查类型只支持 code/security" }
+        value
+    }.distinct()
+}
+
 internal fun parseWorkGoalAcceptanceArguments(args: JsonObject): Pair<List<String>, List<String>> {
     fun requiredStringArray(key: String): List<String> {
         val array = args[key] as? JsonArray

@@ -175,6 +175,7 @@ internal class LocalConversationSurfaceArgs(
     val onSelectMessageVariant: suspend (String, Int) -> Boolean,
     val onRegenerate: (String) -> Boolean,
     val onGenerateReplySuggestions: suspend () -> Boolean,
+    val onSampleSession: (suspend (String, String) -> com.labteto.dshmobile.local.model.LocalConversationSampleResult)?,
     val onLoadOlderTranscript: suspend (String) -> Result<Int>,
     val onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
     val onStop: () -> Unit,
@@ -241,6 +242,7 @@ internal fun LocalConversationSurface(
     onSelectMessageVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
     onGenerateReplySuggestions: suspend () -> Boolean,
+    onSampleSession: (suspend (String, String) -> com.labteto.dshmobile.local.model.LocalConversationSampleResult)? = null,
     onLoadOlderTranscript: suspend (String) -> Result<Int>,
     onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
     onStop: () -> Unit,
@@ -305,6 +307,7 @@ internal fun LocalConversationSurface(
         onSelectMessageVariant = onSelectMessageVariant,
         onRegenerate = onRegenerate,
         onGenerateReplySuggestions = onGenerateReplySuggestions,
+        onSampleSession = onSampleSession,
         onLoadOlderTranscript = onLoadOlderTranscript,
         onImportAttachment = onImportAttachment,
         onStop = onStop,
@@ -351,6 +354,7 @@ internal fun LocalConversationSurface(
 private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val state = args.state
     val workActions = args.workActions
+    var queuedMessagesOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     val nativeDocuments = args.nativeDocuments
     val nativeDocumentSnapshot by (nativeDocuments?.snapshots ?: kotlinx.coroutines.flow.flowOf(
         com.labteto.dshmobile.uicontract.UiDocumentsSceneSnapshot(null, emptyList(), false, null)
@@ -377,6 +381,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val onSelectMessageVariant = args.onSelectMessageVariant
     val onRegenerate = args.onRegenerate
     val onGenerateReplySuggestions = args.onGenerateReplySuggestions
+    val onSampleSession = args.onSampleSession
     val onLoadOlderTranscript = args.onLoadOlderTranscript
     val onImportAttachment = args.onImportAttachment
     val onStop = args.onStop
@@ -487,6 +492,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var showPersonaEditor by rememberSaveable { mutableStateOf(false) }
     var personaEditorDraft by remember { mutableStateOf<PersonaProfile?>(null) }
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
+    var showSessionSample by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
     var renameSessionOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     val attachmentDrafts = rememberSaveable(
@@ -649,7 +655,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             appendPendingWorkToolActivities(withArtifacts, workToolActivities, state.running)
         else withArtifacts
     }
-    val transcriptItems = remember(withActivities) { composeLocalReplyAttachments(withActivities) }
+    val groupedActivities = remember(withActivities, state.usageMode) {
+        if (state.usageMode == LocalUsageMode.WORK) groupConsecutiveWorkOperations(withActivities)
+        else withActivities
+    }
+    val transcriptItems = remember(groupedActivities) { composeLocalReplyAttachments(groupedActivities) }
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
     val loadingOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
@@ -758,6 +768,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
     LaunchedEffect(state.sessionId, state.usageMode) {
         showReplySuggestions = false
+        showSessionSample = false
         showPersonaPicker = false
         if (!state.groupChat.enabled) showGroupMemberPicker = false
         editingUserMessage = null
@@ -986,6 +997,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             onTogglePin = onTogglePinSession,
                             onRenameSession = { renameSessionOpen = true },
                             onDeleteSession = onDeleteSession,
+                            onOpenSample = onSampleSession?.takeIf {
+                                state.configured && !state.running && !state.loading && state.messages.isNotEmpty()
+                            }?.let { { showSessionSample = true } },
                         )
                     } else {
                         WorkSurfaceHeader(
@@ -1013,6 +1027,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             onDeleteSession = onDeleteSession,
                             onOpenWorkEvidence = workActions?.let { { showWorkEvidence = true } },
                             onOpenDocuments = if (state.sessionId.isNotBlank() && !state.loading) onOpenNativeDocuments else null,
+                            onOpenSample = onSampleSession?.takeIf {
+                                state.configured && !state.running && !state.loading && state.messages.isNotEmpty()
+                            }?.let { { showSessionSample = true } },
                         )
                     }
                 }
@@ -1422,6 +1439,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 repeatCount = transcriptItem.repeatCount,
                                 activity = transcriptItem.activity,
                                 groupedMessages = transcriptItem.groupedMessages,
+                                operationGroup = transcriptItem.operationGroup,
                                 active = state.running && transcriptItem.message.role != "tool" &&
                                     transcriptItem.key == transcriptItems.lastOrNull()?.key,
                             )
@@ -1597,6 +1615,20 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             ),
         )
 
+        if (state.queuedInputCount > 0 && workActions?.queuedUserPort != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                SyButton(
+                    text = "待执行消息 · " + state.queuedInputCount,
+                    onClick = { queuedMessagesOpen = true },
+                    size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Outline,
+                )
+            }
+        }
+
         LocalConversationComposer(
             state = state,
             skillDisplayNames = skillDisplayNames,
@@ -1725,7 +1757,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         ?.takeIf { state.usageMode == LocalUsageMode.WORK }
         ?.takeUnless { localPlanReviewOf(it) != null }
         ?.let { question ->
-        QuestionDialog(
+        if (question.mcpFormFields != null || question.mcpUrl != null) {
+            McpElicitationDialog(
+                question = question,
+                onAnswer = { answer -> onAnswerQuestion(question.callId, answer) },
+                onDismiss = { onCancelQuestion(question.callId) },
+            )
+        } else QuestionDialog(
             question = question.question,
             options = question.options,
             onAnswer = { answer -> onAnswerQuestion(question.callId, answer) },
@@ -1807,6 +1845,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             },
         )
     }
+    if (queuedMessagesOpen && workActions?.queuedUserPort != null) {
+        LocalQueuedUserQueueSheet(
+            port = workActions.queuedUserPort,
+            sessionId = state.sessionId,
+            queuedCount = state.queuedInputCount,
+            onDismiss = { queuedMessagesOpen = false },
+        )
+    }
+
     editingUserMessage?.let { message ->
         LocalChatEditMessageSheet(
             message = message,
@@ -1828,6 +1875,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         )
     }
 
+    if (showSessionSample && onSampleSession != null) {
+        LocalSessionSampleSheet(
+            sessionId = state.sessionId,
+            onSample = onSampleSession,
+            onDismiss = { showSessionSample = false },
+        )
+    }
     if (
         showReplySuggestions &&
         state.usageMode == LocalUsageMode.CHAT &&

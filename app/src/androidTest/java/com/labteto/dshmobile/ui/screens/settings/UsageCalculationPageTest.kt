@@ -217,7 +217,7 @@ class UsageCalculationPageTest {
         val store = TokenUsageAnalyticsStore(context, json)
         val tracker = DeepSeekUsageTracker(
             context,
-            DeepSeekPricingRepository(context, http),
+            DeepSeekPricingRepository(context, http, com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy(context)),
             store,
         )
         tracker.reconcileLegacyUsage()

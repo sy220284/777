@@ -435,6 +435,14 @@ internal class LocalWorkAgentTurnExecutor(
                         profileId = snapshot.modelState.modelSelection.activeProfileId,
                         routeFingerprint = snapshot.modelState.modelSelection.activeProfile?.routeFingerprint(),
                     )
+                    // Recompute from durable tool/finding facts immediately before each model step.
+                    // This is a short-lived request layer, never additional model history.
+                    val investigationContext = LocalWorkInvestigationRuntime.context(
+                        runEventLog, liveGoal?.id.orEmpty(), uiSourceMessageId,
+                    )
+                    val reusableDiscoveryContext = improvementArchive.relevantDiscoveries(
+                        snapshot.projectId.orEmpty(), effectiveSkillInput,
+                    )
                     val skillGuidance = resolveLocalWorkSkillGuidance(
                         sessionStorage.files.workspace, effectiveSkillInput,
                         selectedInvocations = pinnedInvocations.current(),
@@ -450,7 +458,8 @@ internal class LocalWorkAgentTurnExecutor(
                     )
                     val productContextTokens =
                         estimateModelTokens(workPromptContext.stable) +
-                            estimateModelTokens(workPromptContext.dynamic + improvementGuidance) +
+                            estimateModelTokens(workPromptContext.dynamic + improvementGuidance +
+                                investigationContext + reusableDiscoveryContext) +
                             estimateModelTokens(workPromptContext.skill)
                     if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep)) {
                         LocalWorkSummarySettings.attach(context)
@@ -502,7 +511,9 @@ internal class LocalWorkAgentTurnExecutor(
                     val durableRequestMessages = withWorkTurnContext(
                         withLocalWorkExecutionMode(runHistory.snapshot()),
                         workPromptContext.stable,
-                        workPromptContext.dynamic + improvementGuidance + "\n" + LOCAL_WORK_CAPABILITY_RECOVERY_GUIDANCE + "\n" +
+                        workPromptContext.dynamic + improvementGuidance + "\n" +
+                            investigationContext + "\n" + reusableDiscoveryContext + "\n" +
+                            LOCAL_WORK_CAPABILITY_RECOVERY_GUIDANCE + "\n" +
                             com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
                         workPromptContext.skill,
                     )
@@ -860,6 +871,18 @@ internal class LocalWorkAgentTurnExecutor(
                                 event.recoveryHint?.let { put("recovery_hint", it) }
                                 put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                             })
+                            LocalWorkInvestigationRuntime.observe(
+                                log = runEventLog,
+                                goalId = binding.workState.snapshot().goal?.id.orEmpty(),
+                                sourceMessageId = uiSourceMessageId,
+                                callId = event.call.id,
+                                toolName = event.call.name,
+                                args = event.call.arguments,
+                                toolDeclaredSequence = declaredToolEvent?.second,
+                                resultSequence = toolEvent.sequence,
+                                output = boundedContent,
+                                isError = deliveryIsError,
+                            )
                             runHistory.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention, toolImages))
                             completedToolCallIds += event.call.id
                             if (!deliveryIsError && event.call.name == "exit_plan_mode" &&
@@ -1111,6 +1134,34 @@ internal class LocalWorkAgentTurnExecutor(
         } finally {
             if (ownerJob != null) {
                 workRunRegistry.releaseCompletedTurn(binding, ownerJob)
+                // One delivery owner for explicit update_goal and auto-completed goals.
+                // Persisted artifact/published and artifact/publication-failed events record
+                // the real phone delivery outcome independently of verified Goal status.
+                val completed = binding.workState.snapshot().goal?.takeIf {
+                    it.status == "completed"
+                }
+                if (completed != null) {
+                    try {
+                        val delivered = withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                            sessionStorage.files.publishVerifiedDeliverables(
+                                binding.sessionId, completed.artifactPaths,
+                                localWorkTaskFolderPaths(completed.description, completed.id).deliverables,
+                            )
+                        }
+                        // Clear the previous delivery failure only if an artifact was published.
+                        if (delivered.isNotEmpty()) binding.state.update { current ->
+                            if (current.error?.startsWith("目标验收完成，但手机下载交付失败：") == true)
+                                current.copy(error = null)
+                            else current
+                        }
+                    } catch (error: Exception) {
+                        AppLog.failure("WorkAgentTurn", "publish_downloads", error,
+                            sessionId = binding.sessionId)
+                        binding.state.update { current -> current.copy(
+                            error = "目标验收完成，但手机下载交付失败：${error.message}；文件保留在工作区，可在文件页重试保存",
+                        ) }
+                    }
+                }
                 // Derived archive refresh does not change the completed Work result.
                 settledRunId?.let { runId -> onTurnSettled(binding, runId, settledImprovement) }
             }

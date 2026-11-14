@@ -163,6 +163,7 @@ fun LocalHarnessScreen(
     val transcriptHistory by viewModel.transcriptHistory.collectAsStateWithLifecycle()
     val pinnedSessionIds by viewModel.pinnedSessionIds.collectAsStateWithLifecycle()
     val sessionTitleOverrides by viewModel.sessionTitleOverrides.collectAsStateWithLifecycle()
+    val sectionCatalog by viewModel.sessionSections.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     // Native drags remain finger-tracked; short, explicit animations handle
     // toolbar taps, completed navigation and returning from drawer pages.
@@ -504,6 +505,7 @@ fun LocalHarnessScreen(
         selectMessageVariant = viewModel::selectChatMessageVariant,
         regenerate = viewModel::regenerateReply,
         generateReplySuggestions = viewModel::generateReplySuggestions,
+        sampleSession = viewModel::sampleSession,
         loadOlderTranscript = viewModel::loadOlderTranscript,
         importAttachment = viewModel::importAttachment,
         stop = viewModel::stop,
@@ -558,14 +560,37 @@ fun LocalHarnessScreen(
     )
     val workActions = LocalWorkFeatureUiActions(
         workState = viewModel.workState,
+        projectActions = viewModel.projectActions,
+        queuedUserPort = viewModel.queuedUserPort,
         workspaceFiles = viewModel::workspaceFiles,
+        saveWorkspaceFileToDownloads = { path ->
+            viewModel.saveWorkspaceFileToDownloadsForSession(shell.sessionId, path)
+        },
+        importWorkspaceFile = viewModel::importWorkspaceFile,
+        publishedWorkspaceFile = { path ->
+            viewModel.publishedWorkspaceFileForSession(shell.sessionId, path)
+        },
         workspaceDirectory = viewModel::workspaceDirectory,
         workspaceDirectoryPage = viewModel::workspaceDirectoryPage,
         searchWorkspaceFiles = viewModel::searchWorkspaceFiles,
         searchWorkspacePage = viewModel::searchWorkspacePage,
+        stopWorkspaceSearch = viewModel::stopWorkspaceSearch,
+        observeWorkspaceFiles = viewModel::observeWorkspaceFiles,
+        remoteGitBranches = viewModel::remoteGitBranchesForUi,
+        compareLocalGit = viewModel::compareLocalGitForUi,
+        compareRemoteGit = viewModel::compareRemoteGitForUi,
+        compareCommitGit = viewModel::compareCommitGitForUi,
+        findIndependentCodeReview = viewModel::findIndependentCodeReviewForUi,
+        runIndependentCodeReview = viewModel::runIndependentCodeReviewForUi,
+        acceptIndependentCodeReview = viewModel::acceptIndependentCodeReviewForUi,
+        findIndependentSecurityReview = viewModel::findIndependentSecurityReviewForUi,
+        runIndependentSecurityReview = viewModel::runIndependentSecurityReviewForUi,
+        approveIndependentSecurityReview = viewModel::approveIndependentSecurityReviewForUi,
         conversationFiles = viewModel::conversationFiles,
-        previewWorkspaceFile = viewModel::previewWorkspaceFile,
-        previewWorkspaceFilePage = viewModel::previewWorkspaceFilePage,
+        previewWorkspaceFile = { path -> viewModel.previewWorkspaceFileForSession(shell.sessionId, path) },
+        previewWorkspaceFilePage = { path, offset ->
+            viewModel.previewWorkspaceFilePageForSession(shell.sessionId, path, offset)
+        },
         artifactsForUi = viewModel::artifactsForUi,
         eventSequenceForUi = viewModel::eventSequenceForUi,
         eventChanges = viewModel::workEventChangesForUi,
@@ -914,6 +939,12 @@ fun LocalHarnessScreen(
                 globalSearchOpenRequest = openGlobalSearchRequest,
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
+                sectionCatalog = sectionCatalog,
+                onCreateSection = viewModel::createSessionSection,
+                onRenameSection = viewModel::renameSessionSection,
+                onDeleteSection = viewModel::deleteSessionSection,
+                onMoveSection = viewModel::moveSessionSection,
+                onAssignSessionSection = viewModel::assignSessionSection,
                 currentGalleryId = shell.galleryId,
                 currentGalleryStoryId = shell.galleryStoryId,
                 currentPersonaName = shell.chatPersona.name,

@@ -26,6 +26,7 @@ internal class LocalWorkspaceIntermediateMaintenance(private val workspaceRoot: 
         const val DAY_MS = 24L * 60 * 60 * 1000
         const val TEMP_GRACE_MS = DAY_MS
         const val INDEX_RETENTION_MS = 14L * DAY_MS
+        const val TOOL_RESPONSE_RETENTION_MS = 30L * DAY_MS
         const val INDEX_PRESSURE_GRACE_MS = DAY_MS
         const val INDEX_BUDGET = 64L * 1024 * 1024
         const val MAX_VISITS = 30_000
@@ -33,6 +34,9 @@ internal class LocalWorkspaceIntermediateMaintenance(private val workspaceRoot: 
         val INDEX_TEMP = Regex("^\\.[0-9a-f]{64}\\.index-[0-9a-fA-F-]{36}\\.tmp$")
         val ATTACHMENT_TEMP = Regex("^\\.(?:incoming-[0-9a-fA-F-]{36}|normalized-[0-9a-fA-F-]{36}\\.jpg)$")
         val WRITE_TEMP = Regex("^\\.write-[a-zA-Z0-9-]{6,}\\.tmp$")
+        // Only files emitted by LocalWebTools are eligible; user-created files are preserved.
+        val FETCH_RESPONSE = Regex("^fetch-[0-9]{13}-[a-fA-F0-9]{8}\\.(?:txt|json|xml|html)$")
+        val QUERY_RESPONSE = Regex("^query-[0-9]{13}-[a-fA-F0-9]{8}\\.json$")
     }
 
     fun cleanup(nowMillis: Long = System.currentTimeMillis()): Report {
@@ -132,6 +136,29 @@ internal class LocalWorkspaceIntermediateMaintenance(private val workspaceRoot: 
                     val candidate = entry.toFile()
                     if (WRITE_TEMP.matches(candidate.name) && regular(candidate) &&
                         stale(candidate, TEMP_GRACE_MS)) deleteOwned(candidate)
+                }
+            }
+        }
+        // Large web responses and JSON query spill files are reproducible intermediates.
+        // Keep recent results available to ongoing Work; never sweep .dsh/write-locks or
+        // arbitrary user-named workspace files.
+        for ((relative, generatedName) in listOf(
+            ".dsh/fetches" to FETCH_RESPONSE,
+            ".dsh/queries" to QUERY_RESPONSE,
+        )) {
+            val dir = File(root, relative)
+            if (!dir.exists()) continue
+            require(!Files.isSymbolicLink(dir.toPath()) &&
+                dir.canonicalFile.toPath().startsWith(root.toPath())) {
+                "工具缓存目录不安全：$relative"
+            }
+            require(dir.isDirectory) { "工具缓存路径不是目录：$relative" }
+            Files.newDirectoryStream(dir.toPath()).use { entries ->
+                for (entry in entries) {
+                    if (++scanned > MAX_VISITS) break
+                    val candidate = entry.toFile()
+                    if (generatedName.matches(candidate.name) && regular(candidate) &&
+                        stale(candidate, TOOL_RESPONSE_RETENTION_MS)) deleteOwned(candidate)
                 }
             }
         }

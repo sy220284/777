@@ -1,4 +1,4 @@
-# 神言神语 V6.3 · 当前 Android 手机 UI 完整设计源
+# 神言神语 V6 · 当前 Android 手机设计资源
 
 > 本设计包是恢复原生 Android V6.3 的事实参考；新版业务修复与新增功能以现行核心代码为准。历史 UI 3.0 接入规范已退役，不恢复已取消功能入口。
 
@@ -7,7 +7,7 @@
 - **[V6.3 当前 Compose 真实实现规范](V6-CURRENT-IMPLEMENTATION.zh-CN.md)**：三主题的真实 ARGB、L1–L5 材质、区域透明度、尺寸、动效、触觉、7 条顶层路由、21 个设置二级页、工作/聊天/工具等交互与退役清单。
 - **[现行页面与退役入口机器清单](current-ui.json)**：`LocalFeatureCatalog` 和 `SettingsDestination` 的对应关系及历史合并事实，按现行原生路由组织，不再按历史样张编号。
 - **[打开当前手机单列交互设计稿](mobile/app.html)**：本轮按主线重新组织，只允许当前仍有真实入口的页面/状态。它是离线交互投影，**不是 Android 真实截图，也不是 Figma 已同步证明**。
-- [可复用 SVG 入口图标](sy-entry-icons.svg)、[图标源文件映射](SY-ENTRY-ICONS.zh-CN.md)、[文件类 SVG](assets/file-icons-preview.svg)、[逐场景验收台账](STATUS.zh-CN.md)。其中原代码保留 26 个原始 SVG 路径，**仅 24 个属于当前现行功能入口**；`Projects`、`RunCenter` 为历史退役入口，在新版交付素材中剔除，不以路径存在恢复 UI。详见图标规范。
+- [可复用 SVG 入口图标](sy-entry-icons.svg)、[图标源文件映射](SY-ENTRY-ICONS.zh-CN.md)、[文件类 SVG](assets/file-icons-preview.svg)、[现行设计与实现状态](STATUS.zh-CN.md)。其中原代码保留 26 个原始 SVG 路径，**仅 24 个属于当前现行功能入口**；`Projects`、`RunCenter` 为历史退役入口，在新版交付素材中剔除，不以路径存在恢复 UI。详见图标规范。
 
 ## 本轮升级：V6.4 视觉与材质设计目标（尚未写入 Android）
 
@@ -18,8 +18,8 @@
 ## 现有成熟交互与专用视觉的权威来源
 
 - [V6.3 已实现交互与组件契约](V6-IMPLEMENTED-INTERACTION-CONTRACT.zh-CN.md)：全宽阅读、滚动锚点、IME 跟随、字号自适应、Work 六态、文件共享转场和现有测试来源。
-- [手机/人物设计](../mobile-ui.md) 与 [媒体专用规格](V6-MEDIA-CHAT-EXPERIENCE.zh-CN.md)：保留双列人物、相片详情、真实媒体结果和自动模型路由。
-- **四类文档互相配合**：机器清单只记录已合并事实；现行规范与交互契约记录实际实现；V6.4 记录设计目标；STATUS 分开登记源码、CI 与设备验收。离线 HTML 为演示投影。
+- [手机/人物设计](../mobile-ui.md)及[现行媒体能力](../../MEDIA-CAPABILITIES.zh-CN.md)：说明人物管理、媒体创作入口与结果归属；交互组件以当前 Compose 实现为准。
+- **文档关系**：现行实现与交互契约描述已落地行为，V6.4 记录未来设计目标，STATUS 维护设计与功能状态，离线 HTML 作为演示稿。
 
 ## 以代码为准的视觉归属
 
@@ -31,7 +31,7 @@
 
 旧 `shenyan-v6-mobile-unified-20261013.zip` 及旧版截图/HTML 只可从 Git 历史追溯，**不再是现行设计包、视觉规范或功能入口的输入**。其中含已退役的三选导航、独立运行中心/项目、工作五段、独立检查更新页等；不能重新发布为有效设计素材。
 
-已合并的界面修正主要见 #693、#694、#696–#704、#708、#709、#710；**#711 技能/插件卡片与共享材质修复已合并**，自动化已通过，放大字体与 TalkBack 仍需设备验收；**#705 已于 2026-10-17 合并**，其 UI 3.0 独立界面架构现由 [PR #766](https://github.com/sy220284/777/pull/766) 回退；业务功能修复仍须单独保留和验收。两项边界及风险详见现行规范和台账。
+已合并界面修改包含 #693、#694、#696–#704、#708、#709、#710 和 #711；#705 曾于 2026-10-17 合并，其架构随后由 #766 回退，现行实现参见 Compose。
 
 Figma 当前 Starter MCP 配额耗尽，未写入可编辑画布；Canva 未检索到现有 777 设计稿/品牌包；仓库设计稿和文档不等于在线设计同步。待恢复后按代码变量、组件和全页面单列设计逐项对齐，记录节点和对照截图再宣布完成。
 
@@ -40,7 +40,7 @@ Figma 当前 Starter MCP 配额耗尽，未写入可编辑画布；Canva 未检�
 - [手机交互预览](mobile/app.html) 已用本地重绘的完整独立 HTML 替换旧简化页面：21 个 `SettingsDestination` 都有各自的表达，9 项原先复用的设置块已按 `SettingsScreen`/`MiniMaxQuotaPage`/`UsageCalculationPage`/`MemorySettingsSections` 等原生来源拆开。预览数据全部标明模拟或未读取，不能把离线按钮当成可工作的真实功能。
 - SVG 总览实物只保留现行 **24 枚**入口图标，HTML 同步内嵌同一组可编辑 SVG 数据，不再将保留于 Kotlin 的两枚退役路径导入有效设计包。
 - `sync-design-package.py` 与 CI 静态门禁检查 **SVG 实际枚数、HTML 实际图标键名及退役过滤**，避免“文档写 24 枚但实际打包了 26 枚”。旧屏幕 PNG 未纳入现行仓库打包输入。
-- 外部重绘 ZIP 保留新渲染图和独立源文件；**GitHub 仓库源码及生成导出内容已对齐，但仓库 ZIP 与已交付外部完整 ZIP 仍是两种体量的工件**（前者无 59 张 PNG），不要混淆两者内容数量。Android 原生、Figma 在线画布仍单独验收。
+- 外部重绘 ZIP 保留新渲染图和独立源文件；**GitHub 仓库源码及生成导出内容已对齐，但仓库 ZIP 与已交付外部完整 ZIP 仍是两种体量的工件**（前者无 59 张 PNG），不要混淆两者内容数量。
 
 - 当前可编辑源由 `mobile/index.html`、`mobile/v6.css`、`mobile/v6.js` 和 `assets/icons`、`assets/portraits` 的现行 SVG 组成；`build-standalone.py` 可重复构建单文件 `mobile/app.html`，CI 对照确保离线版本不会与设计源分叉。
 
@@ -54,7 +54,6 @@ Figma 当前 Starter MCP 配额耗尽，未写入可编辑画布；Canva 未检�
 
 - [V6.3 全图标三主题检查画廊](icon-gallery.html)：按 24+61+20+11+12 五类展示 SVG 实物，支持暖纸、烟熏玻璃、哑光黑切换。它是设计目测载体，实际 Android 图标以 Compose/XML 为准。
 
-## V6.3 正式交付
+## 图标资源规范
 
-- **[V6.3 交付变更与验收](V6.3-DELIVERY.zh-CN.md)**：统一版本口径、全部图标清单和真实交付边界。
-- **[V6.3 图标规范](V6.3-ICON-SYSTEM.zh-CN.md)**：全量 128 个可编辑变体的标准及 Android 对应关系。
+- **[V6.3 图标规范](V6.3-ICON-SYSTEM.zh-CN.md)**：可编辑图标及 Android 对应关系。

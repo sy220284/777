@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
+import com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
@@ -39,6 +40,7 @@ internal data class LocalShellFeatureUiActions(
     val selectMessageVariant: suspend (String, Int) -> Boolean,
     val regenerate: (String) -> Boolean,
     val generateReplySuggestions: suspend () -> Boolean,
+    val sampleSession: suspend (String, String) -> com.labteto.dshmobile.local.model.LocalConversationSampleResult,
     val loadOlderTranscript: suspend (String) -> Result<Int>,
     val importAttachment: suspend (Uri) -> LocalImportedAttachment,
     val stop: () -> Unit,
@@ -101,7 +103,12 @@ internal data class LocalWorkUiActionResult(
 
 internal data class LocalWorkFeatureUiActions(
     val workState: StateFlow<LocalWorkUiState>,
+    val projectActions: LocalWorkProjectsUiActions? = null,
+    val queuedUserPort: com.labteto.dshmobile.uicontract.UiQueuedUserPort? = null,
     val workspaceFiles: suspend () -> List<LocalWorkspaceFile>,
+    val saveWorkspaceFileToDownloads: suspend (String) -> String = { error("保存到下载目录未连接") },
+    val importWorkspaceFile: (suspend (Uri) -> String)? = null,
+    val publishedWorkspaceFile: suspend (String) -> com.labteto.dshmobile.local.files.LocalPublishedDownload? = { null },
     val workspaceDirectory: suspend (String) -> List<LocalWorkspaceDirectoryEntry> = { emptyList() },
     val workspaceDirectoryPage: suspend (String, Int) -> LocalWorkspaceDirectoryPage = { _, _ ->
         LocalWorkspaceDirectoryPage(emptyList(), null)
@@ -110,6 +117,19 @@ internal data class LocalWorkFeatureUiActions(
     val searchWorkspacePage: suspend (String, Int) -> LocalWorkspaceSearchPage = { _, _ ->
         LocalWorkspaceSearchPage(emptyList(), null)
     },
+    val stopWorkspaceSearch: suspend (String) -> Boolean = { false },
+    val observeWorkspaceFiles: (List<String>) -> kotlinx.coroutines.flow.Flow<com.labteto.dshmobile.local.files.LocalWorkspaceFileChange> =
+        { kotlinx.coroutines.flow.emptyFlow() },
+    val remoteGitBranches: (suspend (String) -> List<String>)? = null,
+    val compareLocalGit: (suspend (String, Boolean) -> LocalRemoteGitDiffUi)? = null,
+    val compareRemoteGit: (suspend (String, String, String) -> LocalRemoteGitDiffUi)? = null,
+    val compareCommitGit: (suspend (String, String) -> LocalRemoteGitDiffUi)? = null,
+    val findIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview?)? = null,
+    val runIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview)? = null,
+    val acceptIndependentCodeReview: (suspend (String, String, com.labteto.dshmobile.local.work.LocalIndependentCodeReview, LocalRemoteGitDiffUi) -> Boolean)? = null,
+    val findIndependentSecurityReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalSecurityReview?)? = null,
+    val runIndependentSecurityReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalSecurityReview)? = null,
+    val approveIndependentSecurityReview: (suspend (String, String, com.labteto.dshmobile.local.work.LocalSecurityReview, LocalRemoteGitDiffUi) -> Boolean)? = null,
     val conversationFiles: suspend (String) -> LocalConversationFiles,
     val previewWorkspaceFile: suspend (String) -> LocalWorkspaceFilePreview,
     val previewWorkspaceFilePage: suspend (String, Long) -> LocalWorkspaceFilePreview = { path, _ -> previewWorkspaceFile(path) },

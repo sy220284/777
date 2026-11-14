@@ -17,8 +17,6 @@ import android.media.MediaPlayer
 import android.os.Build
 import android.media.MediaMetadataRetriever
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
 import android.widget.MediaController
 import android.widget.VideoView
@@ -553,36 +551,43 @@ internal fun MediaMessageCard(
     }
 }
 
-/** Explicit user-selected device destination; sharing never masquerades as a save. */
-/** The save picker is shared by audio's inline button and the photo viewer's overflow. */
+/** One-tap public download, shared by the audio/video/image message actions. */
 @Composable
 private fun rememberMediaSaveAction(
-    file: File?, mime: String, onResult: (Boolean) -> Unit,
+    file: File?, onResult: (String?, String?) -> Unit,
 ): () -> Unit {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val destination = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mime)) { uri ->
-        if (uri != null) scope.launch {
-            val saved = runCatching {
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { output ->
-                        file?.inputStream()?.use { input -> input.copyTo(output) }
-                            ?: error("源文件不可用")
-                    } ?: error("无法写入选定位置")
+    var saving by remember(file?.absolutePath) { mutableStateOf(false) }
+    return {
+        if (file != null && !saving) {
+            saving = true
+            scope.launch {
+                try {
+                    val location = withContext(Dispatchers.IO) {
+                        com.labteto.dshmobile.local.files.LocalDownloadsPublisher.owned(context)
+                            .publishOwnedFile(file)
+                    }
+                    onResult(location, null)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    onResult(null, failure.message ?: "无法保存到手机下载目录")
+                } finally {
+                    saving = false
                 }
             }
-            onResult(saved.isSuccess)
         }
     }
-    return { file?.let { destination.launch(it.name) } }
 }
 
 @Composable
 private fun MediaSaveButton(file: File, mime: String) {
     val resources = LocalResources.current
     var status by remember(file.absolutePath) { mutableStateOf<String?>(null) }
-    val save = rememberMediaSaveAction(file, mime) { success ->
-        status = resources.getString(if (success) R.string.media_action_saved else R.string.media_action_save_failed)
+    val save = rememberMediaSaveAction(file) { location, failure ->
+        status = if (location != null) "已保存：手机存储/$location"
+            else "保存失败：${failure ?: "未知错误"}"
     }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         SyButton(text = resources.getString(R.string.media_action_save), size = SyButtonSize.Small,
@@ -600,10 +605,9 @@ internal fun InlineReplyMediaActions(file: File, mime: String, onError: (String)
     val resources = LocalResources.current
     val context = LocalContext.current
     var open by remember(file.absolutePath) { mutableStateOf(false) }
-    val save = rememberMediaSaveAction(file, mime) { success ->
-        Toast.makeText(context,
-            resources.getString(if (success) R.string.media_action_saved else R.string.media_action_save_failed),
-            Toast.LENGTH_SHORT).show()
+    val save = rememberMediaSaveAction(file) { location, failure ->
+        Toast.makeText(context, if (location != null) "已保存：手机存储/$location"
+            else "保存失败：${failure ?: "未知错误"}", Toast.LENGTH_LONG).show()
     }
     Box {
         IconButton(onClick = { open = true },
@@ -755,10 +759,9 @@ internal fun MediaImageDetailDialog(
         offsetY = if (next <= 1f) 0f else (offsetY + panChange.y).coerceIn(-1100f, 1100f)
     }
     val localFile = file?.takeIf(File::isFile)
-    val save = rememberMediaSaveAction(localFile, localFile?.let(::imageMime) ?: "image/jpeg") { success ->
-        Toast.makeText(context,
-            resources.getString(if (success) R.string.media_action_saved else R.string.media_action_save_failed),
-            Toast.LENGTH_SHORT).show()
+    val save = rememberMediaSaveAction(localFile) { location, failure ->
+        Toast.makeText(context, if (location != null) "已保存：手机存储/$location"
+            else "保存失败：${failure ?: "未知错误"}", Toast.LENGTH_LONG).show()
     }
     val actions = buildList {
         if (onDeleteRequest != null) add(SyMenuItem(
@@ -1121,6 +1124,45 @@ internal fun LocalWorkArtifactMessageRow(
     }
     var expanded by remember(artifact.reference) { mutableStateOf(false) }
     var error by remember(artifact.reference) { mutableStateOf<String?>(null) }
+    var savingDownload by remember(artifact.reference) { mutableStateOf(false) }
+    var published by remember(artifact.reference, sessionId) {
+        mutableStateOf<com.labteto.dshmobile.local.files.LocalPublishedDownload?>(null)
+    }
+    val publicationRevision = if (actions != null && sessionId != null) actions.eventSequenceForUi(sessionId) else -1L
+    LaunchedEffect(artifact.reference, artifact.fileObservation, actions, publicationRevision) {
+        published = if (artifact.category == "file" && actions != null && file != null) {
+            withContext(Dispatchers.IO) { actions.publishedWorkspaceFile(artifact.reference) }
+        } else null
+    }
+    fun saveArtifact() {
+        if (savingDownload || actions == null || file == null) return
+        savingDownload = true
+        scope.launch {
+            try {
+                val saved = actions.saveWorkspaceFileToDownloads(artifact.reference)
+                published = withContext(Dispatchers.IO) { actions.publishedWorkspaceFile(artifact.reference) }
+                error = if (published == null) "已保存：手机存储/$saved" else null
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                error = "保存失败：${failure.message ?: "未知错误"}"
+            } finally {
+                savingDownload = false
+            }
+        }
+    }
+    fun openPublished() {
+        val target = published ?: return
+        val source = file ?: return
+        try {
+            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                setDataAndType(target.uri, localArtifactMime(source))
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            })
+        } catch (failure: Exception) {
+            error = "无法打开下载成果：${failure.message ?: "请选择支持此文件的应用"}"
+        }
+    }
     LaunchedEffect(artifact.reference, artifact.fileObservation, artifact.versionNow, artifact.currentlyAvailable, actions) {
         preview = null
         if (artifact.category == "file" && artifact.currentlyAvailable != false && actions != null) {
@@ -1175,6 +1217,12 @@ internal fun LocalWorkArtifactMessageRow(
                 style = DsType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
         }
+        published?.let { saved ->
+            Text(if (saved.currentVersion) "已保存：手机存储/${saved.location}"
+                else "已保存旧版本：手机存储/${saved.location}（当前工作区文件已修改）",
+                style = DsType.caption11.withReadingWeight(),
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+        }
         if (artifact.versionAtCreation != null && currentVersion != null &&
             artifact.versionAtCreation != currentVersion) {
             Text(resources.getString(R.string.media_chat_work_file_changed), style = DsType.caption11.withReadingWeight(),
@@ -1197,13 +1245,20 @@ internal fun LocalWorkArtifactMessageRow(
                 })
         }
         if (inline && artifact.category == "file") {
-            InlineReplyArtifactActions(file, onOpen, onError = { error = it })
+            InlineReplyArtifactActions(file, onOpen, onError = { error = it },
+                onSaveToDownloads = if (actions != null && file != null) ::saveArtifact else null,
+                published = published, onOpenPublished = ::openPublished)
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 if (artifact.category == "file") {
                     SyButton(resources.getString(R.string.media_chat_view_entire_file), onClick = onOpen,
                         size = SyButtonSize.Small)
                     if (file != null) {
+                        SyButton(text = if (published?.currentVersion == true) "打开已保存"
+                            else "保存到下载", onClick = {
+                                if (published?.currentVersion == true) openPublished() else saveArtifact()
+                            }, enabled = !savingDownload && actions != null, size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline)
                         SyButton(resources.getString(R.string.media_chat_share_save),
                             size = SyButtonSize.Small, variant = SyButtonVariant.Ghost,
                             onClick = {
@@ -1231,6 +1286,9 @@ internal fun InlineReplyArtifactActions(
     file: File?,
     onOpen: () -> Unit,
     onError: (String) -> Unit,
+    onSaveToDownloads: (() -> Unit)? = null,
+    published: com.labteto.dshmobile.local.files.LocalPublishedDownload? = null,
+    onOpenPublished: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -1242,6 +1300,16 @@ internal fun InlineReplyArtifactActions(
             onClick = { open = false; onOpen() },
         ))
         if (file?.isFile == true) {
+            if (onSaveToDownloads != null) add(SyMenuItem(
+                text = "保存到下载",
+                icon = FeatherIcons.Download,
+                onClick = { open = false; onSaveToDownloads() },
+            ))
+            if (published?.currentVersion == true && onOpenPublished != null) add(SyMenuItem(
+                text = "打开已保存文件",
+                icon = FeatherIcons.FileText,
+                onClick = { open = false; onOpenPublished() },
+            ))
             add(SyMenuItem(
                 text = resources.getString(R.string.media_chat_share_save),
                 icon = FeatherIcons.ArrowUp,

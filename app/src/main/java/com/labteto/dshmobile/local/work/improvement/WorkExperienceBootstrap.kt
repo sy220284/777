@@ -16,7 +16,7 @@ import kotlinx.serialization.json.contentOrNull
  * persisted as adopted Work strategies, injected into live task prompts or installed as skills.
  */
 internal object WorkExperienceBootstrap {
-    const val VERSION = "harness2-review-bootstrap-1"
+    const val VERSION = "harness2-review-bootstrap-2"
 
     internal data class Pattern(
         val evidenceTag: String,
@@ -50,6 +50,18 @@ internal object WorkExperienceBootstrap {
             reviewQuestion = "完成声明与可观察交付证据冲突，是否存在过早宣告成功？",
             safeDirection = "将完成状态绑定到可核验的工具、文件和测试回执",
         ),
+        Pattern(
+            evidenceTag = "finding_supported",
+            name = "调查发现中的可复用方法",
+            reviewQuestion = "本次任务产生了带真实来源的调查发现；哪些查找、补读或交叉核查动作值得在相似问题中尝试？",
+            safeDirection = "只提炼可验证的调查方法，不把模型记录的发现、因果关系或改进收益直接视为已证明",
+        ),
+        Pattern(
+            evidenceTag = "source_follow_through",
+            name = "主动补读与调查闭环",
+            reviewQuestion = "工具返回未读完的来源时，任务随后实际读取了后续范围。有哪些定位、分页和核查方法值得在相似场景复用？",
+            safeDirection = "只提炼有真实读取回执的方法；游标读完不等于结论已经科学验证，仍需检查材料与任务目标",
+        ),
     )
 
     fun catalogMarkdown(): String = buildString {
@@ -72,12 +84,16 @@ internal object WorkExperienceBootstrap {
         val goalRejections: Int,
         val qualityConflicts: Int,
         val toolContractErrors: Int = 0,
+        val supportedFindings: Int = 0,
+        val followedSourceCursors: Int = 0,
     ) {
         fun supports(tag: String): Boolean = when (tag) {
             "tool_failure" -> toolFailures > 0
             "tool_contract_error" -> toolContractErrors > 0
             "goal_rejection" -> goalRejections > 0
             "quality_conflict" -> qualityConflicts > 0
+            "finding_supported" -> supportedFindings > 0
+            "source_follow_through" -> followedSourceCursors > 0
             else -> false
         }
 
@@ -90,6 +106,9 @@ internal object WorkExperienceBootstrap {
         var rejections = 0
         var conflicts = 0
         var contractErrors = 0
+        val currentFindings = linkedMapOf<String, String>()
+        val sourcesWithOpenCursor = mutableMapOf<String, String>()
+        val completedSourceCursors = mutableSetOf<String>()
         forEachCompletedGoalEvent(log, goal) { event ->
             when (event.type) {
                 "tool/result" -> if (
@@ -101,13 +120,37 @@ internal object WorkExperienceBootstrap {
                         contractErrors++
                     }
                 }
+                "work/source-observed" -> {
+                    val source = (event.data["source"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+                    val kind = (event.data["kind"] as? JsonPrimitive)?.contentOrNull
+                    val hasNext = (event.data["has_next"] as? JsonPrimitive)?.contentOrNull == "true"
+                    if (source.isNotBlank() && kind == "slice") {
+                        val region = (event.data["region"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+                        if (hasNext && region.isNotBlank()) {
+                            sourcesWithOpenCursor[source] = region
+                        } else if (!hasNext) {
+                            val previousRegion = sourcesWithOpenCursor.remove(source)
+                            if (previousRegion != null && region.isNotBlank() && region != previousRegion) {
+                                completedSourceCursors += source
+                            }
+                        }
+                    }
+                }
+                "work/finding" -> {
+                    val id = (event.data["finding_id"] as? JsonPrimitive)?.contentOrNull
+                    val status = (event.data["status"] as? JsonPrimitive)?.contentOrNull
+                    if (!id.isNullOrBlank() && status in setOf("hypothesis", "supported", "rejected")) {
+                        currentFindings[id] = status.orEmpty()
+                    }
+                }
                 "goal/transition-rejected" -> rejections++
                 "work/output-quality" -> {
                     conflicts += (event.data["findings"] as? JsonArray)?.size ?: 0
                 }
             }
         }
-        return Signals(toolFailures, rejections, conflicts, contractErrors)
+        return Signals(toolFailures, rejections, conflicts, contractErrors,
+            currentFindings.values.count { it == "supported" }, completedSourceCursors.size)
     }
 
     /**
@@ -133,6 +176,8 @@ internal object WorkExperienceBootstrap {
             - tool_contract_error: ${signals.toolContractErrors}
             - goal_rejection: ${signals.goalRejections}
             - quality_conflict: ${signals.qualityConflicts}
+            - finding_supported: ${signals.supportedFindings} (model-reported finding with a source receipt, not independently proven)
+            - source_follow_through: ${signals.followedSourceCursors} (source cursor followed by an actual later reading; not proof of discovery)
             - artifact execution receipt exists: ${hasArtifactReceipt}
             - verification command execution receipt exists: ${hasVerificationReceipt}
             Task description (untrusted, abbreviated): ${objective.take(320)}
@@ -151,13 +196,16 @@ internal object WorkExperienceBootstrap {
                a problem happened, NOT that your corrective action works.
             4. Prefer a conditional on-demand procedure over longer always-on System Prompt.
                Do not change permissions, user rules, privacy protections or safety approvals.
-            5. If these facts cannot support a concrete reusable suggestion, output NO_ENTRY
-               (no JSON and no explanation). Never force a lesson from successful completion.
+            5. A supported finding marks an investigated lead, not a verified research discovery.
+               Source follow-through means a later read occurred, not that all material was verified.
+               Suggest reusable investigative actions only when grounded by this signal.
+               If facts cannot support a concrete reusable suggestion, output NO_ENTRY
+               (no JSON and no explanation). Never force a lesson from ordinary success.
 
             Otherwise return ONE JSON object only:
             {"cue":"generalizable situation trigger", "guidance":"concrete optional corrective action",
              "reason":"what the observed signal supports, without claiming a gain",
-             "category":"workflow|prompt|skill", "evidence_tag":"tool_failure|tool_contract_error|goal_rejection|quality_conflict"}
+             "category":"workflow|prompt|skill", "evidence_tag":"tool_failure|tool_contract_error|goal_rejection|quality_conflict|finding_supported|source_follow_through"}
         """.trimIndent()
     }
 }

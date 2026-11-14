@@ -21,6 +21,7 @@ import com.labteto.dshmobile.local.model.modelPostAdmissionFailure
 import com.labteto.dshmobile.local.model.modelTransportFailure
 import com.labteto.dshmobile.local.model.normalizeModelBaseUrl
 import com.labteto.dshmobile.local.model.parseDeepSeekOpenAiUsage
+import com.labteto.dshmobile.local.model.retryAfterMillis
 import com.labteto.dshmobile.local.model.requireUniqueModelToolCallIds
 import com.labteto.dshmobile.local.model.validatedModelToolCall
 import com.labteto.dshmobile.local.model.withCancellableModelResponse
@@ -143,6 +144,8 @@ class DeepSeekClient @Inject constructor(
                         } else "模型请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
                         retryable = response.code == 408 || response.code == 429 || response.code >= 500,
                         status = response.code,
+                        providerRetryAfterMs = retryAfterMillis(response.header("Retry-After"))
+                            ?: response.header("retry-after-ms")?.toLongOrNull()?.coerceAtLeast(0L),
                         requestId = requestId,
                         admissionState = LocalModelAdmissionState.REJECTED,
                     )
@@ -268,6 +271,8 @@ class DeepSeekClient @Inject constructor(
                         } else "模型请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
                         retryable = response.code == 408 || response.code == 429 || response.code >= 500,
                         status = response.code,
+                        providerRetryAfterMs = retryAfterMillis(response.header("Retry-After"))
+                            ?: response.header("retry-after-ms")?.toLongOrNull()?.coerceAtLeast(0L),
                         requestId = requestId,
                         admissionState = LocalModelAdmissionState.REJECTED,
                     )

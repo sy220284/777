@@ -1,83 +1,23 @@
 package com.labteto.dshmobile.local.work
 
-import android.os.FileObserver
+import com.labteto.dshmobile.local.files.workspaceFileWatchTargets
+import com.labteto.dshmobile.local.files.watchWorkspaceFileChanges
 import java.io.File
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.map
 
-/**
- * Paths are taken from already-admitted Work evidence links, never a model or URL.
- * Watching happens only while the evidence panel is subscribed. The real Work Owner
- * reads and hashes actual bytes after any notification; the watcher never asserts a pass.
- */
+/** Work evidence subscribes to the shared workspace watcher and verifies the actual file later. */
 internal fun workEvidenceWatchTargets(
     workspace: File,
     links: List<LocalRequirementEvidenceLink>,
     artifactPaths: List<String> = emptyList(),
-): Map<File, Set<String>> {
-    val root = workspace.canonicalFile
-    if (!root.isDirectory) return emptyMap()
-    val rootPath = root.toPath()
-    val watches = linkedMapOf<File, MutableSet<String>>()
-    for (relative in (links.map { it.artifactPath } + artifactPaths).distinct()) {
-        if (relative.isBlank() || relative.startsWith('/') ||
-            relative.contains('\\') || relative.contains(':')) continue
-        val parts = relative.split('/')
-        if (parts.any { it.isBlank() || it == "." || it == ".." }) continue
+): Map<File, Set<String>> =
+    workspaceFileWatchTargets(workspace, (links.map { it.artifactPath } + artifactPaths).distinct())
 
-        // First validate the entire *existing* path. A symlink resolving back into the
-        // workspace is still not an authoritative evidence path.
-        var parent = root
-        var valid = true
-        for (part in parts) {
-            val next = File(parent, part)
-            if (java.nio.file.Files.isSymbolicLink(next.toPath())) {
-                valid = false
-                break
-            }
-            if (next.exists() && !next.canonicalFile.toPath().startsWith(rootPath)) {
-                valid = false
-                break
-            }
-            parent = next
-        }
-        if (!valid) continue
-
-        // Observe every existing parent directory from the workspace root down. A
-        // missing intermediate folder is watched by its nearest existing ancestor,
-        // so an external CREATE/MOVED_TO can re-arm watchers for the new child.
-        parent = root
-        for (part in parts) {
-            if (!parent.isDirectory) break
-            watches.getOrPut(parent.canonicalFile) { linkedSetOf() } += part
-            parent = File(parent, part)
-        }
-    }
-    return watches.mapValues { (_, names) -> names.toSet() }
-}
-
-/** Single Android-native filesystem event subscription; no polling or second file status store. */
 internal fun watchLocalWorkEvidenceFiles(
     workspace: File,
     links: List<LocalRequirementEvidenceLink>,
     artifactPaths: List<String> = emptyList(),
-): Flow<Unit> = callbackFlow {
-    val targets = workEvidenceWatchTargets(workspace, links, artifactPaths)
-    val flags = FileObserver.MODIFY or FileObserver.CLOSE_WRITE or
-        FileObserver.MOVED_TO or FileObserver.MOVED_FROM or FileObserver.DELETE or
-        FileObserver.CREATE or FileObserver.ATTRIB or FileObserver.DELETE_SELF
-    // A parent-directory inotify watch reports changes to its named children,
-    // including in-place writes (MODIFY/CLOSE_WRITE), not only renames. Register
-    // exactly one watch per distinct directory. Registering an additional inode
-    // watch for every evidence file exhausts Android's inotify budget on large
-    // Work deliveries and can silently stop notifications after the first N.
-    val observers = targets.map { (directory, names) ->
-        object : FileObserver(directory.absolutePath, flags) {
-            override fun onEvent(event: Int, path: String?) {
-                if (path == null || path in names) trySend(Unit)
-            }
-        }.also(FileObserver::startWatching)
-    }
-    awaitClose { observers.forEach(FileObserver::stopWatching) }
-}
+): Flow<Unit> =
+    watchWorkspaceFileChanges(workspace, (links.map { it.artifactPath } + artifactPaths).distinct())
+        .map { Unit }

@@ -116,6 +116,108 @@ class AgentInputQueue(
             }
         }
 
+    /**
+     * Edit only an unconsumed plain-text user input. Rich model payloads may contain attachments,
+     * so they must be rebuilt by the owning Feature rather than silently losing their provenance.
+     * The persistence callback runs under the queue lock and sees the proposed complete queue.
+     */
+    fun editUserCommitted(
+        id: String,
+        newText: String,
+        commit: (List<QueuedAgentInput>) -> Unit,
+    ): Boolean = synchronized(lock) {
+        require(id.isNotBlank() && newText.isNotBlank()) { "队列编号和新内容不能为空" }
+        val index = items.indexOfFirst { it.id == id && it.kind == QueuedAgentInputKind.USER }
+        if (index < 0) return@synchronized false
+        val before = items[index]
+        require(before.modelMessage == null) { "含附件的输入需由会话发送层重新生成消息" }
+        val changed = before.copy(content = newText, memoryInput = newText)
+        items[index] = changed
+        try {
+            commit(items.toList())
+            true
+        } catch (failure: Throwable) {
+            items[index] = before
+            throw failure
+        }
+    }
+
+    /**
+     * Compare-and-swap a complete user message, including the model-visible envelope.
+     * Work/Chat owners must reconstruct image/file blocks before calling this; preserving the
+     * original ID keeps the admission receipt and user-visible message identity consistent.
+     */
+    fun replaceUserCommitted(
+        expected: QueuedAgentInput,
+        replacement: QueuedAgentInput,
+        commit: (List<QueuedAgentInput>) -> Unit,
+    ): Boolean = synchronized(lock) {
+        require(expected.kind == QueuedAgentInputKind.USER && expected.id.isNotBlank())
+        require(replacement.kind == QueuedAgentInputKind.USER && replacement.id == expected.id)
+        require(replacement.content.isNotBlank() && replacement.continuation == null &&
+            replacement.agentSource == null) { "只能替换完整的用户队列消息" }
+        require(replacement.modelMessage == null ||
+            (replacement.modelMessage["role"] as? kotlinx.serialization.json.JsonPrimitive)?.content ==
+                "user") { "模型消息必须维持用户身份" }
+        val index = items.indexOfFirst { it.id == expected.id && it.kind == QueuedAgentInputKind.USER }
+        if (index < 0 || items[index] != expected) return@synchronized false
+        items[index] = replacement
+        try {
+            commit(items.toList())
+            true
+        } catch (failure: Throwable) {
+            items[index] = expected
+            throw failure
+        }
+    }
+
+    /** Cancel a queued user input, never a system continuation or another agent's message. */
+    fun removeUserCommitted(
+        id: String,
+        commit: (List<QueuedAgentInput>) -> Unit,
+    ): Boolean = synchronized(lock) {
+        require(id.isNotBlank()) { "队列编号不能为空" }
+        val index = items.indexOfFirst { it.id == id && it.kind == QueuedAgentInputKind.USER }
+        if (index < 0) return@synchronized false
+        val removed = items.removeAt(index)
+        try {
+            commit(items.toList())
+            true
+        } catch (failure: Throwable) {
+            items.add(index, removed)
+            throw failure
+        }
+    }
+
+    /**
+     * Reorder every queued USER item as one transaction. Internal Agent messages and autonomous
+     * continuations retain their exact slots and cannot be manipulated by user queue operations.
+     */
+    fun reorderUsersCommitted(
+        orderedUserIds: List<String>,
+        commit: (List<QueuedAgentInput>) -> Unit,
+    ): Boolean = synchronized(lock) {
+        val previous = items.toList()
+        val users = previous.filter { it.kind == QueuedAgentInputKind.USER }
+        if (orderedUserIds.size != users.size ||
+            orderedUserIds.any(String::isBlank) ||
+            orderedUserIds.toSet().size != orderedUserIds.size ||
+            orderedUserIds.toSet() != users.map { it.id }.toSet()
+        ) return@synchronized false
+        val ordered = orderedUserIds.map { id -> users.first { it.id == id } }.iterator()
+        val proposed = previous.map { if (it.kind == QueuedAgentInputKind.USER) ordered.next() else it }
+        items.clear()
+        items.addAll(proposed)
+        try {
+            commit(items.toList())
+            true
+        } catch (failure: Throwable) {
+            items.clear()
+            items.addAll(previous)
+            throw failure
+        }
+    }
+
     fun clear(): Int = synchronized(lock) {
         val count = items.size
         items.clear()

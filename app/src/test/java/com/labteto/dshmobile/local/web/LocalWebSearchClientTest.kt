@@ -108,7 +108,7 @@ class LocalWebSearchClientTest {
             } else {
                 response(request, 200, """{"title":"案例","content":"# 正文"}""")
             }
-        }, Json) { charges += it }
+        }, Json, onBillableResult = { charges += it })
         client.search("key", listOf("没有结果"))
         assertTrue(charges.isEmpty())
         client.fetch("key", "https://example.com")
@@ -130,7 +130,7 @@ class LocalWebSearchClientTest {
                 response(request, 200,
                     """{"results":[{"title":"事实","url":"https://example.com","summary":"摘要"}]}""")
             }
-        }, Json) { if (it == "search") charges++ }
+        }, Json, onBillableResult = { if (it == "search") charges++ })
         client.search(
             "key", listOf("查询"), oriQuestion = "用户原始提问", localization = "8.8.8.8",
         )

@@ -28,7 +28,10 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
+    fun provideOkHttpClient(policy: com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy): OkHttpClient = OkHttpClient.Builder()
+        .enforceManagedNetworkDestinations { scheme, host ->
+            policy.current().requireNetworkDestination(scheme, host)
+        }
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)

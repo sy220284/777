@@ -22,11 +22,33 @@ data class LocalApproval(
     val requestId: String? = null,
 )
 
+/** MCP flat form fields, including protocol-supported string multi-select arrays. */
+data class LocalQuestionFormField(
+    val name: String,
+    val title: String,
+    val kind: String,
+    val required: Boolean,
+    val options: List<String> = emptyList(),
+    val defaultValue: String = "",
+    val minLength: Int? = null,
+    val maxLength: Int? = null,
+    val minimum: Double? = null,
+    val maximum: Double? = null,
+    val optionLabels: Map<String, String> = emptyMap(),
+    val minItems: Int? = null,
+    val maxItems: Int? = null,
+)
+
+const val LOCAL_MCP_QUESTION_DECLINE = "__MCP_QUESTION_DECLINED__"
+const val LOCAL_MCP_QUESTION_URL_ACCEPT = "__MCP_QUESTION_URL_ACCEPTED__"
+
 /** A model question that pauses the current turn until the user answers it. */
 data class LocalQuestion(
     val callId: String,
     val question: String,
     val options: List<String> = emptyList(),
+    val mcpFormFields: List<LocalQuestionFormField>? = null,
+    val mcpUrl: String? = null,
     /** Issued by the current waiter, never accepted from a model call. */
     val requestId: String? = null,
 )

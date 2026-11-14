@@ -89,6 +89,46 @@ class MemoryStoreTest {
         )
     }
 
+    @Test fun manualEditRestoreIsDurableRevisionBoundAndCanRedo() {
+        val memory = store()
+        val original = memory.remember("用户偏好简短回答", MemoryScope.GLOBAL)
+        val edited = memory.update(
+            original.id, content = "用户偏好完整回答", importance = 91, pinned = true,
+            expectedUpdatedAt = original.updatedAt,
+        )
+        assertEquals("用户偏好简短回答", edited.previousManualRevision?.content)
+        assertThrows(IllegalArgumentException::class.java) {
+            store().restoreManualEdit(original.id, original.updatedAt)
+        }
+        val restored = store().restoreManualEdit(original.id, edited.updatedAt)
+        assertEquals(original.content, restored.content)
+        assertEquals(original.importance, restored.importance)
+        assertEquals(original.pinned, restored.pinned)
+        assertEquals("用户偏好完整回答", restored.previousManualRevision?.content)
+        assertEquals(restored, all(store()).single())
+        val redone = store().restoreManualEdit(original.id, restored.updatedAt)
+        assertEquals(edited.content, redone.content)
+        assertEquals(edited.importance, redone.importance)
+        assertEquals(edited.pinned, redone.pinned)
+    }
+
+    @Test fun restoreEditedMemoryMaintainsSourceInvalidationAndRejectsDeactivatedRecords() {
+        val memory = store()
+        val initial = memory.remember(
+            "原始事实", MemoryScope.GLOBAL, sourceSessionId = "s", sourceMessageId = "m",
+        )
+        val edited = memory.update(initial.id, content = "修改事实")
+        assertTrue(memory.acknowledgeSourceInvalidation(edited))
+        val restored = store().restoreManualEdit(edited.id, edited.updatedAt)
+        assertEquals(initial.sourceMessages, restored.sourceMessages)
+        assertEquals(initial.content, restored.content)
+        assertEquals(initial.sourceMessages, restored.pendingSourceInvalidations)
+        assertTrue(store().forget(restored.id, restored.updatedAt))
+        assertThrows(IllegalArgumentException::class.java) {
+            store().restoreManualEdit(restored.id, restored.updatedAt)
+        }
+    }
+
     @get:Rule val temporary = TemporaryFolder()
     private fun store() = MemoryStore(temporary.root, Json)
     private fun all(store: MemoryStore) = store.listActive(
@@ -868,5 +908,27 @@ class MemoryStoreTest {
         assertTrue(active.single().sourceMessages.isEmpty())
         assertTrue(active.single().hasUnboundSource)
     }
+
+
+    @Test fun consolidationKeepsDistinctFactsWhoseFirstTwoThousandCharactersMatch() {
+        val memoryStore = store()
+        val prefix = "A".repeat(2_100)
+        memoryStore.remember(prefix + "保留东边入口", MemoryScope.GLOBAL)
+        memoryStore.remember(prefix + "保留西边入口", MemoryScope.GLOBAL)
+        assertEquals(0, memoryStore.consolidateIfDue(force = true))
+        assertEquals(2, all(memoryStore).size)
+    }
+
+    @Test fun consolidationPreservesExplicitPrivateVersusPublicDisclosure() {
+        val memoryStore = store()
+        memoryStore.remember("同一项资料", MemoryScope.GLOBAL,
+            disclosure = MemoryDisclosure.PRIVATE, disclosureExplicit = true)
+        memoryStore.remember("同一项资料。", MemoryScope.GLOBAL,
+            disclosure = MemoryDisclosure.PUBLIC, disclosureExplicit = true)
+        assertEquals(0, memoryStore.consolidateIfDue(force = true))
+        assertEquals(setOf(MemoryDisclosure.PRIVATE, MemoryDisclosure.PUBLIC),
+            all(memoryStore).map { it.disclosure }.toSet())
+    }
+
 
 }

@@ -98,6 +98,7 @@ internal fun localShellFeatureUiContribution(
             onSelectMessageVariant = actions.selectMessageVariant,
             onRegenerate = actions.regenerate,
             onGenerateReplySuggestions = actions.generateReplySuggestions,
+            onSampleSession = actions.sampleSession,
             onLoadOlderTranscript = actions.loadOlderTranscript,
             onImportAttachment = actions.importAttachment,
             onStop = actions.stop,

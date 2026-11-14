@@ -4,7 +4,11 @@ import com.shenyan.designsystem.foundation.SyMetric
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +43,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
@@ -50,7 +57,9 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
 import com.labteto.dshmobile.local.files.LocalWorkspaceSearchPage
+import com.labteto.dshmobile.local.files.LocalWorkspaceFileChange
 import com.labteto.dshmobile.local.session.LocalConversationFiles
+import com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.shenyan.SyButton
@@ -61,11 +70,15 @@ import com.shenyan.designsystem.components.SyEmptyState
 import com.shenyan.designsystem.components.SyLoadingState
 import com.labteto.dshmobile.ui.shenyan.SySearchField
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -73,6 +86,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.delay
 
 internal enum class LocalFilesMode { WORKSPACE, CONVERSATION }
 
@@ -91,6 +106,8 @@ internal fun LocalWorkspaceFilesDialog(
     sessionId: String,
     workspacePath: String,
     loadWorkspace: suspend () -> List<LocalWorkspaceFile>,
+    saveToDownloads: suspend (String) -> String = { error("下载目录保存功能不可用") },
+    importFromPhone: (suspend (android.net.Uri) -> String)? = null,
     loadDirectory: suspend (String) -> List<LocalWorkspaceDirectoryEntry> = { emptyList() },
     loadDirectoryPage: suspend (String, Int) -> LocalWorkspaceDirectoryPage = { path, offset ->
         if (offset == 0) LocalWorkspaceDirectoryPage(loadDirectory(path), null)
@@ -103,6 +120,20 @@ internal fun LocalWorkspaceFilesDialog(
         if (offset == 0) LocalWorkspaceSearchPage(loadSearch(search), null)
         else LocalWorkspaceSearchPage(emptyList(), null)
     },
+    stopSearch: suspend (String) -> Boolean = { false },
+    projectActions: LocalWorkProjectsUiActions? = null,
+    observeChanges: (List<String>) -> kotlinx.coroutines.flow.Flow<LocalWorkspaceFileChange> =
+        { kotlinx.coroutines.flow.emptyFlow() },
+    remoteGitBranches: (suspend (String) -> List<String>)? = null,
+    compareLocalGit: (suspend (String, Boolean) -> LocalRemoteGitDiffUi)? = null,
+    compareRemoteGit: (suspend (String, String, String) -> LocalRemoteGitDiffUi)? = null,
+    compareCommitGit: (suspend (String, String) -> LocalRemoteGitDiffUi)? = null,
+    findIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview?)? = null,
+    runIndependentCodeReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalIndependentCodeReview)? = null,
+    acceptIndependentCodeReview: (suspend (String, String, com.labteto.dshmobile.local.work.LocalIndependentCodeReview, LocalRemoteGitDiffUi) -> Boolean)? = null,
+    findIndependentSecurityReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalSecurityReview?)? = null,
+    runIndependentSecurityReview: (suspend (String, String, LocalRemoteGitDiffUi) -> com.labteto.dshmobile.local.work.LocalSecurityReview)? = null,
+    approveIndependentSecurityReview: (suspend (String, String, com.labteto.dshmobile.local.work.LocalSecurityReview, LocalRemoteGitDiffUi) -> Boolean)? = null,
     loadConversation: suspend (String) -> LocalConversationFiles,
     loadPreview: suspend (String) -> LocalWorkspaceFilePreview,
     loadPreviewPage: suspend (String, Long) -> LocalWorkspaceFilePreview = { path, _ -> loadPreview(path) },
@@ -145,10 +176,37 @@ internal fun LocalWorkspaceFilesDialog(
     var query by com.labteto.dshmobile.ui.components.rememberNavigationEntryState("", entryRequest, mode, sessionId)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
     var selecting by rememberSaveable(mode, sessionId, section, directory) { mutableStateOf(false) }
     val selected = remember(mode, sessionId, section, directory) { mutableStateListOf<String>() }
     var sharing by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var savedLocation by remember(mode, sessionId, section, directory) { mutableStateOf<String?>(null) }
+    var importedLocation by remember(mode, sessionId) { mutableStateOf<String?>(null) }
+    var importing by remember(mode, sessionId) { mutableStateOf(false) }
     var shareError by remember(mode, sessionId, section, directory) { mutableStateOf<String?>(null) }
+    var gitSheetOpen by remember(mode, sessionId) { mutableStateOf(false) }
+    var gitIsLocal by remember(mode, sessionId) { mutableStateOf(false) }
+    var gitIsCommit by remember(mode, sessionId) { mutableStateOf(false) }
+    var gitCommitInput by remember(mode, sessionId) { mutableStateOf("") }
+    var projectsSheetOpen by remember(mode, sessionId) { mutableStateOf(false) }
+    var gitIncludeUntracked by remember(mode, sessionId) { mutableStateOf(false) }
+    var gitLoading by remember(mode, sessionId) { mutableStateOf(false) }
+    var gitError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
+    var gitRepository by remember(mode, sessionId) { mutableStateOf(".") }
+    var gitBranches by remember(mode, sessionId) { mutableStateOf(emptyList<String>()) }
+    var gitBranchQuery by remember(mode, sessionId) { mutableStateOf("") }
+    var gitSelectedRef by remember(mode, sessionId) { mutableStateOf<String?>(null) }
+    var gitResult by remember(mode, sessionId) { mutableStateOf<LocalRemoteGitDiffUi?>(null) }
+    var codeReview by remember(mode, sessionId) { mutableStateOf<com.labteto.dshmobile.local.work.LocalIndependentCodeReview?>(null) }
+    var codeReviewBusy by remember(mode, sessionId) { mutableStateOf(false) }
+    var codeReviewError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
+    var codeReviewConfirm by remember(mode, sessionId) { mutableStateOf(false) }
+    var securityReview by remember(mode, sessionId) { mutableStateOf<com.labteto.dshmobile.local.work.LocalSecurityReview?>(null) }
+    var securityReviewBusy by remember(mode, sessionId) { mutableStateOf(false) }
+    var securityReviewError by remember(mode, sessionId) { mutableStateOf<String?>(null) }
+    var securityReviewConfirm by remember(mode, sessionId) { mutableStateOf(false) }
+    var gitJob by remember(mode, sessionId) { mutableStateOf<Job?>(null) }
     val chooserTitle = stringResource(R.string.local_files_share_chooser)
     val failedText = stringResource(R.string.local_files_share_failed)
     val limitText = stringResource(R.string.local_files_share_limit, MAX_LOCAL_SHARE_FILES)
@@ -165,8 +223,11 @@ internal fun LocalWorkspaceFilesDialog(
             LocalFilesMode.CONVERSATION ->
                 (conversation.artifacts + conversation.involved).distinctBy { it.path }
         }
-        candidates.filter { isShareableWorkspacePath(it.path) &&
-            (normalizedQuery.isBlank() || it.path.contains(normalizedQuery, ignoreCase = true)) }
+        candidates.filter { file ->
+            isShareableWorkspacePath(file.path) &&
+                (mode == LocalFilesMode.WORKSPACE ||
+                    normalizedQuery.isBlank() || file.path.contains(normalizedQuery, ignoreCase = true))
+        }
     }
     val visibleSharePaths = remember(shareableFiles) {
         shareableFiles.map { it.path }.distinct()
@@ -201,6 +262,223 @@ internal fun LocalWorkspaceFilesDialog(
                 shareError = failedText
             } finally {
                 sharing = false
+            }
+        }
+    }
+
+    fun save(paths: List<String>) {
+        if (saving || paths.isEmpty()) return
+        saving = true
+        shareError = null
+        savedLocation = null
+        scope.launch {
+            val exported = mutableListOf<String>()
+            try {
+                for (path in paths.distinct()) exported += saveToDownloads(path)
+                savedLocation = if (exported.size == 1) {
+                    "已保存：${exported.single()}"
+                } else {
+                    "已保存 ${exported.size} 个文件到 Download/神言神语"
+                }
+                selected.clear()
+                selecting = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                shareError = "已保存 ${exported.size} 个文件；剩余文件保存失败：${failure.message.orEmpty()}"
+            } finally {
+                saving = false
+            }
+        }
+    }
+
+    fun openDownloads() {
+        // Try the exact folder in the Android document provider first.
+        val folder = android.provider.DocumentsContract.buildDocumentUri(
+            "com.android.externalstorage.documents", "primary:Download/神言神语")
+        val directOpened = try {
+            context.startActivity(Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(folder, android.provider.DocumentsContract.Document.MIME_TYPE_DIR)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            })
+            true
+        } catch (_: android.content.ActivityNotFoundException) {
+            false
+        } catch (_: SecurityException) {
+            false
+        }
+        if (!directOpened) {
+            try {
+                context.startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS))
+                shareError = "请进入「神言神语」文件夹：手机存储/Download/神言神语"
+            } catch (failure: Exception) {
+                shareError = "请在手机文件管理器打开：手机存储/Download/神言神语"
+            }
+        }
+    }
+
+    /** Restore two independent durable reports for every Git comparison mode. */
+    suspend fun restoreReviewHistory(diff: LocalRemoteGitDiffUi) {
+        if (diff.truncated || diff.patch.isBlank()) return
+        try {
+            codeReview = findIndependentCodeReview?.invoke(sessionId, gitRepository, diff)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            codeReviewError = failure.message ?: "读取历史代码审查记录失败"
+        }
+        try {
+            securityReview = findIndependentSecurityReview?.invoke(sessionId, gitRepository, diff)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            securityReviewError = failure.message ?: "读取历史安全审查记录失败"
+        }
+    }
+
+    /** Review current tracked edits directly, even when the repo has no remote. */
+    fun openLocalGitComparison() {
+        val compare = compareLocalGit ?: return
+        gitJob?.cancel()
+        gitRepository = directory.ifBlank { "." }
+        gitIsLocal = true
+        gitIsCommit = false
+        gitSheetOpen = true
+        gitBranches = emptyList()
+        gitSelectedRef = null
+        gitResult = null
+        gitError = null
+        codeReview = null
+        codeReviewError = null
+        securityReview = null
+        securityReviewError = null
+        gitJob = scope.launch {
+            gitLoading = true
+            try {
+                val diff = compare(gitRepository, gitIncludeUntracked)
+                gitResult = diff
+                restoreReviewHistory(diff)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                gitError = failure.message ?: "读取本地 Git 修改失败"
+            } finally {
+                gitLoading = false
+            }
+        }
+    }
+
+    fun openGitComparison() {
+        val listBranches = remoteGitBranches ?: return
+        gitJob?.cancel()
+        gitRepository = directory.ifBlank { "." }
+        gitIsLocal = false
+        gitIsCommit = false
+        gitSheetOpen = true
+        gitError = null
+        gitSelectedRef = null
+        gitResult = null
+        codeReview = null
+        codeReviewError = null
+        securityReview = null
+        securityReviewError = null
+        gitBranches = emptyList()
+        gitBranchQuery = ""
+        gitJob = scope.launch {
+            gitLoading = true
+            try {
+                gitBranches = listBranches(gitRepository)
+                if (gitBranches.isEmpty()) {
+                    gitError = "当前目录没有可比较的本地远端跟踪分支。请先在该 Git 仓库中获取远端分支。"
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                gitError = failure.message ?: "读取本地 Git 分支失败"
+            } finally {
+                gitLoading = false
+            }
+        }
+    }
+
+    fun compareGitReference(reference: String) {
+        val compare = compareRemoteGit ?: return
+        if (gitLoading || reference !in gitBranches) return
+        val remote = reference.substringBefore('/')
+        val branch = reference.substringAfter('/')
+        gitJob?.cancel()
+        gitJob = scope.launch {
+            gitLoading = true
+            gitSelectedRef = reference
+            gitResult = null
+            codeReview = null
+            codeReviewError = null
+            securityReview = null
+            securityReviewError = null
+            gitError = null
+            try {
+                val diff = compare(gitRepository, remote, branch)
+                gitResult = diff
+                // Reopening the same diff reuses its durable report instead of charging for another review.
+                restoreReviewHistory(diff)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                gitError = failure.message ?: "比较远端分支失败"
+            } finally {
+                gitLoading = false
+            }
+        }
+    }
+
+
+    /** A single advanced target field, using the same review and approval pipeline as other diffs. */
+    fun openCommitComparison() {
+        if (compareCommitGit == null) return
+        gitJob?.cancel()
+        gitRepository = directory.ifBlank { "." }
+        gitIsLocal = false
+        gitIsCommit = true
+        gitSheetOpen = true
+        gitCommitInput = ""
+        gitBranches = emptyList()
+        gitSelectedRef = null
+        gitResult = null
+        gitError = null
+        codeReview = null
+        codeReviewError = null
+        securityReview = null
+        securityReviewError = null
+    }
+
+    fun loadCommitComparison() {
+        val compare = compareCommitGit ?: return
+        val commit = gitCommitInput.trim()
+        if (commit.isEmpty()) {
+            gitError = "请粘贴要审查的 Git 提交哈希"
+            return
+        }
+        gitJob?.cancel()
+        gitJob = scope.launch {
+            gitLoading = true
+            gitError = null
+            gitResult = null
+            gitSelectedRef = null
+            codeReview = null
+            codeReviewError = null
+            securityReview = null
+            securityReviewError = null
+            try {
+                val diff = compare(gitRepository, commit)
+                gitResult = diff
+                gitSelectedRef = diff.trackingRef
+                restoreReviewHistory(diff)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                gitError = failure.message ?: "读取指定提交失败"
+            } finally {
+                gitLoading = false
             }
         }
     }
@@ -377,11 +655,46 @@ internal fun LocalWorkspaceFilesDialog(
         }
     }
 
-    // Search is debounced; folder navigation and rendering never wait on a global search.
+    // Watch only the selected directory or the bounded paths visible in search results.
+    // Changes trigger a fresh Owner query; the file watcher is never a second file catalog.
+    val observedPaths = if (mode != LocalFilesMode.WORKSPACE || section < 0 && query.isBlank()) {
+        emptyList()
+    } else if (query.isNotBlank()) {
+        listOf(".") + workspace.take(64).map(LocalWorkspaceFile::path)
+    } else {
+        listOf(directory.ifBlank { "." })
+    }
+    LaunchedEffect(mode, sessionId, directory, query, observedPaths) {
+        if (observedPaths.isEmpty()) return@LaunchedEffect
+        try {
+            observeChanges(observedPaths).collectLatest {
+                delay(300)
+                if (previewPath == null && !loading) reload()
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            if (mode == LocalFilesMode.WORKSPACE) {
+                pageReadError = failure.message ?: "文件变化监听失败，请手动刷新"
+            }
+        }
+    }
+
+    // Search is debounced and its ranked snapshot belongs to this exact visible query.
+    // Cancelling the effect on query change or closing the dialog releases that snapshot.
     LaunchedEffect(mode, sessionId, query) {
-        if (mode == LocalFilesMode.WORKSPACE && loadedForEntry && query.trim() != lastLoadedSearch) {
-            if (query.isNotBlank()) kotlinx.coroutines.delay(280)
-            reload()
+        val activeQuery = query.trim()
+        try {
+            if (mode == LocalFilesMode.WORKSPACE && loadedForEntry &&
+                activeQuery != lastLoadedSearch) {
+                if (activeQuery.isNotEmpty()) kotlinx.coroutines.delay(280)
+                reload()
+            }
+            if (mode == LocalFilesMode.WORKSPACE && activeQuery.isNotEmpty()) awaitCancellation()
+        } finally {
+            if (mode == LocalFilesMode.WORKSPACE && activeQuery.isNotEmpty()) {
+                withContext(NonCancellable + Dispatchers.IO) { stopSearch(activeQuery) }
+            }
         }
     }
 
@@ -395,6 +708,38 @@ internal fun LocalWorkspaceFilesDialog(
         reload()
         loadedForEntry = true
         initialFilePath?.let(onInitialFilePathConsumed)
+    }
+
+    val phoneFilePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments(),
+    ) { pickedUris ->
+        val importFile = importFromPhone
+        if (importFile != null && pickedUris.isNotEmpty() && !importing) {
+            scope.launch {
+                importing = true
+                importedLocation = null
+                var completed = 0
+                var firstPath: String? = null
+                try {
+                    pickedUris.distinct().forEach { uri ->
+                        val path = importFile(uri)
+                        if (firstPath == null) firstPath = path
+                        completed++
+                    }
+                    reload()
+                    importedLocation = "已将 $completed 个手机文件导入工作区" +
+                        if (completed == 1) "：${firstPath.orEmpty()}" else ""
+                    if (completed == 1 && firstPath != null) openPreview(requireNotNull(firstPath))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    if (completed > 0) reload()
+                    importedLocation = "已导入 $completed 个文件，其余文件导入失败：${failure.message.orEmpty()}"
+                } finally {
+                    importing = false
+                }
+            }
+        }
     }
 
     fun navigateBack() {
@@ -488,6 +833,40 @@ internal fun LocalWorkspaceFilesDialog(
                     placeholder = stringResource(R.string.fluid_files_search),
                     modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd))
 
+                if (mode == LocalFilesMode.WORKSPACE && section == -1 &&
+                    preview == null && query.isBlank()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                    ) {
+                        Text("完成的成果：手机存储/Download/神言神语",
+                            modifier = Modifier.weight(1f),
+                            style = DsType.small13.withReadingWeight())
+                        SyButton(
+                            text = "打开下载",
+                            onClick = ::openDownloads,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                        )
+                    }
+                }
+                if (mode == LocalFilesMode.WORKSPACE && section == -1 &&
+                    preview == null && query.isBlank() && importFromPhone != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        SyButton(
+                            text = if (importing) "导入中…" else "导入手机文件",
+                            onClick = { phoneFilePicker.launch(arrayOf("*/*")) },
+                            enabled = !importing,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                            modifier = Modifier.testTag("work_import_phone_file"),
+                        )
+                    }
+                }
                 if (preview == null && query.isNotBlank() && mode == LocalFilesMode.WORKSPACE) {
                     Text(
                         stringResource(R.string.local_workspace_search_scope),
@@ -497,6 +876,44 @@ internal fun LocalWorkspaceFilesDialog(
                     )
                 }
 
+                if (mode == LocalFilesMode.WORKSPACE && preview == null && !selecting && projectActions != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        SyButton(
+                            text = "管理项目",
+                            onClick = { projectsSheetOpen = true },
+                            enabled = !loading,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                            modifier = Modifier.testTag("work_projects_open"),
+                        )
+                    }
+                }
+                if (mode == LocalFilesMode.WORKSPACE && preview == null && !selecting &&
+                    (compareLocalGit != null || compareCommitGit != null ||
+                        (remoteGitBranches != null && compareRemoteGit != null))) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        SyButton(
+                            text = "代码审查",
+                            onClick = {
+                                when {
+                                    compareLocalGit != null -> openLocalGitComparison()
+                                    remoteGitBranches != null && compareRemoteGit != null -> openGitComparison()
+                                    compareCommitGit != null -> openCommitComparison()
+                                }
+                            },
+                            enabled = !loading,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                            modifier = Modifier.testTag("work_git_review_entry"),
+                        )
+                    }
+                }
                 if (preview == null && !loading && error == null && visibleSharePaths.isNotEmpty()) {
                     if (selecting) {
                         Row(
@@ -538,8 +955,16 @@ internal fun LocalWorkspaceFilesDialog(
                                 text = stringResource(R.string.local_files_share_selected),
                                 onClick = { share(selected.toList()) },
                                 modifier = Modifier.weight(1f),
-                                enabled = selected.isNotEmpty() && !sharing,
+                                enabled = selected.isNotEmpty() && !sharing && !saving,
                                 size = SyButtonSize.Small,
+                            )
+                            SyButton(
+                                text = "保存到下载",
+                                onClick = { save(selected.toList()) },
+                                modifier = Modifier.weight(1f),
+                                enabled = selected.isNotEmpty() && !sharing && !saving,
+                                size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Outline,
                             )
                         }
                     } else {
@@ -564,10 +989,40 @@ internal fun LocalWorkspaceFilesDialog(
                         SyButton(
                             text = stringResource(R.string.local_files_share_one),
                             onClick = { share(listOf(preview!!.file.path)) },
-                            enabled = !sharing,
+                            enabled = !sharing && !saving,
                             size = SyButtonSize.Small,
                         )
+                        SyButton(
+                            text = "保存到下载",
+                            onClick = { save(listOf(preview!!.file.path)) },
+                            enabled = !saving && !sharing,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                        )
                     }
+                }
+                savedLocation?.let { location ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                    ) {
+                        Text(location, modifier = Modifier.weight(1f),
+                            style = DsType.small13.withReadingWeight())
+                        SyButton(
+                            text = "查看下载",
+                            onClick = ::openDownloads,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
+                        )
+                    }
+                }
+                importedLocation?.let { message ->
+                    Text(
+                        message,
+                        modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapSm),
+                        style = DsType.small13.withReadingWeight(),
+                    )
                 }
                 shareError?.let {
                     Text(
@@ -682,6 +1137,378 @@ internal fun LocalWorkspaceFilesDialog(
                 }
             }
         }
+    if (projectsSheetOpen && mode == LocalFilesMode.WORKSPACE && projectActions != null) {
+        LocalWorkProjectsSheet(
+            actions = projectActions,
+            sessionId = sessionId,
+            currentFolder = directory.takeIf { it.isNotBlank() && it != "任务" && it != "交付成果" } ?: ".",
+            onOpenProject = { projectRoot ->
+                projectsSheetOpen = false
+                query = ""
+                directory = if (projectRoot == ".") "" else projectRoot
+                section = when {
+                    projectRoot == "." -> -1
+                    projectRoot == "任务" || projectRoot.startsWith("任务/") -> 0
+                    projectRoot == "交付成果" || projectRoot.startsWith("交付成果/") -> 1
+                    else -> 2
+                }
+                loading = true
+                scope.launch { reload() }
+            },
+            onDismiss = { projectsSheetOpen = false },
+        )
+    }
+    if (codeReviewConfirm && codeReview != null && gitResult != null) {
+        SyResponsiveSheet(
+            title = "确认接纳审查结论",
+            subtitle = "只保存人工接纳记录，不执行修改，也不会把审查意见当作测试通过。",
+            onDismiss = { if (!codeReviewBusy) codeReviewConfirm = false },
+        ) {
+            SyButton(
+                text = "确认接纳",
+                enabled = !codeReviewBusy,
+                onClick = {
+                    val saved = codeReview
+                    val diff = gitResult
+                    val accept = acceptIndependentCodeReview
+                    if (saved != null && diff != null && accept != null) {
+                        gitJob?.cancel()
+                        gitJob = scope.launch {
+                            codeReviewBusy = true
+                            codeReviewError = null
+                            try {
+                                if (accept(sessionId, gitRepository, saved, diff)) {
+                                    codeReview = saved.copy(humanAccepted = true)
+                                    codeReviewConfirm = false
+                                } else {
+                                    codeReviewError = "Git 差异或审查版本已变化，请重新审查。"
+                                    codeReviewConfirm = false
+                                }
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                codeReviewError = failure.message ?: "接纳审查结论失败"
+                                codeReviewConfirm = false
+                            } finally {
+                                codeReviewBusy = false
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            SyButton("取消", onClick = { codeReviewConfirm = false }, enabled = !codeReviewBusy,
+                variant = SyButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
+        }
+    }
+    if (securityReviewConfirm && securityReview != null && gitResult != null) {
+        SyResponsiveSheet(
+            title = "确认安全放行",
+            subtitle = "仅批准此份 Git 变更的安全审核结论；变更后自动失效。工具执行仍需原有权限与审批。",
+            onDismiss = { if (!securityReviewBusy) securityReviewConfirm = false },
+        ) {
+            SyButton(
+                text = "批准当前变更",
+                enabled = !securityReviewBusy,
+                onClick = {
+                    val saved = securityReview
+                    val diff = gitResult
+                    val approve = approveIndependentSecurityReview
+                    if (saved != null && saved.verdict == "allow" && diff != null && approve != null) {
+                        gitJob?.cancel()
+                        gitJob = scope.launch {
+                            securityReviewBusy = true
+                            securityReviewError = null
+                            try {
+                                if (approve(sessionId, gitRepository, saved, diff)) {
+                                    securityReview = saved.copy(humanApproved = true)
+                                } else {
+                                    securityReviewError = "代码、风险裁决或审批版本已变化，请重新安全审查。"
+                                }
+                                securityReviewConfirm = false
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                securityReviewError = failure.message ?: "安全放行记录失败"
+                                securityReviewConfirm = false
+                            } finally {
+                                securityReviewBusy = false
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().testTag("work_security_review_approve_confirm"),
+            )
+            SyButton("取消", onClick = { securityReviewConfirm = false },
+                enabled = !securityReviewBusy, variant = SyButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth())
+        }
+    }
+    if (gitSheetOpen) {
+        val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+        SyResponsiveSheet(
+            title = when {
+                gitIsCommit -> "审查指定提交"
+                gitIsLocal -> "检查本地修改"
+                else -> "比较远端分支"
+            },
+            subtitle = when {
+                gitIsCommit -> "审查已存在的 Git 提交，合并提交使用第一父提交作为基线；不联网"
+                gitIsLocal -> "包括暂存与未暂存的已跟踪文件，不联网，不自动提交"
+                else -> "只读取已获取的本地远端分支，不会自动联网"
+            },
+            onDismiss = { gitJob?.cancel(); gitSheetOpen = false },
+            scrollable = true,
+        ) {
+            Text("审查范围", style = DsType.small13Strong, color = colors.text)
+            androidx.compose.foundation.layout.FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+            ) {
+                if (compareLocalGit != null) SyButton(
+                    text = "本地修改",
+                    onClick = ::openLocalGitComparison,
+                    enabled = !gitLoading && !codeReviewBusy && !securityReviewBusy,
+                    size = SyButtonSize.Small,
+                    variant = if (gitIsLocal) SyButtonVariant.Outline else SyButtonVariant.Ghost,
+                    modifier = Modifier.testTag("work_local_git_diff"),
+                )
+                if (remoteGitBranches != null && compareRemoteGit != null) SyButton(
+                    text = "远端分支",
+                    onClick = ::openGitComparison,
+                    enabled = !gitLoading && !codeReviewBusy && !securityReviewBusy,
+                    size = SyButtonSize.Small,
+                    variant = if (!gitIsLocal && !gitIsCommit) SyButtonVariant.Outline else SyButtonVariant.Ghost,
+                    modifier = Modifier.testTag("work_git_remote_diff"),
+                )
+                if (compareCommitGit != null) SyButton(
+                    text = "指定提交",
+                    onClick = ::openCommitComparison,
+                    enabled = !gitLoading && !codeReviewBusy && !securityReviewBusy,
+                    size = SyButtonSize.Small,
+                    variant = if (gitIsCommit) SyButtonVariant.Outline else SyButtonVariant.Ghost,
+                    modifier = Modifier.testTag("work_git_commit_review_open"),
+                )
+            }
+            Text("仓库目录：$gitRepository", style = DsType.small13, color = colors.textSecondary)
+            if (gitIsCommit && compareCommitGit != null) {
+                SySearchField(
+                    gitCommitInput, { gitCommitInput = it.take(64) },
+                    placeholder = "粘贴 Git 提交哈希",
+                    modifier = Modifier.fillMaxWidth().testTag("work_git_commit_input"),
+                )
+                SyButton(
+                    text = if (gitLoading) "正在读取…" else "读取提交差异",
+                    onClick = ::loadCommitComparison,
+                    enabled = !gitLoading && gitCommitInput.trim().length >= 7,
+                    modifier = Modifier.fillMaxWidth().testTag("work_git_commit_load"),
+                )
+                Text("只接受仓库中已有的提交哈希，支持首次提交；提交内容变化时历史审查不会误复用。",
+                    style = DsType.caption11, color = colors.textSecondary)
+            }
+            if (gitIsLocal && compareLocalGit != null) {
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+                    SyCheckboxControl(
+                        checked = gitIncludeUntracked,
+                        onCheckedChange = { selected ->
+                            if (!gitLoading && !codeReviewBusy) {
+                                gitIncludeUntracked = selected
+                                codeReview = null
+                                securityReview = null
+                                openLocalGitComparison()
+                            }
+                        },
+                    )
+                    Text("同时审查新建文件", style = DsType.small13, color = colors.text,
+                        modifier = Modifier.testTag("work_git_include_untracked"))
+                }
+                gitResult?.let { snapshot ->
+                    if (snapshot.untrackedFileCount > 0) Text(
+                        "发现 " + snapshot.untrackedFileCount + " 个未跟踪文件。新文件可能包含密钥；选择后才会纳入模型审查。",
+                        style = DsType.caption11, color = colors.warningInk)
+                }
+            }
+            if (gitLoading) Text("正在读取 Git 结果…", color = colors.textSecondary)
+            gitError?.let { Text(it, color = colors.dangerInk) }
+            if (gitBranches.size > 8) SySearchField(
+                gitBranchQuery, { gitBranchQuery = it },
+                placeholder = "搜索远端分支",
+                modifier = Modifier.fillMaxWidth().testTag("work_git_branch_search"),
+            )
+            val visibleGitBranches = gitBranches.filter {
+                gitBranchQuery.isBlank() || it.contains(gitBranchQuery.trim(), ignoreCase = true)
+            }
+            visibleGitBranches.take(20).forEach { reference ->
+                SyButton(
+                    text = if (gitSelectedRef == reference) "已选择 · $reference" else reference,
+                    onClick = { compareGitReference(reference) },
+                    enabled = !gitLoading,
+                    variant = SyButtonVariant.Ghost,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (visibleGitBranches.size > 20) Text(
+                "还有 ${visibleGitBranches.size - 20} 条分支，请缩小搜索范围。",
+                style = DsType.caption11, color = colors.textSecondary,
+            )
+            gitResult?.let { result ->
+                Text(result.trackingRef, style = DsType.small13Strong, color = colors.text)
+                SelectionContainer {
+                    Text(result.statistics.ifBlank { "没有已跟踪文件的变化" },
+                        style = DsType.small13, color = colors.textSecondary)
+                }
+                if (result.patch.isNotEmpty()) {
+                    Text("差异预览", style = DsType.small13Strong, color = colors.text)
+                    LocalGitDiffPreview(result.patch)
+                    SyButton(
+                        text = "复制差异内容",
+                        onClick = { clipboard.setText(AnnotatedString(result.patch)) },
+                        variant = SyButtonVariant.Outline,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (result.truncated) {
+                    Text("差异超过 128KB，当前结果仅包含前 128KB。",
+                        style = DsType.caption11, color = colors.warningInk)
+                }
+                if (mode == LocalFilesMode.WORKSPACE && result.patch.isNotBlank() &&
+                    (runIndependentCodeReview != null || codeReview != null || codeReviewError != null)) {
+                    // A durable review remains readable even without a model-run capability.
+                    if (runIndependentCodeReview != null) SyButton(
+                        text = if (codeReviewBusy) "独立审查中…" else "独立代码审查",
+                        onClick = {
+                            val review = runIndependentCodeReview
+                            if (review != null && !codeReviewBusy && !securityReviewBusy) {
+                                gitJob?.cancel()
+                                gitJob = scope.launch {
+                                    codeReviewBusy = true
+                                    codeReviewError = null
+                                    codeReview = null
+                                    try {
+                                        codeReview = review(sessionId, gitRepository, result)
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (failure: Exception) {
+                                        codeReviewError = failure.message ?: "独立代码审查失败"
+                                    } finally {
+                                        codeReviewBusy = false
+                                    }
+                                }
+                            }
+                        },
+                        enabled = !gitLoading && !codeReviewBusy && !securityReviewBusy && !result.truncated,
+                        modifier = Modifier.fillMaxWidth().testTag("work_code_review_start"),
+                    )
+                    codeReviewError?.let { Text(it, color = colors.dangerInk) }
+                    codeReview?.let { saved ->
+                        Text("审查结论 · " + saved.trackingRef,
+                            style = DsType.small13Strong, color = colors.text)
+                        SelectionContainer {
+                            Column(
+                                Modifier.fillMaxWidth().heightIn(max = 360.dp)
+                                    .verticalScroll(rememberScrollState()),
+                            ) {
+                                MarkdownText(saved.report,
+                                    modifier = Modifier.testTag("work_code_review_report"))
+                            }
+                        }
+                        Text("模型审查：已形成报告 · 人工接纳：" +
+                            (if (saved.humanAccepted) "已确认" else "待确认"),
+                            style = DsType.caption11, color = colors.textSecondary)
+                        Text("实际构建与测试：此处没有关联回执；请在 Work 任务结果中查看真实执行状态。",
+                            style = DsType.caption11, color = colors.textSecondary)
+                        if (!saved.humanAccepted && acceptIndependentCodeReview != null) {
+                            SyButton(
+                                text = "人工接纳审查结论",
+                                onClick = { codeReviewConfirm = true },
+                                enabled = !codeReviewBusy,
+                                modifier = Modifier.fillMaxWidth().testTag("work_code_review_accept"),
+                                variant = SyButtonVariant.Outline,
+                            )
+                        } else if (saved.humanAccepted) {
+                            Text("人工接纳已记录", color = colors.textSecondary)
+                        }
+                    }
+                }
+                if (mode == LocalFilesMode.WORKSPACE && result.patch.isNotBlank() &&
+                    (runIndependentSecurityReview != null || securityReview != null ||
+                        securityReviewError != null)) {
+                    // Risk evidence and prior user decisions must survive a temporarily unavailable reviewer.
+                    if (runIndependentSecurityReview != null) SyButton(
+                        text = if (securityReviewBusy) "安全审查中…" else "独立安全审核",
+                        onClick = {
+                            val start = runIndependentSecurityReview
+                            if (start != null && !securityReviewBusy && !codeReviewBusy) {
+                                gitJob?.cancel()
+                                gitJob = scope.launch {
+                                    securityReviewBusy = true
+                                    securityReviewError = null
+                                    securityReview = null
+                                    try {
+                                        securityReview = start(sessionId, gitRepository, result)
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (failure: Exception) {
+                                        securityReviewError = failure.message ?: "独立安全审核失败"
+                                    } finally {
+                                        securityReviewBusy = false
+                                    }
+                                }
+                            }
+                        },
+                        enabled = !gitLoading && !securityReviewBusy && !codeReviewBusy &&
+                            !result.truncated,
+                        modifier = Modifier.fillMaxWidth().testTag("work_security_review_start"),
+                        variant = SyButtonVariant.Outline,
+                    )
+                    securityReviewError?.let { Text(it, color = colors.dangerInk) }
+                    securityReview?.let { saved ->
+                        Text("安全审查 · " + saved.trackingRef,
+                            style = DsType.small13Strong, color = colors.text)
+                        SelectionContainer {
+                            Column(Modifier.fillMaxWidth().heightIn(max = 360.dp)
+                                .verticalScroll(rememberScrollState())) {
+                                MarkdownText(saved.report,
+                                    modifier = Modifier.testTag("work_security_review_report"))
+                            }
+                        }
+                        if (saved.verdict == "block") {
+                            Text("审核存在待处理风险，当前版本不可放行。修复后重新检查。",
+                                style = DsType.caption11, color = colors.warningInk)
+                        } else if (saved.humanApproved) {
+                            Text("当前版本已人工批准；修改代码后需重新审核。",
+                                style = DsType.caption11, color = colors.successInk)
+                        } else if (approveIndependentSecurityReview != null) {
+                            SyButton(
+                                text = "人工批准当前变更",
+                                onClick = { securityReviewConfirm = true },
+                                enabled = !securityReviewBusy && !codeReviewBusy,
+                                modifier = Modifier.fillMaxWidth().testTag("work_security_review_approve"),
+                                variant = SyButtonVariant.Outline,
+                            )
+                        }
+                        Text("模型安全裁决：" + (if (saved.verdict == "allow") "未发现明确风险" else "已阻断风险") +
+                            " · 人工确认：" + (if (saved.humanApproved) "已记录" else "未通过"),
+                            style = DsType.caption11, color = colors.textSecondary)
+                        Text("实际工具授权与测试：由原工具审批和 Work 执行记录分别判断；本页的模型裁决不会替代。",
+                            style = DsType.caption11, color = colors.textSecondary)
+                    }
+                }
+                Text(when {
+                    gitIsCommit ->
+                        "指定提交只包含该次提交的历史差异，不包含当前工作区的未提交修改。"
+                    !gitIsLocal ->
+                        "远端分支比较包含当前已跟踪文件的工作区变化，不包含未跟踪文件。"
+                    result.includesUntrackedFiles ->
+                        "已纳入所选新建文件；忽略规则仍生效，超出范围时会停止完整审查。"
+                    else ->
+                        "当前仅检查已跟踪文件；需要检查新建文件时可开启上方选项。"
+                }, style = DsType.caption11, color = colors.textSecondary)
+            }
+        }
+    }
 }
 
 /** Virtual root categories; actual file locations never change during an upgrade. */

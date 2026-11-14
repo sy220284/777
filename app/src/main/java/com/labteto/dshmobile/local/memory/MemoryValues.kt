@@ -36,6 +36,15 @@ data class MemorySourceRef(
     val messageId: String,
 )
 
+/** Previous user edit only; bounded to one durable version and not a source identity. */
+@Serializable
+data class MemoryManualRevision(
+    val content: String,
+    val kind: MemoryKind,
+    val importance: Int,
+    val pinned: Boolean,
+)
+
 @Serializable
 data class MemoryRecord(
     val id: String,
@@ -67,6 +76,7 @@ data class MemoryRecord(
     val pinned: Boolean = false,
     val active: Boolean = true,
     val supersededBy: String? = null,
+    val previousManualRevision: MemoryManualRevision? = null,
     val createdAt: Long,
     val updatedAt: Long,
 )

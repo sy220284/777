@@ -72,6 +72,7 @@ internal fun userFacingWorkToolActionRes(toolName: String?): Int? {
 internal fun userFacingWorkToolAction(toolName: String?): String? {
     val name = toolName?.lowercase().orEmpty()
     when (name) {
+        "work_finding" -> return "整理调查发现"
         "read", "read_file", "file_inspect" -> return "读取文件"
         "grep", "search" -> return "搜索文件内容"
         "glob", "find", "list_files" -> return "查找工作区文件"
@@ -82,6 +83,22 @@ internal fun userFacingWorkToolAction(toolName: String?): String? {
         "job_kill" -> return "停止后台任务"
         "web_search" -> return "搜索网页"
         "web_fetch", "http_request" -> return "读取网页内容"
+        "android_screen", "android_find", "android_wait" -> return "检查手机界面状态"
+        "android_click_node", "android_tap_text", "android_tap" -> return "点击手机界面"
+        "android_set_text_node", "android_type" -> return "向手机界面输入"
+        "android_swipe", "android_scroll" -> return "滚动手机界面"
+        "android_back" -> return "手机返回上一页"
+        "android_home" -> return "返回手机主屏幕"
+        "android_screenshot" -> return "读取当前手机画面"
+        "android_vscreen_create" -> return "创建独立虚拟屏"
+        "android_vscreen_list", "android_vscreen_status" -> return "检查虚拟屏状态"
+        "android_vscreen_launch" -> return "在虚拟屏启动应用"
+        "android_vscreen_tap" -> return "点击虚拟屏界面"
+        "android_vscreen_swipe" -> return "滑动虚拟屏界面"
+        "android_vscreen_screenshot" -> return "读取虚拟屏画面"
+        "android_vscreen_close" -> return "关闭虚拟屏"
+        "android_notification_status" -> return "核对通知授权状态"
+        "android_notification_list" -> return "读取已授权通知"
     }
     if (com.labteto.dshmobile.ui.agentOperationKind(name) == com.labteto.dshmobile.ui.AgentOperationKind.Execute)
         return "运行本地任务"
@@ -121,6 +138,7 @@ internal fun WorkTimelineStepRow(
     active: Boolean = false,
     activity: com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem? = null,
     groupedMessages: List<com.labteto.dshmobile.local.session.LocalHarnessMessage> = emptyList(),
+    operationGroup: Boolean = false,
 ) {
     if (message.role != "tool") {
         val content = localWorkTimelineText(message.content) ?: return
@@ -147,13 +165,46 @@ internal fun WorkTimelineStepRow(
     val phase = completedWorkToolPhase(message)
     val action = workToolActionLabel(message.toolName, activity?.argumentsPreview)
     var detailsOpen by remember(message.id) { mutableStateOf(false) }
-    val hasDetails = message.content.isNotBlank() || message.blocks.isNotEmpty() || groupedMessages.any { it.content.isNotBlank() || it.blocks.isNotEmpty() }
+    val receipts = listOf(message) + groupedMessages
+    val hasDetails = operationGroup || message.content.isNotBlank() || message.blocks.isNotEmpty() ||
+        groupedMessages.any { it.content.isNotBlank() || it.blocks.isNotEmpty() }
+    val activities = receipts.mapNotNull { userFacingWorkToolAction(it.toolName) }.distinct()
+    val isFinding = !operationGroup && message.toolName == "work_finding" &&
+        phase == LocalToolUiPhase.COMPLETED
+    val findingText = if (isFinding && message.content.contains("；发现="))
+        message.content.substringAfter("；发现=").substringBefore("；来源回执=").trim().take(280)
+    else ""
+    val findingStatus = if (isFinding && message.content.contains("状态="))
+        message.content.substringAfter("状态=").substringBefore("；")
+    else ""
+    val findingLabel = when (findingStatus) {
+        "supported" -> "调查线索 · 有来源支持"
+        "rejected" -> "调查修正 · 已排除假说"
+        "hypothesis" -> "发现新线索 · 待核查"
+        else -> if (isFinding) "调查发现已整理" else null
+    }
+    val groupLabel = if (operationGroup) {
+        val summary = activities.take(2).joinToString("、").ifBlank { "工具操作" }
+        "$summary · 已完成 ${receipts.size} 项"
+    } else findingLabel
     WorkToolStatusRow(message.toolName, phase, argumentsPreview = activity?.argumentsPreview,
-        repeatCount = repeatCount,
+        repeatCount = if (operationGroup) 1 else repeatCount,
+        labelOverride = groupLabel,
         modifier = Modifier.testTag(message.toolCallId?.let { "work-tool:$it" } ?: "work-tool:${message.id}"),
         onClick = if (hasDetails) ({ detailsOpen = true }) else null)
+    if (findingText.isNotBlank()) {
+        Text(
+            findingText,
+            modifier = Modifier.fillMaxWidth().padding(start = 24.dp, top = 2.dp, bottom = 8.dp),
+            style = DsType.std14.withReadingWeight(),
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
+            maxLines = 3,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        )
+    }
     if (detailsOpen) {
-        SyResponsiveSheet(title = "工具回执 · $action", onDismiss = { detailsOpen = false },
+        SyResponsiveSheet(title = if (operationGroup) "操作记录 · ${receipts.size} 项" else "工具回执 · $action",
+            onDismiss = { detailsOpen = false },
             scrollable = true, seamlessBackground = false,
             trailing = {
                 SyButton("关闭", onClick = { detailsOpen = false }, size = SyButtonSize.Small,
@@ -161,9 +212,11 @@ internal fun WorkTimelineStepRow(
             }) {
             Text(workToolPhaseText(phase), style = DsType.std14Strong.withReadingWeight())
             message.toolErrorCode?.let { Text(it, style = DsType.small13.withReadingWeight()) }
-            (listOf(message) + groupedMessages).forEachIndexed { index, receipt ->
-                if (repeatCount > 1) {
-                    Text("第 " + (index + 1) + " 次检查",
+            receipts.forEachIndexed { index, receipt ->
+                if (operationGroup || repeatCount > 1) {
+                    Text(if (operationGroup) "第 ${index + 1} 项 · " +
+                        (userFacingWorkToolAction(receipt.toolName) ?: receipt.toolName.orEmpty())
+                        else "第 ${index + 1} 次检查",
                         style = DsType.small13.withReadingWeight())
                 }
                 receipt.blocks.filterIsInstance<com.labteto.dshmobile.local.session.LocalMessageBlock.Image>().forEach { image ->
@@ -214,12 +267,13 @@ private fun WorkToolStatusRow(
     onClick: (() -> Unit)? = null,
     argumentsPreview: String? = null,
     repeatCount: Int = 1,
+    labelOverride: String? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val provider = userFacingWorkToolProvider(name)
     val action = workToolActionLabel(name, argumentsPreview)
     // Provider is already visible via the icon. Repeating it in every title adds noise.
-    val label = if (repeatCount > 1) "$action · 已检查 " + repeatCount + " 次" else action
+    val label = labelOverride ?: if (repeatCount > 1) "$action · 已检查 " + repeatCount + " 次" else action
     val status = workToolPhaseText(phase)
     val tint = when (phase) {
         LocalToolUiPhase.FAILED -> colors.dangerInk
@@ -258,6 +312,10 @@ private fun WorkToolStatusRow(
             if (phase != LocalToolUiPhase.COMPLETED) {
                 Text(status, style = DsType.small13.withReadingWeight(), color = tint)
             }
+        }
+        if (labelOverride != null && onClick != null) {
+            Icon(imageVector = FeatherIcons.ChevronRight, contentDescription = "展开操作明细",
+                tint = colors.textSecondary, modifier = Modifier.size(16.dp))
         }
     }
 }

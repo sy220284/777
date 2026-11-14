@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy
 import com.labteto.dshmobile.local.io.readBoundedBody
 
 import com.labteto.dshmobile.core.net.withCancellableHttpResponse
@@ -226,7 +227,10 @@ internal fun accumulateDeepSeekUsage(
 class DeepSeekPricingRepository @Inject constructor(
     @ApplicationContext context: Context,
     private val http: OkHttpClient,
+    private val managedPolicy: LocalManagedExecutionPolicy,
 ) {
+    /** Official pricing fetch has a fixed endpoint; following redirects could bypass domain policy. */
+    private val pricingHttp = http.newBuilder().followRedirects(false).followSslRedirects(false).build()
     private val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val _state = MutableStateFlow(loadPersistedState())
     val state: StateFlow<DeepSeekPricingState> = _state.asStateFlow()
@@ -236,13 +240,14 @@ class DeepSeekPricingRepository @Inject constructor(
         val before = _state.value
         _state.value = before.copy(refreshing = true, error = null)
         try {
+            managedPolicy.current().requireNetworkDestination("https", "api-docs.deepseek.com")
             val request = Request.Builder()
                 .url(OFFICIAL_PRICING_URL)
                 .header("Accept-Language", "zh-CN,zh;q=0.9")
                 .header("User-Agent", "DSH-Mobile/777 DeepSeek-Pricing")
                 .get()
                 .build()
-            val models = withCancellableHttpResponse(http.newCall(request)) { response ->
+            val models = withCancellableHttpResponse(pricingHttp.newCall(request)) { response ->
                 check(response.isSuccessful) { "官网返回 HTTP ${response.code}" }
                 val html = readBoundedBody(response.body, MAX_PRICING_HTML_CHARS * 4)
                 check(html.isNotBlank()) { "官网价格页为空" }

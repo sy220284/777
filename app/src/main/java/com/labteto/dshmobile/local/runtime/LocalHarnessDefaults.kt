@@ -39,7 +39,7 @@ internal val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
 
 internal val SUBAGENT_EXCLUDED_TOOLS = setOf(
     "subagent", "subagent_fork", "workflow", "ask_user_question",
-    "session_event_search", "session_trace", "create_goal", "get_goal", "update_goal",
+    "session_event_search", "session_trace", "create_goal", "get_goal", "update_goal", "work_finding",
     "session_search", "session_event_trace", "session_event_read", "todo_write", "update_plan",
     "exit_plan_mode",
     "memory_remember", "memory_update", "memory_forget", "vision_analyze_screen",

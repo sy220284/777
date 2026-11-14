@@ -53,6 +53,25 @@ class LocalSessionEntryRegressionTest {
         compose.runOnIdle { assertEquals(1, deleted) }
     }
 
+    @Test fun sessionSampleMenuOpensTheRealFeatureAction() {
+        var opened = 0
+        compose.setContent {
+            DshTheme {
+                ConversationActionsMenu(
+                    pinned = false,
+                    onTogglePin = {},
+                    onRename = {},
+                    onDelete = {},
+                    onOpenSample = { opened++ },
+                )
+            }
+        }
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        compose.onNodeWithContentDescription(ctx.getString(R.string.local_session_actions)).performClick()
+        compose.onNodeWithTag("menu-item:" + ctx.getString(R.string.local_session_sample_title)).performClick()
+        compose.runOnIdle { assertEquals(1, opened) }
+    }
+
     @Test fun modelConfigurationEntryClosesPickerThenOpensSettings() {
         var closed = 0
         var configured = 0

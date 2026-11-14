@@ -10,9 +10,13 @@ import com.labteto.dshmobile.uicontract.UiAttachmentInspectionReceipt
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourcePriority
 import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.files.LocalDownloadsPublisher
+import com.labteto.dshmobile.local.files.LocalPublishedDownload
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryEntry
 import com.labteto.dshmobile.local.files.LocalWorkspaceDirectoryPage
 import com.labteto.dshmobile.local.files.LocalWorkspaceSearchPage
+import com.labteto.dshmobile.local.files.LocalWorkspaceFileChange
+import com.labteto.dshmobile.local.files.watchWorkspaceFileChanges
 import com.labteto.dshmobile.local.files.LocalWorkspaceToolGuide
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.runtime.LocalBundledRuntimeManager
@@ -27,6 +31,24 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.put
+
+/** Preserve human file names in Work while keeping all imported paths under one local folder. */
+internal fun workImportSafeName(originalName: String): String =
+    originalName.substringAfterLast('/').substringAfterLast('\\')
+        .replace(Regex("""[\\/:*?"<>|\p{Cntrl}]"""), "_")
+        .take(120).trim().trim('.').ifBlank { "手机文件" }
+
+internal fun workImportAvailablePath(safeName: String, exists: (String) -> Boolean): String {
+    val stem = safeName.substringBeforeLast('.', safeName)
+    val extension = safeName.substringAfterLast('.', "").takeIf(String::isNotBlank)
+        ?.let { ".$it" }.orEmpty()
+    return (1..512).asSequence().map { index ->
+        val filename = if (index == 1) safeName else "$stem ($index)$extension"
+        "导入文件/$filename"
+    }.firstOrNull { !exists(it) } ?: error("同名文件过多，请先整理工作区的导入文件")
+}
 
 /**
  * Session/File capability owning the app-private workspace views used by local conversations.
@@ -43,6 +65,7 @@ class LocalSessionFilesRuntime @Inject internal constructor(
 ) : com.labteto.dshmobile.uicontract.FilesUiPort {
     private val resourceScheduler = runtimeStateStore.resourceScheduler
     private val context = context
+    private val eventLogs = eventLogs
     internal val workspace = LocalWorkspace(
         root = File(context.filesDir, "local-harness/workspace"),
         extraSearchPaths = bundledRuntimeManager::searchPaths,
@@ -53,7 +76,13 @@ class LocalSessionFilesRuntime @Inject internal constructor(
         ),
     )
 
+    private val downloadsPublisher by lazy { LocalDownloadsPublisher(context, workspace) }
+
     init {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO).launch {
+            try { downloadsPublisher.ensureDirectory() }
+            catch (failure: Exception) { AppLog.failure("DownloadsPublisher", "initialize_folder", failure) }
+        }
         runCatching { LocalWorkspaceToolGuide.ensure(context, File(workspace.path)) }
             .onFailure { AppLog.failure("WorkspaceToolGuide", "create_readme", it) }
     }
@@ -91,6 +120,38 @@ class LocalSessionFilesRuntime @Inject internal constructor(
             } else attachmentImporter.import(uri)
         } }
 
+    private val workFileImportLock = Any()
+
+    override suspend fun importWorkspaceFile(uri: Uri): String {
+        require(com.labteto.dshmobile.local.isSupportedPickerAttachmentUri(uri.scheme, uri.authority)) {
+            "只能导入 Android 文件选择器授权的文档"
+        }
+        // A Work file enters its ordinary visible workspace directly. The shared streaming
+        // writer handles atomic commit, bounds RAM use and avoids duplicating Chat attachments.
+        return withContext(Dispatchers.IO) {
+            resourceScheduler.withResource(
+                HarnessResourceKind.FILE_IO, "file:import_work", priority = HarnessResourcePriority.INTERACTIVE,
+            ) {
+                val resolver = context.contentResolver
+                val originalName = resolver.query(
+                    uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null,
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                } ?: error("所选手机文件没有名称")
+                val safeName = workImportSafeName(originalName)
+                resolver.openInputStream(uri)?.use { input ->
+                    synchronized(workFileImportLock) {
+                        val selected = workImportAvailablePath(safeName) {
+                            workspace.workspaceFileAt(it) != null
+                        }
+                        workspace.writeFromStream(selected, input)
+                        selected
+                    }
+                } ?: error("无法读取系统授权的手机文件")
+            }
+        }
+    }
+
     internal suspend fun importToolImages(content: com.labteto.dshmobile.harness.tools.ToolRichContent?): List<LocalImportedAttachment> =
         withContext(Dispatchers.IO) {
             content?.images.orEmpty().map { image ->
@@ -123,6 +184,12 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     override suspend fun searchWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage =
         withContext(Dispatchers.IO) { workspace.searchWorkspacePage(query, offset) }
 
+    override fun observeWorkspaceFiles(paths: List<String>): kotlinx.coroutines.flow.Flow<LocalWorkspaceFileChange> =
+        watchWorkspaceFileChanges(File(workspace.path), paths)
+
+    override suspend fun stopWorkspaceSearch(query: String): Boolean =
+        withContext(Dispatchers.IO) { workspace.stopWorkspaceSearch(query) }
+
     override suspend fun conversationFiles(sessionId: String): LocalConversationFiles =
         withContext(Dispatchers.IO) { coordinator.conversationFiles(sessionId) }
 
@@ -135,6 +202,86 @@ class LocalSessionFilesRuntime @Inject internal constructor(
         withContext(Dispatchers.IO) { resourceScheduler.withResource(
             HarnessResourceKind.FILE_IO, "file:preview_page", priority = HarnessResourcePriority.INTERACTIVE
         ) { workspace.preview(path, offset = offset) } }
+
+    internal suspend fun publishedWorkspaceFile(path: String): LocalPublishedDownload? =
+        withContext(Dispatchers.IO) { downloadsPublisher.publishedWorkspace(path) }
+
+    override suspend fun saveWorkspaceFileToDownloads(path: String): String =
+        withContext(Dispatchers.IO) {
+            val units = com.labteto.dshmobile.harness.resource.harnessFileIoUnitsForBytes(
+                workspace.fileSizeForResourceBudget(path))
+            resourceScheduler.withResource(HarnessResourceKind.FILE_IO, "file:publish_downloads",
+                units = units, priority = HarnessResourcePriority.BACKGROUND) {
+                downloadsPublisher.publish(path)
+            }
+        }
+
+    /** The durable event makes automatic publication and its exact user-visible location auditable. */
+    internal suspend fun publishVerifiedDeliverables(
+        sessionId: String,
+        paths: List<String>,
+        deliverablesDirectory: String? = null,
+    ): List<String> {
+        val finalPaths = withContext(Dispatchers.IO) {
+            val root = java.nio.file.Paths.get(workspace.path)
+            val folderFiles = deliverablesDirectory?.let { subfolder ->
+                require(subfolder.startsWith("交付成果/") &&
+                    subfolder.split('/').none { it.isBlank() || it == "." || it == ".." }) {
+                    "交付成果目录无效"
+                }
+                val directory = root.resolve(subfolder)
+                if (!java.nio.file.Files.isDirectory(directory, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                    emptyList()
+                } else {
+                    java.nio.file.Files.walk(directory, 8).use { entries ->
+                        val visited = entries.limit(2001).collect(java.util.stream.Collectors.toList())
+                        require(visited.size <= 2000) {
+                            "交付目录文件过多，请在工作区选择需要发布的文件"
+                        }
+                        val files = visited.filter {
+                            java.nio.file.Files.isRegularFile(it, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                        }.map { root.relativize(it).toString().replace('\\', '/') }
+                            .filter { path ->
+                                val name = path.substringAfterLast('/')
+                                !name.startsWith('.') && !name.endsWith('~') &&
+                                    !name.endsWith(".tmp", true) && !name.endsWith(".part", true) &&
+                                    !name.endsWith(".bak", true) &&
+                                    path.split('/').none { it.startsWith('.') } &&
+                                    workspace.workspaceFileAt(path) != null
+                            }
+                        require(files.size <= 512) {
+                            "本次交付文件超过 512 项，请在工作区批量选择后保存"
+                        }
+                        files
+                    }
+                }
+            }.orEmpty()
+            (paths + folderFiles).distinct()
+        }
+        val locations = ArrayList<String>()
+        for (path in finalPaths) {
+            val previous = downloadsPublisher.publishedWorkspace(path)
+            val location = try {
+                saveWorkspaceFileToDownloads(path)
+            } catch (error: Exception) {
+                eventLogs.get(sessionId).append("artifact/publication-failed",
+                    kotlinx.serialization.json.buildJsonObject {
+                        put("path", path)
+                        put("reason", error.message ?: error::class.java.simpleName)
+                    })
+                throw error
+            }
+            if (previous?.currentVersion != true || previous.location != location) {
+                eventLogs.get(sessionId).append("artifact/published",
+                    kotlinx.serialization.json.buildJsonObject {
+                        put("path", path)
+                        put("location", location)
+                    })
+            }
+            locations += location
+        }
+        return locations
+    }
 
     override suspend fun exportWorkspaceFile(path: String, output: java.io.OutputStream): Long =
         withContext(Dispatchers.IO) {

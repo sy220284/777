@@ -77,6 +77,12 @@ class LocalSettingsDataFacade @Inject internal constructor(
         return updated
     }
 
+    internal fun restoreMemory(existing: MemoryRecord): MemoryRecord {
+        val restored = memoryManager.restoreManualEdit(existing)
+        recoverDiaryAfterMemorySave("记忆已恢复上一版本")
+        return restored
+    }
+
     internal fun forgetMemory(existing: MemoryRecord): Boolean {
         val removed = memoryStore.forget(existing.id, existing.updatedAt)
         if (removed) recoverDiaryAfterMemorySave("记忆已停用")

@@ -45,6 +45,7 @@ internal class LocalAgentTaskGraphController(
         nodeInputFiles: List<List<String>> = emptyList(), nodeOutputFiles: List<List<String>> = emptyList(),
         resumeGraphId: String? = null,
         replanGraphId: String? = null,
+        originFindingId: String? = null,
         workspaceRepository: String? = null,
         backendCapabilities: com.labteto.dshmobile.local.agent.LocalSubagentCapabilities = com.labteto.dshmobile.local.agent.LocalSubagentCapabilities(),
     ): String = binding.workflowAdmission.withLock {
@@ -72,6 +73,11 @@ internal class LocalAgentTaskGraphController(
             openGraphs(binding).singleOrNull { it.graphId == originalId }
                 ?: error("TASKGRAPH_REPLAN_SOURCE_NOT_OPEN:$originalId")
         }
+        require(originFindingId.isNullOrBlank() || (replacing != null &&
+            LocalWorkFindingJournal.supportedForReplan(
+                binding.eventLog, binding.workState.snapshot().goal?.id.orEmpty(), originFindingId))) {
+            "TASKGRAPH_REPLAN_ORIGIN_FINDING_MISSING_OR_REJECTED"
+        }
         val route = persistentJobs.workflowRoute(LocalWorkerModelRouter.resolve(modelOverride, binding.aggregateSnapshot()))
         require(workspaceRepository == null || allowMutation) { "独立工作区任务图需要显式写授权" }
         val model = route.first
@@ -82,6 +88,11 @@ internal class LocalAgentTaskGraphController(
         requireCurrentWorkflowGoal(goal, goal)
         val plan = LocalWorkTaskGraphPlan(buildJsonObject {
             put("version", 1)
+            replacing?.let { predecessor ->
+                put("reuses_graph_id", predecessor.graphId)
+                put("reuses_graph_execution_id", requireNotNull(predecessor.graphExecutionId))
+            }
+            originFindingId?.let { put("origin_finding_id", it) }
             put("backend_binding", backendCapabilities.backendBinding())
             put("user_revision", workflowUserRevision(binding.eventLog))
             put("source_message_id", binding.eventLog.latestMatching(setOf("turn/start")) { true }
@@ -147,6 +158,7 @@ internal class LocalAgentTaskGraphController(
             // between events leaves both inspectable rather than losing work.
             binding.eventLog.append("taskgraph/replanned", buildJsonObject {
                 put("old_graph_id", replacing.graphId)
+                originFindingId?.let { put("origin_finding_id", it) }
                 put("old_execution_id", requireNotNull(replacing.graphExecutionId))
                 put("new_graph_id", graphId)
                 put("new_execution_id", execution)
@@ -364,6 +376,7 @@ internal class LocalAgentTaskGraphController(
         try {
             checkOwner()
             require(plan.value["version"]?.jsonPrimitive?.intOrNull == 1) { "任务图持久定义版本不受支持" }
+            seedReusableReadOnlyGraphResults(log, workspaceRoot, graphId, execution, goalId, plan)
             val result = workflow.runDetailed(plan.prepared, plan.recoveredResults(log, execution, workspaceRoot))
             checkOwner()
             settle(result.executionOutcome)

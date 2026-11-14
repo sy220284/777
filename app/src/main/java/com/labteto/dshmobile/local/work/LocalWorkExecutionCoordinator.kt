@@ -4,6 +4,11 @@ import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
+import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
+import com.labteto.dshmobile.local.agent.LocalQueuedUserMessageEditor
+import com.labteto.dshmobile.local.agent.LocalQueuedUserPreview
+import com.labteto.dshmobile.local.agent.userPreviews
+import kotlinx.coroutines.flow.update
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.model.buildLocalUserModelMessage
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -374,12 +379,108 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         }
     }
 
+    override fun queuedUserInputs(): List<LocalQueuedUserPreview> =
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            val state = runtimeStateStore.state.value
+            if (state.usageMode != LocalUsageMode.WORK || state.loading ||
+                runtimeStateStore.sessionTransitioning) emptyList()
+            else (workRunRegistry[state.sessionId]?.runHandle
+                ?: runtimeStateStore.foregroundRunHandle).pendingInputs.userPreviews()
+        }
+
+    override fun removeQueuedUserInput(messageId: String): Boolean =
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            val state = runtimeStateStore.state.value
+            if (state.usageMode != LocalUsageMode.WORK || state.loading ||
+                runtimeStateStore.sessionTransitioning) return@synchronized false
+            val binding = workRunRegistry[state.sessionId]
+            val handle = binding?.runHandle ?: runtimeStateStore.foregroundRunHandle
+            val update = LocalQueuedUserMessageEditor(
+                eventLogFor(state.sessionId), handle.pendingInputs,
+            ).remove(messageId) ?: return@synchronized false
+            handle.transcriptProjectionCursor =
+                maxOf(handle.transcriptProjectionCursor ?: -1L, update.eventSequence)
+            binding?.state?.update { running ->
+                running.copy(
+                    messages = update.hotMessages(),
+                    transcriptIndex = update.transcriptIndex,
+                    kernel = running.kernel.copy(queuedInputCount = update.pendingCount),
+                )
+            }
+            runtimeStateStore.projection.projectWorkQueuedUserTimeline(
+                sessionId = state.sessionId,
+                messages = update.hotMessages(),
+                index = update.transcriptIndex,
+                pendingCount = update.pendingCount,
+                clearError = false,
+            )
+            if (!enqueueSnapshot(state.sessionId)) {
+                runtimeStateStore.projection.publishError(
+                    "排队消息已持久移除，快照保存排队失败；重新打开会话可恢复",
+                )
+            }
+            true
+        }
+
+    override fun reorderQueuedUserInputs(orderedIds: List<String>): Boolean =
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            val state = runtimeStateStore.state.value
+            if (state.usageMode != LocalUsageMode.WORK || state.loading ||
+                runtimeStateStore.sessionTransitioning) return@synchronized false
+            val handle = (workRunRegistry[state.sessionId]?.runHandle
+                ?: runtimeStateStore.foregroundRunHandle)
+            val changed = LocalQueuedUserMessageEditor(
+                eventLogFor(state.sessionId), handle.pendingInputs,
+            ).reorder(orderedIds)
+            if (changed && !enqueueSnapshot(state.sessionId)) {
+                runtimeStateStore.projection.publishError("排队顺序已持久化，快照保存失败；可从事件记录恢复")
+            }
+            changed
+        }
+
     override fun editAndResendUserMessage(
         messageId: String,
         replacement: String,
     ): LocalUserMessageEditResult = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
         var committed = false
         try {
+            val state = runtimeStateStore.state.value
+            if (state.usageMode == LocalUsageMode.WORK && !state.loading &&
+                !runtimeStateStore.sessionTransitioning) {
+                val binding = workRunRegistry[state.sessionId]
+                val runHandle = binding?.runHandle ?: runtimeStateStore.foregroundRunHandle
+                if (runHandle.pendingInputs.snapshot().any {
+                    it.id == messageId && it.kind == QueuedAgentInputKind.USER
+                }) {
+                    val edited = LocalQueuedUserMessageEditor(
+                        eventLogFor(state.sessionId), runHandle.pendingInputs,
+                    ).edit(messageId, replacement)
+                        ?: return@synchronized LocalUserMessageEditResult.UNCHANGED
+                    committed = true
+                    runHandle.transcriptProjectionCursor =
+                        maxOf(runHandle.transcriptProjectionCursor ?: -1L, edited.eventSequence)
+                    binding?.state?.update { running ->
+                        running.copy(
+                            messages = edited.hotMessages(),
+                            transcriptIndex = edited.transcriptIndex,
+                            kernel = running.kernel.copy(queuedInputCount = edited.pendingCount),
+                        )
+                    }
+                    runtimeStateStore.projection.projectWorkQueuedUserTimeline(
+                        sessionId = state.sessionId,
+                        messages = edited.hotMessages(),
+                        index = edited.transcriptIndex,
+                        pendingCount = edited.pendingCount,
+                        clearError = true,
+                    )
+                    if (!enqueueSnapshot(state.sessionId)) {
+                        runtimeStateStore.projection.publishError(
+                            "排队消息已持久保存，当前快照保存失败；重新打开会话可从事件记录恢复",
+                        )
+                    }
+                    return@synchronized LocalUserMessageEditResult.SENT
+                }
+            }
             when (val edit = prepareEditedTurn(messageId, replacement)) {
                 is LocalWorkMessageEditPreparation.Rejected -> edit.reason
                 is LocalWorkMessageEditPreparation.Ready -> {

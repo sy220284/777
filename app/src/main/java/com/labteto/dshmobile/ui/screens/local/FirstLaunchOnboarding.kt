@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.ui.screens.settings.PermissionSetupFlow
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyCategoryRow
@@ -60,7 +61,7 @@ internal fun shouldPresentFirstLaunch(
     hasConfiguredModel: Boolean,
 ): Boolean = !dismissed && !hasUserContent && !hasConfiguredModel
 
-/** Three real onboarding steps. No Android permission is requested until a later explicit action. */
+/** Function-first startup: welcome, mode, privacy and opt-in device authorization. */
 @Composable
 internal fun FirstLaunchOnboarding(
     onSkip: () -> Unit,
@@ -70,8 +71,15 @@ internal fun FirstLaunchOnboarding(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var step by rememberSaveable { mutableIntStateOf(0) }
     var mode by rememberSaveable { mutableStateOf(LocalUsageMode.CHAT) }
-    BackHandler {
+    BackHandler(enabled = step < 3) {
         if (step > 0) step-- else onSkip()
+    }
+    if (step == 3) {
+        PermissionSetupFlow(
+            onFinished = { onStart(mode) },
+            onBack = { step = 2 },
+        )
+        return
     }
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -178,10 +186,10 @@ internal fun FirstLaunchOnboarding(
                     when (step) {
                         0 -> R.string.shenyan_onboarding_try_chat
                         1 -> R.string.shenyan_onboarding_continue
-                        else -> R.string.shenyan_onboarding_start
+                        else -> R.string.shenyan_onboarding_continue
                     },
                 ),
-                onClick = { if (step < 2) step++ else onStart(mode) },
+                onClick = { step++ },
                 modifier = Modifier.fillMaxWidth().widthIn(max = 380.dp),
             )
             SyButton(

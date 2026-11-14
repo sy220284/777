@@ -23,7 +23,10 @@ class LocalChatAutomationExecutionAdapterTest {
             ): LocalChatUserEditResult = error("unused")
 
             override fun selectMessageVariant(messageId: String, targetIndex: Int) = false
-        override fun regenerateReply(messageId: String): Boolean = false
+        override fun queuedUserInputs() = emptyList<com.labteto.dshmobile.local.agent.LocalQueuedUserPreview>()
+            override fun removeQueuedUserInput(messageId: String) = false
+            override fun reorderQueuedUserInputs(orderedIds: List<String>) = false
+            override fun regenerateReply(messageId: String): Boolean = false
 
             override suspend fun execute(request: LocalChatExecutionRequest): LocalChatExecutionResult {
                 captured = request

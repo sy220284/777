@@ -18,7 +18,6 @@
 
 <p align="center">
   <a href="https://github.com/sy220284/777/releases/latest"><strong>下载 Android APK</strong></a>
-  · <a href="docs/FEATURE-TREE.zh-CN.md">查看完整功能树</a>
   · <a href="docs/README.md">阅读项目文档</a>
   · <a href="CHANGELOG.md">更新记录</a>
 </p>
@@ -44,7 +43,7 @@
 | **在对话中创作** | 在符合模型和账户条件时，使用图片、视频、配音、语音转写等多模态能力 |
 | **掌握模型和消耗** | 多模型配置、模型能力路由、聊天/工作模式预算、Token 用量与历史记录 |
 
-这里列的是**当前主分支登记的能力范围**，不代表每项功能在任何手机、模型和权限组合下都可用。具体入口与代码位置见[功能树](docs/FEATURE-TREE.zh-CN.md)，已知测试范围与限制见[验证说明](docs/VALIDATION.md)。
+这里列的是**当前主分支登记的能力范围**，不代表每项功能在任何手机、模型和权限组合下都可用。现行功能与代码入口以实际生产源码及测试为准；开发检查参考[验证说明](docs/VALIDATION.md)。
 
 ### 聊天模式：人物与故事持续下去
 
@@ -60,7 +59,7 @@
 
 > 检查这个项目的代码，列出能复现的问题，修复后运行相关测试，并把修改和验证结果交给我。
 
-工具能执行哪些操作，取决于当前模型、设备权限、工具配置和审批策略。**“已经尝试执行”不自动等于“任务已完成”**；涉及外部服务、真实设备或第三方账户的任务仍需对应环境验证。
+工具能执行哪些操作，取决于当前模型、设备权限、工具配置和审批策略。**“已经尝试执行”不自动等于“任务已完成”**。
 
 ### 多模态：成果直接回到会话
 
@@ -159,18 +158,17 @@ bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug
 | `harness-interop/` | MCP、LSP、GitHub 等互通适配 |
 | `harness-device-android/` | Android 设备能力 |
 | `reference-validation/` | Harness 语义对照与回归验证 |
-| `docs/` | 架构、功能、兼容、安全和验收文档 |
+| `docs/` | 架构、功能、兼容、安全等文档 |
 | `tools/`、`.github/` | 本地工具链、构建脚本与 CI / 发布流程 |
 
-### 质量与验收
+### 开发与检查
 
-CI 根据改动风险选择对应门禁：文档检查、静态与架构规则、单元测试、ARM64/x86 构建以及 Android 16/17 模拟器验证。**某条 CI 成功记录只能证明该次提交运行的检查通过**，不能替代外部账户、真实设备与完整端到端验收。正式 APK 的发布资格单独受完整主分支验证约束。
+构建、测试和设备排障由开发者根据具体问题自行选择。
 
 权威说明：[VALIDATION.md](docs/VALIDATION.md) · [贡献指南](CONTRIBUTING.md) · [工程规则](AGENTS.md)。
 
 ## 文档导航
 
-- [功能树与代码定位](docs/FEATURE-TREE.zh-CN.md) · [功能审计](docs/FUNCTION-AUDIT.zh-CN.md)
 - [系统架构](docs/ARCHITECTURE.md) · [原生 Harness 当前状态](docs/ANDROID-HARNESS-STATUS.zh-CN.md)
 - [UI / UX 规范](docs/UI-UX.zh-CN.md) · [开发工具链](docs/DEVELOPMENT.md)
 - [安全说明](docs/SECURITY.md) · [兼容性](docs/COMPATIBILITY.md) · [验证规则](docs/VALIDATION.md)

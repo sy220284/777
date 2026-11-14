@@ -29,6 +29,7 @@ import com.labteto.dshmobile.local.presentation.projectWorkState
 import com.labteto.dshmobile.local.presentation.projectWorkSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.presentation.LocalSessionSectionUiFacade
 import com.labteto.dshmobile.ui.screens.settings.readDeviceCapabilityState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -57,6 +58,11 @@ class LocalHarnessViewModel @Inject constructor(
     private val conversationPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val approvalPreferences: LocalApprovalPreferences,
     private val networkSearchSettings: LocalNetworkSearchSettings,
+    private val sectionStore: LocalSessionSectionUiFacade,
+    private val reviewFacade: com.labteto.dshmobile.local.presentation.LocalIndependentCodeReviewUiFacade,
+    private val securityReviewFacade: com.labteto.dshmobile.local.presentation.LocalIndependentSecurityReviewUiFacade,
+    private val sampleCoordinator: com.labteto.dshmobile.local.model.LocalConversationSampleCoordinator,
+    private val workProjectUi: com.labteto.dshmobile.local.presentation.LocalWorkProjectsUiFacade,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -125,6 +131,7 @@ class LocalHarnessViewModel @Inject constructor(
     fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
     val state = runtime.state
     val streamingState = runtime.streamingState; internal val sendFeedbackState = runtime.sendFeedbackState
+    internal val queuedUserPort = conversationPorts.queuedUsers
     val shellState = state.projectShellState(viewModelScope)
     val chatSurfaceState = state.projectChatSurfaceState(viewModelScope)
     val workSurfaceState = state.projectWorkSurfaceState(viewModelScope)
@@ -163,6 +170,22 @@ class LocalHarnessViewModel @Inject constructor(
     private val conversationUiState = LocalConversationUiStateStore(appContext)
     val pinnedSessionIds = conversationUiState.pinnedSessionIds
     val sessionTitleOverrides = conversationUiState.sessionTitleOverrides
+    val sessionSections = sectionStore.snapshots
+    internal val projectActions = LocalWorkProjectsUiActions(
+        snapshots = workProjectUi.snapshots,
+        create = { name, root -> workProjectUi.create(name, root); Unit },
+        importExisting = { name, root, sessionId -> workProjectUi.importExisting(name, root, sessionId); Unit },
+        rename = workProjectUi::rename,
+        update = workProjectUi::update,
+        changeRoot = workProjectUi::changeRoot,
+        moveDirectory = workProjectUi::moveDirectory,
+        move = workProjectUi::move,
+        delete = workProjectUi::delete,
+        assignCurrentSession = { sessionId, projectId ->
+            if (state.value.usageMode != LocalUsageMode.WORK || state.value.sessionId != sessionId) false
+            else workProjectUi.assign(setOf(sessionId), projectId)
+        },
+    )
     suspend fun saveCurrentToGallery(
         notes: String,
         existingId: String? = null,
@@ -240,6 +263,9 @@ class LocalHarnessViewModel @Inject constructor(
     ): LocalSendResult = runtime.work.sendWithTeam(text, attachments)
 
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
+
+    internal suspend fun sampleSession(sessionId: String, prompt: String) =
+        sampleCoordinator.sample(sessionId, prompt)
     internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
         withContext(Dispatchers.IO) { runtime.chat.diaryEntries(subjectKey) }
     internal suspend fun correctDiaryEntry(
@@ -299,14 +325,112 @@ class LocalHarnessViewModel @Inject constructor(
     }
     fun toggleSessionPinned(sessionId: String) = conversationUiState.toggleSessionPinned(sessionId)
     fun renameSession(sessionId: String, title: String): Boolean = conversationUiState.renameSession(sessionId, title)
-    suspend fun deleteSessions(ids: Set<String>): Int = conversationUiState.deleteSessions(ids, runtime.session::deleteSessions)
+    fun createSessionSection(title: String): Boolean {
+        sectionStore.create(title)
+        return true
+    }
+    fun renameSessionSection(id: String, title: String) = sectionStore.rename(id, title)
+    fun deleteSessionSection(id: String) = sectionStore.delete(id)
+    fun moveSessionSection(id: String, targetIndex: Int) = sectionStore.move(id, targetIndex)
+    fun assignSessionSection(ids: Set<String>, sectionId: String?): Boolean {
+        if (ids.isEmpty() || !state.value.sessions.mapTo(hashSetOf()) { it.id }.containsAll(ids)) return false
+        return sectionStore.assign(ids, sectionId)
+    }
+    suspend fun deleteSessions(ids: Set<String>): Int {
+        val deleted = conversationUiState.deleteSessions(ids, runtime.session::deleteSessions)
+        if (deleted == ids.size) {
+            sectionStore.forgetDeletedSessions(ids)
+            workProjectUi.forgetDeletedSessions(ids)
+        }
+        return deleted
+    }
     suspend fun importAttachment(uri: Uri): LocalImportedAttachment = runtime.session.importAttachment(uri)
+    internal suspend fun remoteGitBranchesForUi(repository: String) =
+        toolsUi.remoteGitBranchesForUi(repository)
+    internal suspend fun compareLocalGitForUi(repository: String, includeUntracked: Boolean) =
+        toolsUi.compareLocalGitForUi(repository, includeUntracked)
+    internal suspend fun compareRemoteGitForUi(repository: String, remote: String, branch: String) =
+        toolsUi.compareRemoteGitForUi(repository, remote, branch)
+    internal suspend fun compareCommitGitForUi(repository: String, commit: String) =
+        toolsUi.compareCommitGitForUi(repository, commit)
+    /** Recover an existing report for exactly this code snapshot without model billing. */
+    internal suspend fun findIndependentCodeReviewForUi(
+        sessionId: String, repository: String,
+        diff: com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi,
+    ): com.labteto.dshmobile.local.work.LocalIndependentCodeReview? {
+        if (runtime.state.value.sessionId != sessionId ||
+            runtime.state.value.usageMode != LocalUsageMode.WORK) return null
+        return reviewFacade.find(sessionId, repository, diff)
+    }
+
+    internal suspend fun runIndependentCodeReviewForUi(
+        sessionId: String, repository: String,
+        diff: com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi,
+    ): com.labteto.dshmobile.local.work.LocalIndependentCodeReview {
+        require(runtime.state.value.sessionId == sessionId &&
+            runtime.state.value.usageMode == LocalUsageMode.WORK) { "已离开当前工作会话，审查中止" }
+        return reviewFacade.review(sessionId, repository, diff)
+    }
+
+    internal suspend fun acceptIndependentCodeReviewForUi(
+        sessionId: String, repository: String,
+        review: com.labteto.dshmobile.local.work.LocalIndependentCodeReview,
+        diff: com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi,
+    ): Boolean {
+        if (runtime.state.value.sessionId != sessionId ||
+            runtime.state.value.usageMode != LocalUsageMode.WORK) return false
+        return reviewFacade.accept(sessionId, repository, review, diff)
+    }
+
+
+    internal suspend fun findIndependentSecurityReviewForUi(
+        sessionId: String, repository: String,
+        diff: com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi,
+    ): com.labteto.dshmobile.local.work.LocalSecurityReview? {
+        if (runtime.state.value.sessionId != sessionId ||
+            runtime.state.value.usageMode != LocalUsageMode.WORK) return null
+        return securityReviewFacade.find(sessionId, repository, diff)
+    }
+
+    internal suspend fun runIndependentSecurityReviewForUi(
+        sessionId: String, repository: String,
+        diff: com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi,
+    ): com.labteto.dshmobile.local.work.LocalSecurityReview {
+        require(runtime.state.value.sessionId == sessionId &&
+            runtime.state.value.usageMode == LocalUsageMode.WORK) { "已离开当前工作会话，安全审核中止" }
+        return securityReviewFacade.review(sessionId, repository, diff)
+    }
+
+    internal suspend fun approveIndependentSecurityReviewForUi(
+        sessionId: String, repository: String,
+        review: com.labteto.dshmobile.local.work.LocalSecurityReview,
+        diff: com.labteto.dshmobile.local.presentation.LocalRemoteGitDiffUi,
+    ): Boolean {
+        if (runtime.state.value.sessionId != sessionId ||
+            runtime.state.value.usageMode != LocalUsageMode.WORK) return false
+        return securityReviewFacade.approve(sessionId, repository, review, diff)
+    }
+
+    suspend fun importWorkspaceFile(uri: Uri): String = runtime.session.importWorkspaceFileForUi(uri)
+    internal suspend fun publishedWorkspaceFile(path: String) = runtime.session.publishedWorkspaceFileForUi(path)
+    internal suspend fun saveWorkspaceFileToDownloads(path: String) = runtime.session.saveWorkspaceFileToDownloadsForUi(path)
+    internal suspend fun publishedWorkspaceFileForSession(sessionId: String, path: String) =
+        runtime.session.publishedWorkspaceFileForUi(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
+    internal suspend fun saveWorkspaceFileToDownloadsForSession(sessionId: String, path: String) =
+        runtime.session.saveWorkspaceFileToDownloadsForUi(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
     suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
     suspend fun workspaceDirectory(path: String) = runtime.session.workspaceDirectoryForUi(path)
     suspend fun workspaceDirectoryPage(path: String, offset: Int) = runtime.session.workspaceDirectoryPageForUi(path, offset)
     suspend fun searchWorkspaceFiles(query: String) = runtime.session.searchWorkspaceFilesForUi(query)
     suspend fun searchWorkspacePage(query: String, offset: Int) = runtime.session.searchWorkspacePageForUi(query, offset)
+    suspend fun stopWorkspaceSearch(query: String) = runtime.session.stopWorkspaceSearchForUi(query)
+    internal fun observeWorkspaceFiles(paths: List<String>) =
+        runtime.session.observeWorkspaceFilesForUi(paths)
     suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)
+    suspend fun previewWorkspaceFileForSession(sessionId: String, path: String) =
+        runtime.session.previewWorkspaceFileForUi(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
+    suspend fun previewWorkspaceFilePageForSession(sessionId: String, path: String, offset: Long) =
+        runtime.session.previewWorkspaceFilePageForUi(workProjectUi.relocatedReadPath(sessionId, path) ?: path, offset)
     suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
     suspend fun previewWorkspaceFilePage(path: String, offset: Long) =
         runtime.session.previewWorkspaceFilePageForUi(path, offset)

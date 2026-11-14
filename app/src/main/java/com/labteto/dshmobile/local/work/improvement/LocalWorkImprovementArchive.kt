@@ -32,6 +32,12 @@ internal class LocalWorkImprovementArchive(
 ) {
     private data class Problem(val session: String, val sequence: Long, val createdAt: Long, val summary: String)
     private data class GoalReceipt(val session: String, val sequence: Long, val createdAt: Long, val hasMachineEvidence: Boolean)
+    private data class Finding(
+        val session: String, val goalId: String, val projectId: String,
+        val id: String, val sequence: Long,
+        val createdAt: Long, val status: String, val summary: String,
+        val sourceCallId: String, val nextAction: String,
+    )
     private data class Proposal(
         val session: String, val sequence: Long, val createdAt: Long, val id: String,
         val category: String, val cue: String, val guidance: String, val reason: String,
@@ -65,6 +71,7 @@ internal class LocalWorkImprovementArchive(
         val adoptedIds: Set<String>,
         val retiredIds: Set<String>,
         val evaluations: List<Evaluation>,
+        val findings: Map<String, Finding>,
     )
 
     private val cached = linkedMapOf<String, Facts>()
@@ -95,6 +102,51 @@ internal class LocalWorkImprovementArchive(
         return adopted?.copy(active = true) ?: matches.firstOrNull {
             it.id !in used || it.id in usedForThisGoal
         }?.copy(active = false)
+    }
+
+    /**
+     * Cross-task reuse of researched leads, scoped to the very same project.
+     * Suggestions remain untrusted historical evidence; they never change policy
+     * or overwrite the current Goal. A bounded, relevance-filtered excerpt is
+     * assembled from the existing cached Session EventLog projection.
+     */
+    @Synchronized
+    fun relevantDiscoveries(projectId: String, objective: String): String {
+        if (projectId.isBlank() || objective.isBlank()) return ""
+        val terms = investigationSearchTerms(objective)
+        if (terms.size < 2) return ""
+        val candidates = cached.values.asSequence()
+            .flatMap { it.findings.values.asSequence() }
+            .filter { it.projectId == projectId && it.status == "supported" }
+            .map { finding ->
+                val overlap = investigationSearchTerms(finding.summary + " " + finding.nextAction)
+                    .count { it in terms }
+                finding to overlap
+            }
+            .filter { it.second >= 2 }
+            .sortedWith(compareByDescending<Pair<Finding, Int>> { it.second }
+                .thenByDescending { it.first.createdAt })
+            .take(3)
+            .toList()
+        if (candidates.isEmpty()) return ""
+        return buildString {
+            appendLine("【相似任务的本机调查线索：历史来源需要重新核验，按当前目标和权限使用】")
+            candidates.forEach { (finding, _) ->
+                append("- ").append(finding.summary.replace("\\n", " ").take(220))
+                append("；会话=").append(finding.session.take(70))
+                append("，来源调用=").append(finding.sourceCallId.take(70))
+                appendLine()
+            }
+        }.take(950)
+    }
+
+    private fun investigationSearchTerms(value: String): Set<String> {
+        val excluded = setOf("任务", "进行", "检查", "问题", "发现", "结果", "工作", "处理", "一个", "已经")
+        val lower = value.lowercase()
+        val latin = Regex("[a-z0-9_]{2,}").findAll(lower).map { it.value }
+        val han = Regex("[\\u4e00-\\u9fff]+").findAll(lower)
+            .flatMap { it.value.windowed(2).asSequence() }
+        return (latin + han).filter { it !in excluded }.toSet()
     }
 
     /** Create only missing files. The user's notes are never overwritten. */
@@ -153,6 +205,9 @@ internal class LocalWorkImprovementArchive(
         val issues = facts.sumOf(Facts::problemsCount)
         val recentProblems = facts.flatMap(Facts::problems)
             .sortedWith(compareByDescending<Problem> { it.createdAt }.thenByDescending { it.sequence }).take(50)
+        val recentFindings = facts.flatMap { it.findings.values }
+            .sortedWith(compareByDescending<Finding> { it.createdAt }.thenByDescending { it.sequence })
+            .take(80)
         val recentGoals = facts.flatMap(Facts::receipts)
             .sortedWith(compareByDescending<GoalReceipt> { it.createdAt }.thenByDescending { it.sequence }).take(40)
         val proposalCount = facts.sumOf { it.proposals.size }
@@ -176,6 +231,7 @@ internal class LocalWorkImprovementArchive(
             |- 其中有成果或测试执行凭据的 Goal：$receipts
             |- Work 工具结果：$tools；其中错误结果：$failedTools
             |- 可追踪的问题事件：$issues
+            |- 当前保留的调查发现：${facts.sumOf { it.findings.size }}
             |- 待独立验证的工作改进候选：$proposalCount
             |- 有限作用域内正式采纳的策略：${adopted.size}
             |- 已采纳的提示词优化：${activePrompts.size}
@@ -188,6 +244,7 @@ internal class LocalWorkImprovementArchive(
             |- [提示词优化](03-提示词优化.md)
             |- [问题与迭代](04-问题与迭代.md)
             |- [验证与成效](05-验证与成效.md)
+            |- [调查发现](07-调查发现.md)
             |- [我的备注](06-我的备注.md)
             |
             |> 完成任务、具有机器凭据以及策略优于基线，是三种不同的结论。未实施的自动改进不会被伪称为已完成。
@@ -266,6 +323,24 @@ internal class LocalWorkImprovementArchive(
                 "；Token " + row.baselineTokens + " → " + row.candidateTokens +
                 "（来源会话 " + row.session.take(65) + "，事件 #" + row.sequence + "）"
         }
+        val findingsDocument = buildString {
+            append("# 调查发现\n\n")
+            append("以下内容来自本机 Work 调查记录，保留最新修订及真实来源工具调用 ID。")
+            append("状态 supported 表示有工具来源支持，仍可能需要独立核实；不将模型假说直接判定为事实。\n\n")
+            if (recentFindings.isEmpty()) append("暂无调查发现。\n")
+            recentFindings.forEach { finding ->
+                append("- **").append(when (finding.status) {
+                    "supported" -> "有来源支持"
+                    "rejected" -> "已排除"
+                    else -> "待核查"
+                }).append("**：").append(finding.summary.replace("\n", " ").take(500))
+                append("；下一步：").append(finding.nextAction.replace("\n", " ").take(300).ifBlank { "无" })
+                append("；会话 `").append(finding.session.take(80))
+                append("`，目标 `").append(finding.goalId.take(80))
+                append("`，来源调用 `").append(finding.sourceCallId.take(100))
+                append("`，事件 #").append(finding.sequence).append("\n")
+            }
+        }
         val documents = linkedMapOf(
             "00-自我改进总览.md" to summary,
             "01-经验与方法.md" to experienceWithCandidates,
@@ -273,6 +348,7 @@ internal class LocalWorkImprovementArchive(
             "03-提示词优化.md" to prompts,
             "04-问题与迭代.md" to problems,
             "05-验证与成效.md" to verified,
+            "07-调查发现.md" to findingsDocument,
         )
         // A skill proposal is a user-readable DRAFT only; ToolsFeature remains the sole
         // installer/editor. Creating this file never registers or enables a live skill.
@@ -319,6 +395,7 @@ internal class LocalWorkImprovementArchive(
         val adoptedIds = previous?.adoptedIds?.toMutableSet() ?: linkedSetOf()
         val retiredIds = previous?.retiredIds?.toMutableSet() ?: linkedSetOf()
         val evaluations = ArrayDeque<Evaluation>().apply { addAll(previous?.evaluations.orEmpty()) }
+        val findings = linkedMapOf<String, Finding>().apply { putAll(previous?.findings.orEmpty()) }
         log.forEachAfter(previous?.lastSequence ?: -1L) { e ->
             val data = e.data
             when (e.type) {
@@ -358,6 +435,19 @@ internal class LocalWorkImprovementArchive(
                     problemsCount++
                     addBounded(problems, Problem(session, e.sequence, e.createdAt,
                         "Work Goal 完成状态变更被验收规则拒绝"))
+                }
+                "work/finding" -> {
+                    val id = data.text("finding_id").orEmpty()
+                    if (id.isNotBlank() && data.text("status") in setOf("hypothesis", "supported", "rejected")) {
+                        findings[id] = Finding(session, data.text("goal_id").orEmpty(),
+                            data.text("project_id").orEmpty(), id, e.sequence,
+                            e.createdAt, data.text("status").orEmpty(),
+                            data.text("summary").orEmpty().take(500),
+                            data.text("source_call_id").orEmpty().take(100),
+                            data.text("next_action").orEmpty().take(300))
+                        // Only the most recent state for each ID is needed for the derived archive.
+                        while (findings.size > 100) findings.remove(findings.keys.first())
+                    }
                 }
                 "work/improvement-candidate" -> {
                     val candidateId = data.text("id").orEmpty()
@@ -419,7 +509,7 @@ internal class LocalWorkImprovementArchive(
         return Facts(end, fileSize, modifiedAt, fileIdentity, isWork, goals.toSet(),
             turns, toolReceipts, failedTools, goals.size,
             machineEvidenceGoals, problemsCount, problems.toList(), receipts.toList(), proposals.toList(),
-            trialIds, trialGoalIds, adoptedIds, retiredIds, evaluations.toList())
+            trialIds, trialGoalIds, adoptedIds, retiredIds, evaluations.toList(), findings.toMap())
     }
 
     private fun proposalLines(items: List<Proposal>): String =
@@ -468,6 +558,7 @@ internal class LocalWorkImprovementArchive(
         "03-提示词优化.md" to "# 提示词优化\n\n暂无已验证采纳记录。\n",
         "04-问题与迭代.md" to "# 问题与迭代\n\n暂无记录。\n",
         "05-验证与成效.md" to "# 验证与成效\n\n暂无记录。\n",
+        "07-调查发现.md" to "# 调查发现\n\n暂无记录。\n",
     )
 
     private companion object {

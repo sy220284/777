@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.uicontract
 
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
+import com.labteto.dshmobile.local.model.DeepSeekProviderBalance
 import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelPreset
@@ -29,6 +30,16 @@ data class UiSettingsSnapshot(
     val personaBannedPhrases: List<String> = emptyList(),
 ) { val modelProfiles: List<LocalModelProfile> get() = modelSelection.profiles }
 
+
+/** Read-only projection: Settings explains active execution restrictions without exposing policy files. */
+data class UiExecutionPolicySnapshot(
+    val networkEnabled: Boolean,
+    val allowedHosts: List<String>?,
+    val deniedHosts: List<String>,
+    val allowedModelProviders: List<String>?,
+    val managedRestrictions: List<String>,
+)
+
 /** Workflow APIs retain their original owners. No credentials or mutable stores are returned. */
 interface SettingsUiPort {
     val state: Flow<UiSettingsSnapshot>
@@ -51,6 +62,7 @@ interface SettingsUiPort {
     fun configureModel(apiKey: String, model: String, baseUrl: String)
     suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null,
         profileId: String? = null, contextWindowTokensOverride: Int? = null, credentialSourceProfileId: String? = null)
+    suspend fun queryDeepSeekBalance(profile: LocalModelProfile): DeepSeekProviderBalance
     suspend fun queryMiniMaxQuota(profile: LocalModelProfile): MiniMaxProviderUsage
     fun selectModel(id: String)
     fun removeModel(id: String)

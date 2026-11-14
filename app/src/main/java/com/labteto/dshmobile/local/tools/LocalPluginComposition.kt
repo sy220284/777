@@ -21,12 +21,15 @@ import com.labteto.dshmobile.harness.plugin.PluginManager
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.tools.ToolRegistry
+import com.labteto.dshmobile.harness.tools.ToolHookSubscription
+import com.labteto.dshmobile.harness.tools.CodeModePlugin
 import com.labteto.dshmobile.interop.github.GitHubConnectorPlugin
 import com.labteto.dshmobile.interop.github.GitHubConnectorStatus
 import com.labteto.dshmobile.interop.lsp.LspPlugin
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.LocalWebProvider
+import com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy
 import com.labteto.dshmobile.local.TokenUsageContext
 import com.labteto.dshmobile.local.model.LocalApiKeyStore
 import com.labteto.dshmobile.local.model.LocalModelGateway
@@ -66,6 +69,7 @@ class LocalPluginCompositionFactory @Inject constructor(
     private val automationScheduler: HarnessAutomationScheduler,
     private val automationStore: AutomationStore,
     private val webhookController: WebhookController,
+    private val managedPolicy: LocalManagedExecutionPolicy,
 ) {
     internal fun createWebTools(
         searchKeyProvider: suspend () -> String?,
@@ -86,6 +90,8 @@ class LocalPluginCompositionFactory @Inject constructor(
         routeProvider: () -> LocalVisionRoute?,
         imageSupportProvider: (LocalVisionRoute) -> Boolean?,
         executeBuiltin: suspend (LocalToolCall, Boolean, String?) -> com.labteto.dshmobile.harness.tools.ToolResult,
+        onMcpElicitation: suspend (String?, String, String, com.labteto.dshmobile.interop.mcp.McpElicitationRequest) -> com.labteto.dshmobile.interop.mcp.McpElicitationReply =
+            { _, _, _, _ -> com.labteto.dshmobile.interop.mcp.McpElicitationReply("cancel") },
         usageContextProvider: (String?, String?) -> TokenUsageContext? = { _, _ -> null },
     ): LocalPluginComposition = LocalPluginComposition(
         context = context,
@@ -99,6 +105,7 @@ class LocalPluginCompositionFactory @Inject constructor(
         automationScheduler = automationScheduler,
         automationStore = automationStore,
         webhookController = webhookController,
+        managedPolicy = managedPolicy,
         workspaceRoot = workspaceRoot,
         runtimeProcess = runtimeProcess,
         runtimeTerminal = runtimeTerminal,
@@ -112,6 +119,7 @@ class LocalPluginCompositionFactory @Inject constructor(
         routeProvider = routeProvider,
         imageSupportProvider = imageSupportProvider,
         executeBuiltin = executeBuiltin,
+        onMcpElicitation = onMcpElicitation,
         usageContextProvider = usageContextProvider,
     )
 }
@@ -128,6 +136,7 @@ internal class LocalPluginComposition(
     automationScheduler: HarnessAutomationScheduler,
     automationStore: AutomationStore,
     webhookController: WebhookController,
+    managedPolicy: LocalManagedExecutionPolicy,
     workspaceRoot: File,
     runtimeProcess: AndroidProcessRuntime,
     runtimeTerminal: PersistentPipeTerminalProvider,
@@ -141,9 +150,18 @@ internal class LocalPluginComposition(
     routeProvider: () -> LocalVisionRoute?,
     imageSupportProvider: (LocalVisionRoute) -> Boolean?,
     executeBuiltin: suspend (LocalToolCall, Boolean, String?) -> com.labteto.dshmobile.harness.tools.ToolResult,
+    onMcpElicitation: suspend (String?, String, String, com.labteto.dshmobile.interop.mcp.McpElicitationRequest) -> com.labteto.dshmobile.interop.mcp.McpElicitationReply =
+        { _, _, _, _ -> com.labteto.dshmobile.interop.mcp.McpElicitationReply("cancel") },
     usageContextProvider: (String?, String?) -> TokenUsageContext? = { _, _ -> null },
 ) {
-    val tools = ToolRegistry()
+    val tools = ToolRegistry().apply {
+        // Trusted application policy is installed before runtime plugins expose their tools.
+        registerHook(ToolHookSubscription(
+            id = "managed-browser-origin",
+            hook = LocalTrustedDeviceOriginHook(managedPolicy::current),
+            toolNames = setOf("android_open_uri"),
+        ))
+    }
     private val registry = PluginRegistry(HarnessContext(tools = tools))
 
     private val runtimePlugin = AndroidRuntimePlugin(
@@ -153,12 +171,17 @@ internal class LocalPluginComposition(
         resourceScheduler = resourceScheduler,
     )
     private val mcpPlugin = McpToolBridgePlugin(
+        onElicitation = onMcpElicitation,
         http = http,
         json = json,
         workspaceRoot = workspaceRoot,
         stdioCommandResolver = runtimeProcess::resolveCommand,
         stdioEnvironmentProvider = { runtimeProcess.processEnvironment() },
         httpCredentialProvider = mcpCredentials::forEndpoint,
+        verifyHttpEndpoint = { endpoint ->
+            val uri = java.net.URI(endpoint)
+            managedPolicy.current().requireNetworkDestination(uri.scheme.orEmpty(), uri.host.orEmpty())
+        },
         credentialAwareHttpTransportFactory = { serverId, endpoint, bearer ->
             com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerTransport(
                 context.applicationContext, kind = "http", endpoint = endpoint,
@@ -207,9 +230,9 @@ internal class LocalPluginComposition(
         environment = { runtimeProcess.processEnvironment() },
         resourceScheduler = resourceScheduler,
     )
-    private val deviceProvider = AndroidDeviceProvider(
-        context = context,
-        resourceScheduler = resourceScheduler,
+    private val deviceProvider = LocalManagedDeviceProvider(
+        AndroidDeviceProvider(context = context, resourceScheduler = resourceScheduler),
+        policy = managedPolicy::current,
     )
     private val devicePlugin = AndroidDevicePlugin(deviceProvider)
     private val visionPlugin = LocalVisionPlugin(
@@ -234,6 +257,7 @@ internal class LocalPluginComposition(
     private val automationPlugin = AutomationPlugin(automationScheduler, automationStore)
     private val webhookPlugin = WebhookPlugin(webhookController)
     private val builtinPlugin = LocalBuiltinPlugin(executeBuiltin)
+    private val codeModePlugin = CodeModePlugin(tools)
 
     val virtualDisplayProvider: HarnessVirtualDisplayProvider
         get() = registry.context.capabilities.require("android-device", HarnessVirtualDisplayProvider::class)
@@ -247,6 +271,11 @@ internal class LocalPluginComposition(
             pluginDefinition(
                 runtimePlugin,
                 capabilities = setOf("runtime.process", "runtime.terminal"),
+            ),
+            pluginDefinition(
+                codeModePlugin,
+                dependencies = listOf(PluginDependency("android-local-builtins")),
+                capabilities = setOf("workflow.code-mode"),
             ),
             pluginDefinition(
                 mcpPlugin,

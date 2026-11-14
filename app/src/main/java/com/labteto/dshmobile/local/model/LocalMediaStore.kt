@@ -5,6 +5,7 @@ package com.labteto.dshmobile.local.model
 // FEATURE_TREE: {"id":"tools.media.transactional-recovery","path":"第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体创作回执与成果恢复","owner":"TOOLS","entry":"LocalMediaStore","test":"app/src/androidTest/java/com/labteto/dshmobile/local/model/LocalMediaStoreAndroidTest.kt#receiptAndResultCommitTogetherAndLateWriterCannotResurrectDeletion"}
 
 import android.content.Context
+import com.labteto.dshmobile.local.files.LocalDownloadsPublisher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.net.URI
@@ -25,6 +26,7 @@ import kotlinx.serialization.json.Json
 class LocalMediaStore @Inject constructor(@ApplicationContext private val context: Context, private val json: Json) {
     private val directory = File(context.filesDir, "media-studio")
     private val database = LocalMediaDatabase(context, json)
+    private val downloadsPublisher by lazy { LocalDownloadsPublisher.owned(context) }
     private var initialized = false
     private val changes = MutableStateFlow(0L)
     private val mutableError = MutableStateFlow<String?>(null)
@@ -198,6 +200,24 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
     internal fun stageMediaStudioBackup(target: File): LocalMediaStudioBackupSnapshot.Prepared = operation {
         initialize()
         LocalMediaStudioBackupSnapshot(context, json).prepare(database, target)
+    }
+
+    fun publishResultToDownloads(file: File): String {
+        val approved = this.file(file.name) ?: error("媒体成果文件已不存在")
+        require(approved.canonicalFile == file.canonicalFile) { "待发布的媒体文件不是已登记的成果" }
+        return downloadsPublisher.publishOwnedFile(approved)
+    }
+
+    fun recordDownloadPublicationFailure(failure: Exception) {
+        mutableError.value = "媒体成果已保存在应用内，发布到Download/神言神语失败：${failure.message}"
+        changed()
+    }
+
+    fun clearDownloadPublicationFailure() {
+        if (mutableError.value?.startsWith("媒体成果已保存在应用内，发布到Download/") == true) {
+            mutableError.value = null
+            changed()
+        }
     }
 
     fun file(name: String?): File? = managedFile(name)?.takeIf(File::isFile)

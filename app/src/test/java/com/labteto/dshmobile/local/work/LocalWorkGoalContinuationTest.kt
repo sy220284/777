@@ -85,6 +85,20 @@ class LocalWorkGoalContinuationTest {
     )
 
     @Test
+    fun resolvedReadOnlyFailuresMayContinueWithoutRelaxingUnknownEffectGuard() {
+        assertFalse(canAutomaticallyFollowUpWorkGoal(conditions().copy(hadToolFailure = true)))
+        assertTrue(canAutomaticallyFollowUpWorkGoal(conditions().copy(
+            hadToolFailure = true, recoveredReadOnlyFailure = true,
+        )))
+        assertFalse(canAutomaticallyFollowUpWorkGoal(conditions().copy(
+            hadToolFailure = true, recoveredReadOnlyFailure = true, cancelled = true,
+        )))
+        assertFalse(canAutomaticallyFollowUpWorkGoal(conditions().copy(
+            hadToolFailure = true, recoveredReadOnlyFailure = true, pendingInputs = 1,
+        )))
+    }
+
+    @Test
     fun unknownOrUnsettledSideEffectBlocksAllAutomaticGoalFollowUp() {
         val log = toolLog()
         try {

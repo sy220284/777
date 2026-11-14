@@ -44,6 +44,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -139,6 +141,8 @@ internal fun LocalMemorySettingsCard(
         }
     }
 
+    val autoRecallLabel = stringResource(R.string.advanced_auto_recall)
+    val autoMemoryLabel = stringResource(R.string.advanced_auto_memory)
     SettingsCard(stringResource(R.string.advanced_memory_settings)) {
         SyValueRow(
             label = stringResource(R.string.advanced_user_rules),
@@ -157,6 +161,7 @@ internal fun LocalMemorySettingsCard(
             }
             SySwitchControl(
                 checked = local.autoRecall,
+                modifier = Modifier.semantics { contentDescription = autoRecallLabel },
                 onCheckedChange = { next ->
                     viewModel.changeLocalMemoryRecall(
                         if (rules.saving) rules.text else local.userRules,
@@ -177,6 +182,7 @@ internal fun LocalMemorySettingsCard(
             }
             SySwitchControl(
                 checked = local.autoMemory,
+                modifier = Modifier.semantics { contentDescription = autoMemoryLabel },
                 onCheckedChange = { next ->
                     viewModel.changeLocalMemoryAutoMemory(
                         if (rules.saving) rules.text else local.userRules,
@@ -424,6 +430,19 @@ internal fun MemoryManagementCard(
                             variant = SyButtonVariant.Ghost,
                         )
                     }
+                    if (record.previousManualRevision != null) {
+                        SyButton(
+                            text = "恢复上一版本",
+                            enabled = record.id !in page.busyIds,
+                            onClick = {
+                                viewModel.restoreMemory(record.id) { error ->
+                                    report(error ?: "上一版本已恢复")
+                                }
+                            },
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                        )
+                    }
                 }
             }
         }
@@ -499,7 +518,13 @@ internal fun MemoryManagementCard(
                     Text(stringResource(R.string.advanced_pin), style = DsType.small13Strong.withReadingWeight(), color = colors.text)
                     Text(stringResource(R.string.advanced_pin_hint), style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
                 }
-                SySwitchControl(checked = pinned, onCheckedChange = { pinned = it }, enabled = !saving)
+                val pinLabel = stringResource(R.string.advanced_pin)
+                SySwitchControl(
+                    checked = pinned,
+                    onCheckedChange = { pinned = it },
+                    enabled = !saving,
+                    modifier = Modifier.semantics { contentDescription = pinLabel },
+                )
             }
 
         }

@@ -81,35 +81,47 @@ internal fun DeviceCapabilitiesCard(
     state: DeviceCapabilitiesState,
     viewModel: SettingsViewModel,
     onRequestPostingPermission: () -> Unit,
+    onOpenPermissionGuide: () -> Unit,
 ) {
+    val enabledCount = listOf(state.accessibility, state.notifications,
+        state.postingNotifications == true).count { it }
     val overallState = when {
         state.loading -> SyStatus.Running
         state.error != null -> SyStatus.Failed
-        state.accessibility && state.notifications && state.postingNotifications == true -> SyStatus.Done
-        else -> SyStatus.Warning
+        enabledCount == PermissionSetupFeature.entries.size -> SyStatus.Done
+        else -> SyStatus.Neutral
     }
-    val overallLabel = stringResource(
-        when {
+    val overallLabel = if (state.loading || state.error != null || overallState == SyStatus.Done) {
+        stringResource(when {
             state.loading -> R.string.advanced_device_status_checking
             state.error != null -> R.string.advanced_device_status_error
-            overallState == SyStatus.Done -> R.string.advanced_device_status_ready
-            else -> R.string.advanced_device_status_needs_setup
-        },
-    )
+            else -> R.string.advanced_device_status_ready
+        })
+    } else stringResource(R.string.permission_setup_enabled_count, enabledCount)
 
     SettingsCard(stringResource(R.string.advanced_device_capabilities)) {
         SyStatusPill(state = overallState, label = overallLabel)
+        SyButton(
+            text = stringResource(R.string.permission_setup_entry),
+            onClick = onOpenPermissionGuide,
+            variant = SyButtonVariant.Outline,
+            modifier = Modifier.fillMaxWidth(),
+        )
         CapabilityRow(
             label = stringResource(R.string.advanced_accessibility),
             enabled = state.accessibility,
-            hint = stringResource(R.string.advanced_accessibility_hint),
+            hint = if (state.accessibilityGranted && !state.accessibility)
+                stringResource(R.string.permission_setup_reconnect_hint)
+            else stringResource(R.string.advanced_accessibility_hint),
             actionLabel = stringResource(R.string.advanced_enable_accessibility),
             onAction = viewModel::openAccessibilitySettings,
         )
         CapabilityRow(
             label = stringResource(R.string.advanced_notification_access),
             enabled = state.notifications,
-            hint = stringResource(R.string.advanced_notification_access_hint),
+            hint = if (state.notificationAccessGranted && !state.notifications)
+                stringResource(R.string.permission_setup_reconnect_hint)
+            else stringResource(R.string.advanced_notification_access_hint),
             actionLabel = stringResource(R.string.advanced_enable_notifications),
             onAction = viewModel::openNotificationAccessSettings,
         )

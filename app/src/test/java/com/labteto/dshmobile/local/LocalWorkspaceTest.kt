@@ -3,6 +3,10 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.files.LocalFileObservationCache
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.nio.file.StandardCopyOption
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertFalse
@@ -13,6 +17,108 @@ import org.junit.Before
 import org.junit.Test
 
 class LocalWorkspaceTest {
+    @Test
+    fun projectDirectoryMutationWaitsForExistingWorkspaceWriterGate() {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val started = CountDownLatch(1)
+        val finished = CountDownLatch(1)
+        val failures = ConcurrentLinkedQueue<Throwable>()
+        val relocation = Thread {
+            try {
+                workspace.withWorkspaceFileMutation {
+                    entered.countDown()
+                    check(release.await(5, TimeUnit.SECONDS)) { "迁移测试锁未释放" }
+                }
+            } catch (failure: Throwable) {
+                failures.add(failure)
+            }
+        }
+        val writer = Thread {
+            started.countDown()
+            try {
+                workspace.write("并发/安全.txt", "写入内容")
+            } catch (failure: Throwable) {
+                failures.add(failure)
+            } finally {
+                finished.countDown()
+            }
+        }
+        relocation.start()
+        try {
+            assertTrue("迁移必须进入共享文件锁", entered.await(5, TimeUnit.SECONDS))
+            writer.start()
+            assertTrue("写入线程未启动", started.await(5, TimeUnit.SECONDS))
+            assertFalse("文件写入越过了目录迁移锁", finished.await(150, TimeUnit.MILLISECONDS))
+        } finally {
+            release.countDown()
+            relocation.join(5_000)
+            if (writer.state != Thread.State.NEW) writer.join(5_000)
+        }
+        assertFalse(relocation.isAlive)
+        assertFalse(writer.isAlive)
+        assertTrue("并发操作异常: $failures", failures.isEmpty())
+        assertEquals("写入内容", workspace.readRaw("并发/安全.txt"))
+    }
+
+    @Test
+    fun directoryMutationInvalidatesCachedDirectoryPages() {
+        root.resolve("原项目").mkdirs()
+        root.resolve("原项目/正文.txt").writeText("保留")
+        assertEquals(listOf("原项目"), workspace.directoryPage(".").entries.map { it.path })
+        workspace.withWorkspaceFileMutation {
+            Files.move(root.resolve("原项目").toPath(),
+                root.resolve("新项目").toPath(), StandardCopyOption.ATOMIC_MOVE)
+        }
+        assertEquals(listOf("新项目"), workspace.directoryPage(".").entries.map { it.path })
+        assertEquals("保留", workspace.readRaw("新项目/正文.txt"))
+    }
+    @Test
+    fun localVersionedFileApiCreatesUpdatesAndRejectsStaleRevision() {
+        val missing = workspace.fileVersion("成果/文档.md")
+        assertEquals("absent", missing.revision)
+        val first = workspace.writeIfVersion("成果/文档.md", "absent", "第一稿")
+        assertTrue(first.revision.startsWith("sha256:"))
+        assertEquals("第一稿".toByteArray().size.toLong(), first.bytes)
+        assertEquals(first, workspace.fileVersion("成果/文档.md"))
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.writeIfVersion("成果/文档.md", "absent", "错误覆盖")
+        }
+        val second = workspace.writeIfVersion("成果/文档.md", first.revision, "第二稿")
+        assertTrue(second.revision != first.revision)
+        assertEquals("第二稿", workspace.readRaw("成果/文档.md"))
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.writeIfVersion("成果/文档.md", first.revision, "迟到提交")
+        }
+        assertEquals("第二稿", workspace.readRaw("成果/文档.md"))
+    }
+
+    @Test
+    fun localVersionedFileApiObservesNormalWorkspaceWrites() {
+        workspace.write("a.txt", "旧")
+        val previous = workspace.fileVersion("a.txt")
+        workspace.write("a.txt", "新")
+        assertTrue(previous.revision != workspace.fileVersion("a.txt").revision)
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.writeIfVersion("a.txt", previous.revision, "覆盖")
+        }
+    }
+
+    @Test
+    fun localVersionedFileApiRejectsInvalidPathsAndSymbolicLinks() {
+        val external = Files.createTempFile("version-api-external", ".txt")
+        try {
+            for (path in listOf("../outside", "/tmp/file", "folder/../a", "folder//a")) {
+                assertThrows(IllegalArgumentException::class.java) { workspace.fileVersion(path) }
+            }
+            Files.createSymbolicLink(root.resolve("linked.txt").toPath(), external)
+            assertThrows(IllegalArgumentException::class.java) {
+                workspace.writeIfVersion("linked.txt", "absent", "forbidden")
+            }
+        } finally {
+            Files.deleteIfExists(external)
+        }
+    }
     @Test
     fun resourceSizeUsesSandboxIdentityAndRejectsOutsideFiles() {
         val target = root.resolve("large-budget.txt").apply { writeText("abc") }
@@ -98,11 +204,9 @@ class LocalWorkspaceTest {
         }
         dir.resolve("终-唯一报告.md").writeText("目标")
         val first = workspace.searchWorkspacePage("唯一报告")
-        assertTrue(first.files.isEmpty())
-        assertEquals(1, first.nextOffset)
-        val second = workspace.searchWorkspacePage("唯一报告", requireNotNull(first.nextOffset))
-        assertEquals(listOf("任务/稀疏目录/终-唯一报告.md"), second.files.map { it.path })
-        assertEquals(null, second.nextOffset)
+        assertEquals(listOf("任务/稀疏目录/终-唯一报告.md"), first.files.map { it.path })
+        assertEquals(null, first.nextOffset)
+        assertEquals(null, workspace.searchWorkspacePage("不存在的文件").nextOffset)
     }
 
     @Test
@@ -124,6 +228,33 @@ class LocalWorkspaceTest {
         assertEquals(235, results.toSet().size)
         assertTrue(results.all { it.startsWith("任务/搜索目录/报告-") })
         assertEquals(results.take(96), workspace.searchWorkspacePage("报告", 0, 96).files.map { it.path })
+    }
+
+    @Test
+    fun browserFuzzyPaginationKeepsRankingAndNoDuplicates() {
+        workspace.write("功能/ModelContextProvider.kt", "x")
+        workspace.write("功能/ModuleControlPlan.kt", "x")
+        workspace.write("功能/mcp.kt", "x")
+        val first = workspace.searchWorkspacePage("mcp", 0, 1)
+        assertEquals("功能/mcp.kt", first.files.single().path)
+        val second = workspace.searchWorkspacePage("mcp", requireNotNull(first.nextOffset), 1)
+        assertEquals("功能/ModuleControlPlan.kt", second.files.single().path)
+        assertTrue(first.files.first().path != second.files.first().path)
+        assertTrue(workspace.stopWorkspaceSearch("mcp"))
+        assertTrue(runCatching { workspace.searchWorkspacePage("mcp", 1, 1) }.isFailure)
+    }
+
+    @Test
+    fun browserRejectsChangedFileBetweenResultPages() {
+        workspace.write("a-target.txt", "one")
+        workspace.write("b-target.txt", "two")
+        val first = workspace.searchWorkspacePage("target", 0, 1)
+        assertEquals(1, first.nextOffset)
+        workspace.write("b-target.txt", "different file size")
+        val error = runCatching {
+            workspace.searchWorkspacePage("target", requireNotNull(first.nextOffset), 1)
+        }
+        assertTrue(error.isFailure)
     }
 
     @Test

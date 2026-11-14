@@ -129,6 +129,7 @@ internal fun LocalModelSettingsCard(
     var catalogError by remember { mutableStateOf(false) }
     var refreshingModels by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
+    var saveAttempted by remember { mutableStateOf(false) }
     var pendingRemoveId by remember { mutableStateOf<String?>(null) }
     val matchingRoutes = local.modelProfiles.filter {
         it.authKind == LocalModelAuthKind.API_KEY &&
@@ -138,8 +139,12 @@ internal fun LocalModelSettingsCard(
         matchingRoutes.firstOrNull { it.id == id }
     }
     val savedRoute = savedProfile != null
+    val fieldErrors = if (saveAttempted) validateApiModelEditorForm(
+        model, baseUrl, apiKey, savedRoute || credentialSourceProfileId != null,
+    ) else ApiModelEditorFormErrors()
     val selectedPreset = LocalModelPresets.find(model, baseUrl)
     val editRoute: (String, String, String?) -> Unit = { name, url, id ->
+        saveAttempted = false
         editorGeneration++
         editingProfileId = id
         credentialSourceProfileId = id
@@ -359,8 +364,12 @@ internal fun LocalModelSettingsCard(
             scrollable = true,
             footer = {
                 SyButton(stringResource(R.string.advanced_save_model_settings), onClick = {
-                    if (!savedRoute && apiKey.isBlank() && credentialSourceProfileId == null) {
-                        testStatus = "请填写该模型的密钥"
+                    saveAttempted = true
+                    val errors = validateApiModelEditorForm(
+                        model, baseUrl, apiKey, savedRoute || credentialSourceProfileId != null,
+                    )
+                    if (!errors.valid) {
+                        testStatus = errors.model ?: errors.baseUrl ?: errors.apiKey
                     } else if (selectedPreset?.provider == "Kimi Code" && selectedPreset.model == "k3" &&
                         contextWindowTokens.isNotBlank() &&
                         (contextWindowTokens.toIntOrNull() ?: -1) !in 4_096..1_048_576
@@ -394,8 +403,7 @@ internal fun LocalModelSettingsCard(
                         }
                     }
                 }, modifier = Modifier.fillMaxWidth(), size = SyButtonSize.Large, loading = saving,
-                    enabled = !testing && !saving && !refreshingModels && model.isNotBlank() && baseUrl.isNotBlank() &&
-                        (savedRoute || apiKey.isNotBlank() || credentialSourceProfileId != null))
+                    enabled = !testing && !saving && !refreshingModels)
             },
         ) {
             Column(Modifier.fillMaxWidth(),
@@ -435,7 +443,9 @@ internal fun LocalModelSettingsCard(
                         model = it.take(160); editingProfileId = null; editorGeneration++; testStatus = null
                     },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        label = { Text(stringResource(R.string.advanced_default_model)) })
+                        label = { Text(stringResource(R.string.advanced_default_model)) },
+                        isError = fieldErrors.model != null,
+                        supportingText = { fieldErrors.model?.let { Text(it) } })
                     SyTextField(baseUrl, onValueChange = {
                         baseUrl = it.take(1000); editingProfileId = null
                         credentialSourceProfileId = null
@@ -443,7 +453,9 @@ internal fun LocalModelSettingsCard(
                         editorGeneration++; testStatus = null
                     },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        label = { Text(stringResource(R.string.advanced_endpoint)) })
+                        label = { Text(stringResource(R.string.advanced_endpoint)) },
+                        isError = fieldErrors.baseUrl != null,
+                        supportingText = { fieldErrors.baseUrl?.let { Text(it) } })
                     LocalModelContextWindowField(contextWindowTokens) { contextWindowTokens = it; editorGeneration++; testStatus = null }
                 } else {
                     Text(baseUrl, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
@@ -496,7 +508,11 @@ internal fun LocalModelSettingsCard(
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                     label = { Text(stringResource(if (savedRoute) R.string.advanced_replace_model_key
                         else R.string.advanced_model_key)) },
-                    supportingText = { if (savedRoute) Text(stringResource(R.string.local_model_keep_key)) },
+                    supportingText = {
+                        fieldErrors.apiKey?.let { Text(it) }
+                            ?: if (savedRoute) Text(stringResource(R.string.local_model_keep_key)) else Unit
+                    },
+                    isError = fieldErrors.apiKey != null,
                     visualTransformation = PasswordVisualTransformation())
                 SyButton(
                     if (refreshingModels) stringResource(R.string.local_model_catalog_fetching)
@@ -762,3 +778,23 @@ private fun PriceTableRow(
 
 private fun formatDeepSeekPrice(value: Double): String =
     String.format(Locale.US, "%.2f", value).trimEnd('0').trimEnd('.')
+
+/** Client-side required-field feedback; canonical credential and endpoint checks remain in the model gateway. */
+internal data class ApiModelEditorFormErrors(
+    val model: String? = null,
+    val baseUrl: String? = null,
+    val apiKey: String? = null,
+) {
+    val valid: Boolean get() = model == null && baseUrl == null && apiKey == null
+}
+
+internal fun validateApiModelEditorForm(
+    model: String,
+    baseUrl: String,
+    apiKey: String,
+    hasSavedCredential: Boolean,
+): ApiModelEditorFormErrors = ApiModelEditorFormErrors(
+    model = if (model.isBlank()) "请输入模型名称" else null,
+    baseUrl = if (baseUrl.isBlank()) "请输入模型接口地址" else null,
+    apiKey = if (!hasSavedCredential && apiKey.isBlank()) "请填写该模型的密钥" else null,
+)

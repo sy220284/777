@@ -3,6 +3,8 @@ package com.labteto.dshmobile.harness.tools
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -62,4 +64,57 @@ class ToolBindingSnapshotTest {
             assertTrue(registry.executeTracked("first", buildJsonObject {}).executionStarted)
         }
     }
+    private fun codeModePlan(name: String) = buildJsonObject {
+        put("steps", buildJsonArray {
+            add(buildJsonObject {
+                put("tool", name)
+                put("args", buildJsonObject {})
+            })
+        })
+    }
+
+    @Test
+    fun codeModeOnlySampleCanExecutePreviouslyBoundCoreTool() = runTest {
+        val registry = ToolRegistry()
+        var invoked = 0
+        registry.register(tool("read_file") { invoked++ })
+        CodeModePlugin(registry).install(com.labteto.dshmobile.harness.plugin.HarnessContext(registry))
+        val snapshot = registry.captureBindings(JsonArray(listOf(
+            requireNotNull(registry.get("code_mode_run")).schema,
+        )))
+        withContext(snapshot) {
+            val unexposed = registry.executeTracked("read_file", buildJsonObject {})
+            assertFalse(unexposed.executionStarted)
+            assertEquals("TOOL_REGISTRATION_CHANGED", unexposed.result.errorCode)
+            val script = registry.execute("code_mode_run", codeModePlan("read_file"),
+                context = ToolContext(approval = { true }))
+            assertFalse(script.isError)
+        }
+        assertEquals(1, invoked)
+    }
+
+    @Test
+    fun codeModeOnlySampleRejectsLaterOrReplacedToolsBeforeSideEffects() = runTest {
+        val registry = ToolRegistry()
+        var effects = 0
+        registry.register(tool("before") { effects++ })
+        CodeModePlugin(registry).install(com.labteto.dshmobile.harness.plugin.HarnessContext(registry))
+        val snapshot = registry.captureBindings(JsonArray(listOf(
+            requireNotNull(registry.get("code_mode_run")).schema,
+        )))
+        registry.register(tool("later") { effects++ })
+        withContext(snapshot) {
+            val late = registry.execute("code_mode_run", codeModePlan("later"),
+                context = ToolContext(approval = { true }))
+            assertEquals("CODE_MODE_UNSAMPLED_TOOL", late.errorCode)
+        }
+        registry.register(tool("before") { effects++ }, replace = true)
+        withContext(snapshot) {
+            val replaced = registry.execute("code_mode_run", codeModePlan("before"),
+                context = ToolContext(approval = { true }))
+            assertEquals("CODE_MODE_UNSAMPLED_TOOL", replaced.errorCode)
+        }
+        assertEquals(0, effects)
+    }
+
 }

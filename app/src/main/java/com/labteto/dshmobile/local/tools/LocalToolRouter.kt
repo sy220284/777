@@ -163,6 +163,21 @@ internal object LocalToolRouter {
         }
 
     /**
+     * Exact multi-tool discovery, e.g. select:github_status,github_search.
+     * This never infers additional capabilities from descriptions or old task text.
+     * The execution coordinator still enforces the current registry, schema budget and approval.
+     */
+    fun exactSelection(query: String): List<String>? {
+        val command = query.trim()
+        if (!command.startsWith("select:", ignoreCase = true)) return null
+        val names = command.substringAfter(':').split(',', '，').map(String::trim)
+        require(names.isNotEmpty() && names.size <= 16 && names.all {
+            it.matches(Regex("[A-Za-z][A-Za-z0-9_-]{0,127}"))
+        }) { "精确工具选择格式：select:工具名1,工具名2（最多 16 个）" }
+        return names.distinct()
+    }
+
+    /**
      * Ranks capabilities by the strongest matching evidence. A flood of weak description/family
      * terms can no longer outrank a concrete tool identifier or an explicit discovery keyword.
      * Search does not change the conservative implicit preactivation contract.

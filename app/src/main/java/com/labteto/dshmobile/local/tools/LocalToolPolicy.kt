@@ -45,7 +45,7 @@ internal object LocalToolPolicy {
         "web_search", "web_fetch", "http_request", "download_file", "network_diagnose",
         "media_image_options", "media_image_create", "media_image_status",
         "job_list", "job_output", "job_kill", "json_query", "environment_info",
-        "todo_write", "create_goal", "get_goal", "update_goal",
+        "todo_write", "create_goal", "get_goal", "update_goal", "work_finding",
         "skill", "skill_create", "skill_update", "skill_rollback", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local", "extension_record", "extension_inspect", "subagent_fork", "list_agents", "agent_tree", "send_message",
         "interrupt_agent", "agent_inspect", "agent_watch", "agent_resume", "agent_close", "workflow", "team_members", "team_member_status",
         "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown", "team_respond_shutdown", "team_ack_message",
@@ -54,7 +54,8 @@ internal object LocalToolPolicy {
         "team_dismiss_member", "team_stop_all", "team_wait",
         "memory_search", "memory_list", "memory_remember",
         "memory_update", "memory_forget", "session_search", "session_trace",
-        "session_event_trace", "session_event_read", "present", "archive_list", "archive_read", "read_chunk", "write_chunk" -> ToolExposure.OPTIONAL
+        "session_event_trace", "session_event_read", "present", "archive_list", "archive_read", "read_chunk", "write_chunk",
+        "file_version", "file_write_if_version" -> ToolExposure.OPTIONAL
         "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect", "list_files",
         "glob", "grep", "bash", "capability_search", "update_plan", "exit_plan_mode",
         "ask_user_question", "subagent", "list_subagent_models", "list_agent_roles", "session_event_search" -> ToolExposure.CORE
@@ -102,10 +103,10 @@ internal object LocalToolPolicy {
     }
 
     fun access(name: String): ToolAccess = when (canonical(name)) {
-        "write", "edit", "write_chunk", "apply_patch", "download_file", "present",
+        "write", "edit", "write_chunk", "file_write_if_version", "apply_patch", "download_file", "present",
         "skill_create", "skill_update", "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local" -> ToolAccess.WORKSPACE_WRITE
         "update_plan", "exit_plan_mode", "todo_write", "create_goal", "update_goal",
-        "ask_user_question", "memory_remember", "memory_update", "memory_forget" -> ToolAccess.SESSION_WRITE
+        "ask_user_question", "work_finding", "memory_remember", "memory_update", "memory_forget" -> ToolAccess.SESSION_WRITE
         "bash", "job_kill" -> ToolAccess.PROCESS
         "subagent", "subagent_fork", "workflow", "send_message", "interrupt_agent", "agent_resume", "agent_close",
         "team_create_member", "team_start_member", "team_spawn", "team_send_message", "team_request_shutdown", "team_respond_shutdown", "team_ack_message",
@@ -113,7 +114,7 @@ internal object LocalToolPolicy {
         "team_dismiss_member", "team_stop_all" -> ToolAccess.AGENT_CONTROL
         "web_search", "web_fetch", "network_diagnose" -> ToolAccess.NETWORK
         "http_request", "media_image_create", "mcp_start_local" -> ToolAccess.PRIVILEGED
-        "read", "read_chunk", "tool_output_read", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "job_list", "job_output", "json_query",
+        "read", "read_chunk", "file_version", "tool_output_read", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "job_list", "job_output", "json_query",
         "media_image_options", "media_image_status",
         "environment_info", "capability_search", "get_goal", "skill", "extension_inspect", "list_subagent_models", "list_agent_roles", "list_agents", "agent_tree", "agent_inspect", "agent_watch",
         "session_event_search", "session_search", "memory_search", "memory_list",
@@ -126,14 +127,14 @@ internal object LocalToolPolicy {
     fun metadata(name: String): ToolMetadata {
         val canonical = canonical(name)
         val family = when (canonical) {
-            "read", "read_chunk", "tool_output_read", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "write", "edit", "write_chunk",
+            "read", "read_chunk", "file_version", "tool_output_read", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "write", "edit", "write_chunk", "file_write_if_version",
             "apply_patch", "download_file", "json_query", "present" -> "文件"
             "bash", "job_list", "job_output", "job_kill" -> "运行时"
             "web_search", "web_fetch", "http_request", "network_diagnose" -> "网络"
             "media_image_options", "media_image_create", "media_image_status" -> "媒体创作"
             "environment_info", "capability_search" -> "环境"
             "update_plan", "exit_plan_mode", "todo_write", "create_goal", "get_goal", "update_goal",
-            "ask_user_question" -> "任务"
+            "ask_user_question", "work_finding" -> "任务"
             "skill", "skill_create", "skill_update", "skill_rollback" -> "技能"
             "extension_record", "extension_inspect", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local" -> "扩展能力"
             "subagent", "subagent_fork", "workflow", "list_subagent_models", "list_agent_roles", "list_agents", "agent_tree",
@@ -166,6 +167,7 @@ internal object LocalToolPolicy {
             "http_request" -> setOf("http", "https", "api", "接口请求")
             "download_file" -> setOf("下载", "文件下载", "download", "url")
             "archive_list", "archive_read" -> setOf("压缩包", "归档", "tar.gz", "tgz", "zip", "源码包", "archive")
+            "file_version", "file_write_if_version" -> setOf("文件版本", "并发修改", "条件写入", "file revision", "CAS")
             "read_chunk", "write_chunk" -> setOf("大文件", "分块", "续传", "字节读取", "write chunk", "read chunk")
             "network_diagnose" -> setOf("网络诊断", "连通性", "dns", "tls", "vpn", "代理")
             "job_list", "job_output", "job_kill" -> setOf("后台", "后台任务", "进程", "job", "process")
@@ -176,6 +178,7 @@ internal object LocalToolPolicy {
             )
             "todo_write" -> setOf("待办", "任务清单", "todo")
             "create_goal", "get_goal", "update_goal" -> setOf("目标", "goal")
+            "work_finding" -> setOf("发现", "调查", "线索", "假说", "finding", "investigation")
             "skill" -> setOf("技能", "skill")
             "skill_create" -> setOf("技能创建", "自创技能", "创建技能", "skill")
             "skill_update", "skill_rollback" -> setOf("技能优化", "技能版本", "版本回退", "skill")
@@ -211,15 +214,15 @@ internal object LocalToolPolicy {
         return ToolMetadata(
             family = family,
             environmentBound = canonical in setOf(
-                "read", "read_chunk", "write", "write_chunk", "edit", "apply_patch",
+                "read", "read_chunk", "file_version", "write", "write_chunk", "file_write_if_version", "edit", "apply_patch",
                 "file_inspect", "list_files", "glob", "grep",
                 "bash", "job_list", "job_output", "job_kill", "present",
                 "download_file", "json_query",
             ),
-            finishesOnCancellation = canonical in setOf("write", "edit", "write_chunk", "apply_patch"),
+            finishesOnCancellation = canonical in setOf("write", "edit", "write_chunk", "file_write_if_version", "apply_patch"),
             workspaceAccess = when (canonical) {
-                "read", "read_chunk", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "skill", "json_query", "update_goal", "extension_inspect" -> ToolWorkspaceAccess.READ
-                "write", "edit", "write_chunk", "apply_patch", "download_file", "present", "bash",
+                "read", "read_chunk", "file_version", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "skill", "json_query", "update_goal", "extension_inspect" -> ToolWorkspaceAccess.READ
+                "write", "edit", "write_chunk", "file_write_if_version", "apply_patch", "download_file", "present", "bash",
                 "skill_create", "skill_update", "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local" -> ToolWorkspaceAccess.WRITE
                 else -> ToolWorkspaceAccess.NONE
             },
@@ -228,7 +231,7 @@ internal object LocalToolPolicy {
             // Audited native queries: no workspace/session mutation, network side effect or
             // approval interaction. New external/plugin tools must explicitly opt in.
             parallelReadSafe = canonical in setOf(
-                "read", "read_chunk", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "json_query",
+                "read", "read_chunk", "file_version", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "json_query",
             ),
         )
     }
@@ -241,7 +244,7 @@ internal object LocalToolPolicy {
      * [autoApprovalScope] below only classifies lower-risk operations; it is not a global allowlist.
      */
     fun approval(name: String): ToolApprovalPolicy = when (canonical(name)) {
-        "write", "edit", "write_chunk", "apply_patch", "download_file", "skill_create", "skill_update",
+        "write", "edit", "write_chunk", "file_write_if_version", "apply_patch", "download_file", "skill_create", "skill_update",
         "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local", "mcp_start_local", "bash", "job_kill", "send_message", "interrupt_agent", "agent_resume", "agent_close", "team_task_review",
         "team_send_message", "team_interrupt", "team_disable_member", "team_dismiss_member", "team_stop_all",
         "http_request", "media_image_create", "session_event_search", "session_trace", "session_event_trace", "session_event_read",
@@ -259,7 +262,7 @@ internal object LocalToolPolicy {
      *   as a workspace-bounded operation.
      */
     fun autoApprovalScope(name: String): LocalAutoApprovalScope = when (canonical(name)) {
-        "write", "edit", "write_chunk", "apply_patch", "download_file", "skill_create", "skill_update",
+        "write", "edit", "write_chunk", "file_write_if_version", "apply_patch", "download_file", "skill_create", "skill_update",
         "skill_rollback", "extension_record", "mcp_create_local", "mcp_update_local", "mcp_rollback_local" -> LocalAutoApprovalScope.WORKSPACE
         // A shell can leave cwd and reach same-UID app-private state; keep it outside low-risk classification.
         "bash" -> LocalAutoApprovalScope.NONE

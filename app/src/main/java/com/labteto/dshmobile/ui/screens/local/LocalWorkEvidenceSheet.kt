@@ -118,6 +118,23 @@ internal fun LocalWorkEvidenceSheet(
                 }
                 item { Text(stringResource(R.string.work_evidence_reference_only), style = DsType.small13, color = colors.textSecondary) }
             } else {
+                item {
+                    Text(
+                        "模型审查、人工确认、实际工具执行分别留有独立回执；完成状态以当前目标和真实执行记录为准。",
+                        style = DsType.caption11,
+                        color = colors.textSecondary,
+                    )
+                }
+                if ((currentWork?.activeVirtualDisplays ?: 0) > 0) {
+                    item {
+                        Text(
+                            "设备操作状态：当前设备共有 ${currentWork!!.activeVirtualDisplays} 个虚拟屏资源正在使用；下方工具记录显示每次操作的实际结果。",
+                            style = DsType.small13,
+                            color = colors.textSecondary,
+                            modifier = Modifier.testTag("work_device_active_displays"),
+                        )
+                    }
+                }
                 // Running/declared calls have no completed transcript row. Preserve their real phases.
                 items(state.activities.filter { it.phase in setOf(LocalToolUiPhase.DECLARED, LocalToolUiPhase.RUNNING) },
                     key = ::workEvidenceActivityKey) { activity ->
@@ -130,10 +147,21 @@ internal fun LocalWorkEvidenceSheet(
                 }
                 items(state.records, key = { "event:${it.sequence}" }) { record ->
                     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
-                        Text(stringResource(agentOperationLabelRes(agentOperationKind(record.name))), style = DsType.std14Strong, color = colors.text)
-                        record.phase?.let { Text(stringResource(workToolPhaseLabel(it)), color = colors.textSecondary) }
+                        val reviewRecord = record.type.startsWith("work/code-review-") ||
+                            record.type.startsWith("work/security-review-")
+                        if (reviewRecord) {
+                            Text(
+                                if (record.type.startsWith("work/code-review-")) "独立代码审查" else "独立安全审查",
+                                style = DsType.std14Strong, color = colors.text,
+                            )
+                            Text(record.content, style = DsType.small13,
+                                color = if (record.content.contains("阻止")) colors.dangerInk else colors.textSecondary)
+                        } else {
+                            Text(stringResource(agentOperationLabelRes(agentOperationKind(record.name))), style = DsType.std14Strong, color = colors.text)
+                            record.phase?.let { Text(stringResource(workToolPhaseLabel(it)), color = colors.textSecondary) }
+                        }
                         Text("#${record.sequence} · ${record.name}", style = DsType.caption11, color = colors.textSecondary)
-                        record.callId?.let { callId ->
+                        if (!reviewRecord) record.callId?.let { callId ->
                             SyButton(stringResource(R.string.work_tool_details), onClick = { evidenceRequest = callId to record.sequence },
                                 variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
                         }

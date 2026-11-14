@@ -28,6 +28,14 @@ object LocalToolCatalog {
             "path" to string("相对工作区的路径；任务中间文件优先保存到 create_goal 返回的任务目录，普通文档默认中文文件名，扩展名不变"),
             "content" to string("完整文件内容"),
         ), listOf("path", "content")))
+        add(tool("file_version", "读取本机工作区文件的 SHA-256 版本标识；不存在返回 absent，供条件写入使用", properties(
+            "path" to string("仅限工作区规范相对路径"),
+        ), listOf("path")))
+        add(tool("file_write_if_version", "仅当文件版本与预期一致时原子替换；新建必须期望 absent，版本不同明确拒绝", properties(
+            "path" to string("仅限工作区规范相对路径"),
+            "expected_revision" to string("file_version 返回的 revision 或 absent"),
+            "content" to string("替换后的全部 UTF-8 内容"),
+        ), listOf("path", "expected_revision", "content")))
         add(tool("read_chunk", "按字节偏移读取大文件，返回有界 Base64 页和下一字节位置", properties(
             "path" to string("工作区文件路径"),
             "start_byte" to integerRange("起始字节偏移，默认 0", min = 0),
@@ -157,7 +165,7 @@ object LocalToolCatalog {
             "url" to string("要诊断的网址或域名"),
         ), listOf("url")))
         add(tool("environment_info", "查看安卓本机 Harness 的可用环境能力与限制", properties()))
-        add(tool("capability_search", "从实时注册表查看完整能力目录，或按自然语言、能力族、工具名发现并自动加载扩展。已连接 MCP 或新增插件的工具无需修改目录代码；如需总览可搜索『能力目录』。工具执行仍遵守连接、权限和审批要求", properties(
+        add(tool("capability_search", "从实时注册表发现扩展；已知精确名称优先用 select:工具名1,工具名2 一次选择最多 16 个，减少多轮搜索；也支持自然语言及『能力目录』。仅下一模型步骤提供的真实工具表可调用，始终遵守连接、权限和审批要求", properties(
             "query" to string("例如 能力目录、工具与能力检测、GitHub PR、Android 界面、视觉、MCP、LSP、下载或某项具体工具名"),
         ), listOf("query")))
         add(tool("update_plan", "记录任务执行方案的步骤顺序，不记录进行中/已完成状态；进度用 todo_write，长期目标用 create_goal。仅复杂任务需要维护计划，避免重复写同一内容", properties(
@@ -193,12 +201,21 @@ object LocalToolCatalog {
             "description" to string("目标和完成标准"),
             "artifact_paths" to buildJsonObject { put("type", "array"); put("items", string("按用户要求交付的工作区相对文件路径；讨论任务填空数组")) },
             "verification_commands" to buildJsonObject { put("type", "array"); put("items", string("按用户要求执行的完整 shell 命令原文或 process_exec command 的 JSON 数组原文；通过真实退出码和成果版本核验，不能以打印成功日志替代。无需命令的任务填空数组")) },
+            "review_requirements" to buildJsonObject { put("type", "array"); put("items", string("仅任务明确要求时填写 code（独立代码审查）和/或 security（独立安全审查）；其他任务为 []。审查观点、人工确认与真实测试分别结算")) },
         ), listOf("description", "artifact_paths", "verification_commands")))
         add(tool("get_goal", "读取当前会话目标", properties()))
         add(tool("update_goal", "更新目标状态", properties(
             "status" to string("active、paused、completed 或 blocked"),
             "note" to string("状态说明"),
         ), listOf("status")))
+        add(tool("work_finding", "从真实工具回执记录调查发现；提出假说、补充依据、推翻错误判断，或列出当前目标的发现。仅在遇到有价值的新线索时调用；发现记录不等于已独立验证", properties(
+            "action" to string("record 新发现、revise 修改已有发现、list 列出当前目标记录"),
+            "finding_id" to string("revise 必填：由 record 返回的发现 ID"),
+            "summary" to string("record/revise 必填：基于来源的具体观察或假说，8—500 字"),
+            "source_call_id" to string("record/revise 必填：当前目标已成功完成的真实工具调用 ID"),
+            "status" to string("hypothesis 初步假说、supported 有来源支持、rejected 已被调查推翻"),
+            "next_action" to string("准备补查或验证的下一步；可选"),
+        ), listOf("action")))
         add(tool("ask_user_question", "暂停当前轮次并向用户询问无法自行确定的选择", properties(
             "question" to string("清晰、可直接回答的问题"),
             "options" to buildJsonObject {
@@ -340,7 +357,8 @@ object LocalToolCatalog {
             },
             "allow_mutation" to boolean("仅在当前主代理拥有写授权时，显式授权本图节点使用原有受控写工具；中断且副作用未知时停止，不自动重放"),
             "resume_graph_id" to string("可选；按未结算图编号显式恢复原完整不可变计划，不需要重传 tasks；新用户请求优先，恢复写图还需本次 allow_mutation=true"),
-            "replan_graph_id" to string("显式替换现存未结算只读 DAG：需同时提供新 tasks/dependencies；新建独立图与执行 ID，旧结果不复制；可写图必须经 Lead 单独核验"),
+            "replan_graph_id" to string("显式替换现存未结算只读 DAG：需同时提供新 tasks/dependencies；新建独立图与执行 ID，旧结果保留来源但不冒充新执行的验收；可写图须单独核验"),
+            "origin_finding_id" to string("因调查发现改变任务图时填写 work_finding 返回的 ID；仅接受当前目标仍受真实来源支持的发现，并关联到新旧图的事件记录"),
             "node_input_files" to buildJsonObject {
                 put("type", "array"); put("description", "与 tasks 等长的逐节点输入文件路径数组；恢复时按节点内容版本校验")
                 put("items", buildJsonObject { put("type", "array"); put("items", buildJsonObject { put("type", "string") }) })

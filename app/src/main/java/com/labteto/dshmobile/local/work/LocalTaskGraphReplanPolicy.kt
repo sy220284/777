@@ -6,6 +6,7 @@ package com.labteto.dshmobile.local.work
  */
 internal data class LocalTaskGraphReplanDecision(
     val invalidatedNodeIds: Set<String>,
+    val reusableNodeIds: Set<String>,
     val oldPlanVersion: String,
     val newPlanVersion: String,
 )
@@ -22,10 +23,47 @@ internal fun admitLocalTaskGraphReplan(
     }
     require(previous.version != proposed.version) { "TASKGRAPH_REPLAN_NO_CHANGES" }
     require(proposed.nodes.isNotEmpty()) { "TASKGRAPH_REPLAN_EMPTY" }
-    // A revised dependency changes the graph's overall hash and every node's
-    // immutable version. Never impersonate already accepted old node results.
+    // Replacement bookkeeping (source message, origin finding, graph ID) does
+    // not itself justify re-running the same task graph.
+    val executionKeys = listOf("nodes", "model", "route", "max_steps", "pipeline",
+        "allowed_tools", "output_schema", "backend_binding", "workspace_repository",
+        "input_files", "required_files", "node_input_files", "node_output_files", "evidence")
+    require(executionKeys.any { previous.value[it] != proposed.value[it] }) {
+        "TASKGRAPH_REPLAN_NO_SUBSTANTIVE_CHANGES"
+    }
+    // A whole-graph version change must not discard an already verified read-only
+    // result if that node's own task, inputs, dependencies and execution contract
+    // remain unchanged. Reuse still requires the old result to pass recovery checks.
+    val stableRun = listOf("model", "route", "max_steps", "allowed_tools",
+        "output_schema", "backend_binding", "workspace_repository", "pipeline")
+        .all { previous.value[it] == proposed.value[it] }
+    val filesDeclared = previous.value["input_files"] != null &&
+        previous.value["required_files"] != null &&
+        proposed.value["input_files"] != null && proposed.value["required_files"] != null &&
+        previous.value["evidence"] != null && proposed.value["evidence"] != null
+    val proposedById = proposed.nodes.withIndex().associate { it.value.id to it }
+    val candidates = if (stableRun && filesDeclared) previous.nodes.withIndex()
+        .filter { (index, oldNode) ->
+            val target = proposedById[oldNode.id] ?: return@filter false
+            val newNode = target.value
+            oldNode.task == newNode.task &&
+                oldNode.dependsOn == newNode.dependsOn &&
+                previous.inputPaths(index) == proposed.inputPaths(target.index) &&
+                previous.outputPaths(index) == proposed.outputPaths(target.index) &&
+                previous.prepared.evidence.getOrNull(index) == proposed.prepared.evidence.getOrNull(target.index)
+        }.mapTo(linkedSetOf()) { it.value.id }
+    else linkedSetOf()
+    // A result may be borrowed only when every dependency is also borrowed.
+    // Otherwise a changed upstream node could make old downstream work stale.
+    var changed: Boolean
+    do {
+        changed = candidates.removeAll { id ->
+            proposedById.getValue(id).value.dependsOn.any { it !in candidates }
+        }
+    } while (changed)
     return LocalTaskGraphReplanDecision(
-        invalidatedNodeIds = previous.nodes.mapTo(linkedSetOf()) { it.id },
+        invalidatedNodeIds = previous.nodes.mapTo(linkedSetOf()) { it.id } - candidates,
+        reusableNodeIds = candidates,
         oldPlanVersion = previous.version,
         newPlanVersion = proposed.version,
     )

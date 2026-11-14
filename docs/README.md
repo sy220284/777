@@ -1,48 +1,41 @@
-# 文档
+# 777 文档导航
 
-现行文档列在“当前文档”中。保留溯源价值的阶段性修复记录统一放入 [`archive/`](archive/README.md)；它们不代表当前实现。
+这里集中列出仍在使用的产品、架构和开发资料。已结束的审计报告、旧 PR 台账、过时的设计交付记录以及静态功能树已从当前目录清理；历史内容可通过 Git 提交与 [CHANGELOG](../CHANGELOG.md) 追溯。
 
-产品与业务运行说明见 [项目 README](../README.md)。当前已恢复 V6 原生 Android 界面；实际功能和运行边界以当前主分支代码为准。
+应用概览与安装说明见 [项目 README](../README.md)。产品能力及限制以最新生产代码和实际用户入口为准。
 
-## 当前文档
+## 现行产品与架构
 
-| 文档 | 内容 |
+| 文档 | 用途 |
 |---|---|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | 架构 3.0：Feature 所有权、Shared Capability、应用组合根与 Runtime Kernel |
-| [FEATURE-TREE.zh-CN.md](FEATURE-TREE.zh-CN.md)／[交互版](FEATURE-TREE.zh-CN.html) | 历史功能树快照：保留层级与旧代码定位，仅供查阅，不再自动同步或用于验收 |
-| [SYSTEM-AUDIT-GUIDE.zh-CN.md](SYSTEM-AUDIT-GUIDE.zh-CN.md) | 全量系统联审权威规范：按功能架构、数据状态、生命周期、外部能力、性能、体验与工程质量分组执行审计 |
-| [SHARED-AUDIT-CONCLUSIONS.zh-CN.md](SHARED-AUDIT-CONCLUSIONS.zh-CN.md) | 可共享审计结论库：按链路闭环、数据字段、配置依赖与所有权归组的可复用审计规则 |
-| [PROTOCOL.md](PROTOCOL.md) | 当前本机 Session / Agent 协议边界 |
-| [COMPATIBILITY.md](COMPATIBILITY.md) | 当前 Android、ABI 与本机语义参考支持矩阵 |
-| [SECURITY.md](SECURITY.md) | 凭据、工作区、工具、恢复、Web、设备、数据和更新安全边界 |
-| [ANDROID-HARNESS-STATUS.zh-CN.md](ANDROID-HARNESS-STATUS.zh-CN.md) | 当前 Android 原生 Harness 已实现能力与平台限制 |
-| [ANDROID-HARNESS-ROADMAP.zh-CN.md](ANDROID-HARNESS-ROADMAP.zh-CN.md) | 当前版本之后仍需继续收敛的架构与工程工作 |
-| [VALIDATION.md](VALIDATION.md) | 本地编译与按需调试命令 |
-| [history/UI-BACKEND-RESET-20261017.zh-CN.md](history/UI-BACKEND-RESET-20261017.zh-CN.md) | 旧后端保留版、UI 清空及禁发标志历史记录（已退出当前状态） |
+| [架构](ARCHITECTURE.md) | Feature 所有权、Shared Capability、运行时核心与模块关系 |
+| [Android 能力与限制](ANDROID-HARNESS-STATUS.zh-CN.md) | 本机执行能力、操作系统限制及当前实现 |
+| [后续架构方向](ANDROID-HARNESS-ROADMAP.zh-CN.md) | 仍待解决的系统级能力问题 |
+| [协议](PROTOCOL.md) | Session、Agent 与工具通信边界 |
+| [兼容性](COMPATIBILITY.md) | Android、ABI、运行环境 |
+| [安全](SECURITY.md) | 凭据、工作区、工具授权和数据保护 |
+| [本地存储架构](LOCAL-STORAGE-ARCHITECTURE-20261024.zh-CN.md) | SQLite、媒体引用、备份与数据安全 |
+| [模型配置行为](MODEL-EFFECTIVE-CONTRACT.zh-CN.md) | 模型路由、有效配置及使用约束 |
+| [媒体能力](MEDIA-CAPABILITIES.zh-CN.md) | 多模态创作入口、数据归属及供应商接口 |
+| [人物聊天](CHAT-FREE-RESPONSE.zh-CN.md) | 人物回复、记忆和故事语义 |
+| [自我改进机制](AGENT-IMPROVEMENT.md) | 经验形成、发现追查和可复用改进 |
+| [UI / UX](UI-UX.zh-CN.md) | 产品交互与设计原则 |
+| [V6 原生界面设计](design/v6/README.zh-CN.md) | 当前 Compose 实现、组件和视觉资源 |
 
-## 历史归档与扫描证据
+## 开发与审查
 
-- [`archive/`](archive/README.md)：已结束阶段的修复、功能退役记录，仅供溯源，不能覆盖现行规范。
-- 已取消仓库级验收矩阵与证明材料生成流程；历史变更从 Git 提交追溯。
-- 当前实际行为以现行权威文档、代码和测试为准；历史版本沿革从根目录 `CHANGELOG.md` 与 Git 提交查看。
+- [工程与调试](DEVELOPMENT.md)：开发环境、构建和问题排查。
+- [按需测试](VALIDATION.md)：具体问题使用的构建、测试及设备调试方法。
+- [系统审查方法](SYSTEM-AUDIT-GUIDE.zh-CN.md)与[可复用审查规律](SHARED-AUDIT-CONCLUSIONS.zh-CN.md)：提供排查思路，具体结论依据现行代码。
+- [工程协作规范](../AGENTS.md)、[贡献指南](../CONTRIBUTING.md)。
 
-## 其他入口
+## 正在开发的能力
 
-- 仓库工程执行规范：[../AGENTS.md](../AGENTS.md)
-- 项目总览：[../README.md](../README.md)
-- 版本变化：[../CHANGELOG.md](../CHANGELOG.md)
-- 第三方声明：[../THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)
-- 官方 Harness 锁定基线：[../upstream/deepseek-harness.lock.json](../upstream/deepseek-harness.lock.json)
+PR [#895](https://github.com/sy220284/777/pull/895) 的实施状态见[能力接通清单](audits/pr895-capability-current-20261114.md)和[Codex 能力差异](audits/codex-777-capability-alignment-20261112.md)。这两份文档随该 PR 的实际代码变化更新。
 
-## 维护规则
+## 文档维护
 
-文档只写当前真实实现。
-
-当功能、架构、协议、版本或 UI 发生实质变化时：
-
-1. 按实际改动更新直接相关的当前文档；历史功能树不再作为必须同步的项目或验收依据。
-2. 删除已经失效的正文，不在当前文档继续叠加“旧版说明”。
-3. 历史变化写入 `CHANGELOG.md`；必须保留的专项溯源记录统一放入 `archive/` 并注明非现行规范。
-4. 文件名不再使用已经结束的阶段编号、旧版本号或临时项目代号。
-5. 文档应准确描述当前代码实现，不附加验收材料要求。
-6. 未列入“当前文档”表的阶段执行计划、迁移记录和历史说明不属于现行规范；需要追溯时使用 Git 历史与 `CHANGELOG.md`。
+1. 当前功能变化直接修改对应的现行说明，避免重复建立多个状态台账。
+2. 已结束的阶段报告、过期清单及其生成器从现行仓库清理，追溯时查看 Git 历史和 CHANGELOG。
+3. 图标、原型和其他实际设计资产保留在各自目录；不把旧设计交付报告重新作为实现依据。
+4. 文档准确说明功能、实现边界和待解决问题，不添加独立的验收材料或签收流程。

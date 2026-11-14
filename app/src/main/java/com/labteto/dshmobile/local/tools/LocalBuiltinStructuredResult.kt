@@ -62,7 +62,7 @@ internal fun localBuiltinStructuredResult(toolName: String, output: String): Too
 
 private val WORK_RUN_REQUIRED = setOf(
     "update_plan", "exit_plan_mode", "todo_write", "create_goal",
-    "get_goal", "update_goal", "ask_user_question",
+    "get_goal", "update_goal", "ask_user_question", "work_finding",
 )
 private val WORK_AGENT_REQUIRED = setOf(
     "subagent", "subagent_fork", "list_subagent_models", "list_agent_roles", "list_agents", "agent_tree",

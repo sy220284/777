@@ -40,8 +40,12 @@ internal fun projectLocalWorkHistoryPage(log: LocalSessionEventLog, cursor: Loca
         }
     }
     val records = page.map { event ->
-        val name = (event.data["name"] as? JsonPrimitive)?.contentOrNull.orEmpty()
-        val content = (event.data["content"] as? JsonPrimitive)?.contentOrNull
+        val review = localWorkReviewHistoryDescription(event.type,
+            (event.data["verdict"] as? JsonPrimitive)?.contentOrNull)
+        val name = if (review != null) event.type else
+            (event.data["name"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+        // Do not stringify model reports, Git diffs or credential-bearing event JSON into the UI.
+        val content = review ?: (event.data["content"] as? JsonPrimitive)?.contentOrNull
             ?: event.data["arguments"]?.toString() ?: event.data.toString()
         LocalWorkHistoryRecord(event.sequence, event.type, name,
             com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair(content, 4_000),
@@ -60,4 +64,21 @@ internal fun projectLocalWorkHistoryPage(log: LocalSessionEventLog, cursor: Loca
 private const val PAGE_SIZE = 160
 private const val RAW_BATCH_SIZE = 192
 private const val MAX_RAW_SCAN_PER_PAGE = 4_096
-private val HISTORY_TYPES = setOf("tool/call", "tool/execution-started", "tool/result", "subagent/tool-result")
+private val HISTORY_TYPES = setOf("tool/call", "tool/execution-started", "tool/result", "subagent/tool-result") +
+    setOf("work/code-review-start", "work/code-review-result", "work/code-review-accepted",
+        "work/security-review-start", "work/security-review-result", "work/security-review-approved")
+
+/** Pure, non-secret receipt wording; results and human approval remain separate facts. */
+internal fun localWorkReviewHistoryDescription(type: String, verdict: String?): String? = when (type) {
+    "work/code-review-start" -> "独立代码审查已发起"
+    "work/code-review-result" -> "模型已生成代码审查报告，等待用户确认"
+    "work/code-review-accepted" -> "用户已接纳该版本的代码审查结果"
+    "work/security-review-start" -> "独立安全审查已发起"
+    "work/security-review-result" -> when (verdict) {
+        "allow" -> "安全审查模型结论：允许，仍需用户确认"
+        "block" -> "安全审查模型结论：阻止，需修复风险后重新审查"
+        else -> "安全审查模型结论尚未确认"
+    }
+    "work/security-review-approved" -> "用户已批准该版本的安全审查结果"
+    else -> null
+}
