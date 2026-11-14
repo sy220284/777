@@ -331,7 +331,8 @@ class LocalToolsUiFacade @Inject internal constructor(
     override suspend fun readSkillDocument(id: String) = tools.readSkillDocument(id)
     override suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)
     override suspend fun setSkillModelInvocable(id: String, enabled: Boolean) = tools.setSkillModelInvocable(id, enabled)
-    override suspend fun connectHttp(serverId: String, endpoint: String) = tools.connectHttp(serverId, endpoint)
+    override suspend fun connectHttp(serverId: String, endpoint: String): String =
+        mcpConnectionGate.withLock { tools.connectHttp(serverId, endpoint) }
     /** One Feature-owned connection switch for browser OAuth, refresh and manual Bearer.
      * The existing service remains registered until new credentials are ready. */
     private val mcpConnectionGate = kotlinx.coroutines.sync.Mutex()
@@ -379,7 +380,7 @@ class LocalToolsUiFacade @Inject internal constructor(
     }
 
     suspend fun connectHttpWithCredential(serverId: String, endpoint: String, bearer: String): String =
-        if (bearer.isEmpty()) tools.connectHttp(serverId, endpoint)
+        if (bearer.isEmpty()) mcpConnectionGate.withLock { tools.connectHttp(serverId, endpoint) }
         else switchMcpHttpConnection(serverId, endpoint) {
             mcpCredentials.rotateBearer(serverId, endpoint, bearer)
         }
@@ -406,17 +407,25 @@ class LocalToolsUiFacade @Inject internal constructor(
 
     suspend fun revokeMcpLogin(serverId: String, endpoint: String): Boolean {
         mcpOAuth.cancel(serverId)
-        disconnectMcpIfConnected(serverId)
-        return mcpCredentials.revoke(serverId, endpoint)
+        return mcpConnectionGate.withLock {
+            disconnectMcpIfConnected(serverId)
+            mcpCredentials.revoke(serverId, endpoint)
+        }
     }
     suspend fun clearMcpCredential(serverId: String) {
         mcpOAuth.cancel(serverId)
-        disconnectMcpIfConnected(serverId)
-        mcpCredentials.clear(serverId)
+        mcpConnectionGate.withLock {
+            disconnectMcpIfConnected(serverId)
+            mcpCredentials.clear(serverId)
+        }
     }
-    override suspend fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?) =
+    override suspend fun connectStdio(
+        serverId: String, command: List<String>, workingDirectory: String?,
+    ): String = mcpConnectionGate.withLock {
         tools.connectStdio(serverId, command, workingDirectory)
-    override suspend fun disconnect(serverId: String) = tools.disconnect(serverId)
+    }
+    override suspend fun disconnect(serverId: String): String =
+        mcpConnectionGate.withLock { tools.disconnect(serverId) }
 }
 
 @dagger.Module
