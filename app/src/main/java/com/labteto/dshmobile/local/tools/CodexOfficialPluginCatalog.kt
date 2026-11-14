@@ -78,7 +78,9 @@ internal data class CodexOfficialPluginDetail(
     val hasHooks: Boolean,
 )
 
-internal data class CodexOfficialMcpEndpoint(val serverId: String, val url: String)
+internal data class CodexOfficialMcpEndpoint(
+    val serverId: String, val url: String, val clientId: String? = null,
+)
 
 /** Only public HTTPS endpoints can be offered for explicit one-tap browser authorization. */
 internal fun parseCodexOfficialMcpEndpoint(document: String, preferred: String): CodexOfficialMcpEndpoint? {
@@ -95,7 +97,11 @@ internal fun parseCodexOfficialMcpEndpoint(document: String, preferred: String):
             uri.port !in setOf(-1, 443) || !host.contains('.') ||
             host == "localhost" || host.endsWith(".local") ||
             host.matches(Regex("[0-9.]+")) || host.contains(':')) return@mapNotNull null
-        CodexOfficialMcpEndpoint(name, target)
+        val clientId = (value["oauth"] as? JsonObject)?.get("client_id")
+            ?.jsonPrimitive?.contentOrNull?.takeIf {
+                it.matches(Regex("[a-zA-Z0-9_-]{4,128}"))
+            }
+        CodexOfficialMcpEndpoint(name, target, clientId)
     }
     return matches.singleOrNull { it.serverId == preferred } ?: matches.singleOrNull()
 }
