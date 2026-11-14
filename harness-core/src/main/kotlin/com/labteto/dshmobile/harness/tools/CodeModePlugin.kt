@@ -80,6 +80,9 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 family = "workflow",
                 discoveryKeywords = setOf("code mode", "编排", "批量工具"),
                 usageNotes = listOf("CORE 工具按顺序逐步审批；可引用前序持久回执字段，失败停止且不自动重试"),
+                // Child calls are executed under the same workspace lease. They may include
+                // PROCESS/WRITE tools, so the wrapper serializes their shared workspace effects.
+                workspaceAccess = ToolWorkspaceAccess.WRITE,
             ),
             executor = HarnessToolExecutor { originalContext, input, _ ->
                 executePlan(originalContext, input)
@@ -188,7 +191,16 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 "call_id" to (original.attributes["call_id"]?.toString().orEmpty()
                     .ifBlank { "code-mode" } + "/step-${index + 1}")
             )
-            val child = original.copy(attributes = attrs, expectedRegistration = handler)
+            // The outer coordinator has already recorded the parent call as started and
+            // acquired its workspace lease. Reusing these callbacks for child steps would
+            // record the same execution twice (and could acquire the lease recursively).
+            // Registry admission, approval and per-tool Hooks still run for every child.
+            val child = original.copy(
+                attributes = attrs,
+                expectedRegistration = handler,
+                onExecutionStarted = null,
+                onExecutionFinished = null,
+            )
             val outcome = try {
                 // ToolRegistry owns each tool's deadline; an additional script watchdog would
                 // interrupt legitimate long-running tools before their own timeout.
