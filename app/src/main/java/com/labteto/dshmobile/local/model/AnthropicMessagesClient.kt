@@ -204,7 +204,12 @@ internal class AnthropicMessagesClient @Inject constructor(
             if (tools.isNotEmpty()) put("tools", buildJsonArray {
                 tools.forEach { tool ->
                     if (tool.parameters["type"]?.jsonPrimitive?.contentOrNull != "object") {
-                        throw protocolError("工具 input_schema 根节点必须是 object", null)
+                        throw LocalModelException(
+                            code = "MODEL_TOOL_SCHEMA_INVALID",
+                            message = "Anthropic 工具 input_schema 根节点必须是 object",
+                            retryable = false,
+                            origin = LocalModelFailureOrigin.PROTOCOL_ENCODE,
+                        )
                     }
                     add(buildJsonObject {
                         put("name", tool.name)
@@ -626,7 +631,12 @@ internal class AnthropicMessagesClient @Inject constructor(
     private fun parseDataImage(value: String, maxImageBytes: Long): Pair<String, String> {
         if (value.startsWith("https://")) return "url" to value
         val split = value.indexOf(";base64,")
-        if (!value.startsWith("data:image/") || split <= 5) throw protocolError("图片必须为 data URL 或 HTTPS URL", null)
+        if (!value.startsWith("data:image/") || split <= 5) throw LocalModelException(
+            code = "MODEL_PROTOCOL_INPUT_UNSUPPORTED",
+            message = "Anthropic 图片必须为 data URL 或 HTTPS URL",
+            retryable = false,
+            origin = LocalModelFailureOrigin.PROTOCOL_ENCODE,
+        )
         val mediaType = value.substring(5, split)
         val data = value.substring(split + 8)
         // Limits from the effective model route describe binary bytes, not encoded characters.
@@ -638,7 +648,12 @@ internal class AnthropicMessagesClient @Inject constructor(
         val decodedBytes = data.length.toLong() / 4 * 3 - padding
         if (mediaType !in SUPPORTED_IMAGE_MEDIA_TYPES || data.isEmpty() || data.length % 4 != 0 ||
             decodedBytes > maxImageBytes) {
-            throw protocolError("图片格式无效或超过当前模型图片大小上限", null)
+            throw LocalModelException(
+                code = "MODEL_PROTOCOL_INPUT_UNSUPPORTED",
+                message = "图片格式无效或超过当前模型图片大小上限",
+                retryable = false,
+                origin = LocalModelFailureOrigin.PROTOCOL_ENCODE,
+            )
         }
         return mediaType to data
     }
@@ -741,6 +756,7 @@ internal class AnthropicMessagesClient @Inject constructor(
             retryable = false,
             requestId = requestId,
             cause = cause,
+            origin = LocalModelFailureOrigin.STREAM_PARSE,
         )
 
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
