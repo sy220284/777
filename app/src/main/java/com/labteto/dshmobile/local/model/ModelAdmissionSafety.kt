@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalModelFailureOrigin
 import java.io.EOFException
 import java.net.ConnectException
 import java.net.SocketException
@@ -79,6 +80,7 @@ internal fun modelTransportFailure(
             cause = cause,
             requestId = requestId,
             admissionState = LocalModelAdmissionState.NOT_SENT,
+            origin = LocalModelFailureOrigin.TRANSPORT,
         )
     } else {
         LocalModelException(
@@ -90,6 +92,7 @@ internal fun modelTransportFailure(
             providerCode = "request_maybe_admitted",
             admissionState = admission,
             continuationEligible = true,
+            origin = LocalModelFailureOrigin.TRANSPORT,
         )
     }
 }
@@ -113,6 +116,7 @@ internal fun modelPostAdmissionFailure(
     providerCode = "request_interrupted_after_admission",
     admissionState = LocalModelAdmissionState.ADMITTED,
     continuationEligible = true,
+    origin = LocalModelFailureOrigin.STREAM_PARSE,
 )
 
 internal fun LocalModelException.withoutReplayAfterAdmission(): LocalModelException {
