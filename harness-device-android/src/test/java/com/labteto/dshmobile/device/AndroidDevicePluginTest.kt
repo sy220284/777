@@ -251,6 +251,71 @@ class AndroidDevicePluginTest {
     }
 
     @Test
+    fun oldAndroidTextToolsUseTheSameConfirmedInputPathAsNewTool() = runTest {
+        val provider = RecordingProvider { capability ->
+            if (capability in setOf("accessibility_set_text_node", "accessibility_set_text",
+                    "accessibility_input_text")) "false" else "ok:$capability"
+        }
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(provider))
+
+        val calls = listOf(
+            Triple("android_set_text_node", "accessibility_set_text_node",
+                buildJsonObject { put("node", 4); put("value", "") }),
+            Triple("android_type", "accessibility_set_text",
+                buildJsonObject { put("search_text", "旧内容"); put("value", "替换内容") }),
+            Triple("android_input_text", "accessibility_input_text",
+                buildJsonObject { put("id", "app:id/message"); put("value", "替换内容") }),
+            Triple("android_type", "accessibility_set_text",
+                buildJsonObject { put("value", "") }),
+        )
+        calls.forEach { (name, capability, input) ->
+            val result = registry.context.tools.execute(
+                name, input, context = ToolContext(approval = { true }))
+            assertTrue("未核验写入不应声称成功：$name", result.isError)
+            assertEquals("ANDROID_ACTION_UNCONFIRMED", result.errorCode)
+            assertEquals(capability, provider.calls.last().first)
+            assertEquals(input.mapValues { it.value.toString().trim('"') },
+                provider.calls.last().second)
+        }
+        assertEquals(calls.size, provider.calls.size)
+    }
+
+    @Test
+    fun allAndroidTextAliasesNormalizeTargetsBeforeTheSameWriteAndReadback() {
+        val byNode = androidTextInputRequest(
+            "accessibility_set_text_node", mapOf("node" to "7", "value" to ""))
+        assertEquals(7, byNode.nodeIndex)
+        assertEquals("", byNode.value)
+        assertEquals(null, byNode.viewId)
+
+        val byText = androidTextInputRequest(
+            "accessibility_set_text", mapOf("search_text" to "原文", "value" to "新文"))
+        assertEquals("原文", byText.searchText)
+        assertEquals("新文", byText.value)
+        val focus = androidTextInputRequest(
+            "accessibility_set_text", mapOf("value" to ""))
+        assertEquals(null, focus.searchText)
+
+        val byId = androidTextInputRequest(
+            "accessibility_input_text", mapOf("id" to "app:id/edit", "value" to "新文"))
+        assertEquals("app:id/edit", byId.viewId)
+        assertEquals("新文", byId.value)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            androidTextInputRequest("accessibility_set_text_node",
+                mapOf("node" to "oops", "value" to "文字"))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            androidTextInputRequest("accessibility_input_text",
+                mapOf("id" to "app:id/edit", "text" to "原文", "value" to "新文"))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            androidTextInputRequest("accessibility_set_text", mapOf("search_text" to "原文"))
+        }
+    }
+
+    @Test
     fun deviceNumericAndBooleanArgumentsRejectMalformedValuesInsteadOfFallingBack() {
         assertThrows(IllegalArgumentException::class.java) {
             mapOf("duration_ms" to "abc").deviceOptionalLong("duration_ms", 60L, 1L..60_000L)

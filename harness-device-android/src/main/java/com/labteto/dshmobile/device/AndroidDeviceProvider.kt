@@ -105,33 +105,21 @@ class AndroidDeviceProvider(
             "accessibility_find" -> accessibilityFind(arguments)
             "accessibility_click_node" ->
                 accessibility().clickNode(arguments.deviceRequiredInt("node")).toString()
-            "accessibility_set_text_node" ->
-                accessibility().inputText(
-                    nodeIndex = arguments.deviceRequiredInt("node"),
-                    viewId = null,
-                    searchText = null,
-                    value = arguments.deviceStringIncludingEmpty("value"),
-                ).toString()
+
             "accessibility_scroll" -> accessibility().scroll(arguments["direction"] ?: "forward").toString()
             "accessibility_wait" -> accessibilityWait(arguments)
             "android_open_uri" -> openUri(arguments.required("uri"))
             "accessibility_click_text" ->
                 accessibility().clickText(arguments.required("text")).toString()
-            "accessibility_set_text" ->
+            "accessibility_set_text_node", "accessibility_set_text", "accessibility_input_text" -> {
+                val input = androidTextInputRequest(capability, arguments)
                 accessibility().inputText(
-                    nodeIndex = null,
-                    viewId = null,
-                    searchText = arguments.deviceStringIncludingEmpty("search_text")
-                        .takeIf(String::isNotBlank),
-                    value = arguments.deviceStringIncludingEmpty("value"),
+                    nodeIndex = input.nodeIndex,
+                    viewId = input.viewId,
+                    searchText = input.searchText,
+                    value = input.value,
                 ).toString()
-            "accessibility_input_text" ->
-                accessibility().inputText(
-                    nodeIndex = arguments["node"]?.let { arguments.deviceRequiredInt("node") },
-                    viewId = arguments["id"],
-                    searchText = arguments["text"],
-                    value = arguments.deviceStringIncludingEmpty("value"),
-                ).toString()
+            }
             "accessibility_tap" ->
                 accessibility().tap(
                     arguments.deviceRequiredFiniteFloat("x"),
@@ -491,6 +479,47 @@ class AndroidDeviceProvider(
         const val MAX_NOTIFICATION_TEXT_CHARS = 320
         val SAFE_VIEW_SCHEMES = setOf("http", "https", "market", "geo", "mailto", "tel")
     }
+}
+
+/** All three public Android text tools normalize their arguments before one verified input path. */
+internal data class AndroidTextInputRequest(
+    val nodeIndex: Int?,
+    val viewId: String?,
+    val searchText: String?,
+    val value: String,
+)
+
+internal fun androidTextInputRequest(
+    capability: String,
+    arguments: Map<String, String>,
+): AndroidTextInputRequest {
+    val value = arguments.deviceStringIncludingEmpty("value")
+    val request = when (capability) {
+        "accessibility_set_text_node" -> AndroidTextInputRequest(
+            nodeIndex = arguments.deviceRequiredInt("node"),
+            viewId = null,
+            searchText = null,
+            value = value,
+        )
+        "accessibility_set_text" -> AndroidTextInputRequest(
+            nodeIndex = null,
+            viewId = null,
+            searchText = arguments["search_text"]?.takeIf(String::isNotBlank),
+            value = value,
+        )
+        "accessibility_input_text" -> AndroidTextInputRequest(
+            nodeIndex = arguments["node"]?.let { arguments.deviceRequiredInt("node") },
+            viewId = arguments["id"]?.takeIf(String::isNotBlank),
+            searchText = arguments["text"]?.takeIf(String::isNotBlank),
+            value = value,
+        )
+        else -> throw IllegalArgumentException("未知 Android 文本输入能力：$capability")
+    }
+    require(listOf(request.nodeIndex != null, request.viewId != null,
+        request.searchText != null).count { it } <= 1) {
+        "输入目标只能选择 node、id、text 中的一种；全部留空时使用当前已聚焦输入框"
+    }
+    return request
 }
 
 /** An empty TextField value is intentional; only an absent key is invalid. */
