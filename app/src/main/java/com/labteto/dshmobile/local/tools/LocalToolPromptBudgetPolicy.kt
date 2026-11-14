@@ -44,11 +44,23 @@ internal fun optionalToolPromptBudgetForRoute(
     )
     // Core tools consume input tokens even when no optional tool was selected.
     // Budget those definitions before offering any optional schemas to the model.
-    val availableAfterCore = (pressure.remainingOperationalTokens.toLong() -
-        coreDefinitionTokens.coerceAtLeast(0)).coerceAtLeast(0L)
-    val capacity = availableAfterCore.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    return remainingOptionalToolDefinitionBudget(
+        remainingOperationalTokens = pressure.remainingOperationalTokens,
+        coreDefinitionTokens = coreDefinitionTokens,
+        preserveToolSurface = cachePolicy.preserveToolSurface,
+    )
+}
+
+/** Shared arithmetic for any model surface, independent of catalog and provider configuration. */
+internal fun remainingOptionalToolDefinitionBudget(
+    remainingOperationalTokens: Int,
+    coreDefinitionTokens: Int,
+    preserveToolSurface: Boolean,
+): Int {
+    val capacity = (remainingOperationalTokens.toLong() -
+        coreDefinitionTokens.coerceAtLeast(0)).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
     return minOf(
         LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
-        if (cachePolicy.preserveToolSurface) capacity else capacity / 4,
+        if (preserveToolSurface) capacity else capacity / 4,
     )
 }
