@@ -195,6 +195,7 @@ class OpenAiResponsesClientTest {
                 val partial = result.getOrThrow()
                 assertEquals(LocalModelCompletionReason.INTERRUPTED, partial.completionReason)
                 assertEquals("partial", partial.content)
+                assertEquals("stream_interrupted_after_response.output_text.delta", partial.rawStopReason)
                 assertTrue(partial.toolCalls.isEmpty())
                 val denied = runCatching { requireCompletedModelReply(partial) }.exceptionOrNull()
                 assertEquals("MODEL_INTERRUPTED", (denied as? LocalModelException)?.code)
