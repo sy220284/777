@@ -665,7 +665,8 @@ internal fun PluginInventoryBrowser(
                             sourceLabel = item.sourceLabel,
                             statusLabel = item.marketState.label,
                             attentionNeeded = item.marketState.status in setOf(
-                                ExtensionMarketStatus.NEEDS_SETUP, ExtensionMarketStatus.FAILED),
+                                ExtensionMarketStatus.NEEDS_SETUP, ExtensionMarketStatus.FAILED,
+                                ExtensionMarketStatus.UNSUPPORTED),
                             enabled = !loading,
                             onOpen = {
                                 selectedRow = item
