@@ -300,6 +300,10 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
     suspend fun pluginSkills(pluginId: String): List<String> =
         skillSources(pluginId).map { it.first }
 
+    /** The folder can differ from the skill's own SKILL.md name; retain exact origin. */
+    suspend fun pluginSkillLocations(pluginId: String): Map<String, String> =
+        skillSources(pluginId).toMap()
+
     /** Downloads only a user-selected skill. Plugin App/Hook executables remain separately gated. */
     suspend fun installPluginSkill(pluginId: String, skillId: String): String {
         val plugin = list().firstOrNull { it.id == pluginId }
