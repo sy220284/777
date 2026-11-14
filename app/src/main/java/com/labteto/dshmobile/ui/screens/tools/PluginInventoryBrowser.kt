@@ -574,9 +574,14 @@ internal fun PluginInventoryBrowser(
                         codexPluginSkillInstalled(skills, officialRoot, path)
                 }
                 val oneSkillInstalled = oneSkill == null || oneSkill !in missingPluginSkills
-                val endpoint = item.requirements.firstNotNullOfOrNull {
-                    if (!it.registered) skillMcpHttpsEndpoint(it)?.let { url -> it.value to url }
-                    else null
+                val knownUnreadySkillServer = item.requirements.any { requirement ->
+                    !requirement.registered && requirement.type.equals("mcp", ignoreCase = true) &&
+                        connectedServices.any { server -> server.id == requirement.value }
+                }
+                val endpoint = item.requirements.firstNotNullOfOrNull { requirement ->
+                    if (requirement.registered || (requirement.type.equals("mcp", ignoreCase = true) &&
+                            connectedServices.any { it.id == requirement.value })) null
+                    else skillMcpHttpsEndpoint(requirement)?.let { url -> requirement.value to url }
                 }
                 val usePrompt = if (item.installedSkill)
                     "@skill:${item.id.substringAfter(":")}\n"
@@ -599,13 +604,15 @@ internal fun PluginInventoryBrowser(
                 val canConnectOfficial = officialSupported && !officialRegistered &&
                     pluginDetail?.mcpUrl != null && onConnectCodexPlugin != null
                 val canConnectSkill = endpoint != null && onConnectSkillMcp != null
+                val canInspectSkill = knownUnreadySkillServer && item.installedSkill
                 val canUseOfficial = officialSupported && item.installedPlugin &&
                     pluginDetail?.samplePrompts?.isNotEmpty() == true &&
                     (pluginDetail.mcpUrl == null || officialConnected) &&
                     (!pluginDetail.hasApp || officialConnected) &&
                     !pluginDetail.hasHooks && onUseCapability != null
                 val hasDirectAction = canInstallPreset || canInstallCurated ||
-                    canInstallOfficial || canConnectOfficial || canInspectOfficial || canConnectSkill || canUseOfficial ||
+                    canInstallOfficial || canConnectOfficial || canInspectOfficial ||
+                    canConnectSkill || canInspectSkill || canUseOfficial ||
                     (onUseCapability != null && item.available) || item.connectedService ||
                     (!item.id.startsWith("codex-plugin:") &&
                         !item.installablePreset && !item.installableCurated)
@@ -616,7 +623,7 @@ internal fun PluginInventoryBrowser(
                         canInstallOfficial -> if (missingPluginSkills.size > 1)
                             "安装包含的 ${missingPluginSkills.size} 项技能" else "安装"
                         canConnectOfficial || canConnectSkill -> "连接并授权"
-                        canInspectOfficial -> "检查连接"
+                        canInspectOfficial || canInspectSkill -> "检查连接"
                         canUseOfficial -> "使用"
                         item.installedSkill || (onUseCapability != null && item.available) -> "使用"
                         item.connectedService -> "管理连接"
@@ -635,7 +642,7 @@ internal fun PluginInventoryBrowser(
                                     onInstallCodexPluginSkill?.invoke(pluginId, oneSkill)
                             }
                             canConnectOfficial -> onConnectCodexPlugin?.invoke(pluginId)
-                            canInspectOfficial -> {
+                            canInspectOfficial || canInspectSkill -> {
                                 selectedRow = null
                                 onManageConnections()
                             }
