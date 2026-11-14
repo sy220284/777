@@ -515,10 +515,6 @@ internal fun PluginInventoryBrowser(
                             }
                         }
                         val brandLogo = remember(logoBytes) { decodeCodexBrandLogo(logoBytes) }
-                        val usePrompt = if (item.installedSkill) "@skill:" + item.id.substringAfter(":") + "\n"
-                            else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
-                        val installable = (item.installablePreset && onInstallPreset != null) ||
-                            (item.installableCurated && onInstallCurated != null)
                         ExtensionCatalogCard(
                             id = item.id,
                             title = item.name,
@@ -527,45 +523,12 @@ internal fun PluginInventoryBrowser(
                             accent = item.accent,
                             documentIcon = item.documentIcon,
                             brandLogo = brandLogo,
-                            actionText = when {
-                                installable -> "安装"
-                                item.connectedService -> "管理"
-                                item.id.startsWith("codex-plugin:") -> "了解"
-                                item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
-                                    ExtensionMarketStatus.FAILED) -> "配置"
-                                else -> stringResource(
-                                    if (onUseCapability != null && item.available) R.string.plugin_use
-                                    else R.string.tools_catalog_details
-                                )
-                            },
-                            sourceLabel = item.sourceLabel,
                             statusLabel = item.marketState.label,
-                            catalogStyle = true,
-                            attentionNeeded = item.marketState.status in setOf(
-                                ExtensionMarketStatus.NEEDS_SETUP, ExtensionMarketStatus.FAILED,
-                                ExtensionMarketStatus.UNSUPPORTED),
-                            enabled = !loading,
                             onOpen = {
                                 selectedRow = item
                                 if (item.id.startsWith("codex-plugin:")) {
-                                    onReadCodexPluginDetail?.invoke(item.id.removePrefix("codex-plugin:"))
-                                }
-                            },
-                            onAction = {
-                                when {
-                                    item.installablePreset && onInstallPreset != null ->
-                                        onInstallPreset(item.id.substringAfter(":"))
-                                    item.installableCurated && onInstallCurated != null ->
-                                        onInstallCurated(item.id.substringAfter(":"))
-                                    item.connectedService -> onManageConnections()
-                                    item.id.startsWith("codex-plugin:") -> {
-                                        selectedRow = item
-                                        onReadCodexPluginDetail?.invoke(item.id.removePrefix("codex-plugin:"))
-                                    }
-                                    item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
-                                        ExtensionMarketStatus.FAILED) -> selectedRow = item
-                                    onUseCapability != null && item.available -> onUseCapability(usePrompt)
-                                    else -> selectedRow = item
+                                    onReadCodexPluginDetail?.invoke(
+                                        item.id.removePrefix("codex-plugin:"))
                                 }
                             },
                         )
