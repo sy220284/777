@@ -104,20 +104,19 @@ class HarnessAccessibilityService : AccessibilityService() {
 
     fun clickText(text: String): Boolean {
         val root = rootInActiveWindow ?: return false
-        val node = root.findAccessibilityNodeInfosByText(text)
-            .firstOrNull { candidate ->
-                candidate.isVisibleToUser && (candidate.isClickable || clickableAncestor(candidate) != null)
-            }
-            ?: return false
+        val candidates = root.findAccessibilityNodeInfosByText(text).filter { candidate ->
+            candidate.isVisibleToUser && (candidate.isClickable || clickableAncestor(candidate) != null)
+        }
+        val node = requireUniqueAccessibilityTarget(candidates, "点击") ?: return false
         val target = if (node.isClickable) node else clickableAncestor(node) ?: return false
         return target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
     }
 
     fun setText(searchText: String, value: String): Boolean {
         val root = rootInActiveWindow ?: return false
-        val target = root.findAccessibilityNodeInfosByText(searchText)
-            .firstOrNull { it.isEditable }
-            ?: return false
+        val candidates = root.findAccessibilityNodeInfosByText(searchText)
+            .filter { it.isVisibleToUser && it.isEditable }
+        val target = requireUniqueAccessibilityTarget(candidates, "输入文字") ?: return false
         val arguments = Bundle().apply {
             putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
         }

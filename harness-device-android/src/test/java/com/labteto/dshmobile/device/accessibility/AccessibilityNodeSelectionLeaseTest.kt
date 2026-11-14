@@ -43,4 +43,17 @@ class AccessibilityNodeSelectionLeaseTest {
         }
         selection.requireCurrent(0, 1, node(0, "取消"))
     }
+    @Test fun textActionsNeverGuessAmongDuplicateControls() {
+        org.junit.Assert.assertNull(requireUniqueAccessibilityTarget(emptyList<String>(), "点击"))
+        org.junit.Assert.assertEquals(
+            "唯一按钮", requireUniqueAccessibilityTarget(listOf("唯一按钮"), "点击"),
+        )
+        val error = assertThrows(IllegalStateException::class.java) {
+            requireUniqueAccessibilityTarget(listOf("删除", "删除"), "点击")
+        }
+        org.junit.Assert.assertTrue(error.message.orEmpty().contains("android_find"))
+        assertThrows(IllegalStateException::class.java) {
+            requireUniqueAccessibilityTarget(listOf("账号", "账号"), "输入文字")
+        }
+    }
 }
