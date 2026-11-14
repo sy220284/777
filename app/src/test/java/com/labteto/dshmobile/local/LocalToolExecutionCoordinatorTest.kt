@@ -102,6 +102,61 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(listOf("script-1/step-2:bash"), approvals) // no redundant wrapper prompt
     }
 
+    @Test fun planModeRunsReadOnlyCodeModeWithoutExtraPromptsAndRejectsMixedScript() = runBlocking {
+        val registry = ToolRegistry()
+        var reads = 0
+        var writes = 0
+        var prompts = 0
+        registry.register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+            reads++
+            ToolResult("inspection finished")
+        })
+        registry.register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) {
+            writes++
+            ToolResult("write committed")
+        })
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val coordinator = coordinator(registry)
+        fun plan(vararg tools: String) = buildJsonObject {
+            put("steps", buildJsonArray {
+                tools.forEach { name ->
+                    add(buildJsonObject {
+                        put("tool", name)
+                        put("args", buildJsonObject {})
+                    })
+                }
+            })
+        }
+        val visible = registry.captureBindings(JsonArray(listOf(registry.get("code_mode_run")!!.schema)))
+        val allowed = plan("read", "read")
+        val result = withContext(visible) {
+            coordinator.executeScoped(
+                LocalToolCall("plan-read", "code_mode_run", allowed, allowed.toString()),
+                "s1", allowMutation = false, planModeEnabled = true,
+                approval = { _, _, _ -> prompts++; true },
+            )
+        }
+        assertFalse(result.isError)
+        assertEquals(2, reads)
+        assertEquals(0, writes)
+        assertEquals(0, prompts)
+        assertTrue(result.content.contains("\"completed_steps\":2"))
+
+        val mixed = plan("read", "write")
+        val blocked = withContext(visible) {
+            coordinator.executeScoped(
+                LocalToolCall("plan-mixed", "code_mode_run", mixed, mixed.toString()),
+                "s1", allowMutation = false, planModeEnabled = true,
+                approval = { _, _, _ -> prompts++; true },
+            )
+        }
+        assertTrue(blocked.isError)
+        assertEquals("PLAN_MODE_BLOCKED", blocked.errorCode)
+        assertEquals(2, reads)
+        assertEquals(0, writes)
+        assertEquals(0, prompts)
+    }
+
     @Test fun teamRevocationWhileWaitingForSharedWorkspaceLeaseCannotWrite() = runBlocking {
         val gate = com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate()
         val leaseHeld = CompletableDeferred<Unit>()
