@@ -369,6 +369,25 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
     }
 
 
+    /**
+     * Tool results may be ordinary unquoted text, even when the JSON tree reader accepts
+     * an unquoted token as a non-string primitive. Preserve the tool's actual value:
+     * only JSON booleans/null/numbers are typed scalars; all other bare words are text.
+     */
+    private fun parseResultBody(body: String): JsonElement {
+        val parsed = try {
+            Json.parseToJsonElement(body)
+        } catch (_: kotlinx.serialization.SerializationException) {
+            return JsonPrimitive(body)
+        }
+        if (parsed is JsonPrimitive && !parsed.isString &&
+            parsed.content !in setOf("true", "false", "null") &&
+            !JSON_NUMBER_PATTERN.matches(parsed.content)) {
+            return JsonPrimitive(body)
+        }
+        return parsed
+    }
+
     /** Only durable results can be reused. Resolved inputs pass through ToolRegistry again,
      * retaining schema validation, approval, registration identity and Hooks. */
     private fun resolveReferences(node: JsonElement, history: List<ToolResult?>): JsonElement = when (node) {
@@ -380,11 +399,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 throw StepReferenceException("步骤 $ordinal 的临时结果不可传递")
             if (source.content.length > MAX_REFERENCE_SOURCE_CHARS)
                 throw StepReferenceException("步骤 $ordinal 的结果过大")
-            val parsed = try {
-                Json.parseToJsonElement(source.content)
-            } catch (_: kotlinx.serialization.SerializationException) {
-                JsonPrimitive(source.content)
-            }
+            val parsed = parseResultBody(source.content)
             var selected: JsonElement = parsed
             val path = (node["path"] as? JsonPrimitive)?.content.orEmpty()
             for (segment in (parseReferencePath(path)
@@ -441,5 +456,6 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
         const val MAX_REFERENCE_VALUE_CHARS = 8_192
         const val RESULT_REFERENCE_KEY = "\$step_result"
         const val MAX_RESULT_CHARS = 4_000
+        val JSON_NUMBER_PATTERN = Regex("""-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?""")
     }
 }
