@@ -120,6 +120,30 @@ interface ToolsUiPort {
     suspend fun clearGitHub()
 }
 
+/** Full management surface consumed by the Tools feature UI.
+ * The Compose ViewModel depends on this contract, never the runtime facade implementation. */
+interface ToolsManagementUiPort : ToolsUiPort {
+    fun skillChanges(): kotlinx.coroutines.flow.Flow<Unit>
+    suspend fun agentBackendStatus(): String
+    suspend fun probeAgentBackend(): String
+    suspend fun configureAgentBackend(
+        host: String, port: Int, pin: String, token: String, consent: Boolean,
+    )
+    suspend fun revokeAgentBackend()
+    suspend fun checkSkillUpdate(id: String): String?
+    suspend fun upgradeSkill(id: String, revision: String): String
+    suspend fun rollbackSkill(id: String): String
+    suspend fun codexPluginLogo(id: String): ByteArray?
+    suspend fun installCuratedSkill(id: String): String
+    suspend fun importSkillStream(filename: String, input: java.io.InputStream): String
+    suspend fun exportSkillPackageToFile(id: String, destination: java.io.File)
+    suspend fun connectHttpWithCredential(serverId: String, endpoint: String, bearer: String): String
+    suspend fun loginMcp(serverId: String, endpoint: String, clientId: String?): String
+    suspend fun refreshMcpLogin(serverId: String, endpoint: String): String
+    suspend fun revokeMcpLogin(serverId: String, endpoint: String): Boolean
+    suspend fun clearMcpCredential(serverId: String)
+}
+
 sealed interface ToolsUiCommand {
     data class ConnectHttp(val serverId: String, val endpoint: String) : ToolsUiCommand
     data class ConnectStdio(val serverId: String, val command: List<String>, val workingDirectory: String?) : ToolsUiCommand
