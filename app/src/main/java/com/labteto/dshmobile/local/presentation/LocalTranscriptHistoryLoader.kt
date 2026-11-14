@@ -14,12 +14,6 @@ internal data class LocalTranscriptHistoryLoadResult(
     val loadedRawMessages: Int = 0,
 )
 
-/**
- * Reads event-backed transcript pages until a foreground-visible dialogue target is satisfied.
- *
- * Raw runtime/history paging remains bounded by [LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES]. This
- * loader only decides how many bounded pages are needed to satisfy the separate foreground quota.
- */
 /** One paginated history algorithm for native V6 and contract-backed UI.
  * It handles bounded reads and identity-safe deduplication without dropping rich message fields. */
 internal data class TranscriptHistoryBatch<T, C>(
@@ -122,18 +116,21 @@ internal class LocalTranscriptHistoryLoader(
     )
 
     suspend fun bootstrap(sessionId: String): LocalTranscriptHistoryLoadResult? =
-        pager.bootstrap(sessionId)?.let {
-            LocalTranscriptHistoryLoadResult(it.olderMessages, it.nextCursor, it.loadedRawMessages)
+        withContext(Dispatchers.Default) {
+            pager.bootstrap(sessionId)?.let {
+                LocalTranscriptHistoryLoadResult(it.olderMessages, it.nextCursor, it.loadedRawMessages)
+            }
         }
 
     suspend fun olderBatch(
         sessionId: String,
         olderMessages: List<UiMessageSnapshot>,
         startCursor: UiTranscriptCursor,
-    ): LocalTranscriptHistoryLoadResult? =
+    ): LocalTranscriptHistoryLoadResult? = withContext(Dispatchers.Default) {
         pager.olderBatch(sessionId, olderMessages, startCursor)?.let {
             LocalTranscriptHistoryLoadResult(it.olderMessages, it.nextCursor, it.loadedRawMessages)
         }
+    }
 }
 
 // Foreground history budget survives UI replacement; no Compose or legacy renderer is needed.
