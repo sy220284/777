@@ -503,8 +503,11 @@ internal class LocalSkillManager @Inject constructor(
     fun create(id: String, displayName: String, description: String, instructions: String) =
         store.create(id, displayName, description, instructions)
     fun importSkill(filename: String, bytes: ByteArray): String = LocalSkillPackageImporter(storageWorkspace).install(filename, bytes)
+    fun importSkill(filename: String, input: java.io.InputStream): String = LocalSkillPackageImporter(storageWorkspace).install(filename, input)
     fun exportSkillPackage(id: String): ByteArray = LocalSkillPackageExporter(storageWorkspace).export(id)
     fun replaceSkillPackage(id: String, archive: ByteArray): String =
+        LocalSkillPackageUpdater(storageWorkspace).replace(id, archive)
+    fun replaceSkillPackage(id: String, archive: java.io.InputStream): String =
         LocalSkillPackageUpdater(storageWorkspace).replace(id, archive)
     fun canRollbackSkill(id: String): Boolean = LocalSkillPackageUpdater(storageWorkspace).canRollback(id)
     fun rollbackSkill(id: String): String = LocalSkillPackageUpdater(storageWorkspace).rollback(id)
