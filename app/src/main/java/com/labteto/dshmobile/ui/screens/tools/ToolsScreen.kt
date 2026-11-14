@@ -389,6 +389,55 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Installation owns the whole user journey. Trusted skill metadata provides
+     * public HTTPS MCP endpoints; OAuth consent is still granted in the browser.
+     * A failed authorization leaves the installed skill intact and visible for retry.
+     */
+    private suspend fun finishSkillInstallation(installedId: String) {
+        val installed = localTools.installedSkills()
+        val skill = installed.firstOrNull { it.name == installedId }
+        _state.value = _state.value.copy(
+            skills = installed,
+            presets = localTools.presetSkills(),
+            createdSkillId = installedId,
+        )
+        val pending = skill?.requirements.orEmpty().filterNot { it.registered }
+        val connections = pending.mapNotNull { requirement ->
+            skillMcpHttpsEndpoint(requirement)?.let { endpoint ->
+                requirement.value to endpoint
+            }
+        }.distinctBy { it.first }
+        for ((serverId, endpoint) in connections) {
+            _state.value = _state.value.copy(
+                mcpLoginServerId = serverId,
+                feedback = "技能已安装；正在打开 ${serverId} 授权。",
+            )
+            try {
+                localTools.loginMcp(serverId, endpoint, null)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                synchronizeExtensionInventory()
+                _state.value = _state.value.copy(
+                    feedback = "技能 ${installedId} 已安装；${serverId} 授权未完成："
+                        + (failure.message ?: "可在技能详情中重新授权"),
+                )
+                return
+            } finally {
+                _state.value = _state.value.copy(mcpLoginServerId = null)
+            }
+        }
+        synchronizeExtensionInventory()
+        val unresolved = _state.value.skills.firstOrNull { it.name == installedId }
+            ?.requirements.orEmpty().count { !it.registered }
+        _state.value = _state.value.copy(
+            feedback = if (unresolved == 0)
+                "技能 ${installedId} 已安装，可直接使用"
+            else "技能 ${installedId} 已安装，还有 ${unresolved} 项本地运行依赖可在详情中查看",
+        )
+    }
+
     /** Fetch on user entry to Skills; discovery never installs a package. */
     fun refreshCuratedSkills() {
         if (_state.value.curatedLoading) return
@@ -493,11 +542,8 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
             try {
                 val installed = localTools.installCodexPluginSkill(pluginId, skillId)
-                _state.value = _state.value.copy(
-                    loading = false, skills = localTools.installedSkills(),
-                    presets = localTools.presetSkills(), createdSkillId = installed,
-                    feedback = "已从 Codex 官方插件安装技能 $installed；可在已安装中查看",
-                )
+                finishSkillInstallation(installed)
+                _state.value = _state.value.copy(loading = false)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
@@ -514,12 +560,8 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
             try {
                 val installedId = localTools.installCuratedSkill(id)
-                _state.value = _state.value.copy(
-                    loading = false,
-                    skills = localTools.installedSkills(),
-                    presets = localTools.presetSkills(),
-                    createdSkillId = installedId,
-                    feedback = "官方精选技能已安装：$installedId")
+                finishSkillInstallation(installedId)
+                _state.value = _state.value.copy(loading = false)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -537,11 +579,8 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
             try {
                 val installed = localTools.installGitHubSkill(source)
-                _state.value = _state.value.copy(
-                    loading = false, skills = localTools.installedSkills(),
-                    presets = localTools.presetSkills(), createdSkillId = installed,
-                    feedback = "已安装技能：$installed；请查看其运行依赖状态",
-                )
+                finishSkillInstallation(installed)
+                _state.value = _state.value.copy(loading = false)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
@@ -623,7 +662,22 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
-    fun installPreset(id: String) = changeSkills { localTools.installPreset(id) }
+    fun installPreset(id: String) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                localTools.installPreset(id)
+                finishSkillInstallation(id)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                _state.value = _state.value.copy(feedback = "安装技能失败：" +
+                    (failure.message ?: "请检查技能包"))
+            } finally {
+                _state.value = _state.value.copy(loading = false)
+            }
+        }
+    }
     fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         changeSkills(createdId = id) { localTools.createSkill(id, displayName, description, instructions) }
     fun importSkill(uri: Uri) {
