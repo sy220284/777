@@ -39,7 +39,7 @@ class LocalContextBudgetTest {
     }
 
     @Test
-    fun unknownRouteCanUseExplicitContextWindowWithoutOverridingOfficialPreset() {
+    fun unknownRouteCanUseExplicitContextWindowAndOfficialRouteCanUseSmallerUserLimit() {
         val custom = localHistoryBudgetFor(
             memoryClassMb = 512,
             pressure = HarnessResourcePressure.LOW,
@@ -57,8 +57,12 @@ class LocalContextBudgetTest {
 
         assertEquals(1_000_000, documentedContextWindowTokens("custom-model", "https://proxy.example/v1", 1_000_000))
         assertTrue(custom.maxHistoryTokens!! > 192_000)
-        assertEquals(1_000_000, documentedContextWindowTokens("deepseek-flash", "https://api.deepseek.com", 16_000))
-        assertTrue(official.maxHistoryTokens!! > 16_000)
+        // The documented provider capacity remains the maximum, while the user's smaller
+        // requested operational window must govern this concrete route and its reservations.
+        assertEquals(16_000, documentedContextWindowTokens("deepseek-flash", "https://api.deepseek.com", 16_000))
+        assertTrue(official.maxHistoryTokens!! in 1..16_000)
+        assertTrue(official.maxHistoryTokens!! <
+            operationalInputLimitTokens("deepseek-flash", "https://api.deepseek.com"))
     }
 
     @Test
