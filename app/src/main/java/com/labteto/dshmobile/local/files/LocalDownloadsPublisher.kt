@@ -29,6 +29,14 @@ internal class LocalDownloadsPublisher(context: Context, private val workspace: 
         const val RELATIVE_DIRECTORY = "Download/$DIRECTORY"
         private val ROOT = "${Environment.DIRECTORY_DOWNLOADS}/$DIRECTORY/"
         private val publicationLock = Any()
+        private var ownedPublisher: LocalDownloadsPublisher? = null
+
+        /** The Studio and inline media actions publish through one app-owned instance. */
+        fun owned(context: Context): LocalDownloadsPublisher = synchronized(publicationLock) {
+            ownedPublisher ?: LocalDownloadsPublisher(context.applicationContext).also {
+                ownedPublisher = it
+            }
+        }
     }
 
     /** An explanatory first-run file makes the public folder visible before any task completes. */
