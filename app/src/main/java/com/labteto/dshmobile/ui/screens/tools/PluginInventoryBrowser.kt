@@ -567,6 +567,16 @@ internal fun PluginInventoryBrowser(
         val detailBrandLogo = remember(detailLogoBytes) {
             decodeCodexBrandLogo(detailLogoBytes)
         }
+        var requirementsExpanded by remember(item.id) { mutableStateOf(false) }
+        val detailId = item.id.removePrefix("codex-plugin:")
+        val declaredDetail = codexDetails[detailId]
+        val detailRoot = codexPlugins.firstOrNull { it.id == detailId }?.sourcePath
+        val bundleRequirements = if (detailRoot == null) emptyList() else
+            skills.filter { skill ->
+                declaredDetail?.skillDirectories?.values.orEmpty().any { folder ->
+                    codexOfficialPluginSourceMatches(skill.sourceIdentity, detailRoot, folder)
+                }
+            }.flatMap { it.requirements }
         ExtensionDetailPage(
             title = item.name,
             onDismiss = { selectedRow = null },
@@ -581,17 +591,13 @@ internal fun PluginInventoryBrowser(
                         codexPluginSkillInstalled(skills, officialRoot, path)
                 }
                 val oneSkillInstalled = oneSkill == null || oneSkill !in missingPluginSkills
-                val installedBundleRequirements = if (officialRoot == null) emptyList() else
-                    skills.filter { skill ->
-                        pluginDetail?.skillDirectories?.values.orEmpty().any { folder ->
-                            codexOfficialPluginSourceMatches(
-                                skill.sourceIdentity, officialRoot, folder)
-                        }
-                    }.flatMap { it.requirements }
-                val missingBundleAccount = installedBundleRequirements.any { requirement ->
+                val missingBundleAccount = bundleRequirements.any { requirement ->
                     !requirement.registered && requirement.type.equals("mcp", ignoreCase = true) &&
-                        connectedServices.none { it.id == requirement.value } &&
-                        skillMcpHttpsEndpoint(requirement) != null
+                        skillMcpHttpsEndpoint(requirement)?.let { endpoint ->
+                            com.labteto.dshmobile.uicontract.uiMcpDeclaredConnection(
+                                connectedServices, requirement.value, endpoint) ==
+                                com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.ABSENT
+                        } == true
                 }
                 val knownUnreadySkillServer = item.requirements.any { requirement ->
                     !requirement.registered && requirement.type.equals("mcp", ignoreCase = true) &&
@@ -613,14 +619,15 @@ internal fun PluginInventoryBrowser(
                     (onInstallCodexPlugin != null ||
                         (oneSkill != null && !oneSkillInstalled &&
                             onInstallCodexPluginSkill != null))
-                val officialService = pluginDetail?.mcpServerId?.let { serverId ->
-                    connectedServices.firstOrNull { it.id == serverId }
-                }
-                val officialRegistered = officialService?.registration ==
-                    com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED
-                val officialConnected = officialRegistered && officialService?.tools?.isNotEmpty() == true
-                val canInspectOfficial = officialSupported && officialRegistered && !officialConnected
-                val canConnectOfficial = officialSupported && !officialRegistered &&
+                val officialConnection = com.labteto.dshmobile.uicontract.uiMcpDeclaredConnection(
+                    connectedServices, pluginDetail?.mcpServerId, pluginDetail?.mcpUrl)
+                val officialConnected = officialConnection ==
+                    com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.TOOLS_REGISTERED
+                val canInspectOfficial = officialSupported && officialConnection in setOf(
+                    com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.TARGET_CONFLICT,
+                    com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.REGISTERED_UNREADY)
+                val canConnectOfficial = officialSupported && officialConnection ==
+                    com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.ABSENT &&
                     pluginDetail?.mcpUrl != null && onConnectCodexPlugin != null
                 val canConnectSkill = endpoint != null && onConnectSkillMcp != null
                 val canResumeBundleSetup = officialSupported && pluginDetail != null &&
@@ -631,10 +638,15 @@ internal fun PluginInventoryBrowser(
                     pluginDetail?.samplePrompts?.isNotEmpty() == true &&
                     (pluginDetail.mcpUrl == null || officialConnected) &&
                     (!pluginDetail.hasApp || officialConnected) &&
+                    bundleRequirements.all { it.registered } &&
                     !pluginDetail.hasHooks && onUseCapability != null
+                val needsOtherSkillSetup = item.installedSkill &&
+                    item.requirements.any { !it.registered } &&
+                    !canConnectSkill && !canInspectSkill
                 val hasDirectAction = canInstallPreset || canInstallCurated ||
                     canInstallOfficial || canConnectOfficial || canInspectOfficial ||
-                    canResumeBundleSetup || canConnectSkill || canInspectSkill || canUseOfficial ||
+                    canResumeBundleSetup || canConnectSkill || canInspectSkill ||
+                    needsOtherSkillSetup || canUseOfficial ||
                     (onUseCapability != null && item.available) || item.connectedService ||
                     (!item.id.startsWith("codex-plugin:") &&
                         !item.installablePreset && !item.installableCurated)
@@ -647,8 +659,11 @@ internal fun PluginInventoryBrowser(
                         canConnectOfficial || canConnectSkill -> "连接并授权"
                         canResumeBundleSetup -> "继续完成授权"
                         canInspectOfficial || canInspectSkill -> "检查连接"
+                        needsOtherSkillSetup -> "查看待处理依赖"
                         canUseOfficial -> "使用"
-                        item.installedSkill || (onUseCapability != null && item.available) -> "使用"
+                        item.installedSkill && item.requirements.all { it.registered } ->
+                            "使用"
+                        onUseCapability != null && item.available -> "使用"
                         item.connectedService -> "管理连接"
                         else -> "返回对话"
                     },
@@ -670,6 +685,7 @@ internal fun PluginInventoryBrowser(
                                 selectedRow = null
                                 onManageConnections()
                             }
+                            needsOtherSkillSetup -> requirementsExpanded = true
                             canConnectSkill -> requireNotNull(endpoint).let { (serverId, url) ->
                                 onConnectSkillMcp?.invoke(serverId, url)
                             }
@@ -880,7 +896,6 @@ internal fun PluginInventoryBrowser(
                 }
             }
             if (item.requirements.isNotEmpty()) {
-                var requirementsExpanded by remember(item.id) { mutableStateOf(false) }
                 Surface(
                     modifier = Modifier.fillMaxWidth().testTag("skill-dependency-summary"),
                     color = colors.materialL4,
