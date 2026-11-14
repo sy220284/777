@@ -120,7 +120,7 @@ internal fun buildLocalSkillDocument(id: String, description: String, instructio
     require(summary.isNotEmpty() && summary.length <= 240 && '\n' !in summary && '\r' !in summary) {
         "技能描述需要 1—240 个字符且不能换行"
     }
-    require(body.isNotEmpty() && body.length <= 12_000) { "技能说明需要 1—12000 个字符" }
+    require(body.isNotEmpty()) { "技能说明不能为空" }
     val scalar = summary.replace('"', '\'').replace(" #", " ＃")
     require(whenToUse.length <= 240 && '\n' !in whenToUse && '\r' !in whenToUse) { "使用条件不能超过 240 字或换行" }
     val trigger = if (whenToUse.isBlank()) emptyList() else listOf("when-to-use: \"" + whenToUse.replace('"', '\'') + "\"")
