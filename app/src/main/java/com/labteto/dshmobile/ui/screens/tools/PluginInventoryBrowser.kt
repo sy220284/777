@@ -674,8 +674,8 @@ internal fun PluginInventoryBrowser(
                         if ((item.installablePreset && onInstallPreset != null) ||
                                              (item.installableCurated && onInstallCurated != null)) R.string.skills_install
                         else if (onUseCapability != null && item.available) R.string.plugin_use
-                        else if (item.connectedService || item.id.startsWith("codex-plugin:"))
-                            R.string.tools_external_services
+                        else if (item.connectedService) R.string.tools_external_services
+                        else if (item.id.startsWith("codex-plugin:")) R.string.common_close
                         else R.string.tools_catalog_return_chat,
                     ),
                     modifier = Modifier.fillMaxWidth().testTag("plugin-detail-primary-action"),
@@ -686,8 +686,9 @@ internal fun PluginInventoryBrowser(
                         if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
                                          else if (item.installableCurated && onInstallCurated != null) onInstallCurated(item.id.substringAfter(":"))
                         else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
-                        else if (item.connectedService || item.id.startsWith("codex-plugin:"))
-                            onManageConnections() else onReturnToChat()
+                        else if (item.connectedService) onManageConnections()
+                        else if (item.id.startsWith("codex-plugin:")) Unit
+                        else onReturnToChat()
                     },
                 )
             },
