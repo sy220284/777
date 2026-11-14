@@ -409,12 +409,12 @@ class ToolsViewModel @Inject constructor(
     }
 
     /** Fetches official Codex catalog metadata, without installing or authorizing anything. */
-    fun refreshCodexPlugins() {
+    fun refreshCodexPlugins(forceRefetch: Boolean = false) {
         if (_state.value.codexLoading) return
         viewModelScope.launch {
             _state.value = _state.value.copy(codexLoading = true, codexError = null)
             try {
-                val plugins = localTools.codexOfficialPlugins()
+                val plugins = localTools.codexOfficialPlugins(forceRefetch)
                 _state.value = _state.value.copy(codexLoading = false, codexPlugins = plugins)
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -1138,7 +1138,7 @@ fun ToolsScreen(
                                     onReadCodexPluginDetail = viewModel::loadCodexPluginDetail,
                                     onInstallCodexPluginSkill = viewModel::installCodexPluginSkill,
                                     onConnectCodexPlugin = viewModel::connectCodexPlugin,
-                                    onRefreshCodex = viewModel::refreshCodexPlugins,
+                                    onRefreshCodex = { viewModel.refreshCodexPlugins(true) },
                                     curatedLoading = state.curatedLoading,
                                     curatedError = state.curatedError,
                                     pendingSkillUpdates = state.pendingSkillUpdates,
