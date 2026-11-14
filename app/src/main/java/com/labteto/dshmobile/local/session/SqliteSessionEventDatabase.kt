@@ -6,8 +6,15 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.labteto.dshmobile.harness.session.SessionEvent
 import com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalog
+import com.labteto.dshmobile.local.model.LocalRequestMessageSurfaceState
+import com.labteto.dshmobile.local.model.encodeLocalRequestMessageSurface
+import com.labteto.dshmobile.local.model.stableJsonSha256
 import java.util.UUID
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
@@ -23,7 +30,7 @@ class SqliteSessionEventDatabase(
     private val json: Json,
     name: String = "local_session_events_v1.db",
     private val clock: () -> Long = System::currentTimeMillis,
-) : SQLiteOpenHelper(context, name, null, 5) {
+) : SQLiteOpenHelper(context, name, null, 6) {
     private val searchBlockIndex = SqliteSessionSearchBlockIndex(json)
     init { setWriteAheadLoggingEnabled(true) }
 
@@ -55,10 +62,11 @@ class SqliteSessionEventDatabase(
         createVisibleEventIndex(db)
         SqliteLocalAssetCatalog.createSchema(db)
         searchBlockIndex.createSchema(db)
+        createRequestMigrationMarker(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        require(oldVersion in 1..4 && newVersion == 5) {
+        require(oldVersion in 1..5 && newVersion == 6) {
             "不支持的会话事件数据库版本：$oldVersion -> $newVersion"
         }
         // Idempotent even if an older pilot schema omitted this table.
@@ -86,6 +94,83 @@ class SqliteSessionEventDatabase(
         createVisibleEventIndex(db)
         SqliteLocalAssetCatalog.createSchema(db)
         searchBlockIndex.createSchema(db)
+        createRequestMigrationMarker(db)
+        migrateLegacyRequestMessages(db)
+    }
+
+    /**
+     * One transactional V5 -> V6 rewrite: preserve event identity, sequence, payload digest
+     * and every header/attempt reference. Only repeated message-array bytes are removed.
+     * On process death SQLite rolls the entire upgrade back to V5 automatically.
+     *
+     * The derivative search postings must be regenerated from the new smaller payloads.
+     * Reindexing remains lazy so startup does not synchronously rebuild every n-gram.
+     */
+    private fun migrateLegacyRequestMessages(db: SQLiteDatabase) {
+        var previousSession: String? = null
+        var previous: LocalRequestMessageSurfaceState? = null
+        var changed = 0
+        db.rawQuery(
+            "SELECT session_id,sequence,payload FROM session_events " +
+                "WHERE event_type='request/message-surface' ORDER BY session_id,sequence",
+            null,
+        ).use { rows ->
+            while (rows.moveToNext()) {
+                val session = rows.getString(0)
+                val sequence = rows.getLong(1)
+                if (session != previousSession) {
+                    previousSession = session
+                    previous = null
+                }
+                val old = json.parseToJsonElement(rows.getString(2)).jsonObject
+                val array = old["messages"] as? JsonArray
+                    ?: error("旧请求消息面缺少 messages：$session/$sequence")
+                val messages = array.map { element ->
+                    element as? JsonObject
+                        ?: error("旧请求消息面包含非法对象：$session/$sequence")
+                }
+                val digest = (old["digest"] as? JsonPrimitive)?.contentOrNull
+                    ?: error("旧请求消息面缺少摘要：$session/$sequence")
+                check(stableJsonSha256(JsonArray(messages)) == digest) {
+                    "旧请求消息摘要不匹配，停止迁移：$session/$sequence"
+                }
+                val redacted = (old["redacted"] as? JsonPrimitive)?.booleanOrNull ?: false
+                val encoded = encodeLocalRequestMessageSurface(
+                    messages, digest, redacted, previous,
+                )
+                if (encoded.bytesSaved > 0) {
+                    db.execSQL(
+                        "UPDATE session_events SET payload=? WHERE session_id=? AND sequence=?",
+                        arrayOf(encoded.payload.toString(), session, sequence),
+                    )
+                    changed++
+                }
+                previous = LocalRequestMessageSurfaceState(
+                    sequence, messages, digest, encoded.depth, redacted,
+                )
+            }
+        }
+        if (changed > 0) {
+            db.delete("session_search_blocks", null, null)
+            db.delete("session_search_coverage", null, null)
+            db.execSQL("UPDATE session_request_migration SET pending_vacuum=1 WHERE id=1")
+        }
+    }
+
+    private fun createRequestMigrationMarker(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS session_request_migration (" +
+            "id INTEGER PRIMARY KEY NOT NULL CHECK(id=1), " +
+            "pending_vacuum INTEGER NOT NULL DEFAULT 0)")
+        db.execSQL("INSERT OR IGNORE INTO session_request_migration(id,pending_vacuum) VALUES(1,0)")
+    }
+
+    /** Called by one-time startup storage maintenance after V6 upgrade commits. */
+    internal fun needsRequestVacuum(): Boolean = readableDatabase.rawQuery(
+        "SELECT pending_vacuum FROM session_request_migration WHERE id=1", null,
+    ).use { it.moveToFirst() && it.getInt(0) == 1 }
+
+    internal fun finishRequestVacuum() {
+        writableDatabase.execSQL("UPDATE session_request_migration SET pending_vacuum=0 WHERE id=1")
     }
 
     private fun createVisibleEventIndex(db: SQLiteDatabase) {
