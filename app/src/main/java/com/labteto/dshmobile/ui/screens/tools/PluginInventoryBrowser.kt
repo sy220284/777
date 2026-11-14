@@ -88,6 +88,9 @@ private data class InventoryRow(
     val sourceUrl: String? = null,
     val sourceWarning: String? = null,
     val rollbackAvailable: Boolean = false,
+    val sourceLabel: String = "",
+    val marketState: ExtensionMarketState = ExtensionMarketState(ExtensionMarketStatus.BUILTIN, "内置能力 · 按需授权"),
+    val requirements: List<com.labteto.dshmobile.uicontract.UiSkillRequirement> = emptyList(),
 )
 
 /** Match visible skill names first, then identifiers, then explanatory descriptions. */
@@ -138,6 +141,7 @@ internal fun PluginInventoryBrowser(
     onRefreshCurated: (() -> Unit)? = null,
     onCreateSkill: ((String, String, String, String) -> Unit)? = null,
     onImportSkill: (() -> Unit)? = null,
+    onInstallGitHubSkill: ((String) -> Unit)? = null,
     onRemoveSkill: ((String) -> Unit)? = null,
     onShareSkillPackage: ((String) -> Unit)? = null,
     onCheckSkillUpdate: ((String) -> Unit)? = null,
@@ -161,6 +165,8 @@ internal fun PluginInventoryBrowser(
     var upgradeSkillChoice by remember { mutableStateOf<Pair<String, String>?>(null) }
     var rollbackSkillChoice by remember { mutableStateOf<String?>(null) }
     var newSkillId by remember { mutableStateOf("") }
+    var showGitHubImport by remember { mutableStateOf(false) }
+    var githubImportUrl by remember { mutableStateOf("") }
     var newSkillDisplayName by remember { mutableStateOf("") }
     var newSkillDescription by remember { mutableStateOf("") }
     var newSkillBody by remember { mutableStateOf("") }
@@ -205,7 +211,9 @@ internal fun PluginInventoryBrowser(
         }
         val copy = extensionPresentation(id, label, stringResource(hint), ExtensionKind.PLUGIN)
         InventoryRow("local:$id", copy.title, copy.description, connectedService = false,
-            icon = copy.icon, accent = copy.accent, group = copy.group, documentIcon = copy.documentIcon)
+            icon = copy.icon, accent = copy.accent, group = copy.group, documentIcon = copy.documentIcon,
+            sourceLabel = "777 · 随应用安装",
+            marketState = ExtensionMarketState(ExtensionMarketStatus.BUILTIN, "已内置 · 按需授权"))
     }
     val connected = connectedServices.sortedBy { it.id }.map { server ->
         val copy = extensionPresentation(server.id, server.id, "", ExtensionKind.CONNECTOR)
@@ -215,6 +223,8 @@ internal fun PluginInventoryBrowser(
             detail = "已连接 · " + server.tools.size + " 项工具 · " + server.transport.uppercase(),
             connectedService = true,
             available = false,
+            sourceLabel = "MCP · ${server.transport.uppercase()}",
+            marketState = connectorMarketState(server.registration, server.connection),
             icon = copy.icon,
             accent = copy.accent,
             group = copy.group,
@@ -231,14 +241,19 @@ internal fun PluginInventoryBrowser(
             group = copy.group, documentIcon = copy.documentIcon,
             available = true, modelInvocable = skill.modelInvocable, installedSkill = true,
             sourceUrl = skill.sourceUrl, sourceWarning = skill.sourceWarning,
-            rollbackAvailable = skill.rollbackAvailable)
+            rollbackAvailable = skill.rollbackAvailable,
+            requirements = skill.requirements,
+            sourceLabel = if (skill.sourceUrl != null) "GitHub · 已固定来源" else "777 · 本地技能",
+            marketState = installedSkillMarketState(skill.modelInvocable, skill.sourceWarning, skill.requirements))
     }
     val availablePresets = presets.filterNot { it.installed }.map { preset ->
         val copy = extensionPresentation(preset.id, preset.title, preset.description, ExtensionKind.SKILL)
         InventoryRow("skill:" + preset.id, copy.title, copy.description,
             connectedService = false, icon = copy.icon, accent = copy.accent,
             group = copy.group, documentIcon = copy.documentIcon,
-            available = false, installablePreset = true)
+            available = false, installablePreset = true,
+            sourceLabel = "777 · 内置精选",
+            marketState = ExtensionMarketState(ExtensionMarketStatus.INSTALLABLE, "待安装"))
     }
     val installedIds = skills.map { it.name }.toSet()
     val presetIds = presets.map { it.id }.toSet()
@@ -250,26 +265,27 @@ internal fun PluginInventoryBrowser(
             connectedService = false, icon = copy.icon, accent = copy.accent,
             group = copy.group, documentIcon = copy.documentIcon,
             available = false, installableCurated = true,
+            sourceLabel = "OpenAI/skills · 官方精选",
+            marketState = ExtensionMarketState(ExtensionMarketStatus.INSTALLABLE, "可安装 · 依赖待检查"),
         )
     }
-    // The horizontal categories describe real catalogue inventory, not a fabricated app store.
-    // Search always matches stable English IDs even when the cards show localized titles.
-    val list = (if (skillsOnly) when (selectedCategory) {
-        0 -> installedSkills
-        1 -> availablePresets + curated
-        2 -> (installedSkills + availablePresets + curated).filter { it.group == ExtensionGroup.OFFICE }
-        3 -> (installedSkills + availablePresets + curated).filter { it.group == ExtensionGroup.DEVELOPMENT }
-        4 -> (installedSkills + availablePresets + curated).filter { it.group == ExtensionGroup.CREATIVE }
-        else -> installedSkills
-    } else when (selectedCategory) {
-        1 -> filteredConnections
-        2 -> local.filter { it.group == ExtensionGroup.OFFICE || it.group == ExtensionGroup.DEVELOPMENT }
-        3 -> local.filter { it.group == ExtensionGroup.AUTOMATION }
-        4 -> local.filter { it.group == ExtensionGroup.CREATIVE }
-        else -> local
-    }).mapNotNull { item ->
-        inventorySearchScore(query, item.name, item.id, item.detail)?.let { score -> item to score }
-    }.sortedByDescending { it.second }.map { it.first }
+    // Codex separates discovery from local installation and runtime authorization.
+    val catalogue = local + connected + installedSkills + availablePresets + curated
+    val list = catalogue.asSequence().filter { item ->
+        marketplaceTabAllows(
+            selectedTab = selectedCategory, skillsOnly = skillsOnly,
+            installedSkill = item.installedSkill,
+            installable = item.installablePreset || item.installableCurated,
+            connectedService = item.connectedService,
+            localPlugin = item.id.startsWith("local:"), group = item.group,
+        ) && (!item.connectedService || selectedCategory != 1 ||
+            connectedServices.firstOrNull { "service:${it.id}" == item.id }?.let {
+                pluginTransportMatches(it.transport, transportFilter)
+            } == true)
+    }.mapNotNull { item ->
+        inventorySearchScore(query, item.name, item.id, item.detail)?.let { item to it }
+    }.sortedWith(compareByDescending<Pair<InventoryRow, Int>> { it.second }
+        .thenBy { it.first.name }).map { it.first }.toList()
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(if (embedded) Modifier.fillMaxSize() else Modifier.fillMaxSize().safeDrawingPadding()) {
