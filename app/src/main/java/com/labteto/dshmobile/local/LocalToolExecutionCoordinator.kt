@@ -421,7 +421,8 @@ internal class LocalToolExecutionCoordinator(
         var executionStarted = false
         val executionIdentity = LocalToolExecutionIdentity(
             executionId = executionIdFactory(),
-            rootCallId = call.id,
+            rootCallId = executionAttributes["root_call_id"] ?: call.id,
+            parentExecutionId = executionAttributes["parent_execution_id"],
             attributes = buildMap {
                 putAll(executionAttributes)
                 environment?.let { put("execution_environment", it.environmentId) }
@@ -475,7 +476,11 @@ internal class LocalToolExecutionCoordinator(
                         approval = approval,
                         beforeExecution = beforeExecution,
                         observeFileVersions = observeFileVersions,
-                        executionAttributes = executionAttributes + ("code_mode_parent_call_id" to call.id),
+                        executionAttributes = executionAttributes + mapOf(
+                            "root_call_id" to executionIdentity.rootCallId,
+                            "parent_execution_id" to executionIdentity.executionId,
+                            "code_mode_parent_call_id" to call.id,
+                        ),
                         // The parent remains active throughout the whole plan.
                         onExecutionActive = {},
                     )
