@@ -47,6 +47,12 @@ data class ToolContext(
      * Parameters: tool name, resolved arguments, raw arguments, 1-based step number.
      */
     val dispatchNestedTool: (suspend (String, JsonObject, String, Int) -> Pair<ToolResult, Boolean>)? = null,
+    /** Validate the owning run after approval and before executor entry. */
+    val beforeExecution: (suspend (HarnessTool) -> Unit)? = null,
+    /** Approval has access to the actual child invocation identity and resolved arguments. */
+    val approvalWithInvocation: (suspend (
+        tool: HarnessTool, input: JsonObject, attributes: Map<String, Any?>, hookReason: String?,
+    ) -> Boolean)? = null,
 )
 
 @kotlinx.serialization.Serializable
@@ -144,7 +150,9 @@ class ToolRegistry private constructor(
         }.toSet()
         val codeModeChildren = if ("code_mode_run" in names && registered["code_mode_run"] != null) {
             registered.filter { (name, tool) ->
-                name != "code_mode_run" && tool.exposure == ToolExposure.CORE
+                name != "code_mode_run" &&
+                    (tool.exposure == ToolExposure.CORE ||
+                        (tool.exposure == ToolExposure.OPTIONAL && name in names))
             }
         } else emptyMap()
         return ToolBindingSnapshot(registered.filterKeys { it in names }, codeModeChildren)
@@ -301,7 +309,8 @@ class ToolRegistry private constructor(
             ToolApprovalPolicy.MUTATION -> tool.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
         }
         if (needsApproval) {
-            if (context.approval == null && context.approvalWithReason == null) {
+            if (context.approval == null && context.approvalWithReason == null &&
+                context.approvalWithInvocation == null) {
                 return ToolInvocationResult(
                     result = ToolResult(
                         content = "工具需要人工审批：$name",
@@ -312,7 +321,9 @@ class ToolRegistry private constructor(
                     executionStarted = false,
                 )
             }
-            val granted = context.approvalWithReason?.invoke(tool, hookApprovalReason.orEmpty())
+            val granted = context.approvalWithInvocation?.invoke(
+                tool, input, context.attributes, hookApprovalReason,
+            ) ?: context.approvalWithReason?.invoke(tool, hookApprovalReason.orEmpty())
                 ?: requireNotNull(context.approval).invoke(tool)
             if (!granted) return ToolInvocationResult(
                 result = ToolResult(
@@ -339,6 +350,8 @@ class ToolRegistry private constructor(
                 executionStarted = false,
             )
         }
+        currentCoroutineContext().ensureActive()
+        context.beforeExecution?.invoke(tool)
         currentCoroutineContext().ensureActive()
         context.onExecutionStarted?.invoke(tool)
         currentCoroutineContext().ensureActive()
