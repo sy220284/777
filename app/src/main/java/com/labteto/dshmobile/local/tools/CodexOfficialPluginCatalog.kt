@@ -78,6 +78,29 @@ internal data class CodexOfficialPluginDetail(
     val hasHooks: Boolean,
 )
 
+internal data class CodexOfficialMcpEndpoint(val serverId: String, val url: String)
+
+/** Only public HTTPS endpoints can be offered for explicit one-tap browser authorization. */
+internal fun parseCodexOfficialMcpEndpoint(document: String, preferred: String): CodexOfficialMcpEndpoint? {
+    val servers = (Json.parseToJsonElement(document) as? JsonObject)?.get("mcpServers") as? JsonObject
+        ?: return null
+    val matches = servers.entries.mapNotNull { (name, raw) ->
+        if (!OFFICIAL_PLUGIN_ID.matches(name)) return@mapNotNull null
+        val value = raw as? JsonObject ?: return@mapNotNull null
+        if (value["type"]?.jsonPrimitive?.contentOrNull != "http") return@mapNotNull null
+        val target = value["url"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+        val uri = runCatching { java.net.URI(target) }.getOrNull() ?: return@mapNotNull null
+        val host = uri.host?.lowercase() ?: return@mapNotNull null
+        if (uri.scheme != "https" || uri.userInfo != null || uri.fragment != null ||
+            uri.port !in setOf(-1, 443) || !host.contains('.') ||
+            host == "localhost" || host.endsWith(".local") ||
+            host.matches(Regex("[0-9.]+")) || host.contains(':')) return@mapNotNull null
+        CodexOfficialMcpEndpoint(name, target)
+    }
+    return matches.singleOrNull { it.serverId == preferred } ?: matches.singleOrNull()
+}
+
+
 internal fun parseCodexOfficialPluginDetail(document: String): CodexOfficialPluginDetail {
     val root = Json.parseToJsonElement(document).jsonObject
     val name = root["name"]?.jsonPrimitive?.contentOrNull ?: error("插件清单缺少 name")
@@ -118,6 +141,15 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
         )
         require(details.name == name) { "插件清单和实际包名称不匹配" }
         return details
+    }
+
+    suspend fun mcpEndpoint(pluginId: String): CodexOfficialMcpEndpoint? {
+        val plugin = detail(pluginId)
+        if (!plugin.hasMcp) return null
+        return parseCodexOfficialMcpEndpoint(
+            fetch("$rootUrl/plugins/${plugin.name}/.mcp.json", 128 * 1024),
+            plugin.name,
+        )
     }
 
     suspend fun pluginSkills(pluginId: String): List<String> {
