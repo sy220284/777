@@ -69,6 +69,7 @@ class AndroidDeviceProvider(
         "android_open_uri",
         "accessibility_click_text",
         "accessibility_set_text",
+        "accessibility_input_text",
         "accessibility_tap",
         "accessibility_swipe",
         "android_back",
@@ -117,6 +118,13 @@ class AndroidDeviceProvider(
                 accessibility().setText(
                     arguments.deviceStringIncludingEmpty("search_text"),
                     arguments.deviceStringIncludingEmpty("value"),
+                ).toString()
+            "accessibility_input_text" ->
+                accessibility().inputText(
+                    nodeIndex = arguments["node"]?.let { arguments.deviceRequiredInt("node") },
+                    viewId = arguments["id"],
+                    searchText = arguments["text"],
+                    value = arguments.deviceStringIncludingEmpty("value"),
                 ).toString()
             "accessibility_tap" ->
                 accessibility().tap(
