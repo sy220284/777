@@ -103,6 +103,13 @@ internal fun ExtensionCatalogCard(
                             color = colors.textTertiary, maxLines = 1,
                             overflow = TextOverflow.Ellipsis)
                     }
+                    Text(
+                        description,
+                        modifier = Modifier.fillMaxWidth().testTag(tagPrefix + "-detail-" + id),
+                        style = DsType.small13.withReadingWeight(),
+                        color = colors.textSecondary,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 SyButton(
                     enabled = enabled, text = actionText,
@@ -112,13 +119,6 @@ internal fun ExtensionCatalogCard(
                     onClick = onAction,
                 )
             }
-            Text(
-                description,
-                modifier = Modifier.fillMaxWidth().testTag(tagPrefix + "-detail-" + id),
-                style = DsType.small13.withReadingWeight(),
-                color = colors.textSecondary,
-                maxLines = 2, overflow = TextOverflow.Ellipsis,
-            )
             if (statusLabel.isNotBlank()) {
                 Surface(
                     color = if (attentionNeeded) colors.warning.copy(alpha = 0.14f)
