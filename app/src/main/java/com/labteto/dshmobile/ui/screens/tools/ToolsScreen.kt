@@ -124,6 +124,9 @@ data class ToolsUiState(
     val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     val presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
     val curatedSkills: List<String> = emptyList(),
+    val codexPlugins: List<com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot> = emptyList(),
+    val codexLoading: Boolean = false,
+    val codexError: String? = null,
     val curatedLoading: Boolean = false,
     val curatedError: String? = null,
     val pendingSkillUpdates: Map<String, String> = emptyMap(),
@@ -336,6 +339,9 @@ class ToolsViewModel @Inject constructor(
                     skills = skills,
                     presets = presets,
                     curatedSkills = _state.value.curatedSkills,
+                    codexPlugins = _state.value.codexPlugins,
+                    codexLoading = _state.value.codexLoading,
+                    codexError = _state.value.codexError,
                     curatedLoading = _state.value.curatedLoading,
                     curatedError = _state.value.curatedError,
                 )
@@ -392,6 +398,25 @@ class ToolsViewModel @Inject constructor(
             } catch (error: Exception) {
                 _state.value = _state.value.copy(curatedLoading = false,
                     curatedError = "官方精选目录读取失败：" + (error.message ?: "请检查网络"))
+            }
+        }
+    }
+
+    /** Fetches official Codex catalog metadata, without installing or authorizing anything. */
+    fun refreshCodexPlugins() {
+        if (_state.value.codexLoading) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(codexLoading = true, codexError = null)
+            try {
+                val plugins = localTools.codexOfficialPlugins()
+                _state.value = _state.value.copy(codexLoading = false, codexPlugins = plugins)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                _state.value = _state.value.copy(
+                    codexLoading = false,
+                    codexError = "Codex 官方市场读取失败：" + (failure.message ?: "请检查网络"),
+                )
             }
         }
     }
@@ -910,6 +935,8 @@ fun ToolsScreen(
     // Switching tabs must not discard the plugin/skill search and filter context.
     val inventoryTabStates = rememberSaveableStateHolder()
     LaunchedEffect(selectedTab) {
+        if (selectedTab == 0 && state.codexPlugins.isEmpty() &&
+            !state.codexLoading && state.codexError == null) viewModel.refreshCodexPlugins()
         if (selectedTab in 0..1 && state.curatedSkills.isEmpty() &&
             !state.curatedLoading && state.curatedError == null) viewModel.refreshCuratedSkills()
     }
@@ -1020,6 +1047,10 @@ fun ToolsScreen(
                                     skills = state.skills,
                                     presets = state.presets,
                                     curatedSkills = state.curatedSkills,
+                                    codexPlugins = state.codexPlugins,
+                                    codexLoading = state.codexLoading,
+                                    codexError = state.codexError,
+                                    onRefreshCodex = viewModel::refreshCodexPlugins,
                                     curatedLoading = state.curatedLoading,
                                     curatedError = state.curatedError,
                                     pendingSkillUpdates = state.pendingSkillUpdates,
