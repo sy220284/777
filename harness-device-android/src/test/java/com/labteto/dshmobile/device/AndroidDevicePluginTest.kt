@@ -30,6 +30,7 @@ class AndroidDevicePluginTest {
         val names = registry.context.tools.names().toSet()
         assertTrue("android_device_info" in names)
         assertTrue("android_vscreen_create" in names)
+        assertTrue("android_vscreen_start" in names)
         assertTrue("android_clipboard_clear" in names)
         assertTrue("android_vscreen_screenshot" in names)
         assertTrue("android_find" in names)
@@ -74,8 +75,8 @@ class AndroidDevicePluginTest {
         registry.install(AndroidDevicePlugin(provider))
 
         val names = registry.context.tools.names()
-        assertEquals(33, names.size)
-        assertEquals(33, names.toSet().size)
+        assertEquals(34, names.size)
+        assertEquals(34, names.toSet().size)
         assertTrue(registry.isInstalled("android-device"))
 
         assertTrue(registry.uninstall("android-device"))
@@ -128,6 +129,24 @@ class AndroidDevicePluginTest {
         assertEquals("ok:device_info", info.content)
         assertTrue(tap.isError)
         assertEquals(listOf("device_info"), provider.calls.map { it.first })
+    }
+
+    @Test
+    fun virtualScreenOneStepStartRequiresApprovalAndForwardsPackage() = runTest {
+        val provider = RecordingProvider()
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(provider))
+        val noApproval = registry.context.tools.execute("android_vscreen_start",
+            buildJsonObject { put("package", "com.example.notes") })
+        assertTrue(noApproval.isError)
+        assertTrue(provider.calls.isEmpty())
+        val launched = registry.context.tools.execute("android_vscreen_start",
+            buildJsonObject { put("package", "com.example.notes") },
+            context = ToolContext(approval = { true }))
+        assertFalse(launched.isError)
+        assertEquals("vscreen_start", provider.calls.single().first)
+        assertEquals("com.example.notes", provider.calls.single().second["package"])
+        assertEquals(ToolAccess.DEVICE, registry.context.tools.get("android_vscreen_start")!!.access)
     }
 
     @Test
