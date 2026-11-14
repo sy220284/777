@@ -440,10 +440,11 @@ internal class LocalAgentTeamRuntime(
         binding: LocalWorkRunBinding,
     ): String? {
         if (call.name !in TOOL_NAMES) return null
-        // An omitted cursor includes existing durable results. An explicit cursor preserves
-        // the caller's exact continuation point, including through cold recovery.
+        // Default wait observes only events newer than its admission, while an explicit
+        // durable cursor replays exactly the unread messages, including cold recovery.
         val messageWaitCursor = if (call.name == "team_wait_for_message") {
-            call.arguments["after_sequence"]?.jsonPrimitive?.longOrNull?.takeIf { it >= 0L } ?: -1L
+            call.arguments["after_sequence"]?.jsonPrimitive?.longOrNull?.takeIf { it >= 0L }
+                ?: eventLogFor(binding.sessionId).latestSequence()
         } else -1L
         // Capture the watch fence before the first suspension. Otherwise a fast child
         // completion during projection admission is lost and the Lead waits unnecessarily.
