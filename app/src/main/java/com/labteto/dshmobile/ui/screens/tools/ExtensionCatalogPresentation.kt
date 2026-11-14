@@ -23,6 +23,9 @@ internal data class ExtensionPresentation(
 )
 
 private val localizedTitles = mapOf(
+    "code-mode-orchestration" to "代码工作流",
+    "mcp-bridge" to "MCP 服务桥接",
+    "github-connector" to "GitHub 连接器",
     "android-runtime" to "终端与运行环境",
     "local-language-server" to "代码分析",
     "android-device" to "设备控制",
@@ -71,6 +74,9 @@ private val localizedTitles = mapOf(
 )
 
 private val localizedDescriptions = mapOf(
+    "code-mode-orchestration" to "组合多项工具处理开发任务",
+    "mcp-bridge" to "连接并使用已配置的 MCP 工具服务",
+    "github-connector" to "连接 GitHub 仓库并进行开发协作",
     "android-runtime" to "运行终端命令并处理本地文件",
     "local-language-server" to "查找代码、检查问题和分析项目",
     "android-device" to "在授权范围内读取和操作设备",
@@ -118,6 +124,8 @@ internal fun extensionPresentation(
         else -> "本地插件"
     }
     val description = when {
+        kind == ExtensionKind.PLUGIN && localizedDescriptions.containsKey(key) ->
+            localizedDescriptions.getValue(key)
         containsHan(rawDescription) -> rawDescription.trim()
         localizedDescriptions.containsKey(key) -> localizedDescriptions.getValue(key)
         kind == ExtensionKind.SKILL -> "本地技能，可在详情中查看执行规则"
