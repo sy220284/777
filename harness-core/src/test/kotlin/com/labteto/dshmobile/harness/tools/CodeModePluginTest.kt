@@ -196,21 +196,37 @@ class CodeModePluginTest {
         assertTrue(result.content.contains("\"completed_steps\":0"))
     }
 
-    @Test fun mutationScopeAppliesToWrapperButReadOnlyChildrenDoNotNeedExtraApproval() = runTest {
+    @Test fun readOnlyCodeModeRunsInReadOnlyScopesWithoutApprovalsOrWrites() = runTest {
         val registry = ToolRegistry()
-        var called = false
-        register(registry, "read") { called = true; ToolResult("ok") }
+        var reads = 0
+        var writes = 0
+        var approvals = 0
+        register(registry, "read") { reads++; ToolResult("ok") }
+        register(registry, "write", access = ToolAccess.WORKSPACE_WRITE,
+            approval = ToolApprovalPolicy.ALWAYS) { writes++; ToolResult("updated") }
         CodeModePlugin(registry).install(HarnessContext(registry))
-        val noMutation = registry.executeTracked("code_mode_run", plan("read"),
-            context = ToolContext(allowMutation = false, approval = { true }))
-        assertFalse(noMutation.executionStarted)
-        assertEquals("MUTATION_SCOPE_BLOCKED", noMutation.result.errorCode)
-        assertFalse(called)
 
-        val readWithoutApproval = registry.executeTracked("code_mode_run", plan("read"))
-        assertFalse(readWithoutApproval.result.isError)
-        assertTrue(readWithoutApproval.executionStarted)
-        assertTrue(called)
+        val inspectPlan = plan("read", "read")
+        assertTrue(registry.isReadOnlyCodeModePlan(inspectPlan))
+        val response = registry.executeTracked("code_mode_run", inspectPlan,
+            context = ToolContext(allowMutation = false, approval = { approvals++; true }))
+        assertFalse(response.result.isError)
+        assertEquals(2, reads)
+        assertEquals(0, writes)
+        assertEquals(0, approvals)
+        assertTrue(response.result.content.contains("\"completed_steps\":2"))
+
+        val mixed = plan("read", "write")
+        assertFalse(registry.isReadOnlyCodeModePlan(mixed))
+        val rejected = registry.executeTracked("code_mode_run", mixed,
+            context = ToolContext(allowMutation = false))
+        assertFalse(rejected.executionStarted)
+        assertEquals("MUTATION_SCOPE_BLOCKED", rejected.result.errorCode)
+        assertEquals(2, reads) // Entire mixed script rejected before first tool
+        assertEquals(0, writes)
+
+        val fake = plan("read", "code_mode_run")
+        assertFalse(registry.isReadOnlyCodeModePlan(fake))
     }
 
     @Test fun priorDurableResultCanSupplyNestedArgumentsToNextTool() = runTest {
