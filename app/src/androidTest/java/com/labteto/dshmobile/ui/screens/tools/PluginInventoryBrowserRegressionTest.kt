@@ -235,17 +235,17 @@ class PluginInventoryBrowserRegressionTest {
             }
         }
         for (mode in listOf(ThemePreference.LIGHT, ThemePreference.DARK, ThemePreference.MATTE_BLACK)) {
-            for (dp in listOf(320, 360, 393, 412)) {
+            for (widthDp in listOf(320, 360, 393, 412)) {
                 compose.runOnIdle {
                     appearance.value = mode
-                    width.intValue = dp
+                    width.intValue = widthDp
                 }
                 val card = compose.onNodeWithTag("plugin-inventory-card-local:android-runtime")
                     .assertIsDisplayed().getUnclippedBoundsInRoot()
                 val title = compose.onNodeWithTag("plugin-inventory-title-local:android-runtime")
                     .assertIsDisplayed().getUnclippedBoundsInRoot()
-                assertTrue("Title must fit within the $dp dp card in $mode", title.right <= card.right)
-                assertTrue("Card must fit within available width $dp dp", card.width <= dp.dp)
+                assertTrue("Title must fit within the $widthDp dp card in $mode", title.right <= card.right)
+                assertTrue("Card must fit within available width $widthDp dp", card.width <= widthDp.dp)
             }
         }
     }
