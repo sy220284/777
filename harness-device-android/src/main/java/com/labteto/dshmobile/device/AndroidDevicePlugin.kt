@@ -93,9 +93,10 @@ class AndroidDevicePlugin(
                     ),
                     executor = HarnessToolExecutor { _, input, _ ->
                         val arguments = input.mapValues { (_, value) -> value.jsonPrimitive.content }
-                        ToolResult(
+                        androidDeviceToolResult(
+                            spec.capability,
                             provider.invoke(spec.capability, arguments),
-                            retention = spec.retention,
+                            spec.retention,
                         )
                     },
                 ),
@@ -141,3 +142,30 @@ class AndroidDevicePlugin(
     }
 }
 
+
+/**
+ * Android's false response means the action did not receive a completion receipt.
+ * Preserve the uncertain effect rather than recording a successful Work tool result.
+ */
+private val ANDROID_BOOLEAN_ACTIONS = setOf(
+    "accessibility_click_node", "accessibility_set_text_node", "accessibility_scroll",
+    "accessibility_click_text", "accessibility_set_text", "accessibility_tap",
+    "accessibility_swipe", "android_back", "android_home", "vscreen_tap",
+    "vscreen_swipe", "vscreen_close",
+)
+
+internal fun androidDeviceToolResult(
+    capability: String,
+    value: String,
+    retention: ToolResultRetention = ToolResultRetention.DURABLE,
+): ToolResult {
+    val unconfirmed = capability in ANDROID_BOOLEAN_ACTIONS && value == "false"
+    return ToolResult(
+        content = if (unconfirmed) "Android 未确认本次操作完成。请先重新读取当前界面或虚拟屏状态，再决定后续操作。" else value,
+        isError = unconfirmed,
+        errorCode = if (unconfirmed) "ANDROID_ACTION_UNCONFIRMED" else null,
+        retryable = false,
+        recoveryHint = if (unconfirmed) "重新检查当前界面；有副作用的操作应先核对结果再执行。" else null,
+        retention = retention,
+    )
+}
