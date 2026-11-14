@@ -125,6 +125,18 @@ internal object LocalWorkInvestigationRuntime {
         if (events.isEmpty()) return ""
         val lastFindings = linkedMapOf<String, JsonObject>()
         val recentSources = linkedMapOf<String, JsonObject>()
+        // Important findings outlive the bounded recent-tool display window.
+        // Stream only finding events through the indexed event ledger, retaining
+        // the latest revision of each item including explicit rejection.
+        if (goalId.isNotBlank()) {
+            log.forEachOfTypesAfter(-1L, setOf(FINDING_EVENT)) { event ->
+                val value = event.data
+                val id = value.text("finding_id")
+                if (value.text("goal_id") == goalId && id.isNotBlank()) {
+                    lastFindings[id] = value
+                }
+            }
+        }
         events.forEach { event ->
             val value = event.data
             if (event.type == FINDING_EVENT) {
@@ -137,6 +149,13 @@ internal object LocalWorkInvestigationRuntime {
         }
         val findings = lastFindings.values.filter { it.text("status") != "rejected" }.takeLast(4)
         val sources = recentSources.values.toList().takeLast(5)
+        // The latest reading of a source decides whether a continuation cursor is still open.
+        // Earlier pages must not keep requesting a cursor after a later page finished.
+        val latestBySource = linkedMapOf<String, JsonObject>()
+        recentSources.values.forEach { value ->
+            if (value.text("kind") != "search") latestBySource[value.text("source")] = value
+        }
+        val pendingReads = latestBySource.values.filter { it.text("has_next") == "true" }.takeLast(2)
         if (findings.isEmpty() && sources.isEmpty()) return ""
         return buildString {
             appendLine("【当前调查事实：以下来源仅证明已执行的读取范围，不能推断整个文件或全部数据已检查】")
@@ -146,6 +165,16 @@ internal object LocalWorkInvestigationRuntime {
                     .append(if (value.text("kind") == "search") "仅定位线索" else "已读取相关范围")
                 if (value.text("has_next") == "true") append("；返回了可继续读取的游标")
                 append("；调用 ").append(value.text("source_call_id")).appendLine()
+            }
+            if (pendingReads.isNotEmpty()) {
+                appendLine("【仍有未读完的材料】")
+                pendingReads.forEach { value ->
+                    append("- ").append(value.text("source")).append(" [")
+                        .append(value.text("region")).appendLine("]：优先使用来源工具返回的下一页游标继续读取。")
+                }
+            }
+            if (sources.isNotEmpty() && sources.all { it.text("kind") == "search" }) {
+                appendLine("【来源覆盖不足】目前只有检索定位，还没有读取原始内容；需要据此判断时先补读。")
             }
             findings.forEach { value ->
                 append("- 调查发现 ").append(value.text("finding_id"))
@@ -196,8 +225,13 @@ internal object LocalWorkInvestigationRuntime {
         if (goalId.isBlank()) return ""
         val observations = linkedSetOf<String>()
         val findings = linkedMapOf<String, String>()
-        scoped(log, goalId, null).forEach { event ->
+        // A rolling display window is insufficient for a durable progress fence:
+        // once 320 other events arrive it would silently forget valid discoveries
+        // and misclassify old work as fresh progress. Stream the indexed types
+        // across the whole Goal instead; no model text or tool content is copied.
+        log.forEachOfTypesAfter(-1L, setOf(SOURCE_EVENT, FINDING_EVENT)) { event ->
             val value = event.data
+            if (value.text("goal_id") != goalId) return@forEachOfTypesAfter
             if (event.type == SOURCE_EVENT) {
                 observations += value.text("source") + "|" + value.text("region") +
                     "|" + value.text("output_fingerprint")

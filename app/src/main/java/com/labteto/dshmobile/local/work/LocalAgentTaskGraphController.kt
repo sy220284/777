@@ -88,6 +88,10 @@ internal class LocalAgentTaskGraphController(
         requireCurrentWorkflowGoal(goal, goal)
         val plan = LocalWorkTaskGraphPlan(buildJsonObject {
             put("version", 1)
+            replacing?.let { predecessor ->
+                put("reuses_graph_id", predecessor.graphId)
+                put("reuses_graph_execution_id", requireNotNull(predecessor.graphExecutionId))
+            }
             originFindingId?.let { put("origin_finding_id", it) }
             put("backend_binding", backendCapabilities.backendBinding())
             put("user_revision", workflowUserRevision(binding.eventLog))
@@ -372,6 +376,7 @@ internal class LocalAgentTaskGraphController(
         try {
             checkOwner()
             require(plan.value["version"]?.jsonPrimitive?.intOrNull == 1) { "任务图持久定义版本不受支持" }
+            seedReusableReadOnlyGraphResults(log, workspaceRoot, graphId, execution, goalId, plan)
             val result = workflow.runDetailed(plan.prepared, plan.recoveredResults(log, execution, workspaceRoot))
             checkOwner()
             settle(result.executionOutcome)

@@ -55,7 +55,8 @@ internal data class LocalWorkTaskGraphPlan(val value: JsonObject) {
 
     // FEATURE_TREE: {"id":"work.taskgraph.durable-acceptance","path":"第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 持久任务图与节点验收（未合并）","entry":"recoveredResults","owner":"WORK","test":"app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTaskGraphPlanTest.kt#coldRestoreReusesCompletedNodeAndContinuesRemainingNode"}
     fun recoveredResults(log: LocalSessionEventLog, executionId: String, root: File): Map<String, TaskGraphNodeResult> {
-        val (facts, resultEvents) = LocalWorkRecoveryProjections.forLog(log).acceptedFor(log, executionId)
+        val recovery = LocalWorkRecoveryProjections.forLog(log)
+        val (facts, resultEvents) = recovery.acceptedFor(log, executionId)
         val immutableNodes = nodes
         val currentFiles = immutableNodes.indices.associateWith { fileVersions(root, it) }
         val results = linkedMapOf<String, TaskGraphNodeResult>()
@@ -74,9 +75,31 @@ internal data class LocalWorkTaskGraphPlan(val value: JsonObject) {
                 } }
                 if (fact["dependency_versions"] != depVersions) return@forEachIndexed
                 val resultRef = fact["result_sequence"]?.jsonPrimitive?.longOrNull ?: return@forEachIndexed
-                val actual = resultEvents[resultRef] ?: return@forEachIndexed
-                if (actual["job_id"] != fact["job_id"]) return@forEachIndexed
-                if (actual["node_version"]?.jsonPrimitive?.contentOrNull != nodeVersion(node) ||
+                // A read-only replan may borrow an independently verified result from
+                // an immutable predecessor graph. The old result keeps its original
+                // node version and job identity; only the new acceptance is re-bound.
+                // Every reference must still match an actual, durable predecessor fact.
+                val borrowedFrom = fact["reused_from_execution_id"]?.jsonPrimitive?.contentOrNull
+                val predecessor = borrowedFrom?.let { recovery.acceptedNode(log, it, node.id)?.data }
+                if (borrowedFrom != null && (predecessor == null ||
+                        predecessor["job_id"] != fact["job_id"] ||
+                        predecessor["result_sequence"] != fact["result_sequence"] ||
+                        predecessor["output_version"] != fact["output_version"] ||
+                        predecessor["dependencies"] != fact["dependencies"] ||
+                        predecessor["dependency_versions"] != fact["dependency_versions"] ||
+                        predecessor["files"] != fact["files"] ||
+                        predecessor["goal_fingerprint"] != value["goal_fingerprint"])) return@forEachIndexed
+                val actual = if (predecessor != null) {
+                    val jobId = fact["job_id"]?.jsonPrimitive?.contentOrNull ?: return@forEachIndexed
+                    recovery.jobResult(log, jobId)?.takeIf { it.sequence == resultRef }?.data
+                } else resultEvents[resultRef]
+                if (actual == null || actual["job_id"] != fact["job_id"]) return@forEachIndexed
+                val sourceJobNodeVersion = fact["source_job_node_version"]?.jsonPrimitive?.contentOrNull
+                val expectedJobNodeVersion = if (predecessor != null) {
+                    sourceJobNodeVersion ?: predecessor["node_version"]?.jsonPrimitive?.contentOrNull
+                        ?: return@forEachIndexed
+                } else nodeVersion(node)
+                if (actual["node_version"]?.jsonPrimitive?.contentOrNull != expectedJobNodeVersion ||
                     actual["goal_fingerprint"] != value["goal_fingerprint"] ||
                     actual["tool_execution_ids"] !is JsonArray) return@forEachIndexed
                 val before = actual["files"] as? JsonObject ?: return@forEachIndexed

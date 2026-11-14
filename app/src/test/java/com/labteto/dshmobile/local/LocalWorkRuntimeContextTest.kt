@@ -66,11 +66,12 @@ class LocalWorkRuntimeContextTest {
             context = "", workspacePath = "/workspace", model = "test-model",
             baseUrl = "", profile = null, task = "检查界面代码与测试",
         )
-        assertTrue(context.contains("保持连续的自主调查"))
+        assertTrue(context.contains("【默认认知与交互方式】"))
+        assertTrue(context.contains("每次获取关键工具结果后检查其是否改变原假说"))
         assertTrue(context.contains("需要据此下结论时应继续读取相关原文"))
         assertTrue(context.contains("work_finding"))
-        assertTrue(context.contains("自然说出具体发现、原因和下一步"))
-        assertTrue(context.contains("情境适合时可表现好奇、惊讶或兴奋"))
+        assertTrue(context.contains("重要发现及时向用户自然说明并主动追查"))
+        assertTrue(context.contains("允许真实好奇、惊讶和兴奋"))
         assertTrue(context.contains("不得以模型文字代替实际结果"))
         assertFalse(context.contains("每次工具调用必须"))
     }
