@@ -94,8 +94,11 @@ internal data class LocalWorkTaskGraphPlan(val value: JsonObject) {
                     recovery.jobResult(log, jobId)?.takeIf { it.sequence == resultRef }?.data
                 } else resultEvents[resultRef]
                 if (actual == null || actual["job_id"] != fact["job_id"]) return@forEachIndexed
-                val expectedJobNodeVersion = predecessor?.get("node_version")
-                    ?.jsonPrimitive?.contentOrNull ?: nodeVersion(node)
+                val sourceJobNodeVersion = fact["source_job_node_version"]?.jsonPrimitive?.contentOrNull
+                val expectedJobNodeVersion = if (predecessor != null) {
+                    sourceJobNodeVersion ?: predecessor["node_version"]?.jsonPrimitive?.contentOrNull
+                        ?: return@forEachIndexed
+                } else nodeVersion(node)
                 if (actual["node_version"]?.jsonPrimitive?.contentOrNull != expectedJobNodeVersion ||
                     actual["goal_fingerprint"] != value["goal_fingerprint"] ||
                     actual["tool_execution_ids"] !is JsonArray) return@forEachIndexed
