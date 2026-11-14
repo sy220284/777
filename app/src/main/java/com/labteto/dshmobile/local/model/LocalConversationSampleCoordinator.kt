@@ -26,6 +26,7 @@ internal data class LocalConversationSampleResult(
     val inputTokens: Long,
     val outputTokens: Long,
     val usageReported: Boolean,
+    val estimatedCostCny: Double?,
 )
 
 internal const val LOCAL_SESSION_SAMPLE_MAX_PROMPT_BYTES = 4_000
@@ -137,6 +138,8 @@ internal class LocalConversationSampleCoordinator @Inject constructor(
                 inputTokens = reply.usage.promptTokens,
                 outputTokens = reply.usage.completionTokens,
                 usageReported = reply.usage.reported,
+                estimatedCostCny = reply.requestId.takeIf(String::isNotBlank)
+                    ?.let(usageTracker::analyticsRecord)?.estimatedCostCny?.takeIf { it > 0.0 },
             )
         } finally {
             sampleLock.unlock()
