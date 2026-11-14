@@ -40,6 +40,7 @@ sealed interface UiToolDraftValidation {
 }
 data class UiSkillRequirement(
     val type: String, val value: String, val description: String = "", val registered: Boolean = false,
+    val transport: String? = null, val url: String? = null, val command: String? = null,
 )
 data class UiSkillSnapshot(val name: String, val description: String, val modelInvocable: Boolean,
     val displayName: String = name, val sourceUrl: String? = null, val sourceWarning: String? = null,
