@@ -69,7 +69,7 @@ internal class LocalSecurityReviewLedger(private val log: LocalSessionEventLog) 
             put("report", report); put("verdict", verdict)
             put("reviewer_profile_id", profileId)
             request?.data?.get("goal_id")?.let { put("goal_id", it) }
-            request?.data?.get("goal_start_sequence")?.let { put("goal_revision", it) }
+            request?.data?.get("goal_start_sequence")?.let { put("goal_start_sequence", it) }
         })
         return LocalSecurityReview(id, ref, digest, report, verdict, event.sequence)
     }
@@ -113,7 +113,7 @@ internal class LocalSecurityReviewLedger(private val log: LocalSessionEventLog) 
             put("id", id); put("sequence", sequence); put("digest", freshDigest)
             put("decision", "human_security_approval")
             request?.data?.get("goal_id")?.let { put("goal_id", it) }
-            request?.data?.get("goal_start_sequence")?.let { put("goal_revision", it) }
+            request?.data?.get("goal_start_sequence")?.let { put("goal_start_sequence", it) }
         })
         true
     }
