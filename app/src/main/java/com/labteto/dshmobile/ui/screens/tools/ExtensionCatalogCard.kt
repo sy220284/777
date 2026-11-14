@@ -93,7 +93,7 @@ internal fun ExtensionCatalogCard(
                 ) {
                     Text(
                         title,
-                        modifier = Modifier.testTag(tagPrefix + "-title-" + id),
+                        modifier = Modifier.fillMaxWidth().testTag(tagPrefix + "-title-" + id),
                         style = DsType.std14Strong.withReadingWeight(),
                         color = colors.text,
                         maxLines = 1,
@@ -101,7 +101,7 @@ internal fun ExtensionCatalogCard(
                     )
                     Text(
                         description,
-                        modifier = Modifier.testTag(tagPrefix + "-detail-" + id),
+                        modifier = Modifier.fillMaxWidth().testTag(tagPrefix + "-detail-" + id),
                         style = DsType.small13.withReadingWeight(),
                         color = colors.textSecondary,
                         maxLines = 2,
