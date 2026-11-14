@@ -1,4 +1,4 @@
-# 神言神语 V6.3 · 当前 Android 手机 UI 完整设计源
+# 神言神语 V6 · 当前 Android 手机设计资源
 
 > 本设计包是恢复原生 Android V6.3 的事实参考；新版业务修复与新增功能以现行核心代码为准。历史 UI 3.0 接入规范已退役，不恢复已取消功能入口。
 
@@ -7,7 +7,7 @@
 - **[V6.3 当前 Compose 真实实现规范](V6-CURRENT-IMPLEMENTATION.zh-CN.md)**：三主题的真实 ARGB、L1–L5 材质、区域透明度、尺寸、动效、触觉、7 条顶层路由、21 个设置二级页、工作/聊天/工具等交互与退役清单。
 - **[现行页面与退役入口机器清单](current-ui.json)**：`LocalFeatureCatalog` 和 `SettingsDestination` 的对应关系及历史合并事实，按现行原生路由组织，不再按历史样张编号。
 - **[打开当前手机单列交互设计稿](mobile/app.html)**：本轮按主线重新组织，只允许当前仍有真实入口的页面/状态。它是离线交互投影，**不是 Android 真实截图，也不是 Figma 已同步证明**。
-- [可复用 SVG 入口图标](sy-entry-icons.svg)、[图标源文件映射](SY-ENTRY-ICONS.zh-CN.md)、[文件类 SVG](assets/file-icons-preview.svg)、[逐场景验收台账](STATUS.zh-CN.md)。其中原代码保留 26 个原始 SVG 路径，**仅 24 个属于当前现行功能入口**；`Projects`、`RunCenter` 为历史退役入口，在新版交付素材中剔除，不以路径存在恢复 UI。详见图标规范。
+- [可复用 SVG 入口图标](sy-entry-icons.svg)、[图标源文件映射](SY-ENTRY-ICONS.zh-CN.md)、[文件类 SVG](assets/file-icons-preview.svg)、[现行设计与实现状态](STATUS.zh-CN.md)。其中原代码保留 26 个原始 SVG 路径，**仅 24 个属于当前现行功能入口**；`Projects`、`RunCenter` 为历史退役入口，在新版交付素材中剔除，不以路径存在恢复 UI。详见图标规范。
 
 ## 本轮升级：V6.4 视觉与材质设计目标（尚未写入 Android）
 
@@ -18,7 +18,7 @@
 ## 现有成熟交互与专用视觉的权威来源
 
 - [V6.3 已实现交互与组件契约](V6-IMPLEMENTED-INTERACTION-CONTRACT.zh-CN.md)：全宽阅读、滚动锚点、IME 跟随、字号自适应、Work 六态、文件共享转场和现有测试来源。
-- [手机/人物设计](../mobile-ui.md) 与 [媒体专用规格](V6-MEDIA-CHAT-EXPERIENCE.zh-CN.md)：保留双列人物、相片详情、真实媒体结果和自动模型路由。
+- [手机/人物设计](../mobile-ui.md)及[现行媒体能力](../../MEDIA-CAPABILITIES.zh-CN.md)：说明人物管理、媒体创作入口与结果归属；交互组件以当前 Compose 实现为准。
 - **文档关系**：现行实现与交互契约描述已落地行为，V6.4 记录未来设计目标，STATUS 维护设计与功能状态，离线 HTML 作为演示稿。
 
 ## 以代码为准的视觉归属
@@ -54,7 +54,6 @@ Figma 当前 Starter MCP 配额耗尽，未写入可编辑画布；Canva 未检�
 
 - [V6.3 全图标三主题检查画廊](icon-gallery.html)：按 24+61+20+11+12 五类展示 SVG 实物，支持暖纸、烟熏玻璃、哑光黑切换。它是设计目测载体，实际 Android 图标以 Compose/XML 为准。
 
-## V6.3 正式交付
+## 图标资源规范
 
-- **[V6.3 交付变更与验收](V6.3-DELIVERY.zh-CN.md)**：统一版本口径、全部图标清单和真实交付边界。
-- **[V6.3 图标规范](V6.3-ICON-SYSTEM.zh-CN.md)**：全量 128 个可编辑变体的标准及 Android 对应关系。
+- **[V6.3 图标规范](V6.3-ICON-SYSTEM.zh-CN.md)**：可编辑图标及 Android 对应关系。
