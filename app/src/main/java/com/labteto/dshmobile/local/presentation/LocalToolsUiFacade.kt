@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -225,7 +226,20 @@ class LocalToolsUiFacade @Inject internal constructor(
         tools.createSkill(id, displayName, description, instructions)
     override suspend fun importSkill(filename: String, bytes: ByteArray) = tools.importSkill(filename, bytes)
     suspend fun importSkillStream(filename: String, input: java.io.InputStream): String =
-        withContext(Dispatchers.IO) { skillManager.importSkill(filename, input) }
+        withContext(Dispatchers.IO) {
+            val owner = kotlinx.coroutines.currentCoroutineContext()
+            val stream = object : java.io.FilterInputStream(input) {
+                override fun read(): Int {
+                    owner.ensureActive()
+                    return super.read().also { owner.ensureActive() }
+                }
+                override fun read(bytes: ByteArray, offset: Int, length: Int): Int {
+                    owner.ensureActive()
+                    return `in`.read(bytes, offset, length).also { owner.ensureActive() }
+                }
+            }
+            skillManager.importSkill(filename, stream) { owner.ensureActive() }
+        }
     suspend fun exportSkillPackage(id: String): ByteArray = tools.exportSkillPackage(id)
     suspend fun exportSkillPackageToFile(id: String, destination: java.io.File) =
         withContext(Dispatchers.IO) { skillManager.exportSkillPackageToFile(id, destination) }
