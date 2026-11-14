@@ -184,13 +184,30 @@ class ToolsViewModel @Inject constructor(
             _agentBackendStatus.value = "远端连接验证失败：" + (failure.message ?: "连接中断")
         }
     } }
-    fun configureAgentBackend(host: String, port: Int, pin: String, token: String, consent: Boolean) { viewModelScope.launch {
-        try {
-            operationGate.run { localTools.configureAgentBackend(host, port, pin, token, consent) }
-            refreshAgentBackend()
-        } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { _agentBackendStatus.value = "保存失败，请检查主机、端口、证书和连接口令" }
-    } }
+    fun configureAgentBackend(
+        host: String,
+        port: Int,
+        pin: String,
+        token: String,
+        consent: Boolean,
+        onCompleted: (Boolean) -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            _agentBackendStatus.value = "正在保存远端授权…"
+            try {
+                operationGate.run { localTools.configureAgentBackend(host, port, pin, token, consent) }
+                // The UI may discard its in-memory token only after the persistence call succeeds.
+                _agentBackendStatus.value = "已保存远端授权，待连接验证"
+                onCompleted(true)
+                refreshAgentBackend()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _agentBackendStatus.value = "保存失败，请检查主机、端口、证书和连接口令"
+                onCompleted(false)
+            }
+        }
+    }
     fun revokeAgentBackend() { viewModelScope.launch {
         try { operationGate.run { localTools.revokeAgentBackend() }; refreshAgentBackend() }
         catch (cancelled: CancellationException) { throw cancelled }

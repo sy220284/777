@@ -45,8 +45,9 @@ internal fun LocalSessionSampleSheet(
     var error by remember(sessionId) { mutableStateOf<String?>(null) }
     var running by remember(sessionId) { mutableStateOf(false) }
     var job by remember(sessionId) { mutableStateOf<Job?>(null) }
-    val valid = prompt.isNotBlank() &&
-        prompt.toByteArray(Charsets.UTF_8).size <= LOCAL_SESSION_SAMPLE_MAX_PROMPT_BYTES
+    val promptBytes = prompt.toByteArray(Charsets.UTF_8).size
+    val promptTooLong = promptBytes > LOCAL_SESSION_SAMPLE_MAX_PROMPT_BYTES
+    val valid = prompt.isNotBlank() && !promptTooLong
 
     SyResponsiveSheet(
         title = stringResource(R.string.local_session_sample_title),
@@ -73,11 +74,14 @@ internal fun LocalSessionSampleSheet(
             minLines = 3,
             maxLines = 6,
             enabled = !running,
-        )
-        Text(
-            "${prompt.toByteArray(Charsets.UTF_8).size}/$LOCAL_SESSION_SAMPLE_MAX_PROMPT_BYTES 字节",
-            style = DsType.caption11.withReadingWeight(),
-            color = if (valid || prompt.isEmpty()) colors.textTertiary else colors.dangerInk,
+            isError = promptTooLong,
+            supportingText = {
+                Text(
+                    if (promptTooLong) "输入超出限制，请删减文字（$promptBytes/$LOCAL_SESSION_SAMPLE_MAX_PROMPT_BYTES 字节）"
+                    else "$promptBytes/$LOCAL_SESSION_SAMPLE_MAX_PROMPT_BYTES 字节",
+                    style = DsType.caption11.withReadingWeight(),
+                )
+            },
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
