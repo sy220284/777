@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.device.vscreen
 
+import android.app.ActivityManager
 import android.app.ActivityOptions
+import android.content.pm.PackageManager
+import android.os.Build
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
@@ -106,9 +109,21 @@ class VirtualDisplayController(
         val intent = context.packageManager.getLaunchIntentForPackage(packageName)
             ?: error("应用没有可启动入口：$packageName")
         intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-        val options = ActivityOptions.makeBasic()
-            .setLaunchDisplayId(session.display.display.displayId)
-            .toBundle()
+        val displayId = session.display.display.displayId
+        check(session.display.display.isValid) { "虚拟屏已失效：$id；请关闭后重新创建" }
+        check(context.packageManager.hasSystemFeature(
+            PackageManager.FEATURE_ACTIVITIES_ON_SECONDARY_DISPLAYS,
+        )) { "设备不支持在独立显示器启动应用；请使用主屏操作能力" }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val manager = context.getSystemService(ActivityManager::class.java)
+            if (!manager.isActivityStartAllowedOnDisplay(context, displayId, intent)) {
+                throw SecurityException(
+                    "Android 拒绝将 $packageName 启动到虚拟显示器 $displayId：" +
+                        "当前应用没有该目标显示器的活动启动许可；可用 android_vscreen_close 回收槽位。",
+                )
+            }
+        }
+        val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
         context.startActivity(intent, options)
         return "已在虚拟屏 $id 启动 $packageName"
     }
