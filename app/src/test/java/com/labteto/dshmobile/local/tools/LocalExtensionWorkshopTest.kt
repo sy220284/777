@@ -64,7 +64,7 @@ class LocalExtensionWorkshopTest {
             val created = workshop.createMcp("mcp-mcp-selftest", "node", "console.log('ok')")
             assertTrue(created.contains("服务 ID：selftest"))
             assertTrue(workspace.readRaw(".dsh/extensions/mcp-selftest/manifest.json")
-                .contains("\\"server_id\\":\\"selftest\\""))
+                .contains("\"server_id\":\"selftest\""))
             assertFalse(java.io.File(workspace.path,
                 ".dsh/extensions/mcp-mcp-mcp-selftest/manifest.json").exists())
             assertEquals("selftest", workshop.canonicalMcpId("mcp-mcp-selftest"))
