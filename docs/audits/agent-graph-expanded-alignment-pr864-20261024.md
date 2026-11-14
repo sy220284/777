@@ -31,7 +31,7 @@
 | A16 多模型路由 | 部分落地 | `LocalAgentControlPlane.kt`、`LocalPersistentJobRecoveryCoordinator.kt` | 能选择/固定模型路由，未见按成本质量时延自动规划与完整路由实验 |
 | A17 智能调度 | 部分落地 | `LocalTeamIdleTaskDispatch.kt`、`LocalAgentSubtreeBudget.kt`、ResourceScheduler | 依赖就绪/有界预算已存在；未达公平优先级、跨拓扑抢占/熔断自适应 |
 | A18 运行与驻留分离 | 部分落地 | `LocalAgentTeamActivityProjection.kt`、`LocalPersistentJobRecoveryCoordinator.kt` | 有 idle/dormant/续跑；未覆盖所有 Backend 的卸载/加载协议 |
-| A19 中断恢复 | 部分落地 | `LocalSubagentContinuation.kt`、`LocalPersistentJobRecoveryCoordinator.kt` | 有恢复 watermark、副作用审慎策略，缺完整 SIGKILL/OOM/设备异常/跨版本注入矩阵实测 |
+| A19 中断恢复 | 部分落地 | `LocalSubagentContinuation.kt`、`LocalPersistentJobRecoveryCoordinator.kt` | 有恢复 watermark、副作用审慎策略，进程终止、内存不足和跨版本恢复行为仍有完善空间 |
 | A20 多执行后端 | 未落地 | `LocalSubagentRunnerFactory.kt` 仍走本地执行组合 | 未见 LocalSandbox/RemoteTrusted 的真实分布式身份、租约、结果 reconcile |
 | A21 实时可观测 | 部分落地 | `LocalAgentTreeProjection.kt`、`LocalAgentTeamUi.kt`、EventLog | 有树与成员事件视图，缺完整证据差分、全链跨度/花费追踪和历史缺口 UI |
 | A22 人工协同 | 部分落地 | `LocalAgentTeamUi.kt` 的消息/中断/重派入口 | 缺完整授权撤销、指定验证、冲突审查、执行前用户签批全路径 |
