@@ -219,7 +219,10 @@ internal class LocalSkillStore(
                 "技能规则文件不可读取：${preset.id}"
             }
             val current = if (!originalExists) null else workspace.readSkill(preset.id)
-            val disabled = if (current != null) !workspace.skillMetadata(preset.id).modelInvocable else false
+            // Read the already materialized text: malformed long lines are damaged content,
+            // not a reason to fail before the bundled repair can preserve a backup.
+            val metadata = current?.let { parseLocalSkillMetadata(preset.id, it) }
+            val disabled = metadata?.modelInvocable == false
             val desired = withModelInvocationDisabled(baseDocument, disabled)
             val baseline = File(skillsDir, "${preset.id}/.bundled-baseline-sha256")
             val previousBaseline = when {
@@ -237,7 +240,7 @@ internal class LocalSkillStore(
             // rules must survive regardless of their length.
             val validCustomDocument = current != null &&
                 current.lineSequence().firstOrNull()?.trim() == "---" &&
-                parseLocalSkillMetadata(preset.id, current).description.isNotBlank()
+                metadata?.description?.isNotBlank() == true
             if (validCustomDocument && !clean && current != desired) {
                 // A valid local override wins over bundled updates, including legacy
                 // installations created before the fingerprint marker existed.
