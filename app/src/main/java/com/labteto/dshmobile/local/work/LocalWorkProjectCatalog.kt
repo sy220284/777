@@ -29,10 +29,20 @@ data class LocalWorkProject(
     val requestId: String,
 )
 
+/** History of actual directory moves. The original Session EventLog remains immutable. */
+@Serializable
+data class LocalWorkProjectRelocation(
+    val projectId: String,
+    val from: String,
+    val to: String,
+    val changedAtMs: Long,
+)
+
 data class LocalWorkProjectSnapshot(
     val projects: List<LocalWorkProject> = emptyList(),
     val sessionProjects: Map<String, String> = emptyMap(),
     val revision: Long = 0,
+    val relocations: List<LocalWorkProjectRelocation> = emptyList(),
 )
 
 @Serializable
@@ -41,6 +51,7 @@ private data class LocalWorkProjectRecord(
     val projects: List<LocalWorkProject> = emptyList(),
     val sessionProjects: Map<String, String> = emptyMap(),
     val revision: Long = 0,
+    val relocations: List<LocalWorkProjectRelocation> = emptyList(),
 )
 
 /** Durable intent makes a directory rename recoverable if the process dies between two commits. */
@@ -247,11 +258,17 @@ internal class LocalWorkProjectCatalog(
         try {
             Files.move(from, to, StandardCopyOption.ATOMIC_MOVE)
             moved = true
-            commit(old.copy(projects = old.projects.map {
-                if (it.id == id) it.copy(
-                    root = newRoot, updatedAtMs = System.currentTimeMillis(),
-                ) else it
-            }))
+            commit(old.copy(
+                projects = old.projects.map {
+                    if (it.id == id) it.copy(
+                        root = newRoot, updatedAtMs = System.currentTimeMillis(),
+                    ) else it
+                },
+                relocations = old.relocations + LocalWorkProjectRelocation(
+                    projectId = id, from = project.root, to = newRoot,
+                    changedAtMs = System.currentTimeMillis(),
+                ),
+            ))
         } catch (failure: Exception) {
             if (moved) {
                 try {
@@ -380,8 +397,46 @@ internal class LocalWorkProjectCatalog(
         commit(old.copy(
             projects = old.projects.filterNot { it.id == id },
             sessionProjects = old.sessionProjects.filterValues { it != id },
+            relocations = old.relocations.filterNot { it.projectId == id },
         ))
         true
+    }
+
+    /**
+     * Resolve old conversation file references through real, persisted project moves.
+     * This is read-only and session-scoped: existing paths always win, ambiguous/symlink
+     * targets stay rejected, and no user text or original Session events are rewritten.
+     */
+    fun relocatedReadPath(sessionId: String, historicalPath: String): String? = synchronized(lock) {
+        validateSession(sessionId)
+        val old = mutable.value
+        val projectId = old.sessionProjects[sessionId] ?: return@synchronized null
+        val normalized = try { normalizeRootText(historicalPath) }
+            catch (_: IllegalArgumentException) { return@synchronized null }
+        if (normalized != historicalPath || normalized == ".") return@synchronized null
+        val base = workspace.canonicalFile.toPath()
+        fun safeFile(path: String): java.nio.file.Path? {
+            val candidate = base.resolve(path).normalize()
+            if (!candidate.startsWith(base) || candidate == base) return null
+            var cursor = base
+            for (part in base.relativize(candidate)) {
+                cursor = cursor.resolve(part)
+                if (Files.isSymbolicLink(cursor)) return null
+            }
+            return candidate
+        }
+        // File paths that are currently valid must never be silently redirected.
+        val original = safeFile(normalized) ?: return@synchronized null
+        if (Files.exists(original, LinkOption.NOFOLLOW_LINKS)) return@synchronized null
+        var relocated = normalized
+        old.relocations.asSequence().filter { it.projectId == projectId }.forEach { move ->
+            if (relocated == move.from || relocated.startsWith(move.from + "/")) {
+                relocated = move.to + relocated.removePrefix(move.from)
+            }
+        }
+        if (relocated == normalized) return@synchronized null
+        val actual = safeFile(relocated) ?: return@synchronized null
+        relocated.takeIf { Files.isRegularFile(actual, LinkOption.NOFOLLOW_LINKS) }
     }
 
     /** Atomic session reassignment across projects, consistent with the existing Session owner. */
@@ -413,7 +468,8 @@ internal class LocalWorkProjectCatalog(
         val next = value.copy(revision = mutable.value.revision + 1)
         val encoded = json.encodeToString(LocalWorkProjectRecord.serializer(),
             LocalWorkProjectRecord(projects = next.projects,
-                sessionProjects = next.sessionProjects, revision = next.revision)
+                sessionProjects = next.sessionProjects, revision = next.revision,
+                relocations = next.relocations)
         ).toByteArray(Charsets.UTF_8)
         require(encoded.size <= MAX_BYTES) { "项目目录超过存储上限" }
         file.parentFile?.let { Files.createDirectories(it.toPath()) }
@@ -456,7 +512,17 @@ internal class LocalWorkProjectCatalog(
             validateSession(id)
             require(projectId in projectIds) { "项目包含无效会话归属" }
         }
-        return LocalWorkProjectSnapshot(record.projects, record.sessionProjects, record.revision)
+        record.relocations.forEach { item ->
+            require(item.projectId in projectIds && item.from != item.to &&
+                item.from == normalizeRootText(item.from) &&
+                item.to == normalizeRootText(item.to) &&
+                item.from != "." && item.to != "." && item.changedAtMs >= 0L) {
+                "项目历史移动记录无效"
+            }
+        }
+        return LocalWorkProjectSnapshot(
+            record.projects, record.sessionProjects, record.revision, record.relocations,
+        )
     }
 
     private fun checkedName(raw: String) = raw.trim().also {
@@ -517,6 +583,8 @@ class LocalWorkProjectStore @Inject internal constructor(
         filesWorkspace.withWorkspaceFileMutation {
             catalog.moveDirectory(id, expectedRoot, root)
         }
+    fun relocatedReadPath(sessionId: String, historicalPath: String) =
+        catalog.relocatedReadPath(sessionId, historicalPath)
     fun move(id: String, newIndex: Int) = catalog.move(id, newIndex)
     fun delete(id: String) = catalog.delete(id)
     fun assign(ids: Set<String>, id: String?) = catalog.assign(ids, id)
