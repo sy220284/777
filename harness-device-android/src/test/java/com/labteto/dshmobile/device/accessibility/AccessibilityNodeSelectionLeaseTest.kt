@@ -64,6 +64,43 @@ class AccessibilityNodeSelectionLeaseTest {
             listOf(node(0), node(1, "新增"), reindexed)))
     }
 
+    @Test fun composeFieldCanMoveAfterImeLayoutWithoutLosingItsIdentity() {
+        val selection = AccessibilityNodeSelectionLease()
+        val input = AccessibilityNodeSnapshot(1, "", "搜索", null, "EditText",
+            true, true, "[10,100][500,150]", 3)
+        selection.replace(4, listOf(node(0), input))
+        val moved = input.copy(index = 2, bounds = "[10,60][500,110]")
+        assertEquals(2, selection.resolveEditableIndex(1, 4,
+            listOf(node(0), node(1, "其他"), moved)))
+    }
+
+    @Test fun composeRebindingNeverPicksAnotherSingleEditableFieldWithChangedSemantics() {
+        val selection = AccessibilityNodeSelectionLease()
+        val input = AccessibilityNodeSnapshot(1, "", "手机号", null, "EditText",
+            true, true, "[10,100][500,150]", 3)
+        selection.replace(4, listOf(node(0), input))
+        val changedScreen = input.copy(index = 2, bounds = "[10,80][500,130]",
+            contentDescription = "验证码")
+        assertThrows(IllegalStateException::class.java) {
+            selection.resolveEditableIndex(1, 4,
+                listOf(node(0), node(1, "其他"), changedScreen))
+        }
+    }
+
+    @Test fun composeFieldMoveRemainsAmbiguousWhenTwoFieldsHaveSameSemantics() {
+        val selection = AccessibilityNodeSelectionLease()
+        val input = AccessibilityNodeSnapshot(1, "", "搜索", null, "EditText",
+            true, true, "[10,100][500,150]", 3)
+        selection.replace(4, listOf(node(0), input))
+        assertThrows(IllegalStateException::class.java) {
+            selection.resolveEditableIndex(1, 4, listOf(
+                node(0),
+                input.copy(index = 1, bounds = "[10,60][500,110]"),
+                input.copy(index = 2, bounds = "[10,170][500,220]"),
+            ))
+        }
+    }
+
     @Test fun composeInputRebindRejectsWindowChangeAndAmbiguousFields() {
         val selection = AccessibilityNodeSelectionLease()
         val input = AccessibilityNodeSnapshot(1, "", null, null, "EditText", false, true,
