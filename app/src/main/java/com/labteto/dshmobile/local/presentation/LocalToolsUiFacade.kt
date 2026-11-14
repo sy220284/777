@@ -207,12 +207,18 @@ class LocalToolsUiFacade @Inject internal constructor(
                     "SkillOrigin", "技能来源证据无效：${item.name}", failure,
                 )
             }
+            val dependencyResult = runCatching { skillManager.dependencies(item.name) }
+            dependencyResult.exceptionOrNull()?.let { failure ->
+                com.labteto.dshmobile.observability.AppLog.warn(
+                    "SkillDependencies", "技能依赖元数据无法校验：${item.name}", failure,
+                )
+            }
             com.labteto.dshmobile.uicontract.UiSkillSnapshot(
                 item.name, item.description, item.modelInvocable, item.displayName,
                 sourceUrl = result.getOrNull(),
                 sourceWarning = if (result.isFailure) "技能来源记录校验失败，请检查或重新安装此技能" else null,
                 rollbackAvailable = gitHubSkillImporter.canRollback(item.name),
-                requirements = skillManager.dependencies(item.name).map { requirement ->
+                requirements = dependencyResult.getOrNull()?.map { requirement ->
                     val registered = when (requirement.type.lowercase()) {
                         "mcp" -> connected.any { server ->
                             server.id == requirement.value || requirement.value in server.tools
@@ -225,7 +231,12 @@ class LocalToolsUiFacade @Inject internal constructor(
                         requirement.type, requirement.value, requirement.description, registered,
                         requirement.transport, requirement.url, requirement.command,
                     )
-                },
+                } ?: listOf(
+                    com.labteto.dshmobile.uicontract.UiSkillRequirement(
+                        "metadata", item.name,
+                        "技能依赖文件读取失败；请检查 agents/openai.yaml 的路径和内容", false,
+                    )
+                ),
             )
         }
     }
