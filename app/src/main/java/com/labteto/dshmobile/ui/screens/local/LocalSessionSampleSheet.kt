@@ -129,9 +129,11 @@ internal fun LocalSessionSampleSheet(
                 )
                 Text(preview.content, style = DsType.std14.withReadingWeight(), color = colors.text)
                 Text(
-                    if (preview.usageReported)
-                        "${preview.model} · 输入 ${preview.inputTokens} / 输出 ${preview.outputTokens} tokens；费用在用量明细中查询"
-                    else stringResource(R.string.local_session_sample_usage_unreported),
+                    if (preview.usageReported) {
+                        val price = preview.estimatedCostCny?.let { " · 估算费用 ¥%.6f".format(it) }
+                            ?: " · 价格未提供"
+                        "${preview.model} · 输入 ${preview.inputTokens} / 输出 ${preview.outputTokens} tokens$price"
+                    } else stringResource(R.string.local_session_sample_usage_unreported),
                     style = DsType.caption11.withReadingWeight(),
                     color = colors.textSecondary,
                 )
