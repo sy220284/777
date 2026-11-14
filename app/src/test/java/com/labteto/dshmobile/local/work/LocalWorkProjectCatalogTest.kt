@@ -101,8 +101,10 @@ class LocalWorkProjectCatalogTest {
             File(root, "repo/a").mkdirs()
             File(root, "repo/b").mkdirs()
             File(root, "output").mkdirs()
+            File(root, "isolated").mkdirs()
             val project = catalog.importExisting("主项目", "repo")
             val child = catalog.importExisting("子项目", "repo/a")
+            val standalone = catalog.importExisting("独立项目", "isolated")
             val revision = catalog.snapshots.value.revision
             assertTrue(runCatching {
                 catalog.moveDirectory(project.id, "outdated", "output/repo")
@@ -118,11 +120,11 @@ class LocalWorkProjectCatalogTest {
             }.isFailure)
             assertTrue(runCatching {
                 catalog.moveDirectory(child.id, "repo/a", "output/new-repo")
-            }.isSuccess)
-            assertTrue(runCatching {
-                catalog.moveDirectory(project.id, "repo", "output/new-repo/nested")
             }.isFailure)
-            assertEquals(revision + 1, catalog.snapshots.value.revision)
+            assertTrue(runCatching {
+                catalog.moveDirectory(standalone.id, "isolated", "repo/new-project")
+            }.isFailure)
+            assertEquals(revision, catalog.snapshots.value.revision)
             assertTrue(File(root, "repo/a").isDirectory)
             assertTrue(File(root, "repo/b").isDirectory)
         }
