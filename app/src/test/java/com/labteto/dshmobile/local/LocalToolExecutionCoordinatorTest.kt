@@ -216,7 +216,7 @@ class LocalToolExecutionCoordinatorTest {
         val next = coordinator.searchCapabilities("select:" + omitted.take(2).joinToString(","))
         val after = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
         assertTrue(omitted.first() in after)
-        assertTrue(next.contains("下一步"))
+        assertTrue(next.contains(omitted.first()))
     }
 
     @Test
