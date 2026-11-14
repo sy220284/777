@@ -59,6 +59,7 @@ internal class LocalTeamResultMailbox(
 
         fun decode(event: LocalSessionEventLog.Event): LocalTeamAgentMessageSnapshot? {
             if (event.type == TEAM_MESSAGE_QUEUED) {
+                if (event.data["teamId"]?.jsonPrimitive?.contentOrNull != sessionId) return null
                 val message = LocalAgentTeamEventCodec.decodeMessage(event.data)
                 val member = membersById[message.senderId] ?: return null
                 if (message.kind != LocalTeamMessageKind.MESSAGE ||
@@ -174,7 +175,10 @@ internal class LocalTeamResultMailbox(
         afterSequence: Long,
     ): AgentMessageForwardScan {
         var cursor = afterSequence.coerceAtLeast(0L)
-        while (true) {
+        // Observe one fixed EventLog high-water mark per scan. New arrivals are picked up
+        // by the next wait iteration, so a busy producer cannot starve the waiter.
+        val observedSequence = eventLogFor(sessionId).latestSequence()
+        while (cursor < observedSequence) {
             val page = scanAgentMessages(sessionId, targetName, limit = 1, afterSequence = cursor)
             page.messages.firstOrNull()?.let { message ->
                 return AgentMessageForwardScan(message, message.sequence)
@@ -185,6 +189,7 @@ internal class LocalTeamResultMailbox(
             }
             cursor = page.nextCursor
         }
+        return AgentMessageForwardScan(null, cursor)
     }
 
     suspend fun waitForMessage(
@@ -194,17 +199,6 @@ internal class LocalTeamResultMailbox(
         timeoutMs: Int,
     ): String {
         var scanAfter = afterSequence
-        if (scanAfter < 0L) {
-            scanAgentMessages(sessionId, targetName, limit = 1, afterSequence = -1L)
-                .messages.lastOrNull()?.let { latest ->
-                    return "[" + latest.id + "] " + latest.memberName +
-                        " sequence=" + latest.sequence +
-                        " step=" + latest.step + "\n" +
-                        latest.content.take(MAX_RENDERED_MESSAGE_CHARS) +
-                        "\nnext_cursor=" + latest.sequence
-                }
-        }
-
         fun scanNext(): LocalTeamAgentMessageSnapshot? {
             val scan = nextAgentMessageAfter(
                 sessionId = sessionId,
