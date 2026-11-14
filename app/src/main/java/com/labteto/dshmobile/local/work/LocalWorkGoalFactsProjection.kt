@@ -16,6 +16,11 @@ internal data class LocalWorkGoalFacts(
 ) {
     fun hasUnresolvedTools(executingToolId: String? = null): Boolean = attempts.any {
         it.goalId == goalId && it.unresolvedExternalEffect &&
+            // update_goal changes only the canonical Work event log. Even historical
+            // rejected completions marked "possible" cannot leave an external effect:
+            // replaying goal/state provides its actual outcome. Do not let an old
+            // misclassified Goal transition poison future verification of this Goal.
+            it.name != "update_goal" &&
             (executingToolId == null || it.executionId != executingToolId)
     }
 }
