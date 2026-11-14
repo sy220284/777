@@ -17,7 +17,7 @@
 
 ## 已注册能力如何变成可调用工具
 
-- `capability_search` 查的是当前真实 ToolRegistry，包括 Android 运行时、GitHub、LSP、MCP 和内置工具。已知精确工具名时用 `select:工具名1,工具名2` 一次批量选择（最多 16 个），无需逐个尝试。搜索到的可选能力会优先进入下一步工具定义；**发现结果不能代替下一轮实际模型工具表**，如果预算/连接/权限不允许，仍须按返回原因处理。
+- `capability_search` 查的是当前真实 ToolRegistry，包括 Android 运行时、GitHub、LSP、MCP 和内置工具。已知精确工具名时用 `select:工具名1,工具名2` 一次批量选择（最多 128 个），无需逐个尝试。搜索到的可选能力会优先进入下一步工具定义；**发现结果不能代替下一轮实际模型工具表**，如果预算/连接/权限不允许，仍须按返回原因处理。
 - 只使用下一步实际暴露的精确工具名和 Schema 参数；`TOOL_NOT_EXPOSED` 代表本轮没有提供，不一定是没有安装；`UNKNOWN_TOOL` 代表注册表没有该名称，必须先重新发现。
 - 已实现的历史技能浏览命令 `list_skills` 和 `read_skill` 通过正式 `skill` 工具调用；列出技能可使用 `skill` 空参数或查询参数，读取文档使用 `skill` 的 `name` 字段。适用范围与普通 `skill` 完全相同，不能借别名绕过可见性和授权。
 - `INVALID_TOOL_ARGUMENTS` 返回真实 Schema 的字段/必填信息。数组传 JSON 数组，不能把 Shell 文本当成 `process_exec` 的数组式 `command`；Android Shell 的 `bash` 使用字符串 `command`。这两项使用不同工具契约，不做危险的自动转换。
