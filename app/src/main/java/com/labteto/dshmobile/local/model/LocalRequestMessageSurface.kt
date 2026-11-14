@@ -45,7 +45,7 @@ internal fun encodeLocalRequestMessageSurface(
     val full = buildJsonObject {
         put("version", REQUEST_MESSAGE_SURFACE_VERSION)
         put("digest", digest)
-        put("messages", JsonArray(messages))
+        put("messages", JsonArray(messages.toList()))
         put("redacted", redacted)
     }
     if (previous == null || previous.depth >= REQUEST_MESSAGE_DELTA_MAX_DEPTH) {
