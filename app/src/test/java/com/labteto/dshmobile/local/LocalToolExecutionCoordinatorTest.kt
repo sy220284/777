@@ -260,6 +260,47 @@ class LocalToolExecutionCoordinatorTest {
 
 
     @Test
+    fun codeModeNestedApprovalShowsActualToolArgumentsAndChildCallIdentity() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) {
+                ToolResult("file updated")
+            }.copy(schema = functionToolSchema(
+                "write", "写入工作区文件",
+                com.labteto.dshmobile.harness.tools.simpleToolProperties(
+                    mapOf("path" to "string")),
+            )))
+        }
+        com.labteto.dshmobile.harness.tools.CodeModePlugin(registry)
+            .install(com.labteto.dshmobile.harness.plugin.HarnessContext(registry))
+        val steps = buildJsonObject {
+            put("steps", kotlinx.serialization.json.buildJsonArray {
+                add(buildJsonObject {
+                    put("tool", "write")
+                    put("args", buildJsonObject { put("path", "notes.md") })
+                })
+            })
+        }
+        val prompts = mutableListOf<Pair<String, String>>()
+        val durableCallIds = mutableListOf<String>()
+        val result = coordinator(registry, recordAuthorizationDecision = { _, decisionCall, _, _ ->
+            durableCallIds += decisionCall.id
+        }).executeScoped(
+            original = LocalToolCall("batch-call", "code_mode_run", steps, steps.toString()),
+            sessionId = "work", allowMutation = true, planModeEnabled = false,
+            approval = { nestedCall, _, summary ->
+                prompts += nestedCall.id to (nestedCall.name + ": " + summary)
+                true
+            },
+        )
+        assertFalse(result.isError)
+        assertEquals(1, prompts.size)
+        assertEquals("batch-call/step-1", prompts.single().first)
+        assertTrue(prompts.single().second.contains("write：notes.md"))
+        // Parent and child both retain independently auditable authorization identities.
+        assertEquals(listOf("batch-call", "batch-call/step-1"), durableCallIds)
+    }
+
+    @Test
     fun exactMultiToolSelectionLoadsOnlyNamedRegisteredToolsInOneStep() {
         val registry = ToolRegistry().apply {
             listOf("mcp_lookup", "github_status", "unrelated_search").forEach { name ->
@@ -278,6 +319,53 @@ class LocalToolExecutionCoordinatorTest {
         assertFalse("unrelated_search" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
         val again = coordinator.searchCapabilities("select:mcp_lookup")
         assertTrue(again.contains("[已加载]"))
+    }
+
+    @Test
+    fun coreToolSelectionSaysCallDirectlyWithoutCallingItUnavailable() {
+        val registry = ToolRegistry().apply {
+            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE) { ToolResult("ok") })
+        }
+        val report = coordinator(registry).searchCapabilities("select:read,unregistered_tool")
+        assertTrue(report.contains("内置工具"))
+        assertTrue(report.contains("read"))
+        assertTrue(report.contains("unregistered_tool"))
+        assertFalse(report.contains("指定工具当前无法加载：read"))
+    }
+
+    @Test
+    fun largeExactSelectionExposesReadyBatchAndActionableNextBatch() {
+        val registry = ToolRegistry().apply {
+            repeat(128) { index ->
+                val name = "mcp_batch_$index"
+                val properties = buildJsonObject {
+                    repeat(20) { field ->
+                        put("property_$field", buildJsonObject {
+                            put("type", "string")
+                            put("description", "这一字段对接外部 MCP 的复杂参数说明".repeat(15))
+                        })
+                    }
+                }
+                register(tool(name, ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL,
+                    keywords = setOf("批量工具")) { ToolResult("ok") }
+                    .copy(schema = functionToolSchema(name, "扩展工具", properties)))
+            }
+        }
+        val coordinator = coordinator(registry)
+        val all = (0 until 128).map { "mcp_batch_$it" }
+        val report = coordinator.searchCapabilities("select:" + all.joinToString(","))
+        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
+        val omitted = all.filterNot(visible::contains)
+        assertTrue("工具定义实际预算必须仍有效", omitted.isNotEmpty())
+        assertTrue(report.contains("待加载队列"))
+        assertTrue(report.contains("select:" + omitted.joinToString(",")))
+        assertTrue(report.contains("[下一步可用]"))
+        val next = coordinator.searchCapabilities("select:" + omitted.take(2).joinToString(","))
+        val after = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
+        assertTrue(omitted.first() in after)
+        assertTrue(next.contains(omitted.first()))
     }
 
     @Test
