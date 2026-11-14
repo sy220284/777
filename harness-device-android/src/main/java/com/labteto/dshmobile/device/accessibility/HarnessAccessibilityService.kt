@@ -320,7 +320,7 @@ class HarnessAccessibilityService : AccessibilityService() {
         val current = if (rebindEditable) mutableListOf<AccessibilityNodeSnapshot>() else null
         // Only editable nodes can be a text target. Do not retain every Android node
         // merely to re-bind one input, especially on large Compose screens.
-        val editableNodes = mutableMapOf<Int, AccessibilityNodeInfo>()
+        val editableNodes = if (rebindEditable) mutableMapOf<Int, AccessibilityNodeInfo>() else null
         while (queue.isNotEmpty()) {
             val (node, depth) = queue.removeFirst()
             val currentIndex = nextIndex++
@@ -333,7 +333,7 @@ class HarnessAccessibilityService : AccessibilityService() {
             }
             if (rebindEditable) {
                 current!!.add(describeNode(currentIndex, node, depth))
-                if (node.isEditable) editableNodes[currentIndex] = node
+                if (node.isEditable) editableNodes!![currentIndex] = node
             }
             for (childIndex in 0 until node.childCount) {
                 node.getChild(childIndex)?.let { queue.add(it to depth + 1) }
@@ -344,7 +344,7 @@ class HarnessAccessibilityService : AccessibilityService() {
             return null
         }
         val resolved = nodeSelection.resolveEditableIndex(index, root.windowId, requireNotNull(current))
-        return editableNodes[resolved]
+        return editableNodes?.get(resolved)
     }
 
     private fun clickableAncestor(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
