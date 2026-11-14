@@ -394,14 +394,47 @@ class ToolsViewModel @Inject constructor(
      * public HTTPS MCP endpoints; OAuth consent is still granted in the browser.
      * A failed authorization leaves the installed skill intact and visible for retry.
      */
-    private suspend fun finishSkillInstallation(installedId: String) {
-        val installed = localTools.installedSkills()
-        val skill = installed.firstOrNull { it.name == installedId }
+    private suspend fun finishSkillInstallation(
+        installedId: String,
+        officialPluginId: String? = null,
+    ) {
         _state.value = _state.value.copy(
-            skills = installed,
+            skills = localTools.installedSkills(),
             presets = localTools.presetSkills(),
             createdSkillId = installedId,
         )
+        // Official plugin metadata is an authoritative source of its OAuth endpoint
+        // and client registration. A skill's YAML may not duplicate that declaration.
+        val officialDetail = officialPluginId?.let { _state.value.codexDetails[it] }
+        if (officialDetail?.mcpUrl != null && officialPluginId != null) {
+            val serverId = requireNotNull(officialDetail.mcpServerId)
+            val alreadyConnected = localTools.servers().any {
+                it.id == serverId && it.tools.isNotEmpty()
+            }
+            if (!alreadyConnected) {
+                _state.value = _state.value.copy(
+                    mcpLoginServerId = serverId,
+                    feedback = "技能已安装；正在打开 ${serverId} 账号授权。",
+                )
+                try {
+                    localTools.connectCodexPlugin(officialPluginId)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    synchronizeExtensionInventory()
+                    _state.value = _state.value.copy(
+                        feedback = "技能 ${installedId} 已安装；${serverId} 授权未完成："
+                            + (failure.message ?: "可在技能详情中重新授权"),
+                    )
+                    return
+                } finally {
+                    _state.value = _state.value.copy(mcpLoginServerId = null)
+                }
+            }
+        }
+        // Re-read after OAuth so a newly connected official server is never
+        // requested a second time through the skill's dependency metadata.
+        val skill = localTools.installedSkills().firstOrNull { it.name == installedId }
         val pending = skill?.requirements.orEmpty().filterNot { it.registered }
         val connections = pending.mapNotNull { requirement ->
             skillMcpHttpsEndpoint(requirement)?.let { endpoint ->
@@ -542,7 +575,7 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
             try {
                 val installed = localTools.installCodexPluginSkill(pluginId, skillId)
-                finishSkillInstallation(installed)
+                finishSkillInstallation(installed, officialPluginId = pluginId)
                 _state.value = _state.value.copy(loading = false)
             } catch (cancelled: CancellationException) {
                 throw cancelled
