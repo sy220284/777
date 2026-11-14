@@ -234,4 +234,15 @@ class LocalSkillStoreTest {
         assertTrue(workspace.readSkill("writing-polish").contains("用途："))
     }
 
+    @Test fun validCustomizedBundledSkillBeyond128KbIsNotReplaced() = inWorkspace { store, workspace, root ->
+        store.seedOnce()
+        val modified = store.readDocument("writing-polish") + "\n" + "用户扩展规则。".repeat(20_000)
+        val file = root.resolve(".dsh/skills/writing-polish/SKILL.md")
+        file.writeText(modified)
+        assertTrue(file.length() > 128L * 1024)
+        store.seedOnce()
+        assertEquals(modified, workspace.readSkill("writing-polish"))
+        assertEquals(modified, store.readDocument("writing-polish"))
+    }
+
 }
