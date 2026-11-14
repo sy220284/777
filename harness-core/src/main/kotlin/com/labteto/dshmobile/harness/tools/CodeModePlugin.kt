@@ -22,6 +22,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
         val handler: HarnessTool,
         val args: JsonObject,
         val condition: JsonObject?,
+        val continueOnReadError: Boolean,
     )
 
     override val id: String = "code-mode-orchestration"
@@ -45,6 +46,14 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                                     put("args", buildJsonObject {
                                         put("type", "object")
                                         put("additionalProperties", true)
+                                    })
+                                    put("on_error", buildJsonObject {
+                                        put("type", "string")
+                                        put("description", "遇失败 stop（默认）或 continue；仅纯只读且无需审批的工具可继续，最终回执仍明确为部分失败")
+                                        put("enum", buildJsonArray {
+                                            add(JsonPrimitive("stop"))
+                                            add(JsonPrimitive("continue"))
+                                        })
                                     })
                                     put("when", buildJsonObject {
                                         put("type", "object")
@@ -144,14 +153,23 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                     return rejection("CODE_MODE_BAD_CONDITION",
                         "步骤 ${index + 1} 的条件必须引用前序步骤及可验证字段")
             }
-            validated += CodeModeStepPlan(name, handler, arguments, condition as? JsonObject)
+            val onError = (step["on_error"] as? JsonPrimitive)?.content ?: "stop"
+            if (onError !in setOf("stop", "continue"))
+                return rejection("CODE_MODE_BAD_PLAN", "步骤 ${index + 1} 的 on_error 只能是 stop 或 continue")
+            if (onError == "continue" && (handler.access != ToolAccess.READ_ONLY ||
+                    handler.approvalPolicy != ToolApprovalPolicy.NEVER))
+                return rejection("CODE_MODE_UNSAFE_CONTINUE",
+                    "步骤 ${index + 1} 只有无需审批的只读工具才能在失败后继续：$name")
+            validated += CodeModeStepPlan(name, handler, arguments, condition as? JsonObject,
+                onError == "continue")
         }
 
         val observations = mutableListOf<JsonObject>()
         // Preserve original ordinals even when a conditional step is skipped.
         val completedResults = mutableListOf<ToolResult?>()
+        var partialFailure = false
         for ((index, entry) in validated.withIndex()) {
-            val (name, handler, arguments, condition) = entry
+            val (name, handler, arguments, condition, continueOnReadError) = entry
             if (condition != null) {
                 val sourceStep = (condition.getValue("step") as JsonPrimitive).content.toInt()
                 val reference = buildJsonObject {
@@ -231,7 +249,8 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             observations += buildJsonObject {
                 put("index", index + 1)
                 put("tool", name)
-                put("status", if (result.isError) "error" else "completed")
+                put("status", if (result.isError && continueOnReadError)
+                    "error_continued" else if (result.isError) "error" else "completed")
                 put("execution_started", outcome.executionStarted)
                 result.errorCode?.let { put("error_code", it) }
                 // Nested tool calls must not lose Hook diagnostics when the wrapper succeeds.
@@ -252,10 +271,17 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                     put("content", "临时结果已处理，原始内容不进入持久脚本回执")
                 }
             }
-            if (result.isError) return receipt(observations, "stopped", "CODE_MODE_STEP_FAILED")
+            if (result.isError) {
+                if (!continueOnReadError)
+                    return receipt(observations, "stopped", "CODE_MODE_STEP_FAILED")
+                partialFailure = true
+                completedResults += null
+                continue
+            }
             completedResults += result
         }
-        return receipt(observations, "completed", null)
+        return if (partialFailure) receipt(observations, "partial", "CODE_MODE_PARTIAL_FAILED")
+            else receipt(observations, "completed", null)
     }
 
 
@@ -323,13 +349,18 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 put("status", status)
                 put("completed_steps", steps.count { it["status"]?.jsonPrimitive?.content == "completed" })
                 put("skipped_steps", steps.count { it["status"]?.jsonPrimitive?.content == "skipped" })
+                put("failed_steps", steps.count {
+                    it["status"]?.jsonPrimitive?.content in setOf("error", "error_continued",
+                        "reference_failed", "unknown_after_exception")
+                })
                 put("steps", JsonArray(steps))
             }.toString(),
             isError = failureCode != null,
             errorCode = failureCode,
             retryable = false,
             recoveryHint = failureCode?.let {
-                "停止在失败步骤。先核对每步执行回执和文件状态，避免重复具有副作用的操作。"
+                if (status == "partial") "部分只读步骤失败，其余成功结果已保留；可单独补查失败步骤。"
+                else "停止在失败步骤。先核对每步执行回执和文件状态，避免重复具有副作用的操作。"
             },
         )
 
