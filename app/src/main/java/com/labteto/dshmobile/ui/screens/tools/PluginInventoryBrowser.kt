@@ -108,6 +108,7 @@ internal fun inventorySearchScore(query: String, name: String, id: String, detai
 @Composable
 internal fun PluginInventoryBrowser(
     localIds: List<String>,
+    activeToolHookIds: List<String> = emptyList(),
     connectedServices: List<McpServerSnapshot> = emptyList(),
     skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
@@ -335,6 +336,25 @@ internal fun PluginInventoryBrowser(
                 ),
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
+                if (!skillsOnly && query.isBlank() && activeToolHookIds.isNotEmpty()) {
+                    item(key = "registered-tool-hooks") {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().testTag("active-tool-hook-status"),
+                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                        ) {
+                            Text(
+                                "当前生效的工具规则：${activeToolHookIds.size} 项",
+                                style = DsType.small13Strong,
+                                color = colors.text,
+                            )
+                            Text(
+                                activeToolHookIds.sorted().joinToString(" · "),
+                                style = DsType.caption11,
+                                color = colors.textSecondary,
+                            )
+                        }
+                    }
+                }
                 if (skillsOnly && query.isBlank()) {
                     item(key = "skill-creation-actions") {
                         Column(
