@@ -56,29 +56,29 @@ internal fun ExtensionCatalogCard(
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().heightIn(min = 84.dp)
-                .padding(horizontal = 14.dp, vertical = 11.dp),
+                .padding(horizontal = 10.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(13.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Surface(
-                modifier = Modifier.size(54.dp).testTag("$tagPrefix-icon-$id"),
+                modifier = Modifier.size(48.dp).testTag("$tagPrefix-icon-$id"),
                 color = if (documentIcon == null && brandLogo == null)
                     accent.copy(alpha = 0.09f) else colors.materialL4,
-                shape = RoundedCornerShape(17.dp),
+                shape = RoundedCornerShape(15.dp),
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     when {
                         brandLogo != null -> Image(
                             bitmap = brandLogo, contentDescription = null,
-                            modifier = Modifier.size(44.dp),
+                            modifier = Modifier.size(40.dp),
                         )
                         documentIcon != null -> Image(
                             painter = painterResource(documentIcon), contentDescription = null,
-                            modifier = Modifier.size(42.dp),
+                            modifier = Modifier.size(40.dp),
                         )
                         else -> Icon(
                             icon, contentDescription = null, tint = accent,
-                            modifier = Modifier.size(27.dp),
+                            modifier = Modifier.size(25.dp),
                         )
                     }
                 }
@@ -114,7 +114,7 @@ internal fun ExtensionCatalogCard(
             }
             Icon(
                 FeatherIcons.ChevronRight, contentDescription = "查看详情",
-                tint = colors.textTertiary, modifier = Modifier.size(20.dp),
+                tint = colors.textTertiary, modifier = Modifier.size(18.dp),
             )
         }
     }
