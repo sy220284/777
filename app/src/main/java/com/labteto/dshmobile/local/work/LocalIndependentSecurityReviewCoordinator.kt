@@ -52,7 +52,7 @@ internal class LocalSecurityReviewLedger(private val log: LocalSessionEventLog) 
         goal: LocalReviewGoalBinding? = null) {
         log.append("work/security-review-start", buildJsonObject {
             put("id", id); put("ref", ref); put("digest", digest)
-            goal?.let { put("goal_id", it.goalId); put("goal_revision", it.revision) }
+            goal?.let { put("goal_id", it.goalId); put("goal_start_sequence", it.startSequence) }
         })
     }
 
@@ -69,7 +69,7 @@ internal class LocalSecurityReviewLedger(private val log: LocalSessionEventLog) 
             put("report", report); put("verdict", verdict)
             put("reviewer_profile_id", profileId)
             request?.data?.get("goal_id")?.let { put("goal_id", it) }
-            request?.data?.get("goal_revision")?.let { put("goal_revision", it) }
+            request?.data?.get("goal_start_sequence")?.let { put("goal_revision", it) }
         })
         return LocalSecurityReview(id, ref, digest, report, verdict, event.sequence)
     }
@@ -113,7 +113,7 @@ internal class LocalSecurityReviewLedger(private val log: LocalSessionEventLog) 
             put("id", id); put("sequence", sequence); put("digest", freshDigest)
             put("decision", "human_security_approval")
             request?.data?.get("goal_id")?.let { put("goal_id", it) }
-            request?.data?.get("goal_revision")?.let { put("goal_revision", it) }
+            request?.data?.get("goal_start_sequence")?.let { put("goal_revision", it) }
         })
         true
     }
