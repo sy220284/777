@@ -182,6 +182,16 @@ class LocalSubagentCapabilitiesTest {
     }
 
     @Test
+    fun readOnlyAgentExplainsWhyBashCannotBeGrantedByAllowlist() {
+        val schemas = JsonArray(listOf(functionSchema("read"), functionSchema("grep")))
+        val readonly = LocalSubagentCapabilities(toolAllowlist = setOf("bash", "read"))
+        val failure = requireFailure { validateLocalSubagentToolAllowlist(schemas, readonly) }
+        assertTrue(failure.contains("SUBAGENT_TOOL_FILTER_UNAVAILABLE"))
+        assertTrue(failure.contains("只读子代理"))
+        assertTrue(failure.contains("subagent_fork"))
+    }
+
+    @Test
     fun versionTwoCapabilitiesRoundTripIncludingFutureOutputSchema() {
         val capabilities = LocalSubagentCapabilities(
             allowMutation = false,
