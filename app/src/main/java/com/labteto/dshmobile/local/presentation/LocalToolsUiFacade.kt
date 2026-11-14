@@ -261,6 +261,9 @@ class LocalToolsUiFacade @Inject internal constructor(
             item.sourceKind, item.sourceUrl,
         )
     }
+    /** Publisher-provided plugin logo, loaded through the catalog owner. */
+    suspend fun codexPluginLogo(id: String): ByteArray? = codexOfficialPlugins.officialLogo(id)
+
     override suspend fun codexPluginDetail(id: String):
         com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot {
         val info = codexOfficialPlugins.detail(id)
