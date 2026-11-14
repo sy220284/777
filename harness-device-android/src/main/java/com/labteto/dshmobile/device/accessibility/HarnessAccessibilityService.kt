@@ -25,6 +25,8 @@ data class AccessibilityNodeSnapshot(
     val editable: Boolean,
     val bounds: String,
     val depth: Int,
+    /** Android 13+ can preserve the true node identity across Compose recompositions. */
+    val uniqueId: String? = null,
 )
 
 class HarnessAccessibilityService : AccessibilityService() {
@@ -80,6 +82,7 @@ class HarnessAccessibilityService : AccessibilityService() {
             editable = node.isEditable,
             bounds = bounds.toShortString(),
             depth = depth,
+            uniqueId = if (android.os.Build.VERSION.SDK_INT >= 33) node.uniqueId else null,
         )
     }
 
@@ -312,27 +315,36 @@ class HarnessAccessibilityService : AccessibilityService() {
             return null
         }
         val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
-        val nodes = mutableListOf<AccessibilityNodeInfo>()
-        val current = mutableListOf<AccessibilityNodeSnapshot>()
         queue.add(root to 0)
+        var nextIndex = 0
+        val current = if (rebindEditable) mutableListOf<AccessibilityNodeSnapshot>() else null
+        // Only editable nodes can be a text target. Do not retain every Android node
+        // merely to re-bind one input, especially on large Compose screens.
+        val editableNodes = mutableMapOf<Int, AccessibilityNodeInfo>()
         while (queue.isNotEmpty()) {
             val (node, depth) = queue.removeFirst()
-            val currentIndex = nodes.size
-            nodes += node
-            current += describeNode(currentIndex, node, depth)
+            val currentIndex = nextIndex++
+            if (!rebindEditable && currentIndex == index) {
+                // Clicks only need the selected node, not a scan of the entire UI.
+                nodeSelection.requireCurrent(
+                    index, root.windowId, describeNode(currentIndex, node, depth),
+                )
+                return node
+            }
+            if (rebindEditable) {
+                current!!.add(describeNode(currentIndex, node, depth))
+                if (node.isEditable) editableNodes[currentIndex] = node
+            }
             for (childIndex in 0 until node.childCount) {
                 node.getChild(childIndex)?.let { queue.add(it to depth + 1) }
             }
         }
-        val resolved = if (rebindEditable) {
-            nodeSelection.resolveEditableIndex(index, root.windowId, current)
-        } else {
-            nodeSelection.requireCurrent(
-                index, root.windowId, current.getOrNull(index) ?: return null,
-            )
-            index
+        if (!rebindEditable) {
+            nodeSelection.invalidate()
+            return null
         }
-        return nodes.getOrNull(resolved)
+        val resolved = nodeSelection.resolveEditableIndex(index, root.windowId, requireNotNull(current))
+        return editableNodes[resolved]
     }
 
     private fun clickableAncestor(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
