@@ -505,6 +505,7 @@ fun LocalHarnessScreen(
         selectMessageVariant = viewModel::selectChatMessageVariant,
         regenerate = viewModel::regenerateReply,
         generateReplySuggestions = viewModel::generateReplySuggestions,
+        sampleSession = viewModel::sampleSession,
         loadOlderTranscript = viewModel::loadOlderTranscript,
         importAttachment = viewModel::importAttachment,
         stop = viewModel::stop,
