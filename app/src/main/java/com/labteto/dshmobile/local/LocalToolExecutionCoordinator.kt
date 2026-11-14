@@ -392,7 +392,11 @@ internal class LocalToolExecutionCoordinator(
                 recoveryHint = "先使用 capability_search 或检查工具名称。",
             )
 
-        if (planModeEnabled && !LocalToolPolicy.allowedInPlan(call.name, registered.access, call.arguments)) {
+        val inspectOnlyCodeMode = call.name == "code_mode_run" &&
+            registry.isReadOnlyCodeModePlan(call.arguments)
+        if (planModeEnabled && !LocalToolPolicy.allowedInPlan(call.name, registered.access, call.arguments) &&
+            !inspectOnlyCodeMode
+        ) {
             return AgentToolResult(
                 content = "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。",
                 isError = true,
@@ -401,7 +405,8 @@ internal class LocalToolExecutionCoordinator(
             )
         }
 
-        val readLike = LocalToolPolicy.isReadOnlyInvocation(call.name, registered.access, call.arguments)
+        val readLike = inspectOnlyCodeMode ||
+            LocalToolPolicy.isReadOnlyInvocation(call.name, registered.access, call.arguments)
         if (!allowMutation && !readLike) {
             return AgentToolResult(
                 content = "当前子任务是只读作用域，不能执行会改变状态的工具：" + call.name,
