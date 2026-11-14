@@ -162,7 +162,7 @@ class LocalWorkTaskGraphPlanTest {
                 put("reuses_graph_execution_id", JsonPrimitive("execution"))
                 put("nodes", buildJsonArray {
                     add(buildJsonObject { put("node_id", "a"); put("task", "研究"); put("depends_on", buildJsonArray {}) })
-                    add(buildJsonObject { put("node_id", "b"); put("task", "新的验证"); put("depends_on", buildJsonArray { add(JsonPrimitive("a")) } })
+                    add(buildJsonObject { put("node_id", "b"); put("task", "新的验证"); put("depends_on", buildJsonArray { add(JsonPrimitive("a")) }) })
                 })
             }))
             assertEquals(0, seedReusableReadOnlyGraphResults(
