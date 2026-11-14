@@ -202,9 +202,10 @@ internal class LocalWorkProjectCatalog(
      * sibling or a child of another existing workspace directory (never the source itself).
      * An atomic filesystem rename and an on-disk intent protect Git history and recovery.
      */
-    fun moveDirectory(id: String, destination: String): Boolean = synchronized(lock) {
+    fun moveDirectory(id: String, expectedRoot: String, destination: String): Boolean = synchronized(lock) {
         val old = mutable.value
         val project = old.projects.firstOrNull { it.id == id } ?: error("项目不存在")
+        require(project.root == expectedRoot) { "项目目录已变化，请重新打开后再移动" }
         require(project.root != ".") { "整个工作区不能作为可移动项目文件夹" }
         val from = movePath(project.root)
         val to = movePath(destination)
@@ -504,7 +505,8 @@ class LocalWorkProjectStore @Inject internal constructor(
     fun rename(id: String, name: String) = catalog.rename(id, name)
     fun update(id: String, name: String, root: String) = catalog.update(id, name, root)
     fun changeRoot(id: String, root: String) = catalog.changeRoot(id, root)
-    fun moveDirectory(id: String, root: String) = catalog.moveDirectory(id, root)
+    fun moveDirectory(id: String, expectedRoot: String, root: String) =
+        catalog.moveDirectory(id, expectedRoot, root)
     fun move(id: String, newIndex: Int) = catalog.move(id, newIndex)
     fun delete(id: String) = catalog.delete(id)
     fun assign(ids: Set<String>, id: String?) = catalog.assign(ids, id)
