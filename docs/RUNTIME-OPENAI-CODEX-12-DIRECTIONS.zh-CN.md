@@ -31,5 +31,5 @@
 
 - 新增单元测试：Model Selection 在工具注销/规划模式/网络设置下显式报告原因，且不泄露被拒工具 Schema；子代理长上下文保留最近纠正并检查 UTF-16 surrogate 安全。
 - 保留既有 LocalToolRouterTest / LocalToolExecutionCoordinatorTest / LocalSubagentContextTest 为回归目标。
-- 连接器环境只支持源码核验与 Git 对象写入，**尚未在本机执行 Gradle 编译/Android 设备测试，必须等待 CI 的实际状态**。
+- 连接器环境可读取源码并写入 Git 对象；运行构建命令按开发环境选择。
 - 合并须验证架构门禁、全量/定向测试、失败/正常/恢复路径，并在合并前重新比对 main/head，不以 PR 创建视为交付。
