@@ -49,7 +49,7 @@ object LocalToolCatalog {
             "offset" to integerRange("必须等于上次返回的 next_byte，首次 0", min = 0),
             "finish" to boolean("是否提交完整文件，默认 false"),
         ), listOf("path", "offset")))
-        add(tool("edit", "唯一字面量替换；修改前必须先用 read 读取包含待替换内容的目标区域，write 创建或覆盖不算读取", properties(
+        add(tool("edit", "按唯一原文字面量精确替换。已明确掌握 old_text 时可直接编辑，无需先调用 read；工具会校验原文仅出现一次和文件版本，原文不存在、重复或已读取版本过期时拒绝修改；不确定内容时先 read", properties(
             "path" to string("相对工作区的路径"),
             "old_text" to string("必须只出现一次的原文"),
             "new_text" to string("替换后的文字"),
