@@ -74,7 +74,9 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 },
             ),
             access = ToolAccess.AGENT_CONTROL,
-            approvalPolicy = ToolApprovalPolicy.ALWAYS,
+            // The script is only a dispatcher: each real child tool independently checks
+            // policy, mutation scope, hooks and user approval. Do not ask users twice.
+            approvalPolicy = ToolApprovalPolicy.NEVER,
             exposure = ToolExposure.CORE,
             metadata = ToolMetadata(
                 family = "workflow",
