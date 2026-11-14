@@ -136,7 +136,10 @@ class LocalToolExecutionCoordinatorTest {
             })
         }
         val prompts = mutableListOf<Pair<String, String>>()
-        val result = coordinator(registry).executeScoped(
+        val durableCallIds = mutableListOf<String>()
+        val result = coordinator(registry, recordAuthorizationDecision = { _, decisionCall, _, _ ->
+            durableCallIds += decisionCall.id
+        }).executeScoped(
             original = LocalToolCall("batch-call", "code_mode_run", steps, steps.toString()),
             sessionId = "work", allowMutation = true, planModeEnabled = false,
             approval = { nestedCall, _, summary ->
@@ -149,6 +152,9 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals("batch-call", prompts.first().first)
         assertEquals("batch-call/step-1", prompts.last().first)
         assertTrue(prompts.last().second.contains("write：notes.md"))
+        // The UI presents the concrete child, while the durable activity ledger
+        // retains the real parent execution rather than introducing orphan child calls.
+        assertEquals(listOf("batch-call", "batch-call"), durableCallIds)
     }
 
     @Test
