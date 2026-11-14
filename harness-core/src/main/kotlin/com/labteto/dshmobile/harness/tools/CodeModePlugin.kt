@@ -31,7 +31,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             name = TOOL_NAME,
             schema = functionToolSchema(
                 TOOL_NAME,
-                "受控串行工具编排。支持前序持久结果引用与 when 条件跳过；每步经过原工具权限、审批及审计，并采用原工具的超时及取消规则。遇失败停止，不执行任意脚本或自动重试未知副作用。",
+                "受控串行工具编排。支持已加载的核心工具与扩展工具、前序结果引用和 when 条件；扩展工具先通过 capability_search 选中，并在模型下一步装入真实工具表。每步保留原工具权限、审批、超时和审计；返回各步骤结果。",
                 parameterSchema = buildJsonObject {
                     put("type", "object")
                     put("properties", buildJsonObject {
@@ -79,7 +79,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             metadata = ToolMetadata(
                 family = "workflow",
                 discoveryKeywords = setOf("code mode", "编排", "批量工具"),
-                usageNotes = listOf("CORE 工具按顺序逐步审批；可引用前序持久回执字段，失败停止且不自动重试"),
+                usageNotes = listOf("核心工具即用；用 capability_search 加载的 MCP、GitHub、Android 等扩展工具可加入同一编排，须在本轮模型工具表中；保持逐步权限审批"),
                 // Child calls are executed under the same workspace lease. They may include
                 // PROCESS/WRITE tools, so the wrapper serializes their shared workspace effects.
                 workspaceAccess = ToolWorkspaceAccess.WRITE,
@@ -116,10 +116,16 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 return rejection("CODE_MODE_RECURSION_DENIED", "Code Mode 不允许嵌套调用自身")
             val handler = liveTools.get(name)
                 ?: return rejection("CODE_MODE_TOOL_MISSING", "步骤 ${index + 1} 的工具不可用：$name")
-            if (handler.exposure != ToolExposure.CORE)
-                return rejection("CODE_MODE_UNAUTHORIZED_TOOL", "步骤 ${index + 1} 未获工具发现授权：$name")
+            if (handler.exposure == ToolExposure.INTERNAL)
+                return rejection("CODE_MODE_UNAUTHORIZED_TOOL", "步骤 ${index + 1} 无法使用内部工具：$name")
+            // Optional tools must be independently loaded by capability_search and frozen
+            // in the exact tool table sent to the model. A script cannot discover or grant them.
+            if (handler.exposure == ToolExposure.OPTIONAL && sampled == null)
+                return rejection("CODE_MODE_UNSAMPLED_TOOL",
+                    "步骤 ${index + 1} 的扩展工具尚未装入：$name；先使用 capability_search 精确选择，在下一模型步骤重试")
             if (sampled != null && sampled.codeModeChild(name) !== handler)
-                return rejection("CODE_MODE_UNSAMPLED_TOOL", "步骤 ${index + 1} 的工具未在本轮采样时锁定：$name")
+                return rejection("CODE_MODE_UNSAMPLED_TOOL",
+                    "步骤 ${index + 1} 的工具未在本轮冻结工具表：$name；扩展工具需先通过 capability_search 选择")
             val arguments = step["args"] as? JsonObject
                 ?: return rejection("CODE_MODE_BAD_PLAN", "步骤 ${index + 1} 缺少对象类型的参数")
             validateReferencePlan(arguments, index + 1)?.let { problem ->
