@@ -782,11 +782,12 @@ internal fun PluginInventoryBrowser(
                                         color = colors.textSecondary)
                                     Text(details.samplePrompts.first(),
                                         style = DsType.std14.withReadingWeight(), color = colors.text)
-                                    val pluginReady = item.installedPlugin && when {
-                                        details.mcpUrl != null -> connectedServices.any {
-                                            it.id == details.mcpServerId &&
-                                                it.tools.isNotEmpty()
-                                        }
+                                    val pluginReady = item.installedPlugin &&
+                                        bundleRequirements.all { it.registered } && when {
+                                        details.mcpUrl != null ->
+                                            com.labteto.dshmobile.uicontract.uiMcpDeclaredConnection(
+                                                connectedServices, details.mcpServerId, details.mcpUrl) ==
+                                                com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.TOOLS_REGISTERED
                                         details.hasApp || details.hasHooks -> false
                                         else -> true
                                     }
@@ -873,15 +874,28 @@ internal fun PluginInventoryBrowser(
                 Text("安装技能不会静默启动外部程序；MCP 服务需要你明确同意连接。",
                     style = DsType.caption11, color = colors.textSecondary)
                 if (item.marketState.status != ExtensionMarketStatus.UNSUPPORTED &&
-                    details?.mcpUrl != null && onConnectCodexPlugin != null) {
+                    details?.mcpUrl != null) {
                     Text("连接地址：" + details.mcpUrl,
                         style = DsType.caption11, color = colors.textSecondary)
-                    SyButton(text = "授权并连接 ${details.mcpServerId ?: "MCP"}",
-                        enabled = !loading, variant = SyButtonVariant.Info,
-                        onClick = {
-                            selectedRow = null
-                            onConnectCodexPlugin(pluginId)
-                        })
+                    when (com.labteto.dshmobile.uicontract.uiMcpDeclaredConnection(
+                        connectedServices, details.mcpServerId, details.mcpUrl)) {
+                        com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.ABSENT -> {
+                            if (onConnectCodexPlugin != null)
+                                SyButton(text = "授权并连接 ${details.mcpServerId ?: "MCP"}",
+                                    enabled = !loading, variant = SyButtonVariant.Info,
+                                    onClick = {
+                                        selectedRow = null
+                                        onConnectCodexPlugin(pluginId)
+                                    })
+                        }
+                        com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.TOOLS_REGISTERED ->
+                            Text("已连接并登记工具；实际调用仍需授权",
+                                style = DsType.small13, color = colors.successInk)
+                        else -> SyButton(
+                            text = "检查连接与服务标识", enabled = !loading,
+                            variant = SyButtonVariant.Info,
+                            onClick = { selectedRow = null; onManageConnections() })
+                    }
                 } else if (details?.hasMcp == true && details.mcpUrl == null) {
                     Text("该插件暂未提供 Android 可直接连接的 HTTPS MCP 服务。",
                         style = DsType.small13, color = colors.textSecondary)
@@ -914,22 +928,35 @@ internal fun PluginInventoryBrowser(
                 if (requirementsExpanded) {
                     item.requirements.forEach { requirement ->
                         Text(
-                            "${if (requirement.registered) "已连接" else "需要授权"} · ${requirement.description.ifBlank { requirement.value }}",
+                            "${if (requirement.registered) "已就绪" else if (requirement.type.equals("mcp", true)) "待连接或检查" else "待配置"} · ${requirement.description.ifBlank { requirement.value }}",
                             style = DsType.small13.withReadingWeight(),
                             color = if (requirement.registered) colors.successInk else colors.warningInk,
                         )
                         val endpoint = if (!requirement.registered)
                             skillMcpHttpsEndpoint(requirement) else null
-                        if (endpoint != null && onConnectSkillMcp != null) {
-                            SyButton(
-                                text = "连接并授权",
-                                enabled = !loading,
-                                variant = SyButtonVariant.Info,
-                                onClick = {
-                                    selectedRow = null
-                                    onConnectSkillMcp(requirement.value, endpoint)
-                                },
-                            )
+                        if (endpoint != null) {
+                            val current = com.labteto.dshmobile.uicontract.uiMcpDeclaredConnection(
+                                connectedServices, requirement.value, endpoint)
+                            when (current) {
+                                com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.ABSENT -> {
+                                    if (onConnectSkillMcp != null)
+                                        SyButton(
+                                            text = "连接并授权",
+                                            enabled = !loading,
+                                            variant = SyButtonVariant.Info,
+                                            onClick = {
+                                                selectedRow = null
+                                                onConnectSkillMcp(requirement.value, endpoint)
+                                            },
+                                        )
+                                }
+                                else -> SyButton(
+                                    text = "检查连接",
+                                    enabled = !loading,
+                                    variant = SyButtonVariant.Info,
+                                    onClick = { selectedRow = null; onManageConnections() },
+                                )
+                            }
                         }
                     }
                     if (item.requirements.any { !it.registered && skillMcpHttpsEndpoint(it) == null }) {
