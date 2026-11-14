@@ -73,7 +73,6 @@ internal class AccessibilityNodeSelectionLease {
                 when {
                     sameGeometry.size > 1 -> emptyList()
                     sameSemantics.size == 1 -> sameSemantics
-                    editable.size == 1 -> editable
                     else -> emptyList()
                 }
             }
