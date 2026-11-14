@@ -17,6 +17,45 @@ data class UiMcpServerSnapshot(
     val connection: UiToolConnection = UiToolConnection.HEALTH_UNCHECKED,
     val authorization: UiToolAuthorization = UiToolAuthorization.REQUIRED_PER_CALL,
 )
+/** The UI can identify a declared service by ID and public target, but health and
+ * individual tool authorization still belong to the Tool owner. */
+enum class UiMcpDeclaredConnection { ABSENT, TARGET_CONFLICT, REGISTERED_UNREADY, TOOLS_REGISTERED }
+
+/** Use the same display-target semantics as the MCP registry; never treat an ID
+ * collision or a zero-tool service as proof that the declared plugin works. */
+fun uiMcpDeclaredConnection(
+    servers: List<UiMcpServerSnapshot>, serverId: String?, endpoint: String?,
+): UiMcpDeclaredConnection {
+    if (serverId.isNullOrBlank()) return UiMcpDeclaredConnection.ABSENT
+    val server = servers.firstOrNull { it.id == serverId }
+        ?: return UiMcpDeclaredConnection.ABSENT
+    if (endpoint.isNullOrBlank() || !server.transport.equals("http", ignoreCase = true))
+        return UiMcpDeclaredConnection.TARGET_CONFLICT
+    fun displayIdentity(value: String): String? = runCatching {
+        val uri = java.net.URI(value)
+        val scheme = uri.scheme?.lowercase()
+        val host = uri.host?.lowercase()
+        if (scheme !in setOf("https", "http") || host.isNullOrBlank() ||
+            uri.rawUserInfo != null || uri.rawFragment != null) null
+        else java.net.URI(
+            scheme, null, host, uri.port,
+            uri.path?.ifBlank { "/" } ?: "/", null, null,
+        ).toString()
+    }.getOrNull()
+    if (displayIdentity(server.target) == null ||
+        displayIdentity(server.target) != displayIdentity(endpoint))
+        return UiMcpDeclaredConnection.TARGET_CONFLICT
+    // The MCP owner deliberately removes query strings from display targets.
+    // Without a tenant-scoped identity receipt this UI may not claim a match.
+    if (java.net.URI(endpoint).rawQuery != null)
+        return UiMcpDeclaredConnection.REGISTERED_UNREADY
+    return if (server.registration == UiToolRegistration.REGISTERED &&
+        server.connection == UiToolConnection.HEALTH_UNCHECKED &&
+        server.tools.isNotEmpty())
+        UiMcpDeclaredConnection.TOOLS_REGISTERED
+    else UiMcpDeclaredConnection.REGISTERED_UNREADY
+}
+
 /** Ordered MCP Owner events are hints to invalidate cached health, never call permission. */
 data class UiMcpLifecycleEvent(
     val sequence: Long, val serverId: String, val connection: UiToolConnection?,
