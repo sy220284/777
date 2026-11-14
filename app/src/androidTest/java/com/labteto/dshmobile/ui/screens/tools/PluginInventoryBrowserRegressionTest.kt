@@ -95,7 +95,7 @@ class PluginInventoryBrowserRegressionTest {
             }
         }
         compose.onNodeWithTag("plugin-category-list").performScrollToIndex(4)
-        compose.onNodeWithText("创意与图像").performClick()
+        compose.onNodeWithText("创意与设计").performClick()
         compose.onNodeWithText("视觉理解").assertIsDisplayed()
         compose.onNodeWithText("终端与运行环境").assertDoesNotExist()
     }
