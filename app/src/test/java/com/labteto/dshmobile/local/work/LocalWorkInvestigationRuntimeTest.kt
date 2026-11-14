@@ -77,6 +77,28 @@ class LocalWorkInvestigationRuntimeTest {
         } finally { log.close() }
     }
 
+    @Test fun oldFindingRemainsVisibleAfterLongToolHistoryAndLatestRejectionWins() {
+        val log = log()
+        try {
+            log.append("work/finding", buildJsonObject {
+                put("goal_id", "goal-a"); put("finding_id", "finding-long")
+                put("status", "hypothesis"); put("summary", "大型仓库隐藏了共用模块")
+                put("next_action", "追查依赖")
+            })
+            repeat(450) { index ->
+                log.append("tool/status", buildJsonObject { put("index", index) })
+            }
+            assertTrue(LocalWorkInvestigationRuntime.context(log, "goal-a", "turn-a")
+                .contains("大型仓库隐藏了共用模块"))
+            log.append("work/finding", buildJsonObject {
+                put("goal_id", "goal-a"); put("finding_id", "finding-long")
+                put("status", "rejected"); put("summary", "已核实没有共用模块")
+            })
+            assertFalse(LocalWorkInvestigationRuntime.context(log, "goal-a", "turn-a")
+                .contains("大型仓库隐藏了共用模块"))
+        } finally { log.close() }
+    }
+
     @Test fun aLaterCompletedReadClearsOlderCursorAdvice() {
         val log = log()
         try {
