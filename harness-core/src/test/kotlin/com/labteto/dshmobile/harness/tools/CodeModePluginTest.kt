@@ -111,6 +111,63 @@ class CodeModePluginTest {
         assertTrue(actual.content.contains("\"completed_steps\":1"))
     }
 
+    @Test fun independentReadsContinueAfterOneFailureButNeverClaimFullSuccess() = runTest {
+        val registry = ToolRegistry()
+        val calls = mutableListOf<String>()
+        register(registry, "broken") {
+            calls += "broken"
+            ToolResult("not found", isError = true, errorCode = "TOOL_NOT_FOUND")
+        }
+        register(registry, "good") {
+            calls += "good"
+            ToolResult("located")
+        }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val batch = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject {
+                    put("tool", "broken")
+                    put("args", buildJsonObject {})
+                    put("on_error", "continue")
+                })
+                add(buildJsonObject {
+                    put("tool", "good")
+                    put("args", buildJsonObject {})
+                })
+            })
+        }
+        val output = registry.execute("code_mode_run", batch, ToolContext(approval = { true }))
+        assertTrue(output.isError)
+        assertEquals("CODE_MODE_PARTIAL_FAILED", output.errorCode)
+        assertEquals(listOf("broken", "good"), calls)
+        assertTrue(output.content.contains("\"status\":\"partial\""))
+        assertTrue(output.content.contains("\"failed_steps\":1"))
+        assertTrue(output.content.contains("located"))
+    }
+
+    @Test fun mutationCannotBeMarkedContinueOnErrorBeforeAnyToolRuns() = runTest {
+        val registry = ToolRegistry()
+        var changed = false
+        register(registry, "write", ToolAccess.WORKSPACE_WRITE) {
+            changed = true
+            ToolResult("changed")
+        }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val plan = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject {
+                    put("tool", "write")
+                    put("args", buildJsonObject {})
+                    put("on_error", "continue")
+                })
+            })
+        }
+        val outcome = registry.execute("code_mode_run", plan,
+            context = ToolContext(approval = { true }))
+        assertEquals("CODE_MODE_UNSAFE_CONTINUE", outcome.errorCode)
+        assertFalse(changed)
+    }
+
     @Test fun scriptsWithMoreThanEightStepsCompleteUsingOriginalToolRules() = runTest {
         val registry = ToolRegistry()
         var completed = 0
