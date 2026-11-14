@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.work
 
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -73,6 +74,110 @@ class LocalWorkProjectCatalogTest {
             assertTrue(catalog.snapshots.value.projects.isEmpty())
             assertFalse(File(root, "项目/失败项目-66666666").exists())
             assertFalse(File(root, "项目").exists())
+        }
+
+
+    @Test fun actualDirectoryMovePreservesBytesGitAndSessionAcrossRestart() =
+        testCatalog { file, root, catalog ->
+            val original = File(root, "source").apply { mkdirs() }
+            File(original, ".git/objects").mkdirs()
+            File(original, ".git/objects/commit").writeText("git-history")
+            File(original, "chapter.txt").writeText("第一章")
+            File(root, "archive").mkdirs()
+            val project = catalog.importExisting("小说", "source",
+                initialSessionId = "work-7")
+            assertTrue(catalog.moveDirectory(project.id, "source", "archive/novel"))
+            assertFalse(original.exists())
+            assertEquals("第一章", File(root, "archive/novel/chapter.txt").readText())
+            assertEquals("git-history", File(root, "archive/novel/.git/objects/commit").readText())
+            val loaded = LocalWorkProjectCatalog(file, root, Json).snapshots.value
+            assertEquals("archive/novel", loaded.projects.single().root)
+            assertEquals(project.id, loaded.sessionProjects["work-7"])
+            assertFalse(File(file.parentFile, file.name + ".moving").exists())
+        }
+
+    @Test fun moveRefusesOldConfirmationOverlapsAndExistingDestinations() =
+        testCatalog { _, root, catalog ->
+            File(root, "repo/a").mkdirs()
+            File(root, "repo/b").mkdirs()
+            File(root, "output").mkdirs()
+            val project = catalog.importExisting("主项目", "repo")
+            val child = catalog.importExisting("子项目", "repo/a")
+            val revision = catalog.snapshots.value.revision
+            assertTrue(runCatching {
+                catalog.moveDirectory(project.id, "outdated", "output/repo")
+            }.isFailure)
+            assertTrue(runCatching {
+                catalog.moveDirectory(project.id, "repo", "output/repo")
+            }.isFailure)
+            assertTrue(runCatching {
+                catalog.moveDirectory(child.id, "repo/a", "repo/b")
+            }.isFailure)
+            assertTrue(runCatching {
+                catalog.moveDirectory(child.id, "repo/a", "repo/a/sub")
+            }.isFailure)
+            assertEquals(revision, catalog.snapshots.value.revision)
+            assertTrue(File(root, "repo/a").isDirectory)
+            assertTrue(File(root, "repo/b").isDirectory)
+        }
+
+    @Test fun failedCatalogCommitRollsRealDirectoryBackWithoutLosingFiles() =
+        testCatalog { file, root, catalog ->
+            File(root, "source").mkdirs()
+            File(root, "source/important.txt").writeText("retained")
+            val project = catalog.importExisting("案例", "source")
+            val previous = file.readBytes()
+            assertTrue(file.delete())
+            assertTrue(file.mkdir())
+            File(file, "prevent-replace").writeText("block")
+            assertTrue(runCatching {
+                catalog.moveDirectory(project.id, "source", "target")
+            }.isFailure)
+            assertEquals("retained", File(root, "source/important.txt").readText())
+            assertFalse(File(root, "target").exists())
+            assertEquals("source", catalog.snapshots.value.projects.single().root)
+            assertFalse(File(file.parentFile, file.name + ".moving").exists())
+            assertTrue(file.deleteRecursively())
+            file.writeBytes(previous)
+            assertEquals("source", LocalWorkProjectCatalog(file, root, Json)
+                .snapshots.value.projects.single().root)
+        }
+
+    @Test fun restartRecoversInterruptedRenameAndRecognizesCompletedCommit() =
+        testCatalog { file, root, catalog ->
+            File(root, "source").mkdirs()
+            File(root, "source/record.txt").writeText("durable")
+            val project = catalog.importExisting("恢复", "source")
+            val revision = catalog.snapshots.value.revision
+            val journal = File(file.parentFile, file.name + ".moving")
+            fun intent() = """{"version":1,"projectId":"${project.id}","from":"source","to":"target","revision":$revision}"""
+            journal.writeText(intent())
+            Files.move(File(root, "source").toPath(), File(root, "target").toPath(),
+                StandardCopyOption.ATOMIC_MOVE)
+            val recovered = LocalWorkProjectCatalog(file, root, Json)
+            assertEquals("source", recovered.snapshots.value.projects.single().root)
+            assertEquals("durable", File(root, "source/record.txt").readText())
+            assertFalse(journal.exists())
+            assertTrue(recovered.moveDirectory(project.id, "source", "target"))
+            journal.writeText(intent())
+            val completed = LocalWorkProjectCatalog(file, root, Json)
+            assertEquals("target", completed.snapshots.value.projects.single().root)
+            assertTrue(File(root, "target/record.txt").isFile)
+            assertFalse(journal.exists())
+        }
+
+    @Test fun ambiguousRecoveryPreservesBothDirectoriesAndReportsError() =
+        testCatalog { file, root, catalog ->
+            File(root, "source").mkdirs()
+            File(root, "target").mkdirs()
+            val project = catalog.importExisting("冲突", "source")
+            File(file.parentFile, file.name + ".moving").writeText(
+                """{"version":1,"projectId":"${project.id}","from":"source","to":"target","revision":${catalog.snapshots.value.revision}}"""
+            )
+            assertTrue(runCatching { LocalWorkProjectCatalog(file, root, Json) }.isFailure)
+            assertTrue(File(root, "source").isDirectory)
+            assertTrue(File(root, "target").isDirectory)
+            assertTrue(File(file.parentFile, file.name + ".moving").exists())
         }
 
     @Test fun rejectsTraversalOrDuplicateIdWithoutChangingProject() = testCatalog { file, root, catalog ->
