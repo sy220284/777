@@ -16,8 +16,8 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Codex agent/control/mailbox.rs separates mailbox observation from agent activation.
- * This read-only result stream observes persisted model checkpoints; it does not consume the
- * incoming Job Inbox nor transform delivery receipts into completion claims.
+ * This read-only result stream observes member-to-Lead reports and model checkpoints from
+ * the same durable EventLog, without consuming Job Inbox or claiming task acceptance.
  * Claude teammateMailbox.ts similarly separates durable teammate messages from execution.
  */
 internal class LocalTeamResultMailbox(
@@ -46,6 +46,7 @@ internal class LocalTeamResultMailbox(
     ): LocalTeamAgentMessagePage {
         val state = project(sessionId)
         val membersByJob = state.members.associateBy(LocalTeamMemberSnapshot::jobId)
+        val membersById = state.members.associateBy(LocalTeamMemberSnapshot::id)
         val target = targetName?.trim()?.takeIf(String::isNotBlank)
         if (target != null) {
             require(state.members.any { it.name == target }) {
@@ -57,6 +58,22 @@ internal class LocalTeamResultMailbox(
         val latest = log.latestSequence()
 
         fun decode(event: LocalSessionEventLog.Event): LocalTeamAgentMessageSnapshot? {
+            if (event.type == TEAM_MESSAGE_QUEUED) {
+                val message = LocalAgentTeamEventCodec.decodeMessage(event.data)
+                val member = membersById[message.senderId] ?: return null
+                if (message.kind != LocalTeamMessageKind.MESSAGE ||
+                    message.targetId != sessionId ||
+                    (target != null && member.name != target)) return null
+                return LocalTeamAgentMessageSnapshot(
+                    id = message.id,
+                    sequence = event.sequence,
+                    createdAt = event.createdAt,
+                    memberId = member.id,
+                    memberName = member.name,
+                    content = message.content,
+                    step = 0,
+                )
+            }
             if (event.type != LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT) return null
             val jobId = event.data["background_job_id"]?.jsonPrimitive?.contentOrNull ?: return null
             val member = membersByJob[jobId] ?: return null
@@ -149,75 +166,25 @@ internal class LocalTeamResultMailbox(
         val scannedThroughSequence: Long,
     )
 
+    /** Reuse the same result reader as team_messages. Continue across page budgets so a
+     * busy EventLog cannot turn a real member result into a false timeout. */
     private fun nextAgentMessageAfter(
         sessionId: String,
         targetName: String?,
         afterSequence: Long,
     ): AgentMessageForwardScan {
-        val state = project(sessionId)
-        val membersByJob = state.members.associateBy(LocalTeamMemberSnapshot::jobId)
-        val membersById = state.members.associateBy(LocalTeamMemberSnapshot::id)
-        val target = targetName?.trim()?.takeIf(String::isNotBlank)
-        if (target != null) {
-            require(state.members.any { it.name == target }) {
-                "TEAM_MEMBER_NOT_FOUND：找不到 teammate：" + target
-            }
-        }
-
         var cursor = afterSequence.coerceAtLeast(0L)
-        repeat(16) {
-            val page = eventLogFor(sessionId).pageAfter(cursor, AGENT_MESSAGE_SCAN_PAGE)
-            if (page.isEmpty()) {
-                return AgentMessageForwardScan(null, cursor)
+        while (true) {
+            val page = scanAgentMessages(sessionId, targetName, limit = 1, afterSequence = cursor)
+            page.messages.firstOrNull()?.let { message ->
+                return AgentMessageForwardScan(message, message.sequence)
             }
-            page.sortedBy(LocalSessionEventLog.Event::sequence).forEach { event ->
-                cursor = maxOf(cursor, event.sequence)
-                if (event.type == TEAM_MESSAGE_QUEUED) {
-                    val message = LocalAgentTeamEventCodec.decodeMessage(event.data)
-                    val sender = membersById[message.senderId] ?: return@forEach
-                    if (message.kind != LocalTeamMessageKind.MESSAGE ||
-                        message.targetId != sessionId ||
-                        (target != null && sender.name != target)) return@forEach
-                    return AgentMessageForwardScan(
-                        message = LocalTeamAgentMessageSnapshot(
-                            id = message.id,
-                            sequence = event.sequence,
-                            createdAt = event.createdAt,
-                            memberId = sender.id,
-                            memberName = sender.name,
-                            content = message.content,
-                            step = 0,
-                        ),
-                        scannedThroughSequence = cursor,
-                    )
-                }
-                if (event.type != LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT) return@forEach
-                val jobId = event.data["background_job_id"]?.jsonPrimitive?.contentOrNull
-                    ?: return@forEach
-                val member = membersByJob[jobId] ?: return@forEach
-                if (target != null && member.name != target) return@forEach
-                if (!verification.isFirstResultCheckpoint(eventLogFor(sessionId), event)) return@forEach
-                val content = event.data["terminal_output"]?.jsonPrimitive?.contentOrNull
-                    ?.takeIf(String::isNotBlank)
-                    ?: return@forEach
-                return AgentMessageForwardScan(
-                    message = LocalTeamAgentMessageSnapshot(
-                        id = verification.resultIdentity(event),
-                        sequence = event.sequence,
-                        createdAt = event.createdAt,
-                        memberId = member.id,
-                        memberName = member.name,
-                        content = content,
-                        step = event.data["step"]?.jsonPrimitive?.intOrNull?.coerceAtLeast(0) ?: 0,
-                    ),
-                    scannedThroughSequence = cursor,
-                )
+            if (!page.hasMore) return AgentMessageForwardScan(null, page.nextCursor)
+            check(page.nextCursor > cursor) {
+                "TEAM_RESULT_HISTORY_SCAN_STALLED：持久事件扫描无法推进"
             }
-            if (page.size < AGENT_MESSAGE_SCAN_PAGE) {
-                return AgentMessageForwardScan(null, cursor)
-            }
+            cursor = page.nextCursor
         }
-        return AgentMessageForwardScan(null, cursor)
     }
 
     suspend fun waitForMessage(
@@ -227,6 +194,16 @@ internal class LocalTeamResultMailbox(
         timeoutMs: Int,
     ): String {
         var scanAfter = afterSequence
+        if (scanAfter < 0L) {
+            scanAgentMessages(sessionId, targetName, limit = 1, afterSequence = -1L)
+                .messages.lastOrNull()?.let { latest ->
+                    return "[" + latest.id + "] " + latest.memberName +
+                        " sequence=" + latest.sequence +
+                        " step=" + latest.step + "\n" +
+                        latest.content.take(MAX_RENDERED_MESSAGE_CHARS) +
+                        "\nnext_cursor=" + latest.sequence
+                }
+        }
 
         fun scanNext(): LocalTeamAgentMessageSnapshot? {
             val scan = nextAgentMessageAfter(
