@@ -725,7 +725,7 @@ internal fun PluginInventoryBrowser(
                         Text("发布方：${details.developerName.ifBlank { "OpenAI / 合作开发者" }} · ${details.version}",
                             style = DsType.caption11, color = colors.textTertiary)
                         val abilities = buildList {
-                            if (details.hasSkills) add("技能")
+                            if (details.skills.isNotEmpty()) add("技能")
                             if (details.hasMcp) add("MCP")
                             if (details.hasApp) add("App")
                             if (details.hasHooks) add("Hooks")
