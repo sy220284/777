@@ -127,6 +127,9 @@ data class ToolsUiState(
     val codexPlugins: List<com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot> = emptyList(),
     val codexLoading: Boolean = false,
     val codexError: String? = null,
+    val codexDetails: Map<String, com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot> = emptyMap(),
+    val codexDetailLoadingId: String? = null,
+    val codexDetailError: String? = null,
     val curatedLoading: Boolean = false,
     val curatedError: String? = null,
     val pendingSkillUpdates: Map<String, String> = emptyMap(),
@@ -342,6 +345,9 @@ class ToolsViewModel @Inject constructor(
                     codexPlugins = _state.value.codexPlugins,
                     codexLoading = _state.value.codexLoading,
                     codexError = _state.value.codexError,
+                    codexDetails = _state.value.codexDetails,
+                    codexDetailLoadingId = _state.value.codexDetailLoadingId,
+                    codexDetailError = _state.value.codexDetailError,
                     curatedLoading = _state.value.curatedLoading,
                     curatedError = _state.value.curatedError,
                 )
@@ -416,6 +422,53 @@ class ToolsViewModel @Inject constructor(
                 _state.value = _state.value.copy(
                     codexLoading = false,
                     codexError = "Codex 官方市场读取失败：" + (failure.message ?: "请检查网络"),
+                )
+            }
+        }
+    }
+
+    /** Details are fetched on selection, not as dozens of extra startup requests. */
+    fun loadCodexPluginDetail(id: String) {
+        if (_state.value.codexPlugins.none { it.id == id } ||
+            _state.value.codexDetailLoadingId == id ||
+            id in _state.value.codexDetails) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(codexDetailLoadingId = id, codexDetailError = null)
+            try {
+                val detail = localTools.codexPluginDetail(id)
+                _state.value = _state.value.copy(
+                    codexDetails = _state.value.codexDetails + (id to detail),
+                    codexDetailLoadingId = null,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                _state.value = _state.value.copy(
+                    codexDetailLoadingId = null,
+                    codexDetailError = failure.message ?: "Codex 插件详情读取失败",
+                )
+            }
+        }
+    }
+
+    fun installCodexPluginSkill(pluginId: String, skillId: String) {
+        val plugin = _state.value.codexPlugins.firstOrNull { it.id == pluginId } ?: return
+        if (plugin.codexOnly || plugin.installPolicy == "NOT_AVAILABLE" ||
+            _state.value.codexDetails[pluginId]?.skills?.contains(skillId) != true) return
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val installed = localTools.installCodexPluginSkill(pluginId, skillId)
+                _state.value = _state.value.copy(
+                    loading = false, skills = localTools.installedSkills(),
+                    presets = localTools.presetSkills(), createdSkillId = installed,
+                    feedback = "已从 Codex 官方插件安装技能 $installed；可在已安装中查看",
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false, feedback = failure.message ?: "插件技能安装失败",
                 )
             }
         }
@@ -1050,6 +1103,11 @@ fun ToolsScreen(
                                     codexPlugins = state.codexPlugins,
                                     codexLoading = state.codexLoading,
                                     codexError = state.codexError,
+                                    codexDetails = state.codexDetails,
+                                    codexDetailLoadingId = state.codexDetailLoadingId,
+                                    codexDetailError = state.codexDetailError,
+                                    onReadCodexPluginDetail = viewModel::loadCodexPluginDetail,
+                                    onInstallCodexPluginSkill = viewModel::installCodexPluginSkill,
                                     onRefreshCodex = viewModel::refreshCodexPlugins,
                                     curatedLoading = state.curatedLoading,
                                     curatedError = state.curatedError,
