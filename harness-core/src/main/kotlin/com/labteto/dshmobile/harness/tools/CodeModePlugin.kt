@@ -33,7 +33,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             name = TOOL_NAME,
             schema = functionToolSchema(
                 TOOL_NAME,
-                "串行执行已加载工具，支持前序结果引用和 when 条件。步骤从 1 开始编号；when.path 是前序工具返回正文的 JSON 字段路径，例如 approved、file.path 或 items[0].name，不是 steps[0].content；前序返回普通文本时省略 path，用 equals 比较全文。示例：第 1 步返回 {approved:true}，第 2 步使用 when:{step:1,path:approved,equals:true}。扩展工具先用 capability_search 加载，下一模型步骤才能编排；每个子工具维持实际权限审批、执行与审计。",
+                "串行执行已加载工具，支持前序结果引用和 when 条件。步骤从 1 开始编号；when.path 是前序工具返回正文的 JSON 字段路径，例如 approved、file.path 或 items[0].name，不是 steps[0].content；前序返回普通文本时省略 path，用 equals 比较全文。示例：第 1 步返回 {\"approved\":true}，第 2 步使用 when:{\"step\":1,\"path\":\"approved\",\"equals\":true}。扩展工具先用 capability_search 加载，下一模型步骤才能编排；每个子工具维持实际权限审批、执行与审计。",
                 parameterSchema = buildJsonObject {
                     put("type", "object")
                     put("properties", buildJsonObject {
