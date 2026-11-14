@@ -185,6 +185,8 @@ Automation 不允许进入 Chat / Work 内部实现。需要执行聊天或工�
 ### 4.4 ToolsFeature / SettingsFeature
 
 ToolsFeature 负责工具管理、MCP 集成和用户可见工具入口；运行时真正的 Tool execution contract 属于 Shared Capability。
+ 
+插件技能的安装来源以 `LocalGitHubSkillImporter` 验证过的固定版本收据为准，向 UI 发布 `UiSkillSourceIdentity`（仓库所有者、仓库名、完整提交、目录）；插件列表、详情和批量安装共用来源身份，UI 不再解析 GitHub URL 片段决定归属。账号授权由 `LocalMcpOAuthCoordinator` 暂存回执，`LocalToolsUiFacade` 作为 ToolsFeature 连接变更入口，统一处理 OAuth、手动 Bearer、刷新及失败恢复；已登记服务、工具发现、健康状态、单次工具审批是独立事实，不以工具列表为空作为重新授权理由。
 
 SettingsFeature 负责设置体验和配置入口；真实配置事实仍归对应业务 Owner：Feature 专属配置归所属 Feature，中立跨域配置归对应 Shared Capability。
 
@@ -246,6 +248,8 @@ Shared Capability 是多个 Feature 可以安全复用的纯能力边界。
 - 恢复时的所有权裁决。
 
 Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建立第二套 Session 所有权。
+ 
+会话历史以 Session EventLog / 原生 Session pager 为唯一持久事实来源；`TranscriptHistoryPager` 统一前台所需对话数量、有界分页、去重和会话切换检查。原生 V6 与 `UiMessageHistoryPort` 分别承担富媒体消息渲染和独立 UI 的字段投影，复用同一分页算法，保留原生消息中的图片、附件和工具执行字段；后续 UI 消息契约扩展须先证明这些字段完整无损，再退出原生展示适配。
 
 ### Model Capability
 

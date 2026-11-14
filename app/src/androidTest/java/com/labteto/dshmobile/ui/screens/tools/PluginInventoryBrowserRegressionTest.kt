@@ -522,6 +522,44 @@ class PluginInventoryBrowserRegressionTest {
     }
 
     @Test
+    fun registeredMcpWithNoToolsOffersInspectionInsteadOfRepeatedOauth() {
+        var openedConnectionManager = 0
+        var oauthAttempts = 0
+        val pluginId = "figma@openai-curated"
+        val plugin = com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            pluginId, "figma", "Creativity", "plugins/figma", "AVAILABLE", "ON_INSTALL", false,
+        )
+        val detail = com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            pluginId, "Figma", "设计协作", "Figma", "2.0",
+            emptyList(), true, false, false, "figma", "https://mcp.figma.com/mcp",
+        )
+        val service = com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(
+            "figma", "http", "https://mcp.figma.com/mcp", emptyList(),
+            registration = com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED,
+        )
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), codexPlugins = listOf(plugin),
+                    codexDetails = mapOf(pluginId to detail),
+                    connectedServices = listOf(service),
+                    onBack = {}, onManageConnections = { openedConnectionManager++ },
+                    onReturnToChat = {},
+                    onConnectCodexPlugin = { oauthAttempts++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action")
+            .assertIsDisplayed().performClick()
+        compose.runOnIdle {
+            assertEquals(1, openedConnectionManager)
+            assertEquals(0, oauthAttempts)
+        }
+    }
+
+    @Test
     fun installedPluginSkillRecognizesPinnedOriginWhenFolderAndSkillNameDiffer() {
         var installRequests = 0
         val pluginId = "zoom@openai-curated"
@@ -542,6 +580,9 @@ class PluginInventoryBrowserRegressionTest {
                     skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
                         "zoom-general", "Use Zoom", true,
                         sourceUrl = "https://github.com/openai/plugins/tree/0123456789012345678901234567890123456789/plugins/zoom/skills/general",
+                        sourceIdentity = com.labteto.dshmobile.uicontract.UiSkillSourceIdentity(
+                            "openai", "plugins", "0123456789012345678901234567890123456789",
+                            "plugins/zoom/skills/general"),
                     )),
                     onBack = {}, onManageConnections = {}, onReturnToChat = {},
                     onInstallCodexPluginSkill = { _, _ -> installRequests++ },

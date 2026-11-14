@@ -413,10 +413,10 @@ class ToolsViewModel @Inject constructor(
         val officialDetail = officialPluginId?.let { _state.value.codexDetails[it] }
         if (officialDetail?.mcpUrl != null && officialPluginId != null) {
             val serverId = requireNotNull(officialDetail.mcpServerId)
-            val alreadyConnected = localTools.servers().any {
-                it.id == serverId && it.tools.isNotEmpty()
-            }
-            if (!alreadyConnected) {
+            // A known service must be repaired through its explicit connection action.
+            // Empty tools, pending health or a failed transport never trigger surprise OAuth.
+            val knownService = localTools.servers().any { it.id == serverId }
+            if (!knownService) {
                 _state.value = _state.value.copy(
                     mcpLoginServerId = serverId,
                     feedback = "技能已安装；正在打开 ${serverId} 账号授权。",
@@ -474,10 +474,21 @@ class ToolsViewModel @Inject constructor(
             .count { !it.registered }
         val scope = if (bundledSkillIds.size > 1) "插件 ${officialPluginId ?: installedId} 的 ${bundledSkillIds.size} 项技能"
             else "技能 ${installedId}"
+        val officialServer = officialDetail?.mcpServerId?.let { id ->
+            localTools.servers().firstOrNull {
+                it.id == id &&
+                    it.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED
+            }
+        }
         _state.value = _state.value.copy(
-            feedback = if (unresolved == 0)
-                "${scope}已安装，可直接使用"
-            else "${scope}已安装，还有 ${unresolved} 项运行依赖可在详情中查看",
+            feedback = when {
+                unresolved != 0 -> "${scope}已安装，还有 ${unresolved} 项运行依赖需在详情中处理"
+                officialDetail?.mcpUrl != null && officialServer == null ->
+                    "${scope}已安装，服务尚未登记；请进入详情连接账号"
+                officialServer != null && officialServer.tools.isEmpty() ->
+                    "${scope}已安装，服务已登记但尚无可用工具；请在连接器中检查健康状态"
+                else -> "${scope}已安装，可直接使用"
+            },
         )
     }
 
@@ -655,7 +666,7 @@ class ToolsViewModel @Inject constructor(
                 }
                 val allIds = localTools.installedSkills().filter { skill ->
                     detail.skillDirectories.values.any { folder ->
-                        skill.sourceUrl?.endsWith("/${plugin.sourcePath}/$folder") == true
+                        codexOfficialPluginSourceMatches(skill.sourceIdentity, plugin.sourcePath, folder)
                     }
                 }.map { it.name }.distinct()
                 if (allIds.isEmpty()) error("插件没有可安装的 Android 技能")

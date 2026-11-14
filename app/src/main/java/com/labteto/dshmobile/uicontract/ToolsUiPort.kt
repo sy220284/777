@@ -42,9 +42,14 @@ data class UiSkillRequirement(
     val type: String, val value: String, val description: String = "", val registered: Boolean = false,
     val transport: String? = null, val url: String? = null, val command: String? = null,
 )
+/** Verified immutable GitHub installation receipt. UI must never infer ownership from URL substrings. */
+data class UiSkillSourceIdentity(
+    val owner: String, val repository: String, val commit: String, val directory: String,
+)
 data class UiSkillSnapshot(val name: String, val description: String, val modelInvocable: Boolean,
     val displayName: String = name, val sourceUrl: String? = null, val sourceWarning: String? = null,
-    val rollbackAvailable: Boolean = false, val requirements: List<UiSkillRequirement> = emptyList())
+    val rollbackAvailable: Boolean = false, val requirements: List<UiSkillRequirement> = emptyList(),
+    val sourceIdentity: UiSkillSourceIdentity? = null)
 data class UiPresetSkillSnapshot(val id: String, val title: String, val description: String, val installed: Boolean)
 data class UiCodexPluginDetailSnapshot(
     val id: String, val displayName: String, val description: String,

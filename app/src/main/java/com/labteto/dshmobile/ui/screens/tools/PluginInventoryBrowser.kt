@@ -103,6 +103,7 @@ private data class InventoryRow(
     val installablePreset: Boolean = false,
     val installableCurated: Boolean = false,
     val sourceUrl: String? = null,
+    val sourceIdentity: com.labteto.dshmobile.uicontract.UiSkillSourceIdentity? = null,
     val sourceWarning: String? = null,
     val rollbackAvailable: Boolean = false,
     val sourceLabel: String = "",
@@ -273,7 +274,8 @@ internal fun PluginInventoryBrowser(
             connectedService = false, icon = copy.icon, accent = copy.accent,
             group = copy.group, documentIcon = copy.documentIcon,
             available = true, modelInvocable = skill.modelInvocable, installedSkill = true,
-            sourceUrl = skill.sourceUrl, sourceWarning = skill.sourceWarning,
+            sourceUrl = skill.sourceUrl, sourceIdentity = skill.sourceIdentity,
+            sourceWarning = skill.sourceWarning,
             rollbackAvailable = skill.rollbackAvailable,
             requirements = skill.requirements,
             sourceLabel = if (skill.sourceUrl != null) "GitHub · 已固定来源" else "777 · 本地技能",
@@ -315,7 +317,7 @@ internal fun PluginInventoryBrowser(
             it.id == plugin.name || it.id == codexDetails[plugin.id]?.mcpServerId
         }
         val installedFromPlugin = skills.any {
-            codexOfficialPluginSourceMatches(it.sourceUrl, plugin.sourcePath)
+            codexOfficialPluginSourceMatches(it.sourceIdentity, plugin.sourcePath)
         }
         val verifiedDetail = codexDetails[plugin.id]
         val support = when {
@@ -364,7 +366,7 @@ internal fun PluginInventoryBrowser(
     val pluginPageSkills = if (skillsOnly) installedSkills else installedSkills.filterNot { installed ->
         codexPlugins.any { plugin ->
             !plugin.codexOnly && plugin.installPolicy != "NOT_AVAILABLE" &&
-                codexOfficialPluginSourceMatches(installed.sourceUrl, plugin.sourcePath)
+                codexOfficialPluginSourceMatches(installed.sourceIdentity, plugin.sourcePath)
         }
     }
     val catalogue = local + connected + pluginPageSkills + availablePresets + curated + officialPlugins
@@ -587,13 +589,14 @@ internal fun PluginInventoryBrowser(
                     (onInstallCodexPlugin != null ||
                         (oneSkill != null && !oneSkillInstalled &&
                             onInstallCodexPluginSkill != null))
-                val officialConnected = pluginDetail?.mcpServerId != null &&
-                    connectedServices.any { server ->
-                        server.id == pluginDetail.mcpServerId &&
-                            server.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED &&
-                            server.tools.isNotEmpty()
-                    }
-                val canConnectOfficial = officialSupported && !officialConnected &&
+                val officialService = pluginDetail?.mcpServerId?.let { serverId ->
+                    connectedServices.firstOrNull { it.id == serverId }
+                }
+                val officialRegistered = officialService?.registration ==
+                    com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED
+                val officialConnected = officialRegistered && officialService?.tools?.isNotEmpty() == true
+                val canInspectOfficial = officialSupported && officialRegistered && !officialConnected
+                val canConnectOfficial = officialSupported && !officialRegistered &&
                     pluginDetail?.mcpUrl != null && onConnectCodexPlugin != null
                 val canConnectSkill = endpoint != null && onConnectSkillMcp != null
                 val canUseOfficial = officialSupported && item.installedPlugin &&
@@ -602,7 +605,7 @@ internal fun PluginInventoryBrowser(
                     (!pluginDetail.hasApp || officialConnected) &&
                     !pluginDetail.hasHooks && onUseCapability != null
                 val hasDirectAction = canInstallPreset || canInstallCurated ||
-                    canInstallOfficial || canConnectOfficial || canConnectSkill || canUseOfficial ||
+                    canInstallOfficial || canConnectOfficial || canInspectOfficial || canConnectSkill || canUseOfficial ||
                     (onUseCapability != null && item.available) || item.connectedService ||
                     (!item.id.startsWith("codex-plugin:") &&
                         !item.installablePreset && !item.installableCurated)
@@ -613,6 +616,7 @@ internal fun PluginInventoryBrowser(
                         canInstallOfficial -> if (missingPluginSkills.size > 1)
                             "安装包含的 ${missingPluginSkills.size} 项技能" else "安装"
                         canConnectOfficial || canConnectSkill -> "连接并授权"
+                        canInspectOfficial -> "检查连接"
                         canUseOfficial -> "使用"
                         item.installedSkill || (onUseCapability != null && item.available) -> "使用"
                         item.connectedService -> "管理连接"
@@ -631,6 +635,10 @@ internal fun PluginInventoryBrowser(
                                     onInstallCodexPluginSkill?.invoke(pluginId, oneSkill)
                             }
                             canConnectOfficial -> onConnectCodexPlugin?.invoke(pluginId)
+                            canInspectOfficial -> {
+                                selectedRow = null
+                                onManageConnections()
+                            }
                             canConnectSkill -> requireNotNull(endpoint).let { (serverId, url) ->
                                 onConnectSkillMcp?.invoke(serverId, url)
                             }

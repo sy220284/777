@@ -2,8 +2,8 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.presentation.LocalSessionUiFacade
-import com.labteto.dshmobile.local.session.LocalTranscriptPage
 import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
+import com.labteto.dshmobile.local.presentation.TranscriptHistoryPager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -23,122 +23,36 @@ internal interface LocalTranscriptHistoryPageSource {
     ): LocalTranscriptHistoryLoadResult?
 }
 
-/** Bounded Session Event paging and foreground-visible transcript projection. */
+/** Native V6 preserves rich tool/media/message blocks while sharing the one bounded pager. */
 internal class LocalTranscriptHistoryLoader(
     private val session: LocalSessionUiFacade,
-    private val currentSessionId: () -> String,
-    private val liveMessages: () -> List<LocalHarnessMessage>,
+    currentSessionId: () -> String,
+    liveMessages: () -> List<LocalHarnessMessage>,
 ) : LocalTranscriptHistoryPageSource {
-    override suspend fun bootstrap(sessionId: String): LocalTranscriptHistoryLoadResult? = withContext(Dispatchers.Default) {
-        var olderMessages = emptyList<LocalHarnessMessage>()
-        var pageCursor: LocalTranscriptPageCursor? = null
-        var nextCursor: LocalTranscriptPageCursor? = null
-        var needsMoreVisibleDialogue = true
-        var cursorAdvanced = true
-        var loadedPages = 0
-        var loadedRawMessages = 0
+    private val pager = TranscriptHistoryPager(
+        readPage = { sessionId: String, cursor: LocalTranscriptPageCursor?, limit: Int ->
+            val page = withContext(Dispatchers.IO) {
+                session.transcriptPage(sessionId, cursor, limit)
+            }
+            page.messages to page.nextCursor
+        },
+        liveMessages = liveMessages,
+        currentSessionId = currentSessionId,
+        messageId = LocalHarnessMessage::id,
+        countDialogue = ::userVisibleDialogueMessageCount,
+    )
 
-        do {
-            val page = readPage(sessionId, pageCursor, LOCAL_TRANSCRIPT_INITIAL_VISIBLE_DIALOGUE_MESSAGES)
-            loadedPages++
-            loadedRawMessages += page.messages.size
-            if (currentSessionId() != sessionId) return@withContext null
-
-            val live = liveMessages()
-            olderMessages = prependUniqueOlderMessages(page.messages, olderMessages, live)
-            nextCursor = page.nextCursor
-            needsMoreVisibleDialogue = needsMoreUserVisibleDialogue(
-                messages = mergeLocalTranscriptHistory(olderMessages, live),
-                target = LOCAL_TRANSCRIPT_INITIAL_VISIBLE_DIALOGUE_MESSAGES,
-            )
-            cursorAdvanced = nextCursor != pageCursor
-            pageCursor = nextCursor
-        } while (
-            nextCursor != null &&
-            needsMoreVisibleDialogue &&
-            cursorAdvanced &&
-            loadedPages < LOCAL_TRANSCRIPT_HISTORY_MAX_PAGES_PER_LOAD &&
-            loadedRawMessages < LOCAL_TRANSCRIPT_HISTORY_MAX_RAW_MESSAGES_PER_LOAD
-        )
-
-        LocalTranscriptHistoryLoadResult(
-            olderMessages = olderMessages,
-            nextCursor = nextCursor,
-            loadedRawMessages = loadedRawMessages,
-        )
-    }
+    override suspend fun bootstrap(sessionId: String): LocalTranscriptHistoryLoadResult? =
+        pager.bootstrap(sessionId)?.let {
+            LocalTranscriptHistoryLoadResult(it.olderMessages, it.nextCursor, it.loadedRawMessages)
+        }
 
     override suspend fun olderBatch(
         sessionId: String,
         olderMessages: List<LocalHarnessMessage>,
         startCursor: LocalTranscriptPageCursor,
-    ): LocalTranscriptHistoryLoadResult? = withContext(Dispatchers.Default) {
-        var accumulated = olderMessages
-        var nextCursor: LocalTranscriptPageCursor? = startCursor
-        var loadedRawMessages = 0
-        val initialVisibleCount = userVisibleDialogueMessageCount(
-            mergeLocalTranscriptHistory(accumulated, liveMessages()),
-        )
-        var addedVisibleDialogue = 0
-        var cursorAdvanced = true
-        var loadedPages = 0
-
-        do {
-            val requestedCursor = nextCursor ?: break
-            val page = readPage(sessionId, requestedCursor, LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES)
-            loadedPages++
-            loadedRawMessages += page.messages.size
-            if (currentSessionId() != sessionId) return@withContext null
-
-            accumulated = prependUniqueOlderMessages(
-                pageMessages = page.messages,
-                olderMessages = accumulated,
-                liveMessages = liveMessages(),
-            )
-            nextCursor = page.nextCursor
-            addedVisibleDialogue = (
-                userVisibleDialogueMessageCount(
-                    mergeLocalTranscriptHistory(accumulated, liveMessages()),
-                ) - initialVisibleCount
-            ).coerceAtLeast(0)
-            cursorAdvanced = nextCursor != requestedCursor
-        } while (
-            nextCursor != null &&
-            addedVisibleDialogue < LOCAL_TRANSCRIPT_HISTORY_VISIBLE_DIALOGUE_BATCH_MESSAGES &&
-            cursorAdvanced &&
-            loadedPages < LOCAL_TRANSCRIPT_HISTORY_MAX_PAGES_PER_LOAD &&
-            loadedRawMessages < LOCAL_TRANSCRIPT_HISTORY_MAX_RAW_MESSAGES_PER_LOAD
-        )
-
-        LocalTranscriptHistoryLoadResult(
-            olderMessages = accumulated,
-            nextCursor = nextCursor,
-            loadedRawMessages = loadedRawMessages,
-        )
-    }
-
-    private suspend fun readPage(
-        sessionId: String,
-        cursor: LocalTranscriptPageCursor?,
-        limit: Int,
-    ): LocalTranscriptPage = withContext(Dispatchers.IO) {
-        session.transcriptPage(
-            sessionId = sessionId,
-            cursor = cursor,
-            limit = limit,
-        )
-    }
-
-    private fun prependUniqueOlderMessages(
-        pageMessages: List<LocalHarnessMessage>,
-        olderMessages: List<LocalHarnessMessage>,
-        liveMessages: List<LocalHarnessMessage>,
-    ): List<LocalHarnessMessage> {
-        if (pageMessages.isEmpty()) return olderMessages
-        val existingIds = HashSet<String>(olderMessages.size + liveMessages.size)
-        olderMessages.mapTo(existingIds, LocalHarnessMessage::id)
-        liveMessages.mapTo(existingIds, LocalHarnessMessage::id)
-        val newlyLoaded = pageMessages.filter { message -> existingIds.add(message.id) }
-        return if (newlyLoaded.isEmpty()) olderMessages else newlyLoaded + olderMessages
-    }
+    ): LocalTranscriptHistoryLoadResult? =
+        pager.olderBatch(sessionId, olderMessages, startCursor)?.let {
+            LocalTranscriptHistoryLoadResult(it.olderMessages, it.nextCursor, it.loadedRawMessages)
+        }
 }

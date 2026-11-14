@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.ensureActive
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,7 +17,6 @@ internal fun isRegisteredMcpSkillRequirement(
 ): Boolean = servers.any { server ->
     server.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED &&
         server.connection == com.labteto.dshmobile.uicontract.UiToolConnection.HEALTH_UNCHECKED &&
-        server.tools.isNotEmpty() &&
         (server.id == name || name in server.tools)
 }
 
@@ -212,7 +212,11 @@ class LocalToolsUiFacade @Inject internal constructor(
         val connected = servers()
         val registeredTools = tools.capabilityCatalogue().map { it.name }.toSet()
         tools.installedSkills().map { item ->
-            val result = runCatching { gitHubSkillImporter.installedSourceLink(item.name) }
+            val result = runCatching { gitHubSkillImporter.installedSourceIdentity(item.name) }
+            val sourceIdentity = result.getOrNull()?.let { (source, commit) ->
+                com.labteto.dshmobile.uicontract.UiSkillSourceIdentity(
+                    source.owner, source.repository, commit, source.directory)
+            }
             result.exceptionOrNull()?.let { failure ->
                 com.labteto.dshmobile.observability.AppLog.warn(
                     "SkillOrigin", "技能来源证据无效：${item.name}", failure,
@@ -226,8 +230,11 @@ class LocalToolsUiFacade @Inject internal constructor(
             }
             com.labteto.dshmobile.uicontract.UiSkillSnapshot(
                 item.name, item.description, item.modelInvocable, item.displayName,
-                sourceUrl = result.getOrNull(),
+                sourceUrl = sourceIdentity?.let {
+                    "https://github.com/${it.owner}/${it.repository}/tree/${it.commit}/${it.directory}"
+                },
                 sourceWarning = if (result.isFailure) "技能来源记录校验失败，请检查或重新安装此技能" else null,
+                sourceIdentity = sourceIdentity,
                 rollbackAvailable = gitHubSkillImporter.canRollback(item.name),
                 requirements = dependencyResult.getOrNull()?.map { requirement ->
                     val registered = when (requirement.type.lowercase()) {
@@ -324,30 +331,78 @@ class LocalToolsUiFacade @Inject internal constructor(
     override suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)
     override suspend fun setSkillModelInvocable(id: String, enabled: Boolean) = tools.setSkillModelInvocable(id, enabled)
     override suspend fun connectHttp(serverId: String, endpoint: String) = tools.connectHttp(serverId, endpoint)
-    suspend fun connectHttpWithCredential(serverId: String, endpoint: String, bearer: String): String {
-        if (bearer.isNotEmpty()) {
-            disconnectMcpIfConnected(serverId)
-            mcpCredentials.save(serverId, endpoint, bearer)
+    /** One Feature-owned connection switch for browser OAuth, refresh and manual Bearer.
+     * The existing service remains registered until new credentials are ready. */
+    private val mcpConnectionGate = kotlinx.coroutines.sync.Mutex()
+
+    private suspend fun switchMcpHttpConnection(
+        serverId: String,
+        endpoint: String,
+        stage: suspend () -> com.labteto.dshmobile.local.tools.LocalMcpCredentialStore.CredentialRotationReceipt,
+    ): String = mcpConnectionGate.withLock {
+        val existing = tools.servers().firstOrNull { it.id == serverId }
+        if (existing != null) {
+            val uri = java.net.URI(endpoint)
+            val advertised = java.net.URI(
+                uri.scheme, null, uri.host, uri.port,
+                uri.path?.ifBlank { "/" } ?: "/", null, null,
+            ).toString()
+            require(existing.transport == "http" && existing.target == advertised) {
+                "服务标识已被不同连接占用；请先在连接器中管理原服务"
+            }
         }
-        return tools.connectHttp(serverId, endpoint)
+        // No live service mutation before the remote grant is available.
+        val rotation = stage()
+        try {
+            if (existing != null) tools.disconnect(serverId)
+            tools.connectHttp(serverId, endpoint)
+        } catch (failure: Throwable) {
+            val restorationFailure = kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                try {
+                    if (tools.servers().any { it.id == serverId }) tools.disconnect(serverId)
+                    mcpCredentials.rollbackCredentialRotation(serverId, rotation)
+                    if (existing != null) tools.connectHttp(serverId, endpoint)
+                    null
+                } catch (restoration: Throwable) {
+                    restoration
+                }
+            }
+            if (restorationFailure != null) {
+                val error = IllegalStateException(
+                    "MCP 连接切换失败，且恢复原服务失败：${restorationFailure.message}", failure)
+                error.addSuppressed(restorationFailure)
+                throw error
+            }
+            throw failure
+        }
     }
+
+    suspend fun connectHttpWithCredential(serverId: String, endpoint: String, bearer: String): String =
+        if (bearer.isEmpty()) tools.connectHttp(serverId, endpoint)
+        else switchMcpHttpConnection(serverId, endpoint) {
+            mcpCredentials.rotateBearer(serverId, endpoint, bearer)
+        }
+
     private suspend fun disconnectMcpIfConnected(serverId: String) {
         if (tools.servers().any { it.id == serverId }) tools.disconnect(serverId)
     }
-    suspend fun loginMcp(serverId: String, endpoint: String, clientId: String?) {
-        kotlinx.coroutines.currentCoroutineContext().ensureActive()
-        disconnectMcpIfConnected(serverId)
-        kotlinx.coroutines.currentCoroutineContext().ensureActive()
-        mcpOAuth.authorize(serverId, endpoint, clientId)
-        kotlinx.coroutines.currentCoroutineContext().ensureActive()
-        tools.connectHttp(serverId, endpoint)
-    }
+
+    suspend fun loginMcp(serverId: String, endpoint: String, clientId: String?): String =
+        switchMcpHttpConnection(serverId, endpoint) {
+            val grant = mcpOAuth.authorize(serverId, endpoint, clientId)
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            mcpCredentials.rotateOAuth(serverId, endpoint, grant)
+        }
+
     fun cancelMcpLogin(serverId: String) = mcpOAuth.cancel(serverId)
-    suspend fun refreshMcpLogin(serverId: String, endpoint: String) {
-        disconnectMcpIfConnected(serverId)
-        mcpCredentials.refresh(serverId, endpoint)
-        tools.connectHttp(serverId, endpoint)
-    }
+
+    suspend fun refreshMcpLogin(serverId: String, endpoint: String): String =
+        switchMcpHttpConnection(serverId, endpoint) {
+            val refreshed = mcpCredentials.stageOAuthRefresh(serverId, endpoint)
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            mcpCredentials.rotateOAuth(serverId, endpoint, refreshed)
+        }
+
     suspend fun revokeMcpLogin(serverId: String, endpoint: String): Boolean {
         mcpOAuth.cancel(serverId)
         disconnectMcpIfConnected(serverId)
