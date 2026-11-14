@@ -89,6 +89,24 @@ class AnthropicMessagesClientTest {
     }
 
     @Test
+    fun officialClaudeModelSpecificCacheMinimumAvoidsIncorrectBreakpoints() {
+        val stable = LocalCanonicalMessage(
+            role = LocalCanonicalRole.SYSTEM,
+            content = listOf(LocalCanonicalContent.Text("固定项目规则".repeat(260))),
+            instructionScope = LocalInstructionScope.SESSION.name,
+        )
+        fun hasCache(model: String): Boolean {
+            val payload = client.buildPayload(route(model = model), listOf(stable), emptyList(), null)
+            return payload.getValue("system").jsonArray.single().jsonObject.containsKey("cache_control")
+        }
+        assertTrue(hasCache("claude-sonnet-5-5"))
+        assertTrue(hasCache("claude-sonnet-5"))
+        assertFalse(hasCache("claude-opus-4-6"))
+        assertFalse(hasCache("claude-haiku-4-5"))
+        assertFalse(hasCache("claude-unlisted-model"))
+    }
+
+    @Test
     fun anthropicCompatibleProxyKeepsLegacyWireSystemWithoutCacheMarkers() {
         val message = LocalCanonicalMessage(
             LocalCanonicalRole.SYSTEM,
