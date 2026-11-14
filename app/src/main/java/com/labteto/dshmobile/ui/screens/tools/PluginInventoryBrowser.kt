@@ -711,6 +711,37 @@ internal fun PluginInventoryBrowser(
                             color = colors.text)
                         Text(details.description, style = DsType.std14.withReadingWeight(),
                             color = colors.textSecondary)
+                        if (details.samplePrompts.isNotEmpty()) {
+                            Surface(
+                                color = item.accent.copy(alpha = 0.06f),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                            ) {
+                                Column(
+                                    Modifier.fillMaxWidth().padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Text("试试这样使用", style = DsType.small13Strong,
+                                        color = colors.textSecondary)
+                                    Text(details.samplePrompts.first(),
+                                        style = DsType.std14.withReadingWeight(), color = colors.text)
+                                    val pluginReady = item.installedPlugin &&
+                                        (details.mcpUrl == null || connectedServices.any {
+                                            it.id == details.mcpServerId && it.tools.isNotEmpty()
+                                        })
+                                    if (pluginReady && onUseCapability != null) {
+                                        SyButton(
+                                            text = "使用这个示例",
+                                            variant = SyButtonVariant.Ghost,
+                                            onClick = {
+                                                selectedRow = null
+                                                onUseCapability(details.samplePrompts.first())
+                                            },
+                                            modifier = Modifier.testTag("codex-plugin-example"),
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         Text("发布方：${details.developerName.ifBlank { "OpenAI / 合作开发者" }} · ${details.version}",
                             style = DsType.caption11, color = colors.textTertiary)
                         val abilities = buildList {
