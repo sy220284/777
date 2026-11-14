@@ -29,6 +29,16 @@ internal class AccessibilityNodeSelectionLease {
     }
 
     /**
+     * An unchanged editable field can be used directly without collecting a
+     * second full-window snapshot. Match the complete observed node identity.
+     */
+    fun matchesCurrentEditable(index: Int, windowId: Int, current: AccessibilityNodeSnapshot): Boolean {
+        val snapshot = observed ?: return false
+        return index >= 0 && snapshot.windowId == windowId && current.editable &&
+            snapshot.nodes.getOrNull(index) == current && observed === snapshot
+    }
+
+    /**
      * Editable Compose nodes commonly have no view id. Re-bind a selected input to
      * its current live identity, using a unique view id when available, otherwise
      * its unique on-screen geometry and semantics class in the same window.

@@ -349,7 +349,12 @@ class HarnessAccessibilityService : AccessibilityService() {
                 return node
             }
             if (rebindEditable) {
-                current!!.add(describeNode(currentIndex, node, depth))
+                val live = describeNode(currentIndex, node, depth)
+                // When the selected input still has the same observed identity,
+                // avoid traversing the remainder of a potentially huge Compose tree.
+                if (currentIndex == index &&
+                    nodeSelection.matchesCurrentEditable(index, root.windowId, live)) return node
+                current!!.add(live)
                 if (node.isEditable) editableNodes!![currentIndex] = node
             }
             for (childIndex in 0 until node.childCount) {
