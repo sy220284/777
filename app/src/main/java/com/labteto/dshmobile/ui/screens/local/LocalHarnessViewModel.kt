@@ -177,11 +177,11 @@ class LocalHarnessViewModel @Inject constructor(
         rename = workProjectUi::rename,
         update = workProjectUi::update,
         changeRoot = workProjectUi::changeRoot,
-        moveDirectory = { id, destination ->
+        moveDirectory = { id, expectedRoot, destination ->
             check(!state.value.kernel.running && !state.value.loading) {
                 "工作执行中，请在任务完成后移动项目文件夹"
             }
-            workProjectUi.moveDirectory(id, destination)
+            workProjectUi.moveDirectory(id, expectedRoot, destination)
         },
         move = workProjectUi::move,
         delete = workProjectUi::delete,
