@@ -415,7 +415,13 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(codexLoading = true, codexError = null)
             try {
                 val plugins = localTools.codexOfficialPlugins(forceRefetch)
-                _state.value = _state.value.copy(codexLoading = false, codexPlugins = plugins)
+                val availableIds = plugins.map { it.id }.toSet()
+                val details = if (forceRefetch) emptyMap() else
+                    _state.value.codexDetails.filterKeys { it in availableIds }
+                _state.value = _state.value.copy(
+                    codexLoading = false, codexPlugins = plugins,
+                    codexDetails = details, codexDetailError = null,
+                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
