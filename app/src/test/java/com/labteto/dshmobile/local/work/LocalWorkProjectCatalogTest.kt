@@ -113,6 +113,9 @@ class LocalWorkProjectCatalogTest {
             assertEquals("final/two/record.txt", restored.relocatedReadPath("session-a", "archive/one/record.txt"))
             assertEquals(null, restored.relocatedReadPath("session-b", "source/record.txt"))
             assertEquals("session content", File(root, "final/two/record.txt").readText())
+            File(root, "unrelated").mkdirs()
+            assertTrue(restored.changeRoot(project.id, "unrelated"))
+            assertEquals(null, restored.relocatedReadPath("session-a", "source/record.txt"))
         }
 
     @Test fun historicalAliasDoesNotOverrideExistingFilesCrossSessionOrSymlinks() =
