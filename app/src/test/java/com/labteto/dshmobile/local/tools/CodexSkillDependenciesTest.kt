@@ -15,6 +15,7 @@ class CodexSkillDependenciesTest {
                   value: "figma"
                   description: "连接设计工具"
                   transport: "http"
+                  url: "https://mcp.figma.com/mcp"
                 - type: "tool"
                   value: "android_screen"
                   description: "设备屏幕"
@@ -23,7 +24,8 @@ class CodexSkillDependenciesTest {
         """.trimIndent()
         val actual = parseCodexSkillDependencies(source)
         assertEquals(2, actual.size)
-        assertEquals(CodexSkillDependency("mcp", "figma", "连接设计工具"), actual[0])
+        assertEquals(CodexSkillDependency("mcp", "figma", "连接设计工具",
+            transport = "http", url = "https://mcp.figma.com/mcp"), actual[0])
         assertEquals(CodexSkillDependency("tool", "android_screen", "设备屏幕"), actual[1])
     }
 
