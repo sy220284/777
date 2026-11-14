@@ -454,6 +454,44 @@ internal class LocalToolExecutionCoordinator(
             if (!granted) approvalDenied = true
             return granted
         }
+        // Code Mode's children are real tool calls. Dispatch them through this same coordinator
+        // with new call IDs, instead of inheriting the parent's callbacks (whose approval,
+        // registration check, workspace lease and durable receipt all belong to code_mode_run).
+        val nestedDispatch: (suspend (String, JsonObject, String, Int) ->
+            Pair<com.labteto.dshmobile.harness.tools.ToolResult, Boolean>)? =
+            if (call.name == "code_mode_run") {
+                { childName, childArguments, childRawArguments, stepOrdinal ->
+                    val nestedCall = LocalToolCall(
+                        id = "${call.id}/step-$stepOrdinal",
+                        name = childName,
+                        arguments = childArguments,
+                        rawArguments = childRawArguments,
+                    )
+                    val childResult = executeScoped(
+                        original = nestedCall,
+                        sessionId = sessionId,
+                        allowMutation = allowMutation,
+                        planModeEnabled = planModeEnabled,
+                        approval = approval,
+                        beforeExecution = beforeExecution,
+                        observeFileVersions = observeFileVersions,
+                        executionAttributes = executionAttributes + ("code_mode_parent_call_id" to call.id),
+                        // The parent remains active throughout the whole plan.
+                        onExecutionActive = {},
+                    )
+                    com.labteto.dshmobile.harness.tools.ToolResult(
+                        content = childResult.content,
+                        isError = childResult.isError,
+                        errorCode = childResult.errorCode,
+                        retryable = childResult.retryable,
+                        recoveryHint = childResult.recoveryHint,
+                        retention = childResult.retention,
+                        processExitCode = childResult.processExitCode,
+                        fileVersions = childResult.fileVersions,
+                        richContent = childResult.richContent,
+                    ) to (childResult.executionId != null)
+                }
+            } else null
         val invocation = try {
             executionOwner?.requireCurrent(sessionId)
             runOwner?.requireCurrent(sessionId)
@@ -475,6 +513,7 @@ internal class LocalToolExecutionCoordinator(
                             currentCoroutineContext()[LocalModelRunContext]?.profile?.let { put("model_profile", it) }
                         },
                         expectedRegistration = registered,
+                        dispatchNestedTool = nestedDispatch,
                         onExecutionFinished = { _, result ->
                             if (callerJob?.isCancelled == true) {
                                 recordCancelledExecutionFinished(sessionId, call, executionIdentity, result)
