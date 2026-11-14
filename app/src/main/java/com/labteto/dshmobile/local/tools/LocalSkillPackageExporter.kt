@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import java.io.ByteArrayOutputStream
+import java.io.OutputStream
 import java.io.File
 import java.nio.channels.Channels
 import java.nio.file.Files
@@ -16,7 +17,13 @@ import java.util.zip.ZipOutputStream
  * Follows LocalSkillPackageImporter size/path budgets and rejects filesystem links.
  */
 internal class LocalSkillPackageExporter(private val workspace: LocalWorkspace) {
-    fun export(id: String): ByteArray {
+    fun export(id: String): ByteArray = ByteArrayOutputStream().also { exportToStream(id, it) }.toByteArray()
+
+    fun exportToFile(id: String, destination: File) {
+        destination.outputStream().buffered().use { exportToStream(id, it) }
+    }
+
+    private fun exportToStream(id: String, destination: OutputStream) {
         require(id.matches(Regex("[a-z][a-z0-9-]{1,47}"))) { "技能标识无效" }
         val parent = File(workspace.path, ".dsh")
         val catalog = File(parent, "skills")
@@ -31,7 +38,6 @@ internal class LocalSkillPackageExporter(private val workspace: LocalWorkspace) 
         Files.walk(root.toPath()).use { stream ->
             val iterator = stream.iterator()
             while (iterator.hasNext()) {
-                require(paths.size < 128) { "技能包的文件和目录数量超过 128" }
                 paths.add(iterator.next())
             }
         }
@@ -51,19 +57,7 @@ internal class LocalSkillPackageExporter(private val workspace: LocalWorkspace) 
         require(files.isNotEmpty() && files.any {
             root.toPath().relativize(it).toString() == "SKILL.md"
         }) { "技能规则 SKILL.md 不存在" }
-        var totalSize = 0L
-        for (path in files) {
-            val length = Files.size(path)
-            if (root.toPath().relativize(path).toString() == "SKILL.md") {
-                require(length in 1..24_000) { "技能规则文件超过 24 KB" }
-            }
-            require(length <= 8L * 1024 * 1024) { "技能包单文件超过 8 MB" }
-            totalSize += length
-            require(totalSize <= 24L * 1024 * 1024) { "技能包总大小超过 24 MB" }
-        }
-
-        val output = ByteArrayOutputStream()
-        ZipOutputStream(output).use { zip ->
+        ZipOutputStream(destination).use { zip ->
             val buffer = ByteArray(8192)
             for (path in files) {
                 val relative = root.toPath().relativize(path).toString()
@@ -97,9 +91,5 @@ internal class LocalSkillPackageExporter(private val workspace: LocalWorkspace) 
                 }
             }
         }
-        require(output.size() <= LocalSkillPackageImporter.MAX_ARCHIVE_BYTES) {
-            "技能包压缩后超过 8 MB"
-        }
-        return output.toByteArray()
     }
 }
