@@ -208,7 +208,7 @@ internal class LocalWorkProjectCatalog(
         require(project.root != ".") { "整个工作区不能作为可移动项目文件夹" }
         val from = movePath(project.root)
         val to = movePath(destination)
-        val newRoot = to.relativeTo(workspace.canonicalFile.toPath()).toString()
+        val newRoot = workspace.canonicalFile.toPath().relativize(to).toString()
             .replace(File.separatorChar, '/')
         if (project.root == newRoot) return@synchronized false
         require(Files.isDirectory(from, LinkOption.NOFOLLOW_LINKS)) { "原项目文件夹已不存在" }
