@@ -209,7 +209,9 @@ internal class AnthropicMessagesClient @Inject constructor(
                         systemFragments.forEachIndexed { index, (content, _) ->
                             add(buildJsonObject {
                                 put("type", "text")
-                                put("text", content)
+                                // Preserve the original joined-string semantics at provider boundaries.
+                                // Empty separators may change instructions when two layers touch.
+                                put("text", if (index == 0) content else "\n\n$content")
                                 if (index == cacheBreakpoint) {
                                     put("cache_control", buildJsonObject {
                                         put("type", "ephemeral")
