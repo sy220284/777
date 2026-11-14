@@ -574,6 +574,7 @@ internal fun PluginInventoryBrowser(
             decodeCodexBrandLogo(detailLogoBytes)
         }
         var requirementsExpanded by remember(item.id) { mutableStateOf(false) }
+        var bundleDependenciesExpanded by remember(item.id) { mutableStateOf(false) }
         val detailId = item.id.removePrefix("codex-plugin:")
         val declaredDetail = codexDetails[detailId]
         val detailRoot = codexPlugins.firstOrNull { it.id == detailId }?.sourcePath
@@ -649,10 +650,13 @@ internal fun PluginInventoryBrowser(
                 val needsOtherSkillSetup = item.installedSkill &&
                     item.requirements.any { !it.registered } &&
                     !canConnectSkill && !canInspectSkill
+                val needsOtherBundleSetup = officialSupported && pluginDetail != null &&
+                    missingPluginSkills.isEmpty() && bundleRequirements.any { !it.registered } &&
+                    !canResumeBundleSetup && !canInspectOfficial && !canConnectOfficial
                 val hasDirectAction = canInstallPreset || canInstallCurated ||
                     canInstallOfficial || canConnectOfficial || canInspectOfficial ||
                     canResumeBundleSetup || canConnectSkill || canInspectSkill ||
-                    needsOtherSkillSetup || canUseOfficial ||
+                    needsOtherSkillSetup || needsOtherBundleSetup || canUseOfficial ||
                     (onUseCapability != null && item.available) || item.connectedService ||
                     (!item.id.startsWith("codex-plugin:") &&
                         !item.installablePreset && !item.installableCurated)
@@ -665,7 +669,7 @@ internal fun PluginInventoryBrowser(
                         canConnectOfficial || canConnectSkill -> "连接并授权"
                         canResumeBundleSetup -> "继续完成授权"
                         canInspectOfficial || canInspectSkill -> "检查连接"
-                        needsOtherSkillSetup -> "查看待处理依赖"
+                        needsOtherSkillSetup || needsOtherBundleSetup -> "查看待处理依赖"
                         canUseOfficial -> "使用"
                         item.installedSkill && item.requirements.all { it.registered } ->
                             "使用"
@@ -692,6 +696,7 @@ internal fun PluginInventoryBrowser(
                                 onManageConnections()
                             }
                             needsOtherSkillSetup -> requirementsExpanded = true
+                            needsOtherBundleSetup -> bundleDependenciesExpanded = true
                             canConnectSkill -> requireNotNull(endpoint).let { (serverId, url) ->
                                 onConnectSkillMcp?.invoke(serverId, url)
                             }
@@ -821,6 +826,21 @@ internal fun PluginInventoryBrowser(
                         }
                         Text("包含能力：${abilities.joinToString(" / ").ifBlank { "元数据" }}",
                             style = DsType.small13, color = colors.textSecondary)
+                        val pendingBundleDependencies = bundleRequirements.filterNot { it.registered }
+                        if (pendingBundleDependencies.isNotEmpty()) {
+                            Text("运行依赖待处理 · ${pendingBundleDependencies.size} 项",
+                                style = DsType.small13Strong, color = colors.warningInk)
+                            if (bundleDependenciesExpanded) {
+                                pendingBundleDependencies.forEach { requirement ->
+                                    Text(requirement.description.ifBlank { requirement.value },
+                                        style = DsType.small13.withReadingWeight(),
+                                        color = colors.textSecondary)
+                                }
+                                SyButton(text = "管理连接器",
+                                    variant = SyButtonVariant.Ghost,
+                                    onClick = { selectedRow = null; onManageConnections() })
+                            }
+                        }
                         if (details.skills.isNotEmpty() &&
                             item.marketState.status != ExtensionMarketStatus.UNSUPPORTED) {
                             var childSkillsExpanded by remember(pluginId) { mutableStateOf(false) }
