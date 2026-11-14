@@ -738,7 +738,7 @@ internal fun PluginInventoryBrowser(
             newSkillDisplayName.any { it in '\u4e00'..'\u9fff' }
         val canCreate = validId && validName && newSkillDescription.isNotBlank() &&
             newSkillDescription.length <= 240 &&
-            newSkillBody.isNotBlank() && newSkillBody.length <= 12_000
+            newSkillBody.isNotBlank()
         SyResponsiveSheet(
             title = stringResource(R.string.skills_create),
             onDismiss = { showCreateSkill = false },
@@ -885,7 +885,7 @@ internal fun PluginInventoryBrowser(
                     onClick = {
                         onSaveSkillDocument(skillEditor.id, withLocalSkillDisplayName(editedSkillBody, editedSkillDisplayName))
                     },
-                    enabled = !loading && editedSkillBody.isNotBlank() && editedSkillBody.length <= 20_000 &&
+                    enabled = !loading && editedSkillBody.isNotBlank() &&
                         editedSkillDisplayName.trim().length in 1..40 &&
                         editedSkillDisplayName.any { it in '\u4e00'..'\u9fff' },
                     modifier = Modifier.fillMaxWidth(),
