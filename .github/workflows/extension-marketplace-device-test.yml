@@ -46,3 +46,17 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.tools.PluginInventoryBrowserRegressionTest --stacktrace --console=plain
+      - name: 输出失败用例与断言
+        if: failure()
+        run: |
+          find app/build/outputs/androidTest-results -type f -name '*.xml' -print -exec grep -n -A 16 -B 3 -E '<failure|<error' {} \; || true
+      - name: 保存 Android 实机交互测试报告
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: extension-market-device-test-results
+          path: |
+            app/build/outputs/androidTest-results/connected/
+            app/build/reports/androidTests/connected/
+          if-no-files-found: warn
+          retention-days: 7
