@@ -13,6 +13,7 @@ import java.lang.ref.WeakReference
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeout
 
 data class AccessibilityNodeSnapshot(
     val index: Int,
@@ -104,11 +105,11 @@ class HarnessAccessibilityService : AccessibilityService() {
 
     fun clickText(text: String): Boolean {
         val root = rootInActiveWindow ?: return false
-        val candidates = root.findAccessibilityNodeInfosByText(text).filter { candidate ->
-            candidate.isVisibleToUser && (candidate.isClickable || clickableAncestor(candidate) != null)
-        }
-        val node = requireUniqueAccessibilityTarget(candidates, "点击") ?: return false
-        val target = if (node.isClickable) node else clickableAncestor(node) ?: return false
+        val targets = root.findAccessibilityNodeInfosByText(text).mapNotNull { candidate ->
+            if (!candidate.isVisibleToUser) null
+            else if (candidate.isClickable) candidate else clickableAncestor(candidate)
+        }.distinct()
+        val target = requireUniqueAccessibilityTarget(targets, "点击") ?: return false
         return target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
     }
 
@@ -147,7 +148,7 @@ class HarnessAccessibilityService : AccessibilityService() {
 
     fun scrollForward(): Boolean = scroll("forward")
 
-    fun tap(
+    suspend fun tap(
         x: Float,
         y: Float,
         durationMillis: Long = 60L,
@@ -158,10 +159,10 @@ class HarnessAccessibilityService : AccessibilityService() {
             .setDisplayId(displayId)
             .addStroke(GestureDescription.StrokeDescription(path, 0, durationMillis.coerceAtLeast(1L)))
             .build()
-        return dispatchGesture(gesture, null, null)
+        return awaitGestureCompletion(gesture, durationMillis)
     }
 
-    fun swipe(
+    suspend fun swipe(
         startX: Float,
         startY: Float,
         endX: Float,
@@ -177,7 +178,34 @@ class HarnessAccessibilityService : AccessibilityService() {
             .setDisplayId(displayId)
             .addStroke(GestureDescription.StrokeDescription(path, 0, durationMillis.coerceAtLeast(1L)))
             .build()
-        return dispatchGesture(gesture, null, null)
+        return awaitGestureCompletion(gesture, durationMillis)
+    }
+
+    /**
+     * dispatchGesture() returning true means Android only accepted the request. Await the real
+     * completion callback before starting a dependent gesture or reporting execution success.
+     * Cancellation/timeout is surfaced to the caller so unknown effects are never auto-replayed.
+     */
+    private suspend fun awaitGestureCompletion(
+        gesture: GestureDescription,
+        durationMillis: Long,
+    ): Boolean = withTimeout(durationMillis.coerceIn(1L, 60_000L) + 10_000L) {
+        suspendCancellableCoroutine { continuation ->
+            val scheduled = dispatchGesture(
+                gesture,
+                object : GestureResultCallback() {
+                    override fun onCompleted(gestureDescription: GestureDescription?) {
+                        if (continuation.isActive) continuation.resume(true)
+                    }
+
+                    override fun onCancelled(gestureDescription: GestureDescription?) {
+                        if (continuation.isActive) continuation.resume(false)
+                    }
+                },
+                null,
+            )
+            if (!scheduled && continuation.isActive) continuation.resume(false)
+        }
     }
 
     suspend fun screenshotPng(): ByteArray = suspendCancellableCoroutine { continuation ->
