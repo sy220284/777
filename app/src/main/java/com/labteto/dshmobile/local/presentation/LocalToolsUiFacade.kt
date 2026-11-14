@@ -241,14 +241,25 @@ class LocalToolsUiFacade @Inject internal constructor(
     override suspend fun codexPluginDetail(id: String):
         com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot {
         val info = codexOfficialPlugins.detail(id)
+        val remote = if (info.hasMcp) codexOfficialPlugins.mcpEndpoint(id) else null
         return com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
             id, info.displayName, info.description, info.developerName, info.version,
             if (info.hasSkills) codexOfficialPlugins.pluginSkills(id) else emptyList(),
             info.hasMcp, info.hasApp, info.hasHooks,
+            remote?.serverId, remote?.url,
         )
     }
     override suspend fun installCodexPluginSkill(pluginId: String, skillId: String): String =
         codexOfficialPlugins.installPluginSkill(pluginId, skillId)
+    override suspend fun connectCodexPlugin(id: String): String {
+        val entry = codexOfficialPlugins.list().firstOrNull { it.id == id }
+            ?: error("Codex 官方目录中没有该插件")
+        require(entry.offeredOnAndroid) { "该插件不支持在 777 中连接" }
+        val endpoint = codexOfficialPlugins.mcpEndpoint(id)
+            ?: error("该插件没有可在 Android 使用的 HTTPS MCP 服务，请查看官方能力说明")
+        loginMcp(endpoint.serverId, endpoint.url, endpoint.clientId)
+        return "已完成 MCP 授权并连接：${endpoint.serverId}"
+    }
     /** The feature owns source validation; UI passes only the name from a visible catalog row. */
     suspend fun installCuratedSkill(id: String) = gitHubSkillImporter.install(
         com.labteto.dshmobile.local.tools.curatedGitHubSkillUrl(id),
