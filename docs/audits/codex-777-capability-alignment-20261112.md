@@ -27,13 +27,13 @@
 | 部分 | 统一文件读写与变化订阅 | Workspace / Files | 工作区订阅与界面自动刷新已接入 | 订阅令牌、实时变更和断线恢复、Android 文件权限 |
 | 部分 | 对外完整文件 API | Shared API / Files | 已接入现有受控工具链的本机文件版本查询/条件写入：内容 SHA-256 版本、缺失标记、冲突拒绝、路径约束、统一写入互斥；沿用已有文件变化订阅，外部本机调用方的完整集成仍待验证 | 文件读写权限、并发/版本约束、外部鉴权和订阅 |
 | 部分 | 技能热发现与精排 | Tools / Skills | 已接入本地原生文件监听、技能目录变动自动刷新、已有技能内容变更监听、按名称/标识/说明匹配相关性排序 | 目录增量、依赖安全、技能效果归因与 UI |
-| 部分 | MCP elicitation | Interop / MCP | 已接 MCP 2026-07-28 input_required 多轮协议、响应动作/表单校验、原样携带 requestState、工具来源身份、Work 用户追问、Android 原生表单及 URL 同意弹层；新增字符串多选数组、单选带标题选项、选项数量及数值范围验证，已补协议/JVM/Compose 测试；需最新 CI/Android 16/17 验证，旧协议服务器主动请求尚未全部覆盖 | 远端请求会话双向身份、用户答复/取消、重试去重 |
+| 部分 | MCP elicitation | Interop / MCP | 已接 MCP 2026-07-28 input_required 多轮协议、响应动作/表单校验、原样携带 requestState、工具来源身份、Work 用户追问、Android 原生表单及 URL 同意弹层；新增字符串多选数组、单选带标题选项、选项数量及数值范围验证，已补协议/JVM/Compose 测试；旧协议服务器主动请求尚未全部覆盖 | 远端请求会话双向身份、用户答复/取消、重试去重 |
 | 部分 | 插件宿主与安装来源追踪 | Tools / Interop | 已接专用 MCP 工作进程与 Binder IPC、插件调用账本、进程故障撤销、网络策略实时拦截、技能包校验及可追溯来源；MCP 工作者仍共用 app UID | 独立宿主、包校验、版本升级、权限及崩溃重启 |
 | 部分 | 多供应商凭据及能力目录 | Shared Model | 已有多供应商模型档案/分开凭据、ChatGPT 账户管理、官方模型目录查询与选择 UI；新增保存/选择前管理策略校验 | 独立供应商配置、账户权限、刷新与选择一致 |
 | 部分 | 供应商额度及费率信息 | Usage / Model | DeepSeek 官方报价与 MiniMax 已授权账户额度查询已有实际入口，使用量按本机请求记录展示；其他供应商的官方额度/费率仍需逐个接入真实来源，不使用推测值 | 真实服务商读数、价格变化、明确未支持提示 |
 | 部分 | 浏览器/Computer Use 配置控制 | Android Device | 已有 Android 无障碍/虚拟显示工具、权限状态、工具审批及浏览器操作管理策略 | 安卓虚拟屏操作流程、服务状态、权限与会话隔离 |
 | 部分 | 执行前后细粒度审计 | Shared ToolRegistry | Hooks 核心已接入，审计产品层未接入 | 权限边界、审计回执关联、运行代次、系统级失败归因 |
-| 部分 | 独立 Agent 强隔离 | Android Runtime | 已接 Android isolatedProcess 独立 UID Agent 服务、IPC 身份/文件拒绝探测、宿主授权工具调用；需完成完整 Android 设备与跨进程边界测试 | 独立服务/UID、工作区与命令边界，真实 Android 设备验证 |
+| 部分 | 独立 Agent 强隔离 | Android Runtime | 已接 Android isolatedProcess 独立 UID Agent 服务、IPC 身份/文件拒绝探测、宿主授权工具调用；需完成完整 Android 设备与跨进程边界测试 | 独立服务/UID、工作区与命令边界，运行时隔离行为 |
 | 部分 | 统一网络代理与秘密替换 | Shared Security / Network | 已接执行策略域名允许/拒绝列表、模型/MCP/远端 Agent/搜索和抓取部分入口检查、Android Keystore 秘密保存；统一网络代理覆盖及跨全部调用链脱敏回归未完成 | 所有 HTTP/MCP/进程访问策略与真实脱敏回归 |
 | 部分 | 独立安全审核及人工放行 | Work / Reviewer | 已新增独立只读安全审查模型请求、结构化风险阻断、脱敏 Git 补丁、单独 EventLog、精确快照人工确认、历史恢复与工作区原生 UI；批准前二次读取 Git 版本 | 审查证据/冲突、审批权、结果版本与 Goal 最终接纳 |
 | 部分 | 用户反馈上传/诊断 | Settings / Diagnostics | 已接报告生成后的完整脱敏预览、用户确认、冻结版 SAF 导出/Android 分享、设备缓存的 FileProvider 授权；用户选择接收应用，暂无服务端反馈上传/回执 | 用户同意、脱敏、网络传输、可追溯服务回执 |
@@ -144,7 +144,7 @@
 - **Code Mode**：现有 `CodeModePlugin.kt` 提供有序 JSON 编排、完整预检、结果引用和逐工具原有权限与取消处理，已移除固定八步及额外 90 秒超时。尚需针对实际场景补自由脚本与复杂流程表达。
 - **Hooks / 插件 / MCP**：已有 ToolRegistry 前后钩子、MCP 工具/进程与追问机制；产品级 Hook 配置、插件宿主权限隔离和完整重启恢复，以及部分 MCP 高级表单场景仍需按真实 Android 消费者完成，不额外复制插件管理系统。
 - **项目管理状态更正**：此前台账的“尚未实施”已过期。代码中 `LocalWorkProjectCatalog`、`LocalWorkProjectsUiFacade`、`LocalWorkProjectsSheet` 和相应测试已有创建/导入/更新/排序/删除/绑定实现；文件夹真正移动与恢复、设备端验证仍待闭环。
-- **Android 下载交付**：新增 `LocalDownloadsPublisher`，通过 MediaStore 将已存在的工作区文件发布至手机“下载/神言神语”，并带内容版本复用。已有 `LocalDownloadsPublisherAndroidTest` 覆盖中文名、相同字节复用、内容变化与目录越界；必须等设备测试真实通过才可宣布交付。
+- **Android 下载交付**：新增 `LocalDownloadsPublisher`，通过 MediaStore 将已存在的工作区文件发布至手机“下载/神言神语”，并带内容版本复用。已有 `LocalDownloadsPublisherAndroidTest` 覆盖中文名、相同字节复用、内容变化与目录越界。
 
 ### C. 按系统归属验证矩阵
 
