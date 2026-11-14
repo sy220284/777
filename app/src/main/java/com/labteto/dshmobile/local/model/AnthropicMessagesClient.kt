@@ -264,10 +264,6 @@ internal class AnthropicMessagesClient @Inject constructor(
         }
     }
 
-    private companion object {
-        const val MIN_CACHEABLE_PREFIX_BYTES = 4_096L
-    }
-
     private fun isOfficialAnthropicCachingRoute(baseUrl: String): Boolean =
         java.net.URI(baseUrl).let { uri ->
             uri.scheme.equals("https", ignoreCase = true) &&
@@ -810,6 +806,8 @@ internal class AnthropicMessagesClient @Inject constructor(
         else left.coerceAtLeast(0L) + right.coerceAtLeast(0L)
 
     private companion object {
+        const val MIN_CACHEABLE_PREFIX_BYTES = 4_096L
+
         fun protocolErrorStatic(
             detail: String,
             requestId: String?,
