@@ -890,6 +890,7 @@ fun ToolsScreen(
     var showMcpStdio by rememberSaveable { mutableStateOf(false) }
     var expandedMcpServer by remember { mutableStateOf<String?>(null) }
     var showAgentSettings by remember { mutableStateOf(false) }
+    var showConnectorSettings by rememberSaveable { mutableStateOf(false) }
     var confirmClearGitHub by remember { mutableStateOf(false) }
     // Single page with three tabs. The registered tool catalogue is not user-facing.
     var selectedTab by rememberSaveable(startAtPlugins, startAtSkills) {
@@ -915,7 +916,7 @@ fun ToolsScreen(
         )
     }
 
-    BackHandler(enabled = showGitHubBrowser || showGitHubConfig || showAgentSettings || handleRootSystemBack) {
+    BackHandler(enabled = showGitHubBrowser || showGitHubConfig || showAgentSettings || showConnectorSettings || handleRootSystemBack) {
         when {
             showGitHubBrowser -> showGitHubBrowser = false
             showGitHubConfig -> {
@@ -924,6 +925,7 @@ fun ToolsScreen(
                 githubToken = ""
             }
             showAgentSettings -> showAgentSettings = false
+            showConnectorSettings && selectedTab == 2 -> showConnectorSettings = false
             else -> onClose()
         }
     }
@@ -1040,7 +1042,16 @@ fun ToolsScreen(
                                     onSetSkillModelInvocable = viewModel::setSkillModelInvocable,
                                 )
                             }
-                            else -> Column(Modifier.fillMaxSize()) {
+                            else -> if (!showConnectorSettings) {
+                                ConnectorInventoryBrowser(
+                                    servers = state.servers,
+                                    githubConfigured = state.githubConfigured,
+                                    loading = state.loading,
+                                    onGitHub = { showGitHubConfig = true },
+                                    onMcp = { showExternalConfig = true },
+                                    onOpenSettings = { showConnectorSettings = true },
+                                )
+                            } else Column(Modifier.fillMaxSize()) {
                                 val initialLoading = state.loading &&
                                     state.localPlugins.isEmpty() &&
                                     state.servers.isEmpty() &&
@@ -1058,6 +1069,12 @@ fun ToolsScreen(
                                         .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
                                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                                 ) {
+                                    SyButton(
+                                        text = "返回连接器目录",
+                                        onClick = { showConnectorSettings = false },
+                                        variant = SyButtonVariant.Ghost,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
                                     AgentBackendSettings(viewModel)
                                     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                                         Text(
@@ -1597,17 +1614,17 @@ internal fun CapabilityCenterTabs(selectedTab: Int, onSelect: (Int) -> Unit) {
         segments = listOf(
             SySegment("plugins", stringResource(R.string.tools_catalog_title)),
             SySegment("skills", stringResource(R.string.skills_title)),
-            SySegment("permissions", stringResource(R.string.settings_page_permissions)),
+            SySegment("connectors", "连接器"),
         ),
         selectedKey = when (selectedTab) {
             1 -> "skills"
-            2 -> "permissions"
+            2 -> "connectors"
             else -> "plugins"
         },
         onSelect = { key ->
             onSelect(when (key) {
                 "skills" -> 1
-                "permissions" -> 2
+                "connectors" -> 2
                 else -> 0
             })
         },

@@ -5,6 +5,10 @@ name: Android 能力契约回归
     paths:
       - 'app/src/main/java/com/labteto/dshmobile/local/tools/**'
       - 'app/src/test/java/com/labteto/dshmobile/local/tools/**'
+      - 'app/src/main/java/com/labteto/dshmobile/ui/screens/tools/**'
+      - 'app/src/test/java/com/labteto/dshmobile/ui/screens/tools/**'
+      - 'app/src/androidTest/java/com/labteto/dshmobile/ui/screens/tools/**'
+      - 'app/src/main/res/drawable/ic_ui_*.xml'
       - 'app/src/main/java/com/labteto/dshmobile/local/work/**'
       - 'harness-core/src/main/kotlin/com/labteto/dshmobile/harness/capability/**'
       - 'harness-device-android/src/**'
@@ -35,6 +39,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
       - name: 应用 JVM 单元测试
         run: ./gradlew --max-workers=2 :app:testDebugUnitTest --stacktrace --console=plain
+      - name: 编译 Android 界面测试代码
+        run: ./gradlew --max-workers=2 :app:compileDebugAndroidTestKotlin --stacktrace --console=plain
       - name: 能力注册与 Android 设备模块单元测试
         run: ./gradlew --max-workers=2 :harness-core:test :harness-device-android:testDebugUnitTest --stacktrace --console=plain
       - name: 构建可安装的调试包

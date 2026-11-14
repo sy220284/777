@@ -61,7 +61,7 @@ class PluginInventoryBrowserRegressionTest {
         }
         compose.onNodeWithTag("plugin-category-list").performScrollToIndex(1)
         compose.onNodeWithText("服务扩展 · 1").performClick()
-        compose.onNodeWithText("local-mcp").assertIsDisplayed().performClick()
+        compose.onNodeWithText("MCP 本地服务").assertIsDisplayed().performClick()
         compose.onNodeWithTag("plugin-detail-primary-action").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, openedConnections) }
     }
@@ -95,7 +95,7 @@ class PluginInventoryBrowserRegressionTest {
             }
         }
         compose.onNodeWithTag("plugin-category-list").performScrollToIndex(4)
-        compose.onNodeWithText("创意与图像").performClick()
+        compose.onNodeWithText("创意与设计").performClick()
         compose.onNodeWithText("视觉理解").assertIsDisplayed()
         compose.onNodeWithText("终端与运行环境").assertDoesNotExist()
     }
@@ -111,9 +111,9 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithText("report").assertIsDisplayed()
-        compose.onNodeWithText("Build a report").assertIsDisplayed()
-        compose.onNodeWithText("已安装").assertDoesNotExist()
+        compose.onNodeWithText("报告生成").assertIsDisplayed()
+        compose.onNodeWithText("整理资料并制作报告").assertIsDisplayed()
+        compose.onNodeWithText("已安装").assertIsDisplayed()
     }
 
     @Test
@@ -132,8 +132,9 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
+        compose.onNodeWithText("精选").assertIsDisplayed().performClick()
         compose.onNodeWithText("资料研究与核实").assertIsDisplayed()
-        compose.onNodeWithText("添加").performClick()
+        compose.onNodeWithText("安装").performClick()
         compose.runOnIdle { assertEquals("research-check", selected) }
     }
 
@@ -153,7 +154,7 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithText("my-skill").performClick()
+        compose.onNodeWithTag("plugin-inventory-card-skill:my-skill").performClick()
         compose.onNodeWithText("移除").performClick()
         compose.runOnIdle { assertEquals(null, removed) }
         compose.onNodeWithText("移除技能").assertIsDisplayed()
@@ -413,7 +414,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithText("当前标签:0").assertIsDisplayed()
         compose.onNodeWithText("技能").performClick()
         compose.onNodeWithText("当前标签:1").assertIsDisplayed()
-        compose.onNodeWithText("连接与权限").performClick()
+        compose.onNodeWithText("连接器").performClick()
         compose.onNodeWithText("当前标签:2").assertIsDisplayed()
         compose.onNodeWithText("插件").performClick()
         compose.onNodeWithText("当前标签:0").assertIsDisplayed()
@@ -441,7 +442,7 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithText("upgrade-demo").performClick()
+        compose.onNodeWithTag("plugin-inventory-card-skill:upgrade-demo").performClick()
         compose.onNodeWithTag("skill-check-update").assertExists().performScrollTo().performClick()
         compose.runOnIdle { assertEquals("upgrade-demo", checked) }
         compose.onNodeWithTag("skill-upgrade").assertExists().performScrollTo().performClick()
@@ -467,7 +468,7 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithText("rollback-demo").performClick()
+        compose.onNodeWithTag("plugin-inventory-card-skill:rollback-demo").performClick()
         compose.onNodeWithTag("skill-rollback").assertExists().performScrollTo().performClick()
         compose.runOnIdle { assertEquals(null, restored) }
         compose.onNodeWithTag("skill-rollback-confirm").assertIsDisplayed().performClick()
