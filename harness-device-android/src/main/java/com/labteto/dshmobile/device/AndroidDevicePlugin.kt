@@ -52,7 +52,8 @@ class AndroidDevicePlugin(
         Spec("android_wait", "accessibility_wait", "等待文本或控件 id 出现，避免固定延时猜测页面状态", mapOf("text" to "string", "id" to "string", "timeout_ms" to "integer"), access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
         Spec("android_open_uri", "android_open_uri", "通过系统安全 VIEW Intent 打开 http/https/market/geo/mailto/tel URI", mapOf("uri" to "string"), setOf("uri"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_tap_text", "accessibility_click_text", "按文本定位并点击控件", mapOf("text" to "string"), setOf("text"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
-        Spec("android_type", "accessibility_set_text", "定位可编辑控件并写入文本", mapOf("search_text" to "string", "value" to "string"), setOf("search_text", "value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
+        Spec("android_type", "accessibility_set_text", "按现有文本或当前焦点定位输入框并写入，建议优先使用 android_input_text 自动核验写入结果", mapOf("search_text" to "string", "value" to "string"), setOf("search_text", "value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
+        Spec("android_input_text", "accessibility_input_text", "一次完成 Android/Compose 文本输入：可用 node、控件 id、现有文本精确定位；全部留空即使用当前焦点。自动聚焦、替换文本并回读确认；返回 false 表示未确认生效。", mapOf("node" to "integer", "id" to "string", "text" to "string", "value" to "string"), setOf("value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_tap", "accessibility_tap", "按屏幕坐标点击", mapOf("x" to "number", "y" to "number", "duration_ms" to "integer"), setOf("x", "y"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_swipe", "accessibility_swipe", "按坐标执行滑动", mapOf("start_x" to "number", "start_y" to "number", "end_x" to "number", "end_y" to "number", "duration_ms" to "integer"), setOf("start_x", "start_y", "end_x", "end_y"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_back", "android_back", "执行系统返回", access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
@@ -137,7 +138,7 @@ class AndroidDevicePlugin(
         )
         val ACCESSIBILITY_TOOLS = setOf(
             "android_screen", "android_find", "android_click_node", "android_set_text_node",
-            "android_scroll", "android_wait", "android_tap_text", "android_type", "android_tap",
+            "android_scroll", "android_wait", "android_tap_text", "android_type", "android_input_text", "android_tap",
             "android_swipe", "android_screenshot",
         )
     }
@@ -150,7 +151,7 @@ class AndroidDevicePlugin(
  */
 private val ANDROID_BOOLEAN_ACTIONS = setOf(
     "accessibility_click_node", "accessibility_set_text_node", "accessibility_scroll",
-    "accessibility_click_text", "accessibility_set_text", "accessibility_tap",
+    "accessibility_click_text", "accessibility_set_text", "accessibility_input_text", "accessibility_tap",
     "accessibility_swipe", "android_back", "android_home", "vscreen_tap",
     "vscreen_swipe", "vscreen_close",
 )
