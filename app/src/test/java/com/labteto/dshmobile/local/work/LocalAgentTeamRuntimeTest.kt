@@ -2933,6 +2933,7 @@ class LocalAgentTeamRuntimeTest {
         val ownership = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
         val identity = com.labteto.dshmobile.harness.agent.AgentRunIdentity(session, "child:sa-team-1", "run")
         ownership.claim(identity) {}
+        val beforeSubmission = f.log.latestSequence()
         val submitted = kotlinx.coroutines.withContext(ownership.executionContext(identity)) {
             f.runtime.executeMember(session, "job-team-1",
                 memberTestToolCall("submit", "team_send_message", buildJsonObject {
@@ -2943,10 +2944,13 @@ class LocalAgentTeamRuntimeTest {
         val resultId = Regex("team-msg-[a-f0-9]{20}").find(submitted)?.value
             ?: error("Member tool did not return a durable message ID")
 
-        // Waiting without an explicit cursor observes already persisted Team member messages.
+        // Explicit durable cursors recover messages produced before the wait began.
         val waited = f.runtime.execute(LocalToolCall(
             "wait-result", "team_wait_for_message",
-            buildJsonObject { put("timeout_ms", 1000) }, "{}",
+            buildJsonObject {
+                put("after_sequence", beforeSubmission)
+                put("timeout_ms", 1000)
+            }, "{}",
         ), binding).orEmpty()
         assertTrue(waited.contains(resultId))
         complete(resultId)
