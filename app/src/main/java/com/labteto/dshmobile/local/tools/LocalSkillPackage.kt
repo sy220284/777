@@ -3,131 +3,153 @@ package com.labteto.dshmobile.local.tools
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.local.files.parseLocalSkillMetadata
 import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.nio.ByteBuffer
+import java.io.InputStream
 import java.nio.charset.CodingErrorAction
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.zip.ZipInputStream
 
-/** One import boundary for a SKILL.md file or a zipped skill directory; never execute contents. */
+/**
+ * 单一技能包导入边界。文件和资源按流写入同一文件系统的临时目录，校验完成后
+ * 才原子公布技能；大小只受设备实际可用存储空间约束。
+ */
 internal class LocalSkillPackageImporter(private val workspace: LocalWorkspace) {
-    companion object {
-        const val MAX_ARCHIVE_BYTES = 8 * 1024 * 1024
-        private const val MAX_DOCUMENT_BYTES = 24_000
-        private const val MAX_ENTRY_BYTES = 8 * 1024 * 1024
-        private const val MAX_TOTAL_BYTES = 24 * 1024 * 1024
-        private const val MAX_ENTRY_COUNT = 128
-    }
+    fun install(filename: String, bytes: ByteArray): String =
+        ByteArrayInputStream(bytes).use { install(filename, it) }
 
-    fun install(filename: String, bytes: ByteArray): String {
-        require(bytes.isNotEmpty() && bytes.size <= MAX_ARCHIVE_BYTES) { "技能文件不能为空或超过 8 MB" }
-        val entries = when {
-            filename.endsWith(".zip", ignoreCase = true) -> decodeZip(bytes)
-            filename.endsWith(".md", ignoreCase = true) -> linkedMapOf("SKILL.md" to bytes)
-            else -> throw IllegalArgumentException("请选择 SKILL.md 或 ZIP 技能包")
+    fun install(filename: String, input: InputStream, beforePublish: () -> Unit = {}): String {
+        require(filename.endsWith(".zip", true) || filename.endsWith(".md", true)) {
+            "请选择 SKILL.md 或 ZIP 技能包"
         }
-        val documentBytes = entries["SKILL.md"] ?: throw IllegalArgumentException("技能包缺少 SKILL.md")
-        require(documentBytes.size <= MAX_DOCUMENT_BYTES) { "SKILL.md 超过 24 KB，请拆分附属资料后重试" }
-        val document = decodeUtf8(documentBytes)
-        entries["SKILL.md"] = document.toByteArray(Charsets.UTF_8)
-        val lines = document.lines()
-        require(lines.firstOrNull()?.trim() == "---") { "SKILL.md 缺少开头的元数据" }
-        val end = lines.drop(1).indexOfFirst { it.trim() == "---" } + 1
-        require(end in 2..95 && lines.drop(end + 1).any { it.isNotBlank() }) { "SKILL.md 缺少完整元数据或执行规则" }
-        val names = lines.subList(1, end).mapNotNull { line ->
-            Regex("""^name:\s*["']?([a-z][a-z0-9-]{1,47})["']?\s*$""")
-                .matchEntire(line.trim())?.groupValues?.get(1)
-        }
-        require(names.size == 1) { "SKILL.md 必须包含唯一且有效的 name 字段（英文技能标识）" }
-        val id = names.single()
-        require(parseLocalSkillMetadata(id, document).description.isNotBlank()) { "SKILL.md 缺少 description 技能说明" }
-        require(LocalPresetSkillCatalog.entries.none { it.id == id }) { "预置技能标识已保留" }
-
-        val skillRoot = File(workspace.path, ".dsh/skills")
-        val destination = File(skillRoot, id)
-        require(!destination.exists() && !Files.isSymbolicLink(destination.toPath())) { "同名技能已经存在：$id" }
-        val stagingRoot = File(workspace.path, ".dsh").apply { mkdirs() }
-        require(!Files.isSymbolicLink(stagingRoot.toPath()) && !Files.isSymbolicLink(skillRoot.toPath())) {
-            "技能目录不能是符号链接"
-        }
-        val staging = Files.createTempDirectory(stagingRoot.toPath(), ".skill-import-").toFile()
+        val systemRoot = File(workspace.path, ".dsh").apply { mkdirs() }
+        val skillsRoot = File(systemRoot, "skills")
+        require(!Files.isSymbolicLink(systemRoot.toPath()) &&
+            !Files.isSymbolicLink(skillsRoot.toPath())) { "技能目录不能是符号链接" }
+        val temporary = Files.createTempDirectory(systemRoot.toPath(), ".skill-import-").toFile()
         try {
-            // Stage outside the catalog, so a failed import never advertises a partial skill.
-            for ((name, payload) in entries) {
-                val target = File(staging, name)
-                require(target.canonicalFile.toPath().startsWith(staging.canonicalFile.toPath())) { "技能包路径不安全" }
-                require(target.parentFile.isDirectory || target.parentFile.mkdirs()) { "无法创建技能目录" }
-                Files.write(target.toPath(), payload)
+            val unpacked = File(temporary, "unpacked").apply { mkdirs() }
+            val selected = if (filename.endsWith(".zip", true)) {
+                extractZip(input, unpacked)
+            } else {
+                input.use { source -> File(unpacked, "SKILL.md").outputStream().use { target -> source.copyTo(target) } }
+                unpacked
             }
-            require(skillRoot.isDirectory || skillRoot.mkdirs()) { "无法创建技能目录" }
+            val document = File(selected, "SKILL.md")
+            require(document.isFile && !Files.isSymbolicLink(document.toPath())) {
+                "技能包缺少 SKILL.md"
+            }
+            val id = readSkillId(document)
+            require(LocalPresetSkillCatalog.entries.none { it.id == id }) {
+                "预置技能标识已保留"
+            }
+            val destination = File(skillsRoot, id)
+            require(!destination.exists() && !Files.isSymbolicLink(destination.toPath())) {
+                "同名技能已经存在：$id"
+            }
+            require(skillsRoot.isDirectory || skillsRoot.mkdirs()) { "无法创建技能目录" }
             require(!destination.exists()) { "同名技能已经存在：$id" }
+            beforePublish()
             try {
-                Files.move(staging.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE)
+                Files.move(selected.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE)
             } catch (_: AtomicMoveNotSupportedException) {
-                Files.move(staging.toPath(), destination.toPath())
+                Files.move(selected.toPath(), destination.toPath())
             }
             return id
         } finally {
-            if (staging.exists()) staging.deleteRecursively()
+            if (temporary.exists()) require(temporary.deleteRecursively()) {
+                "技能导入临时文件清理失败"
+            }
         }
     }
 
-    private fun decodeZip(bytes: ByteArray): LinkedHashMap<String, ByteArray> {
-        val raw = linkedMapOf<String, ByteArray>()
-        var expanded = 0L
-        var entryCount = 0
-        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+    private fun extractZip(source: InputStream, unpacked: File): File {
+        val files = linkedSetOf<String>()
+        val unpackedPath = unpacked.canonicalFile.toPath()
+        ZipInputStream(source.buffered()).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
-                entryCount++
-                require(entryCount <= MAX_ENTRY_COUNT) { "技能包目录和文件数量超过安全限制" }
                 val name = entry.name
-                require(name.length <= 512 && name.count { it == '/' } <= 16) { "技能包文件路径过长或嵌套过深" }
-                require(name.isNotBlank() && '\\' !in name && !name.startsWith("/") &&
-                    ':' !in name && name.split('/').none { it == "." || it == ".." || it.isEmpty() && !name.endsWith("/") }) {
-                    "技能包包含不安全的文件路径"
+                require(name.isNotBlank() && !name.startsWith("/") && '\\' !in name &&
+                    ':' !in name && name.split('/').none {
+                        it == "." || it == ".." || (it.isEmpty() && !name.endsWith("/"))
+                    }) { "技能包包含不安全的文件路径" }
+                val target = File(unpacked, name)
+                require(target.canonicalFile.toPath().startsWith(unpackedPath)) {
+                    "技能包路径越过技能目录"
                 }
-                if (!entry.isDirectory) {
-                    require(raw.size < MAX_ENTRY_COUNT && name !in raw) { "技能包文件数量过多或存在重名文件" }
-                    val out = ByteArrayOutputStream()
-                    val buffer = ByteArray(8192)
-                    while (true) {
-                        val count = zip.read(buffer)
-                        if (count < 0) break
-                        expanded += count
-                        require(out.size() + count <= MAX_ENTRY_BYTES && expanded <= MAX_TOTAL_BYTES) {
-                            "技能包解压后的文件超出安全限制"
-                        }
-                        out.write(buffer, 0, count)
+                if (entry.isDirectory) {
+                    require(target.isDirectory || target.mkdirs()) { "无法创建技能目录" }
+                } else {
+                    require(files.add(name)) { "技能包存在重复文件：$name" }
+                    require(target.parentFile.isDirectory || target.parentFile.mkdirs()) {
+                        "无法创建技能文件目录"
                     }
-                    raw[name] = out.toByteArray()
+                    target.outputStream().use { output ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        var sinceSpaceCheck = 0L
+                        while (true) {
+                            val count = zip.read(buffer)
+                            if (count < 0) break
+                            output.write(buffer, 0, count)
+                            sinceSpaceCheck += count
+                            if (sinceSpaceCheck >= 8L * 1024 * 1024) {
+                                require(unpacked.usableSpace > 32L * 1024 * 1024) {
+                                    "设备剩余存储空间不足，已停止技能解压"
+                                }
+                                sinceSpaceCheck = 0
+                            }
+                        }
+                    }
                 }
                 zip.closeEntry()
             }
         }
-        require(raw.isNotEmpty()) { "技能包为空" }
-        val roots = raw.keys.filter { it.endsWith("/SKILL.md") && it.count { c -> c == '/' } == 1 }
-        val prefix = when {
-            "SKILL.md" in raw -> ""
-            roots.size == 1 -> roots.single().substringBefore("/") + "/"
-            else -> throw IllegalArgumentException("技能包需要在根目录或唯一的技能目录下包含 SKILL.md")
-        }
-        require(raw.keys.all { it.startsWith(prefix) }) { "技能包包含技能目录以外的文件" }
-        return LinkedHashMap<String, ByteArray>().apply {
-            for ((name, content) in raw) {
-                val relative = name.removePrefix(prefix)
-                require(relative.isNotBlank())
-                put(relative, content)
-            }
-        }
+        require(files.isNotEmpty()) { "技能包为空" }
+        if ("SKILL.md" in files) return unpacked
+        val roots = files.filter { it.endsWith("/SKILL.md") && it.count { c -> c == '/' } == 1 }
+        require(roots.size == 1) { "技能包需要在根目录或唯一的技能目录下包含 SKILL.md" }
+        val prefix = roots.single().substringBefore('/') + "/"
+        require(files.all { it.startsWith(prefix) }) { "技能包包含技能目录以外的文件" }
+        return File(unpacked, prefix)
     }
 
-    private fun decodeUtf8(bytes: ByteArray): String =
-        Charsets.UTF_8.newDecoder()
+    /** 只解析元数据，不将整份技能规则与全部资源装入内存。 */
+    private fun readSkillId(document: File): String {
+        val decoder = Charsets.UTF_8.newDecoder()
             .onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT)
-            .decode(ByteBuffer.wrap(bytes)).toString().removePrefix("\uFEFF")
+        java.io.InputStreamReader(document.inputStream(), decoder).buffered().use { reader ->
+            require(reader.readLine()?.removePrefix("\uFEFF")?.trim() == "---") {
+                "SKILL.md 缺少开头的元数据"
+            }
+            val header = mutableListOf("---")
+            var closed = false
+            repeat(95) {
+                if (!closed) {
+                    val line = reader.readLine() ?: throw IllegalArgumentException("SKILL.md 缺少完整元数据")
+                    header += line
+                    if (line.trim() == "---") closed = true
+                }
+            }
+            require(closed && header.size >= 3) { "SKILL.md 缺少完整元数据" }
+            var hasRules = false
+            while (true) {
+                val line = reader.readLine() ?: break
+                if (line.isNotBlank()) hasRules = true
+            }
+            require(hasRules) { "SKILL.md 缺少执行规则" }
+            val names = header.drop(1).dropLast(1).mapNotNull { line ->
+                Regex("""^name:\s*["']?([a-z][a-z0-9-]{1,47})["']?\s*$""")
+                    .matchEntire(line.trim())?.groupValues?.get(1)
+            }
+            require(names.size == 1) { "SKILL.md 必须包含唯一且有效的 name 字段（英文技能标识）" }
+            val id = names.single()
+            require(parseLocalSkillMetadata(id, header.joinToString("\n")).description.isNotBlank()) {
+                "SKILL.md 缺少 description 技能说明"
+            }
+            return id
+        }
+    }
 }

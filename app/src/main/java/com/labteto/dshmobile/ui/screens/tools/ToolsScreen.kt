@@ -19,7 +19,6 @@ import androidx.core.content.ContextCompat
 import android.net.Uri
 import android.provider.OpenableColumns
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Arrangement
@@ -496,25 +495,15 @@ class ToolsViewModel @Inject constructor(
         launchOperation {
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
             try {
-                val (filename, bytes) = withContext(Dispatchers.IO) {
+                val id = withContext(Dispatchers.IO) {
                     val resolver = appContext.contentResolver
-                    val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-                        if (cursor.moveToFirst()) cursor.getString(0) else null
-                    } ?: uri.lastPathSegment?.substringAfterLast('/') ?: ""
-                    val input = resolver.openInputStream(uri) ?: error(appContext.getString(R.string.skills_import_open_failed))
-                    val output = ByteArrayOutputStream()
-                    input.use { stream ->
-                        val buffer = ByteArray(8192)
-                        while (true) {
-                            val count = stream.read(buffer)
-                            if (count < 0) break
-                            require(output.size() + count <= 8 * 1024 * 1024) { appContext.getString(R.string.skills_import_too_large) }
-                            output.write(buffer, 0, count)
-                        }
-                    }
-                    name to output.toByteArray()
+                    val filename = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                        ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+                        ?: uri.lastPathSegment?.substringAfterLast('/') ?: ""
+                    resolver.openInputStream(uri)?.use { stream ->
+                        localTools.importSkillStream(filename, stream)
+                    } ?: error(appContext.getString(R.string.skills_import_open_failed))
                 }
-                val id = localTools.importSkill(filename, bytes)
                 _state.value = _state.value.copy(
                     loading = false,
                     skills = localTools.installedSkills(),
@@ -538,13 +527,12 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
             try {
                 val file = withContext(Dispatchers.IO) {
-                    val bytes = localTools.exportSkillPackage(id)
                     val folder = File(appContext.cacheDir, "skill-package-shares")
                     require(!Files.isSymbolicLink(folder.toPath()) &&
                         (folder.isDirectory || folder.mkdirs())) { "无法创建技能分享缓存" }
                     val pending = Files.createTempFile(folder.toPath(), "skill-", ".partial")
                     try {
-                        Files.write(pending, bytes)
+                        localTools.exportSkillPackageToFile(id, pending.toFile())
                         val target = File(folder, "$id.zip").toPath()
                         try {
                             Files.move(pending, target, StandardCopyOption.ATOMIC_MOVE,

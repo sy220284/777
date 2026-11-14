@@ -234,4 +234,31 @@ class LocalSkillStoreTest {
         assertTrue(workspace.readSkill("writing-polish").contains("用途："))
     }
 
+    @Test fun validCustomizedBundledSkillBeyond128KbIsNotReplaced() = inWorkspace { store, workspace, root ->
+        store.seedOnce()
+        val modified = store.readDocument("writing-polish") + "\n" + "用户扩展规则。".repeat(20_000)
+        val file = root.resolve(".dsh/skills/writing-polish/SKILL.md")
+        file.writeText(modified)
+        assertTrue(file.length() > 128L * 1024)
+        store.seedOnce()
+        assertEquals(modified, workspace.readSkill("writing-polish"))
+        assertEquals(modified, store.readDocument("writing-polish"))
+        store.setModelInvocable("writing-polish", false)
+        assertTrue(!workspace.skillMetadata("writing-polish").modelInvocable)
+        assertTrue(store.readDocument("writing-polish").contains("用户扩展规则"))
+        store.setModelInvocable("writing-polish", true)
+        assertTrue(workspace.skillMetadata("writing-polish").modelInvocable)
+        assertTrue(store.readDocument("writing-polish").length > 128 * 1024)
+    }
+
+    @Test fun manuallyCreatedSkillSupportsLongInstructions() = inWorkspace { store, workspace, _ ->
+        val instructions = "长篇技能规则。".repeat(20_000)
+        store.create("long-custom-skill", "大型自定义技能", "包含大量引用和操作步骤", instructions)
+        assertTrue(workspace.readSkill("long-custom-skill").contains(instructions))
+        store.setModelInvocable("long-custom-skill", false)
+        assertTrue(!workspace.skillMetadata("long-custom-skill").modelInvocable)
+        store.setModelInvocable("long-custom-skill", true)
+        assertTrue(workspace.readSkill("long-custom-skill").contains(instructions))
+    }
+
 }

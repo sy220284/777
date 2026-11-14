@@ -83,13 +83,20 @@ class LocalSkillPackageImporterTest {
         assertTrue(workspace.skills().isEmpty())
     }
 
-    @Test fun rejectsOversizedDocumentAndBombLikeArchive() = runInWorkspace { importer, workspace, _ ->
-        val tooLong = example + "x".repeat(24_100)
-        assertThrows(IllegalArgumentException::class.java) { importer.install("SKILL.md", tooLong.toByteArray()) }
-        val huge = archive("SKILL.md" to example.toByteArray(), "huge.txt" to ByteArray(8 * 1024 * 1024 + 1))
-        assertThrows(IllegalArgumentException::class.java) { importer.install("big.zip", huge) }
-        assertTrue(workspace.skills().isEmpty())
-    }
+    @Test fun importsLargeRulesAndResourcesWithoutFixedCapacityCeilings() =
+        runInWorkspace { importer, workspace, root ->
+            val extended = example + "\n" + "技能规则".repeat(26_000)
+            val resource = ByteArray(9 * 1024 * 1024).also { java.util.Random(12).nextBytes(it) }
+            val zipped = archive(
+                "SKILL.md" to extended.toByteArray(),
+                "references/large.bin" to resource,
+            )
+            assertTrue(zipped.size > 8 * 1024 * 1024)
+            assertEquals("sample-skill", importer.install("large.zip", zipped.inputStream()))
+            assertEquals(resource.size.toLong(),
+                root.resolve(".dsh/skills/sample-skill/references/large.bin").length())
+            assertTrue(workspace.readModelSkill("sample-skill").contains("技能规则"))
+        }
 
     @Test fun supportsSingleRootZipAndRejectsSiblings() = runInWorkspace { importer, workspace, _ ->
         assertThrows(IllegalArgumentException::class.java) {
@@ -98,21 +105,21 @@ class LocalSkillPackageImporterTest {
         assertEquals("sample-skill", importer.install("pkg.zip", archive("SKILL.md" to example.toByteArray())))
         assertTrue(workspace.skills().contains("sample-skill"))
     }
-    @Test fun rejectsExcessiveDirectoryEntriesWithoutCreatingSkill() = runInWorkspace { importer, workspace, _ ->
-        val output = ByteArrayOutputStream()
-        ZipOutputStream(output).use { zip ->
-            zip.putNextEntry(ZipEntry("pkg/SKILL.md"))
-            zip.write(example.toByteArray())
-            zip.closeEntry()
-            repeat(128) { i ->
-                zip.putNextEntry(ZipEntry("pkg/directory-${i}/"))
+    @Test fun acceptsSkillWithMoreThanOneHundredAndTwentyEightDirectories() =
+        runInWorkspace { importer, workspace, _ ->
+            val output = ByteArrayOutputStream()
+            ZipOutputStream(output).use { zip ->
+                zip.putNextEntry(ZipEntry("pkg/SKILL.md"))
+                zip.write(example.toByteArray())
                 zip.closeEntry()
+                repeat(150) { i ->
+                    zip.putNextEntry(ZipEntry("pkg/references/directory-$i/note.md"))
+                    zip.write("引用".toByteArray())
+                    zip.closeEntry()
+                }
             }
+            assertEquals("sample-skill", importer.install("many-directories.zip", output.toByteArray().inputStream()))
+            assertTrue(workspace.skills().contains("sample-skill"))
         }
-        assertThrows(IllegalArgumentException::class.java) {
-            importer.install("many-directories.zip", output.toByteArray())
-        }
-        assertFalse(workspace.skills().contains("sample-skill"))
-    }
 
 }

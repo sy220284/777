@@ -120,7 +120,7 @@ internal fun buildLocalSkillDocument(id: String, description: String, instructio
     require(summary.isNotEmpty() && summary.length <= 240 && '\n' !in summary && '\r' !in summary) {
         "技能描述需要 1—240 个字符且不能换行"
     }
-    require(body.isNotEmpty() && body.length <= 12_000) { "技能说明需要 1—12000 个字符" }
+    require(body.isNotEmpty()) { "技能说明不能为空" }
     val scalar = summary.replace('"', '\'').replace(" #", " ＃")
     require(whenToUse.length <= 240 && '\n' !in whenToUse && '\r' !in whenToUse) { "使用条件不能超过 240 字或换行" }
     val trigger = if (whenToUse.isBlank()) emptyList() else listOf("when-to-use: \"" + whenToUse.replace('"', '\'') + "\"")
@@ -218,9 +218,11 @@ internal class LocalSkillStore(
             require(originalExists || Files.notExists(originalPath, LinkOption.NOFOLLOW_LINKS)) {
                 "技能规则文件不可读取：${preset.id}"
             }
-            val oversized = originalExists && Files.size(originalPath) > 128 * 1024
-            val current = if (!originalExists || oversized) null else workspace.readSkill(preset.id)
-            val disabled = if (current != null) !workspace.skillMetadata(preset.id).modelInvocable else false
+            val current = if (!originalExists) null else workspace.readSkill(preset.id)
+            // Read the already materialized text: malformed long lines are damaged content,
+            // not a reason to fail before the bundled repair can preserve a backup.
+            val metadata = current?.let { parseLocalSkillMetadata(preset.id, it) }
+            val disabled = metadata?.modelInvocable == false
             val desired = withModelInvocationDisabled(baseDocument, disabled)
             val baseline = File(skillsDir, "${preset.id}/.bundled-baseline-sha256")
             val previousBaseline = when {
@@ -234,19 +236,18 @@ internal class LocalSkillStore(
                     // Legacy installation without a baseline: don't erase an unknown user edit.
                     (previousBaseline == null && current == desired)
                 )
-            // A UI editing limit is not an ownership boundary: workspace-authored rules
-            // can legitimately be 24 KB–128 KB. Only an unchanged bundled baseline
-            // is eligible for automatic replacement.
+            // Bundled upgrades may replace only known unchanged originals. Valid customized
+            // rules must survive regardless of their length.
             val validCustomDocument = current != null &&
                 current.lineSequence().firstOrNull()?.trim() == "---" &&
-                parseLocalSkillMetadata(preset.id, current).description.isNotBlank()
+                metadata?.description?.isNotBlank() == true
             if (validCustomDocument && !clean && current != desired) {
                 // A valid local override wins over bundled updates, including legacy
                 // installations created before the fingerprint marker existed.
                 continue
             }
-            if (originalExists && (oversized || (current != null && !clean && current != desired))) {
-                // Preserve original bytes before repairing damaged or oversized rules.
+            if (originalExists && current != null && !clean && current != desired) {
+                // Preserve original bytes before repairing an invalid or damaged rule file.
                 val backup = File(skillsDir, "${preset.id}/SKILL.pre-repair.md")
                 if (Files.notExists(backup.toPath(), LinkOption.NOFOLLOW_LINKS)) {
                     Files.copy(originalPath, backup.toPath())
@@ -405,18 +406,12 @@ internal class LocalSkillStore(
 
     fun readDocument(id: String): String {
         requireInstalled(id)
-        return workspace.readRaw(".dsh/skills/$id/SKILL.md").also {
-            require(it.toByteArray(Charsets.UTF_8).size <= 24_000) {
-                "技能说明超过 24 KB，请通过工作区文件工具编辑"
-            }
-        }
+        return workspace.readRaw(".dsh/skills/$id/SKILL.md")
     }
 
     fun updateDocument(id: String, document: String) {
         requireInstalled(id)
-        require(document.isNotBlank() && document.toByteArray(Charsets.UTF_8).size <= 24_000) {
-            "技能文件不能为空，且不能超过 24 KB"
-        }
+        require(document.isNotBlank()) { "技能文件不能为空" }
         require(document.lineSequence().firstOrNull()?.trim() != "---" ||
             document.lineSequence().drop(1).take(95).any { it.trim() == "---" }) {
             "技能元数据缺少结束分隔符"
@@ -503,9 +498,15 @@ internal class LocalSkillManager @Inject constructor(
     fun create(id: String, displayName: String, description: String, instructions: String) =
         store.create(id, displayName, description, instructions)
     fun importSkill(filename: String, bytes: ByteArray): String = LocalSkillPackageImporter(storageWorkspace).install(filename, bytes)
+    fun importSkill(filename: String, input: java.io.InputStream, beforePublish: () -> Unit = {}): String =
+        LocalSkillPackageImporter(storageWorkspace).install(filename, input, beforePublish)
     fun exportSkillPackage(id: String): ByteArray = LocalSkillPackageExporter(storageWorkspace).export(id)
+    fun exportSkillPackageToFile(id: String, destination: File) =
+        LocalSkillPackageExporter(storageWorkspace).exportToFile(id, destination)
     fun replaceSkillPackage(id: String, archive: ByteArray): String =
         LocalSkillPackageUpdater(storageWorkspace).replace(id, archive)
+    fun replaceSkillPackage(id: String, archive: java.io.InputStream, beforePublish: () -> Unit = {}): String =
+        LocalSkillPackageUpdater(storageWorkspace).replace(id, archive, beforePublish)
     fun canRollbackSkill(id: String): Boolean = LocalSkillPackageUpdater(storageWorkspace).canRollback(id)
     fun rollbackSkill(id: String): String = LocalSkillPackageUpdater(storageWorkspace).rollback(id)
     fun remove(id: String) {
