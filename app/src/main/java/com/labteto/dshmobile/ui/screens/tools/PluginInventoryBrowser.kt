@@ -124,6 +124,11 @@ internal fun PluginInventoryBrowser(
     codexLoading: Boolean = false,
     codexError: String? = null,
     onRefreshCodex: (() -> Unit)? = null,
+    codexDetails: Map<String, com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot> = emptyMap(),
+    codexDetailLoadingId: String? = null,
+    codexDetailError: String? = null,
+    onReadCodexPluginDetail: ((String) -> Unit)? = null,
+    onInstallCodexPluginSkill: ((String, String) -> Unit)? = null,
     curatedLoading: Boolean = false,
     curatedError: String? = null,
     pendingSkillUpdates: Map<String, String> = emptyMap(),
@@ -627,7 +632,12 @@ internal fun PluginInventoryBrowser(
                             attentionNeeded = item.marketState.status in setOf(
                                 ExtensionMarketStatus.NEEDS_SETUP, ExtensionMarketStatus.FAILED),
                             enabled = !loading,
-                            onOpen = { selectedRow = item },
+                            onOpen = {
+                                selectedRow = item
+                                if (item.id.startsWith("codex-plugin:")) {
+                                    onReadCodexPluginDetail?.invoke(item.id.removePrefix("codex-plugin:"))
+                                }
+                            },
                             onAction = {
                                 when {
                                     item.installablePreset && onInstallPreset != null ->
@@ -635,7 +645,10 @@ internal fun PluginInventoryBrowser(
                                     item.installableCurated && onInstallCurated != null ->
                                         onInstallCurated(item.id.substringAfter(":"))
                                     item.connectedService -> onManageConnections()
-                                    item.id.startsWith("codex-plugin:") -> selectedRow = item
+                                    item.id.startsWith("codex-plugin:") -> {
+                                        selectedRow = item
+                                        onReadCodexPluginDetail?.invoke(item.id.removePrefix("codex-plugin:"))
+                                    }
                                     item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
                                         ExtensionMarketStatus.FAILED) -> selectedRow = item
                                     onUseCapability != null && item.available -> onUseCapability(usePrompt)
@@ -693,18 +706,68 @@ internal fun PluginInventoryBrowser(
             }
             Text(item.marketState.label, style = DsType.small13Strong.withReadingWeight(),
                 color = if (item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
-                    ExtensionMarketStatus.FAILED)) colors.warningInk else colors.successInk)
+                    ExtensionMarketStatus.FAILED, ExtensionMarketStatus.UNSUPPORTED))
+                    colors.warningInk else colors.successInk)
             if (item.marketState.advice.isNotBlank()) {
                 Text(item.marketState.advice, style = DsType.small13.withReadingWeight(),
                     color = colors.textSecondary)
             }
             if (item.id.startsWith("codex-plugin:")) {
+                val pluginId = item.id.removePrefix("codex-plugin:")
                 Text("官方来源：github.com/openai/plugins", style = DsType.caption11,
                     color = colors.textTertiary)
-                Text("Codex 插件使用官方安装器和服务授权。777 会使用本机 MCP 连接与工具审批。",
-                    style = DsType.small13, color = colors.textSecondary)
+                val details = codexDetails[pluginId]
+                when {
+                    details != null -> {
+                        Text(details.description, style = DsType.small13, color = colors.textSecondary)
+                        Text("发布方：${details.developerName.ifBlank { "OpenAI / 合作开发者" }} · ${details.version}",
+                            style = DsType.caption11, color = colors.textTertiary)
+                        val abilities = buildList {
+                            if (details.hasSkills) add("技能")
+                            if (details.hasMcp) add("MCP")
+                            if (details.hasApp) add("App")
+                            if (details.hasHooks) add("Hooks")
+                        }
+                        Text("包含能力：${abilities.joinToString(" / ").ifBlank { "元数据" }}",
+                            style = DsType.small13, color = colors.textSecondary)
+                        if (details.skills.isNotEmpty() &&
+                            item.marketState.status != ExtensionMarketStatus.UNSUPPORTED) {
+                            Text("可直接安装的技能", style = DsType.std14Strong, color = colors.text)
+                            details.skills.forEach { skill ->
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(skill, modifier = Modifier.weight(1f),
+                                        style = DsType.small13, color = colors.text)
+                                    val installed = skills.any { it.name == skill }
+                                    SyButton(
+                                        text = if (installed) "已安装" else "安装",
+                                        variant = SyButtonVariant.Info,
+                                        enabled = !loading && !installed && onInstallCodexPluginSkill != null,
+                                        onClick = {
+                                            selectedRow = null
+                                            onInstallCodexPluginSkill?.invoke(pluginId, skill)
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    codexDetailLoadingId == pluginId ->
+                        Text("正在检查官方插件包及技能目录…", style = DsType.small13,
+                            color = colors.textSecondary)
+                    else -> {
+                        Text(codexDetailError ?: "按需获取该插件的详细能力说明",
+                            style = DsType.small13, color = colors.textSecondary)
+                        if (onReadCodexPluginDetail != null) {
+                            SyButton(text = "重新读取插件详情", onClick = {
+                                onReadCodexPluginDetail(pluginId)
+                            }, variant = SyButtonVariant.Ghost)
+                        }
+                    }
+                }
+                Text("外部应用、MCP 服务与钩子需要单独验证连接和授权，安装技能不会静默启动外部程序。",
+                    style = DsType.caption11, color = colors.textSecondary)
                 if (item.marketState.status != ExtensionMarketStatus.UNSUPPORTED) {
-                    SyButton(text = "查看连接方式", variant = SyButtonVariant.Info,
+                    SyButton(text = "管理连接与授权", variant = SyButtonVariant.Info,
                         onClick = { selectedRow = null; onManageConnections() })
                 }
             }
