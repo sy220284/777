@@ -62,6 +62,7 @@ class AndroidDevicePlugin(
         Spec("android_notification_list", "notification_list", "读取已授权的当前通知；结果会进入会话历史，已限长并脱敏常见验证码/密码；未授权时先调用 android_notification_status", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
         Spec("android_clipboard_get", "clipboard_get", "读取当前剪贴板", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
         Spec("android_clipboard_set", "clipboard_set", "写入剪贴板", mapOf("text" to "string"), setOf("text"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
+        Spec("android_clipboard_clear", "clipboard_clear", "清空系统剪贴板，清理自动化测试文本残留", access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_vscreen_create", "vscreen_create", "创建独立 Android 虚拟显示", mapOf("width" to "integer", "height" to "integer", "density_dpi" to "integer"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_vscreen_list", "vscreen_list", "列出虚拟显示", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_vscreen_status", "vscreen_status", "读取虚拟显示状态", mapOf("id" to "string"), setOf("id"), ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.MUTATION),
