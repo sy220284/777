@@ -17,16 +17,23 @@ class LocalTaskGraphReplanPolicyTest {
         dependent: Boolean = true,
         write: Boolean = false,
         goal: String = "goal-v1",
+        second: String = "verify",
     ) = LocalWorkTaskGraphPlan(buildJsonObject {
         put("allow_mutation", write)
         put("goal_fingerprint", goal)
+        put("model", "frozen-model")
+        put("route", "frozen-route")
+        put("pipeline", false)
+        put("input_files", buildJsonArray {})
+        put("required_files", buildJsonArray {})
+        put("evidence", buildJsonArray {})
         put("nodes", buildJsonArray {
             add(buildJsonObject {
                 put("node_id", "a"); put("task", first)
                 put("depends_on", buildJsonArray {})
             })
             add(buildJsonObject {
-                put("node_id", "b"); put("task", "verify")
+                put("node_id", "b"); put("task", second)
                 put("depends_on", buildJsonArray { if (dependent) add(JsonPrimitive("a")) })
             })
         })
@@ -42,6 +49,22 @@ class LocalTaskGraphReplanPolicyTest {
         assertTrue(admit.oldPlanVersion != admit.newPlanVersion)
         assertTrue(previous.nodeVersion(previous.nodes.first()) !=
             changed.nodeVersion(changed.nodes.first()))
+    }
+
+    @Test fun unchangedReadOnlyNodeCanBeReusedWhenOtherTaskChanges() {
+        val previous = plan()
+        val revised = plan(second = "verify new evidence")
+        val decision = admitLocalTaskGraphReplan(previous, revised)
+        assertEquals(setOf("a"), decision.reusableNodeIds)
+        assertEquals(setOf("b"), decision.invalidatedNodeIds)
+    }
+
+    @Test fun changingAnAncestorInvalidatesAllDownstreamReuse() {
+        val previous = plan()
+        val revised = plan(first = "different research")
+        val decision = admitLocalTaskGraphReplan(previous, revised)
+        assertTrue(decision.reusableNodeIds.isEmpty())
+        assertEquals(setOf("a", "b"), decision.invalidatedNodeIds)
     }
 
     @Test fun writableSideEffectsRequireSeparateVerificationBeforeReplanning() {
