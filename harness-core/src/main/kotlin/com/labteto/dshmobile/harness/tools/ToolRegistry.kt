@@ -42,6 +42,10 @@ data class ToolContext(
     val onExecutionFinished: (suspend (HarnessTool, ToolResult) -> Unit)? = null,
     /** Revalidate the owning run before each admitted operation, including Code Mode children. */
     val beforeExecution: (suspend (HarnessTool) -> Unit)? = null,
+    /** Exact tool arguments and child call identity for approval in nested orchestration. */
+    val approvalWithInvocation: (suspend (
+        tool: HarnessTool, input: JsonObject, attributes: Map<String, Any?>, hookReason: String?,
+    ) -> Boolean)? = null,
 )
 
 @kotlinx.serialization.Serializable
@@ -273,7 +277,8 @@ class ToolRegistry private constructor(
             ToolApprovalPolicy.MUTATION -> tool.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
         }
         if (needsApproval) {
-            if (context.approval == null && context.approvalWithReason == null) {
+            if (context.approval == null && context.approvalWithReason == null &&
+                context.approvalWithInvocation == null) {
                 return ToolInvocationResult(
                     result = ToolResult(
                         content = "工具需要人工审批：$name",
@@ -284,7 +289,9 @@ class ToolRegistry private constructor(
                     executionStarted = false,
                 )
             }
-            val granted = context.approvalWithReason?.invoke(tool, hookApprovalReason.orEmpty())
+            val granted = context.approvalWithInvocation?.invoke(
+                tool, input, context.attributes, hookApprovalReason,
+            ) ?: context.approvalWithReason?.invoke(tool, hookApprovalReason.orEmpty())
                 ?: requireNotNull(context.approval).invoke(tool)
             if (!granted) return ToolInvocationResult(
                 result = ToolResult(
