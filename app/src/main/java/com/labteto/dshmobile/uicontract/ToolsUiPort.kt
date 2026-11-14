@@ -38,9 +38,12 @@ sealed interface UiToolDraftValidation {
     data object Valid : UiToolDraftValidation
     data class Rejected(val reason: String) : UiToolDraftValidation
 }
+data class UiSkillRequirement(
+    val type: String, val value: String, val description: String = "", val registered: Boolean = false,
+)
 data class UiSkillSnapshot(val name: String, val description: String, val modelInvocable: Boolean,
     val displayName: String = name, val sourceUrl: String? = null, val sourceWarning: String? = null,
-    val rollbackAvailable: Boolean = false)
+    val rollbackAvailable: Boolean = false, val requirements: List<UiSkillRequirement> = emptyList())
 data class UiPresetSkillSnapshot(val id: String, val title: String, val description: String, val installed: Boolean)
 /** Read-only repository metadata; writable operations remain in the GitHub plugin approval path. */
 data class UiGitHubRepo(val fullName: String, val description: String, val privateRepo: Boolean,
