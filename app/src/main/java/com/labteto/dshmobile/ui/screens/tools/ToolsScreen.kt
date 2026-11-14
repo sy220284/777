@@ -417,6 +417,29 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
+    /** User-selected GitHub source; no network fetch or execution occurs before installation. */
+    fun installGitHubSkill(link: String) {
+        val source = link.trim()
+        if (!source.startsWith("https://github.com/")) return
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val installed = localTools.installGitHubSkill(source)
+                _state.value = _state.value.copy(
+                    loading = false, skills = localTools.installedSkills(),
+                    presets = localTools.presetSkills(), createdSkillId = installed,
+                    feedback = "已安装技能：$installed；请查看其运行依赖状态",
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false, feedback = failure.message ?: "GitHub 技能安装失败",
+                )
+            }
+        }
+    }
+
     /** Network access happens only after the user explicitly asks to check one source. */
     fun checkSkillUpdate(id: String) {
         if (_state.value.skills.none { it.name == id && it.sourceUrl != null }) return
@@ -887,7 +910,7 @@ fun ToolsScreen(
     // Switching tabs must not discard the plugin/skill search and filter context.
     val inventoryTabStates = rememberSaveableStateHolder()
     LaunchedEffect(selectedTab) {
-        if (selectedTab == 1 && state.curatedSkills.isEmpty() &&
+        if (selectedTab in 0..1 && state.curatedSkills.isEmpty() &&
             !state.curatedLoading && state.curatedError == null) viewModel.refreshCuratedSkills()
     }
 
@@ -1019,6 +1042,7 @@ fun ToolsScreen(
                                     onRefreshCurated = viewModel::refreshCuratedSkills,
                                     onCreateSkill = viewModel::createSkill,
                                     onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
+                                     onInstallGitHubSkill = viewModel::installGitHubSkill,
                                     onRemoveSkill = viewModel::removeSkill,
                                     onShareSkillPackage = viewModel::shareSkillPackage,
                                     onCheckSkillUpdate = viewModel::checkSkillUpdate,
