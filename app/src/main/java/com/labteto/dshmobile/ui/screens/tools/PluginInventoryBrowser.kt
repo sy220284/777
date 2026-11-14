@@ -24,6 +24,7 @@ import com.labteto.dshmobile.ui.shenyan.SySegmented
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -167,6 +168,8 @@ internal fun PluginInventoryBrowser(
     val context = LocalContext.current
     val skillCreationPrompt = stringResource(R.string.skills_create_in_chat_prompt)
     var query by rememberSaveable { mutableStateOf("") }
+    var showSearch by rememberSaveable { mutableStateOf(false) }
+    var showMarketActions by remember { mutableStateOf(false) }
     var selectedCategory by rememberSaveable { mutableIntStateOf(0) }
     var transportFilter by rememberSaveable { mutableStateOf(PluginTransportFilter.ALL) }
     var selectedRow by remember { mutableStateOf<InventoryRow?>(null) }
@@ -361,14 +364,45 @@ internal fun PluginInventoryBrowser(
                 onBack = onBack,
                 backContentDescription = stringResource(R.string.common_back),
             )
-            SySearchField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapMd)
-                    .testTag("plugin-inventory-search"),
-                placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(
+                    horizontal = SyMetric.gapSection, vertical = SyMetric.gapSm),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    if (skillsOnly) "技能" else "插件",
+                    style = DsType.headline17.withReadingWeight(), color = colors.text,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(
+                    onClick = {
+                        showSearch = !showSearch
+                        if (!showSearch) query = ""
+                    },
+                    modifier = Modifier.testTag("plugin-inventory-search-trigger"),
+                ) {
+                    Icon(FeatherIcons.Search, contentDescription = "查找技能或插件",
+                        tint = colors.text)
+                }
+                IconButton(
+                    onClick = { showMarketActions = true },
+                    modifier = Modifier.testTag("plugin-inventory-more"),
+                ) {
+                    Icon(FeatherIcons.MoreVertical, contentDescription = "更多操作",
+                        tint = colors.text)
+                }
+            }
+            if (showSearch) {
+                SySearchField(
+                    value = query, onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapSm)
+                        .testTag("plugin-inventory-search"),
+                    placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search
+                        else R.string.tools_catalog_search),
+                )
+            }
             LazyRow(
                 modifier = Modifier.testTag("plugin-category-list"),
                 contentPadding = PaddingValues(horizontal = SyMetric.gapSection),
@@ -377,15 +411,15 @@ internal fun PluginInventoryBrowser(
                 items(5) { category ->
                     SyFilterChip(
                         text = if (skillsOnly) when (category) {
-                            1 -> installedStatus + " · " + installedSkills.size
+                            1 -> "已安装"
                             2 -> "办公效率"
                             3 -> "开发研究"
                             4 -> "创意设计"
-                            else -> "发现 · " + (installedSkills.size + availablePresets.size + curated.size)
+                            else -> "发现"
                         } else when (category) {
-                            1 -> connectionStatus + " · " + connectedServices.size
-                            2 -> installedStatus + " · " + (installedSkills.size + local.size)
-                            3 -> stringResource(R.string.plugin_category_device)
+                            1 -> "已连接"
+                            2 -> "已安装"
+                            3 -> "设备与自动化"
                             4 -> "创意设计"
                             else -> "发现"
                         },
@@ -393,44 +427,6 @@ internal fun PluginInventoryBrowser(
                         onClick = { selectedCategory = category },
                     )
                 }
-            }
-            if (!skillsOnly && selectedCategory == 1) {
-                // Design screen 18: connection transport is a real property from
-                // the service handshake, never an invented plugin-store category.
-                val options = PluginTransportFilter.entries
-                val counts = options.map { filter ->
-                    connectedServices.count { pluginTransportMatches(it.transport.toString(), filter) }
-                }
-                SySegmented(
-                    segments = options.mapIndexed { index, filter ->
-                        SySegment(
-                            filter.name,
-                            "${stringResource(
-                                when (filter) {
-                                    PluginTransportFilter.ALL -> R.string.plugin_transport_all
-                                    PluginTransportFilter.HTTP -> R.string.plugin_transport_http
-                                    PluginTransportFilter.STDIO -> R.string.plugin_transport_stdio
-                                },
-                            )} · ${counts[index]}",
-                        )
-                    },
-                    selectedKey = transportFilter.name,
-                    onSelect = { key ->
-                        transportFilter = options.firstOrNull { it.name == key } ?: PluginTransportFilter.ALL
-                    },
-                    role = Role.Tab,
-                    hapticOnChange = true,
-                    stretch = true,
-                    modifier = Modifier.fillMaxWidth()
-                        .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapMd)
-                        .testTag("plugin-transport-tabs"),
-                )
-                SyButton(
-                    text = stringResource(R.string.tools_external_services),
-                    variant = SyButtonVariant.Ghost,
-                    onClick = onManageConnections,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection),
-                )
             }
             if (loading && list.isNotEmpty()) {
                 Text(
@@ -449,163 +445,16 @@ internal fun PluginInventoryBrowser(
                 ),
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
-                if (query.isBlank() && selectedCategory == 0) {
-                    item(key = "extension-market-hero") {
-                        ExtensionMarketplaceHero(
-                            skillsOnly = skillsOnly,
-                            installedCount = installedSkills.size + if (skillsOnly) 0 else local.size,
-                            discoverableCount = availablePresets.size + curated.size + officialPlugins.size,
-                            connectedCount = connectedServices.size,
-                        )
-                    }
-                    item(key = "extension-market-section-heading") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("探索扩展", style = DsType.headline17.withReadingWeight(), color = colors.text)
-                            Text("${list.size} 项", style = DsType.small13, color = colors.textSecondary)
-                        }
+                if (skillsOnly && curatedError != null) {
+                    item(key = "curated-error") {
+                        Text(curatedError, color = colors.dangerInk,
+                            style = DsType.small13.withReadingWeight())
                     }
                 }
-                if (!skillsOnly && query.isBlank() && activeToolHookIds.isNotEmpty()) {
-                    item(key = "registered-tool-hooks") {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().testTag("active-tool-hook-status"),
-                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-                        ) {
-                            Text(
-                                "当前生效的工具规则：${activeToolHookIds.size} 项",
-                                style = DsType.small13Strong,
-                                color = colors.text,
-                            )
-                            Text(
-                                activeToolHookIds.sorted().joinToString(" · "),
-                                style = DsType.caption11,
-                                color = colors.textSecondary,
-                            )
-                        }
-                    }
-                }
-                if (!skillsOnly && query.isBlank() && connectedServices.isNotEmpty()) {
-                    item(key = "mcp-process-boundary") {
-                        Text(
-                            "MCP 扩展使用独立工作进程，当前与应用共享系统身份；文件、网络及设备操作仍按原有工具审批和管理策略执行。",
-                            style = DsType.caption11,
-                            color = colors.textSecondary,
-                            modifier = Modifier.fillMaxWidth().testTag("mcp-worker-permission-status"),
-                        )
-                    }
-                }
-                if (skillsOnly && query.isBlank()) {
-                    item(key = "skill-creation-actions") {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                            ) {
-                                if (onImportSkill != null) {
-                                    SyButton(
-                                        text = stringResource(R.string.skills_import_file),
-                                        onClick = onImportSkill,
-                                        enabled = !loading,
-                                        modifier = Modifier.weight(1f).testTag("skill-import-file"),
-                                    )
-                                }
-                                if (onUseCapability != null) {
-                                    SyButton(
-                                        text = stringResource(R.string.skills_create_in_chat),
-                                        onClick = { onUseCapability(skillCreationPrompt) },
-                                        enabled = !loading,
-                                        variant = SyButtonVariant.Info,
-                                        modifier = Modifier.weight(1f).testTag("skill-create-in-chat"),
-                                    )
-                                }
-                            }
-                            if (onInstallGitHubSkill != null) {
-                                SyButton(
-                                    text = "从 GitHub 安装",
-                                    onClick = { showGitHubImport = true },
-                                    enabled = !loading,
-                                    variant = SyButtonVariant.Ghost,
-                                    modifier = Modifier.fillMaxWidth().testTag("skill-install-github"),
-                                )
-                            }
-                            Text(
-                                stringResource(R.string.skills_import_hint),
-                                modifier = Modifier.fillMaxWidth(),
-                                style = DsType.small13.withReadingWeight(),
-                                color = colors.textSecondary,
-                                maxLines = 2,
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(
-                                    stringResource(R.string.skills_catalog_overview, skills.size, availablePresets.size),
-                                    style = DsType.small13Strong.withReadingWeight(),
-                                    color = colors.textSecondary,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                if (onCreateSkill != null) {
-                                    SyButton(
-                                        text = stringResource(R.string.skills_create_manual),
-                                        variant = SyButtonVariant.Ghost,
-                                        onClick = { showCreateSkill = true },
-                                        enabled = !loading,
-                                        size = SyButtonSize.Small,
-                                        modifier = Modifier.testTag("skill-create-manual"),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-                if (!skillsOnly && (codexLoading || codexError != null || officialPlugins.isNotEmpty())) {
-                    item(key = "codex-market-status") {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(codexError ?: if (codexLoading) "正在读取 Codex 官方插件市场"
-                                else "Codex 官方插件 · ${officialPlugins.size} 项",
-                                style = DsType.small13.withReadingWeight(),
-                                color = if (codexError != null) colors.dangerInk else colors.textSecondary,
-                                modifier = Modifier.weight(1f))
-                            if (!codexLoading && onRefreshCodex != null) {
-                                SyButton(text = "刷新目录", onClick = onRefreshCodex,
-                                    size = SyButtonSize.Small, variant = SyButtonVariant.Ghost)
-                            }
-                        }
-                    }
-                }
-                if (skillsOnly && (curatedLoading || curatedError != null || curated.isNotEmpty())) {
-                    item(key = "curated-status") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-                        ) {
-                            Text(
-                                curatedError ?: if (curatedLoading) "正在读取官方精选技能"
-                                    else "OpenAI 官方精选技能 · 安装后检查依赖",
-                                style = DsType.small13.withReadingWeight(),
-                                color = if (curatedError == null) colors.textSecondary else colors.dangerInk,
-                                modifier = Modifier.weight(1f),
-                            )
-                            if (!curatedLoading && onRefreshCurated != null) {
-                                SyButton(
-                                    text = stringResource(R.string.tools_refresh),
-                                    size = SyButtonSize.Small,
-                                    variant = SyButtonVariant.Ghost,
-                                    onClick = onRefreshCurated,
-                                )
-                            }
-                        }
+                if (!skillsOnly && codexError != null) {
+                    item(key = "codex-error") {
+                        Text(codexError, color = colors.dangerInk,
+                            style = DsType.small13.withReadingWeight())
                     }
                 }
                 if (error != null) {
@@ -664,6 +513,7 @@ internal fun PluginInventoryBrowser(
                             },
                             sourceLabel = item.sourceLabel,
                             statusLabel = item.marketState.label,
+                            catalogStyle = true,
                             attentionNeeded = item.marketState.status in setOf(
                                 ExtensionMarketStatus.NEEDS_SETUP, ExtensionMarketStatus.FAILED,
                                 ExtensionMarketStatus.UNSUPPORTED),
@@ -698,46 +548,89 @@ internal fun PluginInventoryBrowser(
         }
     }
     selectedRow?.let { item ->
-        SyResponsiveSheet(
+        ExtensionDetailPage(
             title = item.name,
             onDismiss = { selectedRow = null },
-            scrollable = true,
             footer = {
-                val usePrompt = if (item.installedSkill) "@skill:${item.id.substringAfter(":")}\n" else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
-                SyButton(
-                    text = stringResource(
-                        if ((item.installablePreset && onInstallPreset != null) ||
-                                             (item.installableCurated && onInstallCurated != null)) R.string.skills_install
-                        else if (onUseCapability != null && item.available) R.string.plugin_use
-                        else if (item.connectedService) R.string.tools_external_services
-                        else if (item.id.startsWith("codex-plugin:")) R.string.common_close
-                        else R.string.tools_catalog_return_chat,
-                    ),
+                val pluginId = item.id.removePrefix("codex-plugin:")
+                val pluginDetail = if (item.id.startsWith("codex-plugin:")) codexDetails[pluginId] else null
+                val oneSkill = pluginDetail?.skills?.singleOrNull()
+                val oneSkillInstalled = oneSkill != null && skills.any { it.name == oneSkill }
+                val endpoint = item.requirements.firstNotNullOfOrNull {
+                    if (!it.registered) skillMcpHttpsEndpoint(it)?.let { url -> it.value to url }
+                    else null
+                }
+                val usePrompt = if (item.installedSkill)
+                    "@skill:${item.id.substringAfter(":")}\n"
+                    else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
+                val hasDirectAction = item.installablePreset || item.installableCurated ||
+                    (oneSkill != null && !oneSkillInstalled) ||
+                    pluginDetail?.mcpUrl != null || endpoint != null ||
+                    (onUseCapability != null && item.available) || item.connectedService ||
+                    !item.id.startsWith("codex-plugin:")
+                if (hasDirectAction) SyButton(
+                    text = when {
+                        item.installablePreset || item.installableCurated -> "安装"
+                        oneSkill != null && !oneSkillInstalled -> "安装"
+                        pluginDetail?.mcpUrl != null || endpoint != null -> "连接并授权"
+                        item.installedSkill || (onUseCapability != null && item.available) -> "使用"
+                        item.connectedService -> "管理连接"
+                        else -> "返回对话"
+                    },
                     modifier = Modifier.fillMaxWidth().testTag("plugin-detail-primary-action"),
                     enabled = !loading,
                     size = SyButtonSize.Large,
                     onClick = {
                         selectedRow = null
-                        if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
-                                         else if (item.installableCurated && onInstallCurated != null) onInstallCurated(item.id.substringAfter(":"))
-                        else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
-                        else if (item.connectedService) onManageConnections()
-                        else if (item.id.startsWith("codex-plugin:")) Unit
-                        else onReturnToChat()
+                        when {
+                            item.installablePreset -> onInstallPreset?.invoke(item.id.substringAfter(":"))
+                            item.installableCurated -> onInstallCurated?.invoke(item.id.substringAfter(":"))
+                            oneSkill != null && !oneSkillInstalled ->
+                                onInstallCodexPluginSkill?.invoke(pluginId, oneSkill)
+                            pluginDetail?.mcpUrl != null -> onConnectCodexPlugin?.invoke(pluginId)
+                            endpoint != null -> onConnectSkillMcp?.invoke(endpoint.first, endpoint.second)
+                            onUseCapability != null && item.available -> onUseCapability(usePrompt)
+                            item.connectedService -> onManageConnections()
+                            else -> onReturnToChat()
+                        }
                     },
                 )
             },
         ) {
-            Text(
-                item.id.removePrefix("local:").removePrefix("service:"),
-                style = DsType.small13.withReadingWeight(),
-                color = colors.textSecondary,
-            )
-            Text(
-                item.detail,
-                style = DsType.small13.withReadingWeight(),
-                color = colors.textSecondary,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                Surface(
+                    modifier = Modifier.size(84.dp),
+                    color = item.accent.copy(alpha = 0.10f),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        if (item.documentIcon != null) {
+                            androidx.compose.foundation.Image(
+                                painter = painterResource(item.documentIcon),
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                            )
+                        } else {
+                            Icon(item.icon, contentDescription = null, tint = item.accent,
+                                modifier = Modifier.size(44.dp))
+                        }
+                    }
+                }
+                Column(Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(item.name, style = DsType.headline17.withReadingWeight(),
+                        color = colors.text)
+                    Text(item.detail, style = DsType.std14.withReadingWeight(),
+                        color = colors.textSecondary)
+                }
+            }
+            Text("介绍", style = DsType.headline17.withReadingWeight(), color = colors.text)
+            Text(item.detail, style = DsType.std14.withReadingWeight(),
+                color = colors.textSecondary)
             if (item.sourceLabel.isNotBlank()) {
                 Text(item.sourceLabel, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
             }
@@ -833,32 +726,49 @@ internal fun PluginInventoryBrowser(
                 }
             }
             if (item.requirements.isNotEmpty()) {
-                Text("运行依赖", style = DsType.small13Strong.withReadingWeight(), color = colors.text)
-                item.requirements.forEach { requirement ->
-                    Text("${if (requirement.registered) "已登记" else "待配置"} · ${requirement.type}: ${requirement.value}",
-                        style = DsType.caption11.withReadingWeight(),
-                        color = if (requirement.registered) colors.successInk else colors.warningInk)
-                    val endpoint = if (!requirement.registered)
-                        skillMcpHttpsEndpoint(requirement) else null
-                    if (endpoint != null && onConnectSkillMcp != null) {
-                        Text("连接地址：$endpoint", style = DsType.caption11,
-                            color = colors.textSecondary)
-                        SyButton(
-                            text = "授权并连接 ${requirement.value}",
-                            enabled = !loading,
-                            variant = SyButtonVariant.Info,
-                            onClick = {
-                                selectedRow = null
-                                onConnectSkillMcp(requirement.value, endpoint)
-                            },
-                        )
+                var requirementsExpanded by remember(item.id) { mutableStateOf(false) }
+                Surface(
+                    modifier = Modifier.fillMaxWidth().testTag("skill-dependency-summary"),
+                    color = colors.materialL4,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                    onClick = { requirementsExpanded = !requirementsExpanded },
+                ) {
+                    Row(Modifier.fillMaxWidth().padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text("运行依赖 · ${item.requirements.size} 项",
+                            style = DsType.std14Strong, color = colors.text)
+                        Icon(FeatherIcons.ChevronDown, contentDescription = "展开运行依赖",
+                            tint = colors.textSecondary)
                     }
                 }
-                if (item.requirements.any { !it.registered }) {
-                    SyButton(text = "管理连接与授权", onClick = {
-                        selectedRow = null
-                        onManageConnections()
-                    }, variant = SyButtonVariant.Info)
+                if (requirementsExpanded) {
+                    item.requirements.forEach { requirement ->
+                        Text(
+                            "${if (requirement.registered) "已连接" else "需要授权"} · ${requirement.description.ifBlank { requirement.value }}",
+                            style = DsType.small13.withReadingWeight(),
+                            color = if (requirement.registered) colors.successInk else colors.warningInk,
+                        )
+                        val endpoint = if (!requirement.registered)
+                            skillMcpHttpsEndpoint(requirement) else null
+                        if (endpoint != null && onConnectSkillMcp != null) {
+                            SyButton(
+                                text = "连接并授权",
+                                enabled = !loading,
+                                variant = SyButtonVariant.Info,
+                                onClick = {
+                                    selectedRow = null
+                                    onConnectSkillMcp(requirement.value, endpoint)
+                                },
+                            )
+                        }
+                    }
+                    if (item.requirements.any { !it.registered && skillMcpHttpsEndpoint(it) == null }) {
+                        Text("部分依赖没有公开连接地址，可在连接器中查看本机可用的服务。",
+                            style = DsType.small13, color = colors.textSecondary)
+                        SyButton(text = "查看连接器", variant = SyButtonVariant.Ghost,
+                            onClick = { selectedRow = null; onManageConnections() })
+                    }
                 }
             }
             if (item.installedSkill && !item.modelInvocable) {
@@ -996,6 +906,52 @@ internal fun PluginInventoryBrowser(
                         selectedRow = null
                     },
                 )
+            }
+        }
+    }
+    if (showMarketActions) {
+        SyResponsiveSheet(
+            title = if (skillsOnly) "技能管理" else "插件管理",
+            onDismiss = { showMarketActions = false },
+        ) {
+            if (skillsOnly) {
+                if (onImportSkill != null) SyButton(
+                    text = "导入技能文件",
+                    onClick = { showMarketActions = false; onImportSkill() },
+                    modifier = Modifier.fillMaxWidth().testTag("skill-import-file"),
+                )
+                if (onUseCapability != null) SyButton(
+                    text = "对话创建技能",
+                    variant = SyButtonVariant.Ghost,
+                    onClick = { showMarketActions = false; onUseCapability(skillCreationPrompt) },
+                    modifier = Modifier.fillMaxWidth().testTag("skill-create-in-chat"),
+                )
+                if (onInstallGitHubSkill != null) SyButton(
+                    text = "从 GitHub 安装",
+                    variant = SyButtonVariant.Ghost,
+                    onClick = { showMarketActions = false; showGitHubImport = true },
+                    modifier = Modifier.fillMaxWidth().testTag("skill-install-github"),
+                )
+                if (onCreateSkill != null) SyButton(
+                    text = "手动创建技能",
+                    variant = SyButtonVariant.Ghost,
+                    onClick = { showMarketActions = false; showCreateSkill = true },
+                    modifier = Modifier.fillMaxWidth().testTag("skill-create-manual"),
+                )
+                if (onRefreshCurated != null) SyButton(
+                    text = "刷新精选目录", variant = SyButtonVariant.Ghost,
+                    onClick = { showMarketActions = false; onRefreshCurated() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                if (onRefreshCodex != null) SyButton(
+                    text = "刷新插件目录", variant = SyButtonVariant.Ghost,
+                    onClick = { showMarketActions = false; onRefreshCodex() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                SyButton(text = "连接器管理", variant = SyButtonVariant.Ghost,
+                    onClick = { showMarketActions = false; onManageConnections() },
+                    modifier = Modifier.fillMaxWidth())
             }
         }
     }
