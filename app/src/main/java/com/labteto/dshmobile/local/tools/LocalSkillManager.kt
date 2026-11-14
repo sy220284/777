@@ -505,6 +505,8 @@ internal class LocalSkillManager @Inject constructor(
     fun importSkill(filename: String, bytes: ByteArray): String = LocalSkillPackageImporter(storageWorkspace).install(filename, bytes)
     fun importSkill(filename: String, input: java.io.InputStream): String = LocalSkillPackageImporter(storageWorkspace).install(filename, input)
     fun exportSkillPackage(id: String): ByteArray = LocalSkillPackageExporter(storageWorkspace).export(id)
+    fun exportSkillPackageToFile(id: String, destination: File) =
+        LocalSkillPackageExporter(storageWorkspace).exportToFile(id, destination)
     fun replaceSkillPackage(id: String, archive: ByteArray): String =
         LocalSkillPackageUpdater(storageWorkspace).replace(id, archive)
     fun replaceSkillPackage(id: String, archive: java.io.InputStream): String =
