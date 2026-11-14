@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.device
 
+import android.app.NotificationManager
+import android.content.ComponentName
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -32,6 +34,13 @@ internal fun sanitizeNotificationField(value: String?, maxChars: Int): String {
     }
     return if (redacted.length <= maxChars) redacted
     else redacted.take(maxChars).trimEnd() + "…"
+}
+
+/** Show the real grant separately from the notification listener's live connection. */
+internal fun notificationCapabilityStatus(authorized: Boolean, connected: Boolean): String = buildString {
+    append("authorized=").append(authorized).append("\nconnected=").append(connected)
+    if (!authorized) append("\n请在 Android 通知使用权设置中授权 777")
+    else if (!connected) append("\n通知使用权已授权，请重新连接通知监听服务")
 }
 
 private val NOTIFICATION_SECRET_PATTERN = Regex(
@@ -383,12 +392,13 @@ class AndroidDeviceProvider(
         return "已打开 URI：${uri.scheme}://"
     }
 
-    private fun notificationStatus(): String =
-        if (HarnessNotificationListenerService.active() != null) {
-            "authorized=true\nconnected=true"
-        } else {
-            "authorized=false\nconnected=false\n请在 Android 通知使用权设置中授权 777 后重试"
-        }
+    private fun notificationStatus(): String {
+        val component = ComponentName(context, HarnessNotificationListenerService::class.java)
+        val authorized = context.getSystemService(NotificationManager::class.java)
+            .isNotificationListenerAccessGranted(component)
+        val connected = HarnessNotificationListenerService.active() != null
+        return notificationCapabilityStatus(authorized, connected)
+    }
 
     private fun notificationList(): String {
         val service = HarnessNotificationListenerService.active()
