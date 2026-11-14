@@ -129,6 +129,7 @@ internal fun LocalModelException.withoutReplayAfterAdmission(): LocalModelExcept
         providerParam = providerParam,
         admissionState = LocalModelAdmissionState.ADMITTED,
         continuationEligible = true,
+        origin = origin,
     )
 }
 

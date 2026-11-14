@@ -66,12 +66,17 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /** Keep local history/policy failures separate from provider/network errors in exported diagnostics. */
-internal fun localModelRequestErrorOrigin(code: String?): String =
-    if (code in setOf("WORK_BUDGET_EXHAUSTED", "MODEL_CONTEXT_BUDGET_EXCEEDED", "MODEL_HISTORY_INVALID")) {
-        "local_preflight"
-    } else {
-        "provider_or_transport"
-    }
+internal fun localModelRequestErrorOrigin(
+    code: String?,
+    explicit: LocalModelFailureOrigin? = null,
+): String = explicit?.wireValue ?: when {
+    code in setOf(
+        "WORK_BUDGET_EXHAUSTED", "MODEL_CONTEXT_BUDGET_EXCEEDED", "MODEL_HISTORY_INVALID",
+        "MODEL_PROTOCOL_INPUT_UNSUPPORTED", "MODEL_TOOL_SCHEMA_INVALID",
+        "MODEL_TOOL_CALLING_UNSUPPORTED", "MODEL_IMAGE_UNSUPPORTED", "MODEL_REQUEST_TOO_LARGE",
+    ) -> "local_preflight"
+    else -> "provider_or_transport"
+}
 
 /**
  * Owns foreground model transport semantics: request logging, retry, streaming preview and overflow
@@ -512,7 +517,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                         val preProviderMs = providerStartedNanos?.let { (it - attemptStartedNanos).coerceAtLeast(0L) / 1_000_000 }
                         val providerExecutionMs = providerStartedNanos?.let { (System.nanoTime() - it).coerceAtLeast(0L) / 1_000_000 }
                         val providerError = lastProviderError
-                        val localPreflight = localModelRequestErrorOrigin(providerError?.code) == "local_preflight"
+                        val failureOrigin = localModelRequestErrorOrigin(providerError?.code, providerError?.origin)
+                        val localPreflight = failureOrigin in setOf("local_preflight", "protocol_encode")
                         AppLog.warn(
                             "LocalModelRequest",
                             buildString {
@@ -527,7 +533,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                     modelTransportFailureKind(it)?.let { kind -> append("transport_kind=$kind ") }
                                     append("network_path=${describeModelNetworkPath(networkContext)} ")
                                 }
-                                append("origin=${if (localPreflight) "local_preflight" else "provider_or_transport"} ")
+                                append("origin=$failureOrigin ")
                                 append("retryable=${event.retryable} profile_id=${frozenProfile.id} ")
                                 append("auth_kind=${frozenProfile.authKind.name} protocol=${runSurface.protocol.name} ")
                                 credentialDiagnostic.credentialRefTail?.let { append("credential_ref_tail=$it ") }
@@ -571,7 +577,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             put("session_id", snapshot.sessionId)
                             put("step", step)
                             put("attempt", event.attempt)
-                            put("origin", if (localPreflight) "local_preflight" else "provider_or_transport")
+                            put("origin", failureOrigin)
                             providerError?.let { error ->
                                 put("code", error.code)
                                 put("failure_kind", modelFailureKind(error))

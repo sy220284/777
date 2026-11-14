@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.model
 
 
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalModelFailureOrigin
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.estimatePromptBreakdown
 import java.io.IOException
@@ -261,7 +262,7 @@ internal class AnthropicMessagesClient @Inject constructor(
     }
 
     private fun userContent(message: LocalCanonicalMessage, route: LocalResolvedModelRoute): JsonArray = buildJsonArray {
-        message.content.forEach { block ->
+        message.content.forEachIndexed { index, block ->
             when (block) {
                 is LocalCanonicalContent.Text -> if (block.text.isNotEmpty()) {
                     add(buildJsonObject {
@@ -286,7 +287,24 @@ internal class AnthropicMessagesClient @Inject constructor(
                         })
                     }
                 }
-                else -> throw protocolError("Anthropic 不支持此输入块", null)
+                else -> {
+                    val sourceType = when (block) {
+                        is LocalCanonicalContent.Raw -> block.value["type"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                        is LocalCanonicalContent.ToolResult -> "tool_result"
+                        is LocalCanonicalContent.ToolCall -> "tool_use"
+                        is LocalCanonicalContent.Reasoning -> "reasoning"
+                        else -> "unknown"
+                    }
+                    val safeType = sourceType.take(48).takeIf {
+                        it.isNotEmpty() && it.all { c -> c.isLetterOrDigit() || c == '_' || c == '-' }
+                    } ?: "unknown"
+                    throw LocalModelException(
+                        code = "MODEL_PROTOCOL_INPUT_UNSUPPORTED",
+                        message = "Anthropic 输入第 ${index + 1} 个内容块类型 $safeType 不受当前协议支持；请切换支持该附件的模型，或重新附加文件供工作区读取。",
+                        retryable = false,
+                        origin = LocalModelFailureOrigin.PROTOCOL_ENCODE,
+                    )
+                }
             }
         }
     }
