@@ -41,7 +41,7 @@ jobs:
         run: ./gradlew --max-workers=2 :app:testDebugUnitTest --stacktrace --console=plain
       - name: 编译 Android 界面测试代码
         run: ./gradlew --max-workers=2 :app:compileDebugAndroidTestKotlin --stacktrace --console=plain
-      - name: 能力注册与 Android 设备模块单元测试
-        run: ./gradlew --max-workers=2 :harness-core:test :harness-device-android:testDebugUnitTest --stacktrace --console=plain
+      - name: 能力注册、MCP 互操作与 Android 设备模块单元测试
+        run: ./gradlew --max-workers=2 :harness-core:test :harness-interop:test :harness-device-android:testDebugUnitTest --stacktrace --console=plain
       - name: 构建可安装的调试包
         run: ./gradlew --max-workers=2 :app:assembleDebug --stacktrace --console=plain
