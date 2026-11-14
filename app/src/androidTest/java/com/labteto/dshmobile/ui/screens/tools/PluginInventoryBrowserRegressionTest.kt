@@ -593,6 +593,85 @@ class PluginInventoryBrowserRegressionTest {
     }
 
     @Test
+    fun collidingMcpIdWithDifferentEndpointGoesToRepairWithoutOauth() {
+        var repairs = 0
+        var logins = 0
+        val pluginId = "figma@openai-curated"
+        val plugin = com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            pluginId, "figma", "Creativity", "plugins/figma",
+            "AVAILABLE", "ON_INSTALL", false,
+        )
+        val detail = com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            pluginId, "Figma", "设计", "Figma", "2.0",
+            emptyList(), true, false, false,
+            "figma", "https://mcp.figma.com/mcp",
+        )
+        val unrelated = com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(
+            "figma", "http", "https://unrelated.example/mcp", listOf("read"))
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), codexPlugins = listOf(plugin),
+                    codexDetails = mapOf(pluginId to detail),
+                    connectedServices = listOf(unrelated),
+                    onBack = {}, onReturnToChat = {},
+                    onManageConnections = { repairs++ },
+                    onConnectCodexPlugin = { logins++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
+        compose.runOnIdle {
+            assertEquals(1, repairs)
+            assertEquals(0, logins)
+        }
+    }
+
+    @Test
+    fun incompletePluginDependenciesNeverOfferUseUntilResolved() {
+        var usages = 0
+        val pluginId = "draw@openai-curated"
+        val plugin = com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            pluginId, "draw", "Creativity", "plugins/draw",
+            "AVAILABLE", "ON_INSTALL", false,
+        )
+        val detail = com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            pluginId, "Draw", "绘图", "OpenAI", "1.0",
+            listOf("draw"), false, false, false,
+            skillDirectories = mapOf("draw" to "skills/draw"),
+            samplePrompts = listOf("帮我绘图"),
+        )
+        val installed = com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+            "draw-local", "绘图", true,
+            requirements = listOf(com.labteto.dshmobile.uicontract.UiSkillRequirement(
+                "tool", "render", "绘图运行工具", false,
+            )),
+            sourceIdentity = com.labteto.dshmobile.uicontract.UiSkillSourceIdentity(
+                "openai", "plugins", "0123456789012345678901234567890123456789",
+                "plugins/draw/skills/draw",
+            ),
+        )
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), codexPlugins = listOf(plugin),
+                    codexDetails = mapOf(pluginId to detail), skills = listOf(installed),
+                    onBack = {}, onReturnToChat = {}, onManageConnections = {},
+                    onUseCapability = { usages++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithText("使用这个示例").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
+        compose.onNodeWithText("绘图运行工具").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(0, usages) }
+    }
+
+    @Test
     fun installedPluginSkillRecognizesPinnedOriginWhenFolderAndSkillNameDiffer() {
         var installRequests = 0
         val pluginId = "zoom@openai-curated"
