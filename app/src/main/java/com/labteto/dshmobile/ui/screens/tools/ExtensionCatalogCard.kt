@@ -42,6 +42,7 @@ internal fun ExtensionCatalogCard(
     documentIcon: Int? = null,
     brandLogo: ImageBitmap? = null,
     statusLabel: String = "",
+    enabled: Boolean = true,
     tagPrefix: String = "plugin-inventory",
     onOpen: () -> Unit,
 ) {
@@ -49,6 +50,7 @@ internal fun ExtensionCatalogCard(
     Surface(
         modifier = Modifier.fillMaxWidth().testTag("$tagPrefix-card-$id"),
         onClick = onOpen,
+        enabled = enabled,
         color = colors.materialL4,
         shape = RoundedCornerShape(24.dp),
     ) {
