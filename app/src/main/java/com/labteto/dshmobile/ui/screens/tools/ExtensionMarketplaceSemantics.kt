@@ -6,7 +6,7 @@ import com.labteto.dshmobile.uicontract.UiToolRegistration
 
 /** Codex-style separation: installed, configured and runtime-ready are different facts. */
 internal enum class ExtensionMarketStatus {
-    INSTALLABLE, INSTALLED, MANUAL_ONLY, NEEDS_SETUP, BUILTIN, REGISTERED, CONNECTING, FAILED
+    INSTALLABLE, INSTALLED, MANUAL_ONLY, NEEDS_SETUP, BUILTIN, REGISTERED, CONNECTING, FAILED, UNSUPPORTED
 }
 
 internal data class ExtensionMarketState(
