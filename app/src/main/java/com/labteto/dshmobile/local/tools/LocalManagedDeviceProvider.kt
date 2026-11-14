@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.tools
 
-import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
-import com.labteto.dshmobile.harness.capability.HarnessVirtualDisplayProvider
+import com.labteto.dshmobile.harness.capability.HarnessAndroidDeviceProvider
 import com.labteto.dshmobile.local.security.LocalEffectiveExecutionPolicy
 import java.net.URI
 
@@ -9,11 +8,10 @@ import java.net.URI
  * Device UI remains owned by Android; browser origins are checked at the actual provider boundary.
  * This does not add a parallel accessibility service or weaken the existing per-tool approval gate.
  */
-internal class LocalManagedDeviceProvider<T>(
-    private val delegate: T,
+internal class LocalManagedDeviceProvider(
+    private val delegate: HarnessAndroidDeviceProvider,
     private val policy: () -> LocalEffectiveExecutionPolicy,
-) : HarnessDeviceProvider, HarnessVirtualDisplayProvider
-    where T : HarnessDeviceProvider, T : HarnessVirtualDisplayProvider {
+) : HarnessAndroidDeviceProvider {
     override val capabilities: Set<String> get() = delegate.capabilities
 
     override suspend fun invoke(capability: String, arguments: Map<String, String>): String {
