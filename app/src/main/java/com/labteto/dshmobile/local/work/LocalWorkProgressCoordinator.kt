@@ -105,6 +105,7 @@ internal class LocalWorkProgressCoordinator(
         description: String,
         artifactPaths: List<String> = emptyList(),
         verificationCommands: List<String> = emptyList(),
+        reviewRequirements: List<String> = emptyList(),
     ): String = commitWorkMutation {
         require(description.isNotBlank()) { "目标不能为空" }
         val goal = LocalGoal(description.trim().take(2_000), id = java.util.UUID.randomUUID().toString(),
@@ -116,13 +117,15 @@ internal class LocalWorkProgressCoordinator(
                 }
             }, verificationCommands = verificationCommands.map(String::trim).distinct().onEach {
                 require(it.isNotBlank()) { "验收命令不能为空" }
+            }, reviewRequirements = reviewRequirements.distinct().onEach {
+                require(it in setOf("code", "security")) { "独立审查类型只支持 code 或 security" }
             })
         val folders = workspaceRoot?.let { ensureLocalWorkTaskFolders(it, goal.description, goal.id) }
         val event = eventLog.append("goal/state", workGoalEvent(goal))
         state.update { it.copy(goal = goal.copy(startedAtSequence = event.sequence)) }
         persist()
         buildString {
-            append("目标已创建：${goal.description}\n成果：${goal.artifactPaths.joinToString()}\n验收命令：${goal.verificationCommands.joinToString()}")
+            append("目标已创建：${goal.description}\n成果：${goal.artifactPaths.joinToString()}\n验收命令：${goal.verificationCommands.joinToString()}\n独立审查：${goal.reviewRequirements.joinToString()}")
             folders?.let {
                 append("\n任务文件目录：${it.work}")
                 append("\n交付成果目录：${it.deliverables}")
@@ -141,6 +144,7 @@ internal class LocalWorkProgressCoordinator(
             goal.note?.let { append("\n说明：").append(it) }
             append("\n成果：").append(goal.artifactPaths.joinToString())
             append("\n验收命令：").append(goal.verificationCommands.joinToString())
+            append("\n独立审查：").append(goal.reviewRequirements.joinToString())
             folders?.let {
                 append("\n任务资料建议目录：").append(it.work)
                 append("\n最终交付建议目录：").append(it.deliverables)
@@ -186,4 +190,5 @@ internal fun workGoalEvent(goal: LocalGoal): JsonObject = buildJsonObject {
     put("revision", goal.revision)
     put("artifactPaths", JsonArray(goal.artifactPaths.map(::JsonPrimitive)))
     put("verificationCommands", JsonArray(goal.verificationCommands.map(::JsonPrimitive)))
+    put("reviewRequirements", JsonArray(goal.reviewRequirements.map(::JsonPrimitive)))
 }
