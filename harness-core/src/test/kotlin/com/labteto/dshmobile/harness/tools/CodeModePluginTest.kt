@@ -136,7 +136,7 @@ class CodeModePluginTest {
                 })
             })
         }
-        val output = registry.execute("code_mode_run", batch, ToolContext(approval = { true }))
+        val output = registry.execute("code_mode_run", batch, context = ToolContext(approval = { true }))
         assertTrue(output.isError)
         assertEquals("CODE_MODE_PARTIAL_FAILED", output.errorCode)
         assertEquals(listOf("broken", "good"), calls)
