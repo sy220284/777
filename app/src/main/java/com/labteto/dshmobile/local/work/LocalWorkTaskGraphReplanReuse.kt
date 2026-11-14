@@ -58,6 +58,14 @@ internal fun seedReusableReadOnlyGraphResults(
             if (original["node_version"] != JsonPrimitive(previous.nodeVersion(node)) ||
                 original["goal_fingerprint"] != plan.value["goal_fingerprint"] ||
                 original["files"] != plan.fileVersions(workspaceRoot, index)) return@forEachIndexed
+            val sourceJobId = (original["job_id"] as? JsonPrimitive)?.contentOrNull
+                ?: return@forEachIndexed
+            val sourceSequence = (original["result_sequence"] as? JsonPrimitive)
+                ?.contentOrNull?.toLongOrNull() ?: return@forEachIndexed
+            val sourceResult = recovery.jobResult(log, sourceJobId)
+                ?.takeIf { it.sequence == sourceSequence }?.data ?: return@forEachIndexed
+            if (sourceResult["goal_fingerprint"] != plan.value["goal_fingerprint"] ||
+                sourceResult["node_version"] == null) return@forEachIndexed
             if (recovery.acceptedNode(log, executionId, node.id) == null) {
                 log.append("taskgraph/node-accepted", buildJsonObject {
                     put("graph_id", graphId)
@@ -73,6 +81,7 @@ internal fun seedReusableReadOnlyGraphResults(
                     put("dependencies", original.getValue("dependencies"))
                     put("dependency_versions", original.getValue("dependency_versions"))
                     put("acceptance", "source_verified_readonly_reuse")
+                    put("source_job_node_version", sourceResult.getValue("node_version"))
                     put("reused_from_execution_id", previousExecution)
                     put("reused_from_graph_id", previousGraphId)
                 })
