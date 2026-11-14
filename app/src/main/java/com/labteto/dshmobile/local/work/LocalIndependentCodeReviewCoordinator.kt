@@ -48,7 +48,7 @@ internal class LocalCodeReviewLedger(private val log: LocalSessionEventLog) {
             put("id", id); put("ref", ref); put("digest", digest)
             put("report", report); put("reviewer_profile_id", profileId)
             request?.data?.get("goal_id")?.let { put("goal_id", it) }
-            request?.data?.get("goal_start_sequence")?.let { put("goal_revision", it) }
+            request?.data?.get("goal_start_sequence")?.let { put("goal_start_sequence", it) }
         })
         return LocalIndependentCodeReview(id, ref, digest, report, event.sequence)
     }
@@ -92,7 +92,7 @@ internal class LocalCodeReviewLedger(private val log: LocalSessionEventLog) {
             put("id", id); put("digest", freshDigest); put("sequence", expectedSequence)
             put("decision", "user_acknowledged_review")
             request?.data?.get("goal_id")?.let { put("goal_id", it) }
-            request?.data?.get("goal_start_sequence")?.let { put("goal_revision", it) }
+            request?.data?.get("goal_start_sequence")?.let { put("goal_start_sequence", it) }
         })
         true
     }
