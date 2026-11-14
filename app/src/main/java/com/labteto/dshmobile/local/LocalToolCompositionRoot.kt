@@ -456,6 +456,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
 
     override fun pluginLifecycleSnapshots() = plugins.lifecycleSnapshots()
     override suspend fun recoverFailedPlugin(id: String) = plugins.recoverFailedPlugin(id)
+    override fun activeToolHookIds(): List<String> = registry.hookIds()
     override fun installedPluginIds(): List<String> = plugins.installedPluginIds()
     override fun capabilityCatalogue(): List<com.labteto.dshmobile.local.tools.LocalToolCatalogueEntry> =
         registry.names().sorted().mapNotNull { name ->
