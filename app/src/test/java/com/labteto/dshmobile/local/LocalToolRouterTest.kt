@@ -22,6 +22,15 @@ import org.junit.Test
 
 class LocalToolRouterTest {
     @Test
+    fun exactCapabilitySelectionSupportsLargeBatchesWithoutTruncation() {
+        val selected = (1..32).map { "mcp_demo_tool$it" }
+        assertEquals(selected, LocalToolRouter.exactSelection("select:" + selected.joinToString(",")))
+        assertEquals(selected, LocalToolRouter.exactSelection(
+            "select:" + (selected + selected.first()).joinToString(",")
+        ))
+    }
+
+    @Test
     fun optionalToolsStayHiddenUntilCapabilitySearchEnablesThem() {
         val core = tool("read", "读取文件", ToolExposure.CORE, "文件")
         val android = tool(
