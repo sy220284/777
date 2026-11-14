@@ -139,6 +139,7 @@ interface ToolsManagementUiPort : ToolsUiPort {
     suspend fun exportSkillPackageToFile(id: String, destination: java.io.File)
     suspend fun connectHttpWithCredential(serverId: String, endpoint: String, bearer: String): String
     suspend fun loginMcp(serverId: String, endpoint: String, clientId: String?): String
+    fun cancelMcpLogin(serverId: String)
     suspend fun refreshMcpLogin(serverId: String, endpoint: String): String
     suspend fun revokeMcpLogin(serverId: String, endpoint: String): Boolean
     suspend fun clearMcpCredential(serverId: String)
