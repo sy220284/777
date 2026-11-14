@@ -499,9 +499,10 @@ class LocalWorkProjectStore @Inject internal constructor(
     sessionStorage: LocalSessionStorageRuntime,
     json: Json,
 ) {
+    private val filesWorkspace = sessionStorage.files.workspace
     private val catalog = LocalWorkProjectCatalog(
         File(context.filesDir, "local-harness/work-projects.v1.json"),
-        File(sessionStorage.files.workspace.path),
+        File(filesWorkspace.path),
         json,
     )
     val snapshots = catalog.snapshots
@@ -513,7 +514,9 @@ class LocalWorkProjectStore @Inject internal constructor(
     fun update(id: String, name: String, root: String) = catalog.update(id, name, root)
     fun changeRoot(id: String, root: String) = catalog.changeRoot(id, root)
     fun moveDirectory(id: String, expectedRoot: String, root: String) =
-        catalog.moveDirectory(id, expectedRoot, root)
+        filesWorkspace.withWorkspaceFileMutation {
+            catalog.moveDirectory(id, expectedRoot, root)
+        }
     fun move(id: String, newIndex: Int) = catalog.move(id, newIndex)
     fun delete(id: String) = catalog.delete(id)
     fun assign(ids: Set<String>, id: String?) = catalog.assign(ids, id)
