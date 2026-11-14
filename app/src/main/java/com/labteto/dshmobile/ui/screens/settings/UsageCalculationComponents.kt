@@ -522,6 +522,7 @@ internal fun actionLabel(action: TokenUsageAction): String = stringResource(
         TokenUsageAction.CHAT_REPAIR -> R.string.usage_action_chat_repair
         TokenUsageAction.CHAT_STATE_REFRESH -> R.string.usage_action_chat_state_refresh
         TokenUsageAction.REPLY_SUGGESTIONS -> R.string.usage_action_reply_suggestions
+        TokenUsageAction.SESSION_SAMPLE -> R.string.usage_action_session_sample
         TokenUsageAction.GROUP_REPLY -> R.string.usage_action_group_reply
         TokenUsageAction.GROUP_STATE_REFRESH -> R.string.usage_action_group_state_refresh
         TokenUsageAction.GROUP_ANNOUNCEMENT -> R.string.usage_action_group_announcement
