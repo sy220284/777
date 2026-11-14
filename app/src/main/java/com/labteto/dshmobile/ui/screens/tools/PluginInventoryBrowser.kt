@@ -565,16 +565,24 @@ internal fun PluginInventoryBrowser(
                 val usePrompt = if (item.installedSkill)
                     "@skill:${item.id.substringAfter(":")}\n"
                     else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
-                val hasDirectAction = item.installablePreset || item.installableCurated ||
-                    (oneSkill != null && !oneSkillInstalled) ||
-                    pluginDetail?.mcpUrl != null || endpoint != null ||
+                val officialSupported = item.marketState.status != ExtensionMarketStatus.UNSUPPORTED
+                val canInstallPreset = item.installablePreset && onInstallPreset != null
+                val canInstallCurated = item.installableCurated && onInstallCurated != null
+                val canInstallOfficial = officialSupported && oneSkill != null &&
+                    !oneSkillInstalled && onInstallCodexPluginSkill != null
+                val canConnectOfficial = officialSupported &&
+                    pluginDetail?.mcpUrl != null && onConnectCodexPlugin != null
+                val canConnectSkill = endpoint != null && onConnectSkillMcp != null
+                val hasDirectAction = canInstallPreset || canInstallCurated ||
+                    canInstallOfficial || canConnectOfficial || canConnectSkill ||
                     (onUseCapability != null && item.available) || item.connectedService ||
-                    !item.id.startsWith("codex-plugin:")
+                    (!item.id.startsWith("codex-plugin:") &&
+                        !item.installablePreset && !item.installableCurated)
                 if (hasDirectAction) SyButton(
                     text = when {
-                        item.installablePreset || item.installableCurated -> "安装"
-                        oneSkill != null && !oneSkillInstalled -> "安装"
-                        pluginDetail?.mcpUrl != null || endpoint != null -> "连接并授权"
+                        canInstallPreset || canInstallCurated -> "安装"
+                        canInstallOfficial -> "安装"
+                        canConnectOfficial || canConnectSkill -> "连接并授权"
                         item.installedSkill || (onUseCapability != null && item.available) -> "使用"
                         item.connectedService -> "管理连接"
                         else -> "返回对话"
@@ -585,12 +593,12 @@ internal fun PluginInventoryBrowser(
                     onClick = {
                         selectedRow = null
                         when {
-                            item.installablePreset -> onInstallPreset?.invoke(item.id.substringAfter(":"))
-                            item.installableCurated -> onInstallCurated?.invoke(item.id.substringAfter(":"))
-                            oneSkill != null && !oneSkillInstalled ->
-                                onInstallCodexPluginSkill?.invoke(pluginId, oneSkill)
-                            pluginDetail?.mcpUrl != null -> onConnectCodexPlugin?.invoke(pluginId)
-                            endpoint != null -> onConnectSkillMcp?.invoke(endpoint.first, endpoint.second)
+                            canInstallPreset -> onInstallPreset?.invoke(item.id.substringAfter(":"))
+                            canInstallCurated -> onInstallCurated?.invoke(item.id.substringAfter(":"))
+                            canInstallOfficial -> onInstallCodexPluginSkill?.invoke(pluginId, requireNotNull(oneSkill))
+                            canConnectOfficial -> onConnectCodexPlugin?.invoke(pluginId)
+                            canConnectSkill -> onConnectSkillMcp?.invoke(
+                                requireNotNull(endpoint).first, endpoint.second)
                             onUseCapability != null && item.available -> onUseCapability(usePrompt)
                             item.connectedService -> onManageConnections()
                             else -> onReturnToChat()
