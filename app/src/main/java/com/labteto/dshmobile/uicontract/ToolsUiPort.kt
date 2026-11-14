@@ -45,6 +45,10 @@ data class UiSkillSnapshot(val name: String, val description: String, val modelI
     val displayName: String = name, val sourceUrl: String? = null, val sourceWarning: String? = null,
     val rollbackAvailable: Boolean = false, val requirements: List<UiSkillRequirement> = emptyList())
 data class UiPresetSkillSnapshot(val id: String, val title: String, val description: String, val installed: Boolean)
+data class UiCodexPluginSnapshot(
+    val id: String, val name: String, val category: String, val sourcePath: String,
+    val installPolicy: String, val authPolicy: String, val codexOnly: Boolean,
+)
 /** Read-only repository metadata; writable operations remain in the GitHub plugin approval path. */
 data class UiGitHubRepo(val fullName: String, val description: String, val privateRepo: Boolean,
     val defaultBranch: String)
@@ -78,6 +82,7 @@ interface ToolsUiPort {
     suspend fun presetSkills(): List<UiPresetSkillSnapshot>
     suspend fun readSkillDocument(id: String): String
     suspend fun curatedGitHubSkills(): List<String>
+    suspend fun codexOfficialPlugins(): List<UiCodexPluginSnapshot> = emptyList()
     suspend fun githubRepositories(): List<UiGitHubRepo> = emptyList()
     suspend fun githubEntries(repoFullName: String, directory: String): List<UiGitHubEntry> = emptyList()
 
