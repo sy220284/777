@@ -228,7 +228,7 @@ class SettingsViewModel @Inject constructor(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                AppLog.failure("Settings", "connect_chatgpt", error)
+                // Auth owner records this attempt once; Settings only displays its result.
                 onDone(error.message ?: "ChatGPT 登录失败")
             }
         }
@@ -242,7 +242,7 @@ class SettingsViewModel @Inject constructor(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                AppLog.failure("Settings", "restart_chatgpt_authorization", error)
+                // Avoid duplicate diagnostics for the same authorization attempt.
                 onDone(error.message ?: "重新开始 ChatGPT 授权失败")
             }
         }
