@@ -59,6 +59,33 @@ class LocalExtensionWorkshopTest {
         assertThrows(IllegalArgumentException::class.java) { workshop.launchCommand("research-helper") }
     }
 
+    @Test fun prefixedMcpIdUsesOneCanonicalNamespaceAndPreservesLegacyManifests() =
+        withWorkspace { workshop, workspace ->
+            val created = workshop.createMcp("mcp-mcp-selftest", "node", "console.log('ok')")
+            assertTrue(created.contains("服务 ID：selftest"))
+            assertTrue(workspace.readRaw(".dsh/extensions/mcp-selftest/manifest.json")
+                .contains("\\"server_id\\":\\"selftest\\""))
+            assertFalse(java.io.File(workspace.path,
+                ".dsh/extensions/mcp-mcp-mcp-selftest/manifest.json").exists())
+            assertEquals("selftest", workshop.canonicalMcpId("mcp-mcp-selftest"))
+            assertEquals(workshop.launchCommand("selftest"),
+                workshop.launchCommand("mcp-mcp-selftest"))
+            assertThrows(IllegalArgumentException::class.java) {
+                workshop.createMcp("mcp-selftest", "node", "duplicate")
+            }
+            // Previously created double-prefix directories must stay manageable.
+            val legacy = ".dsh/extensions/mcp-mcp-oldservice"
+            val legacySource = "console.log('legacy')"
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(legacySource.toByteArray()).joinToString("") { "%02x".format(it) }
+            workspace.write("$legacy/server.js", legacySource)
+            workspace.write("$legacy/manifest.json",
+                """{"schema_version":1,"server_id":"mcp-oldservice","interpreter":"node","source_path":"$legacy/server.js","source_sha256":"$digest"}""")
+            assertEquals("mcp-oldservice", workshop.canonicalMcpId("mcp-oldservice"))
+            assertTrue(workshop.launchCommand("mcp-oldservice").first.last()
+                .endsWith("$legacy/server.js"))
+        }
+
     @Test fun localMcpUpdateRollbackSurvivesRestartAndRejectsModifiedBackup() = withWorkspace { workshop, workspace ->
         workshop.createMcp("api-helper", "node", "console.log('v1')")
         val result = workshop.reviseMcp("api-helper", "console.log('v2')")
