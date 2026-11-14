@@ -33,6 +33,8 @@ data class ToolContext(
     val allowMutation: Boolean = true,
     val attributes: Map<String, Any?> = emptyMap(),
     val approval: (suspend (HarnessTool) -> Boolean)? = null,
+    /** Trusted Hook can request more restrictive approval without authorizing execution. */
+    val approvalWithReason: (suspend (HarnessTool, String) -> Boolean)? = null,
     val onExecutionStarted: (suspend (HarnessTool) -> Unit)? = null,
     /** Optional exact tool identity captured with the model-visible permission/tool surface. */
     val expectedRegistration: HarnessTool? = null,
@@ -227,6 +229,7 @@ class ToolRegistry private constructor(
             runId = context.attributes["run_id"] as? String,
         )
         val hookSnapshot = hooks.snapshot(name)
+        var hookApprovalReason: String? = null
         for (subscription in hookSnapshot.subscriptions) {
             val decision = try {
                 withTimeoutOrNull(5_000L) {
@@ -245,6 +248,9 @@ class ToolRegistry private constructor(
                     executionStarted = false,
                 )
             }
+            if (decision is ToolPreUseDecision.Ask && hookApprovalReason == null) {
+                hookApprovalReason = decision.reason
+            }
             if (decision is ToolPreUseDecision.Deny) {
                 return ToolInvocationResult(
                     result = ToolResult(
@@ -257,14 +263,14 @@ class ToolRegistry private constructor(
                 )
             }
         }
-        val needsApproval = when (tool.approvalPolicy) {
+        val needsApproval = hookApprovalReason != null || when (tool.approvalPolicy) {
             ToolApprovalPolicy.NEVER -> false
             ToolApprovalPolicy.ALWAYS -> true
             ToolApprovalPolicy.MUTATION -> tool.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
         }
         if (needsApproval) {
-            val approval = context.approval
-                ?: return ToolInvocationResult(
+            if (context.approval == null && context.approvalWithReason == null) {
+                return ToolInvocationResult(
                     result = ToolResult(
                         content = "工具需要人工审批：$name",
                         isError = true,
@@ -273,7 +279,10 @@ class ToolRegistry private constructor(
                     ),
                     executionStarted = false,
                 )
-            if (!approval(tool)) return ToolInvocationResult(
+            }
+            val granted = context.approvalWithReason?.invoke(tool, hookApprovalReason.orEmpty())
+                ?: requireNotNull(context.approval).invoke(tool)
+            if (!granted) return ToolInvocationResult(
                 result = ToolResult(
                     content = "用户拒绝执行工具：$name",
                     isError = true,
