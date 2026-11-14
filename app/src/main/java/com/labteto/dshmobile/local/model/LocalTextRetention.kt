@@ -70,20 +70,25 @@ internal fun retainTextForModel(
     }
 
     val marker = "\n…工具结果过长，中间内容已省略…\n"
-    val byteBudget = minOf(
-        maxTokens.toLong() * 3L,
-        (maxChars - marker.length).coerceAtLeast(16).toLong(),
-    ).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    val markerBytes = marker.toByteArray(Charsets.UTF_8).size
     val bytes = value.toByteArray(Charsets.UTF_8)
-    if (bytes.size <= byteBudget) {
-        val capped = truncateWithoutSplittingSurrogatePair(value, maxChars)
-        val omitted = bytes.size - capped.toByteArray(Charsets.UTF_8).size
+    val totalByteBudget = maxTokens.toLong() * 3L
+    // The old policy reserved the marker's character length but not its UTF-8 bytes.
+    // That could violate the declared token limit, and tiny windows could exceed maxChars.
+    if (maxChars <= marker.length || totalByteBudget <= markerBytes) {
+        val prefixEnd = safeUtf8PrefixEnd(
+            bytes, minOf(totalByteBudget, maxChars.toLong(), bytes.size.toLong()).toInt(),
+        )
         return LocalRetainedText(
-            text = if (omitted == 0) capped else capped + marker,
-            truncated = omitted > 0,
-            omittedBytes = omitted.coerceAtLeast(0),
+            text = String(bytes, 0, prefixEnd, Charsets.UTF_8),
+            truncated = prefixEnd < bytes.size,
+            omittedBytes = bytes.size - prefixEnd,
         )
     }
+    val byteBudget = minOf(
+        totalByteBudget - markerBytes,
+        (maxChars - marker.length).toLong(),
+    ).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
     val tailBudget = (byteBudget * tailRatio).toInt().coerceAtLeast(0)
     val headBudget = (byteBudget - tailBudget).coerceAtLeast(0)

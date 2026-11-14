@@ -21,18 +21,18 @@ internal fun placeTurnContext(
     val stable = truncateWithoutSplittingSurrogatePair(stableContext, (maxChars - reserve).coerceAtLeast(0))
     val dynamic = truncateWithoutSplittingSurrogatePair(dynamicContext, (maxChars - stable.length).coerceAtLeast(0))
     val result = history.toMutableList()
-    fun message(content: String) = buildJsonObject {
+    fun message(content: String, scope: LocalInstructionScope) = buildJsonObject {
         put("role", "system")
         put("content", content)
-        put(LOCAL_INSTRUCTION_SCOPE, LocalInstructionScope.TURN.name)
+        put(LOCAL_INSTRUCTION_SCOPE, scope.name)
     }
     if (stable.isNotBlank()) {
         val index = if (result.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") 1 else 0
-        result.add(index, message(stable))
+        result.add(index, message(stable, LocalInstructionScope.SESSION))
     }
     for (content in listOf(dynamic, completeRules).filter(String::isNotBlank)) {
         val index = result.indexOfLast { it["role"]?.jsonPrimitive?.contentOrNull == "user" }
-        result.add(if (index >= 0) index else result.size, message(content))
+        result.add(if (index >= 0) index else result.size, message(content, LocalInstructionScope.TURN))
     }
     return result
 }
