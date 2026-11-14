@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.device.AndroidDevicePlugin
+import com.labteto.dshmobile.harness.capability.HarnessAndroidDeviceProvider
 import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
 import com.labteto.dshmobile.harness.capability.HarnessVirtualDisplayProvider
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
@@ -14,7 +15,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalManagedDeviceProviderTest {
-    private class FakeProvider : HarnessDeviceProvider, HarnessVirtualDisplayProvider {
+    private class FakeProvider : HarnessAndroidDeviceProvider {
         override val capabilities = setOf("android_open_uri", "android_tap", "vscreen_create")
         val called = mutableListOf<String>()
         val acquiredOwners = mutableListOf<String>()
