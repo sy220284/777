@@ -41,6 +41,14 @@ class CodexSkillDependenciesTest {
         assertTrue(actual.any { it.type == "unknown" })
     }
 
+    @Test fun unsupportedInlineDeclarationsRemainUnresolved() {
+        val result = parseCodexSkillDependencies("""
+            dependencies:
+              tools: [{type: mcp, value: figma}]
+        """.trimIndent())
+        assertEquals("unknown", result.single().type)
+    }
+
     @Test fun noDeclaredRequirementsAreEmpty() {
         assertEquals(emptyList<CodexSkillDependency>(), parseCodexSkillDependencies("description: sample"))
         assertEquals(emptyList<CodexSkillDependency>(), parseCodexSkillDependencies("dependencies:\n  tools:\n"))
