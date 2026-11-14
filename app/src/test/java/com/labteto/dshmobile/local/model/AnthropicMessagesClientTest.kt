@@ -74,6 +74,8 @@ class AnthropicMessagesClientTest {
         val payload = client.buildPayload(route(), listOf(stable, dynamic, user), emptyList(), null)
         val blocks = payload.getValue("system").jsonArray
         assertEquals(2, blocks.size)
+        assertEquals("项目固定规则".repeat(600) + "\n\n仅本轮有效的临时说明",
+            blocks.joinToString("") { it.jsonObject.getValue("text").jsonPrimitive.content })
         assertEquals("ephemeral",
             blocks[0].jsonObject.getValue("cache_control").jsonObject.getValue("type").jsonPrimitive.content)
         assertFalse(blocks[1].jsonObject.containsKey("cache_control"))
