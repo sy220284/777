@@ -24,5 +24,17 @@ class LocalToolPromptBudgetPolicyTest {
         assertEquals(0, remainingOptionalToolDefinitionBudget(6_000, 7_000, true))
         assertEquals(1_000, remainingOptionalToolDefinitionBudget(7_000, 3_000, false))
         assertEquals(4_000, remainingOptionalToolDefinitionBudget(7_000, 3_000, true))
+        assertEquals(24_000, remainingOptionalToolDefinitionBudget(
+            remainingOperationalTokens = 150_000,
+            coreDefinitionTokens = 12_000,
+            preserveToolSurface = true,
+            requestedDefinitionTokens = 24_000,
+        ))
+        assertEquals(3_000, remainingOptionalToolDefinitionBudget(
+            remainingOperationalTokens = 20_000,
+            coreDefinitionTokens = 8_000,
+            preserveToolSurface = false,
+            requestedDefinitionTokens = 24_000,
+        ))
     }
 }
