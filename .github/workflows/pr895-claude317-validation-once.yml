@@ -28,6 +28,7 @@ jobs:
             --tests com.labteto.dshmobile.local.files.LocalWorkspaceFileChangesTest \
             --tests com.labteto.dshmobile.local.model.LocalConversationSampleCoordinatorTest \
             --tests com.labteto.dshmobile.local.tools.ipc.LocalMcpNetworkAdmissionTest \
+            --tests com.labteto.dshmobile.local.work.LocalWorkReviewObligationsTest \
             --stacktrace --console=plain
       - name: 编译 Android 安装包与仪表测试
         run: ./gradlew --max-workers=2 :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace --console=plain

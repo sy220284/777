@@ -128,6 +128,27 @@ class LocalWorkReviewObligationsTest {
             })
         }
 
+    @Test fun failedWriteWithPossibleSideEffectRevokesApprovedReview() =
+        withGoal(listOf("code")) { log, goal ->
+            val ledger = LocalCodeReviewLedger(log)
+            ledger.request("review-before-error", "worktree/HEAD", "digest",
+                currentReviewGoalBinding(log, "code"))
+            val report = ledger.complete("review-before-error", "worktree/HEAD", "digest",
+                "检查完成", "profile")
+            assertTrue(ledger.accept(report.id, report.evidenceSequence, report.digest))
+            assertTrue(localWorkDeliveryEvidence(log, goal).outstandingReviews.isEmpty())
+            log.append("tool/call", buildJsonObject {
+                put("id", "failed-edit"); put("goal_id", goal.id); put("name", "edit")
+            })
+            log.append("tool/result", buildJsonObject {
+                put("id", "failed-edit"); put("name", "edit")
+                put("side_effect", "possible"); put("is_error", true)
+            })
+            assertTrue(localWorkDeliveryEvidence(log, goal).outstandingReviews.any {
+                it.contains("新的修改")
+            })
+        }
+
     @Test fun subsequentGoalOwnedMutationInvalidatesAcknowledgedSnapshot() =
         withGoal(listOf("code")) { log, goal ->
             val code = LocalCodeReviewLedger(log)
