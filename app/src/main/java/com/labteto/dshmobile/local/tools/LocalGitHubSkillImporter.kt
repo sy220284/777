@@ -9,10 +9,14 @@ import java.net.URI
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import java.util.zip.ZipInputStream
+import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -283,6 +287,7 @@ internal class LocalGitHubSkillImporter @Inject constructor(
     private suspend fun installPinned(
         source: PublicGitHubSkillLocation, commit: String, replaceId: String?,
     ): String {
+        val owner = currentCoroutineContext()
         val scratch = File.createTempFile("github-skill-", ".zip", context.cacheDir)
         try {
             useSnapshot(source, commit) { archive ->
@@ -290,26 +295,50 @@ internal class LocalGitHubSkillImporter @Inject constructor(
                     writePinnedGitHubSkillArchive(source, commit, archive, output)
                 }
             }
+            owner.ensureActive()
             return scratch.inputStream().use { input ->
-                if (replaceId == null) skills.importSkill("github-skill.zip", input)
-                else skills.replaceSkillPackage(replaceId, input)
+                val stream = object : java.io.FilterInputStream(input) {
+                    override fun read(): Int {
+                        owner.ensureActive()
+                        return super.read().also { owner.ensureActive() }
+                    }
+                    override fun read(bytes: ByteArray, offset: Int, length: Int): Int {
+                        owner.ensureActive()
+                        return `in`.read(bytes, offset, length).also { owner.ensureActive() }
+                    }
+                }
+                if (replaceId == null) skills.importSkill("github-skill.zip", stream) { owner.ensureActive() }
+                else skills.replaceSkillPackage(replaceId, stream) { owner.ensureActive() }
             }
         } finally {
             if (scratch.exists()) require(scratch.delete()) { "临时技能包清理失败" }
         }
     }
 
-    private fun <T> useSnapshot(
+    private suspend fun <T> useSnapshot(
         source: PublicGitHubSkillLocation, commit: String, consume: (InputStream) -> T,
     ): T {
         val url = "https://codeload.github.com/${source.owner}/${source.repository}/zip/$commit"
         val request = Request.Builder().url(url).get().build()
-        return http.newCall(request).execute().use { response ->
+        val owner = currentCoroutineContext()
+        return withCancellableHttpResponse(http.newCall(request)) { response ->
             require(response.isSuccessful) {
                 "无法下载 GitHub 技能目录（HTTP ${response.code}），请检查网络"
             }
             val body = response.body ?: throw IOException("GitHub 仓库压缩包为空")
-            body.byteStream().use(consume)
+            body.byteStream().use { raw ->
+                val stream = object : java.io.FilterInputStream(raw) {
+                    override fun read(): Int {
+                        owner.ensureActive()
+                        return super.read().also { owner.ensureActive() }
+                    }
+                    override fun read(bytes: ByteArray, offset: Int, length: Int): Int {
+                        owner.ensureActive()
+                        return `in`.read(bytes, offset, length).also { owner.ensureActive() }
+                    }
+                }
+                consume(stream).also { owner.ensureActive() }
+            }
         }
     }
 
@@ -327,6 +356,7 @@ internal class LocalGitHubSkillImporter @Inject constructor(
                 advertisedGitCommit(body.byteStream(), source.ref)
             }
         } catch (publicError: Exception) {
+            if (publicError is CancellationException) throw publicError
             val token = credentials.get()?.takeIf(String::isNotBlank)
                 ?: throw IOException("GitHub 公开仓库连接失败，请检查网络或在工具设置中连接 GitHub 账户", publicError)
             val url = "https://api.github.com/repos/${source.owner}/${source.repository}/commits/${source.ref}"
