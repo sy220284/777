@@ -412,7 +412,7 @@ class LocalToolsUiFacade @Inject internal constructor(
         switchMcpHttpConnection(serverId, endpoint) {
             PreparedMcpCredential.OAuth(mcpOAuth.authorize(serverId, endpoint, clientId))
         }
-    fun cancelMcpLogin(serverId: String) = mcpOAuth.cancel(serverId)
+    override fun cancelMcpLogin(serverId: String) = mcpOAuth.cancel(serverId)
     override suspend fun refreshMcpLogin(serverId: String, endpoint: String): String =
         switchMcpHttpConnection(serverId, endpoint) {
             PreparedMcpCredential.OAuth(mcpCredentials.stageOAuthRefresh(serverId, endpoint))
