@@ -640,7 +640,7 @@ internal fun PluginInventoryBrowser(
                 color = if (item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
                     ExtensionMarketStatus.FAILED, ExtensionMarketStatus.UNSUPPORTED))
                     colors.warningInk else colors.successInk)
-            if (item.marketState.advice.isNotBlank()) {
+            if (item.marketState.advice.isNotBlank() && item.requirements.isEmpty()) {
                 Text(item.marketState.advice, style = DsType.small13.withReadingWeight(),
                     color = colors.textSecondary)
             }
