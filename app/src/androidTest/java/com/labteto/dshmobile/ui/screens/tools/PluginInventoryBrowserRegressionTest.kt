@@ -15,6 +15,9 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
+import com.labteto.dshmobile.ui.theme.ThemePreference
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot as McpServerSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -216,6 +219,36 @@ class PluginInventoryBrowserRegressionTest {
         }
     }
 
+
+    @Test
+    fun extensionListRemainsReadableAcrossFourWidthsAndThreeThemes() {
+        val width = mutableIntStateOf(320)
+        val appearance = mutableStateOf(ThemePreference.LIGHT)
+        compose.setContent {
+            DshTheme(preference = appearance.value, textScale = 1.3f) {
+                Box(Modifier.width(width.intValue.dp)) {
+                    PluginInventoryBrowser(
+                        localIds = listOf("android-runtime"),
+                        onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    )
+                }
+            }
+        }
+        for (mode in listOf(ThemePreference.LIGHT, ThemePreference.DARK, ThemePreference.MATTE_BLACK)) {
+            for (dp in listOf(320, 360, 393, 412)) {
+                compose.runOnIdle {
+                    appearance.value = mode
+                    width.intValue = dp
+                }
+                val card = compose.onNodeWithTag("plugin-inventory-card-local:android-runtime")
+                    .assertIsDisplayed().getUnclippedBoundsInRoot()
+                val title = compose.onNodeWithTag("plugin-inventory-title-local:android-runtime")
+                    .assertIsDisplayed().getUnclippedBoundsInRoot()
+                assertTrue("Title must fit within the $dp dp card in $mode", title.right <= card.right)
+                assertTrue("Card must fit within available width $dp dp", card.width <= dp.dp)
+            }
+        }
+    }
 
     @Test
     fun pluginCardsKeepCompactIconsAndReadableText() {
