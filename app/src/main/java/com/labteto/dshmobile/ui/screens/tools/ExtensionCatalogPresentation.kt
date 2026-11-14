@@ -189,7 +189,7 @@ internal fun extensionPresentation(
 ): ExtensionPresentation {
     val key = id.lowercase()
     val name = rawName.trim()
-    val englishBrand = name.lowercase() in proprietaryNames
+    val englishBrand = name.lowercase() in proprietaryNames && name != name.lowercase()
     val title = when {
         containsHan(name) -> name
         englishBrand -> name
