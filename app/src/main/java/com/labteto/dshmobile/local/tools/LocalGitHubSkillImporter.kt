@@ -1,11 +1,16 @@
 package com.labteto.dshmobile.local.tools
 
-import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
+import java.io.DataInputStream
+import java.io.IOException
 import java.net.URI
-import java.net.URLEncoder
-import java.util.Base64
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import java.util.zip.ZipInputStream
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -123,139 +128,244 @@ internal fun parseGitHubSkillUpdateSource(document: String): Pair<PublicGitHubSk
     return source to value("commit")
 }
 
-/** Fetches a single public GitHub skill folder, then delegates admission to the existing
- * ZIP importer. No desktop Python, Git binary, remote execution or hidden cloud service. */
+
+/**
+ * Resolve an immutable public Git revision from GitHub's advertised Git refs, which are not
+ * subject to the GitHub REST API's unauthenticated request quota.
+ */
+internal fun advertisedGitCommit(advertisement: InputStream, ref: String): String {
+    require(ref.matches(Regex("[A-Za-z0-9._-]{1,100}"))) { "GitHub 分支或标签无效" }
+    val matches = mutableMapOf<String, String>()
+    DataInputStream(advertisement).use { input ->
+        while (true) {
+            val first = input.read()
+            if (first < 0) break
+            val header = ByteArray(4)
+            header[0] = first.toByte()
+            input.readFully(header, 1, 3)
+            val size = header.toString(Charsets.US_ASCII).toIntOrNull(16)
+                ?: throw IOException("GitHub Git 引用响应格式无效")
+            if (size == 0 || size == 1 || size == 2) continue
+            require(size in 4..65520) { "GitHub Git 引用长度无效" }
+            val packet = ByteArray(size - 4)
+            input.readFully(packet)
+            val item = packet.toString(Charsets.UTF_8).substringBefore('\u0000').trimEnd('\n')
+            val space = item.indexOf(' ')
+            if (space == 40 && item.substring(0, space).matches(Regex("[0-9a-fA-F]{40}"))) {
+                matches[item.substring(space + 1)] = item.substring(0, 40).lowercase()
+            }
+        }
+    }
+    return matches["refs/heads/$ref"] ?: matches["refs/tags/$ref^{}"]
+        ?: matches["refs/tags/$ref"]
+        ?: throw IOException("GitHub 未找到分支或标签：$ref")
+}
+
+/** Select only the requested subtree from a public immutable repository snapshot. */
+internal fun writePinnedGitHubSkillArchive(
+    source: PublicGitHubSkillLocation,
+    commit: String,
+    snapshot: InputStream,
+    destination: OutputStream,
+): Int {
+    val prefix = source.directory.trimEnd('/') + "/"
+    var count = 0
+    var archiveRoot: String? = null
+    ZipInputStream(snapshot.buffered()).use { incoming ->
+        ZipOutputStream(destination.buffered()).use { outgoing ->
+            while (true) {
+                val entry = incoming.nextEntry ?: break
+                val root = entry.name.substringBefore('/')
+                require(root.isNotBlank() && root != "." && root != "..") {
+                    "GitHub 仓库压缩包根目录无效"
+                }
+                if (archiveRoot == null) archiveRoot = root
+                require(archiveRoot == root) { "GitHub 仓库压缩包包含不一致的根目录" }
+                val path = entry.name.substringAfter('/', "")
+                if (!entry.isDirectory && path.startsWith(prefix)) {
+                    val relative = path.removePrefix(prefix)
+                    require(relative.isNotBlank() && relative != ".github-source.json" &&
+                        !relative.startsWith("/") && '\\' !in relative &&
+                        relative.split('/').none { it.isBlank() || it == "." || it == ".." }) {
+                        "GitHub 技能资源路径不安全"
+                    }
+                    outgoing.putNextEntry(ZipEntry(relative))
+                    incoming.copyTo(outgoing)
+                    outgoing.closeEntry()
+                    count++
+                }
+                incoming.closeEntry()
+            }
+            require(count > 0) { "GitHub 所选目录没有技能文件" }
+            outgoing.putNextEntry(ZipEntry(".github-source.json"))
+            outgoing.write(githubSkillSourceEvidence(source, commit))
+            outgoing.closeEntry()
+        }
+    }
+    return count
+}
+
+/** Fetches public GitHub skills as a single pinned snapshot and admits them through the shared
+ * streaming ZIP importer. REST API quota exhaustion must not make official skills unusable. */
 @Singleton
 internal class LocalGitHubSkillImporter @Inject constructor(
     private val http: OkHttpClient,
     private val json: Json,
     private val skills: LocalSkillManager,
+    private val credentials: LocalGitHubCredentialStore,
+    @ApplicationContext private val context: Context,
 ) {
     suspend fun install(link: String): String = withContext(Dispatchers.IO) {
         val source = PublicGitHubSkillLocation.parse(link)
-        val commit = resolveCommit(source)
-        skills.importSkill("github-skill.zip", download(source, commit))
+        installPinned(source, resolveCommit(source), null)
     }
 
     suspend fun availableUpdate(id: String): String? = withContext(Dispatchers.IO) {
-        val document = skills.githubSourceEvidence(id)
+        val evidence = skills.githubSourceEvidence(id)
             ?: throw IllegalArgumentException("此技能没有可验证的 GitHub 来源")
-        val (source, currentCommit) = parseGitHubSkillUpdateSource(document)
+        val (source, currentCommit) = parseGitHubSkillUpdateSource(evidence)
         resolveCommit(source).takeUnless { it == currentCommit }
     }
 
     suspend fun updateInstalled(id: String, expectedCommit: String): String = withContext(Dispatchers.IO) {
         require(expectedCommit.matches(Regex("[0-9a-f]{40}"))) { "更新版本无效" }
-        val document = skills.githubSourceEvidence(id)
+        val evidence = skills.githubSourceEvidence(id)
             ?: throw IllegalArgumentException("此技能没有可验证的 GitHub 来源")
-        val (source, currentCommit) = parseGitHubSkillUpdateSource(document)
+        val (source, currentCommit) = parseGitHubSkillUpdateSource(evidence)
         val latest = resolveCommit(source)
         require(latest == expectedCommit && latest != currentCommit) {
             "远端版本已变化，请重新检查更新"
         }
-        skills.replaceSkillPackage(id, download(source, latest))
+        installPinned(source, latest, id)
     }
 
     fun canRollback(id: String): Boolean = skills.canRollbackSkill(id)
+
     suspend fun rollback(id: String): String = withContext(Dispatchers.IO) {
         skills.rollbackSkill(id)
     }
 
-    private suspend fun download(source: PublicGitHubSkillLocation, commit: String): ByteArray {
-        // All file downloads are pinned to one immutable GitHub commit.
-        val pinned = source.copy(ref = commit)
-        val files = linkedMapOf<String, ByteArray>()
-        var totalBytes = 0L
-        suspend fun collect(path: String, relative: String, depth: Int) {
-            require(depth <= 10 && files.size < 128) { "技能目录过大或嵌套过深" }
-            val root = get(pinned, path)
-            val entries = when (root) {
-                is JsonArray -> root.toList()
-                is JsonObject -> listOf(root)
-                else -> error("GitHub 返回了意外的目录格式")
-            }
-            for (entry in entries) {
-                val item = entry.jsonObject
-                val name = item.string("name")
-                val childPath = requireGitHubSkillChildPath(path, name, item.string("path"))
-                val childRelative = if (relative.isEmpty()) name else "$relative/$name"
-                when (item.string("type")) {
-                    "dir" -> collect(childPath, childRelative, depth + 1)
-                    "file" -> {
-                        require(childRelative !in files) { "技能目录包含重复文件，拒绝覆盖" }
-                        val blob = get(pinned, childPath).jsonObject
-                        require(blob.string("encoding") == "base64") { "技能文件不可按 Base64 读取" }
-                        val value = blob.string("content").replace("\n", "")
-                        val bytes = Base64.getDecoder().decode(value)
-                        totalBytes += bytes.size
-                        require(bytes.size <= 8 * 1024 * 1024 && totalBytes <= 24L * 1024 * 1024 &&
-                            files.size < 128) { "技能资源超过本机导入容量" }
-                        files[childRelative] = bytes
-                    }
-                    else -> error("暂不支持此 GitHub 文件类型")
-                }
-            }
-        }
-        collect(source.directory, "", 0)
-        require("SKILL.md" in files) { "所选 GitHub 目录中没有 SKILL.md" }
-        require(".github-source.json" !in files) { "源技能包包含保留的来源证据文件" }
-        require(files.size < 128) { "附加来源证据后技能文件数量超出限制" }
-        files[".github-source.json"] = githubSkillSourceEvidence(source, commit)
-        val zipped = ByteArrayOutputStream()
-        ZipOutputStream(zipped).use { zip ->
-            files.forEach { (name, bytes) ->
-                zip.putNextEntry(ZipEntry(name))
-                zip.write(bytes)
-                zip.closeEntry()
-            }
-        }
-        return zipped.toByteArray()
-    }
-
-    /** A share link is a read-only local fact; it never fetches a branch or installs anything. */
     fun installedSourceLink(id: String): String? =
         skills.githubSourceEvidence(id)?.let(::parseGitHubSkillSourceLink)
 
+    /** Listing is read-only. If the public REST quota is exhausted, enumerate the pinned ZIP. */
     suspend fun curatedSkills(): List<String> = withContext(Dispatchers.IO) {
         val official = PublicGitHubSkillLocation(
             owner = "openai", repository = "skills", ref = "main", directory = "skills/.curated")
-        (get(official, official.directory) as? JsonArray).orEmpty().mapNotNull {
-            val obj = it.jsonObject
-            obj["name"]?.jsonPrimitive?.contentOrNull.takeIf { obj["type"]?.jsonPrimitive?.contentOrNull == "dir" }
-        }.sorted()
+        try {
+            (get(official.directory, official) as? JsonArray).orEmpty().mapNotNull {
+                val entry = it.jsonObject
+                if (entry["type"]?.jsonPrimitive?.contentOrNull != "dir") null
+                else entry["name"]?.jsonPrimitive?.contentOrNull
+            }.sorted()
+        } catch (failure: GitHubSkillApiException) {
+            if (failure.status != 403 && failure.status != 429) throw failure
+            val pinned = resolveCommit(official)
+            useSnapshot(official, pinned) { stream ->
+                val names = linkedSetOf<String>()
+                ZipInputStream(stream.buffered()).use { zip ->
+                    while (true) {
+                        val entry = zip.nextEntry ?: break
+                        val path = entry.name.substringAfter('/', "")
+                        val relative = path.removePrefix("skills/.curated/")
+                        if (path.startsWith("skills/.curated/") &&
+                            relative.contains('/') && relative.substringBefore('/').isNotBlank()) {
+                            names += relative.substringBefore('/')
+                        }
+                        zip.closeEntry()
+                    }
+                }
+                names.sorted()
+            }
+        }
     }
 
-    private fun resolveCommit(source: PublicGitHubSkillLocation): String {
-        val url = "https://api.github.com/repos/${source.owner}/${source.repository}/commits/${source.ref}"
-        val request = Request.Builder().url(url)
-            .header("Accept", "application/vnd.github+json").get().build()
-        val sha = http.newCall(request).execute().use { response ->
-            require(response.isSuccessful) { "GitHub 技能版本无法固定（HTTP ${response.code}）" }
-            val bytes = response.body?.byteStream()?.use { it.readNBytes(128 * 1024 + 1) }
-                ?: error("GitHub 没有返回版本信息")
-            require(bytes.size <= 128 * 1024) { "GitHub 版本信息过大" }
-            json.parseToJsonElement(bytes.toString(Charsets.UTF_8))
-                .jsonObject.string("sha")
+    private suspend fun installPinned(
+        source: PublicGitHubSkillLocation, commit: String, replaceId: String?,
+    ): String {
+        val scratch = File.createTempFile("github-skill-", ".zip", context.cacheDir)
+        try {
+            useSnapshot(source, commit) { archive ->
+                scratch.outputStream().use { output ->
+                    writePinnedGitHubSkillArchive(source, commit, archive, output)
+                }
+            }
+            return scratch.inputStream().use { input ->
+                if (replaceId == null) skills.importSkill("github-skill.zip", input)
+                else skills.replaceSkillPackage(replaceId, input)
+            }
+        } finally {
+            if (scratch.exists()) require(scratch.delete()) { "临时技能包清理失败" }
         }
-        require(sha.matches(Regex("[0-9a-fA-F]{40}"))) { "GitHub 返回的提交编号无效" }
-        return sha.lowercase()
+    }
+
+    private fun <T> useSnapshot(
+        source: PublicGitHubSkillLocation, commit: String, consume: (InputStream) -> T,
+    ): T {
+        val url = "https://codeload.github.com/${source.owner}/${source.repository}/zip/$commit"
+        val request = Request.Builder().url(url).get().build()
+        return http.newCall(request).execute().use { response ->
+            require(response.isSuccessful) {
+                "无法下载 GitHub 技能目录（HTTP ${response.code}），请检查网络"
+            }
+            val body = response.body ?: throw IOException("GitHub 仓库压缩包为空")
+            body.byteStream().use(consume)
+        }
+    }
+
+    private suspend fun resolveCommit(source: PublicGitHubSkillLocation): String {
+        if (source.ref.matches(Regex("[0-9a-fA-F]{40}"))) return source.ref.lowercase()
+        val request = Request.Builder()
+            .url("https://github.com/${source.owner}/${source.repository}.git/info/refs?service=git-upload-pack")
+            .header("Accept", "application/x-git-upload-pack-advertisement").get().build()
+        try {
+            return http.newCall(request).execute().use { response ->
+                require(response.isSuccessful) {
+                    "GitHub 公开版本查询失败（HTTP ${response.code}）"
+                }
+                val body = response.body ?: throw IOException("GitHub 未返回公开版本信息")
+                advertisedGitCommit(body.byteStream(), source.ref)
+            }
+        } catch (publicError: Exception) {
+            val token = credentials.get()?.takeIf(String::isNotBlank)
+                ?: throw IOException("GitHub 公开仓库连接失败，请检查网络或在工具设置中连接 GitHub 账户", publicError)
+            val url = "https://api.github.com/repos/${source.owner}/${source.repository}/commits/${source.ref}"
+            val api = Request.Builder().url(url)
+                .header("Accept", "application/vnd.github+json")
+                .header("Authorization", "Bearer $token").get().build()
+            return http.newCall(api).execute().use { response ->
+                require(response.isSuccessful) {
+                    "GitHub 版本查询失败（HTTP ${response.code}），请检查账户权限"
+                }
+                val data = response.body?.string() ?: throw IOException("GitHub 没有返回版本信息")
+                val sha = json.parseToJsonElement(data).jsonObject.string("sha")
+                require(sha.matches(Regex("[0-9a-fA-F]{40}"))) { "GitHub 返回的提交编号无效" }
+                sha.lowercase()
+            }
+        }
+    }
+
+    private suspend fun get(path: String, source: PublicGitHubSkillLocation): JsonElement {
+        val encoded = path.split('/').joinToString("/") {
+            java.net.URLEncoder.encode(it, "UTF-8").replace("+", "%20")
+        }
+        val url = "https://api.github.com/repos/${source.owner}/${source.repository}/contents/$encoded?ref=${source.ref}"
+        val token = credentials.get()?.takeIf(String::isNotBlank)
+        val builder = Request.Builder().url(url)
+            .header("Accept", "application/vnd.github+json")
+        if (token != null) builder.header("Authorization", "Bearer $token")
+        return http.newCall(builder.get().build()).execute().use { response ->
+            if (!response.isSuccessful) throw GitHubSkillApiException(response.code)
+            val body = response.body?.byteStream() ?: throw IOException("GitHub 返回空目录")
+            val bytes = body.use { it.readNBytes(4 * 1024 * 1024 + 1) }
+            require(bytes.size <= 4 * 1024 * 1024) { "GitHub 目录元数据异常庞大" }
+            json.parseToJsonElement(bytes.toString(Charsets.UTF_8))
+        }
     }
 
     private fun JsonObject.string(key: String): String =
         this[key]?.jsonPrimitive?.contentOrNull ?: error("GitHub 技能缺少 $key")
-
-    private fun get(source: PublicGitHubSkillLocation, path: String): JsonElement {
-        val encodedPath = path.split('/').joinToString("/") { URLEncoder.encode(it, "UTF-8") }
-        val url = "https://api.github.com/repos/${source.owner}/${source.repository}/contents/$encodedPath?ref=${source.ref}"
-        val request = Request.Builder().url(url).header("Accept", "application/vnd.github+json").get().build()
-        return http.newCall(request).execute().use { response ->
-            require(response.isSuccessful) { "无法读取 GitHub 技能（HTTP ${response.code}）" }
-            val data = response.body?.byteStream()?.use { stream ->
-                // The whole directory/API response is small; downloaded assets have separate bounds.
-                stream.readNBytes(12 * 1024 * 1024 + 1)
-            } ?: error("GitHub 返回空内容")
-            require(data.size <= 12 * 1024 * 1024) { "GitHub 响应过大" }
-            json.parseToJsonElement(data.toString(Charsets.UTF_8))
-        }
-    }
 }
+
+private class GitHubSkillApiException(val status: Int) :
+    IOException("GitHub 目录请求失败（HTTP $status）")
