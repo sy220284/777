@@ -75,7 +75,7 @@ private val localizedDescriptions = mapOf(
     "local-language-server" to "查找代码、检查问题和分析项目",
     "android-device" to "在授权范围内读取和操作设备",
     "local-vision" to "分析图片、屏幕和视觉内容",
-    "android-automation" to "管理任务与执行自动化操作",
+    "android-automation" to "管理任务与自动执行操作",
     "android-webhook" to "接收事件并触发已配置的操作",
     "pdf" to "阅读、整理和处理 PDF 文档",
     "docx" to "创建、编辑和整理 Word 文档",
@@ -108,10 +108,7 @@ internal fun extensionPresentation(
 ): ExtensionPresentation {
     val key = id.lowercase()
     val name = rawName.trim()
-    val englishBrand = name.lowercase() in proprietaryNames ||
-        name.startsWith("MiniMax ") || name.startsWith("WPS ") ||
-        name.startsWith("GitHub ") || name.startsWith("PDF ") ||
-        name.startsWith("Excel ") || name.startsWith("Word ")
+    val englishBrand = name.lowercase() in proprietaryNames
     val title = when {
         containsHan(name) -> name
         englishBrand -> name
