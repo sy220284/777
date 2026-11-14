@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.work.LocalAgentTeamContract.AGENT_MESSAGE_SCA
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.MAX_AGENT_MESSAGE_LIMIT
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.MAX_RECENT_AGENT_MESSAGE_SCAN_PAGES
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.MAX_RENDERED_MESSAGE_CHARS
+import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_QUEUED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.WAIT_POLL_MS
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -155,6 +156,7 @@ internal class LocalTeamResultMailbox(
     ): AgentMessageForwardScan {
         val state = project(sessionId)
         val membersByJob = state.members.associateBy(LocalTeamMemberSnapshot::jobId)
+        val membersById = state.members.associateBy(LocalTeamMemberSnapshot::id)
         val target = targetName?.trim()?.takeIf(String::isNotBlank)
         if (target != null) {
             require(state.members.any { it.name == target }) {
@@ -162,7 +164,7 @@ internal class LocalTeamResultMailbox(
             }
         }
 
-        var cursor = afterSequence
+        var cursor = afterSequence.coerceAtLeast(0L)
         repeat(16) {
             val page = eventLogFor(sessionId).pageAfter(cursor, AGENT_MESSAGE_SCAN_PAGE)
             if (page.isEmpty()) {
@@ -170,6 +172,25 @@ internal class LocalTeamResultMailbox(
             }
             page.sortedBy(LocalSessionEventLog.Event::sequence).forEach { event ->
                 cursor = maxOf(cursor, event.sequence)
+                if (event.type == TEAM_MESSAGE_QUEUED) {
+                    val message = LocalAgentTeamEventCodec.decodeMessage(event.data)
+                    val sender = membersById[message.senderId] ?: return@forEach
+                    if (message.kind != LocalTeamMessageKind.MESSAGE ||
+                        message.targetId != sessionId ||
+                        (target != null && sender.name != target)) return@forEach
+                    return AgentMessageForwardScan(
+                        message = LocalTeamAgentMessageSnapshot(
+                            id = message.id,
+                            sequence = event.sequence,
+                            createdAt = event.createdAt,
+                            memberId = sender.id,
+                            memberName = sender.name,
+                            content = message.content,
+                            step = 0,
+                        ),
+                        scannedThroughSequence = cursor,
+                    )
+                }
                 if (event.type != LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT) return@forEach
                 val jobId = event.data["background_job_id"]?.jsonPrimitive?.contentOrNull
                     ?: return@forEach
