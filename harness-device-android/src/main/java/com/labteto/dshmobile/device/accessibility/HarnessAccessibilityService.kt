@@ -156,7 +156,16 @@ class HarnessAccessibilityService : AccessibilityService() {
         val windowId = target.windowId
         val originalBounds = android.graphics.Rect().also(target::getBoundsInScreen)
         val targetId = target.viewIdResourceName
-        if (!setEditableText(target, value)) return AndroidTextInputOutcome.ACTION_UNCONFIRMED
+        // If this same live field already contains the requested value, no Android
+        // mutation is necessary. This is common when clearing an empty Compose field.
+        if (target.text?.toString() == value) return AndroidTextInputOutcome.VERIFIED
+        if (!setEditableText(target, value)) {
+            // A framework can apply the edit even when ACTION_SET_TEXT returns false.
+            // Check the original field once before reporting an uncertain action.
+            return if (target.refresh() && target.isEditable &&
+                target.text?.toString().orEmpty() == value) AndroidTextInputOutcome.VERIFIED
+            else AndroidTextInputOutcome.ACTION_UNCONFIRMED
+        }
 
         // Read the same control after the framework has applied its semantics update.
         // Retry verification only, not the mutating text action.
