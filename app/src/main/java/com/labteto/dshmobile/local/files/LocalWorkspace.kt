@@ -921,7 +921,7 @@ class LocalWorkspace(
             buildList {
                 repeat(96) {
                     val line = readBoundedLine(reader, 1_024) ?: return@buildList
-                    add(line)
+                    add(if (isEmpty()) line.removePrefix("\uFEFF") else line)
                     if (size == 1 && line.trim() != "---") return@buildList
                     if (size > 1 && line.trim() == "---") return@buildList
                 }
