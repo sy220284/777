@@ -117,6 +117,24 @@ class LocalWorkEvidenceSheetTest {
         }
     }
 
+
+    @Test fun modelSecurityVerdictAndUserApprovalAreSeparateVisibleRows() {
+        val records = listOf(
+            LocalWorkHistoryRecord(12, "work/security-review-result", "work/security-review-result",
+                "安全审查模型结论：阻止，需修复风险后重新审查", "review-1", emptyList()),
+            LocalWorkHistoryRecord(11, "work/code-review-accepted", "work/code-review-accepted",
+                "用户已接纳该版本的代码审查结果", "review-2", emptyList()),
+        )
+        openFromMenu(actions(records = records))
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("安全审查模型结论：阻止，需修复风险后重新审查")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("用户已接纳该版本的代码审查结果").assertExists()
+        compose.onNodeWithText("独立安全审查").assertExists()
+        compose.onNodeWithText("独立代码审查").assertExists()
+    }
+
     private fun openFromMenu(actions: LocalWorkFeatureUiActions) {
         val opened = mutableStateOf(false)
         compose.setContent {
