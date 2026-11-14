@@ -138,6 +138,8 @@ class HarnessAccessibilityService : AccessibilityService() {
                 root.findAccessibilityNodeInfosByText(searchText)
                     .filter { it.isVisibleToUser && it.isEditable }, "输入文字")
             else -> root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                ?.takeIf { it.isVisibleToUser && it.isEditable }
+                ?: onlyVisibleEditable(root)
         }?.takeIf { it.isVisibleToUser && it.isEditable } ?: return false
 
         val windowId = target.windowId
@@ -166,6 +168,24 @@ class HarnessAccessibilityService : AccessibilityService() {
                 return true
         }
         return false
+    }
+
+    /** No selector is needed for a page with exactly one visible editable field. */
+    private fun onlyVisibleEditable(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        var sole: AccessibilityNodeInfo? = null
+        while (queue.isNotEmpty()) {
+            val node = queue.removeFirst()
+            if (node.isVisibleToUser && node.isEditable) {
+                if (sole != null) return null
+                sole = node
+            }
+            for (childIndex in 0 until node.childCount) {
+                node.getChild(childIndex)?.let(queue::add)
+            }
+        }
+        return sole
     }
 
     fun globalBack(): Boolean = performGlobalAction(GLOBAL_ACTION_BACK)
