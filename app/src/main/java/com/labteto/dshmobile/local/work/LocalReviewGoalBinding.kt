@@ -7,7 +7,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
 
 /** A review belongs to the exact active Goal revision which requested that review type. */
-internal data class LocalReviewGoalBinding(val goalId: String, val revision: Long)
+internal data class LocalReviewGoalBinding(val goalId: String, val startSequence: Long)
 
 internal fun currentReviewGoalBinding(log: LocalSessionEventLog, type: String): LocalReviewGoalBinding? {
     require(type == "code" || type == "security")
@@ -18,6 +18,7 @@ internal fun currentReviewGoalBinding(log: LocalSessionEventLog, type: String): 
         ?.any { (it as? JsonPrimitive)?.contentOrNull == type } == true
     if (!requested) return null
     val id = (data["id"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) ?: return null
-    val revision = (data["revision"] as? JsonPrimitive)?.longOrNull ?: return null
-    return LocalReviewGoalBinding(id, revision)
+    val started = (data["startedAtSequence"] as? JsonPrimitive)?.longOrNull
+        ?.takeIf { it >= 0L } ?: goalEvent.sequence
+    return LocalReviewGoalBinding(id, started)
 }
