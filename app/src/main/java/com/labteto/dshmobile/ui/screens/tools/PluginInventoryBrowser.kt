@@ -777,7 +777,16 @@ internal fun PluginInventoryBrowser(
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                     Text(skill, modifier = Modifier.weight(1f),
                                         style = DsType.small13, color = colors.text)
-                                    val installed = skills.any { it.name == skill }
+                                    val officialRoot = codexPlugins
+                                        .firstOrNull { it.id == pluginId }?.sourcePath
+                                    val skillFolder = details.skillDirectories[skill]
+                                    val installed = skills.any { installedSkill ->
+                                        installedSkill.name == skill ||
+                                            (officialRoot != null && skillFolder != null &&
+                                                installedSkill.sourceUrl?.contains(
+                                                    "/$officialRoot/$skillFolder"
+                                                ) == true)
+                                    }
                                     SyButton(
                                         text = if (installed) "已安装" else "安装",
                                         variant = SyButtonVariant.Info,
