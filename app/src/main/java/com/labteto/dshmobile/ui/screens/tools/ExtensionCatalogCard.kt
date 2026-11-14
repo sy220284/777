@@ -89,7 +89,7 @@ internal fun ExtensionCatalogCard(
             ) {
                 Text(
                     title,
-                    modifier = Modifier.testTag("$tagPrefix-title-$id"),
+                    modifier = Modifier.fillMaxWidth().testTag("$tagPrefix-title-$id"),
                     style = DsType.std14Strong.withReadingWeight(),
                     color = colors.text,
                     maxLines = 1,
