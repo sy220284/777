@@ -456,6 +456,6 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
         const val MAX_REFERENCE_VALUE_CHARS = 8_192
         const val RESULT_REFERENCE_KEY = "\$step_result"
         const val MAX_RESULT_CHARS = 4_000
-        val JSON_NUMBER_PATTERN = Regex("""-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?""")
+        val JSON_NUMBER_PATTERN = Regex("""-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?""")
     }
 }
