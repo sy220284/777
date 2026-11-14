@@ -25,12 +25,11 @@ class ExtensionCatalogPresentationTest {
         assertEquals("保留人物声音并调整节奏", skill.description)
     }
 
-    @Test fun genericEnglishMetadataNeverBecomesUserFacingTitleOrSummary() {
+    @Test fun unknownSkillKeepsItsRealIdentityAndMeaningfulDescription() {
         val skill = extensionPresentation("experimental-tool", "experimental-tool",
             "A long English explanation", ExtensionKind.SKILL)
-        assertEquals("自定义技能", skill.title)
-        assertEquals("本地技能，可在详情中查看执行规则", skill.description)
-        assertTrue(skill.title.any { it.code in 0x4e00..0x9fff })
+        assertEquals("Experimental Tool", skill.title)
+        assertEquals("A long English explanation", skill.description)
     }
 
     @Test fun trademarkedEnglishNamesRemainIntactAndLocalConnectorsAreLocalized() {
@@ -39,6 +38,18 @@ class ExtensionCatalogPresentationTest {
         val local = extensionPresentation("local-mcp", "local-mcp", "", ExtensionKind.CONNECTOR)
         assertEquals("MCP 本地服务", local.title)
         assertEquals(ExtensionGroup.GENERAL, local.group)
+    }
+
+    @Test fun publisherLogosAreDistinctVectorAssets() {
+        val figma = extensionPresentation("figma-use", "figma-use", "", ExtensionKind.SKILL)
+        val github = extensionPresentation("gh-fix-ci", "gh-fix-ci", "", ExtensionKind.SKILL)
+        val canva = extensionPresentation("canva", "Canva", "", ExtensionKind.PLUGIN)
+        val notion = extensionPresentation("notion-research-documentation",
+            "notion-research-documentation", "", ExtensionKind.SKILL)
+        assertEquals(R.drawable.ic_market_figma, figma.documentIcon)
+        assertEquals(R.drawable.ic_market_github, github.documentIcon)
+        assertEquals(R.drawable.ic_market_canva, canva.documentIcon)
+        assertEquals(R.drawable.ic_market_notion, notion.documentIcon)
     }
 
     @Test fun categoryAndDocumentIconFollowUnderlyingStableId() {
