@@ -33,6 +33,7 @@ class AndroidDevicePluginTest {
         assertTrue("android_clipboard_clear" in names)
         assertTrue("android_vscreen_screenshot" in names)
         assertTrue("android_find" in names)
+        assertTrue("android_input_text" in names)
         assertTrue("android_click_node" in names)
         assertTrue("android_wait" in names)
         assertTrue("android_notification_status" in names)
@@ -73,8 +74,8 @@ class AndroidDevicePluginTest {
         registry.install(AndroidDevicePlugin(provider))
 
         val names = registry.context.tools.names()
-        assertEquals(32, names.size)
-        assertEquals(32, names.toSet().size)
+        assertEquals(33, names.size)
+        assertEquals(33, names.toSet().size)
         assertTrue(registry.isInstalled("android-device"))
 
         assertTrue(registry.uninstall("android-device"))
@@ -201,6 +202,33 @@ class AndroidDevicePluginTest {
         assertThrows(IllegalArgumentException::class.java) {
             emptyMap<String, String>().deviceStringIncludingEmpty("value")
         }
+    }
+
+    @Test
+    fun inputToolAcceptsFocusedOrPreciselySelectedFieldAndRequiresRealConfirmation() = runTest {
+        val provider = RecordingProvider { capability ->
+            if (capability == "accessibility_input_text") "false" else "ok:$capability"
+        }
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(provider))
+        val input = registry.context.tools.get("android_input_text")!!
+        assertEquals(ToolAccess.DEVICE, input.access)
+        assertEquals(ToolApprovalPolicy.MUTATION, input.approvalPolicy)
+        val emptyFocus = registry.context.tools.execute("android_input_text",
+            buildJsonObject { put("value", "") },
+            context = ToolContext(approval = { true }))
+        assertEquals("ANDROID_ACTION_UNCONFIRMED", emptyFocus.errorCode)
+        assertEquals(mapOf("value" to ""), provider.calls.last().second)
+        val byId = registry.context.tools.execute("android_input_text",
+            buildJsonObject { put("id", "app:id/search"); put("value", "新文字") },
+            context = ToolContext(approval = { true }))
+        assertEquals("ANDROID_ACTION_UNCONFIRMED", byId.errorCode)
+        assertEquals("app:id/search", provider.calls.last().second["id"])
+        val bad = registry.context.tools.execute("android_input_text",
+            buildJsonObject { put("id", "app:id/search") },
+            context = ToolContext(approval = { true }))
+        assertTrue(bad.isError)
+        assertEquals(2, provider.calls.count { it.first == "accessibility_input_text" })
     }
 
     @Test
