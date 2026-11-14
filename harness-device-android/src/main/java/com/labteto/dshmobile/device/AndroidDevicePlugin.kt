@@ -53,7 +53,7 @@ class AndroidDevicePlugin(
         Spec("android_open_uri", "android_open_uri", "通过系统安全 VIEW Intent 打开 http/https/market/geo/mailto/tel URI", mapOf("uri" to "string"), setOf("uri"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_tap_text", "accessibility_click_text", "按文本定位并点击控件", mapOf("text" to "string"), setOf("text"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_type", "accessibility_set_text", "按现有文字定位输入框，或省略 search_text 使用当前焦点；同 android_input_text 的统一写入与回读协议，回执可区分目标未找到与写入后未确认", mapOf("search_text" to "string", "value" to "string"), setOf("value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
-        Spec("android_input_text", "accessibility_input_text", "Android/Compose 输入：优先 id+value 精确选框；其次已聚焦输入框（只传 value）；也可传最近 find 返回的 node 或现有 text。自动替换并回读。成功为 true；失败明确区分目标不可用、系统未确认写入、已接受写入但未能回读，后者先重读界面再决定下一步，避免重复修改。", mapOf("node" to "integer", "id" to "string", "text" to "string", "value" to "string"), setOf("value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
+        Spec("android_input_text", "accessibility_input_text", "Android/Compose 输入：优先 id+value 精确选框；其次使用当前焦点对应的输入框（只传 value）；也可传最近 find 返回的 node 或现有 text。自动替换并回读。成功为 true；失败明确区分目标不可用、系统未确认写入、已接受写入但未能回读，后者先重读界面再决定下一步，避免重复修改。", mapOf("node" to "integer", "id" to "string", "text" to "string", "value" to "string"), setOf("value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_tap", "accessibility_tap", "按屏幕坐标点击", mapOf("x" to "number", "y" to "number", "duration_ms" to "integer"), setOf("x", "y"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_swipe", "accessibility_swipe", "按坐标执行滑动", mapOf("start_x" to "number", "start_y" to "number", "end_x" to "number", "end_y" to "number", "duration_ms" to "integer"), setOf("start_x", "start_y", "end_x", "end_y"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_back", "android_back", "执行系统返回", access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
@@ -180,7 +180,7 @@ internal fun androidDeviceToolResult(
         "ANDROID_INPUT_READBACK_UNCONFIRMED" ->
             "系统已接受文字写入请求，尚未从同一输入框回读确认目标内容；先用 android_find/android_screen 核对实际文字，再决定是否修改。"
         "ANDROID_ACTION_UNCONFIRMED" ->
-            "Android 未确认本次操作完成。请先重新读取当前界面或虚拟屏状态，再决定后续操作。"
+            "Android 未确认本次操作完成。请先重新检查当前界面或虚拟屏状态，再决定后续操作。"
         else -> value
     }
     return ToolResult(
