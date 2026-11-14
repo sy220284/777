@@ -88,6 +88,20 @@ class LocalWorkspace(
     private val observations = LocalFileObservationCache()
     private val textIndex = LocalTextLineIndex(canonicalRoot, boundary::isAllowed)
     private val fileWriteLock = Any()
+
+    /**
+     * The Files owner serializes project directory relocation with ordinary workspace writers.
+     * Invalidate directory/search snapshots regardless of success: a failed transaction may
+     * already have renamed and restored a folder before reporting the error.
+     */
+    internal fun <T> withWorkspaceFileMutation(block: () -> T): T = synchronized(fileWriteLock) {
+        try {
+            block()
+        } finally {
+            synchronized(directoryNameSnapshots) { directoryNameSnapshots.clear() }
+            synchronized(searchCursors) { searchCursors.clear() }
+        }
+    }
     // Retain only the small traversal frontier between consecutive tool pages. On a
     // cache miss (process restart, different query or competing caller), numeric cursors
     // still work by replaying the deterministic walk.
@@ -273,11 +287,12 @@ class LocalWorkspace(
         relativePath: String, bytes: ByteArray, offset: Long, finish: Boolean,
         sessionId: String? = null,
     ): String {
-        val file = resolveForWrite(relativePath)
         val result = synchronized(fileWriteLock) {
-            LocalLargeFileIO.writeChunk(file, bytes, offset, finish, sessionId, canonicalRoot)
+            val file = resolveForWrite(relativePath)
+            LocalLargeFileIO.writeChunk(file, bytes, offset, finish, sessionId, canonicalRoot).also {
+                if (finish) observations.remove(file.path)
+            }
         }
-        if (finish) observations.remove(file.path)
         return "分块写入 " + relativePath + "；session_id=" + result.sessionId +
             "；next_byte=" + result.nextByte +
             if (finish) "；complete=true" else "；complete=false（继续使用 session_id 与 offset=next_byte）"
