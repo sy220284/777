@@ -190,12 +190,25 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             )
             val child = original.copy(attributes = attrs, expectedRegistration = handler)
             val outcome = try {
-                // ToolRegistry owns each tool's deadline; an additional script watchdog would
-                // interrupt legitimate long-running tools before their own timeout.
-                if (sampled == null) {
-                    liveTools.executeTracked(name, resolvedArguments, resolvedArguments.toString(), child)
-                } else withContext(CodeModeStepScope(sampled, handler)) {
-                    liveTools.executeTracked(name, resolvedArguments, resolvedArguments.toString(), child)
+                // The app coordinator owns approvals, workspace leases and durable execution IDs.
+                // Reusing the parent callback would check the child against code_mode_run and
+                // incorrectly reject even the first read/bash step, or attribute it to the parent.
+                // Standalone harness clients keep the original registry execution path.
+                val nested = original.dispatchNestedTool
+                if (nested != null) {
+                    val runChild: suspend () -> Pair<ToolResult, Boolean> = {
+                        nested(name, resolvedArguments, resolvedArguments.toString(), index + 1)
+                    }
+                    val (result, started) = if (sampled == null) runChild()
+                        else withContext(CodeModeStepScope(sampled, handler)) { runChild() }
+                    ToolInvocationResult(result, started)
+                } else {
+                    // ToolRegistry owns each tool's deadline; no second script watchdog.
+                    if (sampled == null) {
+                        liveTools.executeTracked(name, resolvedArguments, resolvedArguments.toString(), child)
+                    } else withContext(CodeModeStepScope(sampled, handler)) {
+                        liveTools.executeTracked(name, resolvedArguments, resolvedArguments.toString(), child)
+                    }
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
