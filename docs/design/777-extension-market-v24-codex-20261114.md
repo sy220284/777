@@ -6,7 +6,7 @@
 ## 设计依据
 
 - 本机设计技能原始包：资料库 `/技能/设计技能2.4.zip`，包括 `手机UI设计技能/SKILL.md`、`references/手机页面规划与简洁性.md`、`references/安卓原生与接口契约.md`、`references/质量门禁与设计审计.md`。
-- 777 [现行 UI 规范](../UI-UX.zh-CN.md)和 [V6.4 设计目标](design/v6/V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)。
+- 777 [现行 UI 规范](../UI-UX.zh-CN.md)和 [V6.4 设计目标](v6/V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)。
 - [Codex 核心插件管理器](https://github.com/openai/codex/blob/main/codex-rs/core-plugins/src/manager.rs)、[市场解析器](https://github.com/openai/codex/blob/main/codex-rs/core-plugins/src/marketplace.rs)、[清单协议](https://github.com/openai/codex/blob/main/codex-rs/core-plugins/src/manifest.rs)、[搜索实现](https://github.com/openai/codex/blob/main/codex-rs/app-server/src/request_processors/plugins/search.rs)。
 - [OpenAI 官方插件目录](https://github.com/openai/plugins/blob/main/.agents/plugins/marketplace.json)、[Figma 插件元数据](https://github.com/openai/plugins/blob/main/plugins/figma/.codex-plugin/plugin.json)。
 
