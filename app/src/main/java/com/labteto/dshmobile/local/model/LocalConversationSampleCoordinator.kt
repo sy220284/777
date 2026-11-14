@@ -68,7 +68,7 @@ private fun <T> Sequence<T>.takeLastSampleContext(limit: Int): Sequence<T> =
     toList().takeLast(limit).asSequence()
 
 @Singleton
-internal class LocalConversationSampleCoordinator @Inject constructor(
+class LocalConversationSampleCoordinator @Inject internal constructor(
     private val stateStore: LocalRuntimeStateStore,
     private val modelGateway: LocalModelGateway,
     private val auxiliary: LocalAuxiliaryModelRequestRuntime,
@@ -77,7 +77,7 @@ internal class LocalConversationSampleCoordinator @Inject constructor(
 ) {
     private val sampleLock = Mutex()
 
-    suspend fun sample(expectedSessionId: String, rawPrompt: String): LocalConversationSampleResult {
+    internal suspend fun sample(expectedSessionId: String, rawPrompt: String): LocalConversationSampleResult {
         val prompt = validateLocalSessionSamplePrompt(rawPrompt)
         check(sampleLock.tryLock()) { "另一项会话采样正在进行，请先取消或查看其结果" }
         try {
