@@ -64,7 +64,7 @@ import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot as McpServerSnapshot
-import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
+import com.labteto.dshmobile.uicontract.ToolsManagementUiPort
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.network.requiresAndroid17LocalNetworkPermission
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
@@ -168,7 +168,7 @@ internal class ToolsOperationGate {
 
 @HiltViewModel
 class ToolsViewModel @Inject constructor(
-    private val localTools: LocalToolsUiFacade,
+    private val localTools: ToolsManagementUiPort,
     @ApplicationContext private val appContext: Context,
     private val networkSearchSettings: LocalNetworkSearchSettings,
 ) : ViewModel() {
