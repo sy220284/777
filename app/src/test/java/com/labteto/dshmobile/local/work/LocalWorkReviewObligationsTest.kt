@@ -83,6 +83,51 @@ class LocalWorkReviewObligationsTest {
             assertTrue(localWorkDeliveryEvidence(log, goal).outstandingReviews.isNotEmpty())
         }
 
+    @Test fun sessionOnlyProgressAndUnrelatedGoalDoNotInvalidateReview() =
+        withGoal(listOf("code")) { log, goal ->
+            val ledger = LocalCodeReviewLedger(log)
+            ledger.request("code-1", "worktree/HEAD", "digest",
+                currentReviewGoalBinding(log, "code"))
+            val review = ledger.complete("code-1", "worktree/HEAD", "digest",
+                "检查完成", "reviewer")
+            assertTrue(ledger.accept(review.id, review.evidenceSequence, review.digest))
+            log.append("tool/call", buildJsonObject {
+                put("id", "todo-1"); put("goal_id", goal.id); put("name", "todo_write")
+            })
+            log.append("tool/result", buildJsonObject {
+                put("id", "todo-1"); put("name", "todo_write")
+                put("is_error", false); put("side_effect", "possible")
+            })
+            log.append("tool/call", buildJsonObject {
+                put("id", "other-goal"); put("goal_id", "unrelated"); put("name", "edit")
+            })
+            log.append("tool/result", buildJsonObject {
+                put("id", "other-goal"); put("name", "edit")
+                put("is_error", false); put("side_effect", "possible")
+            })
+            assertTrue(localWorkDeliveryEvidence(log, goal).outstandingReviews.isEmpty())
+        }
+
+    @Test fun editStartedBeforeApprovalButSettledAfterApprovalInvalidatesIt() =
+        withGoal(listOf("code")) { log, goal ->
+            val ledger = LocalCodeReviewLedger(log)
+            log.append("tool/call", buildJsonObject {
+                put("id", "in-flight-edit"); put("name", "edit"); put("goal_id", goal.id)
+            })
+            ledger.request("code-1", "worktree/HEAD", "digest",
+                currentReviewGoalBinding(log, "code"))
+            val review = ledger.complete("code-1", "worktree/HEAD", "digest",
+                "检查完成", "reviewer")
+            assertTrue(ledger.accept(review.id, review.evidenceSequence, review.digest))
+            log.append("tool/result", buildJsonObject {
+                put("id", "in-flight-edit"); put("name", "edit")
+                put("is_error", false); put("side_effect", "possible")
+            })
+            assertTrue(localWorkDeliveryEvidence(log, goal).outstandingReviews.any {
+                it.contains("新的修改")
+            })
+        }
+
     @Test fun subsequentGoalOwnedMutationInvalidatesAcknowledgedSnapshot() =
         withGoal(listOf("code")) { log, goal ->
             val code = LocalCodeReviewLedger(log)
