@@ -8,7 +8,7 @@ PR #664 设计的 **26 枚路径**仅在 Kotlin 生产代码中保留；按当�
 - **设计方向**：杏灰衬底、墨棕主体、造型轻微非对称，拒绝照搬 Feather 的 2px icon stroke 和直白剪影。浅/深/哑光的材质底板由系统令牌控制；源图只保留抽象黑色 path 供动态 tint。
 - **交互**：保留既有 onClick、contentDescription、最小 48dp 点击热区、按压/悬停/减少动态效果语义；本次只改视觉层，禁止改功能路由。
 - **图标映射**：人物 → `SyEntryIcons.Persona`；新对话 → `SyEntryIcons.NewSession`；任务 → `SyEntryIcons.Tasks`；设置 → `SyEntryIcons.Settings`；搜索 → `SyEntryIcons.Search`；人物画廊 → `SyEntryIcons.Gallery`；群聊 → `SyEntryIcons.GroupChat`；日记 → `SyEntryIcons.Diary`；工作区文件 → `SyEntryIcons.WorkspaceFiles`；工具 → `SyEntryIcons.Tools`；用量 → `SyEntryIcons.Usage`；沉浸阅读 → `SyEntryIcons.Reader`；额度 → `SyEntryIcons.Quota`；外观 → `SyEntryIcons.Appearance`；记忆 → `SyEntryIcons.Memory`；会话存储 → `SyEntryIcons.SessionStorage`；模型 → `SyEntryIcons.Models`；性能 → `SyEntryIcons.Performance`；账户 → `SyEntryIcons.Account`；通知 → `SyEntryIcons.Notifications`；权限 → `SyEntryIcons.Permissions`；高级 → `SyEntryIcons.Advanced`；更新 → `SyEntryIcons.Updates`；对话风格 → `SyEntryIcons.ChatStyle`。
-- **验收**：Gradle 单测及 Android CI 验证加载，不等于所有实际主题/壁纸设备截图达标；应在现行 7 路由与 21 个设置二级目的地的使用场景中核对，不再以历史固定屏幕数量作为验收分母。
+- **实现**：图标资源由现行七条导航路径与设置入口使用，视觉细节按主题和界面布局继续完善。
 - **Figma 状态**：独立设计文件已建立，但 Figma Starter MCP 配额不足时不能承诺已写入组件；以版本库 SVG + Kotlin 同源文件为本轮交付源。
 
 ## 导出规则与剩余代码

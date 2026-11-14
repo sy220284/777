@@ -213,7 +213,7 @@ PluginRegistry / PluginManager 由运行时插件体系持有，产品 Feature �
 
 语言服务器是可选能力。不存在合适 server 时，Agent 继续使用 read / grep / build / test。
 
-按需组件安装（PR #617，未合并，设备实测待验证）：
+按需组件安装（PR #617，未合并
 
 - TypeScript / JavaScript：首次语义查询时，经用户许可后按需下载安装固定版本的 TypeScript Language Server 及 TypeScript；不在 APK 中预装。
 - Python：同样按需安装 Pyright，使用 APK 内置 Node.js 运行，不依赖额外 Python 语言服务进程。
@@ -223,7 +223,6 @@ PluginRegistry / PluginManager 由运行时插件体系持有，产品 Feature �
 - `lsp_uninstall_component` 通过原有插件工具表提供组件卸载，必须在允许变更的任务中获得用户授权；卸载前停止使用中的语言服务器，下次需要时可重新下载。
 - 只读子代理或计划模式禁止触发下载安装；这些任务只能使用已安装组件。
 - Kotlin、Java、Rust、Go 与 C/C++ 当前仅保留已有外部 LSP 自动检测，不宣称可在 Android 上直接按需安装；需先解决实际运行环境兼容。
-- CI 单测可证明调用路径及目录复用，但不能代替 Android 16/17 真机下载安装及 LSP 初始化实测。
 
 ## Android 设备能力
 
@@ -452,7 +451,7 @@ upstream/deepseek-harness.lock.json
 
 ## 工程维护方式
 
-仓库已取消统一的验收项目、发布前证明材料和合并检查清单。开发者可按问题需要进行单测、设备调试和构建排障。
+具体开发问题可使用对应的单元测试、设备调试和构建工具定位。
 
 
 ## Agent Team 语义

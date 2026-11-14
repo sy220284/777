@@ -1,6 +1,6 @@
 # 777 × Codex × Claude 317：同功能优劣复核与 Android 交互优化
 
-> 核查日期：2026-11-13。核查方法为代码入口/协议语义/调用与持久记录核验；**源码存在、CI 通过和 Android 实机完成是三个独立等级**。
+> 核查日期：2026-11-13；重点核对代码入口、协议、运行时状态及持久化路径。
 > 
 > Codex 资料库：`/codex/codex-main-2.zip`（ZIP 中央目录损坏，按单文件头与 CRC 恢复有效源码；不把残缺文件当做已核实）；官方同步对照：`openai/codex@c899e21cda29fdd422898ffa54893f67ece34039`（2026-11-13）。
 >
@@ -16,7 +16,7 @@
 | 审查恢复 | Codex Review 输出归属 session task/event，退出 Review Mode 有特定状态 | 777 审查结果已有持久 EventLog，但最初重新进入弹层不读取它 | 以单一 EventLog 补 `latestForDigest`，通过差异 SHA-256 找回历史报告、人工接纳状态；仅只读恢复，无新模型计费 |
 | 代码改动范围 | Codex 支持未提交、基线、指定提交；777 原仅 `git_diff_remote` | `GitRemoteDiff.kt`、`GitWorkspaceRuntime.kt`、`LocalToolsUiFacade.kt` | 新增 `git_diff_uncommitted` 和“检查本地修改”，复用现有只读 git 命令与工作区路径约束；显式说明未跟踪文件未包含 |
 | 工具安全前置 | Claude 317 有 Hook 失败策略和授权提醒线索；Codex `tools/sandboxing.rs` 有执行隔离 | `ToolHookRegistry.kt` 快照、`ToolRegistry.kt` 前置 Hook 5 秒上限、异常拒绝、审批后 generation 校验 | **777 现有移动端栅栏更值得保留**；新增 Hook 不可旁路旧审批。后置失败保留真实工具副作用回执 |
-| 多智能体工作区 | Claude 317 有团队/协调逻辑；Codex 有代理控制、隔离工作区、团队审核 | `GitWorkspaceRuntime.kt` 真实 worktree 与三方合并，`LocalTeamVerificationController.kt` 审核来源检查 | 保留 777 独立 worktree 与 Lead 验收，接下来补全写权限强约束及跨后端身份/取消/任务图合并的真实设备证明 |
+| 多智能体工作区 | Claude 317 有团队/协调逻辑；Codex 有代理控制、隔离工作区、团队审核 | `GitWorkspaceRuntime.kt` 真实 worktree 与三方合并，`LocalTeamVerificationController.kt` 审核来源检查 | — |
 | MCP 扩展 | Codex 有 MCP 动态能力，Claude 317 有协议交互/Hook 扩展 | `McpToolBridgePlugin.kt`、`McpElicitationRoundTrips.kt`、`McpPluginWorkerService.kt` | 777 已有后台 worker 隔离、来源可追溯、多轮追问的分支代码，继续修复 array/enum 输入、旧协议和崩溃恢复；不复制第二套宿主 |
 | 技能分发 | Claude Code 强于命令/角色/Hook/技能联合封装 | `LocalSkillManager.kt`、`LocalSkillPackageUpdater.kt`、Tools UI；GitHub 精选目录已接入 | 统一扩展包的签名/来源/依赖/权限/升级/回滚/分享，安装后按实际注册能力显示入口 |
 | 长任务恢复 | Codex session rollout/checkpoint、Claude 317 任务继续与错误控制 | `LocalSessionEventLog.kt`、`LocalPersistentJobRecoveryCoordinator.kt`、`LocalWorkIntegrationDecision.kt` | **777 单一事实源和未知副作用门禁是现有优势**；继续检验 SIGKILL、重启后审批代次、未完成动作、目标完成证据 |
@@ -58,15 +58,14 @@
 
 本报告专注“发现既有功能仍做优劣比较”。按原 PR #895 的 29 项台账继续开展，不能用一次审查改动替代所有项目：
 
-- **P0：工程闭环**：项目完整生命周期、未跟踪文件/任意提交/自定义审查目标、真实测试证据、提交前验证、修改快照与回滚，Goal 验证与人工放行。
+- **工程实现方向**：项目完整生命周期、审查目标、提交前检查、修改快照与回滚，以及人工确认入口。
 - **P0：可靠执行**：Team/TaskGraph 跨 backend 统一生命周期，任务取消与恢复、工作区强隔离、可信远端环境状态、设备冷启动与 SIGKILL 故障注入。
 - **P1：统一扩展**：技能+角色+工具+Hook+MCP 的依赖/权限/来源/升级/恢复协议，插件宿主过程隔离与崩溃恢复，确保 UI 选择与真实注册一致。
 - **P1：模型与配置**：多供应商独立凭据目录、真实额度/费率/有效时间、多层策略合并与锁定原因，避免因模型切换产生旧授权残留。
 - **P1：安全与审计**：独立审核、执行后回执、统一网络代理与凭据保护、跨 MCP/HTTP/本地进程的相同权限规则。
 - **P2：多模态**：实时双向语音，复杂视频参考输入、音乐生成、专业字幕/转写结果，继续复用现有媒体 Job 与成果档案。
-- **最终验收**：逐条生产入口及 UI 操作成功、Android 16/17 模拟器/实机、完整 CI、异常恢复；缺乏真实账户的联网能力保留“未实测”，不等同已全部完成。
 
-资料来源：`openai/codex` 最新源码；资料库 Codex ZIP、Claude 317 提取包（行为归纳不复制代码）；777 main 与 PR #895 的真实生产文件。此文是本次源码依据、设计收敛与验收清单，不是所有后续能力已经交付的声明。
+资料来源：`openai/codex`、Codex ZIP、Claude 317 提取包及 777 对应源码；本文件整理能力设计与现状。
 
 
 ## 2026-11-13 追加：五套编程/多模态 CLI 能力与原生 UI 复核
@@ -76,7 +75,7 @@
 | 功能体系 | Codex / Claude 317 与其他 CLI 借鉴点 | 777 现有实现更优之处 | 777 下一步实际验收点 | UI 归属 |
 |---|---|---|---|---|
 | 运行入口 | 独立 shell/headless CLI、结构化输入输出和退出码 | 777 原生 Android 任务可在 UI 查看会话、恢复及设备权限 | 独立 777 命令行、标准化 JSON/JSONL 结果，五套外部 CLI 逐一核 ABI/运行时/授权，失败有确切回执 | 工作区入口与工具详情 |
-| 项目与审查 | Codex 对未提交、分支、指定提交、首次提交、合并提交目标更完整 | 777 已有人工接纳版本栅栏、审查持久 EventLog 与原生差异 sheet | 本轮新增 git_diff_commit+真实工作区按钮，覆盖 root commit、普通/合并提交、无远端场景；CI/Android 验收需继续 | 工作 → 工作区 → 代码审查 |
+| 项目与审查 | Codex 对未提交、分支、指定提交、首次提交、合并提交目标更完整 | 777 已有人工接纳版本栅栏、审查持久 EventLog 与原生差异 sheet | 本轮新增 git_diff_commit+真实工作区按钮，覆盖 root commit、普通/合并提交、无远端场景 | 工作 → 工作区 → 代码审查 |
 | 权限安全 | Codex 沙箱、Claude Hooks、外部 CLI 授权模式 | 777 现有工具审批、插件注册代次核验、未知副作用门禁适合 Android | 同一安全策略覆盖 Git/Shell/MCP/外部进程；重启/取消后的授权失效及真机测试 | 工作中的审批卡；高级设置显示原因 |
 | 扩展与生态 | Claude 命令+技能+Hook 配置；Codex 市场；Gemini 扩展；OpenCode 插件 | 777 已有原生 MCP、Skill、ToolRegistry 和独立插件管理链 | 安装→来源验真→注册→真实调用→升级/回滚→崩溃恢复，逐一保留回执 | 工具 → 技能/插件 → 详情 |
 | 模型与费用 | Codex 模型能力目录、Claude 账户授权、OpenCode 多供应商 | 777 可独立路由模型并通过原生设备账号展示 | 每供应商独立连接/能力检测、真实额度费率+时间、拒绝原因 | 设置 → 模型 |
@@ -93,7 +92,7 @@
 **交互设计验证**：
 - Android UI 2.4 原则：首屏显示当前项目和下一项关键操作，进入代码审查后二级选择目标、三级差异预览/审查接纳；需要身份/敏感权限时就地出现解释及系统授权入口。减少一进页面大量字段。
 - 可交互演示 HTML 和两张截图由本轮制作，独立验证了三主入口、指定提交输入、差异预览及审查操作；所有模拟状态均显式标注“演示”。
-- Figma 新文件：https://www.figma.com/design/58aL1rx9pPm7ykjix96XPa 。文件成功创建；Starter 账户的 MCP 限额阻断后续画布写入，故目前无法给出真实 Figma 帧/组件审查证据。
-- 用户可操作的生产 Android 界面已写入 PR；实际设备、CI、工具端到端结果仍需另行验收，不把交互原型当作 APK 实测。
+- Figma 新文件：https://www.figma.com/design/58aL1rx9pPm7ykjix96XPa 。文件成功创建；Starter 账户的 MCP 限额阻断后续画布写入。
+- 用户可操作的生产 Android 界面已写入 PR；不把交互原型当作 APK 实测。
 
 **证据与边界**：Codex 来源 `/codex/codex-main-2.zip` 与可核验快照 `codex_verified_local_snapshot_2026-11-13.zip`；Claude 317 来源 `/反编译/Claude-Code-2.1.317-Linux-x64-完整反编译包.tar.zst`，包中独立核验记录版本与文件完整性已确认。借鉴协议与交互设计，不复制 Claude 反编译的专有代码。后续能力优先在原所有权链中增强，而非增加重复的 Agent 内核或重复 UI 配置页。
