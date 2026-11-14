@@ -791,6 +791,7 @@ internal fun PluginInventoryBrowser(
                                         text = if (installed) "已安装" else "安装",
                                         variant = SyButtonVariant.Info,
                                         enabled = !loading && !installed && onInstallCodexPluginSkill != null,
+                                        modifier = Modifier.testTag("codex-skill-install-$pluginId-$skill"),
                                         onClick = {
                                             selectedRow = null
                                             onInstallCodexPluginSkill?.invoke(pluginId, skill)
