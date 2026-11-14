@@ -70,6 +70,25 @@ class LocalModelBudgetPolicyTest {
     }
 
     @Test
+    fun documentedContextBudgetNeverSpendsReservedOutputSpace() {
+        for (window in listOf(4_096, 8_192, 16_384, 32_768, 128_000)) {
+            val budget = localHistoryBudgetFor(
+                memoryClassMb = 512,
+                pressure = HarnessResourcePressure.LOW,
+                model = "MiniMax-M3",
+                baseUrl = "https://api.minimaxi.com/v1",
+                contextWindowTokensOverride = window,
+            )
+            val input = operationalInputLimitTokens(
+                "MiniMax-M3", "https://api.minimaxi.com/v1", window,
+            )
+            assertEquals(input, budget.maxHistoryTokens)
+            assertTrue("input + output reserve + headroom exceeded $window",
+                input.toLong() + budget.outputReserveTokens!! + budget.headroomTokens!! <= window.toLong())
+        }
+    }
+
+    @Test
     fun sliceBudgetsFollowSelectedModelWithoutDroppingPriorUsage() = runTest {
         val budget = LocalWorkExecutionBudget()
         budget.beginExecutionSlice(LocalModelBudgetPolicies.forRoute("MiniMax-M3", "https://api.minimaxi.com/v1"))
