@@ -10,7 +10,7 @@
 
 ## Code Mode 前序结果的实际写法
 - 已有 `配置.json` 内容为 `{"file":{"path":"文档.md"}}` 时，可执行：`{"steps":[{"tool":"json_query","args":{"path":"配置.json","query":""}},{"tool":"read","args":{"path":{"$step_result":1,"path":"file.path"}}}]}`；第一步返回 JSON 内容，第二步读取其中的文件路径。
-- 引用前一步的结果：`{"$step_result":1}`。引用其 JSON 内容的具体字段：`{"$step_result":1,"path":"file.path"}`。步骤编号从 **1** 开始，字段路径使用点号，如 `file.path` 或 `items.0.name`，不能写成 `$.file.path`、`[0]`、`steps[0]`。
+- 引用前一步的结果：`{"$step_result":1}`。取其中字段：`{"$step_result":1,"path":"$.file.path"}`。步骤编号从 **1** 开始，路径可按习惯写成 `file.path`、`$.file.path`、`items[0].name`、`items.0.name` 或 `['中文字段']`；也支持 `$.items[0]["name"]`。无需转换成特殊内部格式。
 - `path` 访问的是上一步工具返回的 **原始持久结果正文**；若结果是纯字符串则不能从中取不存在的 JSON 字段。不能引用屏幕截图等临时结果。条件字段使用 `"when":{"step":1,"path":"approved","equals":true}`。
 - 需要确认具体返回结构时，先单独执行第一步查看真实结果，再组装引用。计划在执行任何写入前会校验引用语法，后续写入仍遵守原工具授权。
 
