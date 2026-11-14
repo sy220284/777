@@ -114,7 +114,7 @@ class PluginInventoryBrowserRegressionTest {
         }
         compose.onNodeWithText("报告生成").assertIsDisplayed()
         compose.onNodeWithText("整理资料并制作报告").assertIsDisplayed()
-        compose.onNodeWithText("已安装").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-card-skill:report").assertIsDisplayed()
     }
 
     @Test
