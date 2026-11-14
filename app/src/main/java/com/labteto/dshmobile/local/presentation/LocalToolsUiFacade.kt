@@ -32,12 +32,12 @@ class LocalToolsUiFacade @Inject internal constructor(
     private val gitHubBrowser: com.labteto.dshmobile.local.tools.LocalGitHubCredentialManager,
     private val mcpCredentials: com.labteto.dshmobile.local.tools.LocalMcpCredentialStore,
     private val mcpOAuth: com.labteto.dshmobile.local.tools.LocalMcpOAuthCoordinator,
-) : com.labteto.dshmobile.uicontract.ToolsUiPort {
-    suspend fun agentBackendStatus(): String = agentBackends.status()
-    suspend fun probeAgentBackend(): String = agentBackends.probe()
-    suspend fun configureAgentBackend(host: String, port: Int, pin: String, token: String, consent: Boolean) =
+) : com.labteto.dshmobile.uicontract.ToolsManagementUiPort {
+    override suspend fun agentBackendStatus(): String = agentBackends.status()
+    override suspend fun probeAgentBackend(): String = agentBackends.probe()
+    override suspend fun configureAgentBackend(host: String, port: Int, pin: String, token: String, consent: Boolean) =
         agentBackends.configure(host, port, pin, token, consent)
-    suspend fun revokeAgentBackend() = agentBackends.revoke()
+    override suspend fun revokeAgentBackend() = agentBackends.revoke()
 
     override fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit> = tools.serverChanges()
 
@@ -208,7 +208,7 @@ class LocalToolsUiFacade @Inject internal constructor(
         return hasMcpTools to hasThirdPartyPlugin
     }
     /** Refresh the existing skill inventory when the real on-device skill files change. */
-    fun skillChanges(): kotlinx.coroutines.flow.Flow<Unit> = skillManager.changes()
+    override fun skillChanges(): kotlinx.coroutines.flow.Flow<Unit> = skillManager.changes()
     override suspend fun installedSkills() = withContext(Dispatchers.IO) {
         val connected = servers()
         val registeredTools = tools.capabilityCatalogue().map { it.name }.toSet()
@@ -270,7 +270,7 @@ class LocalToolsUiFacade @Inject internal constructor(
         )
     }
     /** Publisher-provided plugin logo, loaded through the catalog owner. */
-    suspend fun codexPluginLogo(id: String): ByteArray? = codexOfficialPlugins.officialLogo(id)
+    override suspend fun codexPluginLogo(id: String): ByteArray? = codexOfficialPlugins.officialLogo(id)
 
     override suspend fun codexPluginDetail(id: String):
         com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot {
@@ -297,7 +297,7 @@ class LocalToolsUiFacade @Inject internal constructor(
         return "已完成 MCP 授权并连接：${endpoint.serverId}"
     }
     /** The feature owns source validation; UI passes only the name from a visible catalog row. */
-    suspend fun installCuratedSkill(id: String) = gitHubSkillImporter.install(
+    override suspend fun installCuratedSkill(id: String) = gitHubSkillImporter.install(
         com.labteto.dshmobile.local.tools.curatedGitHubSkillUrl(id),
     )
     override suspend fun installGitHubSkill(link: String) = gitHubSkillImporter.install(link)
@@ -305,7 +305,7 @@ class LocalToolsUiFacade @Inject internal constructor(
     override suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         tools.createSkill(id, displayName, description, instructions)
     override suspend fun importSkill(filename: String, bytes: ByteArray) = tools.importSkill(filename, bytes)
-    suspend fun importSkillStream(filename: String, input: java.io.InputStream): String =
+    override suspend fun importSkillStream(filename: String, input: java.io.InputStream): String =
         withContext(Dispatchers.IO) {
             val owner = kotlinx.coroutines.currentCoroutineContext()
             val stream = object : java.io.FilterInputStream(input) {
@@ -321,12 +321,12 @@ class LocalToolsUiFacade @Inject internal constructor(
             skillManager.importSkill(filename, stream) { owner.ensureActive() }
         }
     suspend fun exportSkillPackage(id: String): ByteArray = tools.exportSkillPackage(id)
-    suspend fun exportSkillPackageToFile(id: String, destination: java.io.File) =
+    override suspend fun exportSkillPackageToFile(id: String, destination: java.io.File) =
         withContext(Dispatchers.IO) { skillManager.exportSkillPackageToFile(id, destination) }
-    suspend fun checkSkillUpdate(id: String): String? = gitHubSkillImporter.availableUpdate(id)
-    suspend fun upgradeSkill(id: String, revision: String): String =
+    override suspend fun checkSkillUpdate(id: String): String? = gitHubSkillImporter.availableUpdate(id)
+    override suspend fun upgradeSkill(id: String, revision: String): String =
         gitHubSkillImporter.updateInstalled(id, revision)
-    suspend fun rollbackSkill(id: String): String = gitHubSkillImporter.rollback(id)
+    override suspend fun rollbackSkill(id: String): String = gitHubSkillImporter.rollback(id)
     override suspend fun removeSkill(id: String) = tools.removeSkill(id)
     override suspend fun readSkillDocument(id: String) = tools.readSkillDocument(id)
     override suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)
@@ -379,7 +379,7 @@ class LocalToolsUiFacade @Inject internal constructor(
         }
     }
 
-    suspend fun connectHttpWithCredential(serverId: String, endpoint: String, bearer: String): String =
+    override suspend fun connectHttpWithCredential(serverId: String, endpoint: String, bearer: String): String =
         if (bearer.isEmpty()) mcpConnectionGate.withLock { tools.connectHttp(serverId, endpoint) }
         else switchMcpHttpConnection(serverId, endpoint) {
             mcpCredentials.rotateBearer(serverId, endpoint, bearer)
@@ -389,7 +389,7 @@ class LocalToolsUiFacade @Inject internal constructor(
         if (tools.servers().any { it.id == serverId }) tools.disconnect(serverId)
     }
 
-    suspend fun loginMcp(serverId: String, endpoint: String, clientId: String?): String =
+    override suspend fun loginMcp(serverId: String, endpoint: String, clientId: String?): String =
         switchMcpHttpConnection(serverId, endpoint) {
             val grant = mcpOAuth.authorize(serverId, endpoint, clientId)
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
@@ -398,21 +398,21 @@ class LocalToolsUiFacade @Inject internal constructor(
 
     fun cancelMcpLogin(serverId: String) = mcpOAuth.cancel(serverId)
 
-    suspend fun refreshMcpLogin(serverId: String, endpoint: String): String =
+    override suspend fun refreshMcpLogin(serverId: String, endpoint: String): String =
         switchMcpHttpConnection(serverId, endpoint) {
             val refreshed = mcpCredentials.stageOAuthRefresh(serverId, endpoint)
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             mcpCredentials.rotateOAuth(serverId, endpoint, refreshed)
         }
 
-    suspend fun revokeMcpLogin(serverId: String, endpoint: String): Boolean {
+    override suspend fun revokeMcpLogin(serverId: String, endpoint: String): Boolean {
         mcpOAuth.cancel(serverId)
         return mcpConnectionGate.withLock {
             disconnectMcpIfConnected(serverId)
             mcpCredentials.revoke(serverId, endpoint)
         }
     }
-    suspend fun clearMcpCredential(serverId: String) {
+    override suspend fun clearMcpCredential(serverId: String) {
         mcpOAuth.cancel(serverId)
         mcpConnectionGate.withLock {
             disconnectMcpIfConnected(serverId)
@@ -432,6 +432,9 @@ class LocalToolsUiFacade @Inject internal constructor(
 @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
 internal abstract class LocalToolsUiBindings {
     @dagger.Binds abstract fun bindToolsUiPort(facade: LocalToolsUiFacade): com.labteto.dshmobile.uicontract.ToolsUiPort
+    @dagger.Binds abstract fun bindToolsManagementUiPort(facade: LocalToolsUiFacade):
+        com.labteto.dshmobile.uicontract.ToolsManagementUiPort
+
 }
 
 /** Read-only Git comparison receipt; process/runtime objects stay behind the UI facade. */
