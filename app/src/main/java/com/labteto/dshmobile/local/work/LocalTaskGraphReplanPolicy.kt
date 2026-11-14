@@ -23,6 +23,14 @@ internal fun admitLocalTaskGraphReplan(
     }
     require(previous.version != proposed.version) { "TASKGRAPH_REPLAN_NO_CHANGES" }
     require(proposed.nodes.isNotEmpty()) { "TASKGRAPH_REPLAN_EMPTY" }
+    // Replacement bookkeeping (source message, origin finding, graph ID) does
+    // not itself justify re-running the same task graph.
+    val executionKeys = listOf("nodes", "model", "route", "max_steps", "pipeline",
+        "allowed_tools", "output_schema", "backend_binding", "workspace_repository",
+        "input_files", "required_files", "node_input_files", "node_output_files", "evidence")
+    require(executionKeys.any { previous.value[it] != proposed.value[it] }) {
+        "TASKGRAPH_REPLAN_NO_SUBSTANTIVE_CHANGES"
+    }
     // A whole-graph version change must not discard an already verified read-only
     // result if that node's own task, inputs, dependencies and execution contract
     // remain unchanged. Reuse still requires the old result to pass recovery checks.
