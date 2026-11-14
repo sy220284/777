@@ -106,7 +106,7 @@ class AndroidDeviceProvider(
             "accessibility_set_text_node" ->
                 accessibility().setTextNode(
                     arguments.deviceRequiredInt("node"),
-                    arguments.required("value"),
+                    arguments.deviceStringIncludingEmpty("value"),
                 ).toString()
             "accessibility_scroll" -> accessibility().scroll(arguments["direction"] ?: "forward").toString()
             "accessibility_wait" -> accessibilityWait(arguments)
@@ -115,8 +115,8 @@ class AndroidDeviceProvider(
                 accessibility().clickText(arguments.required("text")).toString()
             "accessibility_set_text" ->
                 accessibility().setText(
-                    arguments.required("search_text"),
-                    arguments.required("value"),
+                    arguments.deviceStringIncludingEmpty("search_text"),
+                    arguments.deviceStringIncludingEmpty("value"),
                 ).toString()
             "accessibility_tap" ->
                 accessibility().tap(
@@ -455,6 +455,10 @@ class AndroidDeviceProvider(
         val SAFE_VIEW_SCHEMES = setOf("http", "https", "market", "geo", "mailto", "tel")
     }
 }
+
+/** An empty TextField value is intentional; only an absent key is invalid. */
+internal fun Map<String, String>.deviceStringIncludingEmpty(key: String): String =
+    this[key] ?: throw IllegalArgumentException("缺少参数：$key")
 
 internal fun Map<String, String>.deviceRequiredInt(key: String): Int {
     val raw = this[key]?.takeIf(String::isNotBlank) ?: error("缺少参数：$key")
