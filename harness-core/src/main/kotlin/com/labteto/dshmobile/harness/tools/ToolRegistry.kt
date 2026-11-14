@@ -221,11 +221,16 @@ class ToolRegistry private constructor(
         }
         // Hooks run after contract validation and mutation scope admission; they cannot grant
         // permissions or replace an approval. Every denial occurs before any executor entry.
+        val hookIdentity = ToolHookInvocationIdentity(
+            callId = context.attributes["call_id"] as? String,
+            executionId = context.attributes["execution_id"] as? String,
+            runId = context.attributes["run_id"] as? String,
+        )
         val hookSnapshot = hooks.snapshot(name)
         for (subscription in hookSnapshot.subscriptions) {
             val decision = try {
                 withTimeoutOrNull(5_000L) {
-                    subscription.hook.beforeUse(ToolPreUseRequest(context.sessionId, tool, input))
+                    subscription.hook.beforeUse(ToolPreUseRequest(context.sessionId, tool, input, hookIdentity))
                 } ?: ToolPreUseDecision.Deny("Hook 超时：" + subscription.id)
             } catch (cancel: CancellationException) {
                 throw cancel
@@ -300,8 +305,8 @@ class ToolRegistry private constructor(
         // owns a finish-on-cancellation region, including its terminal receipt. Other tools
         // retain cooperative cancellation and unknown-effect recovery.
         return if (tool.metadata.finishesOnCancellation) {
-            withContext(NonCancellable) { executeHandler(tool, input, rawArguments, context, hookSnapshot) }
-        } else executeHandler(tool, input, rawArguments, context, hookSnapshot)
+            withContext(NonCancellable) { executeHandler(tool, input, rawArguments, context, hookSnapshot, hookIdentity) }
+        } else executeHandler(tool, input, rawArguments, context, hookSnapshot, hookIdentity)
     }
 
     private suspend fun executeHandler(
@@ -310,6 +315,7 @@ class ToolRegistry private constructor(
         rawArguments: String,
         context: ToolContext,
         hookSnapshot: ToolHookSnapshot,
+        hookIdentity: ToolHookInvocationIdentity,
     ): ToolInvocationResult {
         val environment = currentCoroutineContext()[ToolExecutionEnvironmentContext]
         suspend fun executeActual(): ToolResult =
@@ -325,7 +331,7 @@ class ToolRegistry private constructor(
             for (subscription in hookSnapshot.subscriptions) {
                 try {
                     val completed = withTimeoutOrNull(5_000L) {
-                        subscription.hook.afterUse(ToolPostUseEvent(context.sessionId, tool, result))
+                        subscription.hook.afterUse(ToolPostUseEvent(context.sessionId, tool, result, hookIdentity))
                         true
                     } ?: false
                     if (!completed) {
