@@ -195,16 +195,22 @@ internal class AnthropicMessagesClient @Inject constructor(
                             scope == LocalInstructionScope.AGENT.name
                     }
                     val stableCount = if (firstVolatile < 0) systemFragments.size else firstVolatile
-                    val stableBytes = systemFragments.take(stableCount).sumOf {
-                        it.first.toByteArray(Charsets.UTF_8).size.toLong()
-                    }
-                    val toolBytes = tools.sumOf { tool ->
-                        (tool.name.length + tool.description.length +
-                            tool.parameters.toString().length).toLong()
-                    }
-                    // A short transient prompt is not worth writing to the provider cache.
+                    val stableSystem = systemFragments.take(stableCount)
+                        .joinToString("\n\n") { it.first }
+                    // Claude caches tools before system; measure both using the same shared
+                    // tokenizer estimate as model admission, not an unrelated byte threshold.
+                    val stablePrefixEstimate = estimateModelTokens(stableSystem).toLong() +
+                        tools.sumOf { tool ->
+                            estimateModelTokens(
+                                tool.name + tool.description + tool.parameters.toString(),
+                            ).toLong()
+                        }
+                    // The official minimum differs by model generation (512..4096 tokens).
+                    // A marker below that minimum is silently ignored by Claude.
                     val cacheBreakpoint = if (stableCount > 0 &&
-                        stableBytes + toolBytes >= MIN_CACHEABLE_PREFIX_BYTES) stableCount - 1 else -1
+                        stablePrefixEstimate >= minimumOfficialClaudeCacheTokens(route.model)) {
+                        stableCount - 1
+                    } else -1
                     put("system", buildJsonArray {
                         systemFragments.forEachIndexed { index, (content, _) ->
                             add(buildJsonObject {
@@ -808,7 +814,26 @@ internal class AnthropicMessagesClient @Inject constructor(
         else left.coerceAtLeast(0L) + right.coerceAtLeast(0L)
 
     private companion object {
-        const val MIN_CACHEABLE_PREFIX_BYTES = 4_096L
+        /** Cache eligibility follows Claude Platform's per-model documented minima. */
+        fun minimumOfficialClaudeCacheTokens(model: String): Int {
+            val id = model.trim().lowercase()
+            return when {
+                id.startsWith("claude-opus-4-5") ||
+                    id.startsWith("claude-opus-4-6") ||
+                    id.startsWith("claude-haiku-4-5") -> 4_096
+                id.startsWith("claude-opus-4-7") ||
+                    id.startsWith("claude-haiku-3-5") -> 2_048
+                id.startsWith("claude-sonnet-5-5") ||
+                    id.startsWith("claude-haiku-5-5") ||
+                    id.startsWith("claude-opus-5") ||
+                    id.startsWith("claude-fable-5") ||
+                    id.startsWith("claude-mythos-5") -> 512
+                id.startsWith("claude-sonnet-5") ||
+                    id.startsWith("claude-sonnet-4") ||
+                    id.startsWith("claude-opus-4") -> 1_024
+                else -> 4_096 // Unlisted models: don't invent a lower official minimum.
+            }
+        }
 
         fun protocolErrorStatic(
             detail: String,
