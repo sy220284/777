@@ -435,6 +435,13 @@ internal class LocalWorkProjectCatalog(
             }
         }
         if (relocated == normalized) return@synchronized null
+        // A manual project re-association ends the old moved-folder read scope.
+        val currentRoot = old.projects.firstOrNull { it.id == projectId }?.root
+            ?: return@synchronized null
+        if (currentRoot == "." ||
+            (relocated != currentRoot && !relocated.startsWith(currentRoot + "/"))) {
+            return@synchronized null
+        }
         val actual = safeFile(relocated) ?: return@synchronized null
         relocated.takeIf { Files.isRegularFile(actual, LinkOption.NOFOLLOW_LINKS) }
     }
