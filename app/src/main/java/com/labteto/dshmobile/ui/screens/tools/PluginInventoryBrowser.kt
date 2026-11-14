@@ -294,6 +294,14 @@ internal fun PluginInventoryBrowser(
                 onBack = onBack,
                 backContentDescription = stringResource(R.string.common_back),
             )
+            SySearchField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapMd)
+                    .testTag("plugin-inventory-search"),
+                placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
+            )
             LazyRow(
                 modifier = Modifier.testTag("plugin-category-list"),
                 contentPadding = PaddingValues(horizontal = SyMetric.gapSection),
@@ -302,17 +310,17 @@ internal fun PluginInventoryBrowser(
                 items(5) { category ->
                     SyFilterChip(
                         text = if (skillsOnly) when (category) {
-                            1 -> "精选"
-                            2 -> "效率与办公"
-                            3 -> "开发与研究"
-                            4 -> "创意与设计"
-                            else -> installedStatus
+                            1 -> installedStatus + " · " + installedSkills.size
+                            2 -> "办公效率"
+                            3 -> "开发研究"
+                            4 -> "创意设计"
+                            else -> "发现 · " + (installedSkills.size + availablePresets.size + curated.size)
                         } else when (category) {
                             1 -> connectionStatus + " · " + connectedServices.size
-                            2 -> stringResource(R.string.plugin_category_work)
+                            2 -> installedStatus + " · " + (installedSkills.size + local.size)
                             3 -> stringResource(R.string.plugin_category_device)
-                            4 -> "创意与设计"
-                            else -> installedStatus
+                            4 -> "创意设计"
+                            else -> "发现"
                         },
                         selected = selectedCategory == category,
                         onClick = { selectedCategory = category },
@@ -374,6 +382,26 @@ internal fun PluginInventoryBrowser(
                 ),
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
+                if (query.isBlank() && selectedCategory == 0) {
+                    item(key = "extension-market-hero") {
+                        ExtensionMarketplaceHero(
+                            skillsOnly = skillsOnly,
+                            installedCount = installedSkills.size + if (skillsOnly) 0 else local.size,
+                            discoverableCount = availablePresets.size + curated.size,
+                            connectedCount = connectedServices.size,
+                        )
+                    }
+                    item(key = "extension-market-section-heading") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("探索扩展", style = DsType.headline17.withReadingWeight(), color = colors.text)
+                            Text("${list.size} 项", style = DsType.small13, color = colors.textSecondary)
+                        }
+                    }
+                }
                 if (!skillsOnly && query.isBlank() && activeToolHookIds.isNotEmpty()) {
                     item(key = "registered-tool-hooks") {
                         Column(
@@ -431,6 +459,15 @@ internal fun PluginInventoryBrowser(
                                     )
                                 }
                             }
+                            if (onInstallGitHubSkill != null) {
+                                SyButton(
+                                    text = "从 GitHub 安装",
+                                    onClick = { showGitHubImport = true },
+                                    enabled = !loading,
+                                    variant = SyButtonVariant.Ghost,
+                                    modifier = Modifier.fillMaxWidth().testTag("skill-install-github"),
+                                )
+                            }
                             Text(
                                 stringResource(R.string.skills_import_hint),
                                 modifier = Modifier.fillMaxWidth(),
@@ -472,7 +509,7 @@ internal fun PluginInventoryBrowser(
                         ) {
                             Text(
                                 curatedError ?: if (curatedLoading) "正在读取官方精选技能"
-                                    else "官方精选技能 · 可直接安装",
+                                    else "OpenAI 官方精选技能 · 安装后检查依赖",
                                 style = DsType.small13.withReadingWeight(),
                                 color = if (curatedError == null) colors.textSecondary else colors.dangerInk,
                                 modifier = Modifier.weight(1f),
@@ -531,10 +568,20 @@ internal fun PluginInventoryBrowser(
                             icon = item.icon,
                             accent = item.accent,
                             documentIcon = item.documentIcon,
-                            actionText = if (installable) "安装" else stringResource(
-                                if (onUseCapability != null && item.available) R.string.plugin_use
-                                else R.string.tools_catalog_details
-                            ),
+                            actionText = when {
+                                installable -> "安装"
+                                item.connectedService -> "管理"
+                                item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
+                                    ExtensionMarketStatus.FAILED) -> "配置"
+                                else -> stringResource(
+                                    if (onUseCapability != null && item.available) R.string.plugin_use
+                                    else R.string.tools_catalog_details
+                                )
+                            },
+                            sourceLabel = item.sourceLabel,
+                            statusLabel = item.marketState.label,
+                            attentionNeeded = item.marketState.status in setOf(
+                                ExtensionMarketStatus.NEEDS_SETUP, ExtensionMarketStatus.FAILED),
                             enabled = !loading,
                             onOpen = { selectedRow = item },
                             onAction = {
@@ -543,6 +590,9 @@ internal fun PluginInventoryBrowser(
                                         onInstallPreset(item.id.substringAfter(":"))
                                     item.installableCurated && onInstallCurated != null ->
                                         onInstallCurated(item.id.substringAfter(":"))
+                                    item.connectedService -> onManageConnections()
+                                    item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
+                                        ExtensionMarketStatus.FAILED) -> selectedRow = item
                                     onUseCapability != null && item.available -> onUseCapability(usePrompt)
                                     else -> selectedRow = item
                                 }
@@ -551,14 +601,6 @@ internal fun PluginInventoryBrowser(
                     }
                 }
             }
-            // The search bar stays visible at the bottom, as in the reference catalogue.
-            SySearchField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapMd)
-                    .testTag("plugin-inventory-search"),
-                placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
-            )
         }
     }
     selectedRow?.let { item ->
