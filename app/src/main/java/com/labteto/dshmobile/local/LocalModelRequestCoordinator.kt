@@ -531,6 +531,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 providerError?.let {
                                     append("failure_kind=${modelFailureKind(it)} admission_state=${it.admissionState.name.lowercase()} ")
                                     modelTransportFailureKind(it)?.let { kind -> append("transport_kind=$kind ") }
+                                    it.lastStreamEventType?.let { name -> append("last_stream_event=$name ") }
+                                    it.streamEventsSeen?.let { count -> append("stream_events_seen=$count ") }
                                     append("network_path=${describeModelNetworkPath(networkContext)} ")
                                 }
                                 append("origin=$failureOrigin ")
@@ -590,6 +592,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 error.requestId?.let { put("request_id", it) }
                                 error.providerCode?.let { put("provider_code", it) }
                                 error.providerParam?.let { put("provider_param", it) }
+                                error.lastStreamEventType?.let { put("last_stream_event", it) }
+                                error.streamEventsSeen?.let { put("stream_events_seen", it) }
                                 error.cause?.let { cause ->
                                     put("cause_type", cause.javaClass.simpleName)
                                     cause.message?.let { put("cause_detail", sanitizeDiagnosticText(it).take(800)) }
@@ -914,6 +918,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 error.requestId?.let { put("request_id", it) }
                                 error.providerCode?.let { put("provider_code", it) }
                                 error.providerParam?.let { put("provider_param", it) }
+                                error.lastStreamEventType?.let { put("last_stream_event", it) }
+                                error.streamEventsSeen?.let { put("stream_events_seen", it) }
                                 put("failure_kind", modelFailureKind(error))
                                 modelTransportFailureKind(error)?.let { put("transport_kind", it) }
                                 put("network_path_at_start", networkPathAtStart)
