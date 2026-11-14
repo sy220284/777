@@ -37,11 +37,13 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+      # Shared capability contracts run first. A failing fast core/MCP test must not wait
+      # behind the full Android application test suite on every corrective commit.
+      - name: 共享运行时、MCP 互操作与设备能力单元测试
+        run: ./gradlew --max-workers=2 :harness-core:test :harness-interop:test :harness-device-android:testDebugUnitTest --stacktrace --console=plain
       - name: 应用 JVM 单元测试
         run: ./gradlew --max-workers=2 :app:testDebugUnitTest --stacktrace --console=plain
       - name: 编译 Android 界面测试代码
         run: ./gradlew --max-workers=2 :app:compileDebugAndroidTestKotlin --stacktrace --console=plain
-      - name: 能力注册、MCP 互操作与 Android 设备模块单元测试
-        run: ./gradlew --max-workers=2 :harness-core:test :harness-interop:test :harness-device-android:testDebugUnitTest --stacktrace --console=plain
       - name: 构建可安装的调试包
         run: ./gradlew --max-workers=2 :app:assembleDebug --stacktrace --console=plain
