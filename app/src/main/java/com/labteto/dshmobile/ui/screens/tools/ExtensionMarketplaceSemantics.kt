@@ -55,6 +55,24 @@ internal fun connectorMarketState(
     )
 }
 
+/**
+ * A skill's metadata is user-supplied. Only explicit public HTTPS links can prefill a one-tap
+ * connection; actual OAuth and tool authorization still require the user to act.
+ */
+internal fun skillMcpHttpsEndpoint(requirement: UiSkillRequirement): String? {
+    if (requirement.type.lowercase() != "mcp") return null
+    val transport = requirement.transport?.lowercase()
+    if (transport != null && transport !in setOf("http", "sse", "streamable-http")) return null
+    val url = requirement.url ?: return null
+    val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return null
+    val host = uri.host?.lowercase() ?: return null
+    if (uri.scheme != "https" || uri.userInfo != null || uri.fragment != null ||
+        uri.port !in setOf(-1, 443) || !host.contains('.') ||
+        host.endsWith(".local") || host == "localhost" ||
+        host.matches(Regex("[0-9.]+")) || host.contains(':')) return null
+    return url
+}
+
 /** Filtering is based on actual installation/source, never on translated display labels. */
 internal fun marketplaceTabAllows(
     selectedTab: Int,
