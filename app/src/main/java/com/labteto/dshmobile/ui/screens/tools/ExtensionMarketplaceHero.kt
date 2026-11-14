@@ -51,7 +51,7 @@ internal fun ExtensionMarketplaceHero(
             }
             Text(
                 if (skillsOnly) "为你的工作添加新技能" else "让工具随手可用",
-                style = DsType.title20,
+                style = DsType.large20,
                 color = Color.White,
             )
             Text(
