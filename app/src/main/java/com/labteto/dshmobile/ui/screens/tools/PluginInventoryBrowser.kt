@@ -40,6 +40,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import android.content.Intent
+import android.graphics.BitmapFactory
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -71,6 +74,18 @@ internal fun pluginTransportMatches(transport: String, filter: PluginTransportFi
             transport.contains("sse", ignoreCase = true)
         PluginTransportFilter.STDIO -> transport.contains("stdio", ignoreCase = true)
     }
+
+/**
+ * Load a small publisher-provided raster safely. A bad/oversized bitmap cannot
+ * displace the built-in category glyph.
+ */
+private fun decodeCodexBrandLogo(bytes: ByteArray?): ImageBitmap? {
+    if (bytes == null || bytes.isEmpty()) return null
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    if (bounds.outWidth !in 1..1024 || bounds.outHeight !in 1..1024) return null
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+}
 
 private data class InventoryRow(
     val id: String,
@@ -127,6 +142,8 @@ internal fun PluginInventoryBrowser(
     codexError: String? = null,
     onRefreshCodex: (() -> Unit)? = null,
     codexDetails: Map<String, com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot> = emptyMap(),
+    codexLogos: Map<String, ByteArray> = emptyMap(),
+    onRequestCodexLogo: ((String) -> Unit)? = null,
     codexDetailLoadingId: String? = null,
     codexDetailError: String? = null,
     onReadCodexPluginDetail: ((String) -> Unit)? = null,
@@ -489,6 +506,15 @@ internal fun PluginInventoryBrowser(
                     }
                 } else {
                     items(list, key = { it.id }) { item ->
+                        val codexId = item.id.takeIf { it.startsWith("codex-plugin:") }
+                            ?.removePrefix("codex-plugin:")
+                        val logoBytes = codexId?.let(codexLogos::get)
+                        if (codexId != null) {
+                            LaunchedEffect(codexId, logoBytes) {
+                                if (logoBytes == null) onRequestCodexLogo?.invoke(codexId)
+                            }
+                        }
+                        val brandLogo = remember(logoBytes) { decodeCodexBrandLogo(logoBytes) }
                         val usePrompt = if (item.installedSkill) "@skill:" + item.id.substringAfter(":") + "\n"
                             else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
                         val installable = (item.installablePreset && onInstallPreset != null) ||
@@ -500,6 +526,7 @@ internal fun PluginInventoryBrowser(
                             icon = item.icon,
                             accent = item.accent,
                             documentIcon = item.documentIcon,
+                            brandLogo = brandLogo,
                             actionText = when {
                                 installable -> "安装"
                                 item.connectedService -> "管理"
@@ -548,6 +575,11 @@ internal fun PluginInventoryBrowser(
         }
     }
     selectedRow?.let { item ->
+        val detailLogoBytes = item.id.takeIf { it.startsWith("codex-plugin:") }
+            ?.removePrefix("codex-plugin:")?.let(codexLogos::get)
+        val detailBrandLogo = remember(detailLogoBytes) {
+            decodeCodexBrandLogo(detailLogoBytes)
+        }
         ExtensionDetailPage(
             title = item.name,
             onDismiss = { selectedRow = null },
@@ -631,14 +663,16 @@ internal fun PluginInventoryBrowser(
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        if (item.documentIcon != null) {
-                            androidx.compose.foundation.Image(
-                                painter = painterResource(item.documentIcon),
-                                contentDescription = null,
-                                modifier = Modifier.size(64.dp),
+                        when {
+                            detailBrandLogo != null -> androidx.compose.foundation.Image(
+                                bitmap = detailBrandLogo, contentDescription = null,
+                                modifier = Modifier.size(68.dp),
                             )
-                        } else {
-                            Icon(item.icon, contentDescription = null, tint = item.accent,
+                            item.documentIcon != null -> androidx.compose.foundation.Image(
+                                painter = painterResource(item.documentIcon),
+                                contentDescription = null, modifier = Modifier.size(64.dp),
+                            )
+                            else -> Icon(item.icon, contentDescription = null, tint = item.accent,
                                 modifier = Modifier.size(44.dp))
                         }
                     }
