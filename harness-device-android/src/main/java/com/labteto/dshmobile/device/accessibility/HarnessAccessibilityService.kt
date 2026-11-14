@@ -312,27 +312,36 @@ class HarnessAccessibilityService : AccessibilityService() {
             return null
         }
         val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
-        val nodes = mutableListOf<AccessibilityNodeInfo>()
-        val current = mutableListOf<AccessibilityNodeSnapshot>()
         queue.add(root to 0)
+        // Only editable targets need a full-tree uniqueness check. Ordinary clicks
+        // can stop at the selected index. Never retain every AccessibilityNodeInfo.
+        val liveSnapshots = if (rebindEditable) mutableListOf<AccessibilityNodeSnapshot>() else null
+        val editableNodes = mutableMapOf<Int, AccessibilityNodeInfo>()
+        var cursor = 0
         while (queue.isNotEmpty()) {
             val (node, depth) = queue.removeFirst()
-            val currentIndex = nodes.size
-            nodes += node
-            current += describeNode(currentIndex, node, depth)
+            if (rebindEditable) {
+                liveSnapshots!!.add(describeNode(cursor, node, depth))
+                if (node.isEditable) editableNodes[cursor] = node
+            } else if (cursor == index) {
+                nodeSelection.requireCurrent(
+                    index, root.windowId, describeNode(cursor, node, depth),
+                )
+                return node
+            }
+            cursor++
             for (childIndex in 0 until node.childCount) {
                 node.getChild(childIndex)?.let { queue.add(it to depth + 1) }
             }
         }
-        val resolved = if (rebindEditable) {
-            nodeSelection.resolveEditableIndex(index, root.windowId, current)
-        } else {
-            nodeSelection.requireCurrent(
-                index, root.windowId, current.getOrNull(index) ?: return null,
-            )
-            index
+        if (!rebindEditable) {
+            nodeSelection.invalidate()
+            return null
         }
-        return nodes.getOrNull(resolved)
+        val resolved = nodeSelection.resolveEditableIndex(
+            index, root.windowId, requireNotNull(liveSnapshots),
+        )
+        return editableNodes[resolved]
     }
 
     private fun clickableAncestor(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
