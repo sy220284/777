@@ -61,4 +61,20 @@ class ExtensionCatalogPresentationTest {
         assertEquals(ExtensionGroup.CREATIVE, creative.group)
         assertEquals(ExtensionGroup.AUTOMATION, device.group)
     }
+    @Test fun pluginInstallationRequiresPinnedOriginAndIgnoresNameCollisions() {
+        val items = listOf(
+            com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+                "figma-use", "Same name from a different source", true,
+                sourceUrl = "https://github.com/example/something/tree/aabb/skills/figma-use",
+            ),
+            com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+                "other-id", "Official pinned skill with a different local name", true,
+                sourceUrl = "https://github.com/openai/plugins/tree/aabb/plugins/figma/skills/figma-use",
+            ),
+        )
+        assertTrue(codexPluginSkillInstalled(items, "plugins/figma", "skills/figma-use"))
+        assertTrue(!codexPluginSkillInstalled(items.take(1), "plugins/figma", "skills/figma-use"))
+        assertTrue(!codexPluginSkillInstalled(items, "plugins/notion", "skills/figma-use"))
+    }
+
 }
