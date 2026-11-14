@@ -288,18 +288,25 @@ internal class LocalToolExecutionCoordinator(
                 synchronized(target) { target.toSet() }, blocked)
         }
         val exactNames = LocalToolRouter.exactSelection(query)
+        val alreadyBuiltIn = exactNames.orEmpty().filter { name ->
+            tools.any { it.name == name && it.exposure == com.labteto.dshmobile.harness.tools.ToolExposure.CORE }
+        }
         val matches = if (exactNames == null) LocalToolRouter.search(tools, query)
             else exactNames.mapNotNull { name ->
                 tools.firstOrNull { it.name == name && LocalToolRouter.isOptional(it) }
             }
         val unavailableNames = exactNames.orEmpty().filter { name ->
-            matches.none { it.name == name }
+            name !in alreadyBuiltIn && matches.none { it.name == name }
         }
         if (matches.isEmpty()) {
             if (exactNames != null) return buildString {
-                appendLine("指定工具当前无法加载：" + unavailableNames.joinToString(", "))
-                append("请检查实时注册状态、网络开关及工具名；不会自动加载近似名称。")
-            }
+                if (alreadyBuiltIn.isNotEmpty()) appendLine(
+                    "以下是内置工具，无需加载即可直接调用：" + alreadyBuiltIn.joinToString(", "))
+                if (unavailableNames.isNotEmpty()) appendLine(
+                    "指定工具当前无法加载：" + unavailableNames.joinToString(", "))
+                if (unavailableNames.isNotEmpty()) append(
+                    "请检查实时注册状态、网络开关及工具名；不会自动加载近似名称。")
+            }.trimEnd()
             // Don't bounce the user back to guess an internal capability name.
             return "实时工具表没有精确匹配的扩展能力。请勿猜测调用不存在的工具，也不必因此放弃任务。\n" +
                 "在允许联网与写入的 Work 中，可先用 web_search / GitHub 查找可复用实现，" +
@@ -328,16 +335,22 @@ internal class LocalToolExecutionCoordinator(
             val function = (element as? JsonObject)?.get("function") as? JsonObject
             (function?.get("name") as? JsonPrimitive)?.content
         }.toSet()
-        val omitted = matches.count { it.name !in projected }
+        val omittedNames = matches.map(HarnessTool::name).filterNot(projected::contains)
         return buildString {
-            appendLine("发现 ${matches.size} 个已注册的候选扩展工具；按默认工具定义预算估算 ${matches.size - omitted} 个可在下一步使用：")
+            appendLine("找到 ${matches.size} 个扩展工具，${matches.size - omittedNames.size} 个已装入下一模型步骤。")
+            if (alreadyBuiltIn.isNotEmpty()) appendLine(
+                "内置工具可直接调用：" + alreadyBuiltIn.joinToString(", "))
+            if (exactNames != null) appendLine(
+                "本轮只会调用实际装入的工具；已装入的可直接使用，无需再次搜索。")
             if (unavailableNames.isNotEmpty()) appendLine(
                 "指定但未能加载：" + unavailableNames.joinToString(", ") + "（未注册、被关闭或不是可选扩展；不会改用相似工具）"
             )
             // A large live MCP catalog is discoverable, but should not flood a model turn.
             matches.take(MAX_SEARCH_RESULT_PREVIEW).forEach { tool ->
                 append("- ").append(tool.name)
-                if (tool.name in previouslyEnabled && tool.name in projected) append(" [已加载]")
+                if (tool.name in projected) {
+                    append(if (tool.name in previouslyEnabled) " [已加载]" else " [下一步可用]")
+                }
                 selection.omittedReasons[tool.name]?.let { reason ->
                     append(" [当前未装入：").append(reason).append("]")
                 }
@@ -350,8 +363,13 @@ internal class LocalToolExecutionCoordinator(
             if (matches.size > MAX_SEARCH_RESULT_PREVIEW) {
                 appendLine("另有 ${matches.size - MAX_SEARCH_RESULT_PREVIEW} 个匹配工具未在此展开；可按类别或精确名称进一步搜索。")
             }
-            if (omitted > 0) appendLine("有 $omitted 个候选当前未装入，原因已逐项标注；仍无法装入时需按实际工具定义修复，而非猜测调用参数。")
-            append("实际调用仍以下一次模型请求真实提供的工具表及代理权限为准。")
+            if (omittedNames.isNotEmpty()) {
+                appendLine("本轮工具定义预算不足，剩余 ${omittedNames.size} 个工具已排在待加载队列；先使用已装入的工具完成当前工作。")
+                appendLine("后续需要剩余工具时，直接调用 capability_search，query 为：")
+                appendLine("select:" + omittedNames.joinToString(","))
+                appendLine("该选择会将剩余工具提前，不要求重新配置或重新连接已注册服务。")
+            }
+            append("工具调用仍受当前审批与实际连接状态约束。")
         }.trimEnd()
     }
 
