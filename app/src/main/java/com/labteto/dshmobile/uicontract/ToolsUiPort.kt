@@ -51,6 +51,7 @@ data class UiCodexPluginDetailSnapshot(
     val developerName: String, val version: String,
     val skills: List<String>, val hasMcp: Boolean, val hasApp: Boolean, val hasHooks: Boolean,
     val mcpServerId: String? = null, val mcpUrl: String? = null,
+    val skillDirectories: Map<String, String> = emptyMap(),
 )
 data class UiCodexPluginSnapshot(
     val id: String, val name: String, val category: String, val sourcePath: String,
