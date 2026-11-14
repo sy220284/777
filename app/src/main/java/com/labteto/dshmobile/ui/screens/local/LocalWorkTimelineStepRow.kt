@@ -86,6 +86,7 @@ internal fun userFacingWorkToolAction(toolName: String?): String? {
         "android_screen", "android_find", "android_wait" -> return "检查手机界面状态"
         "android_click_node", "android_tap_text", "android_tap" -> return "点击手机界面"
         "android_set_text_node", "android_type" -> return "向手机界面输入"
+        "android_input_text" -> return "识别输入框、写入并核对结果"
         "android_swipe", "android_scroll" -> return "滚动手机界面"
         "android_back" -> return "手机返回上一页"
         "android_home" -> return "返回手机主屏幕"
