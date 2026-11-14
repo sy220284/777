@@ -25,12 +25,11 @@ class ExtensionCatalogPresentationTest {
         assertEquals("保留人物声音并调整节奏", skill.description)
     }
 
-    @Test fun genericEnglishMetadataNeverBecomesUserFacingTitleOrSummary() {
+    @Test fun unknownSkillKeepsItsRealIdentityAndMeaningfulDescription() {
         val skill = extensionPresentation("experimental-tool", "experimental-tool",
             "A long English explanation", ExtensionKind.SKILL)
-        assertEquals("自定义技能", skill.title)
-        assertEquals("本地技能，可在详情中查看执行规则", skill.description)
-        assertTrue(skill.title.any { it.code in 0x4e00..0x9fff })
+        assertEquals("Experimental Tool", skill.title)
+        assertEquals("A long English explanation", skill.description)
     }
 
     @Test fun trademarkedEnglishNamesRemainIntactAndLocalConnectorsAreLocalized() {
@@ -39,6 +38,18 @@ class ExtensionCatalogPresentationTest {
         val local = extensionPresentation("local-mcp", "local-mcp", "", ExtensionKind.CONNECTOR)
         assertEquals("MCP 本地服务", local.title)
         assertEquals(ExtensionGroup.GENERAL, local.group)
+    }
+
+    @Test fun publisherLogosAreDistinctVectorAssets() {
+        val figma = extensionPresentation("figma-use", "figma-use", "", ExtensionKind.SKILL)
+        val github = extensionPresentation("gh-fix-ci", "gh-fix-ci", "", ExtensionKind.SKILL)
+        val canva = extensionPresentation("canva", "Canva", "", ExtensionKind.PLUGIN)
+        val notion = extensionPresentation("notion-research-documentation",
+            "notion-research-documentation", "", ExtensionKind.SKILL)
+        assertEquals(R.drawable.ic_market_figma, figma.documentIcon)
+        assertEquals(R.drawable.ic_market_github, github.documentIcon)
+        assertEquals(R.drawable.ic_market_canva, canva.documentIcon)
+        assertEquals(R.drawable.ic_market_notion, notion.documentIcon)
     }
 
     @Test fun categoryAndDocumentIconFollowUnderlyingStableId() {
@@ -50,4 +61,32 @@ class ExtensionCatalogPresentationTest {
         assertEquals(ExtensionGroup.CREATIVE, creative.group)
         assertEquals(ExtensionGroup.AUTOMATION, device.group)
     }
+    @Test fun pluginInstallationRequiresPinnedOriginAndIgnoresNameCollisions() {
+        val items = listOf(
+            com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+                "figma-use", "Same name from a different source", true,
+                sourceUrl = "https://github.com/example/something/tree/0123456789012345678901234567890123456789/skills/figma-use",
+            ),
+            com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+                "other-id", "Official pinned skill with a different local name", true,
+                sourceUrl = "https://github.com/openai/plugins/tree/0123456789012345678901234567890123456789/plugins/figma/skills/figma-use",
+            ),
+        )
+        assertTrue(codexPluginSkillInstalled(items, "plugins/figma", "skills/figma-use"))
+        assertTrue(!codexPluginSkillInstalled(items.take(1), "plugins/figma", "skills/figma-use"))
+        assertTrue(!codexPluginSkillInstalled(items, "plugins/notion", "skills/figma-use"))
+        val spoofedSource = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+            "other", "Impersonation attempt", true,
+            sourceUrl = "https://github.com/another/plugins/tree/0123456789012345678901234567890123456789/plugins/figma/skills/figma-use",
+        ))
+        assertTrue(!codexPluginSkillInstalled(spoofedSource, "plugins/figma", "skills/figma-use"))
+        val unpinnedSource = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+            "other", "Mutable branch is not provenance", true,
+            sourceUrl = "https://github.com/openai/plugins/tree/main/plugins/figma/skills/figma-use",
+        ))
+        assertTrue(!codexPluginSkillInstalled(unpinnedSource, "plugins/figma", "skills/figma-use"))
+        assertTrue(codexOfficialPluginSourceMatches(items.last().sourceUrl, "plugins/figma"))
+        assertTrue(!codexOfficialPluginSourceMatches(spoofedSource.first().sourceUrl, "plugins/figma"))
+    }
+
 }

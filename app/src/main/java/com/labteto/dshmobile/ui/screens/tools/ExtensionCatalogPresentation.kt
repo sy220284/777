@@ -196,6 +196,10 @@ internal fun extensionPresentation(
         localizedTitles.containsKey(key) -> localizedTitles.getValue(key)
         kind == ExtensionKind.SKILL && containsHan(rawDescription) ->
             rawDescription.trim().substringBefore('，').substringBefore('。').take(16)
+        kind == ExtensionKind.SKILL && name.isNotBlank() ->
+            name.replace('-', ' ').replace('_', ' ').split(' ').joinToString(" ") {
+                it.replaceFirstChar { char -> char.uppercaseChar() }
+            }
         kind == ExtensionKind.SKILL -> "自定义技能"
         kind == ExtensionKind.CONNECTOR -> "外部连接器"
         else -> "本地插件"
@@ -205,6 +209,7 @@ internal fun extensionPresentation(
             localizedDescriptions.getValue(key)
         containsHan(rawDescription) -> rawDescription.trim()
         localizedDescriptions.containsKey(key) -> localizedDescriptions.getValue(key)
+        kind == ExtensionKind.SKILL && rawDescription.isNotBlank() -> rawDescription.trim()
         kind == ExtensionKind.SKILL -> "本地技能，可在详情中查看执行规则"
         kind == ExtensionKind.CONNECTOR -> "连接外部服务并使用其已提供的工具"
         else -> "已注册的本地扩展能力"
@@ -256,7 +261,16 @@ internal fun extensionPresentation(
             else -> FeatherIcons.Clock
         }
         ExtensionGroup.GENERAL -> when (kind) {
-            ExtensionKind.SKILL -> FeatherIcons.BookOpen
+            ExtensionKind.SKILL -> when {
+                key.contains("review") || key.contains("audit") -> FeatherIcons.Eye
+                key.contains("security") || key.contains("policy") -> FeatherIcons.Shield
+                key.contains("test") || key.contains("check") -> FeatherIcons.CheckSquare
+                key.contains("speech") || key.contains("audio") -> FeatherIcons.Activity
+                key.contains("browser") || key.contains("search") -> FeatherIcons.Search
+                key.contains("report") || key.contains("summary") -> FeatherIcons.FileText
+                key.contains("slide") || key.contains("presentation") -> FeatherIcons.Palette
+                else -> FeatherIcons.BookOpen
+            }
             ExtensionKind.CONNECTOR -> FeatherIcons.Globe
             ExtensionKind.PLUGIN -> FeatherIcons.Tool
         }
@@ -268,10 +282,25 @@ internal fun extensionPresentation(
         ExtensionGroup.AUTOMATION -> Color(0xFFB57A3C)
         ExtensionGroup.GENERAL -> Color(0xFF62758A)
     }
-    val documentIcon = when (key) {
-        "pdf" -> R.drawable.ic_ui_filepdf_light
-        "spreadsheet", "xlsx", "excel" -> R.drawable.ic_ui_fileexcel_light
-        "doc", "docx", "word" -> R.drawable.ic_ui_fileword_light
+    // Exact publisher identities take priority over generic category glyphs.
+    // Files are Android VectorDrawable assets, so they remain crisp at every density.
+    val documentIcon = when {
+        key.contains("figma") -> R.drawable.ic_market_figma
+        key == "github" || key.startsWith("gh-") || key.contains("github") ->
+            R.drawable.ic_market_github
+        key.contains("notion") -> R.drawable.ic_market_notion
+        key.contains("canva") -> R.drawable.ic_market_canva
+        key.contains("cloudflare") -> R.drawable.ic_market_cloudflare
+        key.contains("vercel") -> R.drawable.ic_market_vercel
+        key.contains("gmail") -> R.drawable.ic_market_gmail
+        key == "linear" || key.startsWith("linear-") -> R.drawable.ic_market_linear
+        key.contains("tripo") -> R.drawable.ic_market_tripo
+        key.startsWith("android-") || key == "android-device" -> R.drawable.ic_market_android
+        key == "pdf" || key.startsWith("pdf-") -> R.drawable.ic_ui_filepdf_light
+        key in setOf("spreadsheet", "xlsx", "excel") || key.startsWith("excel-") ->
+            R.drawable.ic_ui_fileexcel_light
+        key in setOf("doc", "docx", "word") || key.startsWith("word-") ->
+            R.drawable.ic_ui_fileword_light
         else -> null
     }
     return ExtensionPresentation(title, description, icon, accent, group, documentIcon)

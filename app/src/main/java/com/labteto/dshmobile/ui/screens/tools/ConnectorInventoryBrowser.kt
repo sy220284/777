@@ -152,13 +152,7 @@ internal fun ConnectorInventoryBrowser(
                     accent = item.visual.accent,
                     tagPrefix = "connector-inventory",
                     enabled = !loading,
-                    actionText = when {
-                        item.addNew -> "添加"
-                        item.github && !item.configured -> "连接"
-                        else -> "管理"
-                    },
                     onOpen = { if (item.github) onGitHub() else onMcp() },
-                    onAction = { if (item.github) onGitHub() else onMcp() },
                 )
             }
         }

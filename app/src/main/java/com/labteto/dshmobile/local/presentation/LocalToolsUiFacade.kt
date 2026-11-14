@@ -261,6 +261,9 @@ class LocalToolsUiFacade @Inject internal constructor(
             item.sourceKind, item.sourceUrl,
         )
     }
+    /** Publisher-provided plugin logo, loaded through the catalog owner. */
+    suspend fun codexPluginLogo(id: String): ByteArray? = codexOfficialPlugins.officialLogo(id)
+
     override suspend fun codexPluginDetail(id: String):
         com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot {
         val info = codexOfficialPlugins.detail(id)
@@ -271,6 +274,7 @@ class LocalToolsUiFacade @Inject internal constructor(
             info.hasMcp, info.hasApp, info.hasHooks,
             remote?.serverId, remote?.url,
             if (info.hasSkills) codexOfficialPlugins.pluginSkillLocations(id) else emptyMap(),
+            info.samplePrompts,
         )
     }
     override suspend fun installCodexPluginSkill(pluginId: String, skillId: String): String =

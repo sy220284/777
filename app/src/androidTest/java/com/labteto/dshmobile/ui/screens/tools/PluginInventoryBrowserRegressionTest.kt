@@ -60,7 +60,7 @@ class PluginInventoryBrowserRegressionTest {
             }
         }
         compose.onNodeWithTag("plugin-category-list").performScrollToIndex(1)
-        compose.onNodeWithText("服务扩展 · 1").performClick()
+        compose.onNodeWithText("已连接").performClick()
         compose.onNodeWithText("MCP 本地服务").assertIsDisplayed().performClick()
         compose.onNodeWithTag("plugin-detail-primary-action").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, openedConnections) }
@@ -78,7 +78,8 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithText("使用").performClick()
+        compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
         compose.runOnIdle {
             org.junit.Assert.assertTrue(requireNotNull(prompt).contains("android-runtime"))
         }
@@ -113,7 +114,7 @@ class PluginInventoryBrowserRegressionTest {
         }
         compose.onNodeWithText("报告生成").assertIsDisplayed()
         compose.onNodeWithText("整理资料并制作报告").assertIsDisplayed()
-        compose.onNodeWithText("已安装 · 1").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-card-skill:report").assertIsDisplayed()
     }
 
     @Test
@@ -132,9 +133,9 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithText("发现 · 1").assertIsDisplayed()
-        compose.onNodeWithText("资料研究与核实").assertIsDisplayed()
-        compose.onNodeWithText("安装").performClick()
+        compose.onNodeWithText("发现").assertIsDisplayed()
+        compose.onNodeWithText("资料研究与核实").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
         compose.runOnIdle { assertEquals("research-check", selected) }
     }
 
@@ -177,7 +178,8 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithText("使用").performClick()
+        compose.onNodeWithTag("plugin-inventory-card-skill:manual-review").performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
         compose.runOnIdle {
             org.junit.Assert.assertEquals("@skill:manual-review\n", prompt)
         }
@@ -201,8 +203,10 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
+        compose.onNodeWithTag("plugin-inventory-more").performClick()
         compose.onNodeWithTag("skill-import-file").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, imported) }
+        compose.onNodeWithTag("plugin-inventory-more").performClick()
         compose.onNodeWithTag("skill-create-in-chat").assertIsDisplayed().performClick()
         compose.runOnIdle {
             val prompt = requireNotNull(creationPrompt)
@@ -234,7 +238,7 @@ class PluginInventoryBrowserRegressionTest {
             .getUnclippedBoundsInRoot()
         val card = compose.onNodeWithTag("plugin-inventory-card-local:android-automation")
             .getUnclippedBoundsInRoot()
-        assertTrue("Icon material should not stretch across the row", (icon.right - icon.left) <= 48.dp)
+        assertTrue("Brand icon must fit inside its own tile", (icon.right - icon.left) <= 56.dp)
         assertTrue("Plugin title must have readable horizontal space", (title.right - title.left) >= 100.dp)
         assertTrue("Plugin card should not become a tall empty slab", (card.bottom - card.top) < 220.dp)
     }
@@ -260,14 +264,12 @@ class PluginInventoryBrowserRegressionTest {
             .getUnclippedBoundsInRoot()
         val details = compose.onNodeWithTag("plugin-inventory-detail-skill:research-check", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
-        val action = compose.onNodeWithTag("plugin-inventory-action-skill:research-check", useUnmergedTree = true)
-            .getUnclippedBoundsInRoot()
         val card = compose.onNodeWithTag("plugin-inventory-card-skill:research-check")
             .getUnclippedBoundsInRoot()
         assertTrue("Title must remain readable on narrow screens", (title.right - title.left) >= 100.dp)
         assertTrue("Description stays below title", details.top >= title.bottom)
-        assertTrue("Action must not overlap the description", details.right <= action.left)
-        assertTrue("One-row skill cards must not waste vertical space", (card.bottom - card.top) < 130.dp)
+        assertTrue("Description must stay inside the row", details.right < card.right)
+        assertTrue("Compact list rows must not waste vertical space", (card.bottom - card.top) < 130.dp)
     }
 
     @Test
@@ -310,7 +312,8 @@ class PluginInventoryBrowserRegressionTest {
                 }
             }
         }
-        compose.onNodeWithTag("skill-import-file").assertIsDisplayed()
+        compose.onNodeWithTag("skill-import-file").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-search-trigger").performClick()
         compose.onNodeWithTag("plugin-inventory-search").performTextInput("research")
         compose.onNodeWithTag("skill-import-file").assertDoesNotExist()
         compose.onNodeWithTag("plugin-inventory-card-skill:research-check").assertIsDisplayed()
@@ -326,6 +329,7 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
+        compose.onNodeWithTag("plugin-inventory-search-trigger").performClick()
         compose.onNodeWithTag("plugin-inventory-search").performTextInput("自动执行")
         compose.onNodeWithTag("plugin-inventory-card-local:android-automation").assertIsDisplayed()
         compose.onNodeWithTag("plugin-inventory-search").performTextInput("不存在的插件名称")
@@ -348,7 +352,8 @@ class PluginInventoryBrowserRegressionTest {
             }
         }
         compose.onNodeWithTag("plugin-inventory-card-skill:research-check").assertIsDisplayed()
-        compose.onNodeWithText("使用").assertIsNotEnabled()
+        compose.onNodeWithTag("plugin-inventory-card-skill:research-check").performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action").assertIsNotEnabled()
     }
 
     @Test
@@ -361,7 +366,8 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithTag("plugin-inventory-search").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-search").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-search-trigger").assertIsDisplayed()
         compose.onNodeWithText("插件").assertDoesNotExist()
         compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertIsDisplayed()
     }
@@ -503,13 +509,12 @@ class PluginInventoryBrowserRegressionTest {
         }
         compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
             .performScrollTo().performClick()
-        compose.onNodeWithText("可直接安装的技能").assertIsDisplayed()
-        compose.onNodeWithText("安装").performScrollTo().performClick()
+        compose.onNodeWithText("包含技能 · 1 项").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
         compose.runOnIdle {
             assertEquals(pluginId to "figma-use", selectedSkill)
         }
-        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
-            .performScrollTo().performClick()
+        // Installation keeps the detail destination alive for a connected next step.
         compose.onNodeWithText("授权并连接 figma").performScrollTo().performClick()
         compose.runOnIdle {
             assertEquals(pluginId, connectedPlugin)
@@ -543,11 +548,111 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
+        // Member skills belong inside the bundle detail, not as duplicate cards.
+        compose.onNodeWithTag("plugin-inventory-card-skill:zoom-general")
+            .assertDoesNotExist()
         compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
             .performScrollTo().performClick()
+        compose.onNodeWithTag("codex-plugin-skills-summary").performClick()
         compose.onNodeWithTag("codex-skill-install-$pluginId-general")
             .performScrollTo().assertIsNotEnabled()
         compose.runOnIdle { assertEquals(0, installRequests) }
+    }
+
+    @Test
+    fun skillDependenciesStayCollapsedUntilDetailAndOAuthUsesPredefinedEndpoint() {
+        var authorized: Pair<String, String>? = null
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    skills = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+                        name = "figma-use", description = "编辑 Figma 设计", modelInvocable = true,
+                        requirements = listOf(com.labteto.dshmobile.uicontract.UiSkillRequirement(
+                            type = "mcp", value = "figma", description = "Figma 设计服务",
+                            registered = false, transport = "http",
+                            url = "https://mcp.figma.com/mcp",
+                        )),
+                    )),
+                    skillsOnly = true,
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onConnectSkillMcp = { name, url -> authorized = name to url },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-skill:figma-use").assertIsDisplayed()
+        compose.onNodeWithText("需要授权 · Figma 设计服务").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-card-skill:figma-use").performClick()
+        compose.onNodeWithTag("skill-dependency-summary").assertIsDisplayed()
+        compose.onNodeWithText("需要授权 · Figma 设计服务").assertDoesNotExist()
+        compose.onNodeWithTag("skill-dependency-summary").performClick()
+        compose.onNodeWithText("需要授权 · Figma 设计服务").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
+        compose.runOnIdle {
+            assertEquals("figma" to "https://mcp.figma.com/mcp", authorized)
+        }
+    }
+
+    @Test
+    fun codexPluginWithMultipleSkillsInstallsAsOneBundleFromDetail() {
+        var installedPlugin: String? = null
+        val pluginId = "sample@openai-curated"
+        val plugin = com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            pluginId, "sample", "Productivity", "plugins/sample",
+            "AVAILABLE", "ON_INSTALL", false,
+        )
+        val detail = com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            pluginId, "Sample", "多技能示例插件", "Official", "1.0",
+            listOf("research", "summarize"), false, false, false,
+            skillDirectories = mapOf(
+                "research" to "skills/research",
+                "summarize" to "skills/summarize",
+            ),
+        )
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), codexPlugins = listOf(plugin),
+                    codexDetails = mapOf(pluginId to detail),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onInstallCodexPlugin = { installedPlugin = it },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action").assertIsDisplayed()
+        compose.onNodeWithText("安装包含的 2 项技能").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(pluginId, installedPlugin) }
+    }
+
+    @Test
+    fun installingAPresetKeepsDetailOpenAndReprojectsLiveInstalledState() {
+        val installed = androidx.compose.runtime.mutableStateOf(false)
+        var usePrompt: String? = null
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    presets = listOf(com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot(
+                        "research-check", "资料研究与核实", "核查来源", installed.value,
+                    )),
+                    skills = if (installed.value) listOf(
+                        com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+                            "research-check", "核查来源", true,
+                        )) else emptyList(),
+                    skillsOnly = true,
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onInstallPreset = { installed.value = true },
+                    onUseCapability = { usePrompt = it },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-skill:research-check").performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
+        compose.onNodeWithText("使用").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-detail-primary-action").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals("@skill:research-check\n", usePrompt) }
     }
 
 }
