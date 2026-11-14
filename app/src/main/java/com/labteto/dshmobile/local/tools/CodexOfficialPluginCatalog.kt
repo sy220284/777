@@ -36,6 +36,17 @@ internal data class CodexOfficialPluginSummary(
 private val OFFICIAL_PLUGIN_ID = Regex("[a-z][a-z0-9-]{1,63}")
 private val OFFICIAL_PLUGIN_PATH = Regex("(?:\\./)?plugins/[a-zA-Z0-9_./-]{1,180}")
 
+/** Codex plugin.json file references are relative to the plugin root and must stay inside it. */
+private fun codexPluginRelativeAsset(path: String): String? {
+    if (!path.startsWith("./") || path.length > 182) return null
+    val pieces = path.removePrefix("./").trimEnd('/').split('/')
+    if (pieces.isEmpty() || pieces.any {
+        it.isEmpty() || it == "." || it == ".." ||
+            !it.matches(Regex("[A-Za-z0-9_.-]{1,100}"))
+    }) return null
+    return pieces.joinToString("/")
+}
+
 /** Validates marketplace identity and source confinement before exposing install actions. */
 internal fun parseCodexOfficialMarketplace(document: String): List<CodexOfficialPluginSummary> {
     val root = Json.parseToJsonElement(document).jsonObject
@@ -107,6 +118,9 @@ internal data class CodexOfficialPluginDetail(
     val hasMcp: Boolean,
     val hasApp: Boolean,
     val hasHooks: Boolean,
+    val skillRoots: List<String> = emptyList(),
+    val mcpPath: String? = null,
+    val inlineMcpConfig: String? = null,
 )
 
 internal data class CodexOfficialMcpEndpoint(
@@ -143,6 +157,21 @@ internal fun parseCodexOfficialPluginDetail(document: String): CodexOfficialPlug
     val name = root["name"]?.jsonPrimitive?.contentOrNull ?: error("插件清单缺少 name")
     require(OFFICIAL_PLUGIN_ID.matches(name)) { "插件名称无效" }
     val interfaceData = root["interface"] as? JsonObject
+    val declaredSkills = when (val paths = root["skills"]) {
+        is kotlinx.serialization.json.JsonPrimitive ->
+            listOfNotNull(paths.contentOrNull?.let(::codexPluginRelativeAsset))
+        is JsonArray -> paths.mapNotNull {
+            (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+                ?.let(::codexPluginRelativeAsset)
+        }
+        else -> emptyList()
+    }
+    val mcpEntry = root["mcpServers"]
+    val mcpFile = (mcpEntry as? kotlinx.serialization.json.JsonPrimitive)
+        ?.contentOrNull?.let(::codexPluginRelativeAsset)
+    val inlineMcp = (mcpEntry as? JsonObject)?.let {
+        JsonObject(mapOf("mcpServers" to it)).toString()
+    }
     return CodexOfficialPluginDetail(
         name = name,
         displayName = interfaceData?.get("displayName")?.jsonPrimitive?.contentOrNull ?: name,
@@ -154,6 +183,8 @@ internal fun parseCodexOfficialPluginDetail(document: String): CodexOfficialPlug
         hasMcp = root["mcpServers"] != null,
         hasApp = root["apps"] != null,
         hasHooks = root["hooks"] != null,
+        skillRoots = declaredSkills.distinct(),
+        mcpPath = mcpFile, inlineMcpConfig = inlineMcp,
     )
 }
 
@@ -167,6 +198,7 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
     private val catalogMutex = Mutex()
     private var catalogCache: Pair<Long, List<CodexOfficialPluginSummary>>? = null
     private val detailsCache = java.util.concurrent.ConcurrentHashMap<String, CodexOfficialPluginDetail>()
+    private val skillSourcesCache = java.util.concurrent.ConcurrentHashMap<String, List<Pair<String, String>>>()
 
     /** Codex-style cache: a manual refresh bypasses it; details share the same market snapshot. */
     suspend fun list(forceRefetch: Boolean = false): List<CodexOfficialPluginSummary> {
@@ -185,6 +217,7 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
             val entries = parseCodexOfficialMarketplace(fetch(catalogUrl, 1024 * 1024))
             catalogCache = System.nanoTime() to entries
             detailsCache.clear()
+            skillSourcesCache.clear()
             return entries
         } finally {
             catalogMutex.unlock()
@@ -214,40 +247,68 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
     }
 
     suspend fun mcpEndpoint(pluginId: String): CodexOfficialMcpEndpoint? {
-        val plugin = detail(pluginId)
-        if (!plugin.hasMcp) return null
+        val detail = detail(pluginId)
+        if (!detail.hasMcp) return null
         val entry = list().firstOrNull { it.id == pluginId }
             ?: error("该插件不在官方市场")
         require(entry.sourceKind == "local") { "第三方仓库需要由对应安装器连接" }
-        return parseCodexOfficialMcpEndpoint(
-            fetch("$rootUrl/${entry.sourcePath}/.mcp.json", 128 * 1024),
-            plugin.name,
-        )
+        val document = when {
+            detail.inlineMcpConfig != null -> detail.inlineMcpConfig
+            detail.mcpPath != null ->
+                fetch("$rootUrl/${entry.sourcePath}/${detail.mcpPath}", 128 * 1024)
+            else -> error("插件 MCP 配置路径未通过安全校验")
+        }
+        return parseCodexOfficialMcpEndpoint(document, detail.name)
     }
 
-    suspend fun pluginSkills(pluginId: String): List<String> {
+    /** Resolves declared plugin.json skill roots rather than assuming every package uses /skills. */
+    private suspend fun skillSources(pluginId: String): List<Pair<String, String>> {
+        skillSourcesCache[pluginId]?.let { return it }
         val detail = detail(pluginId)
         if (!detail.hasSkills) return emptyList()
+        require(detail.skillRoots.isNotEmpty()) { "官方插件的技能目录声明无效" }
         val entry = list().firstOrNull { it.id == pluginId }
             ?: error("该插件不在官方市场")
         require(entry.sourceKind == "local") { "该插件的技能需要通过第三方安装器读取" }
-        val url = "https://api.github.com/repos/openai/plugins/contents/${entry.sourcePath}/skills?ref=main"
-        val items = Json.parseToJsonElement(fetch(url, 512 * 1024)) as? JsonArray
-            ?: error("Codex 插件技能目录无效")
-        return items.mapNotNull { (it as? JsonObject)?.let { entry ->
-            if (entry["type"]?.jsonPrimitive?.contentOrNull != "dir") null
-            else entry["name"]?.jsonPrimitive?.contentOrNull?.takeIf(OFFICIAL_PLUGIN_ID::matches)
-        } }.distinct().sorted()
+        val collected = mutableListOf<Pair<String, String>>()
+        for (skillRoot in detail.skillRoots) {
+            val path = "${entry.sourcePath}/$skillRoot"
+            val url = "https://api.github.com/repos/openai/plugins/contents/$path?ref=main"
+            val items = Json.parseToJsonElement(fetch(url, 512 * 1024)) as? JsonArray
+                ?: error("Codex 插件技能目录无效：$skillRoot")
+            val children = items.mapNotNull { item ->
+                val obj = item as? JsonObject ?: return@mapNotNull null
+                val type = obj["type"]?.jsonPrimitive?.contentOrNull
+                val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                if (type == "dir" && OFFICIAL_PLUGIN_ID.matches(name))
+                    name to "$skillRoot/$name" else null
+            }
+            collected += children
+            if (children.isEmpty() && items.any {
+                    val obj = it as? JsonObject
+                    obj?.get("name")?.jsonPrimitive?.contentOrNull == "SKILL.md" &&
+                        obj["type"]?.jsonPrimitive?.contentOrNull == "file"
+                }) {
+                val id = skillRoot.substringAfterLast('/')
+                if (OFFICIAL_PLUGIN_ID.matches(id)) collected += id to skillRoot
+            }
+        }
+        val unique = collected.distinctBy { it.first }.sortedBy { it.first }
+        return skillSourcesCache.putIfAbsent(pluginId, unique) ?: unique
     }
 
-    /** Downloads one explicitly selected skill; Codex app/MCP/hook bundles require separate authorization. */
+    suspend fun pluginSkills(pluginId: String): List<String> =
+        skillSources(pluginId).map { it.first }
+
+    /** Downloads only a user-selected skill. Plugin App/Hook executables remain separately gated. */
     suspend fun installPluginSkill(pluginId: String, skillId: String): String {
         val plugin = list().firstOrNull { it.id == pluginId }
             ?: error("Codex 市场没有该插件")
         require(plugin.offeredOnAndroid) { "该插件的官方安装限制与 Android 不兼容" }
-        require(skillId in pluginSkills(pluginId)) { "插件中没有该技能" }
+        val skillPath = skillSources(pluginId).firstOrNull { it.first == skillId }?.second
+            ?: error("插件中没有该技能")
         return gitHubSkillImporter.install(
-            "https://github.com/openai/plugins/tree/main/${plugin.sourcePath}/skills/$skillId",
+            "https://github.com/openai/plugins/tree/main/${plugin.sourcePath}/$skillPath",
         )
     }
 
