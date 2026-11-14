@@ -87,7 +87,7 @@
 - 已合并：[#693](https://github.com/sy220284/777/pull/693)、[#694](https://github.com/sy220284/777/pull/694)、[#696–#704](https://github.com/sy220284/777/pulls?q=is%3Apr+is%3Amerged+693..704)、[#708](https://github.com/sy220284/777/pull/708)、[#709](https://github.com/sy220284/777/pull/709)、[#710](https://github.com/sy220284/777/pull/710)。
 - **已合并**：[#711 技能/插件布局](https://github.com/sy220284/777/pull/711)、[#896 阅读与工作交互优化](https://github.com/sy220284/777/pull/896)。#705 曾于 2026-10-17 合并，之后的独立 UI Pack 架构已由原生 V6.3 回退改造处理，当前运行以主线 Compose 为准。**本轮设计文档中的 V6.4 目标均未实施到生产代码。**
 ### Figma / Canva 状态
-项目历史设计链接包括 [Figma 外观文件](https://www.figma.com/design/XRzRhpaBU7nwiy0iZQndB1)。2026-11-13 调用 Figma MCP 返回 Starter 限额错误，Canva 未找到 777/神言/V6 同名设计稿及品牌包。**本轮仅更新 GitHub 设计文档，未修改 Figma、Canva 在线设计层**。后续应根据 [V6.4 目标规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)与已实现 Compose 核对变量、组件和页面截图后，再确认在线设计完成。
+项目历史设计链接包括 [Figma 外观文件](https://www.figma.com/design/XRzRhpaBU7nwiy0iZQndB1)。2026-11-13 调用 Figma MCP 返回 Starter 限额错误，Canva 未找到 777/神言/V6 同名设计稿及品牌包；**本轮仅更新 GitHub 设计文档，未修改 Figma、Canva 在线设计层**。后续应根据 [V6.4 目标规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)与已实现 Compose 核对变量、组件和页面截图后，再确认在线设计完成。
 ## 历史附录：2026-10-15 本地审计修复候选（非当前实现证明）
 此处为 2026-10-15 旧候选快照，旧资料当时记录的功能状态不自动等于当前未合并。原文曾提出：保留现有七条产品路由。工作会话菜单增加“工作记录与交付”弹层：完整历史游标分页、工具真实阶段和原始事件详情、当前目标与步骤、选定成果版本的手动来源关联。关联只证明来源，不代表验收通过。文件元数据观察用于刷新预览，显式核验和关联才计算内容哈希。
-记忆管理改为源数据先搜索／类型筛选再分页，可到达旧记录；任务暂停、恢复、取消与立即运行提供异步回执，异常后先重读事实而不重放命令。Android 测试代码已编译。
+记忆管理改为源数据先搜索／类型筛选再分页，可到达旧记录；任务暂停、恢复、取消与立即运行提供异步回执，异常后先重读事实而不重放命令。Android 测试代码已编译，真机触摸、TalkBack、字体放大和后台生命周期验收待执行。

@@ -1,5 +1,5 @@
 # PR #895 能力实际接通状态（2026-11-14）
-对照范围沿用 `codex-777-capability-alignment-20261112.md` 的 29 项，以 #895 最新生产源码和 Android 操作路径核对；分类反映当前功能接入深度。
+对照范围沿用 `codex-777-capability-alignment-20261112.md` 的 29 项；以 #895 最新生产源码与 Android 操作路径归类。
 ## 分类口径
 - **已接通**：有生产入口、实际执行路径及结果/状态持久关联；未跑过的 Android 实机路径仍单独注明。
 - **部分接通**：能使用一部分功能，主要使用场景或系统连接仍缺。
@@ -39,7 +39,7 @@
 | 07 | Code Mode | 有界步骤、结果引用、工具审批/取消已通过后台工具入口执行；自由表达与复杂编排未完成，无需独立主导航 |
 | 19 | 插件宿主 | MCP 工作进程和来源账本已有，但共享 app UID，完整插件权限隔离与崩溃恢复不完整 |
 | 23 | 前后细粒度审计 | 工具层回执已有；产品级跨工具操作关联、审核事件展示未闭合 |
-| 24 | 独立 Agent 隔离 | 独立 UID 服务及 IPC 检测已有；真实设备下跨进程拒绝和崩溃恢复待验证 |
+| 24 | 独立 Agent 隔离 | 独立 UID 服务及 IPC 检测已有 |
 ## 尚未实现（3 项）
 | 编号 | 能力 | 需要新增的产品行为 |
 |---|---|---|
@@ -49,4 +49,4 @@
 ## 本轮实际代码改动
 沿现有 `Work → 项目 Facade → Catalog / Files 工作区` 路径增加原生文件夹迁移，UI 将“只修改项目关联”与“移动真实文件”明确分开。只移动工作区内、无别的项目相互嵌套引用的独占目录；要求目标目录尚未存在、上级目录有效，用户确认的是源路径版本，并在 Work 统一检查前台及后台活跃任务；用同文件系统原子重命名保留文件与 Git 历史。历史会话中记录的旧绝对/相对文件路径仍需单独处理，因此项目完整生命周期保持“部分接通”。持久恢复记录解决“文件已移动但项目索引尚未保存”的进程中断；失败时回滚，双方都存在等歧义情况直接报错并保留字节。
 相关代码：`app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProjectCatalog.kt`、`local/presentation/LocalWorkProjectsUiFacade.kt`、`ui/screens/local/LocalWorkProjectsSheet.kt` 和 `LocalHarnessViewModel.kt`。回归用例：`LocalWorkProjectCatalogTest.kt`、`LocalWorkProjectsSheetUiTest.kt`。代码提交后的构建结果与设备结果按 **最新 SHA** 核对。
-后续沿现有 Android 原生入口继续补可操作的目录恢复反馈、Computer Use 当前操作状态、Code Review 测试事实关联和安全审查结果回显；没有服务端协议的能力继续明确标识，不虚构余额、设备操作或上传结果。
+后续沿现有 Android 原生入口继续补目录恢复反馈、Computer Use 操作状态、Code Review 测试事实关联和安全审查结果回显。未接通的网络服务能力继续准确标识。

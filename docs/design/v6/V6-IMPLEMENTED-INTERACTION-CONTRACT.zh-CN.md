@@ -1,9 +1,9 @@
 # 777 V6.3 · 已实现交互与组件契约
-> **事实基线**：主线 `02544aa4b8d96fbd0e0aac5d7bf1a3e9f581df6a`（2026-11-13）。本文记录已合并 Compose 中值得继承的交互及其验收依据；下一轮视觉目标见 [V6.4 设计规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)。本轮只修订文档。
+> **事实基线**：主线 `02544aa4b8d96fbd0e0aac5d7bf1a3e9f581df6a`（2026-11-13）。本文记录已合并 Compose 中值得继承的交互及其实现细节；下一轮视觉目标见 [V6.4 设计规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)。本轮只修订文档。
 ## 1. 事实与设计职责
 - **唯一业务来源**：顶层路由由 `LocalFeatureCatalog` 拥有（7 条），设置二级目的地由 `SettingsScreen.kt#SettingsDestination` 拥有（21 项）；当前快照见 [机器清单](current-ui.json)。
 - **共享视觉来源**：`SyColors`、`SyMetric`、`SyMaterialSurface`、`SyMotion`。Chat、Work、人物、文件、媒体、工具和设置分别保留专用布局。
-- **文档角色**：[当前实现](V6-CURRENT-IMPLEMENTATION.zh-CN.md)与本文记录已经存在的行为，[V6.4](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)记录待实施目标，[STATUS](STATUS.zh-CN.md)分开记录代码、测试和 Android 设备验收。原型仅为交互投影。
+- **文档角色**：[当前实现](V6-CURRENT-IMPLEMENTATION.zh-CN.md)与本文记录已经存在的行为，[V6.4](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)记录待实施目标，[STATUS](STATUS.zh-CN.md)分开记录代码、测试和 Android 实现状态。原型仅为交互投影。
 ## 2. 聊天、Work、历史与流式阅读
 | 场景 | 当前实现 | 必须维持的体验 |
 |---|---|---|
