@@ -909,4 +909,26 @@ class MemoryStoreTest {
         assertTrue(active.single().hasUnboundSource)
     }
 
+
+    @Test fun consolidationKeepsDistinctFactsWhoseFirstTwoThousandCharactersMatch() {
+        val memoryStore = store()
+        val prefix = "A".repeat(2_100)
+        memoryStore.remember(prefix + "保留东边入口", MemoryScope.GLOBAL)
+        memoryStore.remember(prefix + "保留西边入口", MemoryScope.GLOBAL)
+        assertEquals(0, memoryStore.consolidateIfDue(force = true))
+        assertEquals(2, all(memoryStore).size)
+    }
+
+    @Test fun consolidationPreservesExplicitPrivateVersusPublicDisclosure() {
+        val memoryStore = store()
+        memoryStore.remember("同一项资料", MemoryScope.GLOBAL,
+            disclosure = MemoryDisclosure.PRIVATE, disclosureExplicit = true)
+        memoryStore.remember("同一项资料。", MemoryScope.GLOBAL,
+            disclosure = MemoryDisclosure.PUBLIC, disclosureExplicit = true)
+        assertEquals(0, memoryStore.consolidateIfDue(force = true))
+        assertEquals(setOf(MemoryDisclosure.PRIVATE, MemoryDisclosure.PUBLIC),
+            all(memoryStore).map { it.disclosure }.toSet())
+    }
+
+
 }

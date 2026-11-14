@@ -75,6 +75,8 @@ internal fun consolidateMemoryRecords(
         val lineageId: String?,
         val subjectKey: String?,
         val kind: MemoryKind,
+        val disclosure: MemoryDisclosure,
+        val disclosureExplicit: Boolean,
         val content: String,
     )
 
@@ -87,6 +89,8 @@ internal fun consolidateMemoryRecords(
                 lineageId = record.lineageId,
                 subjectKey = record.subjectKey,
                 kind = record.kind,
+                disclosure = record.disclosure,
+                disclosureExplicit = record.disclosureExplicit,
                 content = canonicalMemoryIdentity(record.content),
             )
         }
@@ -143,4 +147,3 @@ internal fun consolidateMemoryRecords(
 internal fun canonicalMemoryIdentity(text: String): String =
     text.lowercase()
         .replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】|｜=_-]+"""), "")
-        .take(2_000)
