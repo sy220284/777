@@ -95,11 +95,6 @@ class HarnessAccessibilityService : AccessibilityService() {
         return target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
     }
 
-    fun setTextNode(index: Int, value: String): Boolean {
-        val target = nodeAt(index)?.takeIf(AccessibilityNodeInfo::isEditable) ?: return false
-        return setEditableText(target, value)
-    }
-
     /** Compose controls may only accept ACTION_SET_TEXT once focused.
      * Retry the same idempotent replacement on the same refreshed node, never another field.
      */
@@ -122,19 +117,6 @@ class HarnessAccessibilityService : AccessibilityService() {
         }.distinct()
         val target = requireUniqueAccessibilityTarget(targets, "点击") ?: return false
         return target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-    }
-
-    fun setText(searchText: String, value: String): Boolean {
-        val root = rootInActiveWindow ?: return false
-        val candidates = if (searchText.isBlank()) {
-            // A blank Compose TextField has no text to match; require an explicit current
-            // input focus rather than guessing among all editable controls.
-            listOfNotNull(root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT))
-                .filter { it.isVisibleToUser && it.isEditable }
-        } else root.findAccessibilityNodeInfosByText(searchText)
-            .filter { it.isVisibleToUser && it.isEditable }
-        val target = requireUniqueAccessibilityTarget(candidates, "输入文字") ?: return false
-        return setEditableText(target, value)
     }
 
     /**
