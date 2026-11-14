@@ -201,6 +201,7 @@ object LocalToolCatalog {
             "description" to string("目标和完成标准"),
             "artifact_paths" to buildJsonObject { put("type", "array"); put("items", string("按用户要求交付的工作区相对文件路径；讨论任务填空数组")) },
             "verification_commands" to buildJsonObject { put("type", "array"); put("items", string("按用户要求执行的完整 shell 命令原文或 process_exec command 的 JSON 数组原文；通过真实退出码和成果版本核验，不能以打印成功日志替代。无需命令的任务填空数组")) },
+            "review_requirements" to buildJsonObject { put("type", "array"); put("items", string("仅任务明确要求时填写 code（独立代码审查）和/或 security（独立安全审查）；其他任务为 []。审查观点、人工确认与真实测试分别结算")) },
         ), listOf("description", "artifact_paths", "verification_commands")))
         add(tool("get_goal", "读取当前会话目标", properties()))
         add(tool("update_goal", "更新目标状态", properties(
