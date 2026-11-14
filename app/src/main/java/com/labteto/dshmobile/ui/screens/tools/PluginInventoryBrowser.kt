@@ -315,7 +315,7 @@ internal fun PluginInventoryBrowser(
             it.id == plugin.name || it.id == codexDetails[plugin.id]?.mcpServerId
         }
         val installedFromPlugin = skills.any {
-            it.sourceUrl?.contains("/${plugin.sourcePath}/") == true
+            codexOfficialPluginSourceMatches(it.sourceUrl, plugin.sourcePath)
         }
         val verifiedDetail = codexDetails[plugin.id]
         val support = when {

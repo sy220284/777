@@ -104,10 +104,32 @@ internal fun marketplaceTabAllows(
  * points to that plugin's declared directory. Display-name collisions are not
  * proof that a package is installed.
  */
+/**
+ * An installed skill belongs to an official bundle only when the verified importer
+ * receipt points to openai/plugins at an immutable 40-character commit.
+ * A matching trailing folder from another repository is not ownership evidence.
+ */
+internal fun codexOfficialPluginSourceMatches(
+    sourceUrl: String?,
+    pluginRoot: String,
+    skillDirectory: String? = null,
+): Boolean {
+    if (sourceUrl.isNullOrBlank()) return false
+    val uri = runCatching { java.net.URI(sourceUrl) }.getOrNull() ?: return false
+    if (uri.scheme != "https" || !uri.host.equals("github.com", ignoreCase = true) ||
+        uri.userInfo != null || uri.port != -1 || uri.query != null || uri.fragment != null) return false
+    val pieces = uri.rawPath.orEmpty().split('/')
+    if (pieces.size < 7 || pieces.take(4) != listOf("", "openai", "plugins", "tree") ||
+        !pieces[4].matches(Regex("[0-9a-f]{40}"))) return false
+    val actual = pieces.drop(5).joinToString("/")
+    return if (skillDirectory == null) actual.startsWith("$pluginRoot/")
+        else actual == "$pluginRoot/$skillDirectory"
+}
+
 internal fun codexPluginSkillInstalled(
     skills: List<com.labteto.dshmobile.uicontract.UiSkillSnapshot>,
     pluginRoot: String,
     skillDirectory: String,
 ): Boolean = skills.any { skill ->
-    skill.sourceUrl?.endsWith("/$pluginRoot/$skillDirectory") == true
+    codexOfficialPluginSourceMatches(skill.sourceUrl, pluginRoot, skillDirectory)
 }

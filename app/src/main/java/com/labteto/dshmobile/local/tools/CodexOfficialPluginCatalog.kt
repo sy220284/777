@@ -66,8 +66,10 @@ internal fun parseCodexOfficialMarketplace(document: String): List<CodexOfficial
         val externalUrl: String?
         when (kind) {
             "local" -> {
+                val parts = rawPath.removePrefix("./").split('/')
                 if (!OFFICIAL_PLUGIN_PATH.matches(rawPath) ||
-                    rawPath.split('/').any { it == ".." }) return@mapNotNull null
+                    parts.firstOrNull() != "plugins" ||
+                    parts.any { it.isEmpty() || it == "." || it == ".." }) return@mapNotNull null
                 relative = rawPath.removePrefix("./").trimEnd('/')
                 externalUrl = null
             }

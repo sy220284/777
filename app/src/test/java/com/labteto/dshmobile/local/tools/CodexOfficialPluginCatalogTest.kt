@@ -49,6 +49,8 @@ class CodexOfficialPluginCatalogTest {
         val list = parseCodexOfficialMarketplace("""
             {"name":"openai-curated","plugins":[
              {"name":"bad", "source":{"source":"local","path":"../secrets"}},
+             {"name":"double", "source":{"source":"local","path":"plugins//fake"}},
+             {"name":"dot", "source":{"source":"local","path":"plugins/./fake"}},
              {"name":"git-url","source":{"source":"url","url":"https://example.org"}},
              {"name":"good","source":{"source":"local","path":"./plugins/good"},
               "policy":{"installation":"NOT_AVAILABLE","authentication":"ON_USE"}}
