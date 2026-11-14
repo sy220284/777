@@ -328,8 +328,8 @@ internal fun PluginInventoryBrowser(
                 "Codex 使用 Git 插件安装器部署此插件；777 可以单独导入公开技能目录")
             matchingService != null -> connectorMarketState(matchingService.registration, matchingService.connection)
             installedFromPlugin -> ExtensionMarketState(
-                ExtensionMarketStatus.INSTALLED, "已安装部分技能",
-                "已导入可用技能；插件其他能力需进入详情按需连接")
+                ExtensionMarketStatus.INSTALLED, "已安装可用技能",
+                "本机技能已就绪；插件其它能力在详情中说明支持范围")
             verifiedDetail?.skills?.isNotEmpty() == true -> ExtensionMarketState(
                 ExtensionMarketStatus.INSTALLABLE, "可安装技能",
                 "点击了解，选择需要的技能；安装后显示其运行依赖")
@@ -588,8 +588,13 @@ internal fun PluginInventoryBrowser(
                 val canConnectOfficial = officialSupported && !officialConnected &&
                     pluginDetail?.mcpUrl != null && onConnectCodexPlugin != null
                 val canConnectSkill = endpoint != null && onConnectSkillMcp != null
+                val canUseOfficial = officialSupported && item.installedPlugin &&
+                    pluginDetail?.samplePrompts?.isNotEmpty() == true &&
+                    (pluginDetail.mcpUrl == null || officialConnected) &&
+                    (!pluginDetail.hasApp || officialConnected) &&
+                    !pluginDetail.hasHooks && onUseCapability != null
                 val hasDirectAction = canInstallPreset || canInstallCurated ||
-                    canInstallOfficial || canConnectOfficial || canConnectSkill ||
+                    canInstallOfficial || canConnectOfficial || canConnectSkill || canUseOfficial ||
                     (onUseCapability != null && item.available) || item.connectedService ||
                     (!item.id.startsWith("codex-plugin:") &&
                         !item.installablePreset && !item.installableCurated)
@@ -600,6 +605,7 @@ internal fun PluginInventoryBrowser(
                         canInstallOfficial -> if (missingPluginSkills.size > 1)
                             "安装包含的 ${missingPluginSkills.size} 项技能" else "安装"
                         canConnectOfficial || canConnectSkill -> "连接并授权"
+                        canUseOfficial -> "使用"
                         item.installedSkill || (onUseCapability != null && item.available) -> "使用"
                         item.connectedService -> "管理连接"
                         else -> "返回对话"
@@ -619,6 +625,10 @@ internal fun PluginInventoryBrowser(
                             canConnectOfficial -> onConnectCodexPlugin?.invoke(pluginId)
                             canConnectSkill -> requireNotNull(endpoint).let { (serverId, url) ->
                                 onConnectSkillMcp?.invoke(serverId, url)
+                            }
+                            canUseOfficial -> {
+                                selectedRow = null
+                                onUseCapability?.invoke(requireNotNull(pluginDetail).samplePrompts.first())
                             }
                             onUseCapability != null && item.available -> {
                                 selectedRow = null
