@@ -185,6 +185,7 @@ class LocalToolsUiFacade @Inject internal constructor(
         }
     override suspend fun recoverFailedPlugin(id: String): List<String> =
         tools.recoverFailedPlugin(id)
+    override fun activeToolHookIds() = tools.activeToolHookIds()
     override fun installedPluginIds() = tools.installedPluginIds()
     /** Registry presence is a configuration hint, not an execution grant. */
     internal suspend fun handoffExternalReadiness(): Pair<Boolean, Boolean> {
