@@ -39,10 +39,12 @@ internal object LocalWorkInvestigationRuntime {
     private fun sourceName(name: String, args: JsonObject): String {
         val path = args.text("path").ifBlank { args.text("file_path") }
         val repo = args.text("repository_full_name").ifBlank { args.text("repo_full_name") }
+        val ref = args.text("ref").take(48)
         val url = args.text("url").substringBefore('?').substringBefore('#')
         val value = when {
             name == "tool_output_read" -> "结果回执:" + args.text("call_id")
-            repo.isNotBlank() && path.isNotBlank() -> "$repo/$path"
+            repo.isNotBlank() && path.isNotBlank() ->
+                if (ref.isBlank()) "$repo/$path" else "$repo@$ref/$path"
             path.isNotBlank() -> path
             url.isNotBlank() -> url
             repo.isNotBlank() -> repo
@@ -88,6 +90,10 @@ internal object LocalWorkInvestigationRuntime {
         if (isError || toolDeclaredSequence == null) return
         val kind = sourceKind(toolName) ?: return
         val source = sourceName(toolName, args)
+        // Without a stable document or file identity, two unrelated read calls
+        // must not appear to be a continuation of the same source.
+        if (kind == "slice" && (source == toolName ||
+                (toolName == "tool_output_read" && args.text("call_id").isBlank()))) return
         val region = region(kind, args)
         log.append(SOURCE_EVENT, buildJsonObject {
             put("goal_id", goalId)
