@@ -338,8 +338,8 @@ internal fun PluginInventoryBrowser(
                 "官方授权策略：" +
                     if (plugin.authPolicy == "ON_USE") "首次使用时授权" else "连接时授权")
             verifiedDetail != null && verifiedDetail.hasApp -> ExtensionMarketState(
-                ExtensionMarketStatus.NEEDS_SETUP, "需要应用连接",
-                "请查看详情并授权该应用的实际可用服务")
+                ExtensionMarketStatus.UNSUPPORTED, "需要 App 运行环境",
+                "该插件依赖独立应用宿主；777 当前没有对应的 Android 执行器")
             verifiedDetail != null && verifiedDetail.hasHooks -> ExtensionMarketState(
                 ExtensionMarketStatus.UNSUPPORTED, "Codex 钩子能力",
                 "此插件的钩子需要对应 Codex 执行环境")
@@ -724,10 +724,14 @@ internal fun PluginInventoryBrowser(
                                         color = colors.textSecondary)
                                     Text(details.samplePrompts.first(),
                                         style = DsType.std14.withReadingWeight(), color = colors.text)
-                                    val pluginReady = item.installedPlugin &&
-                                        (details.mcpUrl == null || connectedServices.any {
-                                            it.id == details.mcpServerId && it.tools.isNotEmpty()
-                                        })
+                                    val pluginReady = item.installedPlugin && when {
+                                        details.mcpUrl != null -> connectedServices.any {
+                                            it.id == details.mcpServerId &&
+                                                it.tools.isNotEmpty()
+                                        }
+                                        details.hasApp || details.hasHooks -> false
+                                        else -> true
+                                    }
                                     if (pluginReady && onUseCapability != null) {
                                         SyButton(
                                             text = "使用这个示例",
@@ -820,9 +824,17 @@ internal fun PluginInventoryBrowser(
                             selectedRow = null
                             onConnectCodexPlugin(pluginId)
                         })
-                } else if (item.marketState.status != ExtensionMarketStatus.UNSUPPORTED) {
-                    SyButton(text = "查看连接方式", variant = SyButtonVariant.Info,
-                        onClick = { selectedRow = null; onManageConnections() })
+                } else if (details?.hasMcp == true && details.mcpUrl == null) {
+                    Text("该插件暂未提供 Android 可直接连接的 HTTPS MCP 服务。",
+                        style = DsType.small13, color = colors.textSecondary)
+                }
+                if (details?.hasApp == true) {
+                    Text("所含 App 需要对应的应用宿主；777 当前只安装可独立运行的技能。",
+                        style = DsType.small13, color = colors.textSecondary)
+                }
+                if (details?.hasHooks == true) {
+                    Text("所含 Hooks 依赖 Codex 执行环境，本机暂不执行。",
+                        style = DsType.small13, color = colors.textSecondary)
                 }
             }
             if (item.requirements.isNotEmpty()) {
