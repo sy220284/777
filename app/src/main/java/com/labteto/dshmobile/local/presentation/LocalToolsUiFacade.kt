@@ -209,7 +209,7 @@ class LocalToolsUiFacade @Inject internal constructor(
     /** Refresh the existing skill inventory when the real on-device skill files change. */
     fun skillChanges(): kotlinx.coroutines.flow.Flow<Unit> = skillManager.changes()
     override suspend fun installedSkills() = withContext(Dispatchers.IO) {
-        val connected = tools.servers()
+        val connected = servers()
         val registeredTools = tools.capabilityCatalogue().map { it.name }.toSet()
         tools.installedSkills().map { item ->
             val result = runCatching { gitHubSkillImporter.installedSourceLink(item.name) }
