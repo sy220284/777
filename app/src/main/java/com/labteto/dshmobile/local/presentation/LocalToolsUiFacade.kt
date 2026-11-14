@@ -197,6 +197,8 @@ class LocalToolsUiFacade @Inject internal constructor(
     /** Refresh the existing skill inventory when the real on-device skill files change. */
     fun skillChanges(): kotlinx.coroutines.flow.Flow<Unit> = skillManager.changes()
     override suspend fun installedSkills() = withContext(Dispatchers.IO) {
+        val connected = tools.servers()
+        val registeredTools = tools.capabilityCatalogue().map { it.name }.toSet()
         tools.installedSkills().map { item ->
             val result = runCatching { gitHubSkillImporter.installedSourceLink(item.name) }
             result.exceptionOrNull()?.let { failure ->
@@ -209,6 +211,19 @@ class LocalToolsUiFacade @Inject internal constructor(
                 sourceUrl = result.getOrNull(),
                 sourceWarning = if (result.isFailure) "技能来源记录校验失败，请检查或重新安装此技能" else null,
                 rollbackAvailable = gitHubSkillImporter.canRollback(item.name),
+                requirements = skillManager.requirements(item.name).map { requirement ->
+                    val registered = when (requirement.type.lowercase()) {
+                        "mcp" -> connected.any { server ->
+                            server.id == requirement.value || requirement.value in server.tools
+                        }
+                        "tool" -> requirement.value in registeredTools ||
+                            connected.any { requirement.value in it.tools }
+                        else -> false
+                    }
+                    com.labteto.dshmobile.uicontract.UiSkillRequirement(
+                        requirement.type, requirement.value, requirement.description, registered,
+                    )
+                },
             )
         }
     }
