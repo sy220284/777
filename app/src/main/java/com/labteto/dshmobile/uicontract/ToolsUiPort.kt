@@ -49,6 +49,7 @@ data class UiCodexPluginDetailSnapshot(
     val id: String, val displayName: String, val description: String,
     val developerName: String, val version: String,
     val skills: List<String>, val hasMcp: Boolean, val hasApp: Boolean, val hasHooks: Boolean,
+    val mcpServerId: String? = null, val mcpUrl: String? = null,
 )
 data class UiCodexPluginSnapshot(
     val id: String, val name: String, val category: String, val sourcePath: String,
@@ -92,6 +93,7 @@ interface ToolsUiPort {
         error("当前市场没有 Codex 插件详情服务")
     suspend fun installCodexPluginSkill(pluginId: String, skillId: String): String =
         error("当前市场不支持安装此插件技能")
+    suspend fun connectCodexPlugin(id: String): String = error("当前市场无法连接该插件")
     suspend fun githubRepositories(): List<UiGitHubRepo> = emptyList()
     suspend fun githubEntries(repoFullName: String, directory: String): List<UiGitHubEntry> = emptyList()
 
