@@ -45,6 +45,11 @@ data class UiSkillSnapshot(val name: String, val description: String, val modelI
     val displayName: String = name, val sourceUrl: String? = null, val sourceWarning: String? = null,
     val rollbackAvailable: Boolean = false, val requirements: List<UiSkillRequirement> = emptyList())
 data class UiPresetSkillSnapshot(val id: String, val title: String, val description: String, val installed: Boolean)
+data class UiCodexPluginDetailSnapshot(
+    val id: String, val displayName: String, val description: String,
+    val developerName: String, val version: String,
+    val skills: List<String>, val hasMcp: Boolean, val hasApp: Boolean, val hasHooks: Boolean,
+)
 data class UiCodexPluginSnapshot(
     val id: String, val name: String, val category: String, val sourcePath: String,
     val installPolicy: String, val authPolicy: String, val codexOnly: Boolean,
@@ -83,6 +88,10 @@ interface ToolsUiPort {
     suspend fun readSkillDocument(id: String): String
     suspend fun curatedGitHubSkills(): List<String>
     suspend fun codexOfficialPlugins(): List<UiCodexPluginSnapshot> = emptyList()
+    suspend fun codexPluginDetail(id: String): UiCodexPluginDetailSnapshot =
+        error("当前市场没有 Codex 插件详情服务")
+    suspend fun installCodexPluginSkill(pluginId: String, skillId: String): String =
+        error("当前市场不支持安装此插件技能")
     suspend fun githubRepositories(): List<UiGitHubRepo> = emptyList()
     suspend fun githubEntries(repoFullName: String, directory: String): List<UiGitHubEntry> = emptyList()
 
