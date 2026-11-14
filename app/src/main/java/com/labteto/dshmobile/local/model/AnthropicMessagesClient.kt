@@ -344,6 +344,8 @@ internal class AnthropicMessagesClient @Inject constructor(
         var stopReason: String? = null
         var sawMessageStop = false
         var sawMessageStart = false
+        var lastStreamEventType: String? = null
+        var streamEventsSeen = 0
         val closedBlocks = mutableSetOf<Int>()
 
         val reader = ModelStreamLineReader(body.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_STREAM_BYTES)
@@ -373,8 +375,11 @@ internal class AnthropicMessagesClient @Inject constructor(
                     .getOrElse { cause ->
                         throw protocolError("Anthropic SSE 包含无法解析的数据帧", requestId, cause)
                     }
+                val eventType = event["type"]?.jsonPrimitive?.contentOrNull
+                lastStreamEventType = eventType?.take(48)
+                streamEventsSeen++
                 LocalMiniMaxPolicy.requireSuccessfulResponse(event)
-                when (event["type"]?.jsonPrimitive?.contentOrNull) {
+                when (eventType) {
                     "message_start" -> {
                         if (sawMessageStart) throw protocolError("重复 message_start", requestId)
                         sawMessageStart = true
@@ -471,6 +476,8 @@ internal class AnthropicMessagesClient @Inject constructor(
                 code = "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION",
                 detail = "Anthropic Messages 流在 message_stop 前结束",
                 requestId = requestId ?: messageId,
+                lastStreamEventType = lastStreamEventType,
+                streamEventsSeen = streamEventsSeen,
             )
         }
         if (!sawMessageStart || messageId.isNullOrBlank() || (sawMessageStop && stopReason !in setOf("max_tokens", "refusal") && closedBlocks.size != blocks.size)) {
@@ -484,6 +491,9 @@ internal class AnthropicMessagesClient @Inject constructor(
             else -> LocalModelCompletionReason.COMPLETED
         }
 
+        val effectiveStopReason = if (!sawMessageStop) {
+            "stream_interrupted_after_${lastStreamEventType ?: "unknown"}"
+        } else stopReason
         val nativeContent = buildJsonArray {
             blocks.toSortedMap().values.filter { completionReason == LocalModelCompletionReason.COMPLETED || it.type == "text" }
                 .forEach { add(it.toNative(json, requestId ?: messageId)) }
@@ -530,13 +540,13 @@ internal class AnthropicMessagesClient @Inject constructor(
             role = LocalCanonicalRole.ASSISTANT,
             content = canonicalBlocks,
             replay = replay.takeIf { completionReason == LocalModelCompletionReason.COMPLETED },
-            completionReason = completionReason, rawStopReason = stopReason,
+            completionReason = completionReason, rawStopReason = effectiveStopReason,
         )
         val promptTokens = safeAdd(inputTokens, safeAdd(cacheReadTokens, cacheCreationTokens))
         val toolCalls = canonicalBlocks.filterIsInstance<LocalCanonicalContent.ToolCall>()
             .map(LocalCanonicalContent.ToolCall::toLocalToolCall)
         return LocalModelReply(
-            completionReason = completionReason, rawStopReason = stopReason,
+            completionReason = completionReason, rawStopReason = effectiveStopReason,
             message = LocalCanonicalModelCodec.toHistoryMessage(canonical),
             content = canonicalBlocks.filterIsInstance<LocalCanonicalContent.Text>()
                 .joinToString("") { it.text }.ifBlank { null },
