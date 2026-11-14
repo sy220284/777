@@ -166,6 +166,7 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
     private val catalogUrl = "$rootUrl/.agents/plugins/marketplace.json"
     private val catalogMutex = Mutex()
     private var catalogCache: Pair<Long, List<CodexOfficialPluginSummary>>? = null
+    private val detailsCache = java.util.concurrent.ConcurrentHashMap<String, CodexOfficialPluginDetail>()
 
     /** Codex-style cache: a manual refresh bypasses it; details share the same market snapshot. */
     suspend fun list(forceRefetch: Boolean = false): List<CodexOfficialPluginSummary> {
@@ -183,6 +184,7 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
             }
             val entries = parseCodexOfficialMarketplace(fetch(catalogUrl, 1024 * 1024))
             catalogCache = System.nanoTime() to entries
+            detailsCache.clear()
             return entries
         } finally {
             catalogMutex.unlock()
@@ -194,19 +196,21 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
         require(OFFICIAL_PLUGIN_ID.matches(name) && pluginId == "$name@openai-curated") {
             "Codex 插件标识不合法"
         }
+        detailsCache[pluginId]?.let { return it }
         val entry = list().firstOrNull { it.id == pluginId }
             ?: error("该插件不在 Codex 官方市场")
         if (entry.sourceKind != "local") {
-            return CodexOfficialPluginDetail(
+            val description = CodexOfficialPluginDetail(
                 name, name, "Codex 官方市场登记的第三方 Git 插件，来源：${entry.sourceUrl}",
                 "第三方开发者", "", false, false, false, false,
             )
+            return detailsCache.putIfAbsent(pluginId, description) ?: description
         }
         val details = parseCodexOfficialPluginDetail(
             fetch("$rootUrl/${entry.sourcePath}/.codex-plugin/plugin.json", 256 * 1024),
         )
         require(details.name == name) { "插件清单和实际包名称不匹配" }
-        return details
+        return detailsCache.putIfAbsent(pluginId, details) ?: details
     }
 
     suspend fun mcpEndpoint(pluginId: String): CodexOfficialMcpEndpoint? {
