@@ -8,6 +8,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ExtensionMarketplaceSemanticsTest {
+    @Test fun declaredHttpsSkillMcpCanBeAuthorizedWithoutManualEndpointEntry() {
+        val requirement = UiSkillRequirement("mcp", "github", transport = "http",
+            url = "https://api.githubcopilot.com/mcp/")
+        assertEquals("https://api.githubcopilot.com/mcp/", skillMcpHttpsEndpoint(requirement))
+    }
+
+    @Test fun invalidSkillMcpAddressesRequireExplicitManualReview() {
+        assertEquals(null, skillMcpHttpsEndpoint(UiSkillRequirement("mcp", "unsafe",
+            transport = "http", url = "http://localhost:8080/")))
+        assertEquals(null, skillMcpHttpsEndpoint(UiSkillRequirement("mcp", "unsafe",
+            transport = "stdio", url = "https://example.com/")))
+        assertEquals(null, skillMcpHttpsEndpoint(UiSkillRequirement("mcp", "unsafe",
+            transport = "http", url = "https://127.0.0.1/mcp")))
+    }
+
     @Test fun installedDoesNotHideMissingMcpRequirement() {
         val state = installedSkillMarketState(true, null, listOf(UiSkillRequirement("mcp", "github", registered = false)))
         assertEquals(ExtensionMarketStatus.NEEDS_SETUP, state.status)
