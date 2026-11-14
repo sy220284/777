@@ -54,7 +54,7 @@ class CodeModePluginTest {
                 onExecutionFinished = { tool, _ -> receipts += tool.name }))
         assertFalse(result.isError)
         assertEquals(listOf("read", "write"), calls)
-        assertEquals(2, approvals)
+        assertEquals(1, approvals) // only the actual write needs confirmation
         assertEquals(listOf("read", "write", "code_mode_run"), receipts)
         assertTrue(result.content.contains("\"completed_steps\":2"))
     }
@@ -196,20 +196,23 @@ class CodeModePluginTest {
         assertTrue(result.content.contains("\"completed_steps\":0"))
     }
 
-    @Test fun mutationScopeAndMissingApprovalStillApplyToWholeScript() = runTest {
+    @Test fun mutationScopeAppliesToWrapperButReadOnlyChildrenDoNotNeedExtraApproval() = runTest {
         val registry = ToolRegistry()
         var called = false
         register(registry, "read") { called = true; ToolResult("ok") }
         CodeModePlugin(registry).install(HarnessContext(registry))
         val noMutation = registry.executeTracked("code_mode_run", plan("read"),
             context = ToolContext(allowMutation = false, approval = { true }))
-        val noApproval = registry.executeTracked("code_mode_run", plan("read"))
         assertFalse(noMutation.executionStarted)
-        assertFalse(noApproval.executionStarted)
         assertEquals("MUTATION_SCOPE_BLOCKED", noMutation.result.errorCode)
-        assertEquals("APPROVAL_REQUIRED", noApproval.result.errorCode)
         assertFalse(called)
+
+        val readWithoutApproval = registry.executeTracked("code_mode_run", plan("read"))
+        assertFalse(readWithoutApproval.result.isError)
+        assertTrue(readWithoutApproval.executionStarted)
+        assertTrue(called)
     }
+
     @Test fun priorDurableResultCanSupplyNestedArgumentsToNextTool() = runTest {
         val registry = ToolRegistry()
         var received: JsonObject? = null
