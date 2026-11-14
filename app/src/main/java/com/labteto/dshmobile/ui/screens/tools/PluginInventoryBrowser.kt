@@ -295,6 +295,7 @@ internal fun PluginInventoryBrowser(
         val installedFromPlugin = skills.any {
             it.sourceUrl?.contains("/plugins/${plugin.name}/skills/") == true
         }
+        val verifiedDetail = codexDetails[plugin.id]
         val support = when {
             plugin.codexOnly -> ExtensionMarketState(ExtensionMarketStatus.UNSUPPORTED,
                 "Codex 专属", "该插件要求 Codex 产品环境；777 当前无法直接启用")
@@ -305,11 +306,23 @@ internal fun PluginInventoryBrowser(
                 "Codex 使用 Git 插件安装器部署此插件；777 可以单独导入公开技能目录")
             matchingService != null -> connectorMarketState(matchingService.registration, matchingService.connection)
             installedFromPlugin -> ExtensionMarketState(
-                ExtensionMarketStatus.NEEDS_SETUP, "已装技能 · 其余待连接",
-                "已安装此插件内的技能，MCP 与应用连接需要单独授权")
+                ExtensionMarketStatus.INSTALLED, "已安装部分技能",
+                "已导入可用技能；插件其他能力需进入详情按需连接")
+            verifiedDetail?.skills?.isNotEmpty() == true -> ExtensionMarketState(
+                ExtensionMarketStatus.INSTALLABLE, "可安装技能",
+                "点击了解，选择需要的技能；安装后显示其运行依赖")
+            verifiedDetail?.mcpUrl != null -> ExtensionMarketState(
+                ExtensionMarketStatus.NEEDS_SETUP, "连接后可用",
+                "官方授权策略：" +
+                    if (plugin.authPolicy == "ON_USE") "首次使用时授权" else "连接时授权")
+            verifiedDetail != null && verifiedDetail.hasApp -> ExtensionMarketState(
+                ExtensionMarketStatus.NEEDS_SETUP, "需要应用连接",
+                "请查看详情并授权该应用的实际可用服务")
+            verifiedDetail != null && verifiedDetail.hasHooks -> ExtensionMarketState(
+                ExtensionMarketStatus.UNSUPPORTED, "Codex 钩子能力",
+                "此插件的钩子需要对应 Codex 执行环境")
             else -> ExtensionMarketState(ExtensionMarketStatus.NEEDS_SETUP,
-                "需要连接", "官方授权策略：" +
-                    if (plugin.authPolicy == "ON_USE") "首次使用时授权" else "安装时授权")
+                "查看能力", "点击了解，检查该插件在 Android 上可使用的部分")
         }
         InventoryRow("codex-plugin:" + plugin.id,
             if (copy.title == "本地插件") plugin.name else copy.title,
