@@ -2438,6 +2438,17 @@ class LocalAgentTeamRuntimeTest {
         assertTrue(first.nextCursor < fixture.log.latestSequence())
         val second = fixture.runtime.scanAgentMessages(session, "worker", 1, first.nextCursor)
         assertEquals("result-end", second.messages.single().id)
+        // Wait follows every durable scan page instead of reporting a false timeout
+        // when the result is farther away than one bounded scanning pass.
+        val waited = runBlocking {
+            fixture.runtime.execute(LocalToolCall("wait-long-history", "team_wait_for_message", buildJsonObject {
+                put("target", "worker")
+                put("after_sequence", baseline)
+                put("timeout_ms", 1000)
+            }, "{}"), teamBinding(fixture, session))
+        }.orEmpty()
+        assertTrue(waited.contains("[result-end]"))
+        assertTrue(waited.contains("next_cursor="))
     }
 
     @Test fun genericTeamStopUsesExactJobAndPreservesInterruptVersusClose() = runBlocking {
