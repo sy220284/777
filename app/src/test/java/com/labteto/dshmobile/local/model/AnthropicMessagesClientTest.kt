@@ -56,6 +56,54 @@ class AnthropicMessagesClientTest {
     )
 
     @Test
+    fun officialClaudeCachesOnlyStableInstructionPrefix() {
+        val stable = LocalCanonicalMessage(
+            role = LocalCanonicalRole.SYSTEM,
+            content = listOf(LocalCanonicalContent.Text("项目固定规则".repeat(600))),
+            instructionScope = LocalInstructionScope.SESSION.name,
+        )
+        val dynamic = LocalCanonicalMessage(
+            role = LocalCanonicalRole.SYSTEM,
+            content = listOf(LocalCanonicalContent.Text("仅本轮有效的临时说明")),
+            instructionScope = LocalInstructionScope.TURN.name,
+        )
+        val user = LocalCanonicalMessage(
+            LocalCanonicalRole.USER,
+            listOf(LocalCanonicalContent.Text("读取源码")),
+        )
+        val payload = client.buildPayload(route(), listOf(stable, dynamic, user), emptyList(), null)
+        val blocks = payload.getValue("system").jsonArray
+        assertEquals(2, blocks.size)
+        assertEquals("ephemeral",
+            blocks[0].jsonObject.getValue("cache_control").jsonObject.getValue("type").jsonPrimitive.content)
+        assertFalse(blocks[1].jsonObject.containsKey("cache_control"))
+        assertEquals(1, payload.getValue("messages").jsonArray.size)
+
+        // Small, frequently changing prompts should not incur provider cache-write costs.
+        val short = client.buildPayload(route(), listOf(stable.copy(
+            content = listOf(LocalCanonicalContent.Text("短规则")),
+        ), user), emptyList(), null)
+        assertFalse(short.getValue("system").jsonArray[0].jsonObject.containsKey("cache_control"))
+    }
+
+    @Test
+    fun anthropicCompatibleProxyKeepsLegacyWireSystemWithoutCacheMarkers() {
+        val message = LocalCanonicalMessage(
+            LocalCanonicalRole.SYSTEM,
+            listOf(LocalCanonicalContent.Text("固定规则".repeat(1000))),
+            instructionScope = LocalInstructionScope.SESSION.name,
+        )
+        val payload = client.buildPayload(
+            route(baseUrl = "https://proxy.example/v1"),
+            listOf(message),
+            emptyList(),
+            null,
+        )
+        assertEquals("固定规则".repeat(1000), payload.getValue("system").jsonPrimitive.content)
+        assertFalse(payload.containsKey("cache_control"))
+    }
+
+    @Test
     fun sameRouteReplaysNativeThinkingSignatureAndToolUseLosslessly() {
         val route = route()
         val native = buildJsonArray {
