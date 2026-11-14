@@ -467,8 +467,11 @@ internal class LocalToolExecutionCoordinator(
             val summary = approvalSummary(concreteCall, tool) +
                 hookReason?.takeIf(String::isNotBlank)?.let { "\n受信工具规则要求确认：" + it }.orEmpty()
             val granted = approval(concreteCall, tool, summary)
-            // Keep each child authorization tied to its actual tool, arguments, and call ID.
-            recordAuthorizationDecision(sessionId, concreteCall, executionIdentity, granted)
+            // Approval UI and its decision log use the actual child name/arguments.
+            // The tool activity ledger has one execution owner: the parent Code Mode call.
+            // Recording a child-only authorization as a separate tool activity would create
+            // an orphan without a corresponding tool/call and tool/result settlement.
+            recordAuthorizationDecision(sessionId, call, executionIdentity, granted)
             authorizationRecorded = true
             if (!granted) approvalDenied = true
             return granted
