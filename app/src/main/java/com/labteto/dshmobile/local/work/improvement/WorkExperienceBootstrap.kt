@@ -107,7 +107,7 @@ internal object WorkExperienceBootstrap {
         var conflicts = 0
         var contractErrors = 0
         val currentFindings = linkedMapOf<String, String>()
-        val sourcesWithOpenCursor = mutableSetOf<String>()
+        val sourcesWithOpenCursor = mutableMapOf<String, String>()
         val completedSourceCursors = mutableSetOf<String>()
         forEachCompletedGoalEvent(log, goal) { event ->
             when (event.type) {
@@ -125,10 +125,14 @@ internal object WorkExperienceBootstrap {
                     val kind = (event.data["kind"] as? JsonPrimitive)?.contentOrNull
                     val hasNext = (event.data["has_next"] as? JsonPrimitive)?.contentOrNull == "true"
                     if (source.isNotBlank() && kind == "slice") {
-                        if (hasNext) {
-                            sourcesWithOpenCursor += source
-                        } else if (sourcesWithOpenCursor.remove(source)) {
-                            completedSourceCursors += source
+                        val region = (event.data["region"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+                        if (hasNext && region.isNotBlank()) {
+                            sourcesWithOpenCursor[source] = region
+                        } else if (!hasNext) {
+                            val previousRegion = sourcesWithOpenCursor.remove(source)
+                            if (previousRegion != null && region.isNotBlank() && region != previousRegion) {
+                                completedSourceCursors += source
+                            }
                         }
                     }
                 }
