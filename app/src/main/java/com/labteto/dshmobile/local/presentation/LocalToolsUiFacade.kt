@@ -261,6 +261,7 @@ class LocalToolsUiFacade @Inject internal constructor(
             if (info.hasSkills) codexOfficialPlugins.pluginSkills(id) else emptyList(),
             info.hasMcp, info.hasApp, info.hasHooks,
             remote?.serverId, remote?.url,
+            if (info.hasSkills) codexOfficialPlugins.pluginSkillLocations(id) else emptyMap(),
         )
     }
     override suspend fun installCodexPluginSkill(pluginId: String, skillId: String): String =
