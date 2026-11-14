@@ -287,7 +287,7 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
             if (children.isEmpty() && items.any {
                     val obj = it as? JsonObject
                     obj?.get("name")?.jsonPrimitive?.contentOrNull == "SKILL.md" &&
-                        obj["type"]?.jsonPrimitive?.contentOrNull == "file"
+                        obj?.get("type")?.jsonPrimitive?.contentOrNull == "file"
                 }) {
                 val id = skillRoot.substringAfterLast('/')
                 if (OFFICIAL_PLUGIN_ID.matches(id)) collected += id to skillRoot
