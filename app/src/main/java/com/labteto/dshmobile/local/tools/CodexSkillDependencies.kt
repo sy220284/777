@@ -53,25 +53,28 @@ internal fun parseCodexSkillDependencies(source: String): List<CodexSkillDepende
         val value = line.trim()
         if (indent == 0) {
             if (inTools) flush()
-            inDependencies = value == "dependencies:"
+            inDependencies = value.startsWith("dependencies:")
+            if (inDependencies && value != "dependencies:") unrecognized = true
             inTools = false
             toolsIndent = -1
             continue
         }
         if (!inDependencies) continue
         if (!inTools) {
-            if (value == "tools:") {
+            if (value.startsWith("tools:")) {
                 inTools = true
                 toolsIndent = indent
+                if (value != "tools:") unrecognized = true
             }
             continue
         }
         if (indent <= toolsIndent) {
             flush()
             inTools = false
-            if (value == "tools:") {
+            if (value.startsWith("tools:")) {
                 inTools = true
                 toolsIndent = indent
+                if (value != "tools:") unrecognized = true
             }
             continue
         }
