@@ -16,6 +16,7 @@ class LocalToolsUiFacade @Inject internal constructor(
     private val skillManager: com.labteto.dshmobile.local.tools.LocalSkillManager,
     private val agentBackends: com.labteto.dshmobile.local.agent.LocalAgentBackendRuntime,
     private val gitHubSkillImporter: com.labteto.dshmobile.local.tools.LocalGitHubSkillImporter,
+    private val codexOfficialPlugins: com.labteto.dshmobile.local.tools.CodexOfficialPluginCatalog,
     private val gitHubBrowser: com.labteto.dshmobile.local.tools.LocalGitHubCredentialManager,
     private val mcpCredentials: com.labteto.dshmobile.local.tools.LocalMcpCredentialStore,
     private val mcpOAuth: com.labteto.dshmobile.local.tools.LocalMcpOAuthCoordinator,
@@ -231,6 +232,12 @@ class LocalToolsUiFacade @Inject internal constructor(
         com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot(it.id, it.title, it.description, it.installed)
     }
     override suspend fun curatedGitHubSkills() = gitHubSkillImporter.curatedSkills()
+    override suspend fun codexOfficialPlugins() = codexOfficialPlugins.list().map { item ->
+        com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            item.id, item.name, item.category, item.sourcePath,
+            item.installPolicy, item.authPolicy, item.codexOnly,
+        )
+    }
     /** The feature owns source validation; UI passes only the name from a visible catalog row. */
     suspend fun installCuratedSkill(id: String) = gitHubSkillImporter.install(
         com.labteto.dshmobile.local.tools.curatedGitHubSkillUrl(id),
