@@ -8,6 +8,16 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /** Removes options whose runtime semantics are not read-only in planning/read-only scopes. */
 internal fun HarnessTool.forReadOnlyModelScope(): HarnessTool {
+    if (name == "code_mode_run") {
+        val function = schema["function"] as? JsonObject ?: return this
+        val description = function["description"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val scoped = description +
+            "；当前规划模式只允许全由只读/网络查询工具组成的步骤列表，可批量读取和检查。" +
+            "一旦包含写文件、命令或设备操作，整段脚本在首步前拒绝。真实工具权限和审批仍逐步生效。"
+        return copy(schema = JsonObject(schema + ("function" to JsonObject(
+            function + ("description" to JsonPrimitive(scoped))
+        ))))
+    }
     if (name != "web_fetch") return this
     val function = schema["function"] as? JsonObject ?: return this
     val parameters = function["parameters"] as? JsonObject ?: return this
