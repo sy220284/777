@@ -97,10 +97,21 @@ class HarnessAccessibilityService : AccessibilityService() {
 
     fun setTextNode(index: Int, value: String): Boolean {
         val target = nodeAt(index)?.takeIf(AccessibilityNodeInfo::isEditable) ?: return false
+        return setEditableText(target, value)
+    }
+
+    /** Compose controls may only accept ACTION_SET_TEXT once focused.
+     * Retry the same idempotent replacement on the same refreshed node, never another field.
+     */
+    private fun setEditableText(target: AccessibilityNodeInfo, value: String): Boolean {
         val arguments = Bundle().apply {
             putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
         }
-        return target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+        if (target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)) return true
+        if (!target.isVisibleToUser || !target.isFocusable) return false
+        if (!target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)) return false
+        return target.refresh() && target.isEditable &&
+            target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
     }
 
     fun clickText(text: String): Boolean {
@@ -115,13 +126,15 @@ class HarnessAccessibilityService : AccessibilityService() {
 
     fun setText(searchText: String, value: String): Boolean {
         val root = rootInActiveWindow ?: return false
-        val candidates = root.findAccessibilityNodeInfosByText(searchText)
+        val candidates = if (searchText.isBlank()) {
+            // A blank Compose TextField has no text to match; require an explicit current
+            // input focus rather than guessing among all editable controls.
+            listOfNotNull(root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT))
+                .filter { it.isVisibleToUser && it.isEditable }
+        } else root.findAccessibilityNodeInfosByText(searchText)
             .filter { it.isVisibleToUser && it.isEditable }
         val target = requireUniqueAccessibilityTarget(candidates, "输入文字") ?: return false
-        val arguments = Bundle().apply {
-            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
-        }
-        return target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+        return setEditableText(target, value)
     }
 
     fun globalBack(): Boolean = performGlobalAction(GLOBAL_ACTION_BACK)
