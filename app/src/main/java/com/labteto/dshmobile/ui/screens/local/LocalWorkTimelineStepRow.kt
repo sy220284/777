@@ -92,6 +92,7 @@ internal fun userFacingWorkToolAction(toolName: String?): String? {
         "android_home" -> return "返回手机主屏幕"
         "android_screenshot" -> return "读取当前手机画面"
         "android_vscreen_create" -> return "创建独立虚拟屏"
+        "android_vscreen_start" -> return "打开应用独立虚拟屏（失败自动回收）"
         "android_vscreen_list", "android_vscreen_status" -> return "检查虚拟屏状态"
         "android_vscreen_launch" -> return "在虚拟屏启动应用"
         "android_vscreen_tap" -> return "点击虚拟屏界面"
