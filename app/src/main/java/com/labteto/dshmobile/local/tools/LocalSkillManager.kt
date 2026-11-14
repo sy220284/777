@@ -403,18 +403,12 @@ internal class LocalSkillStore(
 
     fun readDocument(id: String): String {
         requireInstalled(id)
-        return workspace.readRaw(".dsh/skills/$id/SKILL.md").also {
-            require(it.toByteArray(Charsets.UTF_8).size <= 24_000) {
-                "技能说明超过 24 KB，请通过工作区文件工具编辑"
-            }
-        }
+        return workspace.readRaw(".dsh/skills/$id/SKILL.md")
     }
 
     fun updateDocument(id: String, document: String) {
         requireInstalled(id)
-        require(document.isNotBlank() && document.toByteArray(Charsets.UTF_8).size <= 24_000) {
-            "技能文件不能为空，且不能超过 24 KB"
-        }
+        require(document.isNotBlank()) { "技能文件不能为空" }
         require(document.lineSequence().firstOrNull()?.trim() != "---" ||
             document.lineSequence().drop(1).take(95).any { it.trim() == "---" }) {
             "技能元数据缺少结束分隔符"
