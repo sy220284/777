@@ -123,8 +123,18 @@ internal fun validateLocalSubagentToolAllowlist(
     }.toSet()
     val unavailable = allowlist - available
     require(unavailable.isEmpty()) {
-        "SUBAGENT_TOOL_FILTER_UNAVAILABLE：工具白名单包含当前子代理不可用能力：" +
-            unavailable.sorted().joinToString(",")
+        val unavailableList = unavailable.sorted().joinToString(",")
+        if (!capabilities.allowMutation && unavailable.any {
+                it in setOf("bash", "run_shell", "write", "edit", "apply_patch", "process_exec")
+            }) {
+            "SUBAGENT_TOOL_FILTER_UNAVAILABLE：当前是只读子代理，" +
+                "进程命令和写入工具未获授权：$unavailableList。" +
+                "只读检查请使用当前可见的 read/grep 等工具；需要运行测试时由父任务执行，" +
+                "或显式通过已授权的 subagent_fork 创建可写工作区。"
+        } else {
+            "SUBAGENT_TOOL_FILTER_UNAVAILABLE：工具不在当前子代理实际可见的工具表中：" +
+                unavailableList + "；allowed_tools 只能缩小工具范围，不会自动启用工具。"
+        }
     }
 }
 
