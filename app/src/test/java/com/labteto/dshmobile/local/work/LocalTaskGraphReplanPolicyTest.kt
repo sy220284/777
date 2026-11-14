@@ -67,6 +67,19 @@ class LocalTaskGraphReplanPolicyTest {
         assertEquals(setOf("a", "b"), decision.invalidatedNodeIds)
     }
 
+    @Test fun metadataOnlyChangeDoesNotRestartAnIdenticalTaskGraph() {
+        val previous = plan()
+        val onlyBookkeeping = LocalWorkTaskGraphPlan(kotlinx.serialization.json.JsonObject(
+            previous.value.toMutableMap().apply {
+                put("reuses_graph_id", JsonPrimitive("older"))
+                put("reuses_graph_execution_id", JsonPrimitive("older-execution"))
+            },
+        ))
+        assertTrue(runCatching {
+            admitLocalTaskGraphReplan(previous, onlyBookkeeping)
+        }.exceptionOrNull()?.message.orEmpty().contains("TASKGRAPH_REPLAN_NO_SUBSTANTIVE_CHANGES"))
+    }
+
     @Test fun writableSideEffectsRequireSeparateVerificationBeforeReplanning() {
         assertTrue(runCatching { admitLocalTaskGraphReplan(plan(write = true), plan(first = "new")) }
             .exceptionOrNull()?.message.orEmpty().contains("TASKGRAPH_REPLAN_WRITABLE"))
