@@ -2895,6 +2895,71 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun memberMessageSettlesOwnedTaskAndWakesLeadWithoutFakeCheckpoint() = runBlocking {
+        val session = "team-member-submitted-result"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        startLiveChild(f, session)
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT, task(session, "task-1", 1, emptyList()))
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT, task(session, "task-1", 2, emptyList(),
+            status = "in_progress", ownerId = "member-1"))
+        val binding = teamBinding(f, session)
+
+        // A Lead-originated message with a plausible ID cannot settle a member task.
+        val wrongId = "team-msg-11111111111111111111"
+        f.log.append(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
+            teamMessage(session, wrongId, "member-1", "Not the assigned member's result"))
+        suspend fun complete(resultId: String) = f.runtime.execute(
+            LocalToolCall("settle", "team_task_update", buildJsonObject {
+                put("task_id", "task-1")
+                put("expected_revision", 2)
+                put("action", "complete")
+                put("result_id", resultId)
+            }, "{}"), binding)
+        assertTrue(runCatching { complete(wrongId) }.isFailure)
+        assertEquals(LocalTeamTaskStatus.IN_PROGRESS, f.runtime.project(session).tasks.single().status)
+
+        val ownership = com.labteto.dshmobile.harness.agent.AgentRunOwnership()
+        val identity = com.labteto.dshmobile.harness.agent.AgentRunIdentity(session, "child:sa-team-1", "run")
+        ownership.claim(identity) {}
+        val submitted = kotlinx.coroutines.withContext(ownership.executionContext(identity)) {
+            f.runtime.executeMember(session, "job-team-1",
+                memberTestToolCall("submit", "team_send_message", buildJsonObject {
+                    put("target", "@lead")
+                    put("message", "task-1 result: checked the inputs and attached verification details")
+                }))
+        }
+        val resultId = Regex("team-msg-[a-f0-9]{20}").find(submitted)?.value
+            ?: error("Member tool did not return a durable message ID")
+
+        // Waiting without an explicit cursor observes already persisted Team member messages.
+        val waited = f.runtime.execute(LocalToolCall(
+            "wait-result", "team_wait_for_message",
+            buildJsonObject { put("timeout_ms", 1000) }, "{}",
+        ), binding).orEmpty()
+        assertTrue(waited.contains(resultId))
+        complete(resultId)
+        val task = f.runtime.project(session).tasks.single()
+        assertEquals(LocalTeamTaskStatus.COMPLETED, task.status)
+        assertEquals(resultId, task.completionResultId)
+        assertNull(f.runtime.project(session).failure)
+        val proof = f.runtime.execute(LocalToolCall(
+            "inspect-result", "team_task_evidence",
+            buildJsonObject { put("task_id", "task-1") }, "{}",
+        ), binding).orEmpty()
+        assertTrue(proof.contains("member_message_binding_valid=true"))
+        assertTrue(proof.contains("result_binding_valid=true"))
+        assertTrue(proof.contains("result_source=member_message"))
+        assertTrue(proof.contains("content_verified=false"))
+        assertTrue(proof.contains("goal_accepted=false"))
+        val restored = LocalAgentTeamRuntime(f.jobs,
+            { _, _, _, _, _, _, _, _, _, _ -> JobStartResult(false, null, "unused") },
+            { _, _, _ -> JobMessageAdmission(false, false, false, "unused") },
+            { f.log }, SessionProjectionRegistry())
+        assertEquals(resultId, restored.project(session).tasks.single().completionResultId)
+    }
+
+    @Test
     fun completionRequiresFreshOwnedResultAndUnlocksDependencyOnlyAfterVerification() = runBlocking {
         val session = "team-verified-complete"
         val fixture = fixture(session)
