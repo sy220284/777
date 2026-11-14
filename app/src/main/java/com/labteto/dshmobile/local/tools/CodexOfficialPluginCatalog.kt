@@ -121,6 +121,7 @@ internal data class CodexOfficialPluginDetail(
     val skillRoots: List<String> = emptyList(),
     val mcpPath: String? = null,
     val inlineMcpConfig: String? = null,
+    val logoPath: String? = null,
 )
 
 internal data class CodexOfficialMcpEndpoint(
@@ -185,6 +186,8 @@ internal fun parseCodexOfficialPluginDetail(document: String): CodexOfficialPlug
         hasHooks = root["hooks"] != null,
         skillRoots = declaredSkills.distinct(),
         mcpPath = mcpFile, inlineMcpConfig = inlineMcp,
+        logoPath = interfaceData?.get("logo")?.jsonPrimitive?.contentOrNull
+            ?.let(::codexPluginRelativeAsset),
     )
 }
 
@@ -199,6 +202,8 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
     private var catalogCache: Pair<Long, List<CodexOfficialPluginSummary>>? = null
     private val detailsCache = java.util.concurrent.ConcurrentHashMap<String, CodexOfficialPluginDetail>()
     private val skillSourcesCache = java.util.concurrent.ConcurrentHashMap<String, List<Pair<String, String>>>()
+    private val logoCache = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
+    private val unavailableLogos = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     /** Codex-style cache: a manual refresh bypasses it; details share the same market snapshot. */
     suspend fun list(forceRefetch: Boolean = false): List<CodexOfficialPluginSummary> {
@@ -218,6 +223,8 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
             catalogCache = System.nanoTime() to entries
             detailsCache.clear()
             skillSourcesCache.clear()
+            logoCache.clear()
+            unavailableLogos.clear()
             return entries
         } finally {
             catalogMutex.unlock()
@@ -259,6 +266,44 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
             else -> error("插件 MCP 配置路径未通过安全校验")
         }
         return parseCodexOfficialMcpEndpoint(document, detail.name)
+    }
+
+    /**
+     * Reads official publisher artwork on demand from a manifest-declared relative asset.
+     * The payload is memory-cached only; no third-party icon CDN or user file access.
+     * Decode is performed by the UI after checking dimensions.
+     */
+    suspend fun officialLogo(pluginId: String): ByteArray? {
+        logoCache[pluginId]?.let { return it }
+        if (pluginId in unavailableLogos) return null
+        val entry = list().firstOrNull { it.id == pluginId }
+            ?: error("Codex 市场不存在该插件")
+        if (entry.sourceKind != "local" || entry.codexOnly) {
+            unavailableLogos += pluginId
+            return null
+        }
+        val asset = detail(pluginId).logoPath
+        if (asset == null || !(asset.endsWith(".png", ignoreCase = true) ||
+                    asset.endsWith(".webp", ignoreCase = true) ||
+                    asset.endsWith(".jpg", ignoreCase = true) ||
+                    asset.endsWith(".jpeg", ignoreCase = true))) {
+            unavailableLogos += pluginId
+            return null
+        }
+        val bytes = withContext(Dispatchers.IO) {
+            val url = "$rootUrl/${entry.sourcePath}/$asset"
+            val request = Request.Builder().url(url).get().build()
+            withCancellableHttpResponse(http.newCall(request)) { response ->
+                require(response.isSuccessful) {
+                    "Codex 官方插件图标下载失败（HTTP ${response.code}）"
+                }
+                val payload = response.body?.byteStream()?.use { it.readNBytes(256 * 1024 + 1) }
+                    ?: throw IOException("Codex 插件图标响应为空")
+                require(payload.size <= 256 * 1024) { "插件图标超出大小限制" }
+                payload
+            }
+        }
+        return logoCache.putIfAbsent(pluginId, bytes) ?: bytes
     }
 
     /** Resolves declared plugin.json skill roots rather than assuming every package uses /skills. */
