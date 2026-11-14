@@ -128,6 +128,7 @@ data class ToolsUiState(
     val codexLoading: Boolean = false,
     val codexError: String? = null,
     val codexDetails: Map<String, com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot> = emptyMap(),
+    val codexLogos: Map<String, ByteArray> = emptyMap(),
     val codexDetailLoadingId: String? = null,
     val codexDetailError: String? = null,
     val curatedLoading: Boolean = false,
@@ -224,6 +225,7 @@ class ToolsViewModel @Inject constructor(
     fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
     fun setDeepSeekSearchPreferred(enabled: Boolean) = networkSearchSettings.setDeepSeekPreferred(enabled)
     private val operationGate = ToolsOperationGate()
+    private val requestedCodexLogos = mutableSetOf<String>()
     private var mcpLoginJob: kotlinx.coroutines.Job? = null
     private val _githubBrowse = MutableStateFlow(GitHubBrowseState())
     internal val githubBrowse: StateFlow<GitHubBrowseState> = _githubBrowse.asStateFlow()
@@ -346,6 +348,7 @@ class ToolsViewModel @Inject constructor(
                     codexLoading = _state.value.codexLoading,
                     codexError = _state.value.codexError,
                     codexDetails = _state.value.codexDetails,
+                    codexLogos = _state.value.codexLogos,
                     codexDetailLoadingId = _state.value.codexDetailLoadingId,
                     codexDetailError = _state.value.codexDetailError,
                     curatedLoading = _state.value.curatedLoading,
@@ -507,9 +510,12 @@ class ToolsViewModel @Inject constructor(
                 val availableIds = plugins.map { it.id }.toSet()
                 val details = if (forceRefetch) emptyMap() else
                     _state.value.codexDetails.filterKeys { it in availableIds }
+                if (forceRefetch) requestedCodexLogos.clear()
                 _state.value = _state.value.copy(
                     codexLoading = false, codexPlugins = plugins,
                     codexDetails = details, codexDetailError = null,
+                    codexLogos = if (forceRefetch) emptyMap() else
+                        _state.value.codexLogos.filterKeys { it in availableIds },
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -517,6 +523,28 @@ class ToolsViewModel @Inject constructor(
                 _state.value = _state.value.copy(
                     codexLoading = false,
                     codexError = "Codex 官方市场读取失败：" + (failure.message ?: "请检查网络"),
+                )
+            }
+        }
+    }
+
+    /** Fetch artwork only as a marketplace row becomes visible.
+     * Loading and errors stay separate from installation/authorization.
+     */
+    fun loadCodexPluginLogo(id: String) {
+        if (_state.value.codexPlugins.none { it.id == id } ||
+            id in _state.value.codexLogos || !requestedCodexLogos.add(id)) return
+        viewModelScope.launch {
+            try {
+                val bytes = localTools.codexPluginLogo(id) ?: return@launch
+                _state.value = _state.value.copy(
+                    codexLogos = _state.value.codexLogos + (id to bytes),
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                com.labteto.dshmobile.observability.AppLog.warn(
+                    "CodexPluginIcon", "官方插件图标加载失败：$id", failure,
                 )
             }
         }
@@ -1300,6 +1328,8 @@ fun ToolsScreen(
                                     codexLoading = state.codexLoading,
                                     codexError = state.codexError,
                                     codexDetails = state.codexDetails,
+                                    codexLogos = state.codexLogos,
+                                    onRequestCodexLogo = viewModel::loadCodexPluginLogo,
                                     codexDetailLoadingId = state.codexDetailLoadingId,
                                     codexDetailError = state.codexDetailError,
                                     onReadCodexPluginDetail = viewModel::loadCodexPluginDetail,
