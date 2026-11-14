@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
@@ -506,87 +504,34 @@ internal fun PluginInventoryBrowser(
                     }
                 } else {
                     items(list, key = { it.id }) { item ->
-                        Surface(
-                            modifier = Modifier.fillMaxWidth().testTag("plugin-inventory-card-" + item.id),
-                            onClick = { selectedRow = item },
-                            color = colors.materialL2,
-                            shape = RoundedCornerShape(24.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth()
-                                    .heightIn(min = 80.dp)
-                                    .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                            ) {
-                                Surface(
-                                    modifier = Modifier.size(48.dp).testTag("plugin-inventory-icon-" + item.id),
-                                    color = item.accent.copy(alpha = 0.10f),
-                                    shape = RoundedCornerShape(14.dp),
-                                ) {
-                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        val documentIcon = item.documentIcon
-                                        if (documentIcon != null) {
-                                            Image(
-                                                painter = painterResource(documentIcon),
-                                                contentDescription = null,
-                                                modifier = Modifier.size(40.dp),
-                                            )
-                                        } else {
-                                            Icon(
-                                                imageVector = item.icon,
-                                                contentDescription = null,
-                                                tint = item.accent,
-                                                modifier = Modifier.size(26.dp),
-                                            )
-                                        }
-                                    }
+                        val usePrompt = if (item.installedSkill) "@skill:" + item.id.substringAfter(":") + "\n"
+                            else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
+                        val installable = (item.installablePreset && onInstallPreset != null) ||
+                            (item.installableCurated && onInstallCurated != null)
+                        ExtensionCatalogCard(
+                            id = item.id,
+                            title = item.name,
+                            description = item.detail,
+                            icon = item.icon,
+                            accent = item.accent,
+                            documentIcon = item.documentIcon,
+                            actionText = if (installable) "安装" else stringResource(
+                                if (onUseCapability != null && item.available) R.string.plugin_use
+                                else R.string.tools_catalog_details
+                            ),
+                            enabled = !loading,
+                            onOpen = { selectedRow = item },
+                            onAction = {
+                                when {
+                                    item.installablePreset && onInstallPreset != null ->
+                                        onInstallPreset(item.id.substringAfter(":"))
+                                    item.installableCurated && onInstallCurated != null ->
+                                        onInstallCurated(item.id.substringAfter(":"))
+                                    onUseCapability != null && item.available -> onUseCapability(usePrompt)
+                                    else -> selectedRow = item
                                 }
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
-                                ) {
-                                    Text(
-                                        item.name,
-                                        modifier = Modifier.fillMaxWidth()
-                                            .testTag("plugin-inventory-title-${item.id}"),
-                                        color = colors.text,
-                                        style = DsType.std14Strong.withReadingWeight(),
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        item.detail,
-                                        modifier = Modifier.fillMaxWidth()
-                                            .testTag("plugin-inventory-detail-${item.id}"),
-                                        color = colors.textSecondary,
-                                        style = DsType.small13.withReadingWeight(),
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                                val usePrompt = if (item.installedSkill) "@skill:${item.id.substringAfter(":")}\n"
-                                    else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
-                                SyButton(
-                                    enabled = !loading,
-                                    text = stringResource(
-                                        if ((item.installablePreset && onInstallPreset != null) ||
-                                             (item.installableCurated && onInstallCurated != null)) R.string.skills_install
-                                        else if (onUseCapability != null && item.available) R.string.plugin_use
-                                        else R.string.tools_catalog_details
-                                    ),
-                                    variant = SyButtonVariant.Info,
-                                    size = SyButtonSize.Small,
-                                    modifier = Modifier.testTag("plugin-inventory-action-${item.id}"),
-                                    onClick = {
-                                        if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
-                                         else if (item.installableCurated && onInstallCurated != null) onInstallCurated(item.id.substringAfter(":"))
-                                        else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
-                                        else selectedRow = item
-                                    },
-                                )
-                            }
-                        }
+                            },
+                        )
                     }
                 }
             }
