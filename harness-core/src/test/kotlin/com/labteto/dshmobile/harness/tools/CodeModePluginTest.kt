@@ -618,4 +618,31 @@ class CodeModePluginTest {
         assertTrue(result.content.contains("省略 path"))
     }
 
+
+    @Test fun typedJsonScalarsRemainTypedWhileBareTextIsText() = runTest {
+        val registry = ToolRegistry()
+        var reads = 0
+        register(registry, "bool") { ToolResult("true") }
+        register(registry, "number") { ToolResult("12.5") }
+        register(registry, "next") { reads++; ToolResult("done") }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val script = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject { put("tool", "bool"); put("args", buildJsonObject {}) })
+                add(buildJsonObject {
+                    put("tool", "next"); put("args", buildJsonObject {})
+                    put("when", buildJsonObject { put("step", 1); put("equals", true) })
+                })
+                add(buildJsonObject { put("tool", "number"); put("args", buildJsonObject {}) })
+                add(buildJsonObject {
+                    put("tool", "next"); put("args", buildJsonObject {})
+                    put("when", buildJsonObject { put("step", 3); put("equals", 12.5) })
+                })
+            })
+        }
+        val result = registry.execute("code_mode_run", script)
+        assertFalse(result.content, result.isError)
+        assertEquals(result.content, 2, reads)
+    }
+
 }
