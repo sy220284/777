@@ -129,15 +129,19 @@ internal fun localWorkDeliveryEvidence(
     val missing = graphMissing.toMutableList()
     var artifactId: String? = null
     for (path in goal.artifactPaths) {
-        val result = log.latestMatching(setOf("tool/result")) { data ->
+        val recorded = log.latestMatching(setOf("tool/result")) { data ->
             data.value("is_error") == "false" && version(data, path) != null &&
                 callFor(data, Long.MAX_VALUE) != null
         }?.takeIf { result ->
-            result.sequence > start && callFor(result.data, result.sequence) != null &&
-                now[path] != null && version(result.data, path) == now[path]
+            result.sequence > start && callFor(result.data, result.sequence) != null
         }
-        if (result == null) missing += "成果尚未核验或版本已变化：$path"
-        else artifactId = result.data.value("id")
+        when {
+            now[path] == null -> missing += "成果文件不存在或无法读取：$path；先确认成果已保存"
+            recorded == null -> missing += "成果尚无当前目标下的真实工具版本证据：$path；先执行写入或读取验证"
+            version(recorded.data, path) != now[path] ->
+                missing += "成果版本已变化：$path；重新核验最新内容后再结算"
+            else -> artifactId = recorded.data.value("id")
+        }
     }
     fun commandMatches(args: JsonObject, declared: String): Boolean = when (val command = args["command"]) {
         is JsonPrimitive -> command.contentOrNull?.trim() == declared.trim()
@@ -155,10 +159,20 @@ internal fun localWorkDeliveryEvidence(
             val args = call.data["arguments"] as? JsonObject
             args?.let { commandMatches(it, command) } == true
         }?.takeIf { it.sequence > start && callFor(it.data, it.sequence) != null }
-        val success = result != null && result.data.value("is_error") == "false" &&
-            (result.data["process_exit_code"] as? JsonPrimitive)?.intOrNull == 0 &&
-            goal.artifactPaths.all { path -> now[path] != null && version(result.data, path) == now[path] }
-        if (!success) missing += "验收命令未成功执行、最新执行失败或成果版本已变化：$command"
+        val exitCode = (result?.data?.get("process_exit_code") as? JsonPrimitive)?.intOrNull
+        val issue = when {
+            result == null -> "验收命令尚无当前目标下的真实执行记录：$command；请单独执行原命令"
+            result.data.value("is_error") != "false" ->
+                "验收命令最新执行失败：$command；退出码：${exitCode?.toString() ?: "未返回"}"
+            exitCode == null -> "验收命令没有可核验的退出码：$command；请检查实际执行结果"
+            exitCode != 0 -> "验收命令最新执行退出码为 $exitCode：$command"
+            goal.artifactPaths.any { now[it] == null } ->
+                "验收后成果文件不存在或无法读取：$command；检查声明的成果路径"
+            goal.artifactPaths.any { version(result.data, it) != now[it] } ->
+                "验收后成果版本已变化：$command；重新执行原命令验证当前文件"
+            else -> null
+        }
+        if (issue != null) missing += issue
         else verificationId = result?.data?.value("id")
     }
     return LocalWorkDeliveryEvidence(needsArtifact, needsTest, runtimeFacts = facts,

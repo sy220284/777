@@ -28,6 +28,7 @@ Agent 必须读取并执行这些具体约束，但不得在本文件中再维�
 - 自主调试参考：`docs/DEVELOPMENT.md`
 - 本地开发工具链：`docs/DEVELOPMENT.md`
 - 安全规则：`docs/SECURITY.md`
+- Agent 工具调用、错误恢复与验收方法：`docs/AGENT-TOOL-USAGE.zh-CN.md`
 - 协议、兼容、UI / UX：对应当前权威文档
 - 具体预算与硬约束：当前静态门禁、测试和配置
 
