@@ -475,6 +475,14 @@ internal class LocalToolExecutionCoordinator(
                             currentCoroutineContext()[LocalModelRunContext]?.profile?.let { put("model_profile", it) }
                         },
                         expectedRegistration = registered,
+                        beforeExecution = {
+                            executionOwner?.requireCurrent(sessionId)
+                            kotlinx.coroutines.currentCoroutineContext()[
+                                com.labteto.dshmobile.harness.agent.AgentBackendExecutionContext
+                            ]?.requireCurrent()
+                            runOwner?.requireCurrent(sessionId)
+                            if (!beforeExecution()) throw LocalToolSampleSuperseded()
+                        },
                         onExecutionFinished = { _, result ->
                             if (callerJob?.isCancelled == true) {
                                 recordCancelledExecutionFinished(sessionId, call, executionIdentity, result)
