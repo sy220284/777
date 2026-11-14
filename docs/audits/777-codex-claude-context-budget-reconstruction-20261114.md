@@ -22,6 +22,12 @@
 | 长上下文压缩 | 777 `LocalHistoryCompactor`、旧工具结果降级、结构化 Work 状态，Codex `compact` 与世界状态快照 | 沿用单一事件事实源与持久恢复；强制保护原有 system 和最近工具调用完整性 | 沿用 `LocalHistoryCompactor.kt` 与 `LocalToolHistoryProjection.kt` |
 | 真实计费用量 | 777 已记录服务商实际 usage 与缓存命中并以重复样本校准软预算 | 保留真实账本；硬限制不依赖少量采样的估算折减 | 沿用 `LocalPromptPressure.kt` 与 `TokenUsageAnalytics` |
 
+## 本次联动修正：任务指令污染缓存前缀
+
+`LocalWorkRuntimeContext.kt` 以前根据当前请求的关键词向整段“稳定运行时规则”追加模型管理、媒体、工具、历史、代码和用量提示，导致每次切换任务就重写稳定前缀。现在由 `workRuntimeContextParts` 明确产出固定会话规则和本轮专项指南两份内容，`LocalWorkTurnPromptContext.kt` 再统一送入 `TurnContextPlacement.kt`：固定规则为 SESSION；任务指南、召回及技能为 TURN。生产请求的注入顺序与模型序列化标签均有回归验证。
+
+Claude Prompt Caching 官方文档列出按型号变化的最低缓存长度（512/1024/2048/4096 Token）。`AnthropicMessagesClient.kt` 依据已知型号门槛与现有模型 Token 估算决定官方缓存断点；不将固定 4096 字节误当全部型号的通用门槛。未知型号使用保守的 4096 Token 门槛；是否真的命中以真实 usage 的 `cache_creation_input_tokens` 与 `cache_read_input_tokens` 判断。
+
 ## 明确取消的不合理策略
 
 1. 已知模型设置了更小上下文窗口，却由预设值直接覆盖用户设置。
