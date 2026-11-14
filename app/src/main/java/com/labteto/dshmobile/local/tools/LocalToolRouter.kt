@@ -317,7 +317,7 @@ internal object LocalToolRouter {
         description(tool).take(MAX_CAPABILITY_DESCRIPTION_CHARS)
 
     internal const val DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS = 16_000
-    private const val MAX_OPTIONAL_TOOL_PROMPT_TOKENS = 24_000
+    internal const val MAX_OPTIONAL_TOOL_PROMPT_TOKENS = 24_000
     private const val MAX_OPTIONAL_SCHEMA_TOKENS = 24_000
     private const val MAX_COMPACT_DESCRIPTION_CHARS = 240
     private const val MAX_SUMMARY_REQUIREMENTS_PER_FAMILY = 4
