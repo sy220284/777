@@ -5,6 +5,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -24,8 +25,12 @@ internal data class CodexOfficialPluginSummary(
     val installPolicy: String,
     val authPolicy: String,
     val codexOnly: Boolean,
+    val sourceKind: String = "local",
+    val sourceUrl: String? = null,
 ) {
-    val offeredOnAndroid: Boolean get() = !codexOnly && installPolicy != "NOT_AVAILABLE"
+    /** Discovery does not imply the Codex bundle itself can run on Android. */
+    val offeredOnAndroid: Boolean
+        get() = sourceKind == "local" && !codexOnly && installPolicy != "NOT_AVAILABLE"
 }
 
 private val OFFICIAL_PLUGIN_ID = Regex("[a-z][a-z0-9-]{1,63}")
@@ -44,10 +49,36 @@ internal fun parseCodexOfficialMarketplace(document: String): List<CodexOfficial
         val name = item["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
         if (!OFFICIAL_PLUGIN_ID.matches(name)) return@mapNotNull null
         val source = item["source"] as? JsonObject ?: return@mapNotNull null
-        if (source["source"]?.jsonPrimitive?.contentOrNull != "local") return@mapNotNull null
-        val path = source["path"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-        if (!OFFICIAL_PLUGIN_PATH.matches(path) || path.split('/').any { it == ".." }) return@mapNotNull null
-        val relative = path.removePrefix("./").trimEnd('/')
+        val kind = source["source"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+        val rawPath = source["path"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val relative: String
+        val externalUrl: String?
+        when (kind) {
+            "local" -> {
+                if (!OFFICIAL_PLUGIN_PATH.matches(rawPath) ||
+                    rawPath.split('/').any { it == ".." }) return@mapNotNull null
+                relative = rawPath.removePrefix("./").trimEnd('/')
+                externalUrl = null
+            }
+            "url", "git-subdir" -> {
+                val uri = runCatching {
+                    java.net.URI(source["url"]?.jsonPrimitive?.contentOrNull.orEmpty())
+                }.getOrNull() ?: return@mapNotNull null
+                if (uri.scheme != "https" || uri.host != "github.com" ||
+                    uri.userInfo != null || uri.port != -1 ||
+                    uri.query != null || uri.fragment != null ||
+                    uri.path.split('/').filter(String::isNotEmpty).size != 2) return@mapNotNull null
+                if (kind == "git-subdir" &&
+                    (rawPath.isBlank() || rawPath.split('/').any {
+                        it == ".." || it == "." || it.isEmpty()
+                    } || !rawPath.matches(Regex("[a-zA-Z0-9_./-]{1,180}")))) {
+                    return@mapNotNull null
+                }
+                relative = rawPath
+                externalUrl = uri.toASCIIString()
+            }
+            else -> return@mapNotNull null
+        }
         val policy = item["policy"] as? JsonObject
         val installed = policy?.get("installation")?.jsonPrimitive?.contentOrNull ?: "AVAILABLE"
         val auth = policy?.get("authentication")?.jsonPrimitive?.contentOrNull ?: "ON_INSTALL"
@@ -60,7 +91,7 @@ internal fun parseCodexOfficialMarketplace(document: String): List<CodexOfficial
         CodexOfficialPluginSummary(
             id = "$name@openai-curated", name = name,
             category = item["category"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-            sourcePath = relative,
+            sourcePath = relative, sourceKind = kind, sourceUrl = externalUrl,
             installPolicy = installed, authPolicy = auth, codexOnly = codexOnly,
         )
     }.distinctBy { it.id }
@@ -133,17 +164,46 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
 ) {
     private val rootUrl = "https://raw.githubusercontent.com/openai/plugins/main"
     private val catalogUrl = "$rootUrl/.agents/plugins/marketplace.json"
+    private val catalogMutex = Mutex()
+    private var catalogCache: Pair<Long, List<CodexOfficialPluginSummary>>? = null
 
-    suspend fun list(): List<CodexOfficialPluginSummary> =
-        parseCodexOfficialMarketplace(fetch(catalogUrl, 1024 * 1024))
+    /** Codex-style cache: a manual refresh bypasses it; details share the same market snapshot. */
+    suspend fun list(forceRefetch: Boolean = false): List<CodexOfficialPluginSummary> {
+        val now = System.nanoTime()
+        val cached = catalogCache
+        if (!forceRefetch && cached != null && now - cached.first < 15L * 60 * 1_000_000_000L) {
+            return cached.second
+        }
+        catalogMutex.lock()
+        try {
+            val latest = catalogCache
+            if (!forceRefetch && latest != null &&
+                System.nanoTime() - latest.first < 15L * 60 * 1_000_000_000L) {
+                return latest.second
+            }
+            val entries = parseCodexOfficialMarketplace(fetch(catalogUrl, 1024 * 1024))
+            catalogCache = System.nanoTime() to entries
+            return entries
+        } finally {
+            catalogMutex.unlock()
+        }
+    }
 
     suspend fun detail(pluginId: String): CodexOfficialPluginDetail {
         val name = pluginId.removeSuffix("@openai-curated")
         require(OFFICIAL_PLUGIN_ID.matches(name) && pluginId == "$name@openai-curated") {
             "Codex 插件标识不合法"
         }
+        val entry = list().firstOrNull { it.id == pluginId }
+            ?: error("该插件不在 Codex 官方市场")
+        if (entry.sourceKind != "local") {
+            return CodexOfficialPluginDetail(
+                name, name, "Codex 官方市场登记的第三方 Git 插件，来源：${entry.sourceUrl}",
+                "第三方开发者", "", false, false, false, false,
+            )
+        }
         val details = parseCodexOfficialPluginDetail(
-            fetch("$rootUrl/plugins/$name/.codex-plugin/plugin.json", 256 * 1024),
+            fetch("$rootUrl/${entry.sourcePath}/.codex-plugin/plugin.json", 256 * 1024),
         )
         require(details.name == name) { "插件清单和实际包名称不匹配" }
         return details
@@ -152,8 +212,11 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
     suspend fun mcpEndpoint(pluginId: String): CodexOfficialMcpEndpoint? {
         val plugin = detail(pluginId)
         if (!plugin.hasMcp) return null
+        val entry = list().firstOrNull { it.id == pluginId }
+            ?: error("该插件不在官方市场")
+        require(entry.sourceKind == "local") { "第三方仓库需要由对应安装器连接" }
         return parseCodexOfficialMcpEndpoint(
-            fetch("$rootUrl/plugins/${plugin.name}/.mcp.json", 128 * 1024),
+            fetch("$rootUrl/${entry.sourcePath}/.mcp.json", 128 * 1024),
             plugin.name,
         )
     }
@@ -161,7 +224,10 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
     suspend fun pluginSkills(pluginId: String): List<String> {
         val detail = detail(pluginId)
         if (!detail.hasSkills) return emptyList()
-        val url = "https://api.github.com/repos/openai/plugins/contents/plugins/${detail.name}/skills?ref=main"
+        val entry = list().firstOrNull { it.id == pluginId }
+            ?: error("该插件不在官方市场")
+        require(entry.sourceKind == "local") { "该插件的技能需要通过第三方安装器读取" }
+        val url = "https://api.github.com/repos/openai/plugins/contents/${entry.sourcePath}/skills?ref=main"
         val items = Json.parseToJsonElement(fetch(url, 512 * 1024)) as? JsonArray
             ?: error("Codex 插件技能目录无效")
         return items.mapNotNull { (it as? JsonObject)?.let { entry ->
@@ -172,10 +238,12 @@ internal class CodexOfficialPluginCatalog @Inject constructor(
 
     /** Downloads one explicitly selected skill; Codex app/MCP/hook bundles require separate authorization. */
     suspend fun installPluginSkill(pluginId: String, skillId: String): String {
-        val name = pluginId.removeSuffix("@openai-curated")
+        val plugin = list().firstOrNull { it.id == pluginId }
+            ?: error("Codex 市场没有该插件")
+        require(plugin.offeredOnAndroid) { "该插件的官方安装限制与 Android 不兼容" }
         require(skillId in pluginSkills(pluginId)) { "插件中没有该技能" }
         return gitHubSkillImporter.install(
-            "https://github.com/openai/plugins/tree/main/plugins/$name/skills/$skillId",
+            "https://github.com/openai/plugins/tree/main/${plugin.sourcePath}/skills/$skillId",
         )
     }
 
