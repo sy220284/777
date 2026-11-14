@@ -33,7 +33,7 @@ internal class LocalSkillPackageImporter(private val workspace: LocalWorkspace) 
             val selected = if (filename.endsWith(".zip", true)) {
                 extractZip(input, unpacked)
             } else {
-                input.use { source -> File(unpacked, "SKILL.md").outputStream().use(source::copyTo) }
+                input.use { source -> File(unpacked, "SKILL.md").outputStream().use { target -> source.copyTo(target) } }
                 unpacked
             }
             val document = File(selected, "SKILL.md")
@@ -119,7 +119,7 @@ internal class LocalSkillPackageImporter(private val workspace: LocalWorkspace) 
         val decoder = Charsets.UTF_8.newDecoder()
             .onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT)
-        document.inputStream().reader(decoder).buffered().use { reader ->
+        java.io.InputStreamReader(document.inputStream(), decoder).buffered().use { reader ->
             require(reader.readLine()?.removePrefix("\uFEFF")?.trim() == "---") {
                 "SKILL.md 缺少开头的元数据"
             }
@@ -133,9 +133,12 @@ internal class LocalSkillPackageImporter(private val workspace: LocalWorkspace) 
                 }
             }
             require(closed && header.size >= 3) { "SKILL.md 缺少完整元数据" }
-            require(generateSequence { reader.readLine() }.any { it.isNotBlank() }) {
-                "SKILL.md 缺少执行规则"
+            var hasRules = false
+            while (true) {
+                val line = reader.readLine() ?: break
+                if (line.isNotBlank()) hasRules = true
             }
+            require(hasRules) { "SKILL.md 缺少执行规则" }
             val names = header.drop(1).dropLast(1).mapNotNull { line ->
                 Regex("""^name:\s*["']?([a-z][a-z0-9-]{1,47})["']?\s*$""")
                     .matchEntire(line.trim())?.groupValues?.get(1)
