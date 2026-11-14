@@ -54,11 +54,108 @@ class CodeModePluginTest {
                 onExecutionFinished = { tool, _ -> receipts += tool.name }))
         assertFalse(result.isError)
         assertEquals(listOf("read", "write"), calls)
-        assertEquals(2, approvals)
+        assertEquals(1, approvals) // only the actual write needs confirmation
         assertEquals(listOf("read", "write", "code_mode_run"), receipts)
         assertTrue(result.content.contains("\"completed_steps\":2"))
     }
 
+
+    @Test fun appNestedDispatchKeepsRealStepExecutionSeparateFromParentCallbacks() = runTest {
+        val registry = ToolRegistry()
+        register(registry, "read") { ToolResult("ready") }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val childOrdinals = mutableListOf<Int>()
+        val parentReceipts = mutableListOf<String>()
+        val result = registry.execute("code_mode_run", plan("read", "read"),
+            context = ToolContext(
+                onExecutionFinished = { tool, _ -> parentReceipts += tool.name },
+                dispatchNestedTool = { name, _, _, ordinal ->
+                    assertEquals("read", name)
+                    childOrdinals += ordinal
+                    ToolResult("ok") to true
+                },
+            ))
+        assertFalse(result.isError)
+        assertEquals(listOf(1, 2), childOrdinals)
+        assertEquals(listOf("code_mode_run"), parentReceipts)
+        assertTrue(result.content.contains("\"completed_steps\":2"))
+    }
+
+    @Test fun eachChildRechecksCurrentRunBeforeEnteringExecutor() = runTest {
+        val registry = ToolRegistry()
+        var checks = 0
+        var calls = 0
+        register(registry, "read") { calls++; ToolResult("ok") }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val actual = registry.execute("code_mode_run", plan("read", "read"),
+            context = ToolContext(
+                approval = { true },
+                beforeExecution = {
+                    checks++
+                    check(checks < 3) { "原任务已被更新，禁止执行后续工具" }
+                },
+            ))
+        assertEquals("CODE_MODE_STEP_EXCEPTION", actual.errorCode)
+        assertEquals(1, calls)
+        assertTrue(actual.content.contains("\"completed_steps\":1"))
+    }
+
+    @Test fun independentReadsContinueAfterOneFailureButNeverClaimFullSuccess() = runTest {
+        val registry = ToolRegistry()
+        val calls = mutableListOf<String>()
+        register(registry, "broken") {
+            calls += "broken"
+            ToolResult("not found", isError = true, errorCode = "TOOL_NOT_FOUND")
+        }
+        register(registry, "good") {
+            calls += "good"
+            ToolResult("located")
+        }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val batch = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject {
+                    put("tool", "broken")
+                    put("args", buildJsonObject {})
+                    put("on_error", "continue")
+                })
+                add(buildJsonObject {
+                    put("tool", "good")
+                    put("args", buildJsonObject {})
+                })
+            })
+        }
+        val output = registry.execute("code_mode_run", batch, context = ToolContext(approval = { true }))
+        assertTrue(output.isError)
+        assertEquals("CODE_MODE_PARTIAL_FAILED", output.errorCode)
+        assertEquals(listOf("broken", "good"), calls)
+        assertTrue(output.content.contains("\"status\":\"partial\""))
+        assertTrue(output.content.contains("\"failed_steps\":1"))
+        assertTrue(output.content.contains("located"))
+    }
+
+    @Test fun mutationCannotBeMarkedContinueOnErrorBeforeAnyToolRuns() = runTest {
+        val registry = ToolRegistry()
+        var changed = false
+        register(registry, "write", ToolAccess.WORKSPACE_WRITE) {
+            changed = true
+            ToolResult("changed")
+        }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val plan = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject {
+                    put("tool", "write")
+                    put("args", buildJsonObject {})
+                    put("on_error", "continue")
+                })
+            })
+        }
+        val outcome = registry.execute("code_mode_run", plan,
+            context = ToolContext(approval = { true }))
+        assertEquals("CODE_MODE_UNSAFE_CONTINUE", outcome.errorCode)
+        assertFalse(changed)
+    }
 
     @Test fun scriptsWithMoreThanEightStepsCompleteUsingOriginalToolRules() = runTest {
         val registry = ToolRegistry()
@@ -196,20 +293,39 @@ class CodeModePluginTest {
         assertTrue(result.content.contains("\"completed_steps\":0"))
     }
 
-    @Test fun mutationScopeAndMissingApprovalStillApplyToWholeScript() = runTest {
+    @Test fun readOnlyCodeModeRunsInReadOnlyScopesWithoutApprovalsOrWrites() = runTest {
         val registry = ToolRegistry()
-        var called = false
-        register(registry, "read") { called = true; ToolResult("ok") }
+        var reads = 0
+        var writes = 0
+        var approvals = 0
+        register(registry, "read") { reads++; ToolResult("ok") }
+        register(registry, "write", access = ToolAccess.WORKSPACE_WRITE,
+            approval = ToolApprovalPolicy.ALWAYS) { writes++; ToolResult("updated") }
         CodeModePlugin(registry).install(HarnessContext(registry))
-        val noMutation = registry.executeTracked("code_mode_run", plan("read"),
-            context = ToolContext(allowMutation = false, approval = { true }))
-        val noApproval = registry.executeTracked("code_mode_run", plan("read"))
-        assertFalse(noMutation.executionStarted)
-        assertFalse(noApproval.executionStarted)
-        assertEquals("MUTATION_SCOPE_BLOCKED", noMutation.result.errorCode)
-        assertEquals("APPROVAL_REQUIRED", noApproval.result.errorCode)
-        assertFalse(called)
+
+        val inspectPlan = plan("read", "read")
+        assertTrue(registry.isReadOnlyCodeModePlan(inspectPlan))
+        val response = registry.executeTracked("code_mode_run", inspectPlan,
+            context = ToolContext(allowMutation = false, approval = { approvals++; true }))
+        assertFalse(response.result.isError)
+        assertEquals(2, reads)
+        assertEquals(0, writes)
+        assertEquals(0, approvals)
+        assertTrue(response.result.content.contains("\"completed_steps\":2"))
+
+        val mixed = plan("read", "write")
+        assertFalse(registry.isReadOnlyCodeModePlan(mixed))
+        val rejected = registry.executeTracked("code_mode_run", mixed,
+            context = ToolContext(allowMutation = false))
+        assertFalse(rejected.executionStarted)
+        assertEquals("MUTATION_SCOPE_BLOCKED", rejected.result.errorCode)
+        assertEquals(2, reads) // Entire mixed script rejected before first tool
+        assertEquals(0, writes)
+
+        val fake = plan("read", "code_mode_run")
+        assertFalse(registry.isReadOnlyCodeModePlan(fake))
     }
+
     @Test fun priorDurableResultCanSupplyNestedArgumentsToNextTool() = runTest {
         val registry = ToolRegistry()
         var received: JsonObject? = null

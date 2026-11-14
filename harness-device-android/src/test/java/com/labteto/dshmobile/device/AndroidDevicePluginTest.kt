@@ -30,8 +30,11 @@ class AndroidDevicePluginTest {
         val names = registry.context.tools.names().toSet()
         assertTrue("android_device_info" in names)
         assertTrue("android_vscreen_create" in names)
+        assertTrue("android_vscreen_start" in names)
+        assertTrue("android_clipboard_clear" in names)
         assertTrue("android_vscreen_screenshot" in names)
         assertTrue("android_find" in names)
+        assertTrue("android_input_text" in names)
         assertTrue("android_click_node" in names)
         assertTrue("android_wait" in names)
         assertTrue("android_notification_status" in names)
@@ -52,6 +55,7 @@ class AndroidDevicePluginTest {
 
         val tap = requireNotNull(registry.context.tools.get("android_tap"))
         assertEquals(ToolAccess.DEVICE, tap.access)
+        assertEquals(ToolAccess.DEVICE, registry.context.tools.get("android_clipboard_clear")!!.access)
         assertEquals(ToolApprovalPolicy.MUTATION, tap.approvalPolicy)
 
         val find = requireNotNull(registry.context.tools.get("android_find"))
@@ -71,8 +75,8 @@ class AndroidDevicePluginTest {
         registry.install(AndroidDevicePlugin(provider))
 
         val names = registry.context.tools.names()
-        assertEquals(31, names.size)
-        assertEquals(31, names.toSet().size)
+        assertEquals(34, names.size)
+        assertEquals(34, names.toSet().size)
         assertTrue(registry.isInstalled("android-device"))
 
         assertTrue(registry.uninstall("android-device"))
@@ -125,6 +129,24 @@ class AndroidDevicePluginTest {
         assertEquals("ok:device_info", info.content)
         assertTrue(tap.isError)
         assertEquals(listOf("device_info"), provider.calls.map { it.first })
+    }
+
+    @Test
+    fun virtualScreenOneStepStartRequiresApprovalAndForwardsPackage() = runTest {
+        val provider = RecordingProvider()
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(provider))
+        val noApproval = registry.context.tools.execute("android_vscreen_start",
+            buildJsonObject { put("package", "com.example.notes") })
+        assertTrue(noApproval.isError)
+        assertTrue(provider.calls.isEmpty())
+        val launched = registry.context.tools.execute("android_vscreen_start",
+            buildJsonObject { put("package", "com.example.notes") },
+            context = ToolContext(approval = { true }))
+        assertFalse(launched.isError)
+        assertEquals("vscreen_start", provider.calls.single().first)
+        assertEquals("com.example.notes", provider.calls.single().second["package"])
+        assertEquals(ToolAccess.DEVICE, registry.context.tools.get("android_vscreen_start")!!.access)
     }
 
     @Test
@@ -190,6 +212,107 @@ class AndroidDevicePluginTest {
         assertTrue(tap.recoveryHint.orEmpty().contains("重新检查"))
         assertFalse(androidDeviceToolResult("device_info", "false").isError)
         assertFalse(androidDeviceToolResult("accessibility_tap", "true").isError)
+    }
+
+    @Test
+    fun emptyAccessibilityTextIsAValidExplicitValueButMissingFieldIsNot() {
+        assertEquals("", mapOf("search_text" to "").deviceStringIncludingEmpty("search_text"))
+        assertEquals("", mapOf("value" to "").deviceStringIncludingEmpty("value"))
+        assertThrows(IllegalArgumentException::class.java) {
+            emptyMap<String, String>().deviceStringIncludingEmpty("value")
+        }
+    }
+
+    @Test
+    fun inputToolAcceptsFocusedOrPreciselySelectedFieldAndRequiresRealConfirmation() = runTest {
+        val provider = RecordingProvider { capability ->
+            if (capability == "accessibility_input_text") "false" else "ok:$capability"
+        }
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(provider))
+        val input = registry.context.tools.get("android_input_text")!!
+        assertEquals(ToolAccess.DEVICE, input.access)
+        assertEquals(ToolApprovalPolicy.MUTATION, input.approvalPolicy)
+        val emptyFocus = registry.context.tools.execute("android_input_text",
+            buildJsonObject { put("value", "") },
+            context = ToolContext(approval = { true }))
+        assertEquals("ANDROID_ACTION_UNCONFIRMED", emptyFocus.errorCode)
+        assertEquals(mapOf("value" to ""), provider.calls.last().second)
+        val byId = registry.context.tools.execute("android_input_text",
+            buildJsonObject { put("id", "app:id/search"); put("value", "新文字") },
+            context = ToolContext(approval = { true }))
+        assertEquals("ANDROID_ACTION_UNCONFIRMED", byId.errorCode)
+        assertEquals("app:id/search", provider.calls.last().second["id"])
+        val bad = registry.context.tools.execute("android_input_text",
+            buildJsonObject { put("id", "app:id/search") },
+            context = ToolContext(approval = { true }))
+        assertTrue(bad.isError)
+        assertEquals(2, provider.calls.count { it.first == "accessibility_input_text" })
+    }
+
+    @Test
+    fun oldAndroidTextToolsUseTheSameConfirmedInputPathAsNewTool() = runTest {
+        val provider = RecordingProvider { capability ->
+            if (capability in setOf("accessibility_set_text_node", "accessibility_set_text",
+                    "accessibility_input_text")) "false" else "ok:$capability"
+        }
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(provider))
+
+        val calls = listOf(
+            Triple("android_set_text_node", "accessibility_set_text_node",
+                buildJsonObject { put("node", 4); put("value", "") }),
+            Triple("android_type", "accessibility_set_text",
+                buildJsonObject { put("search_text", "旧内容"); put("value", "替换内容") }),
+            Triple("android_input_text", "accessibility_input_text",
+                buildJsonObject { put("id", "app:id/message"); put("value", "替换内容") }),
+            Triple("android_type", "accessibility_set_text",
+                buildJsonObject { put("value", "") }),
+        )
+        calls.forEach { (name, capability, input) ->
+            val result = registry.context.tools.execute(
+                name, input, context = ToolContext(approval = { true }))
+            assertTrue("未核验写入不应声称成功：$name", result.isError)
+            assertEquals("ANDROID_ACTION_UNCONFIRMED", result.errorCode)
+            assertEquals(capability, provider.calls.last().first)
+            assertEquals(input.mapValues { it.value.toString().trim('"') },
+                provider.calls.last().second)
+        }
+        assertEquals(calls.size, provider.calls.size)
+    }
+
+    @Test
+    fun allAndroidTextAliasesNormalizeTargetsBeforeTheSameWriteAndReadback() {
+        val byNode = androidTextInputRequest(
+            "accessibility_set_text_node", mapOf("node" to "7", "value" to ""))
+        assertEquals(7, byNode.nodeIndex)
+        assertEquals("", byNode.value)
+        assertEquals(null, byNode.viewId)
+
+        val byText = androidTextInputRequest(
+            "accessibility_set_text", mapOf("search_text" to "原文", "value" to "新文"))
+        assertEquals("原文", byText.searchText)
+        assertEquals("新文", byText.value)
+        val focus = androidTextInputRequest(
+            "accessibility_set_text", mapOf("value" to ""))
+        assertEquals(null, focus.searchText)
+
+        val byId = androidTextInputRequest(
+            "accessibility_input_text", mapOf("id" to "app:id/edit", "value" to "新文"))
+        assertEquals("app:id/edit", byId.viewId)
+        assertEquals("新文", byId.value)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            androidTextInputRequest("accessibility_set_text_node",
+                mapOf("node" to "oops", "value" to "文字"))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            androidTextInputRequest("accessibility_input_text",
+                mapOf("id" to "app:id/edit", "text" to "原文", "value" to "新文"))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            androidTextInputRequest("accessibility_set_text", mapOf("search_text" to "原文"))
+        }
     }
 
     @Test

@@ -69,6 +69,7 @@ class AndroidDeviceProvider(
         "android_open_uri",
         "accessibility_click_text",
         "accessibility_set_text",
+        "accessibility_input_text",
         "accessibility_tap",
         "accessibility_swipe",
         "android_back",
@@ -78,7 +79,9 @@ class AndroidDeviceProvider(
         "notification_list",
         "clipboard_get",
         "clipboard_set",
+        "clipboard_clear",
         "vscreen_create",
+        "vscreen_start",
         "vscreen_list",
         "vscreen_status",
         "vscreen_launch",
@@ -102,21 +105,21 @@ class AndroidDeviceProvider(
             "accessibility_find" -> accessibilityFind(arguments)
             "accessibility_click_node" ->
                 accessibility().clickNode(arguments.deviceRequiredInt("node")).toString()
-            "accessibility_set_text_node" ->
-                accessibility().setTextNode(
-                    arguments.deviceRequiredInt("node"),
-                    arguments.required("value"),
-                ).toString()
+
             "accessibility_scroll" -> accessibility().scroll(arguments["direction"] ?: "forward").toString()
             "accessibility_wait" -> accessibilityWait(arguments)
             "android_open_uri" -> openUri(arguments.required("uri"))
             "accessibility_click_text" ->
                 accessibility().clickText(arguments.required("text")).toString()
-            "accessibility_set_text" ->
-                accessibility().setText(
-                    arguments.required("search_text"),
-                    arguments.required("value"),
+            "accessibility_set_text_node", "accessibility_set_text", "accessibility_input_text" -> {
+                val input = androidTextInputRequest(capability, arguments)
+                accessibility().inputText(
+                    nodeIndex = input.nodeIndex,
+                    viewId = input.viewId,
+                    searchText = input.searchText,
+                    value = input.value,
                 ).toString()
+            }
             "accessibility_tap" ->
                 accessibility().tap(
                     arguments.deviceRequiredFiniteFloat("x"),
@@ -141,30 +144,21 @@ class AndroidDeviceProvider(
             "notification_list" -> notificationList()
             "clipboard_get" -> clipboardGet()
             "clipboard_set" -> clipboardSet(arguments.required("text"))
-            "vscreen_create" -> {
-                val lease = resourceScheduler?.acquire(
-                    HarnessResourceKind.VIRTUAL_DISPLAY,
-                    owner = "vscreen:tool",
-                )
+            "clipboard_clear" -> clipboardClear()
+            "vscreen_create" -> virtualStatus(createToolDisplay(arguments))
+            "vscreen_start" -> {
+                // Most callers want to use an app, not manage a display. Validate the target
+                // before taking one of the scarce display slots, and release on launch failure.
+                val app = arguments.required("package")
+                val status = createToolDisplay(arguments)
                 try {
-                    val status = virtualDisplays.create(
-                        width = arguments.deviceOptionalInt("width", 1080),
-                        height = arguments.deviceOptionalInt("height", 1920),
-                        densityDpi = arguments.deviceOptionalInt("density_dpi", 420),
-                    )
-                    try {
-                        displayOwnership.registerTool(status.id)
-                        if (lease != null) virtualDisplayLeases[status.id] = lease
-                        virtualStatus(status)
-                    } catch (error: Throwable) {
-                        // Do not leak a live display when publication/ownership fails.
-                        displayOwnership.releaseTool(status.id)
-                        virtualDisplayLeases.remove(status.id)?.close()
-                        runCatching { virtualDisplays.close(status.id) }
-                        throw error
-                    }
+                    virtualStatus(status) + "\n" + virtualDisplays.launch(status.id, app)
                 } catch (error: Throwable) {
-                    lease?.close()
+                    try {
+                        closeToolDisplay(status.id)
+                    } catch (cleanup: Throwable) {
+                        error.addSuppressed(cleanup)
+                    }
                     throw error
                 }
             }
@@ -209,18 +203,51 @@ class AndroidDeviceProvider(
                 val png = virtualDisplays.screenshotPng(id)
                 "data:image/png;base64," + Base64.encodeToString(png, Base64.NO_WRAP)
             }
-            "vscreen_close" -> {
-                val id = arguments.required("id")
-                displayOwnership.requireTool(id)
-                try {
-                    virtualDisplays.close(id).toString()
-                } finally {
-                    displayOwnership.releaseTool(id)
-                    virtualDisplayLeases.remove(id)?.close()
-                }
-            }
+            "vscreen_close" -> closeToolDisplay(arguments.required("id")).toString()
             else -> error("设备能力不存在：$capability")
         }
+
+    private suspend fun createToolDisplay(arguments: Map<String, String>):
+        com.labteto.dshmobile.device.vscreen.VirtualDisplayStatus {
+        val lease = resourceScheduler?.acquire(
+            HarnessResourceKind.VIRTUAL_DISPLAY,
+            owner = "vscreen:tool",
+        )
+        try {
+            val status = virtualDisplays.create(
+                width = arguments.deviceOptionalInt("width", 1080),
+                height = arguments.deviceOptionalInt("height", 1920),
+                densityDpi = arguments.deviceOptionalInt("density_dpi", 420),
+            )
+            try {
+                displayOwnership.registerTool(status.id)
+                if (lease != null) virtualDisplayLeases[status.id] = lease
+                return status
+            } catch (error: Throwable) {
+                displayOwnership.releaseTool(status.id)
+                virtualDisplayLeases.remove(status.id)?.close()
+                try {
+                    virtualDisplays.close(status.id)
+                } catch (cleanup: Throwable) {
+                    error.addSuppressed(cleanup)
+                }
+                throw error
+            }
+        } catch (error: Throwable) {
+            lease?.close()
+            throw error
+        }
+    }
+
+    private fun closeToolDisplay(id: String): Boolean {
+        displayOwnership.requireTool(id)
+        return try {
+            virtualDisplays.close(id)
+        } finally {
+            displayOwnership.releaseTool(id)
+            virtualDisplayLeases.remove(id)?.close()
+        }
+    }
 
     override suspend fun acquireAgentVirtualDisplay(owner: String): String {
         val lease = resourceScheduler?.acquire(
@@ -428,6 +455,12 @@ class AndroidDeviceProvider(
         return "已写入剪贴板"
     }
 
+    private fun clipboardClear(): String {
+        val manager = context.getSystemService(ClipboardManager::class.java)
+        manager.clearPrimaryClip()
+        return "已清空剪贴板"
+    }
+
     private fun virtualStatus(status: com.labteto.dshmobile.device.vscreen.VirtualDisplayStatus): String =
         "id=${status.id}\ndisplay_id=${status.displayId}\nsize=${status.width}x${status.height}\ndensity=${status.densityDpi}\nvalid=${status.valid}"
 
@@ -447,6 +480,51 @@ class AndroidDeviceProvider(
         val SAFE_VIEW_SCHEMES = setOf("http", "https", "market", "geo", "mailto", "tel")
     }
 }
+
+/** All three public Android text tools normalize their arguments before one verified input path. */
+internal data class AndroidTextInputRequest(
+    val nodeIndex: Int?,
+    val viewId: String?,
+    val searchText: String?,
+    val value: String,
+)
+
+internal fun androidTextInputRequest(
+    capability: String,
+    arguments: Map<String, String>,
+): AndroidTextInputRequest {
+    val value = arguments.deviceStringIncludingEmpty("value")
+    val request = when (capability) {
+        "accessibility_set_text_node" -> AndroidTextInputRequest(
+            nodeIndex = arguments.deviceRequiredInt("node"),
+            viewId = null,
+            searchText = null,
+            value = value,
+        )
+        "accessibility_set_text" -> AndroidTextInputRequest(
+            nodeIndex = null,
+            viewId = null,
+            searchText = arguments["search_text"]?.takeIf(String::isNotBlank),
+            value = value,
+        )
+        "accessibility_input_text" -> AndroidTextInputRequest(
+            nodeIndex = arguments["node"]?.let { arguments.deviceRequiredInt("node") },
+            viewId = arguments["id"]?.takeIf(String::isNotBlank),
+            searchText = arguments["text"]?.takeIf(String::isNotBlank),
+            value = value,
+        )
+        else -> throw IllegalArgumentException("未知 Android 文本输入能力：$capability")
+    }
+    require(listOf(request.nodeIndex != null, request.viewId != null,
+        request.searchText != null).count { it } <= 1) {
+        "输入目标只能选择 node、id、text 中的一种；全部留空时使用当前已聚焦输入框"
+    }
+    return request
+}
+
+/** An empty TextField value is intentional; only an absent key is invalid. */
+internal fun Map<String, String>.deviceStringIncludingEmpty(key: String): String =
+    this[key] ?: throw IllegalArgumentException("缺少参数：$key")
 
 internal fun Map<String, String>.deviceRequiredInt(key: String): Int {
     val raw = this[key]?.takeIf(String::isNotBlank) ?: error("缺少参数：$key")

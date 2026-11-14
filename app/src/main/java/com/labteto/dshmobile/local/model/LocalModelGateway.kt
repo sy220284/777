@@ -420,10 +420,14 @@ internal fun prepareLocalModelAdapterRequest(
             retryable = false,
         )
     }
+    // Keep the durable conversation intact; adapt only this request to the selected provider.
+    // In particular, switching from Responses to Anthropic must not replay unsupported
+    // historical file/video blocks, and small active text files should work without re-upload.
+    val projectedMessages = projectCanonicalHistoryForProtocol(canonicalMessages, route.protocol)
     val routedMessages = if (route.capabilities.replay) {
-        canonicalMessages
+        projectedMessages
     } else {
-        canonicalMessages.map { it.copy(replay = null) }
+        projectedMessages.map { it.copy(replay = null) }
     }
     val providerRequiresDisabledThinking = LocalModelPresets.chatTemperatureRangeFor(
         route.model, route.baseUrl,

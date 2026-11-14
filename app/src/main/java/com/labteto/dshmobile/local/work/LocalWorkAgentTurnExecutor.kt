@@ -956,12 +956,24 @@ internal class LocalWorkAgentTurnExecutor(
                                 })
                                 workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/model-partial")
                                 workModelHistoryRuntime.persist(binding)
-                                val queued = event.completionReason == com.labteto.dshmobile.harness.agent.AgentCompletionReason.OUTPUT_LIMIT &&
-                                    outputLimitHasProgress && !waitingForReplyFormSubmission &&
+                                if (event.completionReason == com.labteto.dshmobile.harness.agent.AgentCompletionReason.INTERRUPTED) {
+                                    settlePendingTools("stream_interrupted")
+                                }
+                                val outputLimitQueued =
+                                    event.completionReason == com.labteto.dshmobile.harness.agent.AgentCompletionReason.OUTPUT_LIMIT &&
+                                        outputLimitHasProgress && !waitingForReplyFormSubmission &&
+                                        queueAutomaticWorkContinuation(binding, runContext.runId,
+                                            LocalModelException("MODEL_OUTPUT_LIMIT", "已保留部分正文，继续剩余内容。", false),
+                                            uiSourceMessageId, outputLimitProgress = true)
+                                val interruptedError = if (event.completionReason ==
+                                    com.labteto.dshmobile.harness.agent.AgentCompletionReason.INTERRUPTED)
+                                    interruptedWorkReplyContinuationError(repliesByStep[modelStep]) else null
+                                val interruptedQueued = !waitingForReplyFormSubmission && interruptedError != null &&
                                     queueAutomaticWorkContinuation(binding, runContext.runId,
-                                        LocalModelException("MODEL_OUTPUT_LIMIT", "已保留部分正文，继续剩余内容。", false),
-                                        uiSourceMessageId, outputLimitProgress = true)
-                                if (!queued) binding.state.update { it.copy(error = "模型未完成：${event.reason}；已保留部分正文。") }
+                                        interruptedError, uiSourceMessageId)
+                                if (!outputLimitQueued && !interruptedQueued) binding.state.update {
+                                    it.copy(error = "模型未完成：${event.reason}；已保留部分正文。")
+                                }
                             } else {
                                 settlePendingTools("failed")
                                 val detail = event.reason.take(2_000)

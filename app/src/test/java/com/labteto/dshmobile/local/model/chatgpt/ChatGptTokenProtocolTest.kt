@@ -66,6 +66,19 @@ class ChatGptTokenProtocolTest {
     }
 
     @Test
+    fun unsupportedRegionRejectsAuthorizationWithSafeActionableError() {
+        val failure = parseChatGptTokenFailure(
+            Json,
+            """{"error":{"code":"unsupported_country_region_territory","message":"sensitive-provider-internal"}}""",
+            403, "req_region",
+        )
+        assertEquals("unsupported_country_region_territory", failure.oauthCode)
+        assertTrue(failure.message.orEmpty().contains("所在地区"))
+        assertTrue(failure.message.orEmpty().contains("HTTP 403"))
+        assertFalse(failure.message.orEmpty().contains("sensitive-provider-internal"))
+        assertFalse(shouldRetryChatGptAuthorization(failure.oauthCode, allowed = true))
+    }
+    @Test
     fun unexpectedErrorsKeepStatusAndResponseShape() {
         val detailOnly = parseChatGptTokenFailure(Json, """{"detail":"temporarily unavailable"}""", 503, null)
         assertNull(detailOnly.oauthCode)

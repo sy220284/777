@@ -366,14 +366,25 @@ class LocalWorkspace(
         }
         return observed
     }
-    /** Replace one unique literal after the caller has observed the file. */
+    /**
+     * Exact-match edit can verify its own baseline without a separate model read round-trip.
+     * A previously observed stale version still blocks the edit; it must never be bypassed.
+     * replaceUnique checks both the unique literal and the version again before atomic publish.
+     */
     fun edit(relativePath: String, oldText: String, newText: String): String = synchronized(fileWriteLock) {
         require(oldText.isNotEmpty()) { "待替换内容不能为空" }
         val file = resolveForWrite(relativePath)
         require(file.isFile) { "文件不存在：$relativePath" }
-        val observed = requireFreshObservation(relativePath)
+        val previouslyObserved = observations.get(file.path)
+        val baseline = if (previouslyObserved != null) {
+            requireFreshObservation(relativePath)
+        } else {
+            // The old_text literal is the edit's own contextual precondition.
+            // It must match once, and the file must remain unchanged through publication.
+            fingerprint(file)
+        }
         LocalLargeFileIO.replaceUnique(file, oldText, newText, canonicalRoot) {
-            require(observed == fingerprint(file)) {
+            require(baseline == fingerprint(file)) {
                 "文件在准备编辑时发生变化，请重新读取再编辑：" + relativePath
             }
         }

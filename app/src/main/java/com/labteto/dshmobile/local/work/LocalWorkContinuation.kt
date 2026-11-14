@@ -6,11 +6,34 @@ import com.labteto.dshmobile.harness.agent.AgentContinuationRef
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalModelFailureOrigin
+import com.labteto.dshmobile.local.model.LocalModelAdmissionState
+import com.labteto.dshmobile.local.model.LocalModelCompletionReason
+import com.labteto.dshmobile.local.model.LocalModelReply
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal const val WORK_OUTPUT_LIMIT_CONTINUATION = "MODEL_OUTPUT_LIMIT"
+
+/**
+ * Incomplete provider replies with visible content are durable partial facts, not completed turns.
+ * Recover from a NEW request using that checkpoint; never replay the admitted network POST.
+ * Missing text or unfinished tool results require manual reconciliation instead.
+ */
+internal fun interruptedWorkReplyContinuationError(reply: LocalModelReply?): LocalModelException? {
+    if (reply?.completionReason != LocalModelCompletionReason.INTERRUPTED ||
+        reply.content.isNullOrBlank() || reply.toolCalls.isNotEmpty()) return null
+    return LocalModelException(
+        code = "MODEL_PARTIAL_STREAM_INTERRUPTED",
+        message = "模型流已中断；先核对已保存的部分正文和工具回执，再继续未完成目标",
+        retryable = false,
+        admissionState = LocalModelAdmissionState.ADMITTED,
+        continuationEligible = true,
+        origin = LocalModelFailureOrigin.STREAM_PARSE,
+    )
+}
+
 
 internal const val INTERNAL_WORK_CONTINUATION_PROMPT =
     "恢复同一工作任务。只处理检查点之后尚未完成的部分；已记录的工具回执、审批和副作用不可重复执行。先核对实际进度，再继续。"
@@ -74,6 +97,10 @@ internal fun queueAutomaticWorkContinuation(
     }
 
     if (outputLimitProgress && (binding.runHandle.cancellationRequested || binding.runHandle.pendingInputs.size() != 0)) return false
+    // An unsettled write/effect must be reconciled before any autonomous continuation.
+    binding.state.value.work.goal?.let { goal ->
+        if (hasUnresolvedWorkGoalToolEffects(binding.eventLog, goal)) return false
+    }
     val command = LocalWorkResumeCommand(
         sourceRunId = sourceRunId,
         checkpointSequence = binding.eventLog.latestSequence(),

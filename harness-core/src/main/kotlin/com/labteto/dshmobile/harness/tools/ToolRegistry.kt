@@ -40,6 +40,19 @@ data class ToolContext(
     val expectedRegistration: HarnessTool? = null,
     /** Execution receipt, persisted before returning to a possibly cancelled caller. */
     val onExecutionFinished: (suspend (HarnessTool, ToolResult) -> Unit)? = null,
+    /**
+     * Trusted orchestration dispatch into the application's normal tool coordinator.
+     * The parent callbacks/approval capture its own tool identity and must not be reused
+     * for child invocations. Each child gets a fresh identity, authorization and receipt.
+     * Parameters: tool name, resolved arguments, raw arguments, 1-based step number.
+     */
+    val dispatchNestedTool: (suspend (String, JsonObject, String, Int) -> Pair<ToolResult, Boolean>)? = null,
+    /** Validate the owning run after approval and before executor entry. */
+    val beforeExecution: (suspend (HarnessTool) -> Unit)? = null,
+    /** Approval has access to the actual child invocation identity and resolved arguments. */
+    val approvalWithInvocation: (suspend (
+        tool: HarnessTool, input: JsonObject, attributes: Map<String, Any?>, hookReason: String?,
+    ) -> Boolean)? = null,
 )
 
 @kotlinx.serialization.Serializable
@@ -104,6 +117,27 @@ class ToolRegistry private constructor(
     fun unregister(name: String): HarnessTool? = tools.remove(name)
     fun get(name: String): HarnessTool? = tools.get(name)
     fun names(): List<String> = tools.snapshot().keys.toList()
+
+    /**
+     * Permit a read-only Code Mode plan to run in plan/inspect scopes. The decision is based on
+     * the live registry contracts of *every* child, never on a caller-supplied "readOnly" flag.
+     * The actual children still go through their ordinary schema, Hook and approval checks.
+     */
+    fun isReadOnlyCodeModePlan(plan: JsonObject): Boolean {
+        val steps = plan["steps"] as? JsonArray ?: return false
+        if (steps.isEmpty()) return false
+        val registered = tools.snapshot()
+        return steps.all { element ->
+            val entry = element as? JsonObject ?: return@all false
+            val name = (entry["tool"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                ?: return@all false
+            val handler = registered[name] ?: return@all false
+            name != "code_mode_run" &&
+                handler.exposure == ToolExposure.CORE &&
+                handler.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
+        }
+    }
+
     fun registerHook(subscription: ToolHookSubscription) = hooks.register(subscription)
     fun unregisterHook(id: String): Boolean = hooks.unregister(id)
     fun hookIds(): List<String> = hooks.ids()
@@ -116,7 +150,9 @@ class ToolRegistry private constructor(
         }.toSet()
         val codeModeChildren = if ("code_mode_run" in names && registered["code_mode_run"] != null) {
             registered.filter { (name, tool) ->
-                name != "code_mode_run" && tool.exposure == ToolExposure.CORE
+                name != "code_mode_run" &&
+                    (tool.exposure == ToolExposure.CORE ||
+                        (tool.exposure == ToolExposure.OPTIONAL && name in names))
             }
         } else emptyMap()
         return ToolBindingSnapshot(registered.filterKeys { it in names }, codeModeChildren)
@@ -210,7 +246,11 @@ class ToolRegistry private constructor(
                 executionStarted = false,
             )
         }
-        if (!context.allowMutation && tool.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)) {
+        val readOnlyCodeMode = name == "code_mode_run" && isReadOnlyCodeModePlan(input)
+        if (!context.allowMutation &&
+            tool.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) &&
+            !readOnlyCodeMode
+        ) {
             return ToolInvocationResult(
                 result = ToolResult(
                     content = "当前作用域禁止执行会改变状态的工具：$name",
@@ -269,7 +309,8 @@ class ToolRegistry private constructor(
             ToolApprovalPolicy.MUTATION -> tool.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
         }
         if (needsApproval) {
-            if (context.approval == null && context.approvalWithReason == null) {
+            if (context.approval == null && context.approvalWithReason == null &&
+                context.approvalWithInvocation == null) {
                 return ToolInvocationResult(
                     result = ToolResult(
                         content = "工具需要人工审批：$name",
@@ -280,7 +321,9 @@ class ToolRegistry private constructor(
                     executionStarted = false,
                 )
             }
-            val granted = context.approvalWithReason?.invoke(tool, hookApprovalReason.orEmpty())
+            val granted = context.approvalWithInvocation?.invoke(
+                tool, input, context.attributes, hookApprovalReason,
+            ) ?: context.approvalWithReason?.invoke(tool, hookApprovalReason.orEmpty())
                 ?: requireNotNull(context.approval).invoke(tool)
             if (!granted) return ToolInvocationResult(
                 result = ToolResult(
@@ -307,6 +350,8 @@ class ToolRegistry private constructor(
                 executionStarted = false,
             )
         }
+        currentCoroutineContext().ensureActive()
+        context.beforeExecution?.invoke(tool)
         currentCoroutineContext().ensureActive()
         context.onExecutionStarted?.invoke(tool)
         currentCoroutineContext().ensureActive()

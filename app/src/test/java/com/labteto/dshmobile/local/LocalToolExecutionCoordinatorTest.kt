@@ -10,6 +10,10 @@ import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolWorkspaceAccess
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.CodeModePlugin
+import com.labteto.dshmobile.harness.plugin.HarnessContext
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonArray
 import com.labteto.dshmobile.harness.tools.functionToolSchema
 import com.labteto.dshmobile.local.agent.localAgentRunPolicy
 import com.labteto.dshmobile.local.model.LocalModelProfile
@@ -34,6 +38,147 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
+
+    @Test fun codeModeRunsRealChildStepsThroughFreshAuthorizationAndExecutionIdentities() = runBlocking {
+        val registry = ToolRegistry()
+        val invoked = mutableListOf<String>()
+        registry.register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+            invoked += "read"
+            ToolResult("read-result")
+        })
+        registry.register(tool("bash", ToolAccess.PROCESS, ToolApprovalPolicy.ALWAYS) {
+            invoked += "bash"
+            ToolResult("bash-result")
+        })
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val started = mutableListOf<String>()
+        val lineage = mutableListOf<Triple<String, String, String?>>()
+        val authorized = mutableListOf<String>()
+        val approvals = mutableListOf<String>()
+        val run = coordinator(
+            registry,
+            recordExecutionStarted = { _, call, identity ->
+                started += call.id + ":" + call.name
+                lineage += Triple(identity.rootCallId, identity.executionId, identity.parentExecutionId)
+            },
+            recordAuthorizationDecision = { _, call, _, _ -> authorized += call.id + ":" + call.name },
+            executionIdFactory = object : () -> String {
+                private var counter = 0
+                override fun invoke(): String = "exec-" + (++counter)
+            },
+        )
+        val plan = buildJsonObject {
+            put("steps", buildJsonArray {
+                listOf("read", "bash").forEach { name ->
+                    add(buildJsonObject {
+                        put("tool", name)
+                        put("args", buildJsonObject {})
+                    })
+                }
+            })
+        }
+        val selection = registry.captureBindings(JsonArray(listOf(registry.get("code_mode_run")!!.schema)))
+        val result = withContext(selection) {
+            run.executeScoped(
+                LocalToolCall("script-1", "code_mode_run", plan, plan.toString()),
+                "s1", true, false,
+                approval = { call, tool, _ ->
+                    assertEquals(call.name, tool.name)
+                    approvals += call.id + ":" + tool.name
+                    true
+                },
+            )
+        }
+        assertFalse(result.isError)
+        assertTrue(result.content.contains("\"completed_steps\":2"))
+        assertEquals(listOf("read", "bash"), invoked)
+        assertEquals(listOf("script-1:code_mode_run", "script-1/step-1:read",
+            "script-1/step-2:bash"), started)
+        assertEquals(started, authorized)
+        assertEquals(listOf("script-1", "script-1", "script-1"), lineage.map { it.first })
+        assertEquals(null, lineage[0].third)
+        assertEquals("exec-1", lineage[1].third)
+        assertEquals("exec-1", lineage[2].third)
+        assertEquals(listOf("script-1/step-2:bash"), approvals) // no redundant wrapper prompt
+    }
+
+    @Test fun planModeAdvertisesReadOnlyCodeModeInsteadOfHidingIt() = runBlocking {
+        val registry = ToolRegistry()
+        registry.register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+            ToolResult("preview")
+        })
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val projection = LocalToolSchemaProjection(registry, coordinator(registry))
+        val selected = projection.modelSelection(
+            policy = localAgentRunPolicy(LocalUsageMode.WORK),
+            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
+            planModeEnabled = true,
+            history = emptyList(),
+        )
+        assertTrue("code_mode_run" in projection.names(selected.schemas))
+        val codeMode = selected.schemas
+            .mapNotNull { it as? JsonObject }
+            .first { it.getValue("function").jsonObject.getValue("name").jsonPrimitive.content == "code_mode_run" }
+        val description = codeMode.getValue("function").jsonObject
+            .getValue("description").jsonPrimitive.content
+        assertTrue(description.contains("规划模式只允许"))
+        assertTrue(description.contains("写文件"))
+    }
+
+    @Test fun planModeRunsReadOnlyCodeModeWithoutExtraPromptsAndRejectsMixedScript() = runBlocking {
+        val registry = ToolRegistry()
+        var reads = 0
+        var writes = 0
+        var prompts = 0
+        registry.register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+            reads++
+            ToolResult("inspection finished")
+        })
+        registry.register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) {
+            writes++
+            ToolResult("write committed")
+        })
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val coordinator = coordinator(registry)
+        fun plan(vararg tools: String) = buildJsonObject {
+            put("steps", buildJsonArray {
+                tools.forEach { name ->
+                    add(buildJsonObject {
+                        put("tool", name)
+                        put("args", buildJsonObject {})
+                    })
+                }
+            })
+        }
+        val visible = registry.captureBindings(JsonArray(listOf(registry.get("code_mode_run")!!.schema)))
+        val allowed = plan("read", "read")
+        val result = withContext(visible) {
+            coordinator.executeScoped(
+                LocalToolCall("plan-read", "code_mode_run", allowed, allowed.toString()),
+                "s1", allowMutation = false, planModeEnabled = true,
+                approval = { _, _, _ -> prompts++; true },
+            )
+        }
+        assertFalse(result.isError)
+        assertEquals(2, reads)
+        assertEquals(0, writes)
+        assertEquals(0, prompts)
+        assertTrue(result.content.contains("\"completed_steps\":2"))
+
+        val mixed = plan("read", "write")
+        val blocked = withContext(visible) {
+            coordinator.executeScoped(
+                LocalToolCall("plan-mixed", "code_mode_run", mixed, mixed.toString()),
+                "s1", allowMutation = false, planModeEnabled = true,
+                approval = { _, _, _ -> prompts++; true },
+            )
+        }
+        assertTrue(blocked.isError)
+        assertEquals("PLAN_MODE_BLOCKED", blocked.errorCode)
+        assertEquals(2, reads)
+        assertEquals(0, writes)
+        assertEquals(0, prompts)
+    }
 
     @Test fun teamRevocationWhileWaitingForSharedWorkspaceLeaseCannotWrite() = runBlocking {
         val gate = com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate()
@@ -115,6 +260,47 @@ class LocalToolExecutionCoordinatorTest {
 
 
     @Test
+    fun codeModeNestedApprovalShowsActualToolArgumentsAndChildCallIdentity() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) {
+                ToolResult("file updated")
+            }.copy(schema = functionToolSchema(
+                "write", "写入工作区文件",
+                com.labteto.dshmobile.harness.tools.simpleToolProperties(
+                    mapOf("path" to "string")),
+            )))
+        }
+        com.labteto.dshmobile.harness.tools.CodeModePlugin(registry)
+            .install(com.labteto.dshmobile.harness.plugin.HarnessContext(registry))
+        val steps = buildJsonObject {
+            put("steps", kotlinx.serialization.json.buildJsonArray {
+                add(buildJsonObject {
+                    put("tool", "write")
+                    put("args", buildJsonObject { put("path", "notes.md") })
+                })
+            })
+        }
+        val prompts = mutableListOf<Pair<String, String>>()
+        val durableCallIds = mutableListOf<String>()
+        val result = coordinator(registry, recordAuthorizationDecision = { _, decisionCall, _, _ ->
+            durableCallIds += decisionCall.id
+        }).executeScoped(
+            original = LocalToolCall("batch-call", "code_mode_run", steps, steps.toString()),
+            sessionId = "work", allowMutation = true, planModeEnabled = false,
+            approval = { nestedCall, _, summary ->
+                prompts += nestedCall.id to (nestedCall.name + ": " + summary)
+                true
+            },
+        )
+        assertFalse(result.isError)
+        assertEquals(1, prompts.size)
+        assertEquals("batch-call/step-1", prompts.single().first)
+        assertTrue(prompts.single().second.contains("write：notes.md"))
+        // Parent and child both retain independently auditable authorization identities.
+        assertEquals(listOf("batch-call", "batch-call/step-1"), durableCallIds)
+    }
+
+    @Test
     fun exactMultiToolSelectionLoadsOnlyNamedRegisteredToolsInOneStep() {
         val registry = ToolRegistry().apply {
             listOf("mcp_lookup", "github_status", "unrelated_search").forEach { name ->
@@ -133,6 +319,53 @@ class LocalToolExecutionCoordinatorTest {
         assertFalse("unrelated_search" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
         val again = coordinator.searchCapabilities("select:mcp_lookup")
         assertTrue(again.contains("[已加载]"))
+    }
+
+    @Test
+    fun coreToolSelectionSaysCallDirectlyWithoutCallingItUnavailable() {
+        val registry = ToolRegistry().apply {
+            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE) { ToolResult("ok") })
+        }
+        val report = coordinator(registry).searchCapabilities("select:read,unregistered_tool")
+        assertTrue(report.contains("内置工具"))
+        assertTrue(report.contains("read"))
+        assertTrue(report.contains("unregistered_tool"))
+        assertFalse(report.contains("指定工具当前无法加载：read"))
+    }
+
+    @Test
+    fun largeExactSelectionExposesReadyBatchAndActionableNextBatch() {
+        val registry = ToolRegistry().apply {
+            repeat(128) { index ->
+                val name = "mcp_batch_$index"
+                val properties = buildJsonObject {
+                    repeat(20) { field ->
+                        put("property_$field", buildJsonObject {
+                            put("type", "string")
+                            put("description", "这一字段对接外部 MCP 的复杂参数说明".repeat(15))
+                        })
+                    }
+                }
+                register(tool(name, ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL,
+                    keywords = setOf("批量工具")) { ToolResult("ok") }
+                    .copy(schema = functionToolSchema(name, "扩展工具", properties)))
+            }
+        }
+        val coordinator = coordinator(registry)
+        val all = (0 until 128).map { "mcp_batch_$it" }
+        val report = coordinator.searchCapabilities("select:" + all.joinToString(","))
+        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
+        val omitted = all.filterNot(visible::contains)
+        assertTrue("工具定义实际预算必须仍有效", omitted.isNotEmpty())
+        assertTrue(report.contains("待加载队列"))
+        assertTrue(report.contains("select:" + omitted.joinToString(",")))
+        assertTrue(report.contains("[下一步可用]"))
+        val next = coordinator.searchCapabilities("select:" + omitted.take(2).joinToString(","))
+        val after = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
+        assertTrue(omitted.first() in after)
+        assertTrue(next.contains(omitted.first()))
     }
 
     @Test

@@ -22,6 +22,17 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         require(namePattern.matches(id)) { "扩展标识必须为小写英文字母、数字和连字符" }
         return id
     }
+    /** Normalize user-provided MCP IDs once; existing legacy IDs remain readable. */
+    fun canonicalMcpId(rawId: String): String {
+        safeId(rawId)
+        val legacy = File(workspace.path, ".dsh/extensions/mcp-$rawId/manifest.json")
+        if (legacy.isFile) return rawId
+        var canonical = rawId
+        while (canonical.startsWith("mcp-")) canonical = canonical.removePrefix("mcp-")
+        safeId(canonical)
+        return canonical
+    }
+
     private fun fullSha(text: String): String =
         MessageDigest.getInstance("SHA-256")
             .digest(text.toByteArray(Charsets.UTF_8))
@@ -46,8 +57,8 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
     }
 
     /** Create an inspectable, restart-reusable MCP source package; execution is a separate approval. */
-    fun createMcp(id: String, interpreter: String, source: String): String {
-        safeId(id)
+    fun createMcp(rawId: String, interpreter: String, source: String): String {
+        val id = canonicalMcpId(rawId)
         require(interpreter in setOf("node", "python3")) { "本机 MCP 目前支持 node 或 python3 运行时" }
         require(source.isNotBlank() && source.toByteArray(Charsets.UTF_8).size <= 128 * 1024) {
             "服务源码不能为空或超过 128 KB"
@@ -69,12 +80,12 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         ensureExperienceDocuments()
         require(launchCommand(id).first.size == 2) { "本地 MCP 启动配置无法重新加载" }
         record("mcp", id, "created", "保存可恢复本地 MCP 启动清单和源码；尚未注册", manifestPath)
-        return "本机 MCP 源码及启动清单已写入：$manifestPath。此时仅生成文件；调用 mcp_start_local，经权限审批并真实连接后才算注册。"
+        return "本机 MCP 源码及启动清单已写入：$manifestPath。服务 ID：$id；此时仅生成文件；调用 mcp_start_local，经权限审批并真实连接后才算注册。"
     }
 
     /** Revalidate every persisted field and source digest before handing off to the real MCP bridge. */
-    fun launchCommand(id: String): Pair<List<String>, String> {
-        safeId(id)
+    fun launchCommand(rawId: String): Pair<List<String>, String> {
+        val id = canonicalMcpId(rawId)
         val manifest = Json.parseToJsonElement(
             workspace.readRaw(".dsh/extensions/mcp-$id/manifest.json")
         ).jsonObject
@@ -102,7 +113,8 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
     }
 
     /** All source changes are versioned; an already-running server needs an explicit reconnect. */
-    fun reviseMcp(id: String, source: String): String {
+    fun reviseMcp(rawId: String, source: String): String {
+        val id = canonicalMcpId(rawId)
         val (command, _) = launchCommand(id)
         require(source.isNotBlank() && source.toByteArray(Charsets.UTF_8).size <= 128 * 1024) {
             "MCP 新源码不能为空或超过 128 KB"
@@ -123,8 +135,8 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         return "MCP $id 源码已更新并复核完整性；旧版本 $oldVersion 已备份。先断开旧连接，再运行 mcp_start_local；业务效果尚未验证。"
     }
 
-    fun rollbackMcp(id: String, revision: String): String {
-        safeId(id)
+    fun rollbackMcp(rawId: String, revision: String): String {
+        val id = canonicalMcpId(rawId)
         require(Regex("[a-f0-9]{16}").matches(revision)) { "MCP 版本号无效" }
         val manifest = Json.parseToJsonElement(
             workspace.readRaw(".dsh/extensions/mcp-$id/manifest.json")
@@ -149,8 +161,8 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         return "MCP $id 已回退至 $revision（现版 $currentVersion 已备份）；旧进程需手动断开重启。"
     }
 
-    private fun saveMcpSource(id: String, source: String) {
-        safeId(id)
+    private fun saveMcpSource(rawId: String, source: String) {
+        val id = canonicalMcpId(rawId)
         val manifestPath = ".dsh/extensions/mcp-$id/manifest.json"
         val old = Json.parseToJsonElement(workspace.readRaw(manifestPath)).jsonObject
         require(old["server_id"]?.jsonPrimitive?.content == id) { "MCP 清单标识不一致" }
@@ -233,9 +245,9 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
      * Record evidence pointers only. A user/agent-provided 'tested' label is not independent
      * runtime verification and never registers or authorizes a tool.
      */
-    fun record(kind: String, id: String, phase: String, summary: String, evidencePath: String): String {
+    fun record(kind: String, rawId: String, phase: String, summary: String, evidencePath: String): String {
         require(kind in kinds && phase in phases) { "扩展类别或阶段无效" }
-        safeId(id)
+        val id = if (kind == "mcp") canonicalMcpId(rawId) else safeId(rawId)
         require(summary.isNotBlank() && summary.length <= 1200) { "记录摘要需在 1—1200 字内" }
         require(evidencePath.isBlank() || (evidencePath.length <= 240 &&
             !evidencePath.startsWith("/") && ".." !in evidencePath.split('/'))) { "证据路径须在工作区内" }
@@ -265,9 +277,9 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         return "已写入 $target 及 $indexPath；本次为记录声明，不代表工具已经注册或业务调用成功。"
     }
 
-    fun inspect(kind: String, id: String, liveToolNames: Set<String>, installedPlugins: Set<String>): String {
+    fun inspect(kind: String, rawId: String, liveToolNames: Set<String>, installedPlugins: Set<String>): String {
         require(kind in kinds)
-        safeId(id)
+        val id = if (kind == "mcp") canonicalMcpId(rawId) else safeId(rawId)
         val documented = ".dsh/extensions/$kind-$id/RECORD.md"
         val history = if (File(workspace.path, documented).isFile) workspace.readRaw(documented)
             else "尚无扩展记录"

@@ -29,6 +29,8 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+private class VisionInputException(val code: String, message: String) : IllegalArgumentException(message)
+
 data class LocalVisionRoute(
     val baseUrl: String,
     val model: String,
@@ -201,10 +203,7 @@ class LocalVisionPlugin(
                     }
                     val file = runCatching { imageFile(input.requiredString("path")) }
                         .getOrElse { error ->
-                            return@HarnessToolExecutor ToolResult(
-                                "视觉文件读取失败：${error.message ?: error::class.java.simpleName}",
-                                isError = true,
-                            )
+                            return@HarnessToolExecutor visionFileFailure(error)
                         }
                     val refresh = input.optionalBoolean("refresh")
                     if (!refresh) {
@@ -214,10 +213,7 @@ class LocalVisionPlugin(
                     }
                     val dataUrl = runCatching { imageFileDataUrl(file) }
                         .getOrElse { error ->
-                            return@HarnessToolExecutor ToolResult(
-                                "视觉文件读取失败：${error.message ?: error::class.java.simpleName}",
-                                isError = true,
-                            )
+                            return@HarnessToolExecutor visionFileFailure(error)
                         }
                     val result = analyzeDataUrl(
                         prompt = prompt,
@@ -257,17 +253,29 @@ class LocalVisionPlugin(
         screenshotArguments: Map<String, String>,
     ): ToolResult {
         val route = fixedRoute
-            ?: return ToolResult("当前模型尚未配置，请先在模型设置中选择模型并填写密钥", isError = true)
+            ?: return ToolResult("当前模型尚未配置，请先在模型设置中选择模型并填写密钥", isError = true,
+                errorCode = "VISION_MODEL_NOT_CONFIGURED", recoveryHint = "请在模型设置中选择并保存支持图片的模型。")
         val key = routeKeyProvider(route)
         if (key.isNullOrBlank()) {
-            return ToolResult("当前模型密钥尚未配置，请先在模型设置中填写密钥", isError = true)
+            return ToolResult("当前模型密钥尚未配置，请先在模型设置中填写密钥", isError = true,
+                errorCode = "VISION_MODEL_NOT_CONFIGURED", recoveryHint = "请保存当前模型的有效凭据。")
         }
         if (imageSupportProvider(route) == false) {
-            return ToolResult("当前模型不支持图片理解，请切换支持图片的模型后重试。", isError = true)
+            return ToolResult("当前模型不支持图片理解，请切换支持图片的模型后重试。", isError = true,
+                errorCode = "VISION_IMAGE_UNSUPPORTED", recoveryHint = "请选择支持图片输入的模型。")
         }
-        val imageDataUrl = device.invoke(screenshotCapability, screenshotArguments)
+        val imageDataUrl = try {
+            device.invoke(screenshotCapability, screenshotArguments)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            return ToolResult("设备截图失败：${error.message ?: "截图能力不可用"}",
+                isError = true, errorCode = "VISION_CAPTURE_FAILED",
+                recoveryHint = "核实系统截图授权和虚拟屏状态后重新截图。")
+        }
         if (!imageDataUrl.startsWith("data:image/")) {
-            return ToolResult("设备截图没有返回有效图片", isError = true)
+            return ToolResult("设备截图没有返回有效图片", isError = true,
+                errorCode = "VISION_CAPTURE_INVALID", recoveryHint = "检查当前主屏或虚拟屏是否可截图。")
         }
         return analyzeDataUrl(
             prompt = prompt,
@@ -288,12 +296,15 @@ class LocalVisionPlugin(
         usageContext: TokenUsageContext? = null,
     ): ToolResult {
         val route = fixedRoute ?: routeProvider()
-            ?: return ToolResult("当前模型尚未配置，请先在模型设置中选择模型并填写密钥", isError = true)
+            ?: return ToolResult("当前模型尚未配置，请先在模型设置中选择模型并填写密钥", isError = true,
+                errorCode = "VISION_MODEL_NOT_CONFIGURED", recoveryHint = "请在模型设置中选择并保存支持图片的模型。")
         if (imageSupportProvider(route) == false) {
-            return ToolResult("当前模型不支持图片理解，请切换支持图片的模型后重试。", isError = true)
+            return ToolResult("当前模型不支持图片理解，请切换支持图片的模型后重试。", isError = true,
+                errorCode = "VISION_IMAGE_UNSUPPORTED", recoveryHint = "请选择支持图片输入的模型。")
         }
         val key = fixedKey ?: routeKeyProvider(route)
-            ?: return ToolResult("当前模型密钥尚未配置", isError = true)
+            ?: return ToolResult("当前模型密钥尚未配置", isError = true,
+                errorCode = "VISION_MODEL_NOT_CONFIGURED", recoveryHint = "请在模型设置中配置模型凭据。")
         val boundedPrompt = buildString {
             appendLine(intro)
             appendLine("依据可见内容回答；需要分析或建议时区分可见事实与推断，不臆测画面外事实。")
@@ -312,25 +323,38 @@ class LocalVisionPlugin(
             onFailure = { error ->
                 if (error is CancellationException) throw error
                 if (imageInputUnsupported(error)) {
-                    ToolResult("当前模型不支持图片理解，请切换支持图片的模型后重试。", isError = true)
+                    ToolResult("当前模型不支持图片理解，请切换支持图片的模型后重试。", isError = true,
+                errorCode = "VISION_IMAGE_UNSUPPORTED", recoveryHint = "请选择支持图片输入的模型。")
                 } else {
-                    ToolResult("图片分析失败：${error.message ?: error::class.java.simpleName}", isError = true)
+                    ToolResult("图片分析失败：${error.message ?: error::class.java.simpleName}",
+                        isError = true,
+                        errorCode = (error as? com.labteto.dshmobile.local.LocalModelException)?.let {
+                            it.status?.let { status -> "VISION_HTTP_$status" } ?: it.code
+                        } ?: "VISION_MODEL_FAILURE",
+                        recoveryHint = "核对当前模型连接、图片能力与实际接口响应。")
                 }
             },
         )
     }
 
+    private fun visionFileFailure(error: Throwable): ToolResult = ToolResult(
+        "视觉文件读取失败：${error.message ?: error::class.java.simpleName}",
+        isError = true,
+        errorCode = (error as? VisionInputException)?.code ?: "VISION_FILE_READ_FAILED",
+        recoveryHint = "请在工作区选择存在且可读取的 PNG/JPEG/WebP/GIF 图片。",
+    )
+
     private suspend fun imageFile(relativePath: String): File {
         val root = workspaceRoot?.let { com.labteto.dshmobile.harness.capability.executionWorkspaceRoot(it) }
-            ?.canonicalFile ?: error("本机工作区未配置")
-        require(!File(relativePath).isAbsolute) { "视觉文件路径必须使用工作区相对路径" }
+            ?.canonicalFile ?: throw VisionInputException("VISION_WORKSPACE_UNAVAILABLE", "本机工作区未配置")
+        if (File(relativePath).isAbsolute) throw VisionInputException("VISION_FILE_INVALID_PATH", "视觉文件路径必须使用工作区相对路径")
         val file = File(root, relativePath).canonicalFile
-        require(file.toPath().startsWith(root.toPath())) { "拒绝读取工作区之外的图片" }
-        require(file.isFile) { "图片文件不存在：$relativePath" }
-        require(file.length() in 1..MAX_IMAGE_FILE_BYTES) {
-            "图片大小必须在 1..${MAX_IMAGE_FILE_BYTES / 1024 / 1024} MiB"
-        }
-        require(sniffLocalImageMediaType(file) != null) { "视觉文件仅支持真实的 PNG/JPEG/WebP/GIF 图片" }
+        if (!file.toPath().startsWith(root.toPath())) throw VisionInputException("VISION_FILE_INVALID_PATH", "拒绝读取工作区之外的图片")
+        if (!file.isFile) throw VisionInputException("VISION_FILE_NOT_FOUND", "图片文件不存在：$relativePath")
+        if (file.length() !in 1..MAX_IMAGE_FILE_BYTES) throw VisionInputException(
+            "VISION_FILE_SIZE_INVALID", "图片大小必须在 1..${MAX_IMAGE_FILE_BYTES / 1024 / 1024} MiB")
+        if (sniffLocalImageMediaType(file) == null) throw VisionInputException(
+            "VISION_FILE_TYPE_INVALID", "视觉文件仅支持真实的 PNG/JPEG/WebP/GIF 图片")
         return file
     }
 

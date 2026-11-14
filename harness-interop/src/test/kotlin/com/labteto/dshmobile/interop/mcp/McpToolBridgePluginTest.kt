@@ -71,6 +71,43 @@ class McpToolBridgePluginTest {
         }
     }
 
+    @Test fun prefixedRemoteToolNameGetsOnlyOneLocalMcpPrefix() = runBlocking {
+        var remoteName: String? = null
+        val plugin = McpToolBridgePlugin(http = OkHttpClient(), json = Json, transportFactory = {
+            object : McpTransport {
+                override suspend fun request(method: String, params: JsonObject): JsonObject =
+                    if (method == "tools/list") buildJsonObject {
+                        put("result", buildJsonObject { put("tools", buildJsonArray {
+                            add(buildJsonObject {
+                                put("name", "mcp_selftest_echo")
+                                put("inputSchema", buildJsonObject { put("type", "object") })
+                            })
+                        }) })
+                    } else {
+                        remoteName = params["name"]?.jsonPrimitive?.content
+                        buildJsonObject { put("result", buildJsonObject {
+                            put("content", buildJsonArray { add(buildJsonObject {
+                                put("type", "text"); put("text", "done")
+                            }) })
+                        }) }
+                    }
+                override fun close() = Unit
+            }
+        })
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        try {
+            plugin.connectHttpFromUi(registry.context, "selftest", "https://example.com/mcp")
+            assertEquals(listOf("mcp_selftest_echo"), plugin.serverSnapshots().single().tools)
+            val result = registry.context.tools.execute("mcp_selftest_echo",
+                buildJsonObject { }, context = ToolContext(approval = { true }))
+            assertFalse(result.isError)
+            assertEquals("mcp_selftest_echo", remoteName)
+        } finally {
+            plugin.uninstall(registry.context)
+        }
+    }
+
     @Test fun toolOnlyServerDoesNotExposeUnimplementedResourceMethods() = runBlocking {
         val plugin = McpToolBridgePlugin(http = OkHttpClient(), json = Json, transportFactory = {
             object : McpTransport {

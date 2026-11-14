@@ -151,7 +151,10 @@ internal class LocalToolSchemaProjection(
             .mapNotNull(registry::get)
             .filter { tool -> executionCoordinator.isNetworkSearchPermitted(tool.name) }
             .filter { tool ->
-                !planModeEnabled || LocalToolPolicy.allowedInPlan(tool.name, tool.access)
+                !planModeEnabled || LocalToolPolicy.allowedInPlan(tool.name, tool.access) ||
+                    // Code Mode is visible in Plan Mode for fully read-only scripts only.
+                    // Admission checks the actual child tool contracts before any step runs.
+                    tool.name == "code_mode_run"
             }
         val selection = LocalToolRouter.selectSchemas(
             tools = if (planModeEnabled) tools.map(HarnessTool::forReadOnlyModelScope) else tools,

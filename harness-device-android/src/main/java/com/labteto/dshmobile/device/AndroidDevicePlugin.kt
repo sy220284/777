@@ -47,12 +47,13 @@ class AndroidDevicePlugin(
         Spec("android_screen", "accessibility_tree", "读取当前无障碍控件树，返回短生命周期 node 编号；未就绪时会返回系统无障碍授权引导", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
         Spec("android_find", "accessibility_find", "按文本、控件 id、类型或可交互属性查找当前界面控件", mapOf("text" to "string", "id" to "string", "class" to "string", "clickable" to "boolean", "editable" to "boolean"), access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
         Spec("android_click_node", "accessibility_click_node", "按最近一次界面树/查找结果中的 node 编号点击控件", mapOf("node" to "integer"), setOf("node"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
-        Spec("android_set_text_node", "accessibility_set_text_node", "按 node 编号向可编辑控件写入文本", mapOf("node" to "integer", "value" to "string"), setOf("node", "value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
+        Spec("android_set_text_node", "accessibility_set_text_node", "按 node 编号定位输入框，自动替换文字并回读确认；与 android_input_text 使用同一写入与验证机制", mapOf("node" to "integer", "value" to "string"), setOf("node", "value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_scroll", "accessibility_scroll", "滚动当前界面可滚动区域", mapOf("direction" to "string"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_wait", "accessibility_wait", "等待文本或控件 id 出现，避免固定延时猜测页面状态", mapOf("text" to "string", "id" to "string", "timeout_ms" to "integer"), access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
         Spec("android_open_uri", "android_open_uri", "通过系统安全 VIEW Intent 打开 http/https/market/geo/mailto/tel URI", mapOf("uri" to "string"), setOf("uri"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_tap_text", "accessibility_click_text", "按文本定位并点击控件", mapOf("text" to "string"), setOf("text"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
-        Spec("android_type", "accessibility_set_text", "定位可编辑控件并写入文本", mapOf("search_text" to "string", "value" to "string"), setOf("search_text", "value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
+        Spec("android_type", "accessibility_set_text", "按现有文字定位输入框，或省略 search_text 使用当前焦点；自动替换文字并回读确认，与 android_input_text 使用同一机制", mapOf("search_text" to "string", "value" to "string"), setOf("value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
+        Spec("android_input_text", "accessibility_input_text", "一次完成 Android/Compose 文本输入：可用 node、控件 id、现有文本精确定位；全部留空即使用当前焦点。自动聚焦、替换文本并回读确认；返回 false 表示未确认生效。", mapOf("node" to "integer", "id" to "string", "text" to "string", "value" to "string"), setOf("value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_tap", "accessibility_tap", "按屏幕坐标点击", mapOf("x" to "number", "y" to "number", "duration_ms" to "integer"), setOf("x", "y"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_swipe", "accessibility_swipe", "按坐标执行滑动", mapOf("start_x" to "number", "start_y" to "number", "end_x" to "number", "end_y" to "number", "duration_ms" to "integer"), setOf("start_x", "start_y", "end_x", "end_y"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_back", "android_back", "执行系统返回", access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
@@ -62,7 +63,9 @@ class AndroidDevicePlugin(
         Spec("android_notification_list", "notification_list", "读取已授权的当前通知；结果会进入会话历史，已限长并脱敏常见验证码/密码；未授权时先调用 android_notification_status", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
         Spec("android_clipboard_get", "clipboard_get", "读取当前剪贴板", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
         Spec("android_clipboard_set", "clipboard_set", "写入剪贴板", mapOf("text" to "string"), setOf("text"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
+        Spec("android_clipboard_clear", "clipboard_clear", "清空系统剪贴板，清理自动化测试文本残留", access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_vscreen_create", "vscreen_create", "创建独立 Android 虚拟显示", mapOf("width" to "integer", "height" to "integer", "density_dpi" to "integer"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
+        Spec("android_vscreen_start", "vscreen_start", "一键为指定应用创建并启动虚拟屏。若目标应用无法在虚拟屏启动，将自动释放本次创建的显示器和槽位；成功返回可直接用于截图及操作的 id。", mapOf("package" to "string", "width" to "integer", "height" to "integer", "density_dpi" to "integer"), setOf("package"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_vscreen_list", "vscreen_list", "列出虚拟显示", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_vscreen_status", "vscreen_status", "读取虚拟显示状态", mapOf("id" to "string"), setOf("id"), ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_vscreen_launch", "vscreen_launch", "在虚拟显示中启动应用", mapOf("id" to "string", "package" to "string"), setOf("id", "package"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
@@ -136,7 +139,7 @@ class AndroidDevicePlugin(
         )
         val ACCESSIBILITY_TOOLS = setOf(
             "android_screen", "android_find", "android_click_node", "android_set_text_node",
-            "android_scroll", "android_wait", "android_tap_text", "android_type", "android_tap",
+            "android_scroll", "android_wait", "android_tap_text", "android_type", "android_input_text", "android_tap",
             "android_swipe", "android_screenshot",
         )
     }
@@ -149,7 +152,7 @@ class AndroidDevicePlugin(
  */
 private val ANDROID_BOOLEAN_ACTIONS = setOf(
     "accessibility_click_node", "accessibility_set_text_node", "accessibility_scroll",
-    "accessibility_click_text", "accessibility_set_text", "accessibility_tap",
+    "accessibility_click_text", "accessibility_set_text", "accessibility_input_text", "accessibility_tap",
     "accessibility_swipe", "android_back", "android_home", "vscreen_tap",
     "vscreen_swipe", "vscreen_close",
 )

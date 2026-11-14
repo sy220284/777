@@ -32,6 +32,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
+import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalModelFailureOrigin
 import org.junit.Test
 
 class AnthropicMessagesClientTest {
@@ -104,6 +107,27 @@ class AnthropicMessagesClientTest {
         assertTrue(changed.any {
             it.jsonObject["type"]?.jsonPrimitive?.content == "tool_use"
         })
+    }
+
+    @Test
+    fun unsupportedCrossProviderFileFailsBeforeHttpWithPreciseTypeAndOrigin() {
+        val message = LocalCanonicalMessage(
+            role = LocalCanonicalRole.USER,
+            content = listOf(LocalCanonicalContent.Raw(buildJsonObject {
+                put("type", "input_file")
+                put("filename", "manual.pdf")
+                put("file_data", "sensitive-data-must-not-be-in-error")
+            })),
+        )
+        try {
+            client.buildPayload(route(), listOf(message), emptyList(), null)
+            fail("Cross-protocol input file must be rejected before network admission")
+        } catch (error: LocalModelException) {
+            assertEquals("MODEL_PROTOCOL_INPUT_UNSUPPORTED", error.code)
+            assertEquals(LocalModelFailureOrigin.PROTOCOL_ENCODE, error.origin)
+            assertTrue(error.message.orEmpty().contains("input_file"))
+            assertFalse(error.message.orEmpty().contains("sensitive-data-must-not-be-in-error"))
+        }
     }
 
     @Test
@@ -398,6 +422,7 @@ class AnthropicMessagesClientTest {
         val interrupted = fixture(listOf(start, text)).complete(route(), emptyList(), emptyList(), null, true)
         assertEquals(LocalModelCompletionReason.INTERRUPTED, interrupted.completionReason)
         assertEquals("第一段", interrupted.content)
+        assertEquals("stream_interrupted_after_content_block_start", interrupted.rawStopReason)
     }
 
     @Test

@@ -19,6 +19,52 @@ import org.junit.Test
 
 class LocalVisionPluginTest {
     @Test
+    fun missingWorkspaceImageHasStableErrorAndDoesNotCallModel() = runTest {
+        val root = Files.createTempDirectory("vision-missing-image").toFile()
+        try {
+            val analyzer = RecordingAnalyzer()
+            val registry = PluginRegistry()
+            registry.install(LocalVisionPlugin(
+                device = RecordingDevice(),
+                keyProvider = { "key" },
+                routeProvider = { LocalVisionRoute("https://vision.example/v1", "vision-model") },
+                analyzer = analyzer,
+                workspaceRoot = root,
+            ))
+            val result = registry.context.tools.execute(
+                name = "vision_analyze_file",
+                input = buildJsonObject { put("path", "missing.png"); put("prompt", "分析") },
+                context = ToolContext(approval = { true }),
+            )
+            assertTrue(result.isError)
+            assertEquals("VISION_FILE_NOT_FOUND", result.errorCode)
+            assertTrue(analyzer.calls.isEmpty())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun imageInputUnsupportedReportsTypedFailureBeforeCapture() = runTest {
+        val device = RecordingDevice()
+        val registry = PluginRegistry()
+        registry.install(LocalVisionPlugin(
+            device = device,
+            keyProvider = { "key" },
+            routeProvider = { LocalVisionRoute("https://vision.example/v1", "text-only-model") },
+            analyzer = RecordingAnalyzer(),
+            imageSupportProvider = { false },
+        ))
+        val result = registry.context.tools.execute(
+            name = "vision_analyze_screen",
+            input = buildJsonObject { put("prompt", "分析") },
+            context = ToolContext(approval = { true }),
+        )
+        assertTrue(result.isError)
+        assertEquals("VISION_IMAGE_UNSUPPORTED", result.errorCode)
+        assertTrue(device.calls.isEmpty())
+    }
+    @Test
     fun scopedModelRouteAndCredentialOverrideForegroundAcrossVisionTools() = runTest {
         val device = RecordingDevice()
         val analyzer = RecordingAnalyzer()

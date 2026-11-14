@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.model
 
 
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalModelFailureOrigin
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.estimatePromptBreakdown
 import java.io.IOException
@@ -203,7 +204,12 @@ internal class AnthropicMessagesClient @Inject constructor(
             if (tools.isNotEmpty()) put("tools", buildJsonArray {
                 tools.forEach { tool ->
                     if (tool.parameters["type"]?.jsonPrimitive?.contentOrNull != "object") {
-                        throw protocolError("工具 input_schema 根节点必须是 object", null)
+                        throw LocalModelException(
+                            code = "MODEL_TOOL_SCHEMA_INVALID",
+                            message = "Anthropic 工具 input_schema 根节点必须是 object",
+                            retryable = false,
+                            origin = LocalModelFailureOrigin.PROTOCOL_ENCODE,
+                        )
                     }
                     add(buildJsonObject {
                         put("name", tool.name)
@@ -261,7 +267,7 @@ internal class AnthropicMessagesClient @Inject constructor(
     }
 
     private fun userContent(message: LocalCanonicalMessage, route: LocalResolvedModelRoute): JsonArray = buildJsonArray {
-        message.content.forEach { block ->
+        message.content.forEachIndexed { index, block ->
             when (block) {
                 is LocalCanonicalContent.Text -> if (block.text.isNotEmpty()) {
                     add(buildJsonObject {
@@ -286,7 +292,24 @@ internal class AnthropicMessagesClient @Inject constructor(
                         })
                     }
                 }
-                else -> throw protocolError("Anthropic 不支持此输入块", null)
+                else -> {
+                    val sourceType = when (block) {
+                        is LocalCanonicalContent.Raw -> block.value["type"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                        is LocalCanonicalContent.ToolResult -> "tool_result"
+                        is LocalCanonicalContent.ToolCall -> "tool_use"
+                        is LocalCanonicalContent.Reasoning -> "reasoning"
+                        else -> "unknown"
+                    }
+                    val safeType = sourceType.take(48).takeIf {
+                        it.isNotEmpty() && it.all { c -> c.isLetterOrDigit() || c == '_' || c == '-' }
+                    } ?: "unknown"
+                    throw LocalModelException(
+                        code = "MODEL_PROTOCOL_INPUT_UNSUPPORTED",
+                        message = "Anthropic 输入第 ${index + 1} 个内容块类型 $safeType 不受当前协议支持；请切换支持该附件的模型，或重新附加文件供工作区读取。",
+                        retryable = false,
+                        origin = LocalModelFailureOrigin.PROTOCOL_ENCODE,
+                    )
+                }
             }
         }
     }
@@ -321,6 +344,8 @@ internal class AnthropicMessagesClient @Inject constructor(
         var stopReason: String? = null
         var sawMessageStop = false
         var sawMessageStart = false
+        var lastStreamEventType: String? = null
+        var streamEventsSeen = 0
         val closedBlocks = mutableSetOf<Int>()
 
         val reader = ModelStreamLineReader(body.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_STREAM_BYTES)
@@ -350,8 +375,11 @@ internal class AnthropicMessagesClient @Inject constructor(
                     .getOrElse { cause ->
                         throw protocolError("Anthropic SSE 包含无法解析的数据帧", requestId, cause)
                     }
+                val eventType = event["type"]?.jsonPrimitive?.contentOrNull
+                lastStreamEventType = eventType?.take(48)
+                streamEventsSeen++
                 LocalMiniMaxPolicy.requireSuccessfulResponse(event)
-                when (event["type"]?.jsonPrimitive?.contentOrNull) {
+                when (eventType) {
                     "message_start" -> {
                         if (sawMessageStart) throw protocolError("重复 message_start", requestId)
                         sawMessageStart = true
@@ -448,6 +476,8 @@ internal class AnthropicMessagesClient @Inject constructor(
                 code = "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION",
                 detail = "Anthropic Messages 流在 message_stop 前结束",
                 requestId = requestId ?: messageId,
+                lastStreamEventType = lastStreamEventType,
+                streamEventsSeen = streamEventsSeen,
             )
         }
         if (!sawMessageStart || messageId.isNullOrBlank() || (sawMessageStop && stopReason !in setOf("max_tokens", "refusal") && closedBlocks.size != blocks.size)) {
@@ -461,6 +491,9 @@ internal class AnthropicMessagesClient @Inject constructor(
             else -> LocalModelCompletionReason.COMPLETED
         }
 
+        val effectiveStopReason = if (!sawMessageStop) {
+            "stream_interrupted_after_${lastStreamEventType ?: "unknown"}"
+        } else stopReason
         val nativeContent = buildJsonArray {
             blocks.toSortedMap().values.filter { completionReason == LocalModelCompletionReason.COMPLETED || it.type == "text" }
                 .forEach { add(it.toNative(json, requestId ?: messageId)) }
@@ -507,13 +540,13 @@ internal class AnthropicMessagesClient @Inject constructor(
             role = LocalCanonicalRole.ASSISTANT,
             content = canonicalBlocks,
             replay = replay.takeIf { completionReason == LocalModelCompletionReason.COMPLETED },
-            completionReason = completionReason, rawStopReason = stopReason,
+            completionReason = completionReason, rawStopReason = effectiveStopReason,
         )
         val promptTokens = safeAdd(inputTokens, safeAdd(cacheReadTokens, cacheCreationTokens))
         val toolCalls = canonicalBlocks.filterIsInstance<LocalCanonicalContent.ToolCall>()
             .map(LocalCanonicalContent.ToolCall::toLocalToolCall)
         return LocalModelReply(
-            completionReason = completionReason, rawStopReason = stopReason,
+            completionReason = completionReason, rawStopReason = effectiveStopReason,
             message = LocalCanonicalModelCodec.toHistoryMessage(canonical),
             content = canonicalBlocks.filterIsInstance<LocalCanonicalContent.Text>()
                 .joinToString("") { it.text }.ifBlank { null },
@@ -608,7 +641,12 @@ internal class AnthropicMessagesClient @Inject constructor(
     private fun parseDataImage(value: String, maxImageBytes: Long): Pair<String, String> {
         if (value.startsWith("https://")) return "url" to value
         val split = value.indexOf(";base64,")
-        if (!value.startsWith("data:image/") || split <= 5) throw protocolError("图片必须为 data URL 或 HTTPS URL", null)
+        if (!value.startsWith("data:image/") || split <= 5) throw LocalModelException(
+            code = "MODEL_PROTOCOL_INPUT_UNSUPPORTED",
+            message = "Anthropic 图片必须为 data URL 或 HTTPS URL",
+            retryable = false,
+            origin = LocalModelFailureOrigin.PROTOCOL_ENCODE,
+        )
         val mediaType = value.substring(5, split)
         val data = value.substring(split + 8)
         // Limits from the effective model route describe binary bytes, not encoded characters.
@@ -620,7 +658,12 @@ internal class AnthropicMessagesClient @Inject constructor(
         val decodedBytes = data.length.toLong() / 4 * 3 - padding
         if (mediaType !in SUPPORTED_IMAGE_MEDIA_TYPES || data.isEmpty() || data.length % 4 != 0 ||
             decodedBytes > maxImageBytes) {
-            throw protocolError("图片格式无效或超过当前模型图片大小上限", null)
+            throw LocalModelException(
+                code = "MODEL_PROTOCOL_INPUT_UNSUPPORTED",
+                message = "图片格式无效或超过当前模型图片大小上限",
+                retryable = false,
+                origin = LocalModelFailureOrigin.PROTOCOL_ENCODE,
+            )
         }
         return mediaType to data
     }
@@ -665,6 +708,7 @@ internal class AnthropicMessagesClient @Inject constructor(
             requestId = requestId,
             providerCode = type,
             admissionState = LocalModelAdmissionState.REJECTED,
+            origin = LocalModelFailureOrigin.PROVIDER_REJECTED,
         )
     }
 
@@ -683,6 +727,7 @@ internal class AnthropicMessagesClient @Inject constructor(
             providerRetryAfterMs = retryAfterMs,
             requestId = requestId,
             providerCode = type ?: "stream_error_after_admission",
+            origin = LocalModelFailureOrigin.PROVIDER_REJECTED,
         )
     }
 
@@ -723,6 +768,7 @@ internal class AnthropicMessagesClient @Inject constructor(
             retryable = false,
             requestId = requestId,
             cause = cause,
+            origin = LocalModelFailureOrigin.STREAM_PARSE,
         )
 
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()

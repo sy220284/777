@@ -195,6 +195,7 @@ class OpenAiResponsesClientTest {
                 val partial = result.getOrThrow()
                 assertEquals(LocalModelCompletionReason.INTERRUPTED, partial.completionReason)
                 assertEquals("partial", partial.content)
+                assertEquals("stream_interrupted_after_response.output_text.delta", partial.rawStopReason)
                 assertTrue(partial.toolCalls.isEmpty())
                 val denied = runCatching { requireCompletedModelReply(partial) }.exceptionOrNull()
                 assertEquals("MODEL_INTERRUPTED", (denied as? LocalModelException)?.code)
@@ -737,6 +738,7 @@ class OpenAiResponsesClientTest {
         )
 
         assertEquals("CHATGPT_PLAN_ADMISSION_403", error.code)
+        assertEquals(com.labteto.dshmobile.local.LocalModelFailureOrigin.PROVIDER_REJECTED, error.origin)
         assertFalse(error.retryable)
         assertEquals("serving region is not permitted", error.message)
         assertEquals("req-admission", error.requestId)

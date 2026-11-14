@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalModelFailureOrigin
 import java.io.EOFException
 import java.net.ConnectException
 import java.net.SocketException
@@ -79,6 +80,7 @@ internal fun modelTransportFailure(
             cause = cause,
             requestId = requestId,
             admissionState = LocalModelAdmissionState.NOT_SENT,
+            origin = LocalModelFailureOrigin.TRANSPORT,
         )
     } else {
         LocalModelException(
@@ -90,6 +92,7 @@ internal fun modelTransportFailure(
             providerCode = "request_maybe_admitted",
             admissionState = admission,
             continuationEligible = true,
+            origin = LocalModelFailureOrigin.TRANSPORT,
         )
     }
 }
@@ -104,6 +107,8 @@ internal fun modelPostAdmissionFailure(
     detail: String,
     requestId: String? = null,
     cause: Throwable? = null,
+    lastStreamEventType: String? = null,
+    streamEventsSeen: Int? = null,
 ): LocalModelException = LocalModelException(
     code = code,
     message = "$detail。模型服务已经接收本次请求，为避免重复推理、重复工具副作用或重复计费，777 不会自动重放整轮请求。",
@@ -113,6 +118,9 @@ internal fun modelPostAdmissionFailure(
     providerCode = "request_interrupted_after_admission",
     admissionState = LocalModelAdmissionState.ADMITTED,
     continuationEligible = true,
+    origin = LocalModelFailureOrigin.STREAM_PARSE,
+    lastStreamEventType = lastStreamEventType,
+    streamEventsSeen = streamEventsSeen,
 )
 
 internal fun LocalModelException.withoutReplayAfterAdmission(): LocalModelException {
@@ -129,6 +137,9 @@ internal fun LocalModelException.withoutReplayAfterAdmission(): LocalModelExcept
         providerParam = providerParam,
         admissionState = LocalModelAdmissionState.ADMITTED,
         continuationEligible = true,
+        origin = origin,
+        lastStreamEventType = lastStreamEventType,
+        streamEventsSeen = streamEventsSeen,
     )
 }
 

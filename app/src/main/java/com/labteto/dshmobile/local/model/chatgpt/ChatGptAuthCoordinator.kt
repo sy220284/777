@@ -118,6 +118,10 @@ class ChatGptAuthCoordinator @Inject constructor(
         }
     }
 
+    private fun requireAuthorizationActive() {
+        if (cancellationRequested) throw CancellationException("ChatGPT 授权已取消")
+    }
+
     suspend fun cancelPendingAuthorization() {
         if (!authorizationInProgress) return
         cancellationRequested = true
@@ -198,6 +202,7 @@ class ChatGptAuthCoordinator @Inject constructor(
             } catch (_: TimeoutCancellationException) {
                 error("等待 ChatGPT 浏览器授权超时，请重新发起连接")
             }
+            requireAuthorizationActive()
             require(callback.state == stateValue) { "ChatGPT OAuth state 校验失败" }
             if (callback.error != null) {
                 val detail = callback.errorDescription?.takeIf(String::isNotBlank)
@@ -240,6 +245,7 @@ class ChatGptAuthCoordinator @Inject constructor(
                 }
                 throw error
             }
+            requireAuthorizationActive()
             if (token.scopes.isEmpty() && !callback.scope.isNullOrBlank()) {
                 token = token.copy(
                     scopes = callback.scope.split(' ')
@@ -280,6 +286,8 @@ class ChatGptAuthCoordinator @Inject constructor(
                 savedAtEpochSeconds = now,
                 earliestRefreshAtEpochSeconds = token.earliestRefreshAtEpochSeconds,
             )
+            // An explicit cancellation must win over a late token exchange or ID validation.
+            requireAuthorizationActive()
             accounts.put(record, select = true)
             hostIdentity.clearPendingClientId(issuedClientId)
 

@@ -49,7 +49,7 @@ object LocalToolCatalog {
             "offset" to integerRange("必须等于上次返回的 next_byte，首次 0", min = 0),
             "finish" to boolean("是否提交完整文件，默认 false"),
         ), listOf("path", "offset")))
-        add(tool("edit", "唯一字面量替换；修改前必须先用 read 读取包含待替换内容的目标区域，write 创建或覆盖不算读取", properties(
+        add(tool("edit", "按唯一原文字面量精确替换。已明确掌握 old_text 时可直接编辑，无需先调用 read；工具会校验原文仅出现一次和文件版本，原文不存在、重复或已读取版本过期时拒绝修改；不确定内容时先 read", properties(
             "path" to string("相对工作区的路径"),
             "old_text" to string("必须只出现一次的原文"),
             "new_text" to string("替换后的文字"),
@@ -165,7 +165,7 @@ object LocalToolCatalog {
             "url" to string("要诊断的网址或域名"),
         ), listOf("url")))
         add(tool("environment_info", "查看安卓本机 Harness 的可用环境能力与限制", properties()))
-        add(tool("capability_search", "从实时注册表发现扩展；已知精确名称优先用 select:工具名1,工具名2 一次选择最多 16 个，减少多轮搜索；也支持自然语言及『能力目录』。仅下一模型步骤提供的真实工具表可调用，始终遵守连接、权限和审批要求", properties(
+        add(tool("capability_search", "从实时注册表发现扩展。已知名称可用 select:工具名1,工具名2，一次指定最多 128 个；自动标出本轮预计可用、已加载、缺失及待加载工具，并给出超出定义预算时下一批精确选择命令。已装入本轮模型工具表的 MCP/GitHub 等扩展可直接加入 code_mode_run，串联前序执行结果；仍须逐步经过实际连接与权限审批。", properties(
             "query" to string("例如 能力目录、工具与能力检测、GitHub PR、Android 界面、视觉、MCP、LSP、下载或某项具体工具名"),
         ), listOf("query")))
         add(tool("update_plan", "记录任务执行方案的步骤顺序，不记录进行中/已完成状态；进度用 todo_write，长期目标用 create_goal。仅复杂任务需要维护计划，避免重复写同一内容", properties(

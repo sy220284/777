@@ -116,7 +116,9 @@ class ModelProtocolContractTest {
         val client = OpenAiResponsesClient(OkHttpClient(), json)
         val user = json.parseToJsonElement("""{"role":"user","content":[{"type":"input_audio","input_audio":{"data":"YWJj","format":"wav"}}]}""").jsonObject
         val error = runCatching { client.buildPayload("test", listOf(user), emptyTools, null) }.exceptionOrNull()
-        assertEquals("RESPONSES_PROTOCOL_ERROR", (error as? LocalModelException)?.code)
+        assertEquals("MODEL_PROTOCOL_INPUT_UNSUPPORTED", (error as? LocalModelException)?.code)
+        assertEquals(com.labteto.dshmobile.local.LocalModelFailureOrigin.PROTOCOL_ENCODE,
+            (error as? LocalModelException)?.origin)
     }
 
     @Test fun cancellationClosesChatAndResponsesStreamsAfterHeaders() = runBlocking {

@@ -2,6 +2,15 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
 
+/** Origin is assigned by the actual failing layer and remains stable under R8. */
+internal enum class LocalModelFailureOrigin(val wireValue: String) {
+    LOCAL_PREFLIGHT("local_preflight"),
+    PROTOCOL_ENCODE("protocol_encode"),
+    PROVIDER_REJECTED("provider_rejected"),
+    TRANSPORT("transport"),
+    STREAM_PARSE("stream_parse"),
+}
+
 /** Stable shared model error contract; preserve original JVM package and retry metadata. */
 internal class LocalModelException(
     val code: String,
@@ -15,4 +24,8 @@ internal class LocalModelException(
     val providerParam: String? = null,
     val admissionState: LocalModelAdmissionState = LocalModelAdmissionState.NOT_APPLICABLE,
     val continuationEligible: Boolean = false,
+    val origin: LocalModelFailureOrigin? = null,
+    /** Type/count only; never retain a raw SSE payload or user content here. */
+    val lastStreamEventType: String? = null,
+    val streamEventsSeen: Int? = null,
 ) : Exception(message, cause)

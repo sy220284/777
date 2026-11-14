@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.model
 
 
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalModelFailureOrigin
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.estimatePromptBreakdown
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_RESPONSES_URL
@@ -99,6 +100,8 @@ class OpenAiResponsesClient @Inject constructor(
             .post(payload.toString().toRequestBody(JSON_MEDIA).withModelAdmissionTracking(admissionTracker))
             .build()
         var admittedRequestId: String? = null
+        var lastStreamEventType: String? = null
+        var streamEventsSeen = 0
         val eager = currentCoroutineContext()[AgentEagerToolContext]
         val advertisedToolNames = tools.mapNotNull { schema ->
             ((schema as? JsonObject)?.get("function") as? JsonObject)?.get("name")?.jsonPrimitive?.contentOrNull
@@ -193,6 +196,11 @@ class OpenAiResponsesClient @Inject constructor(
                                     cause = cause,
                                 )
                             }
+                        val eventType = event["type"]?.jsonPrimitive?.contentOrNull
+                        lastStreamEventType = eventType?.take(48)?.takeIf { type ->
+                            type.all { char -> char.isLetterOrDigit() || char == '_' || char == '.' || char == '-' }
+                        }
+                        streamEventsSeen++
                         ((event["response"] as? JsonObject)?.get("usage") as? JsonObject)?.let { reportedUsage = it }
                         streamed.record(event)?.let { onDelta(it) }
                         acceptCompletedItem(event)
@@ -222,6 +230,9 @@ class OpenAiResponsesClient @Inject constructor(
                 currentCoroutineContext().ensureActive()
                 val completed = completedResponse ?: if (streamed.content.isNotBlank() || eagerCalls.isNotEmpty()) buildJsonObject {
                     put("status", "interrupted")
+                    put("incomplete_details", buildJsonObject {
+                        put("reason", "stream_interrupted_after_${lastStreamEventType ?: "unknown"}")
+                    })
                     reportedUsage?.let { put("usage", it) }
                     put("id", requestId.orEmpty())
                 } else throw streamInterruptedAfterAdmission(
@@ -256,6 +267,8 @@ class OpenAiResponsesClient @Inject constructor(
                     requestId = admittedRequestId,
                     detail = "Responses API 流式响应超时",
                     cause = error,
+                    lastStreamEventType = lastStreamEventType,
+                    streamEventsSeen = streamEventsSeen,
                 )
             }
             throw modelTransportFailure(
@@ -273,6 +286,8 @@ class OpenAiResponsesClient @Inject constructor(
                     requestId = admittedRequestId,
                     detail = "Responses API 流式连接中断",
                     cause = error,
+                    lastStreamEventType = lastStreamEventType,
+                    streamEventsSeen = streamEventsSeen,
                 )
             }
             throw modelTransportFailure(
@@ -340,6 +355,8 @@ class OpenAiResponsesClient @Inject constructor(
         requestId: String?,
         detail: String,
         cause: Throwable? = null,
+        lastStreamEventType: String? = null,
+        streamEventsSeen: Int? = null,
     ): LocalModelException =
         if (planSharing) {
             LocalModelException(
@@ -351,6 +368,9 @@ class OpenAiResponsesClient @Inject constructor(
                 providerCode = "stream_interrupted_after_admission",
                 admissionState = LocalModelAdmissionState.ADMITTED,
                 continuationEligible = true,
+                origin = LocalModelFailureOrigin.STREAM_PARSE,
+                lastStreamEventType = lastStreamEventType,
+                streamEventsSeen = streamEventsSeen,
             )
         } else {
             modelPostAdmissionFailure(
@@ -358,6 +378,8 @@ class OpenAiResponsesClient @Inject constructor(
                 detail = detail,
                 requestId = requestId,
                 cause = cause,
+                lastStreamEventType = lastStreamEventType,
+                streamEventsSeen = streamEventsSeen,
             )
         }
 
@@ -646,7 +668,12 @@ class OpenAiResponsesClient @Inject constructor(
                     })
                 }
                 "input_text", "input_image", "input_file" -> add(obj)
-                else -> throw responseProtocolError("不支持的输入内容类型：${obj["type"]}")
+                else -> throw LocalModelException(
+                    code = "MODEL_PROTOCOL_INPUT_UNSUPPORTED",
+                    message = "Responses API 不支持本轮输入内容类型：${obj["type"]?.jsonPrimitive?.contentOrNull?.take(48) ?: "unknown"}；请重新附加文件或切换兼容模型。",
+                    retryable = false,
+                    origin = LocalModelFailureOrigin.PROTOCOL_ENCODE,
+                )
             }
         }
     }
@@ -936,6 +963,7 @@ class OpenAiResponsesClient @Inject constructor(
         requestId = requestId,
         providerCode = code,
         providerParam = param,
+        origin = LocalModelFailureOrigin.PROVIDER_REJECTED,
     )
 
     private fun incompleteReason(event: JsonObject): String {
@@ -992,6 +1020,7 @@ class OpenAiResponsesClient @Inject constructor(
                 providerRetryAfterMs = retryAfterMs,
                 requestId = requestId,
                 admissionState = LocalModelAdmissionState.REJECTED,
+                origin = LocalModelFailureOrigin.PROVIDER_REJECTED,
             )
         }
 
@@ -1006,6 +1035,7 @@ class OpenAiResponsesClient @Inject constructor(
             providerCode = remoteCode,
             providerParam = remoteParam,
             admissionState = LocalModelAdmissionState.REJECTED,
+            origin = LocalModelFailureOrigin.PROVIDER_REJECTED,
         )
     }
 
@@ -1088,6 +1118,7 @@ class OpenAiResponsesClient @Inject constructor(
             providerCode = code,
             providerParam = param,
             admissionState = admissionState,
+            origin = LocalModelFailureOrigin.PROVIDER_REJECTED,
         )
     }
 

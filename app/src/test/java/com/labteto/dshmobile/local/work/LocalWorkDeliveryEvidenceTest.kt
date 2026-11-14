@@ -191,6 +191,28 @@ class LocalWorkDeliveryEvidenceTest {
         file.delete()
         assertNull(localWorkDeliveryEvidence(log, goal, root).artifactCallId)
     }
+    @Test fun completedGoalCanBeReverifiedAfterArtifactWasEditedWithoutCreatingAnotherGoal() =
+        scenario { log, goal, root ->
+            val file = artifact(root)
+            result(log, goal, root, "original-check")
+            val completed = goal.copy(status = "completed")
+            assertTrue(localWorkDeliveryEvidence(log, completed, root).missing.isEmpty())
+
+            file.writeText("new source after first settlement")
+            val stale = localWorkDeliveryEvidence(log, completed, root)
+            assertTrue(stale.missing.any { it.contains("版本已变化") })
+            assertFalse(resolveWorkGoalTransition(completed, completed,
+                LocalWorkState(goal = completed), stale).accepted)
+
+            // Re-executing the declared verifier under the same real Goal identity
+            // must establish fresh evidence for the current artifact bytes.
+            result(log, completed, root, "fresh-check")
+            val refreshed = localWorkDeliveryEvidence(log, completed, root)
+            assertTrue(refreshed.missing.isEmpty())
+            assertTrue(resolveWorkGoalTransition(completed, completed,
+                LocalWorkState(goal = completed), refreshed).accepted)
+        }
+
     @Test fun pauseAndResumeDoNotChangeTheGoalIdentityOrEvidenceHorizon() = scenario { log, goal, root ->
         artifact(root); result(log, goal, root, "success")
         log.append("goal/state", workGoalEvent(goal.copy(status = "paused")))

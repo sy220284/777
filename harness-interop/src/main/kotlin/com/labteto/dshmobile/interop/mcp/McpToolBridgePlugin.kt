@@ -1083,7 +1083,12 @@ class McpToolBridgePlugin(
         val prefix = "mcp_${serverId}_"
         val available = MAX_TOOL_NAME_LENGTH - prefix.length
         require(available > 0) { "MCP server_id 过长" }
-        return prefix + normalized.ifBlank { "tool" }.take(available)
+        // A server may return names already prefixed with its own identity.
+        // Preserve one namespace boundary while keeping the original remote name
+        // in the tools/call payload.
+        var baseName = normalized
+        while (baseName.startsWith(prefix)) baseName = baseName.removePrefix(prefix)
+        return prefix + baseName.ifBlank { "tool" }.take(available)
     }
 
     private fun resourceToolDefinitions(

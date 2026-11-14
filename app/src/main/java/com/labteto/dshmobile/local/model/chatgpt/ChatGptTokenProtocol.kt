@@ -86,6 +86,7 @@ internal fun parseChatGptTokenFailure(
         "invalid_grant" -> "授权码已失效，请重新授权"
         "invalid_client" -> "OAuth 客户端注册无效"
         "access_denied" -> "账户未批准本次授权"
+        "unsupported_country_region_territory" -> "服务端当前不向所在地区提供本次账户授权；请按服务商的账户与地区要求检查"
         else -> "OAuth 令牌交换未成功"
     }
     val message = buildString {
