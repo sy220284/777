@@ -28,6 +28,9 @@ data class ToolPreUseRequest(
 
 sealed interface ToolPreUseDecision {
     data object Allow : ToolPreUseDecision
+    data class Ask(val reason: String) : ToolPreUseDecision {
+        init { require(reason.isNotBlank() && reason.length <= 512) }
+    }
     data class Deny(val reason: String) : ToolPreUseDecision {
         init { require(reason.isNotBlank() && reason.length <= 512) }
     }
