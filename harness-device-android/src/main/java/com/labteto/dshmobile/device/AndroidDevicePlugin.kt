@@ -65,6 +65,7 @@ class AndroidDevicePlugin(
         Spec("android_clipboard_set", "clipboard_set", "写入剪贴板", mapOf("text" to "string"), setOf("text"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_clipboard_clear", "clipboard_clear", "清空系统剪贴板，清理自动化测试文本残留", access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_vscreen_create", "vscreen_create", "创建独立 Android 虚拟显示", mapOf("width" to "integer", "height" to "integer", "density_dpi" to "integer"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
+        Spec("android_vscreen_start", "vscreen_start", "一键为指定应用创建并启动虚拟屏。若目标应用无法在虚拟屏启动，将自动释放本次创建的显示器和槽位；成功返回可直接用于截图及操作的 id。", mapOf("package" to "string", "width" to "integer", "height" to "integer", "density_dpi" to "integer"), setOf("package"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_vscreen_list", "vscreen_list", "列出虚拟显示", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_vscreen_status", "vscreen_status", "读取虚拟显示状态", mapOf("id" to "string"), setOf("id"), ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_vscreen_launch", "vscreen_launch", "在虚拟显示中启动应用", mapOf("id" to "string", "package" to "string"), setOf("id", "package"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
