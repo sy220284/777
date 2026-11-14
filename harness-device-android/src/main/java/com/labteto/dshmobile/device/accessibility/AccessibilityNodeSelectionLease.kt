@@ -28,6 +28,13 @@ internal class AccessibilityNodeSelectionLease {
         ) { EXPIRED_MESSAGE }
     }
 
+    /** Fast path for a stable selected input: same window, node and generation. */
+    fun matchesCurrentEditable(index: Int, windowId: Int, current: AccessibilityNodeSnapshot): Boolean {
+        val snapshot = observed ?: return false
+        return index >= 0 && snapshot.windowId == windowId && current.editable &&
+            snapshot.nodes.getOrNull(index) == current && observed === snapshot
+    }
+
     /**
      * Editable Compose nodes commonly have no view id. Re-bind a selected input to
      * its current live identity, using a unique view id when available, otherwise
