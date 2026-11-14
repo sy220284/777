@@ -33,7 +33,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             name = TOOL_NAME,
             schema = functionToolSchema(
                 TOOL_NAME,
-                "受控串行工具编排。支持已加载的核心工具与扩展工具、前序结果引用和 when 条件；扩展工具先通过 capability_search 选中，并在模型下一步装入真实工具表。每步保留原工具权限、审批、超时和审计；返回各步骤结果。",
+                "串行执行已加载工具，支持前序结果引用和 when 条件。步骤从 1 开始编号；when.path 是前序工具返回正文的 JSON 字段路径，例如 approved、file.path 或 items[0].name，不是 steps[0].content；前序返回普通文本时省略 path，用 equals 比较全文。示例：第 1 步返回 {approved:true}，第 2 步使用 when:{step:1,path:approved,equals:true}。扩展工具先用 capability_search 加载，下一模型步骤才能编排；每个子工具维持实际权限审批、执行与审计。",
                 parameterSchema = buildJsonObject {
                     put("type", "object")
                     put("properties", buildJsonObject {
@@ -58,10 +58,10 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                                     })
                                     put("when", buildJsonObject {
                                         put("type", "object")
-                                        put("description", "前序持久结果匹配 equals 才执行，否则跳过")
+                                        put("description", "仅比较前序成功步骤的持久结果。step 从 1 起；path 指向返回正文 JSON 本身，不含 steps[N].content 包装。普通文本不传 path；equals 类型必须一致。")
                                         put("properties", buildJsonObject {
                                             put("step", buildJsonObject { put("type", "integer") })
-                                            put("path", buildJsonObject { put("type", "string") })
+                                            put("path", buildJsonObject { put("type", "string"); put("description", "可选。前序结果正文 JSON 内的路径，例如 approved、$.file.path、items[0].name；省略则比较整个结果（普通文本或 JSON 值）。") })
                                             put("equals", buildJsonObject {})
                                         })
                                         put("required", buildJsonArray {
@@ -91,7 +91,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             metadata = ToolMetadata(
                 family = "workflow",
                 discoveryKeywords = setOf("code mode", "编排", "批量工具"),
-                usageNotes = listOf("核心工具即用；用 capability_search 加载的 MCP、GitHub、Android 等扩展工具可加入同一编排，须在本轮模型工具表中；保持逐步权限审批"),
+                usageNotes = listOf("步骤序号从 1 起。when.path/\$step_result.path 对应原始 JSON 正文的字段，不是步骤回执的 steps[0].content；返回普通文本时省略 path。", "先用 capability_search 加载可选工具；保留每一步独立审批。"),
             ),
             executor = HarnessToolExecutor { originalContext, input, _ ->
                 executePlan(originalContext, input)
@@ -389,11 +389,16 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             val path = (node["path"] as? JsonPrimitive)?.content.orEmpty()
             for (segment in (parseReferencePath(path)
                 ?: throw StepReferenceException("步骤 $ordinal 的字段路径无效：$path"))) {
-                selected = when (val value = selected) {
-                    is JsonObject -> value[segment]
-                    is JsonArray -> segment.toIntOrNull()?.let { index -> value.getOrNull(index) }
+                val current = selected
+                selected = when (current) {
+                    is JsonObject -> current[segment]
+                    is JsonArray -> segment.toIntOrNull()?.let { index -> current.getOrNull(index) }
                     else -> null
-                } ?: throw StepReferenceException("步骤 $ordinal 的字段不存在：$path")
+                } ?: throw StepReferenceException(when (current) {
+                    is JsonObject -> "步骤 $ordinal 的 JSON 结果缺少字段 '$segment'（路径：$path）；可用字段：${current.keys.joinToString(", ").ifBlank { "（空对象）" }}"
+                    is JsonArray -> "步骤 $ordinal 的数组没有索引 '$segment'（路径：$path；长度：${current.size}）"
+                    else -> "步骤 $ordinal 的结果是文本或 JSON 标量，无法读取 '$path'；直接比较整个结果时请省略 path，结构化字段须由前序工具返回 JSON 对象"
+                })
             }
             if (selected.toString().length > MAX_REFERENCE_VALUE_CHARS)
                 throw StepReferenceException("步骤 $ordinal 的字段超过传递长度限制")
