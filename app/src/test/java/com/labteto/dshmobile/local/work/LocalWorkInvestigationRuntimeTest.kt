@@ -176,6 +176,47 @@ class LocalWorkInvestigationRuntimeTest {
         } finally { log.close() }
     }
 
+    @Test fun theSameGitHubPathOnDistinctRefsIsTrackedSeparately() {
+        val log = log()
+        try {
+            fun source(id: String, ref: String) {
+                val declaration = log.append("tool/call", buildJsonObject {
+                    put("id", id); put("name", "mcp__GitHub__fetch_file")
+                })
+                val result = log.append("tool/result", buildJsonObject {
+                    put("id", id); put("is_error", false)
+                    put("tool_declared_sequence", declaration.sequence)
+                })
+                LocalWorkInvestigationRuntime.observe(
+                    log, "goal-a", "turn-a", id, "mcp__GitHub__fetch_file",
+                    buildJsonObject {
+                        put("repository_full_name", "owner/repo")
+                        put("path", "src/Agent.kt"); put("ref", ref)
+                    }, declaration.sequence, result.sequence, "read content", false,
+                )
+            }
+            source("main-read", "main")
+            source("branch-read", "feature/experimental")
+            val observations = log.eventsOfTypesAfter(-1L, setOf("work/source-observed"))
+            assertEquals(2, observations.size)
+            assertTrue(observations[0].data.toString().contains("repo@main/src/Agent.kt"))
+            assertTrue(observations[1].data.toString().contains("repo@feature/experimental/src/Agent.kt"))
+        } finally { log.close() }
+    }
+
+    @Test fun unidentifiedReadIsNotRecordedAsGroundedSourceCoverage() {
+        val log = log()
+        try {
+            val declaration = log.append("tool/call", buildJsonObject {
+                put("id", "unknown-read")
+            })
+            LocalWorkInvestigationRuntime.observe(log, "goal-a", "turn-a",
+                "unknown-read", "read", buildJsonObject {},
+                declaration.sequence, 42L, "next_start_line=11", false)
+            assertTrue(log.eventsOfTypesAfter(-1L, setOf("work/source-observed")).isEmpty())
+        } finally { log.close() }
+    }
+
     @Test fun unknownSourceResultAndFailedReadDoNotCreateEvidence() {
         val log = log()
         try {
