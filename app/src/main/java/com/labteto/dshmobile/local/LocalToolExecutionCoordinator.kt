@@ -491,12 +491,8 @@ internal class LocalToolExecutionCoordinator(
                         approval = { tool -> requestApprovalForTool(tool, null) },
                         approvalWithReason = { tool, reason -> requestApprovalForTool(tool, reason) },
                         onExecutionStarted = { admittedTool ->
-                            // A new correction can arrive while awaiting approval or resource admission.
-                            // Reject the stale call before entering its executor, with no side effect.
-                            executionOwner?.requireCurrent(sessionId)
-                            kotlinx.coroutines.currentCoroutineContext()[com.labteto.dshmobile.harness.agent.AgentBackendExecutionContext]?.requireCurrent()
-                            runOwner?.requireCurrent(sessionId)
-                            if (!beforeExecution()) throw LocalToolSampleSuperseded()
+                            // Registry.beforeExecution already checks current ownership after approval.
+                            // Repeat only AFTER acquiring the workspace lease, where state may change.
                             // The registry calls this only after schema checks and user approval.
                             // Waiting for approval must never hold a filesystem read/write lease.
                             executionLease = if (environment == null) workspaceReadWriteGate.acquire(admittedTool) else null
