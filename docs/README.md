@@ -10,6 +10,7 @@
 |---|---|
 | [架构](ARCHITECTURE.md) | Feature 所有权、Shared Capability、运行时核心与模块关系 |
 | [Android 能力与限制](ANDROID-HARNESS-STATUS.zh-CN.md) | 本机执行能力、操作系统限制及当前实现 |
+| [Agent 工具操作指南](AGENT-TOOL-USAGE.zh-CN.md) | Code Mode、安卓输入、验收结算、团队清理与系统诊断的真实调用方法 |
 | [后续架构方向](ANDROID-HARNESS-ROADMAP.zh-CN.md) | 仍待解决的系统级能力问题 |
 | [协议](PROTOCOL.md) | Session、Agent 与工具通信边界 |
 | [兼容性](COMPATIBILITY.md) | Android、ABI、运行环境 |

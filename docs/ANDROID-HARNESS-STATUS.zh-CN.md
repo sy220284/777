@@ -226,6 +226,8 @@ PluginRegistry / PluginManager 由运行时插件体系持有，产品 Feature �
 
 ## Android 设备能力
 
+工具实际使用顺序、输入结果码及无需猜测的验证方法见 [Agent 工具操作指南](AGENT-TOOL-USAGE.zh-CN.md)。Android 输入的定位失败、写入请求未确认和写入后回读未确认已经分别返回不同的工具回执；三个文字输入入口共用同一机制。
+
 当前 provider 包括：
 
 - Accessibility。

@@ -25,7 +25,17 @@ data class AccessibilityNodeSnapshot(
     val editable: Boolean,
     val bounds: String,
     val depth: Int,
+    /** Android 13+ can preserve the true node identity across Compose recompositions. */
+    val uniqueId: String? = null,
 )
+
+/** Real outcome of a single text replacement; the model sees the mapped tool receipt. */
+enum class AndroidTextInputOutcome {
+    TARGET_UNAVAILABLE,
+    ACTION_UNCONFIRMED,
+    READBACK_UNCONFIRMED,
+    VERIFIED,
+}
 
 class HarnessAccessibilityService : AccessibilityService() {
     private val nodeSelection = AccessibilityNodeSelectionLease()
@@ -80,6 +90,7 @@ class HarnessAccessibilityService : AccessibilityService() {
             editable = node.isEditable,
             bounds = bounds.toShortString(),
             depth = depth,
+            uniqueId = if (android.os.Build.VERSION.SDK_INT >= 33) node.uniqueId else null,
         )
     }
 
@@ -123,12 +134,12 @@ class HarnessAccessibilityService : AccessibilityService() {
         viewId: String?,
         searchText: String?,
         value: String,
-    ): Boolean {
+    ): AndroidTextInputOutcome {
         require(listOf(nodeIndex != null, !viewId.isNullOrBlank(), !searchText.isNullOrBlank())
             .count { it } <= 1) {
             "输入目标只能选择 node、id、text 中的一种；全部留空时使用当前已聚焦输入框"
         }
-        val root = rootInActiveWindow ?: return false
+        val root = rootInActiveWindow ?: return AndroidTextInputOutcome.TARGET_UNAVAILABLE
         val target = when {
             nodeIndex != null -> nodeAt(nodeIndex, rebindEditable = true)
             !viewId.isNullOrBlank() -> requireUniqueAccessibilityTarget(
@@ -140,21 +151,30 @@ class HarnessAccessibilityService : AccessibilityService() {
             else -> root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
                 ?.takeIf { it.isVisibleToUser && it.isEditable }
                 ?: onlyVisibleEditable(root)
-        }?.takeIf { it.isVisibleToUser && it.isEditable } ?: return false
+        }?.takeIf { it.isVisibleToUser && it.isEditable } ?: return AndroidTextInputOutcome.TARGET_UNAVAILABLE
 
         val windowId = target.windowId
         val originalBounds = android.graphics.Rect().also(target::getBoundsInScreen)
         val targetId = target.viewIdResourceName
-        if (!setEditableText(target, value)) return false
+        // If this same live field already contains the requested value, no Android
+        // mutation is necessary. This is common when clearing an empty Compose field.
+        if (target.text?.toString() == value) return AndroidTextInputOutcome.VERIFIED
+        if (!setEditableText(target, value)) {
+            // A framework can apply the edit even when ACTION_SET_TEXT returns false.
+            // Check the original field once before reporting an uncertain action.
+            return if (target.refresh() && target.isEditable &&
+                target.text?.toString().orEmpty() == value) AndroidTextInputOutcome.VERIFIED
+            else AndroidTextInputOutcome.ACTION_UNCONFIRMED
+        }
 
         // Read the same control after the framework has applied its semantics update.
         // Retry verification only, not the mutating text action.
         repeat(4) {
             kotlinx.coroutines.delay(100L)
             if (target.refresh() && target.isEditable &&
-                target.text?.toString().orEmpty() == value) return true
-            val currentRoot = rootInActiveWindow ?: return false
-            if (currentRoot.windowId != windowId) return false
+                target.text?.toString().orEmpty() == value) return AndroidTextInputOutcome.VERIFIED
+            val currentRoot = rootInActiveWindow ?: return AndroidTextInputOutcome.READBACK_UNCONFIRMED
+            if (currentRoot.windowId != windowId) return AndroidTextInputOutcome.READBACK_UNCONFIRMED
             val currentTarget = if (targetId != null) {
                 val matches = currentRoot.findAccessibilityNodeInfosByViewId(targetId)
                     .filter { it.isVisibleToUser && it.isEditable }
@@ -165,9 +185,9 @@ class HarnessAccessibilityService : AccessibilityService() {
                         android.graphics.Rect().also(focused::getBoundsInScreen) == originalBounds
                 }
             if (currentTarget?.text?.toString().orEmpty() == value && currentTarget != null)
-                return true
+                return AndroidTextInputOutcome.VERIFIED
         }
-        return false
+        return AndroidTextInputOutcome.READBACK_UNCONFIRMED
     }
 
     /** No selector is needed for a page with exactly one visible editable field. */
@@ -312,27 +332,41 @@ class HarnessAccessibilityService : AccessibilityService() {
             return null
         }
         val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
-        val nodes = mutableListOf<AccessibilityNodeInfo>()
-        val current = mutableListOf<AccessibilityNodeSnapshot>()
         queue.add(root to 0)
+        var nextIndex = 0
+        val current = if (rebindEditable) mutableListOf<AccessibilityNodeSnapshot>() else null
+        // Only editable nodes can be a text target. Do not retain every Android node
+        // merely to re-bind one input, especially on large Compose screens.
+        val editableNodes = if (rebindEditable) mutableMapOf<Int, AccessibilityNodeInfo>() else null
         while (queue.isNotEmpty()) {
             val (node, depth) = queue.removeFirst()
-            val currentIndex = nodes.size
-            nodes += node
-            current += describeNode(currentIndex, node, depth)
+            val currentIndex = nextIndex++
+            if (!rebindEditable && currentIndex == index) {
+                // Clicks only need the selected node, not a scan of the entire UI.
+                nodeSelection.requireCurrent(
+                    index, root.windowId, describeNode(currentIndex, node, depth),
+                )
+                return node
+            }
+            if (rebindEditable) {
+                val live = describeNode(currentIndex, node, depth)
+                // When the selected input still has the same observed identity,
+                // avoid traversing the remainder of a potentially huge Compose tree.
+                if (currentIndex == index &&
+                    nodeSelection.matchesCurrentEditable(index, root.windowId, live)) return node
+                current!!.add(live)
+                if (node.isEditable) editableNodes!![currentIndex] = node
+            }
             for (childIndex in 0 until node.childCount) {
                 node.getChild(childIndex)?.let { queue.add(it to depth + 1) }
             }
         }
-        val resolved = if (rebindEditable) {
-            nodeSelection.resolveEditableIndex(index, root.windowId, current)
-        } else {
-            nodeSelection.requireCurrent(
-                index, root.windowId, current.getOrNull(index) ?: return null,
-            )
-            index
+        if (!rebindEditable) {
+            nodeSelection.invalidate()
+            return null
         }
-        return nodes.getOrNull(resolved)
+        val resolved = nodeSelection.resolveEditableIndex(index, root.windowId, requireNotNull(current))
+        return editableNodes?.get(resolved)
     }
 
     private fun clickableAncestor(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {

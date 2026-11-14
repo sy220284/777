@@ -29,6 +29,16 @@ internal class AccessibilityNodeSelectionLease {
     }
 
     /**
+     * An unchanged editable field can be used directly without collecting a
+     * second full-window snapshot. Match the complete observed node identity.
+     */
+    fun matchesCurrentEditable(index: Int, windowId: Int, current: AccessibilityNodeSnapshot): Boolean {
+        val snapshot = observed ?: return false
+        return index >= 0 && snapshot.windowId == windowId && current.editable &&
+            snapshot.nodes.getOrNull(index) == current && observed === snapshot
+    }
+
+    /**
      * Editable Compose nodes commonly have no view id. Re-bind a selected input to
      * its current live identity, using a unique view id when available, otherwise
      * its unique on-screen geometry and semantics class in the same window.
@@ -43,21 +53,23 @@ internal class AccessibilityNodeSelectionLease {
         check(index >= 0 && snapshot.windowId == windowId) { EXPIRED_MESSAGE }
         val original = snapshot.nodes.getOrNull(index)
         check(original != null && original.editable) { EXPIRED_MESSAGE }
-        if (current.getOrNull(index) == original) return index
-
-        val editable = current.filter {
-            it.editable && it.className == original.className &&
-                it.viewId == original.viewId
+        if (current.getOrNull(index) == original) {
+            check(observed === snapshot) { EXPIRED_MESSAGE }
+            return index
         }
-        val candidates = if (!original.viewId.isNullOrBlank()) {
-            // The same resource id can occur in repeated form rows.
-            val matchingBounds = editable.filter { it.bounds == original.bounds }
-            if (matchingBounds.size == 1) matchingBounds
-            else if (editable.size == 1) editable else emptyList()
+
+        val candidates = if (!original.uniqueId.isNullOrBlank()) {
+            // On Android 13+ a stable source-node identity survives layout moves.
+            // A new page can reuse the same view id, class and coordinates.
+            current.filter { it.editable && it.uniqueId == original.uniqueId }
         } else {
-            // Compose fields typically omit view ids. Never guess among siblings.
-            editable.filter {
-                it.bounds == original.bounds &&
+            // Without a source identity, use the complete visible selector.
+            // A matching view id alone is insufficient after navigation because
+            // Compose and repeated forms reuse it on unrelated controls.
+            current.filter {
+                it.editable && it.className == original.className &&
+                    it.viewId == original.viewId &&
+                    it.bounds == original.bounds &&
                     it.contentDescription == original.contentDescription
             }
         }

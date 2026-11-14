@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.MAX_ERROR_CHARS
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_TASK_EVENT
+import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_MESSAGE_QUEUED
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_TASK_REVIEW_EVENT
 import com.labteto.dshmobile.local.work.LocalAgentTeamContract.TEAM_EVENT_VERSION
 import kotlinx.serialization.json.Json
@@ -151,11 +152,9 @@ internal class LocalTeamVerificationController(
             sequenceExclusive = if (seq == Long.MAX_VALUE) Long.MAX_VALUE else seq + 1L,
             limit = 1,
         ).singleOrNull() ?: return "evidence_invalid"
-        if (event.sequence != seq || event.type != LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT ||
-            event.data["background_job_id"]?.jsonPrimitive?.contentOrNull != owner.jobId ||
-            resultIdentity(event.data) != resultId || !isFirstResultCheckpoint(log, event)) {
-            return "evidence_invalid"
-        }
+        if (event.sequence != seq || !isValidTaskResultEvidence(
+                log, sessionId, task, owner.jobId, event, resultId,
+            )) return "evidence_invalid"
         val prior = log.latestMatching(setOf(TEAM_TASK_EVENT), seq) { data ->
             val raw = data["task"] as? JsonObject ?: return@latestMatching false
             raw["id"]?.jsonPrimitive?.contentOrNull == task.id &&
@@ -194,15 +193,13 @@ internal class LocalTeamVerificationController(
             sequenceExclusive = if (seq == Long.MAX_VALUE) Long.MAX_VALUE else seq + 1L,
             limit = 1,
         ).singleOrNull()
-        val checkpointValid = candidate?.let { event ->
-            event.sequence == seq &&
-                event.type == LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT &&
-                event.data["background_job_id"]?.jsonPrimitive?.contentOrNull == member?.jobId &&
-                resultIdentity(event.data) == resultId &&
-                !event.data["terminal_output"]?.jsonPrimitive?.contentOrNull.isNullOrBlank() &&
-                isFirstResultCheckpoint(log, event)
+        val resultValid = candidate?.let { event ->
+            member != null && event.sequence == seq &&
+                isValidTaskResultEvidence(log, sessionId, task, member.jobId, event, resultId)
         } == true
-        val priorOwnedTask = if (checkpointValid) log.latestMatching(
+        val checkpointValid = resultValid && candidate?.type == LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT
+        val memberMessageValid = resultValid && candidate?.type == TEAM_MESSAGE_QUEUED
+        val priorOwnedTask = if (resultValid) log.latestMatching(
             setOf(TEAM_TASK_EVENT), seq,
         ) { data ->
             (data["task"] as? JsonObject)?.let { raw ->
@@ -211,7 +208,7 @@ internal class LocalTeamVerificationController(
                     raw["ownerId"]?.jsonPrimitive?.contentOrNull == task.ownerId
             } == true
         } else null
-        val bindingValid = checkpointValid && priorOwnedTask != null &&
+        val bindingValid = resultValid && priorOwnedTask != null &&
             priorOwnedTask.sequence < seq
         val rootCurrent = task.rootUserRevision?.let {
             it == workflowUserRevision(log)
@@ -225,7 +222,14 @@ internal class LocalTeamVerificationController(
             append("task_id=").append(taskId)
             append("\nresult_id=").append(resultId)
             append("\nevidence_sequence=").append(seq)
-            append("\ncheckpoint_binding_valid=").append(bindingValid)
+            append("\ncheckpoint_binding_valid=").append(checkpointValid && bindingValid)
+            append("\nmember_message_binding_valid=").append(memberMessageValid && bindingValid)
+            append("\nresult_binding_valid=").append(bindingValid)
+            append("\nresult_source=").append(when {
+                checkpointValid -> "model_checkpoint"
+                memberMessageValid -> "member_message"
+                else -> "invalid"
+            })
             append("\nowner_job=").append(member?.jobId ?: "missing")
             append("\nroot_instruction_current=").append(rootCurrent ?: "legacy_unknown")
             append("\nindependent_reviewer_reported=").append(review != null)
@@ -245,7 +249,7 @@ internal class LocalTeamVerificationController(
         task: LocalTeamTaskSnapshot,
         jobId: String,
         resultId: String? = null,
-    ): Boolean = findFreshTaskResult(sessionId, task, jobId, resultId) != null
+    ): Boolean = findFreshTaskResult(sessionId, task, jobId, resultId, allowMemberMessages = true) != null
 
     /** Return the exact existing durable evidence, not just a Boolean success claim. */
     fun findFreshTaskResult(
@@ -253,6 +257,7 @@ internal class LocalTeamVerificationController(
         task: LocalTeamTaskSnapshot,
         jobId: String,
         resultId: String? = null,
+        allowMemberMessages: Boolean = false,
     ): LocalSessionEventLog.Event? {
         val log = eventLogFor(sessionId)
         val taskSequence = log.latestMatching(setOf(TEAM_TASK_EVENT)) { data ->
@@ -260,17 +265,60 @@ internal class LocalTeamVerificationController(
             raw["id"]?.jsonPrimitive?.contentOrNull == task.id &&
                 raw["revision"]?.jsonPrimitive?.intOrNull == task.revision
         }?.sequence ?: return null
+        val types = if (allowMemberMessages) {
+            setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT, TEAM_MESSAGE_QUEUED)
+        } else setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)
         var before = Long.MAX_VALUE
         while (true) {
-            val event = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT), before) { data ->
-                data["background_job_id"]?.jsonPrimitive?.contentOrNull == jobId &&
+            val event = log.latestMatching(types, before) { data ->
+                val checkpoint = data["background_job_id"]?.jsonPrimitive?.contentOrNull == jobId &&
                     (resultId == null || resultIdentity(data) == resultId) &&
                     !data["terminal_output"]?.jsonPrimitive?.contentOrNull.isNullOrBlank()
+                val message = data["message"] as? JsonObject
+                val memberReport = allowMemberMessages && message != null &&
+                    data["teamId"]?.jsonPrimitive?.contentOrNull == sessionId &&
+                    message["senderId"]?.jsonPrimitive?.contentOrNull == task.ownerId &&
+                    message["targetId"]?.jsonPrimitive?.contentOrNull == sessionId &&
+                    (resultId == null || message["id"]?.jsonPrimitive?.contentOrNull == resultId)
+                checkpoint || memberReport
             } ?: return null
             if (event.sequence <= taskSequence) return null
-            if (isFirstResultCheckpoint(log, event)) return event
+            val id = resultId ?: if (event.type == TEAM_MESSAGE_QUEUED) {
+                (event.data["message"] as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull
+            } else resultIdentity(event)
+            if (id != null && isValidTaskResultEvidence(log, sessionId, task, jobId, event, id)) {
+                return event
+            }
             before = event.sequence
         }
+    }
+
+    /**
+     * Both model checkpoints and authenticated member-to-Lead messages are durable task
+     * result sources. Their owner and event ordering are checked against the task revision.
+     */
+    private fun isValidTaskResultEvidence(
+        log: LocalSessionEventLog,
+        sessionId: String,
+        task: LocalTeamTaskSnapshot,
+        jobId: String,
+        event: LocalSessionEventLog.Event,
+        resultId: String,
+    ): Boolean = when (event.type) {
+        LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT ->
+            event.data["background_job_id"]?.jsonPrimitive?.contentOrNull == jobId &&
+                resultIdentity(event) == resultId && isFirstResultCheckpoint(log, event)
+        TEAM_MESSAGE_QUEUED -> {
+            if (event.data["teamId"]?.jsonPrimitive?.contentOrNull != sessionId) false
+            else {
+                val message = runCatching { LocalAgentTeamEventCodec.decodeMessage(event.data) }.getOrNull()
+                message != null && message.kind == LocalTeamMessageKind.MESSAGE &&
+                    message.id == resultId && message.senderId == task.ownerId &&
+                    message.targetId == sessionId && message.content.isNotBlank() &&
+                    project(sessionId).members.any { it.id == task.ownerId && it.jobId == jobId }
+            }
+        }
+        else -> false
     }
 
     fun resultIdentity(event: LocalSessionEventLog.Event): String =
