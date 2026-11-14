@@ -738,6 +738,7 @@ class OpenAiResponsesClientTest {
         )
 
         assertEquals("CHATGPT_PLAN_ADMISSION_403", error.code)
+        assertEquals(com.labteto.dshmobile.local.LocalModelFailureOrigin.PROVIDER_REJECTED, error.origin)
         assertFalse(error.retryable)
         assertEquals("serving region is not permitted", error.message)
         assertEquals("req-admission", error.requestId)
