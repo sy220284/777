@@ -10,6 +10,9 @@ internal data class CodexSkillDependency(
     val type: String,
     val value: String,
     val description: String = "",
+    val transport: String? = null,
+    val url: String? = null,
+    val command: String? = null,
 )
 
 /**
@@ -32,8 +35,13 @@ internal fun parseCodexSkillDependencies(source: String): List<CodexSkillDepende
         val type = record["type"].orEmpty().trim()
         val value = record["value"].orEmpty().trim()
         if (type.isNotBlank() && value.isNotBlank()) {
-            result += CodexSkillDependency(type.take(64), value.take(1024),
-                record["description"].orEmpty().take(1024))
+            result += CodexSkillDependency(
+                type.take(64), value.take(1024),
+                record["description"].orEmpty().take(1024),
+                transport = record["transport"]?.take(64),
+                url = record["url"]?.take(1024),
+                command = record["command"]?.take(1024),
+            )
         } else {
             unrecognized = true
         }
