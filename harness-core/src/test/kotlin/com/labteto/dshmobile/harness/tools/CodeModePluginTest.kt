@@ -60,6 +60,34 @@ class CodeModePluginTest {
     }
 
 
+    @Test fun childStepsMustNotReenterParentExecutionLifecycle() = runTest {
+        val registry = ToolRegistry()
+        var parentStarted = 0
+        var parentFinished = 0
+        val calls = mutableListOf<String>()
+        register(registry, "read") { calls += "read"; ToolResult("ok") }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val orchestrator = requireNotNull(registry.get("code_mode_run"))
+        assertEquals(ToolWorkspaceAccess.WRITE, orchestrator.metadata.workspaceAccess)
+        val outcome = registry.execute("code_mode_run", plan("read", "read"),
+            context = ToolContext(
+                approval = { true },
+                onExecutionStarted = {
+                    parentStarted++
+                    check(parentStarted == 1) { "父调用生命周期被子步骤重复执行" }
+                },
+                onExecutionFinished = { _, _ ->
+                    parentFinished++
+                    check(parentFinished == 1) { "父调用完成回执被子步骤重复执行" }
+                },
+            ))
+        assertFalse(outcome.isError)
+        assertEquals(listOf("read", "read"), calls)
+        assertEquals(1, parentStarted)
+        assertEquals(1, parentFinished)
+        assertTrue(outcome.content.contains("\\"completed_steps\\":2"))
+    }
+
     @Test fun scriptsWithMoreThanEightStepsCompleteUsingOriginalToolRules() = runTest {
         val registry = ToolRegistry()
         var completed = 0
