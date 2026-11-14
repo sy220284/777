@@ -556,4 +556,38 @@ class PluginInventoryBrowserRegressionTest {
         compose.runOnIdle { assertEquals(0, installRequests) }
     }
 
+    @Test
+    fun skillDependenciesStayCollapsedUntilDetailAndOAuthUsesPredefinedEndpoint() {
+        var authorized: Pair<String, String>? = null
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    skills = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+                        name = "figma-use", description = "编辑 Figma 设计", modelInvocable = true,
+                        requirements = listOf(com.labteto.dshmobile.uicontract.UiSkillRequirement(
+                            type = "mcp", value = "figma", description = "Figma 设计服务",
+                            registered = false, transport = "http",
+                            url = "https://mcp.figma.com/mcp",
+                        )),
+                    )),
+                    skillsOnly = true,
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onConnectSkillMcp = { name, url -> authorized = name to url },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-skill:figma-use").assertIsDisplayed()
+        compose.onNodeWithText("需要授权 · Figma 设计服务").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-card-skill:figma-use").performClick()
+        compose.onNodeWithTag("skill-dependency-summary").assertIsDisplayed()
+        compose.onNodeWithText("需要授权 · Figma 设计服务").assertDoesNotExist()
+        compose.onNodeWithTag("skill-dependency-summary").performClick()
+        compose.onNodeWithText("需要授权 · Figma 设计服务").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
+        compose.runOnIdle {
+            assertEquals("figma" to "https://mcp.figma.com/mcp", authorized)
+        }
+    }
+
 }
