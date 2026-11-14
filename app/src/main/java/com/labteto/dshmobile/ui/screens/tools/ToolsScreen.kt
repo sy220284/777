@@ -397,7 +397,9 @@ class ToolsViewModel @Inject constructor(
     private suspend fun finishSkillInstallation(
         installedId: String,
         officialPluginId: String? = null,
+        bundledSkillIds: List<String> = listOf(installedId),
     ) {
+        require(bundledSkillIds.isNotEmpty()) { "安装结果没有技能" }
         _state.value = _state.value.copy(
             skills = localTools.installedSkills(),
             presets = localTools.presetSkills(),
@@ -434,8 +436,10 @@ class ToolsViewModel @Inject constructor(
         }
         // Re-read after OAuth so a newly connected official server is never
         // requested a second time through the skill's dependency metadata.
-        val skill = localTools.installedSkills().firstOrNull { it.name == installedId }
-        val pending = skill?.requirements.orEmpty().filterNot { it.registered }
+        val pending = localTools.installedSkills()
+            .filter { it.name in bundledSkillIds }
+            .flatMap { it.requirements }
+            .filterNot { it.registered }
         val connections = pending.mapNotNull { requirement ->
             skillMcpHttpsEndpoint(requirement)?.let { endpoint ->
                 requirement.value to endpoint
@@ -462,12 +466,15 @@ class ToolsViewModel @Inject constructor(
             }
         }
         synchronizeExtensionInventory()
-        val unresolved = _state.value.skills.firstOrNull { it.name == installedId }
-            ?.requirements.orEmpty().count { !it.registered }
+        val unresolved = _state.value.skills.filter { it.name in bundledSkillIds }
+            .flatMap { it.requirements }
+            .count { !it.registered }
+        val scope = if (bundledSkillIds.size > 1) "插件 ${officialPluginId ?: installedId} 的 ${bundledSkillIds.size} 项技能"
+            else "技能 ${installedId}"
         _state.value = _state.value.copy(
             feedback = if (unresolved == 0)
-                "技能 ${installedId} 已安装，可直接使用"
-            else "技能 ${installedId} 已安装，还有 ${unresolved} 项本地运行依赖可在详情中查看",
+                "${scope}已安装，可直接使用"
+            else "${scope}已安装，还有 ${unresolved} 项运行依赖可在详情中查看",
         )
     }
 
@@ -583,6 +590,65 @@ class ToolsViewModel @Inject constructor(
                 _state.value = _state.value.copy(
                     loading = false, feedback = failure.message ?: "插件技能安装失败",
                 )
+            }
+        }
+    }
+
+    /** Codex uses the plugin bundle as the catalogue unit. Install all declared
+     * Android-compatible skills from their verified folders before OAuth setup.
+     * Repeated taps resume only missing skills; existing installations stay intact.
+     */
+    fun installCodexPlugin(pluginId: String) {
+        val plugin = _state.value.codexPlugins.firstOrNull { it.id == pluginId } ?: return
+        if (plugin.codexOnly || plugin.installPolicy == "NOT_AVAILABLE" ||
+            plugin.sourceKind != "local") return
+        val detail = _state.value.codexDetails[pluginId] ?: return
+        if (detail.skills.isEmpty()) {
+            if (detail.mcpUrl != null) connectCodexPlugin(pluginId)
+            return
+        }
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            val installedThisTime = mutableListOf<String>()
+            try {
+                val installedBefore = localTools.installedSkills()
+                val missing = detail.skills.filterNot { id ->
+                    val folder = detail.skillDirectories[id]
+                    installedBefore.any { skill ->
+                        skill.name == id || (folder != null && skill.sourceUrl?.endsWith(
+                            "/${plugin.sourcePath}/$folder") == true)
+                    }
+                }
+                for (skillId in missing) {
+                    val installedId = localTools.installCodexPluginSkill(pluginId, skillId)
+                    installedThisTime += installedId
+                    _state.value = _state.value.copy(
+                        skills = localTools.installedSkills(),
+                        feedback = "正在安装 ${plugin.name}（${installedThisTime.size}/${missing.size}）",
+                    )
+                }
+                val allIds = localTools.installedSkills().filter { skill ->
+                    skill.name in detail.skills || detail.skillDirectories.values.any { folder ->
+                        skill.sourceUrl?.endsWith("/${plugin.sourcePath}/$folder") == true
+                    }
+                }.map { it.name }.distinct()
+                if (allIds.isEmpty()) error("插件没有可安装的 Android 技能")
+                finishSkillInstallation(
+                    installedId = allIds.last(), officialPluginId = pluginId,
+                    bundledSkillIds = allIds,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                synchronizeExtensionInventory()
+                _state.value = _state.value.copy(
+                    feedback = "插件 ${plugin.name} 安装中断："
+                        + (failure.message ?: "请重新安装")
+                        + if (installedThisTime.isNotEmpty())
+                            "；已安装 ${installedThisTime.size} 项，可再次点击继续" else "",
+                )
+            } finally {
+                _state.value = _state.value.copy(loading = false)
             }
         }
     }
@@ -1240,6 +1306,7 @@ fun ToolsScreen(
                                     codexDetailError = state.codexDetailError,
                                     onReadCodexPluginDetail = viewModel::loadCodexPluginDetail,
                                     onInstallCodexPluginSkill = viewModel::installCodexPluginSkill,
+                                    onInstallCodexPlugin = viewModel::installCodexPlugin,
                                     onConnectCodexPlugin = viewModel::connectCodexPlugin,
                                     onRefreshCodex = { viewModel.refreshCodexPlugins(true) },
                                     curatedLoading = state.curatedLoading,
