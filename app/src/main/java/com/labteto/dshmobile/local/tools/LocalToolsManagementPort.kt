@@ -23,6 +23,7 @@ internal interface LocalToolsManagementPort {
     suspend fun compareRemoteGit(repository: String, remote: String, branch: String): kotlinx.serialization.json.JsonObject
     suspend fun compareCommitGit(repository: String, commit: String): kotlinx.serialization.json.JsonObject
 
+    fun activeToolHookIds(): List<String> = emptyList()
     fun installedPluginIds(): List<String>
     fun capabilityCatalogue(): List<LocalToolCatalogueEntry>
     fun validateCapabilityDraft(
