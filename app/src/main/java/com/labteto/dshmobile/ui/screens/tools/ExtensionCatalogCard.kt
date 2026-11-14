@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.foundation.LocalSyColors
@@ -52,8 +53,67 @@ internal fun ExtensionCatalogCard(
     attentionNeeded: Boolean = false,
     onOpen: () -> Unit,
     onAction: () -> Unit,
+    catalogStyle: Boolean = false,
 ) {
     val colors = LocalSyColors.current
+    if (catalogStyle) {
+        // The marketplace is a list of abilities. Install, authorization and
+        // dependencies live in its detail page instead of crowding every row.
+        Surface(
+            modifier = Modifier.fillMaxWidth().testTag(tagPrefix + "-card-" + id),
+            onClick = onOpen,
+            color = colors.materialL4,
+            shape = RoundedCornerShape(24.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 84.dp)
+                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(13.dp),
+            ) {
+                Surface(
+                    modifier = Modifier.size(54.dp).testTag(tagPrefix + "-icon-" + id),
+                    color = if (documentIcon == null) accent.copy(alpha = 0.09f)
+                        else colors.materialL4,
+                    shape = RoundedCornerShape(17.dp),
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        if (documentIcon != null) {
+                            Image(painterResource(documentIcon), contentDescription = null,
+                                modifier = Modifier.size(42.dp))
+                        } else {
+                            Icon(icon, contentDescription = null, tint = accent,
+                                modifier = Modifier.size(27.dp))
+                        }
+                    }
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        title,
+                        modifier = Modifier.testTag(tagPrefix + "-title-" + id),
+                        style = DsType.std14Strong.withReadingWeight(),
+                        color = colors.text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        description,
+                        modifier = Modifier.testTag(tagPrefix + "-detail-" + id),
+                        style = DsType.small13.withReadingWeight(),
+                        color = colors.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Icon(FeatherIcons.ChevronRight, contentDescription = "查看详情",
+                    tint = colors.textTertiary, modifier = Modifier.size(20.dp))
+            }
+        }
+        return
+    }
     Surface(
         modifier = Modifier.fillMaxWidth().testTag(tagPrefix + "-card-" + id),
         onClick = onOpen,
