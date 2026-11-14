@@ -12,6 +12,7 @@ import android.os.Build
 import android.provider.Settings
 import android.util.Base64
 import com.labteto.dshmobile.device.accessibility.AccessibilityNodeSnapshot
+import com.labteto.dshmobile.device.accessibility.AndroidTextInputOutcome
 import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
 import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerService
 import com.labteto.dshmobile.device.vscreen.VirtualDisplayController
@@ -113,12 +114,17 @@ class AndroidDeviceProvider(
                 accessibility().clickText(arguments.required("text")).toString()
             "accessibility_set_text_node", "accessibility_set_text", "accessibility_input_text" -> {
                 val input = androidTextInputRequest(capability, arguments)
-                accessibility().inputText(
+                when (accessibility().inputText(
                     nodeIndex = input.nodeIndex,
                     viewId = input.viewId,
                     searchText = input.searchText,
                     value = input.value,
-                ).toString()
+                )) {
+                    AndroidTextInputOutcome.VERIFIED -> "true"
+                    AndroidTextInputOutcome.TARGET_UNAVAILABLE -> "input_target_unavailable"
+                    AndroidTextInputOutcome.ACTION_UNCONFIRMED -> "input_action_unconfirmed"
+                    AndroidTextInputOutcome.READBACK_UNCONFIRMED -> "input_readback_unconfirmed"
+                }
             }
             "accessibility_tap" ->
                 accessibility().tap(

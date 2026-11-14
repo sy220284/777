@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.device.accessibility
 
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -65,53 +64,30 @@ class AccessibilityNodeSelectionLeaseTest {
             listOf(node(0), node(1, "新增"), reindexed)))
     }
 
-    @Test fun currentEditableFastPathRequiresSameControlAndObservedScreen() {
+    @Test fun currentEditableFastPathRequiresSameObservedIdentity() {
         val selection = AccessibilityNodeSelectionLease()
-        val input = AccessibilityNodeSnapshot(1, "", null, null, "EditText",
-            true, true, "[10,100][500,150]", 3)
+        val input = AccessibilityNodeSnapshot(1, "", "搜索", null, "EditText",
+            true, true, "[10,100][500,150]", 3, uniqueId = "input-42")
         selection.replace(4, listOf(node(0), input))
         org.junit.Assert.assertTrue(selection.matchesCurrentEditable(1, 4, input))
         org.junit.Assert.assertFalse(selection.matchesCurrentEditable(1, 5, input))
         org.junit.Assert.assertFalse(selection.matchesCurrentEditable(1, 4,
-            input.copy(text = "changed")))
+            input.copy(uniqueId = "other-input")))
+        org.junit.Assert.assertFalse(selection.matchesCurrentEditable(1, 4,
+            input.copy(bounds = "[10,80][500,130]")))
         selection.invalidate()
         org.junit.Assert.assertFalse(selection.matchesCurrentEditable(1, 4, input))
     }
 
-    @Test fun composeFieldCanMoveAfterImeLayoutWithoutLosingItsIdentity() {
+    @Test fun movedInputWithoutStableIdentityMustNotSelectAnotherPage() {
         val selection = AccessibilityNodeSelectionLease()
-        val input = AccessibilityNodeSnapshot(1, "", "搜索", null, "EditText",
+        val original = AccessibilityNodeSnapshot(1, "", "搜索", null, "EditText",
             true, true, "[10,100][500,150]", 3)
-        selection.replace(4, listOf(node(0), input))
-        val moved = input.copy(index = 2, bounds = "[10,60][500,110]")
-        assertEquals(2, selection.resolveEditableIndex(1, 4,
-            listOf(node(0), node(1, "其他"), moved)))
-    }
-
-    @Test fun composeRebindingNeverPicksAnotherSingleEditableFieldWithChangedSemantics() {
-        val selection = AccessibilityNodeSelectionLease()
-        val input = AccessibilityNodeSnapshot(1, "", "手机号", null, "EditText",
-            true, true, "[10,100][500,150]", 3)
-        selection.replace(4, listOf(node(0), input))
-        val changedScreen = input.copy(index = 2, bounds = "[10,80][500,130]",
-            contentDescription = "验证码")
+        selection.replace(4, listOf(node(0), original))
+        val replacement = original.copy(index = 2, bounds = "[10,60][500,110]")
         assertThrows(IllegalStateException::class.java) {
             selection.resolveEditableIndex(1, 4,
-                listOf(node(0), node(1, "其他"), changedScreen))
-        }
-    }
-
-    @Test fun composeFieldMoveRemainsAmbiguousWhenTwoFieldsHaveSameSemantics() {
-        val selection = AccessibilityNodeSelectionLease()
-        val input = AccessibilityNodeSnapshot(1, "", "搜索", null, "EditText",
-            true, true, "[10,100][500,150]", 3)
-        selection.replace(4, listOf(node(0), input))
-        assertThrows(IllegalStateException::class.java) {
-            selection.resolveEditableIndex(1, 4, listOf(
-                node(0),
-                input.copy(index = 1, bounds = "[10,60][500,110]"),
-                input.copy(index = 2, bounds = "[10,170][500,220]"),
-            ))
+                listOf(node(0), node(1, "其他"), replacement))
         }
     }
 
@@ -127,6 +103,41 @@ class AccessibilityNodeSelectionLeaseTest {
         assertThrows(IllegalStateException::class.java) {
             selection.resolveEditableIndex(1, 4, live)
         }
+    }
+
+    @Test fun androidUniqueNodeIdentitySurvivesComposeLayoutMovement() {
+        val selection = AccessibilityNodeSelectionLease()
+        val original = AccessibilityNodeSnapshot(1, "", "内容", "app:id/content",
+            "EditText", false, true, "[0,100][400,150]", 3, uniqueId = "node-123")
+        selection.replace(10, listOf(node(0), original))
+        val moved = original.copy(index = 3, bounds = "[0,300][400,350]", text = "已变化")
+        org.junit.Assert.assertEquals(3, selection.resolveEditableIndex(
+            1, 10, listOf(node(0), node(1), node(2), moved)))
+    }
+
+    @Test fun reusingViewIdOnDifferentPageCannotChangeSelectedInput() {
+        val selection = AccessibilityNodeSelectionLease()
+        val original = AccessibilityNodeSnapshot(1, "", "内容", "app:id/content",
+            "EditText", false, true, "[0,100][400,150]", 3, uniqueId = "original-node")
+        selection.replace(10, listOf(node(0), original))
+        val replacement = original.copy(index = 3, uniqueId = "replacement-node")
+        assertThrows(IllegalStateException::class.java) {
+            selection.resolveEditableIndex(1, 10, listOf(node(0), node(1), node(2), replacement))
+        }
+    }
+
+    @Test fun withoutUniqueIdMovedViewIdMustNotGuessAnotherField() {
+        val selection = AccessibilityNodeSelectionLease()
+        val original = AccessibilityNodeSnapshot(1, "", "输入", "app:id/input",
+            "EditText", false, true, "[0,100][400,150]", 3)
+        selection.replace(10, listOf(node(0), original))
+        val differentPlace = original.copy(index = 2, bounds = "[0,400][400,450]")
+        assertThrows(IllegalStateException::class.java) {
+            selection.resolveEditableIndex(1, 10, listOf(node(0), node(1), differentPlace))
+        }
+        val reindexedAtSamePlace = original.copy(index = 2)
+        org.junit.Assert.assertEquals(2, selection.resolveEditableIndex(
+            1, 10, listOf(node(0), node(1), reindexedAtSamePlace)))
     }
 
     @Test fun textActionsNeverGuessAmongDuplicateControls() {

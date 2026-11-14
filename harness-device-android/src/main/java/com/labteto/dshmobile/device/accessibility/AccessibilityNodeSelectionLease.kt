@@ -28,7 +28,10 @@ internal class AccessibilityNodeSelectionLease {
         ) { EXPIRED_MESSAGE }
     }
 
-    /** Fast path for a stable selected input: same window, node and generation. */
+    /**
+     * An unchanged editable field can be used directly without collecting a
+     * second full-window snapshot. Match the complete observed node identity.
+     */
     fun matchesCurrentEditable(index: Int, windowId: Int, current: AccessibilityNodeSnapshot): Boolean {
         val snapshot = observed ?: return false
         return index >= 0 && snapshot.windowId == windowId && current.editable &&
@@ -55,33 +58,19 @@ internal class AccessibilityNodeSelectionLease {
             return index
         }
 
-        val editable = current.filter {
-            it.editable && it.className == original.className &&
-                it.viewId == original.viewId
-        }
-        val candidates = if (!original.viewId.isNullOrBlank()) {
-            // The same resource id can occur in repeated form rows.
-            val matchingBounds = editable.filter { it.bounds == original.bounds }
-            if (matchingBounds.size == 1) matchingBounds
-            else if (editable.size == 1) editable else emptyList()
+        val candidates = if (!original.uniqueId.isNullOrBlank()) {
+            // On Android 13+ a stable source-node identity survives layout moves.
+            // A new page can reuse the same view id, class and coordinates.
+            current.filter { it.editable && it.uniqueId == original.uniqueId }
         } else {
-            // Compose often reflows the same input when an IME or overlay opens.
-            // Geometry is the strongest match, but a single uniquely described
-            // editable field can also be rebound after it moves.
-            val sameGeometry = editable.filter {
-                it.bounds == original.bounds &&
+            // Without a source identity, use the complete visible selector.
+            // A matching view id alone is insufficient after navigation because
+            // Compose and repeated forms reuse it on unrelated controls.
+            current.filter {
+                it.editable && it.className == original.className &&
+                    it.viewId == original.viewId &&
+                    it.bounds == original.bounds &&
                     it.contentDescription == original.contentDescription
-            }
-            if (sameGeometry.size == 1) sameGeometry else {
-                val sameSemantics = editable.filter {
-                    it.contentDescription == original.contentDescription &&
-                        it.text == original.text
-                }
-                when {
-                    sameGeometry.size > 1 -> emptyList()
-                    sameSemantics.size == 1 -> sameSemantics
-                    else -> emptyList()
-                }
             }
         }
         check(observed === snapshot) { EXPIRED_MESSAGE }
