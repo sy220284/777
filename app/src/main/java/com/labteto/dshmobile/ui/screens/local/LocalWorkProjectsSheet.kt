@@ -244,7 +244,7 @@ internal fun LocalWorkProjectsSheet(
         ConfirmDialog(
             title = "移动实际项目文件夹",
             body = "将“" + editing.root + "”的全部文件移动到“" + destination +
-                "”。项目关联会同步更新，原路径将不再存在。",
+                "”。项目关联会同步更新，原路径将不再存在；历史消息里保存的旧文件路径需要重新选择。",
             confirmLabel = "确认移动",
             onDismiss = { confirmingMove = false },
             onConfirm = {
