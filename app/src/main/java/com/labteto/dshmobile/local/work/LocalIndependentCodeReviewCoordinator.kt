@@ -31,17 +31,24 @@ internal fun codeReviewDigest(repository: String, ref: String, stat: String, pat
 }
 
 internal class LocalCodeReviewLedger(private val log: LocalSessionEventLog) {
-    fun request(id: String, ref: String, digest: String) {
+    fun request(id: String, ref: String, digest: String,
+        goal: LocalReviewGoalBinding? = null) {
         log.append("work/code-review-start", buildJsonObject {
             put("id", id); put("ref", ref); put("digest", digest)
+            goal?.let { put("goal_id", it.goalId); put("goal_revision", it.revision) }
         })
     }
 
     fun complete(id: String, ref: String, digest: String, report: String, profileId: String): LocalIndependentCodeReview {
         require(report.isNotBlank() && report.length <= 16_384)
+        val request = log.latestMatching(setOf("work/code-review-start")) {
+            it["id"]?.jsonPrimitive?.contentOrNull == id && it["digest"]?.jsonPrimitive?.contentOrNull == digest
+        }
         val event = log.append("work/code-review-result", buildJsonObject {
             put("id", id); put("ref", ref); put("digest", digest)
             put("report", report); put("reviewer_profile_id", profileId)
+            request?.data?.get("goal_id")?.let { put("goal_id", it) }
+            request?.data?.get("goal_revision")?.let { put("goal_revision", it) }
         })
         return LocalIndependentCodeReview(id, ref, digest, report, event.sequence)
     }
@@ -77,9 +84,15 @@ internal class LocalCodeReviewLedger(private val log: LocalSessionEventLog) {
         val review = read(id) ?: return@withWriterLease false
         if (review.humanAccepted || review.evidenceSequence != expectedSequence || review.digest != freshDigest)
             return@withWriterLease false
+        val request = log.latestMatching(setOf("work/code-review-start")) {
+            it["id"]?.jsonPrimitive?.contentOrNull == id &&
+                it["digest"]?.jsonPrimitive?.contentOrNull == freshDigest
+        }
         log.append("work/code-review-accepted", buildJsonObject {
             put("id", id); put("digest", freshDigest); put("sequence", expectedSequence)
             put("decision", "user_acknowledged_review")
+            request?.data?.get("goal_id")?.let { put("goal_id", it) }
+            request?.data?.get("goal_revision")?.let { put("goal_revision", it) }
         })
         true
     }
@@ -101,9 +114,10 @@ internal class LocalIndependentCodeReviewCoordinator @Inject constructor(
         val outboundPatch = prepareOutboundReviewPatch(patch)
         val id = UUID.randomUUID().toString()
         val digest = codeReviewDigest(repository, ref, statistics, patch, evidenceRevision)
-        val ledger = LocalCodeReviewLedger(events.get(sessionId))
+        val log = events.get(sessionId)
+        val ledger = LocalCodeReviewLedger(log)
         val profile = model.profileForRun()
-        ledger.request(id, ref, digest)
+        ledger.request(id, ref, digest, currentReviewGoalBinding(log, "code"))
         val reply = model.complete(
             model = profile.model, baseUrl = profile.baseUrl, profile = profile,
             tools = JsonArray(emptyList()),
