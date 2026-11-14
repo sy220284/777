@@ -420,24 +420,27 @@ class LocalWorkspaceTest {
     }
 
     @Test
-    fun editErrorExplainsThatWriteDoesNotCountAsRead() {
+    fun exactEditWithoutPriorReadChecksUniqueAnchorAndPublishesAtomically() {
         workspace.write("fresh.txt", "before")
+        assertEquals("已编辑 fresh.txt", workspace.edit("fresh.txt", "before", "after"))
+        assertEquals("after", root.resolve("fresh.txt").readText())
 
-        val error = assertThrows(IllegalStateException::class.java) {
-            workspace.edit("fresh.txt", "before", "after")
+        workspace.write("duplicates.txt", "same\nsame\n")
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.edit("duplicates.txt", "same", "changed")
         }
+        assertEquals("same\nsame\n", root.resolve("duplicates.txt").readText())
 
-        assertTrue(error.message.orEmpty().contains("write 创建或覆盖文件不算读取"))
-        assertTrue(error.message.orEmpty().contains("包含待替换内容"))
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.edit("duplicates.txt", "missing", "changed")
+        }
+        assertEquals("same\nsame\n", root.resolve("duplicates.txt").readText())
     }
 
     @Test
-    fun editRequiresFreshObservationAndRejectsStaleReads() {
+    fun editUsesExactAnchorAndRejectsPreviouslyObservedStaleRevision() {
         workspace.write("src/fresh.txt", "before")
-
-        assertThrows(IllegalStateException::class.java) {
-            workspace.edit("src/fresh.txt", "before", "after")
-        }
+        assertEquals("已编辑 src/fresh.txt", workspace.edit("src/fresh.txt", "before", "initial"))
 
         workspace.read("src/fresh.txt")
         workspace.writeToolArtifact("src/fresh.txt", "changed elsewhere")
