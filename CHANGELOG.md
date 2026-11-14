@@ -19,6 +19,9 @@ All notable changes to DSH Mobile are documented here. Format based on
 
 ### Changed
 
+- Agent 工具调用说明直接进入模型可见 schema；Code Mode 明确前序 JSON 字段路径与普通文本比较规则，Android 输入优先稳定控件定位，使用方法同步至 `docs/AGENT-TOOL-USAGE.zh-CN.md`。
+- Work 验收按真实执行记录区分未执行、失败、缺少退出码、成果缺失与版本变化；Android 文字输入按目标定位、系统接受和回读确认分别反馈。
+
 - 移除 V6 会话顶部独立“交互文档”快捷行并把文档列表入口收进现有会话更多菜单；思考级别与计划图标使用强调色底纹；输入框固定为单一发送／停止操作，运行中的工作指令通过草稿操作区追加到队列或提交立即调整。
 
 - 记忆管理在完整可见记录中先检索和筛选再分页，可定位与纠正旧记忆；自动化暂停、恢复、取消和立即运行提供异步受理与异常回执。
