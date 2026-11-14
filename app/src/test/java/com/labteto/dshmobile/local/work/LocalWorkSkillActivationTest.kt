@@ -58,7 +58,8 @@ class LocalWorkSkillActivationTest {
             val workspace = LocalWorkspace(root)
             val path = root.resolve(".dsh/skills/code-review/SKILL.md")
             path.parentFile.mkdirs()
-            path.writeText("X".repeat(128 * 1024 + 1))
+            // A directory in place of SKILL.md is unreadable regardless of file-size policy.
+            assertTrue(path.mkdirs())
             val pinned = listOf(LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "code-review"))
             val error = assertThrows(IllegalArgumentException::class.java) {
                 resolveLocalWorkSkillGuidance(workspace, "继续", pinned)
