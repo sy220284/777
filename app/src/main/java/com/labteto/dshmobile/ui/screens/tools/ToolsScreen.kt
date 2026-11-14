@@ -439,10 +439,15 @@ class ToolsViewModel @Inject constructor(
         }
         // Re-read after OAuth so a newly connected official server is never
         // requested a second time through the skill's dependency metadata.
+        val knownServerIds = localTools.servers().mapTo(hashSetOf()) { it.id }
         val pending = localTools.installedSkills()
             .filter { it.name in bundledSkillIds }
             .flatMap { it.requirements }
-            .filterNot { it.registered }
+            .filterNot { requirement ->
+                requirement.registered ||
+                    (requirement.type.equals("mcp", ignoreCase = true) &&
+                        requirement.value in knownServerIds)
+            }
         val connections = pending.mapNotNull { requirement ->
             skillMcpHttpsEndpoint(requirement)?.let { endpoint ->
                 requirement.value to endpoint
@@ -475,18 +480,19 @@ class ToolsViewModel @Inject constructor(
         val scope = if (bundledSkillIds.size > 1) "插件 ${officialPluginId ?: installedId} 的 ${bundledSkillIds.size} 项技能"
             else "技能 ${installedId}"
         val officialServer = officialDetail?.mcpServerId?.let { id ->
-            localTools.servers().firstOrNull {
-                it.id == id &&
-                    it.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED
-            }
+            localTools.servers().firstOrNull { it.id == id }
         }
         _state.value = _state.value.copy(
             feedback = when {
-                unresolved != 0 -> "${scope}已安装，还有 ${unresolved} 项运行依赖需在详情中处理"
-                officialDetail?.mcpUrl != null && officialServer == null ->
-                    "${scope}已安装，服务尚未登记；请进入详情连接账号"
+                officialServer != null &&
+                    officialServer.registration != com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED ->
+                    "${scope}已安装，服务状态异常或连接中；请在连接器中检查"
                 officialServer != null && officialServer.tools.isEmpty() ->
                     "${scope}已安装，服务已登记但尚无可用工具；请在连接器中检查健康状态"
+                unresolved != 0 ->
+                    "${scope}已安装，还有 ${unresolved} 项运行依赖需在详情中处理"
+                officialDetail?.mcpUrl != null && officialServer == null ->
+                    "${scope}已安装，服务尚未登记；请进入详情连接账号"
                 else -> "${scope}已安装，可直接使用"
             },
         )
