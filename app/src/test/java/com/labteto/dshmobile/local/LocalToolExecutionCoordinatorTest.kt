@@ -136,6 +136,52 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun coreToolSelectionSaysCallDirectlyWithoutCallingItUnavailable() {
+        val registry = ToolRegistry().apply {
+            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE) { ToolResult("ok") })
+        }
+        val report = coordinator(registry).searchCapabilities("select:read,unregistered_tool")
+        assertTrue(report.contains("内置工具"))
+        assertTrue(report.contains("read"))
+        assertTrue(report.contains("unregistered_tool"))
+        assertFalse(report.contains("指定工具当前无法加载：read"))
+    }
+
+    @Test
+    fun largeExactSelectionExposesReadyBatchAndActionableNextBatch() {
+        val registry = ToolRegistry().apply {
+            repeat(128) { index ->
+                val name = "mcp_batch_$index"
+                val properties = buildJsonObject {
+                    repeat(20) { field ->
+                        put("property_$field", buildJsonObject {
+                            put("type", "string")
+                            put("description", "这一字段对接外部 MCP 的复杂参数说明".repeat(15))
+                        })
+                    }
+                }
+                register(tool(name, ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL) { ToolResult("ok") }
+                    .copy(schema = functionToolSchema(name, "扩展工具", properties)))
+            }
+        }
+        val coordinator = coordinator(registry)
+        val all = (0 until 128).map { "mcp_batch_$it" }
+        val report = coordinator.searchCapabilities("select:" + all.joinToString(","))
+        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
+        val omitted = all.filterNot(visible::contains)
+        assertTrue("工具定义实际预算必须仍有效", omitted.isNotEmpty())
+        assertTrue(report.contains("待加载队列"))
+        assertTrue(report.contains("select:" + omitted.joinToString(",")))
+        assertTrue(report.contains("[下一步可用]"))
+        val next = coordinator.searchCapabilities("select:" + omitted.take(2).joinToString(","))
+        val after = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
+        assertTrue(omitted.first() in after)
+        assertTrue(next.contains("下一步"))
+    }
+
+    @Test
     fun exactMultiToolSelectionRejectsInvalidNamesAndKeepsPreviousSelection() {
         val registry = ToolRegistry().apply {
             register(tool(name = "mcp_lookup", access = ToolAccess.READ_ONLY,
