@@ -298,7 +298,7 @@ internal fun PluginInventoryBrowser(
             it.id == plugin.name || it.id == codexDetails[plugin.id]?.mcpServerId
         }
         val installedFromPlugin = skills.any {
-            it.sourceUrl?.contains("/plugins/${plugin.name}/skills/") == true
+            it.sourceUrl?.contains("/${plugin.sourcePath}/") == true
         }
         val verifiedDetail = codexDetails[plugin.id]
         val support = when {
@@ -558,11 +558,8 @@ internal fun PluginInventoryBrowser(
                 val officialRoot = codexPlugins.firstOrNull { it.id == pluginId }?.sourcePath
                 val missingPluginSkills = pluginDetail?.skills.orEmpty().filterNot { skillId ->
                     val path = pluginDetail?.skillDirectories?.get(skillId)
-                    skills.any { installed ->
-                        installed.name == skillId || (officialRoot != null &&
-                            path != null && installed.sourceUrl?.endsWith(
-                                "/$officialRoot/$path") == true)
-                    }
+                    officialRoot != null && path != null &&
+                        codexPluginSkillInstalled(skills, officialRoot, path)
                 }
                 val oneSkillInstalled = oneSkill == null || oneSkill !in missingPluginSkills
                 val endpoint = item.requirements.firstNotNullOfOrNull {
@@ -700,13 +697,9 @@ internal fun PluginInventoryBrowser(
                                     val officialRoot = codexPlugins
                                         .firstOrNull { it.id == pluginId }?.sourcePath
                                     val skillFolder = details.skillDirectories[skill]
-                                    val installed = skills.any { installedSkill ->
-                                        installedSkill.name == skill ||
-                                            (officialRoot != null && skillFolder != null &&
-                                                installedSkill.sourceUrl?.endsWith(
-                                                    "/$officialRoot/$skillFolder"
-                                                ) == true)
-                                    }
+                                    val installed = officialRoot != null &&
+                                        skillFolder != null && codexPluginSkillInstalled(
+                                            skills, officialRoot, skillFolder)
                                     SyButton(
                                         text = if (installed) "已安装" else "安装",
                                         variant = SyButtonVariant.Info,
