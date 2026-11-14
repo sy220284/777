@@ -330,7 +330,7 @@ class CodeModePluginTest {
         val registry = ToolRegistry()
         var received: JsonObject? = null
         register(registry, "produce") {
-            ToolResult("""{"file":{"path":"docs/demo.md","count":3}}""")
+            ToolResult("""{"file":{"path":"docs/demo.md","count":3},"items":[{"name":"测试"}]}""")
         }
         registry.register(HarnessTool(
             "consume", functionToolSchema("consume", "使用结果", parameterSchema = buildJsonObject {
@@ -352,11 +352,15 @@ class CodeModePluginTest {
                     put("args", buildJsonObject {
                         put("path", buildJsonObject {
                             put("\$step_result", 1)
-                            put("path", "file.path")
+                            put("path", "$.file['path']")
                         })
                         put("count", buildJsonObject {
                             put("\$step_result", 1)
                             put("path", "file.count")
+                        })
+                        put("name", buildJsonObject {
+                            put("\$step_result", 1)
+                            put("path", "items[0].name")
                         })
                     })
                 })
@@ -367,6 +371,7 @@ class CodeModePluginTest {
         assertFalse(actual.isError)
         assertEquals("docs/demo.md", (received?.get("path") as JsonPrimitive).content)
         assertEquals("3", (received?.get("count") as JsonPrimitive).content)
+        assertEquals("测试", (received?.get("name") as JsonPrimitive).content)
         assertTrue(actual.content.contains("completed_steps"))
     }
 
@@ -386,7 +391,7 @@ class CodeModePluginTest {
                     put("tool", "write")
                     put("args", buildJsonObject {})
                     put("when", buildJsonObject {
-                        put("step", 1); put("path", "approved"); put("equals", true)
+                        put("step", 1); put("path", "$.approved"); put("equals", true)
                     })
                 })
             })
@@ -417,7 +422,7 @@ class CodeModePluginTest {
                 })
                 add(buildJsonObject {
                     put("tool", "write"); put("args", buildJsonObject {})
-                    put("when", buildJsonObject { put("step", 2); put("path", "allowed"); put("equals", false) })
+                    put("when", buildJsonObject { put("step", 2); put("path", "$['allowed']"); put("equals", false) })
                 })
             })
         }
@@ -473,6 +478,38 @@ class CodeModePluginTest {
             })
         }
         val actual = registry.execute("code_mode_run", invalid,
+            context = ToolContext(approval = { true }))
+        assertEquals("CODE_MODE_BAD_REFERENCE", actual.errorCode)
+        assertEquals(0, writes)
+    }
+
+
+    @Test fun invalidResultSelectorIsRejectedBeforeAnyWrite() = runTest {
+        val registry = ToolRegistry()
+        var writes = 0
+        register(registry, "produce") { ToolResult("""{"items":[{"name":"x"}]}""") }
+        register(registry, "write", ToolAccess.WORKSPACE_WRITE) {
+            writes++
+            ToolResult("saved")
+        }
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val plan = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject {
+                    put("tool", "produce"); put("args", buildJsonObject {})
+                })
+                add(buildJsonObject {
+                    put("tool", "write")
+                    put("args", buildJsonObject {
+                        put("content", buildJsonObject {
+                            put("\$step_result", 1)
+                            put("path", "items[*].name")
+                        })
+                    })
+                })
+            })
+        }
+        val actual = registry.execute("code_mode_run", plan,
             context = ToolContext(approval = { true }))
         assertEquals("CODE_MODE_BAD_REFERENCE", actual.errorCode)
         assertEquals(0, writes)
