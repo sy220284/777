@@ -95,12 +95,18 @@ class HarnessAccessibilityService : AccessibilityService() {
         return target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
     }
 
-    fun setTextNode(index: Int, value: String): Boolean {
-        val target = nodeAt(index)?.takeIf(AccessibilityNodeInfo::isEditable) ?: return false
+    /** Compose controls may only accept ACTION_SET_TEXT once focused.
+     * Retry the same idempotent replacement on the same refreshed node, never another field.
+     */
+    private fun setEditableText(target: AccessibilityNodeInfo, value: String): Boolean {
         val arguments = Bundle().apply {
             putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
         }
-        return target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+        if (target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)) return true
+        if (!target.isVisibleToUser || !target.isFocusable) return false
+        if (!target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)) return false
+        return target.refresh() && target.isEditable &&
+            target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
     }
 
     fun clickText(text: String): Boolean {
@@ -113,15 +119,59 @@ class HarnessAccessibilityService : AccessibilityService() {
         return target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
     }
 
-    fun setText(searchText: String, value: String): Boolean {
-        val root = rootInActiveWindow ?: return false
-        val candidates = root.findAccessibilityNodeInfosByText(searchText)
-            .filter { it.isVisibleToUser && it.isEditable }
-        val target = requireUniqueAccessibilityTarget(candidates, "输入文字") ?: return false
-        val arguments = Bundle().apply {
-            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
+    /**
+     * One Android input operation: choose the intended field, replace its text, then
+     * check the resulting accessibility state. Do not report ACTION_SET_TEXT acceptance
+     * as completed input; Compose can accept a request without changing the field.
+     */
+    suspend fun inputText(
+        nodeIndex: Int?,
+        viewId: String?,
+        searchText: String?,
+        value: String,
+    ): Boolean {
+        require(listOf(nodeIndex != null, !viewId.isNullOrBlank(), !searchText.isNullOrBlank())
+            .count { it } <= 1) {
+            "输入目标只能选择 node、id、text 中的一种；全部留空时使用当前已聚焦输入框"
         }
-        return target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+        val root = rootInActiveWindow ?: return false
+        val target = when {
+            nodeIndex != null -> nodeAt(nodeIndex)
+            !viewId.isNullOrBlank() -> requireUniqueAccessibilityTarget(
+                root.findAccessibilityNodeInfosByViewId(viewId)
+                    .filter { it.isVisibleToUser && it.isEditable }, "输入文字")
+            !searchText.isNullOrBlank() -> requireUniqueAccessibilityTarget(
+                root.findAccessibilityNodeInfosByText(searchText)
+                    .filter { it.isVisibleToUser && it.isEditable }, "输入文字")
+            else -> root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        }?.takeIf { it.isVisibleToUser && it.isEditable } ?: return false
+
+        val windowId = target.windowId
+        val originalBounds = android.graphics.Rect().also(target::getBoundsInScreen)
+        val targetId = target.viewIdResourceName
+        if (!setEditableText(target, value)) return false
+
+        // Read the same control after the framework has applied its semantics update.
+        // Retry verification only, not the mutating text action.
+        repeat(4) {
+            kotlinx.coroutines.delay(100L)
+            if (target.refresh() && target.isEditable &&
+                target.text?.toString().orEmpty() == value) return true
+            val currentRoot = rootInActiveWindow ?: return false
+            if (currentRoot.windowId != windowId) return false
+            val currentTarget = if (targetId != null) {
+                val matches = currentRoot.findAccessibilityNodeInfosByViewId(targetId)
+                    .filter { it.isVisibleToUser && it.isEditable }
+                matches.singleOrNull()
+            } else currentRoot.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                ?.takeIf { focused ->
+                    focused.isEditable && focused.isVisibleToUser &&
+                        android.graphics.Rect().also(focused::getBoundsInScreen) == originalBounds
+                }
+            if (currentTarget?.text?.toString().orEmpty() == value && currentTarget != null)
+                return true
+        }
+        return false
     }
 
     fun globalBack(): Boolean = performGlobalAction(GLOBAL_ACTION_BACK)
