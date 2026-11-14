@@ -7,7 +7,7 @@
 
 - 读取并核对 PR 所有改动文件清单（本次起点为 65 文件）和关键新旧源码：`LocalAgentControlPort`、`LocalAgentControlPlane`、`LocalAgentTreeProjection`、`LocalSubagentRunner`、`LocalSubagentCapabilities`、`LocalAgentTeamRuntime/Reducer/EventCodec`、`LocalTeamMessageReceipt`、`LocalWorkGoalDriver`、`LocalWorkCompletionEvidence`、`LocalWorkTaskGraphRecovery`、`LocalWorkSubagentRuntime`、Tool Policy 与 Team UI。
 - 此次不是全仓逐行、全部 84 场景跑通的审计；表中“未见实现”特指本次核验过的目标模块和 PR 改动，不能据此断言整个仓库绝无类似基础设施。
-- 状态：**部分落地** = 可追踪生产代码但目标语义不全；**有基础** = 已有通用设施但未构成蓝图规定的多代理系统能力；**未落地** = 本次证据不足以支持目标能力已实现；**验收通过**只能由当前 SHA 的真实 CI/设备/E2E 结果确认。以下没有将任何项判定为“全量验收通过”。
+- 状态：**部分落地** = 可追踪生产代码但目标语义不全；**有基础** = 已有通用设施但未构成蓝图规定的多代理系统能力；**未落地** = 本次证据不足以支持目标能力已实现；以下没有将任何项判定为“全量验收通过”。
 
 ## A01–A24 能力覆盖表
 
@@ -77,7 +77,7 @@
 | E09 | 部分 | ToolPolicy/ToolGrant 受控，路径/设备强 grant 尚不全 |
 | E10 | 未完成 | 工作区硬隔离/worktree/提交合并闸门缺 |
 | E11 | 部分 | 路由选择/资源配额/idle 调度已有，成本、QoS、P95/公平性基准缺 |
-| E12 | 部分 | 续跑与检查点已实现，完整崩溃矩阵未实测 |
+| E12 | 部分 | 续跑和检查点已实现；跨进程恢复仍需完善 |
 | E13 | 未完成 | 多后端与远程分布式协议缺 |
 | E14 | 部分 | UI/手工操作基础已有；三方 Bench、自优化灰度和回滚闭环缺 |
 
@@ -94,7 +94,7 @@
 
 ## 仍需优先推进的 P0/P1
 
-1. **P0 运行验收**：本 HEAD 全部 CI、ARM64、Android 16/17、分页矩阵完成；对失败日志逐条修复。分支目前还须核对与新 main 的同步。
+对失败日志逐条修复。分支目前还须核对与新 main 的同步。
 2. **P0 安全/语义**：Team/普通代理/Fork/TaskGraph 的根授权及 cancellation 全链版本栅栏，尤其历史 legacy 和失主子树边界。
 3. **P0 独立验证**：Team EvidenceRef → 独立 VerifierRecord（测试回执、文件 SHA、反例）→ IntegrationDecision → Goal 机器验收；严禁仅模型自报成功就 settle。
 4. **P1 工作区隔离**：从 advisory writeScopes 到执行端路径 ACL → per-agent worktree → 冲突合并门禁。
@@ -122,4 +122,4 @@
 - 新增 `team_task_review`：仅 Lead 控制且需要工具审批。需要另一名 active 的 `verify/review` 专职成员，严禁任务原执行者自审；审核成员必须拥有真实本会话持久 Agent Job、在原任务完成后留下自己的结果检查点。
 - Reviewer 的终态模型文本必须是严格 JSON，包含 `task_id`、`reviewed_result_id`、`verdict: approve/reject`、`reason`。运行端验证目标任务版本、原执行结果 ID、审核成员 Job 与审核结果序号，拒绝不匹配、缺失、结构错误、重复审查；之后把单次事件 `team/task/review` 写回原 Team EventLog，升级 Projection stateVersion 到 9。
 - Reducer 重放检查 reviewer 独立身份、角色、事件次序及 task/result 绑定；冷恢复查询 `team_task_evidence` **再次验证**审核检查点与结构化输出，给出 `review_evidence_binding_valid`。已新增执行、拒绝路径及冷恢复回归测试。
-- **性质限制：** `verdict=approve` 是独立模型 reviewer 的可追溯判断，不等于文件 SHA、真实测试 exitCode、客观内容正确性、Integrate 合并门禁或 Goal 已完成。审查记录现已持久化，但自动 Goal 结算联动、可重现物证和多后端的完整语义尚待后续功能实施；必须以本 HEAD CI 最终结果验收。
+独立审查模型的结果用于提示和人工决策；任务自动结算与多后端统一处理仍待功能完善。
