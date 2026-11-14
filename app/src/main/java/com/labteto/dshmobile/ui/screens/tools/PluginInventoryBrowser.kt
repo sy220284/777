@@ -15,8 +15,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
 import com.labteto.dshmobile.ui.shenyan.SySearchField
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
@@ -76,6 +79,9 @@ private data class InventoryRow(
     val detail: String,
     val connectedService: Boolean,
     val icon: ImageVector = FeatherIcons.Globe,
+    val accent: Color = Color(0xFF62758A),
+    val group: ExtensionGroup = ExtensionGroup.GENERAL,
+    val documentIcon: Int? = null,
     val available: Boolean = true,
     val modelInvocable: Boolean = true,
     val installedSkill: Boolean = false,
@@ -199,16 +205,21 @@ internal fun PluginInventoryBrowser(
             "android-automation", "android-webhook" -> R.string.plugin_automation_hint to FeatherIcons.Clock
             else -> R.string.plugin_external_hint to FeatherIcons.Tool
         }
-        InventoryRow("local:$id", label, stringResource(hint), connectedService = false, icon = icon)
+        val copy = extensionPresentation(id, label, stringResource(hint), ExtensionKind.PLUGIN)
+        InventoryRow("local:$id", copy.title, copy.description, connectedService = false,
+            icon = copy.icon, accent = copy.accent, group = copy.group, documentIcon = copy.documentIcon)
     }
     val connected = connectedServices.sortedBy { it.id }.map { server ->
+        val copy = extensionPresentation(server.id, server.id, "", ExtensionKind.CONNECTOR)
         InventoryRow(
-            id = "service:${server.id}",
-            name = server.id,
-            detail = stringResource(R.string.tools_server_summary, server.transport, server.tools.size),
+            id = "service:" + server.id,
+            name = copy.title,
+            detail = "已连接 · " + server.tools.size + " 项工具 · " + server.transport.uppercase(),
             connectedService = true,
             available = false,
-            icon = FeatherIcons.Globe,
+            icon = copy.icon,
+            accent = copy.accent,
+            group = copy.group,
         )
     }
     val filteredConnections = connected.filter { row ->
@@ -216,33 +227,47 @@ internal fun PluginInventoryBrowser(
         server != null && pluginTransportMatches(server.transport.toString(), transportFilter)
     }
     val installedSkills = skills.map { skill ->
-        val display = skill.displayName
-        InventoryRow("skill:" + skill.name, display, skill.description,
-            connectedService = false, icon = FeatherIcons.BookOpen,
+        val copy = extensionPresentation(skill.name, skill.displayName, skill.description, ExtensionKind.SKILL)
+        InventoryRow("skill:" + skill.name, copy.title, copy.description,
+            connectedService = false, icon = copy.icon, accent = copy.accent,
+            group = copy.group, documentIcon = copy.documentIcon,
             available = true, modelInvocable = skill.modelInvocable, installedSkill = true,
             sourceUrl = skill.sourceUrl, sourceWarning = skill.sourceWarning,
             rollbackAvailable = skill.rollbackAvailable)
     }
     val availablePresets = presets.filterNot { it.installed }.map { preset ->
-        InventoryRow("skill:" + preset.id, preset.title, preset.description,
-            connectedService = false, icon = FeatherIcons.BookOpen,
+        val copy = extensionPresentation(preset.id, preset.title, preset.description, ExtensionKind.SKILL)
+        InventoryRow("skill:" + preset.id, copy.title, copy.description,
+            connectedService = false, icon = copy.icon, accent = copy.accent,
+            group = copy.group, documentIcon = copy.documentIcon,
             available = false, installablePreset = true)
     }
     val installedIds = skills.map { it.name }.toSet()
     val presetIds = presets.map { it.id }.toSet()
     val curated = curatedSkills.filterNot { it in installedIds || it in presetIds }.map { id ->
+        val copy = extensionPresentation(id, id, "", ExtensionKind.SKILL)
         InventoryRow(
-            id = "curated-skill:$id", name = id,
-            detail = "官方精选 · openai/skills · 安装前校验包内容",
-            connectedService = false, icon = FeatherIcons.BookOpen,
+            id = "curated-skill:" + id, name = copy.title,
+            detail = "官方精选技能 · 安装前校验完整内容",
+            connectedService = false, icon = copy.icon, accent = copy.accent,
+            group = copy.group, documentIcon = copy.documentIcon,
             available = false, installableCurated = true,
         )
     }
-    val list = (if (skillsOnly) installedSkills + availablePresets + curated else when (selectedCategory) {
+    // The horizontal categories describe real catalogue inventory, not a fabricated app store.
+    // Search always matches stable English IDs even when the cards show localized titles.
+    val list = (if (skillsOnly) when (selectedCategory) {
+        0 -> installedSkills
+        1 -> availablePresets + curated
+        2 -> (installedSkills + availablePresets + curated).filter { it.group == ExtensionGroup.OFFICE }
+        3 -> (installedSkills + availablePresets + curated).filter { it.group == ExtensionGroup.DEVELOPMENT }
+        4 -> (installedSkills + availablePresets + curated).filter { it.group == ExtensionGroup.CREATIVE }
+        else -> installedSkills
+    } else when (selectedCategory) {
         1 -> filteredConnections
-        2 -> local.filter { it.id in setOf("local:android-runtime", "local:local-language-server", "local:android-local-builtins") }
-        3 -> local.filter { it.id in setOf("local:android-device", "local:android-automation", "local:android-webhook") }
-        4 -> local.filter { it.id == "local:local-vision" }
+        2 -> local.filter { it.group == ExtensionGroup.OFFICE || it.group == ExtensionGroup.DEVELOPMENT }
+        3 -> local.filter { it.group == ExtensionGroup.AUTOMATION }
+        4 -> local.filter { it.group == ExtensionGroup.CREATIVE }
         else -> local
     }).mapNotNull { item ->
         inventorySearchScore(query, item.name, item.id, item.detail)?.let { score -> item to score }
@@ -255,25 +280,24 @@ internal fun PluginInventoryBrowser(
                 onBack = onBack,
                 backContentDescription = stringResource(R.string.common_back),
             )
-            SySearchField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapMd)
-                    .testTag("plugin-inventory-search"),
-                placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
-            )
-            if (!skillsOnly) LazyRow(
+            LazyRow(
                 modifier = Modifier.testTag("plugin-category-list"),
                 contentPadding = PaddingValues(horizontal = SyMetric.gapSection),
-                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 items(5) { category ->
                     SyFilterChip(
-                        text = when (category) {
-                            1 -> "${connectionStatus} · ${connectedServices.size}"
+                        text = if (skillsOnly) when (category) {
+                            1 -> "精选"
+                            2 -> "效率与办公"
+                            3 -> "开发与研究"
+                            4 -> "创意与设计"
+                            else -> installedStatus
+                        } else when (category) {
+                            1 -> connectionStatus + " · " + connectedServices.size
                             2 -> stringResource(R.string.plugin_category_work)
                             3 -> stringResource(R.string.plugin_category_device)
-                            4 -> stringResource(R.string.plugin_category_design)
+                            4 -> "创意与设计"
                             else -> installedStatus
                         },
                         selected = selectedCategory == category,
@@ -329,7 +353,7 @@ internal fun PluginInventoryBrowser(
                 )
             }
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(
                     horizontal = SyMetric.gapSection,
                     vertical = SyMetric.gapMd,
@@ -483,28 +507,40 @@ internal fun PluginInventoryBrowser(
                 } else {
                     items(list, key = { it.id }) { item ->
                         Surface(
-                            modifier = Modifier.fillMaxWidth().testTag("plugin-inventory-card-${item.id}"),
+                            modifier = Modifier.fillMaxWidth().testTag("plugin-inventory-card-" + item.id),
                             onClick = { selectedRow = item },
                             color = colors.materialL2,
-                            shape = DsShapes.row,
+                            shape = RoundedCornerShape(24.dp),
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth()
-                                    .heightIn(min = 72.dp)
+                                    .heightIn(min = 80.dp)
                                     .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                             ) {
-                                Box(
-                                    modifier = Modifier.size(32.dp).testTag("plugin-inventory-icon-${item.id}"),
-                                    contentAlignment = Alignment.Center,
+                                Surface(
+                                    modifier = Modifier.size(48.dp).testTag("plugin-inventory-icon-" + item.id),
+                                    color = item.accent.copy(alpha = 0.10f),
+                                    shape = RoundedCornerShape(14.dp),
                                 ) {
-                                    Icon(
-                                        imageVector = item.icon,
-                                        contentDescription = null,
-                                        tint = colors.textSecondary,
-                                        modifier = Modifier.size(20.dp),
-                                    )
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        val documentIcon = item.documentIcon
+                                        if (documentIcon != null) {
+                                            Image(
+                                                painter = painterResource(documentIcon),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(40.dp),
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = item.icon,
+                                                contentDescription = null,
+                                                tint = item.accent,
+                                                modifier = Modifier.size(26.dp),
+                                            )
+                                        }
+                                    }
                                 }
                                 Column(
                                     modifier = Modifier.weight(1f),
@@ -554,6 +590,14 @@ internal fun PluginInventoryBrowser(
                     }
                 }
             }
+            // The search bar stays visible at the bottom, as in the reference catalogue.
+            SySearchField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapMd)
+                    .testTag("plugin-inventory-search"),
+                placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
+            )
         }
     }
     selectedRow?.let { item ->
