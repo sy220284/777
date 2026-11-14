@@ -18,6 +18,7 @@ import kotlinx.serialization.json.JsonObject
 internal fun optionalToolPromptBudgetForRoute(
     modelState: LocalModelState,
     history: List<JsonObject>,
+    coreDefinitionTokens: Int = 0,
 ): Int {
     val profile = modelState.modelSelection.activeProfile
     val cachePolicy = LocalModelPresets.promptCachePolicyFor(
@@ -26,9 +27,6 @@ internal fun optionalToolPromptBudgetForRoute(
         protocol = profile?.protocol ?: LocalModelPresets.protocolFor(modelState.model, modelState.baseUrl),
         authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
     )
-    if (cachePolicy.preserveToolSurface) {
-        return LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS
-    }
     val operationalLimit = operationalInputLimitTokens(
         modelState.model,
         modelState.baseUrl,
@@ -44,8 +42,13 @@ internal fun optionalToolPromptBudgetForRoute(
             profile?.contextWindowTokensOverride,
         ),
     )
+    // Core tools consume input tokens even when no optional tool was selected.
+    // Budget those definitions before offering any optional schemas to the model.
+    val availableAfterCore = (pressure.remainingOperationalTokens.toLong() -
+        coreDefinitionTokens.coerceAtLeast(0)).coerceAtLeast(0L)
+    val capacity = availableAfterCore.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     return minOf(
         LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
-        (pressure.remainingOperationalTokens / 4).coerceAtLeast(0),
+        if (cachePolicy.preserveToolSurface) capacity else capacity / 4,
     )
 }
