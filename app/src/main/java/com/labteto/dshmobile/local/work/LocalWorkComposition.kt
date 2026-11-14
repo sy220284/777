@@ -135,7 +135,9 @@ internal class LocalWorkComposition @Inject constructor(
             },
             nestedReadonlySchemas = { tools.schemas.nestedReadOnlySubagentSchemas() },
             executeTeamTool = { sessionId, jobId, call ->
-                AgentToolResult(agentTeams.executeMember(sessionId, jobId, call))
+                teamMemberControlResult {
+                    agentTeams.executeMember(sessionId, jobId, call)
+                }
             },
             jobs = runtimeStateStore.jobManager,
             modelHistory = runtimeStateStore.foregroundRunHandle.modelHistory,
@@ -455,3 +457,29 @@ internal class LocalWorkComposition @Inject constructor(
     }
 
 }
+
+/**
+ * A member touching another member's task is a rejected tool invocation.
+ * Do not turn that single permission mistake into a terminal failed job.
+ * Caller identity/lease failures and unrelated runtime errors remain fatal.
+ */
+internal suspend fun teamMemberControlResult(invoke: suspend () -> String): AgentToolResult =
+    try {
+        AgentToolResult(invoke())
+    } catch (failure: IllegalArgumentException) {
+        if (!failure.message.orEmpty().startsWith("TEAM_MEMBER_PERMISSION_DENIED")) throw failure
+        AgentToolResult(
+            content = failure.message.orEmpty() + "；本次操作未执行。请先读取当前成员可见的任务并只操作自己领取的任务。",
+            isError = true,
+            errorCode = "TEAM_MEMBER_PERMISSION_DENIED",
+            retryable = false,
+        )
+    } catch (failure: IllegalStateException) {
+        if (!failure.message.orEmpty().startsWith("TEAM_MEMBER_PERMISSION_DENIED")) throw failure
+        AgentToolResult(
+            content = failure.message.orEmpty() + "；本次操作未执行。请先读取当前成员可见的任务并只操作自己领取的任务。",
+            isError = true,
+            errorCode = "TEAM_MEMBER_PERMISSION_DENIED",
+            retryable = false,
+        )
+    }
