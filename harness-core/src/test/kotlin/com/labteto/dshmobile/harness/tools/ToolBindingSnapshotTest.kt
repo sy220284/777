@@ -94,6 +94,61 @@ class ToolBindingSnapshotTest {
     }
 
     @Test
+    fun codeModeExecutesSelectedOptionalToolsButNeverUnselectedOrReplacedTools() = runTest {
+        val registry = ToolRegistry()
+        var publishedCalls = 0
+        var hiddenCalls = 0
+        val first = HarnessTool(
+            name = "mcp_selected_echo",
+            schema = functionToolSchema("mcp_selected_echo", "MCP 已加载工具"),
+            access = ToolAccess.PRIVILEGED,
+            approvalPolicy = ToolApprovalPolicy.ALWAYS,
+            exposure = ToolExposure.OPTIONAL,
+            metadata = ToolMetadata("MCP"),
+            executor = HarnessToolExecutor { _, _, _ ->
+                publishedCalls++
+                ToolResult("remote-ok")
+            },
+        )
+        val hidden = first.copy(
+            name = "mcp_hidden_echo",
+            schema = functionToolSchema("mcp_hidden_echo", "未加载工具"),
+            executor = HarnessToolExecutor { _, _, _ ->
+                hiddenCalls++
+                ToolResult("should-not-run")
+            },
+        )
+        registry.register(first)
+        registry.register(hidden)
+        CodeModePlugin(registry).install(com.labteto.dshmobile.harness.plugin.HarnessContext(registry))
+        val frozen = registry.captureBindings(JsonArray(listOf(
+            requireNotNull(registry.get("code_mode_run")).schema,
+            requireNotNull(registry.get("mcp_selected_echo")).schema,
+        )))
+        withContext(frozen) {
+            val allowed = registry.execute("code_mode_run", codeModePlan("mcp_selected_echo"),
+                context = ToolContext(approval = { true }))
+            assertFalse(allowed.isError)
+            assertTrue(allowed.content.contains("remote-ok"))
+            val denied = registry.execute("code_mode_run", codeModePlan("mcp_hidden_echo"),
+                context = ToolContext(approval = { true }))
+            assertEquals("CODE_MODE_UNSAMPLED_TOOL", denied.errorCode)
+        }
+        assertEquals(1, publishedCalls)
+        assertEquals(0, hiddenCalls)
+        registry.register(first.copy(executor = HarnessToolExecutor { _, _, _ ->
+            publishedCalls++
+            ToolResult("wrong-version")
+        }), replace = true)
+        withContext(frozen) {
+            val revoked = registry.execute("code_mode_run", codeModePlan("mcp_selected_echo"),
+                context = ToolContext(approval = { true }))
+            assertEquals("CODE_MODE_UNSAMPLED_TOOL", revoked.errorCode)
+        }
+        assertEquals(1, publishedCalls)
+    }
+
+    @Test
     fun codeModeOnlySampleRejectsLaterOrReplacedToolsBeforeSideEffects() = runTest {
         val registry = ToolRegistry()
         var effects = 0
