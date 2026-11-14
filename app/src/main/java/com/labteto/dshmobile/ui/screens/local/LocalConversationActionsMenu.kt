@@ -24,6 +24,7 @@ internal fun ConversationActionsMenu(
     onDelete: () -> Unit,
     onOpenWorkEvidence: (() -> Unit)? = null,
     onOpenDocuments: (() -> Unit)? = null,
+    onOpenSample: (() -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var expanded by remember { mutableStateOf(false) }
@@ -47,6 +48,10 @@ internal fun ConversationActionsMenu(
             )) }.orEmpty() + onOpenDocuments?.let { open -> listOf(SyMenuItem(
                 text = stringResource(R.string.local_session_documents),
                 icon = ConversationMenuIcons.InteractiveDocument,
+                onClick = open,
+            )) }.orEmpty() + onOpenSample?.let { open -> listOf(SyMenuItem(
+                text = stringResource(R.string.local_session_sample_title),
+                icon = FeatherIcons.Sparkles,
                 onClick = open,
             )) }.orEmpty() + listOf(
                 SyMenuItem(
