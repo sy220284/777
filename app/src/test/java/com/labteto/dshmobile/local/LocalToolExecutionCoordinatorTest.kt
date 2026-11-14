@@ -10,6 +10,10 @@ import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolWorkspaceAccess
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.CodeModePlugin
+import com.labteto.dshmobile.harness.plugin.HarnessContext
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonArray
 import com.labteto.dshmobile.harness.tools.functionToolSchema
 import com.labteto.dshmobile.local.agent.localAgentRunPolicy
 import com.labteto.dshmobile.local.model.LocalModelProfile
@@ -34,6 +38,61 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
+
+    @Test fun codeModeRunsRealChildStepsThroughFreshAuthorizationAndExecutionIdentities() = runBlocking {
+        val registry = ToolRegistry()
+        val invoked = mutableListOf<String>()
+        registry.register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+            invoked += "read"
+            ToolResult("read-result")
+        })
+        registry.register(tool("bash", ToolAccess.PROCESS, ToolApprovalPolicy.ALWAYS) {
+            invoked += "bash"
+            ToolResult("bash-result")
+        })
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val started = mutableListOf<String>()
+        val authorized = mutableListOf<String>()
+        val approvals = mutableListOf<String>()
+        val run = coordinator(
+            registry,
+            recordExecutionStarted = { _, call, _ -> started += call.id + ":" + call.name },
+            recordAuthorizationDecision = { _, call, _, _ -> authorized += call.id + ":" + call.name },
+            executionIdFactory = object : () -> String {
+                private var counter = 0
+                override fun invoke(): String = "exec-" + (++counter)
+            },
+        )
+        val plan = buildJsonObject {
+            put("steps", buildJsonArray {
+                listOf("read", "bash").forEach { name ->
+                    add(buildJsonObject {
+                        put("tool", name)
+                        put("args", buildJsonObject {})
+                    })
+                }
+            })
+        }
+        val selection = registry.captureBindings(JsonArray(listOf(registry.get("code_mode_run")!!.schema)))
+        val result = withContext(selection) {
+            run.executeScoped(
+                LocalToolCall("script-1", "code_mode_run", plan, plan.toString()),
+                "s1", true, false,
+                approval = { call, tool, _ ->
+                    assertEquals(call.name, tool.name)
+                    approvals += call.id + ":" + tool.name
+                    true
+                },
+            )
+        }
+        assertFalse(result.isError)
+        assertTrue(result.content.contains("\"completed_steps\":2"))
+        assertEquals(listOf("read", "bash"), invoked)
+        assertEquals(listOf("script-1:code_mode_run", "script-1/step-1:read",
+            "script-1/step-2:bash"), started)
+        assertEquals(started, authorized)
+        assertEquals(listOf("script-1:code_mode_run", "script-1/step-2:bash"), approvals)
+    }
 
     @Test fun teamRevocationWhileWaitingForSharedWorkspaceLeaseCannotWrite() = runBlocking {
         val gate = com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate()
