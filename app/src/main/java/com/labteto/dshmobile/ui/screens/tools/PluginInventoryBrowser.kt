@@ -152,6 +152,7 @@ internal fun PluginInventoryBrowser(
     onCreateSkill: ((String, String, String, String) -> Unit)? = null,
     onImportSkill: (() -> Unit)? = null,
     onInstallGitHubSkill: ((String) -> Unit)? = null,
+    onConnectSkillMcp: ((String, String) -> Unit)? = null,
     onRemoveSkill: ((String) -> Unit)? = null,
     onShareSkillPackage: ((String) -> Unit)? = null,
     onCheckSkillUpdate: ((String) -> Unit)? = null,
@@ -813,6 +814,21 @@ internal fun PluginInventoryBrowser(
                     Text("${if (requirement.registered) "已登记" else "待配置"} · ${requirement.type}: ${requirement.value}",
                         style = DsType.caption11.withReadingWeight(),
                         color = if (requirement.registered) colors.successInk else colors.warningInk)
+                    val endpoint = if (!requirement.registered)
+                        skillMcpHttpsEndpoint(requirement) else null
+                    if (endpoint != null && onConnectSkillMcp != null) {
+                        Text("连接地址：$endpoint", style = DsType.caption11,
+                            color = colors.textSecondary)
+                        SyButton(
+                            text = "授权并连接 ${requirement.value}",
+                            enabled = !loading,
+                            variant = SyButtonVariant.Info,
+                            onClick = {
+                                selectedRow = null
+                                onConnectSkillMcp(requirement.value, endpoint)
+                            },
+                        )
+                    }
                 }
                 if (item.requirements.any { !it.registered }) {
                     SyButton(text = "管理连接与授权", onClick = {
