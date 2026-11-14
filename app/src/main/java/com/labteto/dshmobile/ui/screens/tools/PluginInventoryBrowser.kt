@@ -120,6 +120,10 @@ internal fun PluginInventoryBrowser(
     skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
     curatedSkills: List<String> = emptyList(),
+    codexPlugins: List<com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot> = emptyList(),
+    codexLoading: Boolean = false,
+    codexError: String? = null,
+    onRefreshCodex: (() -> Unit)? = null,
     curatedLoading: Boolean = false,
     curatedError: String? = null,
     pendingSkillUpdates: Map<String, String> = emptyMap(),
@@ -270,12 +274,35 @@ internal fun PluginInventoryBrowser(
         )
     }
     // Codex separates discovery from local installation and runtime authorization.
-    val catalogue = local + connected + installedSkills + availablePresets + curated
+    val officialPlugins = if (skillsOnly) emptyList() else codexPlugins.map { plugin ->
+        val copy = extensionPresentation(plugin.name, plugin.name, "", ExtensionKind.PLUGIN)
+        val group = when (plugin.category.lowercase()) {
+            "creativity" -> ExtensionGroup.CREATIVE
+            "developer tools", "education & research" -> ExtensionGroup.DEVELOPMENT
+            "productivity", "communication", "finance" -> ExtensionGroup.OFFICE
+            else -> ExtensionGroup.GENERAL
+        }
+        val support = when {
+            plugin.codexOnly -> ExtensionMarketState(ExtensionMarketStatus.UNSUPPORTED,
+                "Codex 专属", "该插件要求 Codex 产品环境；777 当前无法直接启用")
+            plugin.installPolicy == "NOT_AVAILABLE" -> ExtensionMarketState(
+                ExtensionMarketStatus.UNSUPPORTED, "官方暂不可安装")
+            else -> ExtensionMarketState(ExtensionMarketStatus.NEEDS_SETUP,
+                "需要连接", "官方授权策略：" + if (plugin.authPolicy == "ON_USE") "首次使用时授权" else "安装时授权")
+        }
+        InventoryRow("codex-plugin:" + plugin.id, copy.title, copy.description,
+            connectedService = false, icon = copy.icon, accent = copy.accent,
+            group = group, documentIcon = copy.documentIcon,
+            available = false, sourceLabel = "Codex · openai/plugins · ${plugin.category}",
+            marketState = support)
+    }
+    val catalogue = local + connected + installedSkills + availablePresets + curated + officialPlugins
     val list = catalogue.asSequence().filter { item ->
         marketplaceTabAllows(
             selectedTab = selectedCategory, skillsOnly = skillsOnly,
             installedSkill = item.installedSkill,
-            installable = item.installablePreset || item.installableCurated,
+            installable = item.installablePreset || item.installableCurated ||
+                item.id.startsWith("codex-plugin:"),
             connectedService = item.connectedService,
             localPlugin = item.id.startsWith("local:"), group = item.group,
         ) && (!item.connectedService || selectedCategory != 1 ||
@@ -387,7 +414,7 @@ internal fun PluginInventoryBrowser(
                         ExtensionMarketplaceHero(
                             skillsOnly = skillsOnly,
                             installedCount = installedSkills.size + if (skillsOnly) 0 else local.size,
-                            discoverableCount = availablePresets.size + curated.size,
+                            discoverableCount = availablePresets.size + curated.size + officialPlugins.size,
                             connectedCount = connectedServices.size,
                         )
                     }
