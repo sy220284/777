@@ -41,6 +41,7 @@ class LocalWorkProjectsSheetUiTest {
             rename = { _, _ -> false },
             update = { _, _, _ -> false },
             changeRoot = { _, _ -> false },
+            moveDirectory = { _, _, _ -> false },
             move = { _, _ -> false },
             delete = { false },
             assignCurrentSession = { _, _ -> false },
