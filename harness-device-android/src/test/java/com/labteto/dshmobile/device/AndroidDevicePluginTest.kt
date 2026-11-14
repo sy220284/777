@@ -30,6 +30,7 @@ class AndroidDevicePluginTest {
         val names = registry.context.tools.names().toSet()
         assertTrue("android_device_info" in names)
         assertTrue("android_vscreen_create" in names)
+        assertTrue("android_clipboard_clear" in names)
         assertTrue("android_vscreen_screenshot" in names)
         assertTrue("android_find" in names)
         assertTrue("android_click_node" in names)
@@ -52,6 +53,7 @@ class AndroidDevicePluginTest {
 
         val tap = requireNotNull(registry.context.tools.get("android_tap"))
         assertEquals(ToolAccess.DEVICE, tap.access)
+        assertEquals(ToolAccess.DEVICE, registry.context.tools.get("android_clipboard_clear")!!.access)
         assertEquals(ToolApprovalPolicy.MUTATION, tap.approvalPolicy)
 
         val find = requireNotNull(registry.context.tools.get("android_find"))
@@ -71,8 +73,8 @@ class AndroidDevicePluginTest {
         registry.install(AndroidDevicePlugin(provider))
 
         val names = registry.context.tools.names()
-        assertEquals(31, names.size)
-        assertEquals(31, names.toSet().size)
+        assertEquals(32, names.size)
+        assertEquals(32, names.toSet().size)
         assertTrue(registry.isInstalled("android-device"))
 
         assertTrue(registry.uninstall("android-device"))
