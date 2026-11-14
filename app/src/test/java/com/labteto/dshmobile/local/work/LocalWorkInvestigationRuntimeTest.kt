@@ -63,6 +63,33 @@ class LocalWorkInvestigationRuntimeTest {
         } finally { log.close() }
     }
 
+    @Test fun longRunningGoalRetainsProgressAcrossUnrelatedEvents() {
+        val log = log()
+        try {
+            observe(log, "read-1", "read", "src/Agent.kt", 1, "initial source")
+            val original = LocalWorkInvestigationRuntime.progressIdentity(log, "goal-a")
+            repeat(400) { index ->
+                log.append("tool/status", buildJsonObject { put("index", index) })
+            }
+            assertEquals(original, LocalWorkInvestigationRuntime.progressIdentity(log, "goal-a"))
+            observe(log, "read-2", "read", "src/Agent.kt", 11, "new evidence")
+            assertFalse(original == LocalWorkInvestigationRuntime.progressIdentity(log, "goal-a"))
+        } finally { log.close() }
+    }
+
+    @Test fun aLaterCompletedReadClearsOlderCursorAdvice() {
+        val log = log()
+        try {
+            observe(log, "read-1", "read", "src/Agent.kt", 1, "first page; next_start_line=11")
+            assertTrue(LocalWorkInvestigationRuntime.context(log, "goal-a", "turn-a")
+                .contains("仍有未读完的材料"))
+            observe(log, "read-2", "read", "src/Agent.kt", 11, "last page")
+            val context = LocalWorkInvestigationRuntime.context(log, "goal-a", "turn-a")
+            assertFalse(context.contains("【仍有未读完的材料】"))
+            assertTrue(context.contains("src/Agent.kt"))
+        } finally { log.close() }
+    }
+
     @Test fun searchOnlyIsNotMistakenForSourceVerificationOrAnotherTurn() {
         val log = log()
         try {
