@@ -129,6 +129,7 @@ internal fun PluginInventoryBrowser(
     codexDetailError: String? = null,
     onReadCodexPluginDetail: ((String) -> Unit)? = null,
     onInstallCodexPluginSkill: ((String, String) -> Unit)? = null,
+    onConnectCodexPlugin: ((String) -> Unit)? = null,
     curatedLoading: Boolean = false,
     curatedError: String? = null,
     pendingSkillUpdates: Map<String, String> = emptyMap(),
@@ -764,10 +765,20 @@ internal fun PluginInventoryBrowser(
                         }
                     }
                 }
-                Text("外部应用、MCP 服务与钩子需要单独验证连接和授权，安装技能不会静默启动外部程序。",
+                Text("安装技能不会静默启动外部程序；MCP 服务需要你明确同意连接。",
                     style = DsType.caption11, color = colors.textSecondary)
-                if (item.marketState.status != ExtensionMarketStatus.UNSUPPORTED) {
-                    SyButton(text = "管理连接与授权", variant = SyButtonVariant.Info,
+                if (item.marketState.status != ExtensionMarketStatus.UNSUPPORTED &&
+                    details?.mcpUrl != null && onConnectCodexPlugin != null) {
+                    Text("连接地址：" + details.mcpUrl,
+                        style = DsType.caption11, color = colors.textSecondary)
+                    SyButton(text = "授权并连接 ${details.mcpServerId ?: "MCP"}",
+                        enabled = !loading, variant = SyButtonVariant.Info,
+                        onClick = {
+                            selectedRow = null
+                            onConnectCodexPlugin(pluginId)
+                        })
+                } else if (item.marketState.status != ExtensionMarketStatus.UNSUPPORTED) {
+                    SyButton(text = "查看连接方式", variant = SyButtonVariant.Info,
                         onClick = { selectedRow = null; onManageConnections() })
                 }
             }
