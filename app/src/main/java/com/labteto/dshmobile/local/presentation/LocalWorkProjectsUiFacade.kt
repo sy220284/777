@@ -18,6 +18,9 @@ class LocalWorkProjectsUiFacade @Inject internal constructor(
     fun rename(id: String, name: String) = store.rename(id, name)
     fun update(id: String, name: String, root: String) = store.update(id, name, root)
     fun changeRoot(id: String, root: String) = store.changeRoot(id, root)
+    /** Resolve historical session previews without mutating their original file references. */
+    fun relocatedReadPath(sessionId: String, historicalPath: String): String? =
+        store.relocatedReadPath(sessionId, historicalPath)
     fun moveDirectory(id: String, expectedRoot: String, root: String): Boolean {
         check(!runtimeStateStore.state.value.kernel.running &&
             !runtimeStateStore.sessionTransitioning &&

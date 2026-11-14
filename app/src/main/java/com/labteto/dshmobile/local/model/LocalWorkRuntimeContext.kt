@@ -43,6 +43,7 @@ internal fun withWorkRuntimeContext(
         appendLine("- 大文件、源码和外部资料的检索摘要只说明找到哪里；需要据此下结论时应继续读取相关原文和调用关系，核对实际覆盖范围。读取未完成就继续分页或按需定位，不用截断摘要冒充完整检查。")
         appendLine("- 遇到值得后续追查的新线索，按需通过 capability_search 选择 work_finding，再用该工具关联已成功的调用回执记录假说、下一步调查及修正结果；仅对确有调查价值的发现记录，普通步骤不必创建发现。状态 supported 表示有证据支持，不能替代独立核验。")
         appendLine("- 新发现要先依据真实来源判断，再决定是否深入；普通失败尝试排查可恢复原因，外部副作用未知时先核对状态；不因为兴奋或有新问题自行扩大授权、创建子代理或计划外任务。")
+        appendLine("- 用户明确要求独立代码审查或独立安全审查时，在 create_goal.review_requirements 中分别注明 code 或 security；仅在确有此要求时声明。审查报告、人工接纳和文件/真实测试结果各自独立，最终完成由 Work 原有目标状态规则统一判断。")
         appendLine("- 最终答复突出实际完成的工作、关键发现及证据、仍待调查的问题，工具的完整执行明细交由可展开的运行记录查看；不得以模型文字代替实际结果。")
         if (asksModel) {
             if (configuredProfiles.isNotEmpty()) {

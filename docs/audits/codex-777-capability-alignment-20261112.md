@@ -141,7 +141,7 @@
 ### B. 产品交付差距
 
 - **范围明确仍缺**：会话预测/示例采样、外部编码代理历史与配置迁移、实时双向语音，均在 29 项清单中尚未实施。保持待办，不把有其他相似入口视为完成。
-- **Code Mode**：现有 `CodeModePlugin.kt` 提供至多 8 步 JSON 顺序编排、结果引用、审批/回执，尚非需求中的完整受限脚本执行能力。是否扩大步骤/超时应从真实需求、运行取消与资源约束核定，避免任意阈值。
+- **Code Mode**：现有 `CodeModePlugin.kt` 提供有序 JSON 编排、完整预检、结果引用和逐工具原有权限与取消处理，已移除固定八步及额外 90 秒超时。尚需针对实际场景补自由脚本与复杂流程表达。
 - **Hooks / 插件 / MCP**：已有 ToolRegistry 前后钩子、MCP 工具/进程与追问机制；产品级 Hook 配置、插件宿主权限隔离和完整重启恢复，以及部分 MCP 高级表单场景仍需按真实 Android 消费者完成，不额外复制插件管理系统。
 - **项目管理状态更正**：此前台账的“尚未实施”已过期。代码中 `LocalWorkProjectCatalog`、`LocalWorkProjectsUiFacade`、`LocalWorkProjectsSheet` 和相应测试已有创建/导入/更新/排序/删除/绑定实现；文件夹真正移动与恢复、设备端验证仍待闭环。
 - **Android 下载交付**：新增 `LocalDownloadsPublisher`，通过 MediaStore 将已存在的工作区文件发布至手机“下载/神言神语”，并带内容版本复用。已有 `LocalDownloadsPublisherAndroidTest` 覆盖中文名、相同字节复用、内容变化与目录越界。

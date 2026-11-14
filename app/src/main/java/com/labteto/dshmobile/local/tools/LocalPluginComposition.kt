@@ -21,6 +21,7 @@ import com.labteto.dshmobile.harness.plugin.PluginManager
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.tools.ToolRegistry
+import com.labteto.dshmobile.harness.tools.ToolHookSubscription
 import com.labteto.dshmobile.harness.tools.CodeModePlugin
 import com.labteto.dshmobile.interop.github.GitHubConnectorPlugin
 import com.labteto.dshmobile.interop.github.GitHubConnectorStatus
@@ -153,7 +154,14 @@ internal class LocalPluginComposition(
         { _, _, _, _ -> com.labteto.dshmobile.interop.mcp.McpElicitationReply("cancel") },
     usageContextProvider: (String?, String?) -> TokenUsageContext? = { _, _ -> null },
 ) {
-    val tools = ToolRegistry()
+    val tools = ToolRegistry().apply {
+        // Trusted application policy is installed before runtime plugins expose their tools.
+        registerHook(ToolHookSubscription(
+            id = "managed-browser-origin",
+            hook = LocalTrustedDeviceOriginHook(managedPolicy::current),
+            toolNames = setOf("android_open_uri"),
+        ))
+    }
     private val registry = PluginRegistry(HarnessContext(tools = tools))
 
     private val runtimePlugin = AndroidRuntimePlugin(

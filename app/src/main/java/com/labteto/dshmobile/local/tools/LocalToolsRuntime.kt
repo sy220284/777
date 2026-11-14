@@ -30,6 +30,7 @@ class LocalToolsRuntime @Inject internal constructor(
     internal fun capabilityCatalogue() = management.capabilityCatalogue()
     internal fun validateCapabilityDraft(name: String, schema: kotlinx.serialization.json.JsonObject, input: String) =
         management.validateCapabilityDraft(name, schema, input)
+    internal fun activeToolHookIds(): List<String> = management.activeToolHookIds()
     internal fun installedPluginIds(): List<String> = management.installedPluginIds()
     internal fun pluginLifecycleSnapshots() = management.pluginLifecycleSnapshots()
     internal suspend fun recoverFailedPlugin(id: String) = management.recoverFailedPlugin(id)

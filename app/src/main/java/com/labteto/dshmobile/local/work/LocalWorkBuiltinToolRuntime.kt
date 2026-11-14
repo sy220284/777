@@ -53,7 +53,8 @@ internal class LocalWorkBuiltinToolRuntime(
             "todo_write" -> progress.updateTodos(args)
             "create_goal" -> {
                 val (artifactPaths, verificationCommands) = parseWorkGoalAcceptanceArguments(args)
-                progress.createGoal(args.string("description"), artifactPaths, verificationCommands)
+                progress.createGoal(args.string("description"), artifactPaths, verificationCommands,
+                    parseWorkGoalReviewRequirements(args))
             }
             "get_goal" -> progress.getGoal()
             "work_finding" -> LocalWorkFindingJournal.execute(
@@ -107,6 +108,19 @@ internal class LocalWorkBuiltinToolRuntime(
  * Absence is NOT equivalent to "the user requested no artifact or verification": otherwise
  * update_goal can accept a false completion claim without its intended evidence.
  */
+internal fun parseWorkGoalReviewRequirements(args: JsonObject): List<String> {
+    val values = args["review_requirements"] ?: return emptyList()
+    val items = values as? JsonArray
+        ?: error("create_goal.review_requirements 必须是字符串数组")
+    require(items.size <= 2) { "独立审查类型最多 2 项" }
+    return items.map { item ->
+        val value = (item as? JsonPrimitive)?.takeIf { it.isString }?.content
+            ?: error("独立审查类型无效")
+        require(value in setOf("code", "security")) { "独立审查类型只支持 code/security" }
+        value
+    }.distinct()
+}
+
 internal fun parseWorkGoalAcceptanceArguments(args: JsonObject): Pair<List<String>, List<String>> {
     fun requiredStringArray(key: String): List<String> {
         val array = args[key] as? JsonArray

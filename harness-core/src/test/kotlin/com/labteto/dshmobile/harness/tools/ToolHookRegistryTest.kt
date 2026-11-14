@@ -20,6 +20,86 @@ class ToolHookRegistryTest {
         executor = HarnessToolExecutor { _, _, _ -> execute() },
     )
 
+    @Test fun preAndPostHooksShareTheExactRunAndCallIdentity() = runTest {
+        val registry = ToolRegistry()
+        registry.register(tool())
+        var before: ToolHookInvocationIdentity? = null
+        var after: ToolHookInvocationIdentity? = null
+        val events = mutableListOf<String>()
+        registry.registerHook(ToolHookSubscription("trace", object : ToolLifecycleHook {
+            override suspend fun beforeUse(request: ToolPreUseRequest): ToolPreUseDecision {
+                before = request.identity
+                events += "pre"
+                return ToolPreUseDecision.Allow
+            }
+            override suspend fun afterUse(event: ToolPostUseEvent) {
+                after = event.identity
+                events += "post"
+            }
+        }))
+        val result = registry.executeTracked("patch", JsonObject(emptyMap()), context = ToolContext(
+            sessionId = "session-one",
+            attributes = mapOf("call_id" to "call-1", "execution_id" to "execution-2", "run_id" to "run-3"),
+            onExecutionFinished = { _, _ -> events += "receipt" },
+        ))
+        assertTrue(result.executionStarted)
+        assertEquals(ToolHookInvocationIdentity("call-1", "execution-2", "run-3"), before)
+        assertEquals(before, after)
+        assertEquals(listOf("pre", "receipt", "post"), events)
+    }
+
+    @Test fun askHookEscalatesAnOtherwiseUnpromptedToolAndPreservesReason() = runTest {
+        val registry = ToolRegistry()
+        var executions = 0
+        registry.register(tool(approval = ToolApprovalPolicy.NEVER) {
+            executions++
+            ToolResult("executed")
+        })
+        registry.registerHook(ToolHookSubscription("require-review", object : ToolLifecycleHook {
+            override suspend fun beforeUse(request: ToolPreUseRequest) =
+                ToolPreUseDecision.Ask("必须先得到使用者授权")
+        }))
+        val waiting = registry.executeTracked("patch", JsonObject(emptyMap()))
+        assertEquals("APPROVAL_REQUIRED", waiting.result.errorCode)
+        assertEquals(0, executions)
+        var explanation = ""
+        val accepted = registry.executeTracked("patch", JsonObject(emptyMap()), context = ToolContext(
+            approvalWithReason = { _, reason ->
+                explanation = reason
+                true
+            },
+        ))
+        assertTrue(accepted.executionStarted)
+        assertEquals("必须先得到使用者授权", explanation)
+        assertEquals(1, executions)
+    }
+
+    @Test fun laterDenyOverridesEarlierAskWithoutPrompting() = runTest {
+        val registry = ToolRegistry()
+        var invoked = false
+        registry.register(tool(approval = ToolApprovalPolicy.NEVER) {
+            invoked = true
+            ToolResult("unexpected")
+        })
+        registry.registerHook(ToolHookSubscription("ask", object : ToolLifecycleHook {
+            override suspend fun beforeUse(request: ToolPreUseRequest) = ToolPreUseDecision.Ask("确认")
+        }))
+        registry.registerHook(ToolHookSubscription("deny", object : ToolLifecycleHook {
+            override suspend fun beforeUse(request: ToolPreUseRequest) = ToolPreUseDecision.Deny("禁止")
+        }))
+        var prompted = false
+        val result = registry.executeTracked("patch", JsonObject(emptyMap()), context = ToolContext(
+            approvalWithReason = { _, _ ->
+                prompted = true
+                true
+            },
+        ))
+        assertEquals("TOOL_HOOK_BLOCKED", result.result.errorCode)
+        assertFalse(result.executionStarted)
+        assertFalse(prompted)
+        assertFalse(invoked)
+    }
+
     @Test fun denialIsFailClosedAndDoesNotPromptOrEnterExecutor() = runTest {
         var approvals = 0
         var calls = 0

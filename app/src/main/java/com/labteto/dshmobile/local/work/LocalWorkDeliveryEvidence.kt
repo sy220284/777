@@ -17,11 +17,12 @@ internal data class LocalWorkDeliveryEvidence(
     val testCallId: String? = null,
     val unmetRequirements: List<String>? = null,
     val runtimeFacts: LocalWorkGoalFacts? = null,
+    val outstandingReviews: List<String> = emptyList(),
 ) {
-    val missing: List<String> get() = unmetRequirements ?: buildList {
+    val missing: List<String> get() = (unmetRequirements ?: buildList {
         if (needsArtifact && artifactCallId == null) add("缺少本次目标的真实文件版本或可核验提交证据")
         if (needsTest && testCallId == null) add("缺少本次目标的实际测试/构建成功结果")
-    }
+    }) + outstandingReviews
 }
 
 private fun JsonObject.value(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
@@ -80,6 +81,7 @@ internal fun localWorkDeliveryEvidence(
 ): LocalWorkDeliveryEvidence {
     val needsArtifact = goal.artifactPaths.isNotEmpty()
     val needsTest = goal.verificationCommands.isNotEmpty()
+    val outstandingReviews = localWorkOutstandingRequiredReviews(log, goal)
     val facts = if (goal.id.isBlank()) null else
         LocalWorkRecoveryProjections.forLog(log).goalAssessment(log, goal)
     val graphMissing = buildList {
@@ -88,14 +90,14 @@ internal fun localWorkDeliveryEvidence(
         if (facts?.hasUnresolvedTools(executingToolId) == true) add("目标仍有关联工具副作用未核实")
     }
     if (goal.id.isBlank() && goal.status != "completed") return LocalWorkDeliveryEvidence(needsArtifact, needsTest, runtimeFacts = facts,
-        unmetRequirements = listOf("旧目标尚未明确验收要求；请依据原任务重新声明成果与验收，不适用时显式为空，已完成进度保留"))
+        outstandingReviews = outstandingReviews, unmetRequirements = listOf("旧目标尚未明确验收要求；请依据原任务重新声明成果与验收，不适用时显式为空，已完成进度保留"))
     if (!needsArtifact && !needsTest) return LocalWorkDeliveryEvidence(false, false, runtimeFacts = facts,
-        unmetRequirements = graphMissing)
+        outstandingReviews = outstandingReviews, unmetRequirements = graphMissing)
     val start = goal.startedAtSequence.takeIf { it >= 0L } ?: log.latestMatching(setOf("goal/state")) {
         it.value("id") == goal.id && goal.id.isNotBlank()
     }?.sequence ?: -1L
     if (start < 0) return LocalWorkDeliveryEvidence(needsArtifact, needsTest, runtimeFacts = facts,
-        unmetRequirements = buildList {
+        outstandingReviews = outstandingReviews, unmetRequirements = buildList {
             if (needsArtifact) add("缺少本次目标的真实文件版本或可核验提交证据")
             if (needsTest) add("缺少本次目标的实际测试/构建成功结果")
             addAll(graphMissing)
@@ -160,6 +162,7 @@ internal fun localWorkDeliveryEvidence(
         else verificationId = result?.data?.value("id")
     }
     return LocalWorkDeliveryEvidence(needsArtifact, needsTest, runtimeFacts = facts,
+        outstandingReviews = outstandingReviews,
         artifactCallId = artifactId.takeIf { missing.none { it.startsWith("成果") } },
         testCallId = verificationId.takeIf { missing.none { it.startsWith("验收") } },
         unmetRequirements = missing)

@@ -12,14 +12,25 @@ interface ToolLifecycleHook {
     suspend fun afterUse(event: ToolPostUseEvent) = Unit
 }
 
+/** Identity frozen for this invocation, shared by every lifecycle hook. */
+data class ToolHookInvocationIdentity(
+    val callId: String? = null,
+    val executionId: String? = null,
+    val runId: String? = null,
+)
+
 data class ToolPreUseRequest(
     val sessionId: String?,
     val tool: HarnessTool,
     val input: JsonObject,
+    val identity: ToolHookInvocationIdentity = ToolHookInvocationIdentity(),
 )
 
 sealed interface ToolPreUseDecision {
     data object Allow : ToolPreUseDecision
+    data class Ask(val reason: String) : ToolPreUseDecision {
+        init { require(reason.isNotBlank() && reason.length <= 512) }
+    }
     data class Deny(val reason: String) : ToolPreUseDecision {
         init { require(reason.isNotBlank() && reason.length <= 512) }
     }
@@ -29,6 +40,7 @@ data class ToolPostUseEvent(
     val sessionId: String?,
     val tool: HarnessTool,
     val result: ToolResult,
+    val identity: ToolHookInvocationIdentity = ToolHookInvocationIdentity(),
 )
 
 data class ToolHookSubscription(

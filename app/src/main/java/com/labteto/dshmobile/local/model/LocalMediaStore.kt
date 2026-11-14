@@ -26,7 +26,7 @@ import kotlinx.serialization.json.Json
 class LocalMediaStore @Inject constructor(@ApplicationContext private val context: Context, private val json: Json) {
     private val directory = File(context.filesDir, "media-studio")
     private val database = LocalMediaDatabase(context, json)
-    private val downloadsPublisher by lazy { LocalDownloadsPublisher(context) }
+    private val downloadsPublisher by lazy { LocalDownloadsPublisher.owned(context) }
     private var initialized = false
     private val changes = MutableStateFlow(0L)
     private val mutableError = MutableStateFlow<String?>(null)

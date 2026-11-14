@@ -34,10 +34,11 @@ internal data class LocalWorkIntegrationDecision(
 internal fun decideLocalWorkIntegration(
     evidence: LocalWorkCompletionEvidence,
 ): LocalWorkIntegrationDecision {
+    val missingReviews = evidence.deliveryEvidence?.outstandingReviews.orEmpty()
     val missingProof = evidence.deliveryEvidence?.missing.orEmpty()
     val decision = when {
         evidence.rejectedTeamResults > 0 -> LocalWorkIntegrationDisposition.REVIEW_REJECTED
-        evidence.unreviewedTeamResults > 0 || evidence.awaitingReviewMembers > 0 ->
+        evidence.unreviewedTeamResults > 0 || evidence.awaitingReviewMembers > 0 || missingReviews.isNotEmpty() ->
             LocalWorkIntegrationDisposition.REVIEW_REQUIRED
         missingProof.isNotEmpty() -> LocalWorkIntegrationDisposition.MACHINE_EVIDENCE_MISSING
         !evidence.readyForGoalCompletion -> LocalWorkIntegrationDisposition.OUTSTANDING_WORK
@@ -45,7 +46,7 @@ internal fun decideLocalWorkIntegration(
     }
     return LocalWorkIntegrationDecision(
         disposition = decision,
-        reviewPendingCount = evidence.unreviewedTeamResults + evidence.awaitingReviewMembers,
+        reviewPendingCount = evidence.unreviewedTeamResults + evidence.awaitingReviewMembers + missingReviews.size,
         reviewRejectedCount = evidence.rejectedTeamResults,
         missingMachineEvidence = missingProof,
         outstandingObligations = evidence.userReasons,

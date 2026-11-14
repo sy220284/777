@@ -121,6 +121,7 @@ data class ToolsUiState(
     val servers: List<McpServerSnapshot> = emptyList(),
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
+    val activeToolHookIds: List<String> = emptyList(),
     val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     val presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
     val curatedSkills: List<String> = emptyList(),
@@ -315,6 +316,7 @@ class ToolsViewModel @Inject constructor(
                     servers = servers,
                     githubConfigured = localTools.githubConfigured(),
                     localPlugins = plugins,
+                    activeToolHookIds = localTools.activeToolHookIds(),
                     skills = skills,
                     presets = presets,
                     curatedSkills = _state.value.curatedSkills,
@@ -983,6 +985,7 @@ fun ToolsScreen(
                             0, 1 -> inventoryTabStates.SaveableStateProvider(selectedTab) {
                                 PluginInventoryBrowser(
                                     localIds = state.localPlugins,
+                                    activeToolHookIds = state.activeToolHookIds,
                                     connectedServices = state.servers,
                                     skills = state.skills,
                                     presets = state.presets,

@@ -562,9 +562,13 @@ fun LocalHarnessScreen(
         projectActions = viewModel.projectActions,
         queuedUserPort = viewModel.queuedUserPort,
         workspaceFiles = viewModel::workspaceFiles,
-        saveWorkspaceFileToDownloads = viewModel::saveWorkspaceFileToDownloads,
+        saveWorkspaceFileToDownloads = { path ->
+            viewModel.saveWorkspaceFileToDownloadsForSession(shell.sessionId, path)
+        },
         importWorkspaceFile = viewModel::importWorkspaceFile,
-        publishedWorkspaceFile = viewModel::publishedWorkspaceFile,
+        publishedWorkspaceFile = { path ->
+            viewModel.publishedWorkspaceFileForSession(shell.sessionId, path)
+        },
         workspaceDirectory = viewModel::workspaceDirectory,
         workspaceDirectoryPage = viewModel::workspaceDirectoryPage,
         searchWorkspaceFiles = viewModel::searchWorkspaceFiles,
@@ -582,8 +586,10 @@ fun LocalHarnessScreen(
         runIndependentSecurityReview = viewModel::runIndependentSecurityReviewForUi,
         approveIndependentSecurityReview = viewModel::approveIndependentSecurityReviewForUi,
         conversationFiles = viewModel::conversationFiles,
-        previewWorkspaceFile = viewModel::previewWorkspaceFile,
-        previewWorkspaceFilePage = viewModel::previewWorkspaceFilePage,
+        previewWorkspaceFile = { path -> viewModel.previewWorkspaceFileForSession(shell.sessionId, path) },
+        previewWorkspaceFilePage = { path, offset ->
+            viewModel.previewWorkspaceFilePageForSession(shell.sessionId, path, offset)
+        },
         artifactsForUi = viewModel::artifactsForUi,
         eventSequenceForUi = viewModel::eventSequenceForUi,
         eventChanges = viewModel::workEventChangesForUi,

@@ -441,6 +441,19 @@ internal class LocalToolExecutionCoordinator(
             verifiedReadOnly = readLike,
         )
         var executionLease: LocalWorkspaceReadWriteGate.Lease? = null
+        suspend fun requestApprovalForTool(
+            tool: HarnessTool,
+            hookReason: String?,
+        ): Boolean {
+            val summary = approvalSummary(call, tool) +
+                hookReason?.takeIf(String::isNotBlank)?.let { "\n受信工具规则要求确认：" + it }.orEmpty()
+            val granted = approval(call, tool, summary)
+            // A policy escalation is still the exact same durable user decision.
+            recordAuthorizationDecision(sessionId, call, executionIdentity, granted)
+            authorizationRecorded = true
+            if (!granted) approvalDenied = true
+            return granted
+        }
         val invocation = try {
             executionOwner?.requireCurrent(sessionId)
             runOwner?.requireCurrent(sessionId)
@@ -467,15 +480,8 @@ internal class LocalToolExecutionCoordinator(
                                 recordCancelledExecutionFinished(sessionId, call, executionIdentity, result)
                             }
                         },
-                        approval = { tool ->
-                            val granted = approval(call, tool, approvalSummary(call, tool))
-                            // No tool may start if the exact user's decision failed to
-                            // persist. Do not reuse a previous call's selection/grant.
-                            recordAuthorizationDecision(sessionId, call, executionIdentity, granted)
-                            authorizationRecorded = true
-                            if (!granted) approvalDenied = true
-                            granted
-                        },
+                        approval = { tool -> requestApprovalForTool(tool, null) },
+                        approvalWithReason = { tool, reason -> requestApprovalForTool(tool, reason) },
                         onExecutionStarted = { admittedTool ->
                             // A new correction can arrive while awaiting approval or resource admission.
                             // Reject the stale call before entering its executor, with no side effect.

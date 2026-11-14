@@ -1414,7 +1414,10 @@ internal fun LocalWorkspaceFilesDialog(
                                     modifier = Modifier.testTag("work_code_review_report"))
                             }
                         }
-                        Text("只读模型审查独立留痕；人工接纳仅确认已阅读此份结论。",
+                        Text("模型审查：已形成报告 · 人工接纳：" +
+                            (if (saved.humanAccepted) "已确认" else "待确认"),
+                            style = DsType.caption11, color = colors.textSecondary)
+                        Text("实际构建与测试：此处没有关联回执；请在 Work 任务结果中查看真实执行状态。",
                             style = DsType.caption11, color = colors.textSecondary)
                         if (!saved.humanAccepted && acceptIndependentCodeReview != null) {
                             SyButton(
@@ -1486,7 +1489,10 @@ internal fun LocalWorkspaceFilesDialog(
                                 variant = SyButtonVariant.Outline,
                             )
                         }
-                        Text("安全审核基于只读 Git 快照；批准记录与代码版本绑定，执行仍需工具权限。",
+                        Text("模型安全裁决：" + (if (saved.verdict == "allow") "未发现明确风险" else "已阻断风险") +
+                            " · 人工确认：" + (if (saved.humanApproved) "已记录" else "未通过"),
+                            style = DsType.caption11, color = colors.textSecondary)
+                        Text("实际工具授权与测试：由原工具审批和 Work 执行记录分别判断；本页的模型裁决不会替代。",
                             style = DsType.caption11, color = colors.textSecondary)
                     }
                 }
