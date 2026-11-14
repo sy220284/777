@@ -115,6 +115,43 @@ class LocalToolExecutionCoordinatorTest {
 
 
     @Test
+    fun codeModeNestedApprovalShowsActualToolArgumentsAndChildCallIdentity() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) {
+                ToolResult("file updated")
+            }.copy(schema = functionToolSchema(
+                "write", "写入工作区文件",
+                com.labteto.dshmobile.harness.tools.simpleToolProperties(
+                    mapOf("path" to "string")),
+            )))
+        }
+        com.labteto.dshmobile.harness.tools.CodeModePlugin(registry)
+            .install(com.labteto.dshmobile.harness.plugin.HarnessContext(registry))
+        val steps = buildJsonObject {
+            put("steps", kotlinx.serialization.json.buildJsonArray {
+                add(buildJsonObject {
+                    put("tool", "write")
+                    put("args", buildJsonObject { put("path", "notes.md") })
+                })
+            })
+        }
+        val prompts = mutableListOf<Pair<String, String>>()
+        val result = coordinator(registry).executeScoped(
+            original = LocalToolCall("batch-call", "code_mode_run", steps, steps.toString()),
+            sessionId = "work", allowMutation = true, planModeEnabled = false,
+            approval = { nestedCall, _, summary ->
+                prompts += nestedCall.id to (nestedCall.name + ": " + summary)
+                true
+            },
+        )
+        assertFalse(result.isError)
+        assertEquals(2, prompts.size)
+        assertEquals("batch-call", prompts.first().first)
+        assertEquals("batch-call/step-1", prompts.last().first)
+        assertTrue(prompts.last().second.contains("write：notes.md"))
+    }
+
+    @Test
     fun exactMultiToolSelectionLoadsOnlyNamedRegisteredToolsInOneStep() {
         val registry = ToolRegistry().apply {
             listOf("mcp_lookup", "github_status", "unrelated_search").forEach { name ->
