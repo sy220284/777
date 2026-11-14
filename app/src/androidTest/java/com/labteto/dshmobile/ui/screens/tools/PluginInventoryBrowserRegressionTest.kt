@@ -590,4 +590,37 @@ class PluginInventoryBrowserRegressionTest {
         }
     }
 
+    @Test
+    fun codexPluginWithMultipleSkillsInstallsAsOneBundleFromDetail() {
+        var installedPlugin: String? = null
+        val pluginId = "sample@openai-curated"
+        val plugin = com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            pluginId, "sample", "Productivity", "plugins/sample",
+            "AVAILABLE", "ON_INSTALL", false,
+        )
+        val detail = com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            pluginId, "Sample", "多技能示例插件", "Official", "1.0",
+            listOf("research", "summarize"), false, false, false,
+            skillDirectories = mapOf(
+                "research" to "skills/research",
+                "summarize" to "skills/summarize",
+            ),
+        )
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), codexPlugins = listOf(plugin),
+                    codexDetails = mapOf(pluginId to detail),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onInstallCodexPlugin = { installedPlugin = it },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action").assertIsDisplayed()
+        compose.onNodeWithText("安装插件 · 2 项技能").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(pluginId, installedPlugin) }
+    }
+
 }
