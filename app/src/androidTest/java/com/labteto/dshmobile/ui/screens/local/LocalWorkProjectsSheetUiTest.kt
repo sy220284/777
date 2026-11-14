@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -16,6 +17,52 @@ import org.junit.Test
 
 class LocalWorkProjectsSheetUiTest {
     @get:Rule val compose = createComposeRule()
+
+
+    @Test fun movingDirectoryIsSeparateFromChangingProjectAssociationAndNeedsConfirmation() {
+        val project = LocalWorkProject(
+            id = "77777777-7777-7777-7777-777777777777",
+            name = "长篇",
+            root = "novel",
+            createdAtMs = 1,
+            updatedAtMs = 1,
+            requestId = "77777777-7777-7777-7777-777777777777",
+        )
+        val snapshots = MutableStateFlow(LocalWorkProjectSnapshot(projects = listOf(project)))
+        var requestedMove: Triple<String, String, String>? = null
+        val actions = LocalWorkProjectsUiActions(
+            snapshots = snapshots,
+            create = { _, _ -> },
+            importExisting = { _, _, _ -> },
+            rename = { _, _ -> false },
+            update = { _, _, _ -> false },
+            changeRoot = { _, _ -> false },
+            moveDirectory = { id, expected, destination ->
+                requestedMove = Triple(id, expected, destination)
+                snapshots.value = LocalWorkProjectSnapshot(
+                    projects = listOf(project.copy(root = destination)), revision = 1,
+                )
+                true
+            },
+            move = { _, _ -> false },
+            delete = { false },
+            assignCurrentSession = { _, _ -> false },
+        )
+        compose.setContent {
+            DshTheme {
+                LocalWorkProjectsSheet(actions, "work-1", ".", {}, {})
+            }
+        }
+        compose.onNodeWithText("编辑").performClick()
+        compose.onNodeWithTag("work_project_move_destination").performTextInput("archive/novel")
+        compose.onNodeWithText("移动实际文件夹").performClick()
+        compose.runOnIdle { assertEquals(null, requestedMove) }
+        compose.onNodeWithText("确认移动").performClick()
+        compose.runOnIdle {
+            assertEquals(Triple(project.id, "novel", "archive/novel"), requestedMove)
+            assertEquals("archive/novel", snapshots.value.projects.single().root)
+        }
+    }
 
     @Test fun newProjectNeedsOnlyNameAndUsesAutomaticWorkspaceDirectory() {
         var created: Pair<String, String>? = null
