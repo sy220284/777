@@ -96,6 +96,48 @@ class LocalWorkProjectCatalogTest {
             assertFalse(File(file.parentFile, file.name + ".moving").exists())
         }
 
+    @Test fun historicalFilePreviewFollowsMovesAcrossRestartWithoutRewritingHistory() =
+        testCatalog { file, root, catalog ->
+            File(root, "source").mkdirs()
+            File(root, "source/record.txt").writeText("session content")
+            File(root, "archive").mkdirs()
+            File(root, "final").mkdirs()
+            val project = catalog.importExisting("项目", "source", initialSessionId = "session-a")
+            assertEquals(null, catalog.relocatedReadPath("session-a", "source/record.txt"))
+            assertTrue(catalog.moveDirectory(project.id, "source", "archive/one"))
+            assertEquals("archive/one/record.txt", catalog.relocatedReadPath("session-a", "source/record.txt"))
+            val restored = LocalWorkProjectCatalog(file, root, Json)
+            assertEquals("archive/one/record.txt", restored.relocatedReadPath("session-a", "source/record.txt"))
+            assertTrue(restored.moveDirectory(project.id, "archive/one", "final/two"))
+            assertEquals("final/two/record.txt", restored.relocatedReadPath("session-a", "source/record.txt"))
+            assertEquals("final/two/record.txt", restored.relocatedReadPath("session-a", "archive/one/record.txt"))
+            assertEquals(null, restored.relocatedReadPath("session-b", "source/record.txt"))
+            assertEquals("session content", File(root, "final/two/record.txt").readText())
+        }
+
+    @Test fun historicalAliasDoesNotOverrideExistingFilesCrossSessionOrSymlinks() =
+        testCatalog { _, root, catalog ->
+            File(root, "source").mkdirs()
+            File(root, "source/data.txt").writeText("old")
+            File(root, "dest").mkdirs()
+            val project = catalog.importExisting("项目", "source", initialSessionId = "session-a")
+            assertTrue(catalog.moveDirectory(project.id, "source", "dest/current"))
+            File(root, "source").mkdirs()
+            File(root, "source/data.txt").writeText("new")
+            assertEquals(null, catalog.relocatedReadPath("session-a", "source/data.txt"))
+            assertEquals(null, catalog.relocatedReadPath("session-b", "source/data.txt"))
+            File(root, "source/data.txt").delete()
+            val symlink = File(root, "source/link")
+            val outside = Files.createTempFile("777-outside-", ".txt").toFile()
+            try {
+                Files.createSymbolicLink(symlink.toPath(), outside.toPath())
+                assertEquals(null, catalog.relocatedReadPath("session-a", "source/link"))
+            } finally { outside.delete() }
+            assertEquals(null, catalog.relocatedReadPath("session-a", "../source/data.txt"))
+            assertEquals(null, catalog.relocatedReadPath("session-a", "missing.txt"))
+            assertTrue(runCatching { catalog.relocatedReadPath("../other", "source/data.txt") }.isFailure)
+        }
+
     @Test fun moveRefusesOldConfirmationOverlapsAndExistingDestinations() =
         testCatalog { _, root, catalog ->
             File(root, "repo/a").mkdirs()
